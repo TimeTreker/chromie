@@ -16,12 +16,82 @@ from shared.chromie_contracts.goal import GoalAssociationResolution
 
 
 class GoalExecutionContractTests(unittest.TestCase):
+    def test_response_schema_prevents_canonical_binding_category_conflicts(self):
+        schema = GoalAssociationResolver._response_schema(
+            GoalSegmentationModelOutput,
+            [],
+            [],
+        )
+
+        binding_schema = schema["$defs"]["GoalAssociationModelBinding"]
+        clauses = binding_schema["allOf"]
+        distance_clause = next(
+            clause
+            for clause in clauses
+            if clause["if"]["properties"]["name"].get("enum") == ["distance"]
+        )
+        self.assertEqual(
+            distance_clause["then"]["properties"]["entity_type"]["enum"],
+            ["distance"],
+        )
+
+    def test_canonical_binding_name_cannot_contradict_entity_type(self):
+        model_output = GoalSegmentationModelOutput.model_validate(
+            {
+                "decision": "create_goals",
+                "new_goals": [
+                    {
+                        "description": "Move a specified distance.",
+                        "output_mode": "body_action",
+                        "bindings": [
+                            {
+                                "name": "distance",
+                                "entity_type": "quantity",
+                                "value": "100",
+                            }
+                        ],
+                    }
+                ],
+                "confidence": 1.0,
+            }
+        )
+
+        self.assertEqual(
+            GoalAssociationResolver._binding_semantic_contract_conflicts(
+                model_output
+            ),
+            ["new_goals[0].bindings[0]=distance/quantity"],
+        )
+
     def test_responsibility_coverage_cannot_accept_overmerged_independent_outcomes(self):
         with self.assertRaisesRegex(ValueError, "over-merged"):
             GoalResponsibilityCoverageReview.model_validate(
                 responsibility_coverage(
                     responsibility_item("walk", 0),
                     responsibility_item("sing", 0),
+                )
+            )
+
+    def test_responsibility_coverage_rejects_conflicting_roles_for_same_fragment(self):
+        with self.assertRaisesRegex(ValueError, "exactly one coverage item"):
+            GoalResponsibilityCoverageReview.model_validate(
+                responsibility_coverage(
+                    responsibility_item("walk forward 100 meters", 0),
+                    responsibility_item(
+                        "walk forward 100 meters",
+                        0,
+                        role="constraint",
+                    ),
+                    responsibility_item("bring me water", 1),
+                )
+            )
+
+    def test_responsibility_coverage_cannot_duplicate_one_responsibility_owner(self):
+        with self.assertRaisesRegex(ValueError, "exactly one coverage item"):
+            GoalResponsibilityCoverageReview.model_validate(
+                responsibility_coverage(
+                    responsibility_item("bring me water", 0),
+                    responsibility_item("bring me water", 1),
                 )
             )
 
@@ -73,6 +143,28 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertEqual(review.decision, "accept")
         self.assertEqual(len(ollama.prompts), 1)
 
+    def test_responsibility_coverage_normalizes_context_and_framing_projections(self):
+        normalized = GoalAssociationResolver._normalize_responsibility_coverage_decision(
+            responsibility_coverage(
+                responsibility_item("bring me water", 0),
+                responsibility_item(
+                    "please",
+                    role="framing",
+                    coverage="missing",
+                ),
+                decision="reject",
+            ),
+            sid="sid-framing",
+            goal_count=1,
+        )
+
+        review = GoalResponsibilityCoverageReview.model_validate(normalized)
+
+        self.assertEqual(review.decision, "accept")
+        self.assertEqual(review.items[1].coverage, "covered")
+        self.assertFalse(review.items[1].independently_satisfiable)
+        self.assertEqual(review.items[1].candidate_goal_indices, [])
+
     def test_responsibility_coverage_repairs_invalid_item_contract(self):
         invalid = responsibility_coverage(
             responsibility_item("Blink twice.", 0),
@@ -116,6 +208,145 @@ class GoalExecutionContractTests(unittest.TestCase):
             "goal_association.responsibility_coverage.contract_repair",
         )
         self.assertIn("speech response does not cover requested body motion", ollama.prompts[1][0])
+
+    def test_responsibility_coverage_revises_nonverbatim_contract_repair(self):
+        invalid = responsibility_coverage(
+            responsibility_item("Blink twice.", 0),
+        )
+        invalid["items"][0]["candidate_goal_indices"] = [0, 0]
+        nonverbatim_repair = responsibility_coverage(
+            responsibility_item("Blink two times.", 0),
+        )
+        corrected = responsibility_coverage(
+            responsibility_item("Blink twice.", 0),
+        )
+        ollama = ScriptedOllama([invalid, nonverbatim_repair, corrected])
+
+        review = asyncio.run(
+            GoalAssociationResolver(ollama)._run_responsibility_coverage_audit(
+                request=request(
+                    "Blink twice.",
+                    language="en-US",
+                    route="robot_action",
+                    intent="capability:soridormi.blink_eyes",
+                ),
+                raw={
+                    "decision": "create_goals",
+                    "new_goals": [
+                        {
+                            "description": "Blink twice.",
+                            "output_mode": "body_action",
+                            "bindings": [],
+                        }
+                    ],
+                },
+                generation_options={"temperature": 0},
+                prompt_family="goal_association.responsibility_coverage",
+                attempt=5,
+            )
+        )
+
+        self.assertEqual(review.decision, "accept")
+        self.assertEqual(len(ollama.prompts), 3)
+        self.assertEqual(
+            ollama.prompts[2][1]["prompt_family"],
+            "goal_association.responsibility_coverage.contract_revision",
+        )
+        self.assertIn("must be exact, contiguous", ollama.prompts[2][0])
+
+    def test_responsibility_coverage_clears_noncovered_ownership_redundancy(self):
+        redundant = responsibility_coverage(
+            responsibility_item(
+                "Go forward 100 meters.",
+                0,
+                role="constraint",
+                coverage="missing",
+            ),
+            responsibility_item("Bring water.", 0),
+            decision="reject",
+        )
+        ollama = ScriptedOllama([redundant])
+
+        review = asyncio.run(
+            GoalAssociationResolver(ollama)._run_responsibility_coverage_audit(
+                request=request(
+                    "Go forward 100 meters. Bring water.",
+                    language="en-US",
+                    route="robot_action",
+                    intent="resource_delivery",
+                ),
+                raw={
+                    "decision": "create_goals",
+                    "new_goals": [
+                        {
+                            "description": "Bring water.",
+                            "output_mode": "body_action",
+                            "bindings": [],
+                        }
+                    ],
+                },
+                generation_options={"temperature": 0},
+                prompt_family="goal_association.responsibility_coverage",
+                attempt=5,
+            )
+        )
+
+        self.assertEqual(review.decision, "reject")
+        self.assertEqual(review.items[0].candidate_goal_indices, [])
+        self.assertEqual(len(ollama.prompts), 1)
+
+    def test_responsibility_coverage_derives_complete_unjustified_inventory(self):
+        invalid = responsibility_coverage(
+            responsibility_item(
+                "去往前走个100米",
+                role="constraint",
+                coverage="missing",
+            ),
+            responsibility_item("帮我拿杯水过来", 0),
+            decision="reject",
+            unjustified_candidate_indices=[1, 2, 3, 4, 5, 6],
+        )
+        invalid["items"][0]["independently_satisfiable"] = True
+        repaired = responsibility_coverage(
+            responsibility_item(
+                "去往前走个100米",
+                role="constraint",
+                coverage="missing",
+            ),
+            responsibility_item("帮我拿杯水过来", 0),
+            decision="reject",
+            unjustified_candidate_indices=[1, 2, 3, 4, 5, 6],
+        )
+        ollama = ScriptedOllama([invalid, repaired])
+        raw = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": f"candidate {index}",
+                    "output_mode": "body_action",
+                    "bindings": [],
+                }
+                for index in range(8)
+            ],
+        }
+
+        review = asyncio.run(
+            GoalAssociationResolver(ollama)._run_responsibility_coverage_audit(
+                request=request(
+                    "去往前走个100米，帮我拿杯水过来。",
+                    route="robot_action",
+                    intent="resource_delivery",
+                ),
+                raw=raw,
+                generation_options={"temperature": 0},
+                prompt_family="goal_association.responsibility_coverage",
+                attempt=5,
+            )
+        )
+
+        self.assertEqual(review.decision, "reject")
+        self.assertEqual(review.unjustified_candidate_indices, list(range(1, 8)))
+        self.assertEqual(len(ollama.prompts), 2)
 
     def test_singing_derives_vocal_provider_contract(self):
         goal = GoalAssociationModelGoal.model_validate(
@@ -461,6 +692,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                     "resource_responsibility": {
                         "resource_kind": "physical_object",
                         "resource_description": "red mug",
+                        "resource_quantity": "1",
                         "source_status": "unknown",
                         "delivery_mode": "physical_handover",
                     },
@@ -1161,6 +1393,12 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertIn("responsibility-coverage audit JSON", resegmentation_prompt)
         self.assertIn("No previous Goal DTO is supplied", resegmentation_prompt)
         self.assertIn("Do not use clarification to explain", resegmentation_prompt)
+        self.assertIn(
+            "reason_summary that a constraint was 'integrated'",
+            resegmentation_prompt,
+        )
+        self.assertIn("source_binding_names", resegmentation_prompt)
+        self.assertIn("neither two Goals nor a bare body_action", resegmentation_prompt)
         resegmentation_schema = ollama.prompts[3][1]["response_format"]
         self.assertEqual(
             resegmentation_schema["properties"]["decision"]["enum"],
@@ -1168,7 +1406,1688 @@ class GoalAssociationResolverTests(unittest.TestCase):
         )
         self.assertEqual(
             resegmentation_schema["properties"]["new_goals"]["minItems"],
+            3,
+        )
+        self.assertEqual(
+            resegmentation_schema["properties"]["new_goals"]["maxItems"],
+            3,
+        )
+
+    def test_resegmentation_repair_restores_a_missing_resource_constraint(self):
+        incomplete = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "帮我拿杯水过来。",
+                    "output_mode": "body_action",
+                    "bindings": [],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "unknown",
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "confidence": 1.0,
+        }
+        complete = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "从前方100米处拿一杯水并送给用户。",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "distance",
+                            "entity_type": "distance",
+                            "value": "100",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "direction",
+                            "entity_type": "direction",
+                            "value": "前方",
+                            "confidence": 1.0,
+                        },
+                    ],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "known",
+                        "source_description": "前方100米处",
+                        "source_binding_names": ["distance", "direction"],
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "confidence": 1.0,
+        }
+        initial_rejected = responsibility_coverage(
+            responsibility_item(
+                "去往前走个100米",
+                role="constraint",
+                coverage="missing",
+            ),
+            responsibility_item(
+                "帮我拿杯水过来",
+                coverage="missing",
+            ),
+            decision="reject",
+            unjustified_candidate_indices=[0],
+        )
+        constraint_rejected = responsibility_coverage(
+            responsibility_item(
+                "去往前走个100米",
+                role="constraint",
+                coverage="missing",
+            ),
+            responsibility_item("帮我拿杯水过来", 0),
+            decision="reject",
+        )
+        accepted = responsibility_coverage(
+            responsibility_item(
+                "去往前走个100米",
+                0,
+                role="constraint",
+            ),
+            responsibility_item("帮我拿杯水过来", 0),
+        )
+        invalid_complete = {
+            **complete,
+            "new_goals": [
+                {
+                    **complete["new_goals"][0],
+                    "bindings": [],
+                }
+            ],
+        }
+        ollama = ScriptedOllama(
+            [
+                incomplete,
+                initial_rejected,
+                incomplete,
+                constraint_rejected,
+                invalid_complete,
+                complete,
+                accepted,
+            ]
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "去往前走个100米，帮我拿杯水过来。",
+                    route="robot_action",
+                    intent="resource_delivery",
+                )
+            )
+        )
+
+        self.assertEqual(len(result.new_goals), 1)
+        self.assertEqual(
+            result.new_goals[0].object["bindings"]["distance"]["value"],
+            "100",
+        )
+        assert result.new_goals[0].resource_responsibility is not None
+        self.assertEqual(
+            set(result.new_goals[0].resource_responsibility.source.bindings),
+            {"distance", "direction"},
+        )
+        self.assertEqual(
+            result.metadata["responsibility_coverage"]["attempt_count"],
+            3,
+        )
+        self.assertEqual(
+            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
+            [
+                "goal_association.primary",
+                "goal_association.responsibility_coverage",
+                "goal_association.responsibility_resegmentation",
+                "goal_association.responsibility_coverage_recheck",
+                "goal_association.constraint_representation_repair",
+                "goal_association.final_resegmentation_contract_repair",
+                "goal_association.responsibility_coverage_final",
+            ],
+        )
+        self.assertEqual(
+            result.metadata["contract_repair"]["strategy"],
+            "final_resegmentation_contract_revision",
+        )
+        constraint_repair_prompt = ollama.prompts[4][0]
+        self.assertIn("Goal count, order, and output_mode", constraint_repair_prompt)
+        self.assertIn("reason_summary never represents", constraint_repair_prompt)
+        self.assertIn("source_binding_names", constraint_repair_prompt)
+
+    def test_coverage_owned_resource_survives_duplicate_goal_resegmentation(self):
+        resource_goal = {
+            "description": "从前方100米处拿一杯水并送给用户。",
+            "output_mode": "body_action",
+            "bindings": [
+                {
+                    "name": "distance",
+                    "entity_type": "distance",
+                    "value": "100",
+                    "confidence": 1.0,
+                }
+            ],
+            "resource_responsibility": {
+                "resource_kind": "physical_object",
+                "resource_description": "一杯水",
+                "resource_quantity": "1",
+                "source_status": "known",
+                "source_description": "前方100米处",
+                "source_binding_names": ["distance"],
+                "recipient_description": "用户",
+                "delivery_mode": "physical_handover",
+            },
+        }
+        duplicated = {
+            "decision": "create_goals",
+            "new_goals": [resource_goal, resource_goal],
+            "confidence": 1.0,
+        }
+        rejected = responsibility_coverage(
+            responsibility_item("去往前走个100米", 0, role="constraint"),
+            responsibility_item("帮我拿杯水过来", 0),
+            decision="reject",
+            unjustified_candidate_indices=[1],
+        )
+        dropped_resource = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "向前走100米。",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "distance",
+                            "entity_type": "distance",
+                            "value": "100",
+                            "confidence": 1.0,
+                        }
+                    ],
+                }
+            ],
+            "confidence": 1.0,
+        }
+        corrected = {
+            "decision": "create_goals",
+            "new_goals": [resource_goal],
+            "confidence": 1.0,
+        }
+        accepted = responsibility_coverage(
+            responsibility_item("去往前走个100米", 0, role="constraint"),
+            responsibility_item("帮我拿杯水过来", 0),
+        )
+        ollama = ScriptedOllama(
+            [duplicated, rejected, dropped_resource, corrected, accepted]
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "去往前走个100米，帮我拿杯水过来。",
+                    route="robot_action",
+                    intent="resource_delivery",
+                )
+            )
+        )
+
+        self.assertEqual(len(result.new_goals), 1)
+        self.assertIsNotNone(result.new_goals[0].resource_responsibility)
+        self.assertEqual(
+            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
+            [
+                "goal_association.primary",
+                "goal_association.responsibility_coverage",
+                "goal_association.responsibility_resegmentation",
+                "goal_association.responsibility_resegmentation_contract_repair",
+                "goal_association.responsibility_coverage_recheck",
+            ],
+        )
+        resegmentation_schema = ollama.prompts[2][1]["response_format"]
+        goal_ref = resegmentation_schema["properties"]["new_goals"]["items"][
+            "$ref"
+        ]
+        goal_schema = resegmentation_schema["$defs"][goal_ref.rsplit("/", 1)[-1]]
+        self.assertIn("resource_responsibility", goal_schema["required"])
+        self.assertNotIn(
+            {"type": "null"},
+            goal_schema["properties"]["resource_responsibility"].get(
+                "anyOf", []
+            ),
+        )
+
+    def test_initial_constraint_repair_preserves_resource_goal_ownership(self):
+        incomplete_resource = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "帮我拿杯水过来。",
+                    "output_mode": "body_action",
+                    "bindings": [],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "unknown",
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "confidence": 1.0,
+        }
+        complete_resource = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "从前方100米处拿一杯水并送给用户。",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "distance",
+                            "entity_type": "distance",
+                            "value": "100",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "direction",
+                            "entity_type": "direction",
+                            "value": "前方",
+                            "confidence": 1.0,
+                        },
+                    ],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "known",
+                        "source_description": "前方100米处",
+                        "source_binding_names": ["distance", "direction"],
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "confidence": 1.0,
+        }
+        rejected = responsibility_coverage(
+            responsibility_item(
+                "去往前走个100米",
+                role="constraint",
+                coverage="missing",
+            ),
+            responsibility_item("帮我拿杯水过来", 0),
+            decision="reject",
+        )
+        accepted_complete_goal = responsibility_coverage(
+            responsibility_item("去往前走个100米", 0, role="constraint"),
+            responsibility_item("帮我拿杯水过来", 0),
+        )
+        ollama = ScriptedOllama(
+            [
+                incomplete_resource,
+                rejected,
+                complete_resource,
+                accepted_complete_goal,
+            ]
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "去往前走个100米，帮我拿杯水过来。",
+                    route="robot_action",
+                    intent="resource_delivery",
+                )
+            )
+        )
+
+        self.assertEqual(len(result.new_goals), 1)
+        self.assertEqual(
+            result.new_goals[0].object["bindings"]["distance"]["value"],
+            "100",
+        )
+        responsibility = result.new_goals[0].resource_responsibility
+        self.assertIsNotNone(responsibility)
+        assert responsibility is not None
+        self.assertEqual(
+            set(responsibility.source.bindings),
+            {"distance", "direction"},
+        )
+        self.assertEqual(
+            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
+            [
+                "goal_association.primary",
+                "goal_association.responsibility_coverage",
+                "goal_association.initial_constraint_representation_repair",
+                "goal_association.responsibility_coverage_constraint_repair",
+            ],
+        )
+        self.assertEqual(
+            result.metadata["responsibility_coverage"]["attempt_count"],
+            2,
+        )
+        self.assertFalse(
+            result.metadata["responsibility_coverage"]["resegmented"]
+        )
+        constraint_schema = ollama.prompts[2][1]["response_format"]
+        goal_list_schema = constraint_schema["properties"]["new_goals"]
+        self.assertEqual(goal_list_schema["minItems"], 1)
+        self.assertEqual(goal_list_schema["maxItems"], 1)
+        goal_ref = goal_list_schema["items"]["$ref"].rsplit("/", 1)[-1]
+        self.assertEqual(
+            constraint_schema["$defs"][goal_ref]["properties"]["bindings"][
+                "minItems"
+            ],
             1,
+        )
+
+    def test_coverage_audit_count_prevents_resource_stage_split(self):
+        resource_goal = {
+            "description": "帮我拿杯水过来。",
+            "output_mode": "body_action",
+            "bindings": [],
+            "resource_responsibility": {
+                "resource_kind": "physical_object",
+                "resource_description": "一杯水",
+                "resource_quantity": "1",
+                "source_status": "unknown",
+                "recipient_description": "用户",
+                "delivery_mode": "physical_handover",
+            },
+        }
+        movement_goal = {
+            "description": "向前走100米。",
+            "output_mode": "body_action",
+            "bindings": [
+                {
+                    "name": "distance",
+                    "entity_type": "distance",
+                    "value": "100",
+                    "confidence": 1.0,
+                }
+            ],
+        }
+        split_resource = {
+            "decision": "create_goals",
+            "new_goals": [movement_goal, resource_goal],
+            "confidence": 1.0,
+        }
+        split_without_resource_contract = {
+            "decision": "create_goals",
+            "new_goals": [
+                movement_goal,
+                {
+                    "description": "帮我拿杯水过来。",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "item",
+                            "entity_type": "physical_object",
+                            "value": "一杯水",
+                            "confidence": 1.0,
+                        }
+                    ],
+                },
+            ],
+            "confidence": 1.0,
+        }
+        complete_resource = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "从前方100米处拿一杯水并送给用户。",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "distance",
+                            "entity_type": "distance",
+                            "value": "100",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "direction",
+                            "entity_type": "direction",
+                            "value": "前方",
+                            "confidence": 1.0,
+                        },
+                    ],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "known",
+                        "source_description": "前方100米处",
+                        "source_binding_names": ["distance", "direction"],
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "confidence": 1.0,
+        }
+        initial_rejected = responsibility_coverage(
+            responsibility_item(
+                "去往前走个100米",
+                role="constraint",
+                coverage="missing",
+            ),
+            responsibility_item("帮我拿杯水过来", coverage="missing"),
+            decision="reject",
+            unjustified_candidate_indices=[0],
+        )
+        accepted_split = responsibility_coverage(
+            responsibility_item("去往前走个100米", 0),
+            responsibility_item("帮我拿杯水过来", 1),
+        )
+        accepted_complete = responsibility_coverage(
+            responsibility_item("去往前走个100米", 0, role="constraint"),
+            responsibility_item("帮我拿杯水过来", 0),
+        )
+        ollama = ScriptedOllama(
+            [
+                {
+                    "decision": "create_goals",
+                    "new_goals": [resource_goal],
+                    "confidence": 1.0,
+                },
+                initial_rejected,
+                complete_resource,
+                accepted_complete,
+            ]
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "去往前走个100米，帮我拿杯水过来。",
+                    route="robot_action",
+                    intent="resource_delivery",
+                )
+            )
+        )
+
+        self.assertEqual(len(result.new_goals), 1)
+        responsibility = result.new_goals[0].resource_responsibility
+        self.assertIsNotNone(responsibility)
+        assert responsibility is not None
+        self.assertEqual(
+            set(responsibility.source.bindings),
+            {"distance", "direction"},
+        )
+        self.assertEqual(
+            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
+            [
+                "goal_association.primary",
+                "goal_association.responsibility_coverage",
+                "goal_association.responsibility_resegmentation",
+                "goal_association.responsibility_coverage_recheck",
+            ],
+        )
+        self.assertEqual(
+            result.metadata["responsibility_coverage"]["attempt_count"],
+            2,
+        )
+        goal_schema = ollama.prompts[2][1]["response_format"]["properties"][
+            "new_goals"
+        ]
+        self.assertEqual(goal_schema["minItems"], 1)
+        self.assertEqual(goal_schema["maxItems"], 1)
+
+    def test_resource_spatial_binding_gets_model_owned_source_alignment(self):
+        unaligned = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "向前100米拿一杯水并送给用户。",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "distance",
+                            "entity_type": "distance",
+                            "value": "100",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "direction",
+                            "entity_type": "direction",
+                            "value": "前方",
+                            "confidence": 1.0,
+                        },
+                    ],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "unknown",
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "confidence": 1.0,
+        }
+        aligned = {
+            **unaligned,
+            "new_goals": [
+                {
+                    **unaligned["new_goals"][0],
+                    "resource_responsibility": {
+                        **unaligned["new_goals"][0]["resource_responsibility"],
+                        "source_status": "known",
+                        "source_description": "前方100米处",
+                        "source_binding_names": ["distance", "direction"],
+                    },
+                }
+            ],
+        }
+        invalid_known_source = {
+            **unaligned,
+            "new_goals": [
+                {
+                    **unaligned["new_goals"][0],
+                    "resource_responsibility": {
+                        **unaligned["new_goals"][0]["resource_responsibility"],
+                        "source_status": "known",
+                    },
+                }
+            ],
+        }
+        accepted = responsibility_coverage(
+            responsibility_item("去往前走个100米", 0, role="constraint"),
+            responsibility_item("帮我拿杯水过来", 0),
+        )
+        ollama = ScriptedOllama(
+            [
+                unaligned,
+                accepted,
+                unaligned,
+                invalid_known_source,
+                aligned,
+                accepted,
+            ]
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "去往前走个100米，帮我拿杯水过来。",
+                    route="robot_action",
+                    intent="resource_delivery",
+                )
+            )
+        )
+
+        self.assertEqual(len(result.new_goals), 1)
+        responsibility = result.new_goals[0].resource_responsibility
+        self.assertIsNotNone(responsibility)
+        assert responsibility is not None
+        self.assertEqual(responsibility.source.status, "known")
+        self.assertEqual(
+            set(responsibility.source.bindings),
+            {"distance", "direction"},
+        )
+        self.assertEqual(
+            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
+            [
+                "goal_association.primary",
+                "goal_association.responsibility_coverage",
+                "goal_association.resource_source_alignment_review",
+                "goal_association.resource_source_alignment_residual_repair",
+                "goal_association.resource_source_alignment_residual_dto_repair",
+                "goal_association.responsibility_coverage_source_alignment",
+            ],
+        )
+        self.assertEqual(
+            result.metadata["resource_source_alignment"]["strategy"],
+            "model_owned_typed_binding_alignment",
+        )
+        self.assertEqual(
+            result.metadata["resource_source_alignment"]["attempt_count"],
+            3,
+        )
+        self.assertIn(
+            "Inspect the complete candidate DTO",
+            ollama.prompts[1][0],
+        )
+        source_schema = ollama.prompts[2][1]["response_format"]
+        source_goal_items = source_schema["properties"]["new_goals"]["items"]
+        source_goal_schema = source_schema["$defs"][
+            source_goal_items["$ref"].rsplit("/", 1)[-1]
+        ]
+        self.assertIn("resource_responsibility", source_goal_schema["required"])
+        self.assertNotIn(
+            {"type": "null"},
+            source_goal_schema["properties"]["resource_responsibility"].get(
+                "anyOf", []
+            ),
+        )
+
+    def test_source_alignment_repairs_silent_resource_contract_loss(self):
+        unaligned = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "从前方100米处拿一杯水并送给用户。",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "distance",
+                            "entity_type": "distance",
+                            "value": "100",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "direction",
+                            "entity_type": "direction",
+                            "value": "前方",
+                            "confidence": 1.0,
+                        },
+                    ],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "unknown",
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "confidence": 1.0,
+        }
+        dropped = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "向前走100米。",
+                    "output_mode": "body_action",
+                    "bindings": unaligned["new_goals"][0]["bindings"],
+                }
+            ],
+            "confidence": 1.0,
+        }
+        aligned = {
+            **unaligned,
+            "new_goals": [
+                {
+                    **unaligned["new_goals"][0],
+                    "resource_responsibility": {
+                        **unaligned["new_goals"][0]["resource_responsibility"],
+                        "source_status": "known",
+                        "source_description": "前方100米处",
+                        "source_binding_names": ["distance", "direction"],
+                    },
+                }
+            ],
+        }
+        accepted = responsibility_coverage(
+            responsibility_item("去往前走个100米", 0, role="constraint"),
+            responsibility_item("帮我拿杯水过来", 0),
+        )
+        ollama = ScriptedOllama(
+            [unaligned, accepted, dropped, aligned, accepted]
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "去往前走个100米，帮我拿杯水过来。",
+                    route="robot_action",
+                    intent="resource_delivery",
+                )
+            )
+        )
+
+        responsibility = result.new_goals[0].resource_responsibility
+        self.assertIsNotNone(responsibility)
+        assert responsibility is not None
+        self.assertEqual(responsibility.source.status, "known")
+        self.assertEqual(
+            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
+            [
+                "goal_association.primary",
+                "goal_association.responsibility_coverage",
+                "goal_association.resource_source_alignment_review",
+                "goal_association.resource_source_alignment_dto_repair",
+                "goal_association.responsibility_coverage_source_alignment",
+            ],
+        )
+        self.assertIn(
+            "must preserve resource responsibility ownership",
+            ollama.prompts[3][0],
+        )
+
+    def test_resource_quantity_binding_gets_model_owned_contract_alignment(self):
+        unaligned = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "从前方100米处拿一杯水并送给用户。",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "distance",
+                            "entity_type": "distance",
+                            "value": "100",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "quantity",
+                            "entity_type": "count",
+                            "value": "1",
+                            "confidence": 1.0,
+                        },
+                    ],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "source_status": "known",
+                        "source_binding_names": ["distance"],
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "confidence": 1.0,
+        }
+        aligned = {
+            **unaligned,
+            "new_goals": [
+                {
+                    **unaligned["new_goals"][0],
+                    "resource_responsibility": {
+                        **unaligned["new_goals"][0]["resource_responsibility"],
+                        "resource_quantity": "1",
+                        "source_description": "前方100米处",
+                    },
+                }
+            ],
+        }
+        accepted = responsibility_coverage(
+            responsibility_item("去往前走个100米", 0, role="constraint"),
+            responsibility_item("帮我拿杯水过来", 0),
+        )
+        ollama = ScriptedOllama([unaligned, accepted, aligned, accepted])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "去往前走个100米，帮我拿杯水过来。",
+                    route="robot_action",
+                    intent="resource_delivery",
+                )
+            )
+        )
+
+        responsibility = result.new_goals[0].resource_responsibility
+        self.assertIsNotNone(responsibility)
+        assert responsibility is not None
+        self.assertEqual(responsibility.resource.quantity, "1")
+        self.assertEqual(
+            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
+            [
+                "goal_association.primary",
+                "goal_association.responsibility_coverage",
+                "goal_association.resource_source_alignment_review",
+                "goal_association.responsibility_coverage_source_alignment",
+            ],
+        )
+        self.assertIn("typed amount/count", ollama.prompts[2][0])
+
+    def test_missing_resource_quantity_binding_gets_focused_semantic_audit(self):
+        unaligned = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "去往前走个100米，帮我拿杯水过来。",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "distance",
+                            "entity_type": "distance",
+                            "value": "100",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "direction",
+                            "entity_type": "direction",
+                            "value": "前方",
+                            "confidence": 1.0,
+                        },
+                    ],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "",
+                        "source_status": "known",
+                        "source_description": "前方100米处",
+                        "source_binding_names": ["distance", "direction"],
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "confidence": 1.0,
+        }
+        quantity_binding = {
+            "name": "resource_count",
+            "entity_type": "count",
+            "value": "1",
+            "confidence": 1.0,
+        }
+        aligned = {
+            **unaligned,
+            "new_goals": [
+                {
+                    **unaligned["new_goals"][0],
+                    "bindings": [
+                        *unaligned["new_goals"][0]["bindings"],
+                        quantity_binding,
+                    ],
+                    "resource_responsibility": {
+                        **unaligned["new_goals"][0]["resource_responsibility"],
+                        "resource_quantity": "1",
+                    },
+                }
+            ],
+        }
+        partially_aligned = {
+            **aligned,
+            "new_goals": [
+                {
+                    **aligned["new_goals"][0],
+                    "resource_responsibility": {
+                        **aligned["new_goals"][0]["resource_responsibility"],
+                        "source_binding_names": ["distance"],
+                    },
+                }
+            ],
+        }
+        accepted = responsibility_coverage(
+            responsibility_item("去往前走个100米", 0, role="constraint"),
+            responsibility_item("帮我拿杯水过来", 0),
+        )
+        ollama = ScriptedOllama(
+            [
+                unaligned,
+                accepted,
+                unaligned,
+                binding_audit(
+                    [*unaligned["new_goals"][0]["bindings"], quantity_binding]
+                ),
+                binding_audit(
+                    [*unaligned["new_goals"][0]["bindings"], quantity_binding]
+                ),
+                partially_aligned,
+                partially_aligned,
+                aligned,
+                accepted,
+            ]
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "去往前走个100米，帮我拿杯水过来。",
+                    route="robot_action",
+                    intent="resource_delivery",
+                )
+            )
+        )
+
+        responsibility = result.new_goals[0].resource_responsibility
+        self.assertIsNotNone(responsibility)
+        assert responsibility is not None
+        self.assertEqual(responsibility.resource.quantity, "1")
+        self.assertEqual(
+            result.new_goals[0].object["bindings"]["resource_count"]["value"],
+            "1",
+        )
+        self.assertEqual(
+            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
+            [
+                "goal_association.primary",
+                "goal_association.responsibility_coverage",
+                "goal_association.resource_source_alignment_review",
+                "goal_association.resource_quantity_binding_audit",
+                "goal_association.resource_binding_completeness_review",
+                "goal_association.resource_source_alignment_contract_repair",
+                "goal_association.resource_binding_reconciliation",
+                "goal_association.resource_binding_reconciliation_residual_repair",
+                "goal_association.responsibility_coverage_source_alignment",
+            ],
+        )
+        self.assertIn(
+            "trigger is not evidence",
+            ollama.prompts[3][0],
+        )
+        self.assertIn("not their physical volume", ollama.prompts[3][0])
+        self.assertIn("motion verb or adverb", ollama.prompts[3][0])
+        self.assertIn("distance does not subsume direction", ollama.prompts[4][0])
+        self.assertIn("provider-neutral direction", ollama.prompts[4][0])
+        self.assertIn("intentionally withheld", ollama.prompts[4][0])
+        self.assertNotIn("Prior binding audit JSON", ollama.prompts[4][0])
+        self.assertNotIn('"entity_type"', ollama.prompts[4][0])
+        self.assertIn(
+            "preceding binding reconciliation remained internally incomplete",
+            ollama.prompts[7][0],
+        )
+        audit_schema = ollama.prompts[3][1]["response_format"]
+        self.assertEqual(
+            audit_schema["properties"]["goal_bindings"]["minItems"],
+            1,
+        )
+        quantity_repair_schema = ollama.prompts[5][1]["response_format"]
+        self.assertEqual(
+            quantity_repair_schema["properties"]["new_goals"]["minItems"],
+            1,
+        )
+        self.assertEqual(
+            quantity_repair_schema["properties"]["new_goals"]["maxItems"],
+            1,
+        )
+        self.assertIn("not proof", ollama.prompts[6][0])
+        self.assertIn("collapse alternate binding names", ollama.prompts[6][0])
+        self.assertEqual(
+            set(responsibility.source.bindings),
+            {"distance", "direction"},
+        )
+
+    def test_invalid_known_source_alignment_gets_bounded_dto_repair(self):
+        unbound = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "去往前走个100米，帮我拿杯水过来。",
+                    "output_mode": "body_action",
+                    "bindings": [],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "unknown",
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "confidence": 1.0,
+        }
+        invalid_alignment = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "从前方100米处拿一杯水并送给用户。",
+                    "output_mode": "body_action",
+                    "bindings": [],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "known",
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                },
+                {
+                    "description": "重复拿水责任。",
+                    "output_mode": "body_action",
+                    "bindings": [],
+                },
+            ],
+            "confidence": 1.0,
+            "reason_summary": (
+                "The distance and direction are linked through typed bindings."
+            ),
+        }
+        repaired_alignment = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "从前方100米处拿一杯水并送给用户。",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "distance",
+                            "entity_type": "distance",
+                            "value": "100",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "direction",
+                            "entity_type": "direction",
+                            "value": "前方",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "quantity",
+                            "entity_type": "count",
+                            "value": "1",
+                            "confidence": 1.0,
+                        },
+                    ],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "known",
+                        "source_description": "前方100米处",
+                        "source_binding_names": ["distance", "direction"],
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "confidence": 1.0,
+        }
+        accepted = responsibility_coverage(
+            responsibility_item("去往前走个100米", 0, role="constraint"),
+            responsibility_item("帮我拿杯水过来", 0),
+        )
+        ollama = ScriptedOllama(
+            [unbound, accepted, invalid_alignment, repaired_alignment, accepted]
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "去往前走个100米，帮我拿杯水过来。",
+                    route="robot_action",
+                    intent="resource_delivery",
+                )
+            )
+        )
+
+        responsibility = result.new_goals[0].resource_responsibility
+        self.assertIsNotNone(responsibility)
+        assert responsibility is not None
+        self.assertEqual(responsibility.resource.quantity, "1")
+        self.assertEqual(
+            set(responsibility.source.bindings),
+            {"distance", "direction"},
+        )
+        self.assertEqual(
+            ollama.prompts[3][1]["prompt_family"],
+            "goal_association.resource_source_alignment_dto_repair",
+        )
+        repair_schema = ollama.prompts[3][1]["response_format"]
+        goal_schema = repair_schema["$defs"]["GoalAssociationModelGoal"]
+        resource_schema = repair_schema["$defs"][
+            "GoalAssociationModelResourceResponsibility"
+        ]
+        self.assertIn("bindings", goal_schema["required"])
+        self.assertIn("resource_responsibility", goal_schema["required"])
+        self.assertIn("source_binding_names", resource_schema["required"])
+        self.assertIn("Mechanical validation feedback", ollama.prompts[3][0])
+        self.assertIn("must preserve the fixed Goal count", ollama.prompts[3][0])
+        self.assertEqual(
+            result.metadata["resource_source_alignment"]["attempt_count"],
+            2,
+        )
+
+    def test_resource_identity_cannot_be_relabelled_as_source_evidence(self):
+        unaligned = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "Go forward 100 meters and bring a cup of water.",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "distance",
+                            "entity_type": "length",
+                            "value": "100",
+                            "confidence": 1.0,
+                        }
+                    ],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "a cup of water",
+                        "resource_quantity": "1",
+                        "source_status": "unknown",
+                        "source_description": "",
+                        "source_binding_names": [],
+                        "recipient_description": "requester",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "confidence": 1.0,
+        }
+        invalid_alignment = {
+            **unaligned,
+            "new_goals": [
+                {
+                    **unaligned["new_goals"][0],
+                    "bindings": [
+                        *unaligned["new_goals"][0]["bindings"],
+                        {
+                            "name": "target_item",
+                            "entity_type": "object",
+                            "value": "cup of water",
+                            "confidence": 1.0,
+                        },
+                    ],
+                    "resource_responsibility": {
+                        **unaligned["new_goals"][0]["resource_responsibility"],
+                        "source_status": "known",
+                        "source_description": "100 meters ahead",
+                        "source_binding_names": ["distance", "target_item"],
+                    },
+                }
+            ],
+        }
+        repaired_alignment = {
+            **unaligned,
+            "new_goals": [
+                {
+                    **unaligned["new_goals"][0],
+                    "bindings": [
+                        *unaligned["new_goals"][0]["bindings"],
+                        {
+                            "name": "direction",
+                            "entity_type": "direction",
+                            "value": "forward",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "target_item",
+                            "entity_type": "object",
+                            "value": "cup of water",
+                            "confidence": 1.0,
+                        },
+                    ],
+                    "resource_responsibility": {
+                        **unaligned["new_goals"][0]["resource_responsibility"],
+                        "source_status": "known",
+                        "source_description": "100 meters forward",
+                        "source_binding_names": ["distance", "direction"],
+                    },
+                }
+            ],
+        }
+        accepted = responsibility_coverage(
+            responsibility_item("去往前走个100米", 0, role="constraint"),
+            responsibility_item("帮我拿杯水过来", 0),
+        )
+        ollama = ScriptedOllama(
+            [unaligned, accepted, invalid_alignment, repaired_alignment, accepted]
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "去往前走个100米，帮我拿杯水过来。",
+                    route="robot_action",
+                    intent="resource_delivery",
+                )
+            )
+        )
+
+        responsibility = result.new_goals[0].resource_responsibility
+        self.assertIsNotNone(responsibility)
+        assert responsibility is not None
+        self.assertEqual(
+            set(responsibility.source.bindings),
+            {"distance", "direction"},
+        )
+        self.assertNotIn("target_item", responsibility.source.bindings)
+        self.assertEqual(
+            ollama.prompts[3][1]["prompt_family"],
+            "goal_association.resource_source_alignment_dto_repair",
+        )
+        self.assertIn("non_source_semantics", ollama.prompts[3][0])
+        self.assertIn("Resource identity", ollama.prompts[3][0])
+
+    def test_audited_resource_constraint_requires_typed_binding_alignment(self):
+        unbound = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "去往前走个100米，帮我拿杯水过来。",
+                    "output_mode": "body_action",
+                    "bindings": [],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "unknown",
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "confidence": 1.0,
+        }
+        aligned = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "从前方100米处拿一杯水并送给用户。",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "distance",
+                            "entity_type": "distance",
+                            "value": "100",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "direction",
+                            "entity_type": "direction",
+                            "value": "前方",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "quantity",
+                            "entity_type": "count",
+                            "value": "1",
+                            "confidence": 1.0,
+                        },
+                    ],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "known",
+                        "source_description": "前方100米处",
+                        "source_binding_names": ["distance", "direction"],
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "confidence": 1.0,
+        }
+        quantity_unaligned = {
+            **aligned,
+            "new_goals": [
+                {
+                    **aligned["new_goals"][0],
+                    "resource_responsibility": {
+                        key: value
+                        for key, value in aligned["new_goals"][0][
+                            "resource_responsibility"
+                        ].items()
+                        if key != "resource_quantity"
+                    },
+                }
+            ],
+        }
+        accepted = responsibility_coverage(
+            responsibility_item("去往前走个100米", 0, role="constraint"),
+            responsibility_item("帮我拿杯水过来", 0),
+        )
+        ollama = ScriptedOllama(
+            [
+                unbound,
+                accepted,
+                quantity_unaligned,
+                binding_audit(aligned["new_goals"][0]["bindings"]),
+                binding_audit(aligned["new_goals"][0]["bindings"]),
+                aligned,
+                accepted,
+            ]
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "去往前走个100米，帮我拿杯水过来。",
+                    route="robot_action",
+                    intent="resource_delivery",
+                )
+            )
+        )
+
+        self.assertEqual(len(result.new_goals[0].object["bindings"]), 3)
+        responsibility = result.new_goals[0].resource_responsibility
+        self.assertIsNotNone(responsibility)
+        assert responsibility is not None
+        self.assertEqual(responsibility.resource.quantity, "1")
+        alignment_schema = ollama.prompts[2][1]["response_format"]
+        goal_schema = alignment_schema["$defs"]["GoalAssociationModelGoal"]
+        self.assertIn("bindings", goal_schema["required"])
+        self.assertIn("coverage audit mapping", ollama.prompts[2][0])
+        self.assertIn(
+            "Independent responsibility-coverage audit JSON",
+            ollama.prompts[2][0],
+        )
+        self.assertIn("去往前走个100米", ollama.prompts[2][0])
+        self.assertEqual(
+            ollama.prompts[3][1]["prompt_family"],
+            "goal_association.resource_quantity_binding_audit",
+        )
+        self.assertEqual(
+            ollama.prompts[4][1]["prompt_family"],
+            "goal_association.resource_binding_completeness_review",
+        )
+        self.assertEqual(
+            ollama.prompts[5][1]["prompt_family"],
+            "goal_association.resource_source_alignment_contract_repair",
+        )
+        self.assertEqual(
+            result.metadata["resource_source_alignment"]["attempt_count"], 4
+        )
+
+    def test_invalid_initial_constraint_repair_gets_one_bounded_contract_revision(self):
+        initial = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "拿一杯水给用户。",
+                    "output_mode": "body_action",
+                    "bindings": [],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "unknown",
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "confidence": 1.0,
+        }
+        invalid_resegmentation = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "从前方100米处拿一杯水给用户。",
+                    "output_mode": "body_action",
+                    "bindings": [],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "known",
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "confidence": 1.0,
+        }
+        corrected = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "从前方100米处拿一杯水给用户。",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "distance",
+                            "entity_type": "distance",
+                            "value": "100",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "direction",
+                            "entity_type": "direction",
+                            "value": "前方",
+                            "confidence": 1.0,
+                        },
+                    ],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "known",
+                        "source_description": "前方100米处",
+                        "source_binding_names": ["distance", "direction"],
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "confidence": 1.0,
+        }
+        rejected = responsibility_coverage(
+            responsibility_item(
+                "去往前走个100米",
+                role="constraint",
+                coverage="missing",
+            ),
+            responsibility_item("帮我拿杯水过来", 0),
+            decision="reject",
+        )
+        accepted = responsibility_coverage(
+            responsibility_item("去往前走个100米", 0, role="constraint"),
+            responsibility_item("帮我拿杯水过来", 0),
+        )
+        ollama = ScriptedOllama(
+            [initial, rejected, invalid_resegmentation, corrected, accepted]
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "去往前走个100米，帮我拿杯水过来。",
+                    route="robot_action",
+                    intent="resource_delivery",
+                )
+            )
+        )
+
+        self.assertEqual(len(result.new_goals), 1)
+        self.assertEqual(
+            result.metadata["contract_repair"]["strategy"],
+            "initial_constraint_representation_contract_revision",
+        )
+        self.assertEqual(
+            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
+            [
+                "goal_association.primary",
+                "goal_association.responsibility_coverage",
+                "goal_association.initial_constraint_representation_repair",
+                "goal_association.initial_constraint_representation_contract_repair",
+                "goal_association.responsibility_coverage_constraint_repair",
+            ],
+        )
+        repair_prompt = ollama.prompts[3][0]
+        self.assertIn("known resource source requires", str(repair_prompt))
+
+    def test_invalid_resegmentation_after_constraint_repair_is_bounded(self):
+        initial = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "拿一杯水给用户。",
+                    "output_mode": "body_action",
+                    "bindings": [],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "unknown",
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "confidence": 1.0,
+        }
+        corrected_constraint = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "从前方100米处拿一杯水给用户。",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "distance",
+                            "entity_type": "distance",
+                            "value": "100",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "direction",
+                            "entity_type": "direction",
+                            "value": "前方",
+                            "confidence": 1.0,
+                        },
+                    ],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "known",
+                        "source_description": "前方100米处",
+                        "source_binding_names": ["distance", "direction"],
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "confidence": 1.0,
+        }
+        invalid_resegmentation = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "拿一杯水给用户。",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "distance",
+                            "entity_type": "distance",
+                            "value": "100",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "direction",
+                            "entity_type": "direction",
+                            "value": "前方",
+                            "confidence": 1.0,
+                        },
+                    ],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "known",
+                        "source_binding_names": ["distance", "direction"],
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                },
+                {
+                    "description": "向前走100米。",
+                    "output_mode": "body_action",
+                },
+            ],
+            "confidence": 1.0,
+        }
+        invalid_contract_repair = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "从前方100米处拿一杯水给用户。",
+                    "output_mode": "body_action",
+                    "bindings": [],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "known",
+                        "source_binding_names": ["distance", "direction"],
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "confidence": 1.0,
+        }
+        rejected = responsibility_coverage(
+            responsibility_item(
+                "去往前走个100米",
+                role="constraint",
+                coverage="missing",
+            ),
+            responsibility_item("帮我拿杯水过来", 0),
+            decision="reject",
+        )
+        accepted = responsibility_coverage(
+            responsibility_item("去往前走个100米", 0, role="constraint"),
+            responsibility_item("帮我拿杯水过来", 0),
+        )
+        missing_source_binding_revision = {
+            **corrected_constraint,
+            "new_goals": [
+                {
+                    **corrected_constraint["new_goals"][0],
+                    "bindings": [],
+                }
+            ],
+        }
+        corrected_binding_audit = binding_audit(
+            corrected_constraint["new_goals"][0]["bindings"]
+        )
+        ollama = ScriptedOllama(
+            [
+                initial,
+                rejected,
+                corrected_constraint,
+                rejected,
+                invalid_resegmentation,
+                invalid_contract_repair,
+                missing_source_binding_revision,
+                corrected_binding_audit,
+                accepted,
+            ]
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "去往前走个100米，帮我拿杯水过来。",
+                    route="robot_action",
+                    intent="resource_delivery",
+                )
+            )
+        )
+
+        self.assertEqual(len(result.new_goals), 1)
+        self.assertEqual(
+            result.metadata["contract_repair"]["strategy"],
+            "responsibility_resegmentation_binding_revision",
+        )
+        self.assertEqual(
+            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
+            [
+                "goal_association.primary",
+                "goal_association.responsibility_coverage",
+                "goal_association.initial_constraint_representation_repair",
+                "goal_association.responsibility_coverage_constraint_repair",
+                "goal_association.responsibility_resegmentation",
+                "goal_association.responsibility_resegmentation_contract_repair",
+                "goal_association.responsibility_resegmentation_contract_revision",
+                "goal_association.responsibility_resegmentation_binding_revision",
+                "goal_association.responsibility_coverage_recheck",
+            ],
+        )
+        repair_schema = ollama.prompts[5][1]["response_format"]
+        goal_schema = repair_schema["$defs"]["GoalAssociationModelGoal"]
+        resource_schema = repair_schema["$defs"][
+            "GoalAssociationModelResourceResponsibility"
+        ]
+        self.assertIn("bindings", goal_schema["required"])
+        self.assertIn("source_binding_names", resource_schema["required"])
+        binding_revision_prompt = ollama.prompts[7][0]
+        self.assertIn("missing_same_goal_binding", binding_revision_prompt)
+        self.assertIn("identical name on the same Goal", binding_revision_prompt)
+        self.assertEqual(
+            result.metadata["contract_repair"]["attempt_count"],
+            3,
         )
 
     def test_legacy_host_execution_fields_require_schema_repair(self):
@@ -1895,6 +3814,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                     "resource_responsibility": {
                         "resource_kind": "physical_object",
                         "resource_description": "一杯水",
+                        "resource_quantity": "1",
                         "source_status": "unknown",
                         "recipient_description": "用户",
                         "delivery_mode": "physical_handover",
@@ -1907,7 +3827,9 @@ class GoalAssociationResolverTests(unittest.TestCase):
             responsibility_item("往前给我跑个50米", 0),
             responsibility_item("帮我拿杯水，然后回来", 1),
         )
-        ollama = ScriptedOllama([merged, reviewed, coverage])
+        ollama = ScriptedOllama(
+            [merged, reviewed, reviewed, coverage, coverage]
+        )
 
         result = asyncio.run(
             GoalAssociationResolver(ollama).resolve(
@@ -1915,7 +3837,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(len(ollama.prompts), 3)
+        self.assertEqual(len(ollama.prompts), 5)
         self.assertEqual(
             [goal.description for goal in result.new_goals],
             ["往前移动50米。", "拿一杯水并带回给用户。"],
@@ -1933,6 +3855,499 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertIn("provider-owned stages", review_prompt)
         self.assertIn("Do not split pickup and handoff", review_prompt)
         self.assertIn("Identity shapes expression only", review_prompt)
+        self.assertEqual(
+            ollama.prompts[4][1]["prompt_family"],
+            "goal_association.resource_stage_responsibility_coverage",
+        )
+        focused_schema = ollama.prompts[4][1]["response_format"]
+        focused_item = focused_schema["$defs"][
+            "GoalResponsibilityCoverageItem"
+        ]
+        self.assertEqual(
+            focused_item["properties"]["source_excerpt"]["enum"],
+            ["往前给我跑个50米", "帮我拿杯水，然后回来"],
+        )
+        self.assertEqual(focused_schema["properties"]["items"]["minItems"], 2)
+        self.assertEqual(focused_schema["properties"]["items"]["maxItems"], 2)
+
+    def test_voice_log_instrumental_navigation_stays_inside_resource_goal(self):
+        initial = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "往前走100米。",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "distance",
+                            "entity_type": "distance",
+                            "value": "100",
+                            "confidence": 1.0,
+                        }
+                    ],
+                },
+                {
+                    "description": "拿一杯水并送给用户。",
+                    "output_mode": "body_action",
+                    "bindings": [],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "unknown",
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                },
+            ],
+            "confidence": 1.0,
+        }
+        reviewed = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "从前方100米处拿一杯水并送给用户。",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "distance",
+                            "entity_type": "distance",
+                            "value": "100",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "direction",
+                            "entity_type": "direction",
+                            "value": "前方",
+                            "confidence": 1.0,
+                        },
+                    ],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "known",
+                        "source_description": "前方100米处",
+                        "source_binding_names": ["distance", "direction"],
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "confidence": 1.0,
+        }
+        coverage = responsibility_coverage(
+            responsibility_item("去往前走个100米，帮我拿杯水过来", 0),
+        )
+        ollama = ScriptedOllama([initial, initial, reviewed, coverage])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "去往前走个100米，帮我拿杯水过来。",
+                    route="robot_action",
+                    intent="semantic_capability_planning",
+                )
+            )
+        )
+
+        self.assertEqual(len(result.new_goals), 1)
+        goal = result.new_goals[0]
+        self.assertEqual(goal.description, "从前方100米处拿一杯水并送给用户。")
+        assert goal.resource_responsibility is not None
+        self.assertEqual(goal.resource_responsibility.resource.quantity, "1")
+        self.assertEqual(goal.resource_responsibility.source.status, "known")
+        self.assertEqual(
+            set(goal.resource_responsibility.source.bindings),
+            {"distance", "direction"},
+        )
+        self.assertIn(
+            "resource_provider_stage_split_review",
+            result.metadata["semantic_review"]["triggers"],
+        )
+        self.assertEqual(
+            result.metadata["semantic_review"]["strategy"],
+            "model_owned_resource_stage_adjudication",
+        )
+        self.assertEqual(
+            ollama.prompts[2][1]["prompt_family"],
+            "goal_association.resource_stage_adjudication",
+        )
+        self.assertIn("instrumental source", ollama.prompts[1][0])
+        self.assertIn(
+            "Spatial direction, distance",
+            ollama.prompts[2][0],
+        )
+
+    def test_fresh_review_cannot_silently_drop_resource_responsibility(self):
+        initial = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "前往前方100米并取回一杯水。",
+                    "output_mode": "body_action",
+                    "bindings": [],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "unknown",
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                },
+                {
+                    "description": "将水递给用户。",
+                    "output_mode": "body_action",
+                    "bindings": [],
+                },
+            ],
+            "confidence": 1.0,
+        }
+        lost_resource = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "向前走100米。",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "distance",
+                            "entity_type": "distance",
+                            "value": "100",
+                            "confidence": 1.0,
+                        }
+                    ],
+                },
+                {
+                    "description": "帮我拿杯水过来。",
+                    "output_mode": "body_action",
+                    "bindings": [],
+                },
+            ],
+            "confidence": 1.0,
+        }
+        corrected = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "从前方100米处拿一杯水并送给用户。",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "distance",
+                            "entity_type": "distance",
+                            "value": "100",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "direction",
+                            "entity_type": "direction",
+                            "value": "前方",
+                            "confidence": 1.0,
+                        },
+                    ],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "known",
+                        "source_description": "前方100米处",
+                        "source_binding_names": ["distance", "direction"],
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "confidence": 1.0,
+        }
+        coverage = responsibility_coverage(
+            responsibility_item("去往前走个100米", 0, role="constraint"),
+            responsibility_item("帮我拿杯水过来", 0),
+        )
+        ollama = ScriptedOllama(
+            [initial, lost_resource, lost_resource, corrected, coverage]
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "去往前走个100米，帮我拿杯水过来。",
+                    route="robot_action",
+                    intent="semantic_capability_planning",
+                )
+            )
+        )
+
+        self.assertEqual(len(result.new_goals), 1)
+        self.assertIsNotNone(result.new_goals[0].resource_responsibility)
+        self.assertEqual(
+            result.metadata["semantic_review"]["strategy"],
+            "model_owned_resource_contract_loss_adjudication",
+        )
+        self.assertEqual(
+            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
+            [
+                "goal_association.primary",
+                "goal_association.semantic_resegmentation",
+                "goal_association.resource_contract_loss_adjudication",
+                "goal_association.resource_contract_loss_residual_repair",
+                "goal_association.responsibility_coverage",
+            ],
+        )
+        resource_review_prompt = ollama.prompts[2][0]
+        self.assertIn(
+            "Two independent model passes disagreed",
+            resource_review_prompt,
+        )
+        self.assertIn("known-source bindings", resource_review_prompt)
+        residual_repair_prompt = ollama.prompts[3][0]
+        self.assertIn(
+            "still omitted resource_responsibility from every Goal",
+            residual_repair_prompt,
+        )
+
+    def test_resource_stage_review_cannot_silently_drop_resource_responsibility(
+        self,
+    ):
+        split = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "向前走100米。",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "distance",
+                            "entity_type": "distance",
+                            "value": "100",
+                            "confidence": 1.0,
+                        }
+                    ],
+                },
+                {
+                    "description": "拿一杯水并送给用户。",
+                    "output_mode": "body_action",
+                    "bindings": [],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "unknown",
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                },
+            ],
+            "confidence": 1.0,
+        }
+        lost_resource = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "向前走100米。",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "distance",
+                            "entity_type": "distance",
+                            "value": "100",
+                            "confidence": 1.0,
+                        }
+                    ],
+                },
+                {
+                    "description": "拿一杯水并送给用户。",
+                    "output_mode": "body_action",
+                    "bindings": [],
+                },
+            ],
+            "confidence": 1.0,
+        }
+        corrected = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "从前方100米处拿一杯水并送给用户。",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "distance",
+                            "entity_type": "distance",
+                            "value": "100",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "direction",
+                            "entity_type": "direction",
+                            "value": "前方",
+                            "confidence": 1.0,
+                        },
+                    ],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "known",
+                        "source_description": "前方100米处",
+                        "source_binding_names": ["distance", "direction"],
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "confidence": 1.0,
+        }
+        coverage = responsibility_coverage(
+            responsibility_item("去往前走个100米，帮我拿杯水过来", 0),
+        )
+        ollama = ScriptedOllama([split, split, lost_resource, corrected, coverage])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "去往前走个100米，帮我拿杯水过来。",
+                    route="robot_action",
+                    intent="semantic_capability_planning",
+                )
+            )
+        )
+
+        self.assertEqual(len(result.new_goals), 1)
+        self.assertIsNotNone(result.new_goals[0].resource_responsibility)
+        self.assertEqual(
+            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
+            [
+                "goal_association.primary",
+                "goal_association.semantic_resegmentation",
+                "goal_association.resource_stage_adjudication",
+                "goal_association.resource_stage_contract_loss_repair",
+                "goal_association.responsibility_coverage",
+            ],
+        )
+        repair_prompt = ollama.prompts[3][0]
+        self.assertIn("contract loss, not a semantic decision", repair_prompt)
+        self.assertIn("independently owed", ollama.prompts[2][0])
+
+    def test_contract_resegmentation_cannot_silently_drop_resource_responsibility(
+        self,
+    ):
+        invalid_resource = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "前往前方100米并取回一杯水。",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "actions",
+                            "entity_type": "action_collection",
+                            "value": "walk and fetch",
+                            "confidence": 1.0,
+                        }
+                    ],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "unknown",
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "confidence": 1.0,
+        }
+        lost_resource = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "向前走100米。",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "distance",
+                            "entity_type": "distance",
+                            "value": "100",
+                            "confidence": 1.0,
+                        }
+                    ],
+                },
+                {
+                    "description": "帮我拿杯水过来。",
+                    "output_mode": "body_action",
+                    "bindings": [],
+                },
+            ],
+            "confidence": 1.0,
+        }
+        corrected = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "从前方100米处拿一杯水并送给用户。",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "distance",
+                            "entity_type": "distance",
+                            "value": "100",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "direction",
+                            "entity_type": "direction",
+                            "value": "前方",
+                            "confidence": 1.0,
+                        },
+                    ],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "resource_quantity": "1",
+                        "source_status": "known",
+                        "source_description": "前方100米处",
+                        "source_binding_names": ["distance", "direction"],
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "confidence": 1.0,
+        }
+        coverage = responsibility_coverage(
+            responsibility_item("去往前走个100米", 0, role="constraint"),
+            responsibility_item("帮我拿杯水过来", 0),
+        )
+        ollama = ScriptedOllama(
+            [invalid_resource, lost_resource, corrected, coverage]
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "去往前走个100米，帮我拿杯水过来。",
+                    route="robot_action",
+                    intent="semantic_capability_planning",
+                )
+            )
+        )
+
+        self.assertEqual(len(result.new_goals), 1)
+        self.assertIsNotNone(result.new_goals[0].resource_responsibility)
+        self.assertEqual(
+            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
+            [
+                "goal_association.primary",
+                "goal_association.semantic_contract_resegmentation",
+                "goal_association.semantic_resegmentation",
+                "goal_association.responsibility_coverage",
+            ],
+        )
+        self.assertIn(
+            "resource_contract_loss_review",
+            result.metadata["semantic_review"]["triggers"],
+        )
 
     def test_negative_speech_constraint_stays_with_embodied_goal(self):
         initial = {

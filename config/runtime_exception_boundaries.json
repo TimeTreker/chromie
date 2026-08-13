@@ -511,7 +511,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "a20f2158b2ae721ea4d0a906a3deb2cb488ea46c50023c4d44070aab8fb893fd",
+      "body_sha256": "166d196b5abb1f9dfc93a27c3b86be9015f3291306439fe61893a2010770836d",
       "failure_signals": [
         "continue",
         "diagnostic",
@@ -554,7 +554,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "96f691a3d34e129bdb7e2bb471c93a99defea72dd7e1a688659b55592918091d",
+      "body_sha256": "3474fac17e6be218099a2df859c9176a8148107b2111f60596b70a3218d9610e",
       "failure_signals": [
         "continue",
         "diagnostic",
@@ -799,6 +799,33 @@
       "failure_signals": [
         "diagnostic",
         "return",
+        "state_update"
+      ]
+    },
+    {
+      "path": "agent/app/social_attention.py",
+      "symbol": "SocialAttentionPlanner.plan",
+      "ordinal": 2,
+      "classification": "typed_failure_mapping",
+      "owner": "agent",
+      "contract": "Retain a failed bounded Social Attention contract-repair result for the existing typed failure metadata and fail-soft auxiliary omission path.",
+      "review_status": "reviewed",
+      "body_sha256": "fb3ca836c46246b2306e3f1a7ca2f4279b180c42ecbdb7c46bd9325f3ecaad74",
+      "failure_signals": [
+        "state_update"
+      ]
+    },
+    {
+      "path": "agent/app/social_attention.py",
+      "symbol": "SocialAttentionPlanner.plan",
+      "ordinal": 3,
+      "classification": "typed_failure_mapping",
+      "owner": "agent",
+      "contract": "Retain an unavailable optional none-decision semantic review as typed diagnostic metadata while preserving the first valid fail-soft no-decoration plan.",
+      "review_status": "reviewed",
+      "body_sha256": "8e556eb9899f9008b15e2fc749ae72a1f68d70169520071eb9cb301e1957f64a",
+      "failure_signals": [
+        "diagnostic",
         "state_update"
       ]
     },

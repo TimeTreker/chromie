@@ -272,6 +272,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["AGENT_RESPONSE_COMPOSER_MODEL"], "gemma4:12b")
         self.assertEqual(values["AGENT_TOOL_RESULT_INTERPRETER_MODEL"], "gemma4:12b")
         self.assertEqual(values["AGENT_FAST_PLANNER_MODEL"], "qwen3:4b")
+        self.assertEqual(values["AGENT_SOCIAL_ATTENTION_MODEL"], "qwen3:8b")
         self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "0")
         self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "32768")
         self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "2")
@@ -289,7 +290,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT"], "2048")
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_NUM_PREDICT"], "2048")
         self.assertEqual(values["AGENT_FAST_PLANNER_NUM_PREDICT"], "4096")
-        self.assertEqual(values["AGENT_DEEP_PLANNER_NUM_PREDICT"], "8192")
+        self.assertEqual(values["AGENT_DEEP_PLANNER_NUM_PREDICT"], "4096")
         self.assertEqual(values["AGENT_RESPONSE_COMPOSER_NUM_PREDICT"], "4096")
         self.assertEqual(values["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"], "2048")
         self.assertEqual(manifest["active_profile"], "rtx5090")
@@ -298,7 +299,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(manifest["mode_file"], "env/modes/speech.env")
         self.assertEqual(
             manifest["active_ollama_models"],
-            ["qwen3:4b", "gemma4:12b"],
+            ["qwen3:4b", "gemma4:12b", "qwen3:8b"],
         )
         self.assertEqual(manifest["fingerprint"], values["CHROMIE_RUNTIME_ENV_FINGERPRINT"])
         self.assertEqual(
@@ -315,7 +316,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         )
         self.assertEqual(
             manifest["cognitive_budgets"]["AGENT_DEEP_PLANNER_NUM_PREDICT"],
-            "8192",
+            "4096",
         )
         self.assertEqual(
             manifest["cognitive_budgets"]["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"],

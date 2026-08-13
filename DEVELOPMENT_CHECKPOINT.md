@@ -125,15 +125,17 @@ Do not silently downgrade because authority is absent.
 This checkpoint does **not** grant blanket architecture authority to later
 sessions; use Charter governance when new authority is needed.
 ## Resume point
-Do not add another top-level architecture layer without new evidence. Social
-Attention's source boundary is implemented: canonical session identity, primary
-Capability exclusion, and repeated trusted duplicate/resource checks. The Goal
-boundary keeps broad social impressions as concrete-effect framing unless positive
-audible content is independently requested; coverage rejects extra Goals and
-clarification escape. Working-tree diagnostics retained exact blink and “blink
-twice and be cute” as one body Goal and one `soridormi.blink_eyes(count=2)` MuJoCo
-completion. Remaining work is the clean committed 128-case bundle and human review.
-Non-social liveliness remains separate and deferred pending a concrete requirement.
+Do not add another top-level architecture layer without new evidence. The current
+working tree closes the retained “walk forward 100 metres and bring water” defect at
+its earliest boundaries: one physical-resource Goal keeps direction, distance,
+quantity, recipient, and delivery ownership; Planner selects the complete advertised
+provider capability; internal contract failure never becomes user speech; background
+Social Attention may execute a bounded parallel cue. Live text/MuJoCo diagnostic
+`.chromie/acceptance/voice-log-water-fixed-67` passed with SID `50ebdc83`, two
+completed auxiliary `blink_eyes` event calls, real simulator motion, mocked resource
+acquisition/delivery evidence, natural pre/post speech, and final safe idle. The
+canonical source gate passes; remaining work is clean committed qualification. This does
+not prove literal 100-metre travel, physical water, microphone/speaker, or hardware.
 ## Resume and verification commands
 `docs/STATUS.md` owns implementation/evidence claims. Do not claim live-model,
 audio, MuJoCo, GPU, or physical-provider qualification unless that exact gate ran

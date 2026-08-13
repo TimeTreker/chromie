@@ -3114,6 +3114,26 @@ class GoalDrivenRuntimeCoordinator:
                 "error_type": type(execution_outcome).__name__,
                 "error": str(execution_outcome)[:240],
             }
+        logger.info(
+            "continuous_social_attention_event_done sid=%s turn_id=%s event=%s "
+            "status=%s decision=%s materialized_count=%d request_ids=%s reasons=%s",
+            sid,
+            turn_id,
+            event,
+            str(execution_outcome.get("status") or "unknown"),
+            plan.decision,
+            int(execution_outcome.get("materialized_count") or 0),
+            ",".join(
+                str(item)
+                for item in execution_outcome.get("request_ids", [])
+                if str(item)
+            ),
+            ",".join(
+                str(item)
+                for item in execution_outcome.get("reasons", [])
+                if str(item)
+            ),
+        )
         return execution_outcome
 
     @staticmethod

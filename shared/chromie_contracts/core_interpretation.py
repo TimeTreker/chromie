@@ -189,13 +189,15 @@ class CoreInterpretationResult(BaseModel):
         seen_progress_ids: set[str] = set()
 
         allowed_capability_ids = {
-            normalize_turn_text(item.capability_id)
+            normalize_turn_text(str(item.capability_id or ""))
             for item in decision.routes
-            if normalize_turn_text(item.capability_id)
+            if normalize_turn_text(str(item.capability_id or ""))
         }
         for action in decision.actions or []:
             if isinstance(action, dict):
-                capability_id = normalize_turn_text(action.get("capability_id"))
+                capability_id = normalize_turn_text(
+                    str(action.get("capability_id") or "")
+                )
                 if capability_id:
                     allowed_capability_ids.add(capability_id)
         if decision.intent.startswith("capability:"):
@@ -226,14 +228,16 @@ class CoreInterpretationResult(BaseModel):
         for raw in progress_proposals:
             if not isinstance(raw, dict):
                 continue
-            kind = normalize_turn_text(raw.get("kind"))
+            kind = normalize_turn_text(str(raw.get("kind") or ""))
             intent = normalize_turn_text(raw.get("intent") or decision.intent or "unknown") or "unknown"
             try:
                 confidence = float(raw.get("confidence", decision.confidence))
             except (TypeError, ValueError):
                 continue
             if kind == "capability":
-                capability_id = normalize_turn_text(raw.get("capability_id"))
+                capability_id = normalize_turn_text(
+                    str(raw.get("capability_id") or "")
+                )
                 args = raw.get("args")
                 if capability_id not in allowed_capability_ids or not isinstance(args, dict):
                     continue
@@ -252,7 +256,9 @@ class CoreInterpretationResult(BaseModel):
                     confidence=confidence,
                 )
             elif kind == "native_response":
-                response_text = normalize_turn_text(raw.get("response_text"))
+                response_text = normalize_turn_text(
+                    str(raw.get("response_text") or "")
+                )
                 speech_act = normalize_turn_text(raw.get("speech_act") or "inform") or "inform"
                 if not conversational_scope or not response_text:
                     continue

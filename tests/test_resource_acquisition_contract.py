@@ -12,6 +12,7 @@ from agent.app.planner_contract import (
     ResourceResponsibilityCapabilityUnavailableError,
     ResourceResponsibilityRequiresCompositionError,
     canonical_goal_grounding,
+    resource_grounding_repair_response_schema,
     validate_resource_responsibility_capability_grounding,
 )
 from agent.app.schema import AgentRunRequest, RouteDecision
@@ -278,6 +279,138 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
             "complete_capability_ids=soridormi.acquire_and_deliver_resource",
             str(caught.exception),
         )
+        self.assertEqual(caught.exception.goal_id, "goal-resource")
+        self.assertEqual(
+            caught.exception.complete_capability_ids,
+            ["soridormi.acquire_and_deliver_resource"],
+        )
+
+        base_schema = {
+            "$defs": {
+                "PlannerModelStep": {
+                    "properties": {
+                        "capability_id": {
+                            "enum": [
+                                "soridormi.walk_forward",
+                                "soridormi.acquire_and_deliver_resource",
+                            ]
+                        }
+                    },
+                    "oneOf": [
+                        {
+                            "properties": {
+                                "capability_id": {
+                                    "enum": ["soridormi.walk_forward"]
+                                },
+                                "args": {
+                                    "properties": {"duration_s": {}},
+                                    "required": ["duration_s"],
+                                },
+                            }
+                        },
+                        {
+                            "properties": {
+                                "capability_id": {
+                                    "enum": [
+                                        "soridormi.acquire_and_deliver_resource"
+                                    ]
+                                },
+                                "args": {
+                                    "properties": {
+                                        "resource": {},
+                                        "source": {},
+                                        "recipient": {},
+                                    },
+                                    "required": [],
+                                },
+                            }
+                        },
+                    ],
+                }
+            },
+            "properties": {"steps": {"type": "array", "maxItems": 4}},
+        }
+        tightened = resource_grounding_repair_response_schema(
+            base_schema,
+            error=caught.exception,
+            authoritative_goals=[self._resource_goal()],
+        )
+        step_schema = tightened["$defs"]["PlannerModelStep"]
+        self.assertEqual(
+            step_schema["properties"]["capability_id"]["enum"],
+            ["soridormi.acquire_and_deliver_resource"],
+        )
+        self.assertEqual(len(step_schema["oneOf"]), 1)
+        args_schema = step_schema["oneOf"][0]["properties"]["args"]
+        responsibility = self._resource_goal()["resource_responsibility"]
+        self.assertEqual(
+            args_schema["properties"]["resource"]["const"],
+            responsibility["resource"],
+        )
+        self.assertEqual(
+            args_schema["properties"]["source"]["const"],
+            responsibility["source"],
+        )
+        self.assertEqual(
+            tightened["properties"]["steps"]["minItems"],
+            1,
+        )
+        self.assertEqual(
+            tightened["properties"]["steps"]["maxItems"],
+            1,
+        )
+        tightened["properties"]["parameter_resolutions"] = {"maxItems": 4}
+        tightened_again = resource_grounding_repair_response_schema(
+            tightened,
+            error=caught.exception,
+            authoritative_goals=[self._resource_goal()],
+        )
+        self.assertEqual(
+            tightened_again["properties"]["parameter_resolutions"]["maxItems"],
+            0,
+        )
+
+        movement_goal = {
+            "goal_id": "goal-movement",
+            "description": "向前走100米",
+            "success_criteria": ["向前走100米"],
+            "object": {
+                "bindings": {
+                    "distance": {
+                        "name": "distance",
+                        "entity_type": "distance",
+                        "value": "100",
+                        "confidence": 1.0,
+                    }
+                }
+            },
+        }
+        multi_goal_schema = resource_grounding_repair_response_schema(
+            base_schema,
+            error=caught.exception,
+            authoritative_goals=[movement_goal, self._resource_goal()],
+        )
+        multi_step_schema = multi_goal_schema["$defs"]["PlannerModelStep"]
+        self.assertEqual(len(multi_step_schema["oneOf"]), 2)
+        resource_branch = next(
+            branch
+            for branch in multi_step_schema["oneOf"]
+            if branch["properties"]["capability_id"]["enum"]
+            == ["soridormi.acquire_and_deliver_resource"]
+        )
+        self.assertEqual(
+            resource_branch["properties"]["args"]["properties"]["resource"][
+                "const"
+            ],
+            responsibility["resource"],
+        )
+        multi_steps = multi_goal_schema["properties"]["steps"]
+        self.assertEqual(multi_steps["maxItems"], 4)
+        self.assertEqual(multi_steps["minContains"], 1)
+        self.assertEqual(
+            multi_steps["contains"]["properties"]["source_goal_ids"]["contains"],
+            {"const": "goal-resource"},
+        )
 
     def test_resource_capability_accepts_legacy_or_canonical_delivery_scope(self) -> None:
         for scope in (
@@ -426,6 +559,59 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
             self._planner_output("soridormi.acquire_and_deliver_resource"),
             authoritative_goals=[self._resource_goal()],
             capabilities=[acquire, deliver, complete],
+        )
+
+    def test_complete_capability_argument_conflict_enables_exact_dto_repair(self) -> None:
+        goal = self._resource_goal()
+        responsibility = goal["resource_responsibility"]
+        responsibility["resource"]["quantity"] = "1"
+        responsibility["source"] = {
+            "status": "known",
+            "description": "",
+            "bindings": {
+                "distance_binding": {
+                    "name": "distance_binding",
+                    "entity_type": "distance",
+                    "value": "100",
+                    "confidence": 1.0,
+                }
+            },
+        }
+        raw_output = self._planner_output(
+            "soridormi.acquire_and_deliver_resource"
+        ).model_dump(mode="json")
+        raw_output["steps"][0]["args"] = {
+            "resource": responsibility["resource"],
+            "source": {
+                "status": "known",
+                "description": "100 meters ahead",
+                "bindings": {
+                    "distance_binding": {"type": "string", "value": "100"}
+                },
+            },
+            "recipient": responsibility["recipient"],
+        }
+        output = PlannerModelOutput.model_validate(raw_output)
+        complete = self._resource_capability(
+            "soridormi.acquire_and_deliver_resource",
+            requires=[],
+            provides=["resource_acquired", "resource_delivered"],
+            delivery_modes=["physical_handover"],
+        )
+
+        with self.assertRaises(
+            ResourceResponsibilityCapabilityGroundingError
+        ) as caught:
+            validate_resource_responsibility_capability_grounding(
+                output,
+                authoritative_goals=[goal],
+                capabilities=[complete],
+            )
+
+        self.assertEqual(caught.exception.goal_id, "goal-resource")
+        self.assertEqual(
+            caught.exception.complete_capability_ids,
+            ["soridormi.acquire_and_deliver_resource"],
         )
 
     def test_planner_grounding_preserves_new_resource_responsibility(self) -> None:

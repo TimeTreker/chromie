@@ -16,11 +16,7 @@ from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
     is_allowed_model_ignore,
 )
 from agent.app.cognitive_core.goal_interpreter.fallback import InterpretationUnavailableError
-from agent.app.cognitive_core.goal_interpreter.schema import (
-    FastSpeech,
-    RouteDecision,
-    RouteRequest,
-)
+from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest
 
 
 class GoalInterpreterLlmPromptTests(unittest.TestCase):
@@ -389,6 +385,9 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("Return calibrated confidence", prompt)
         self.assertIn("fast_speech", prompt)
         self.assertIn("first Goal Progress Communication milestone", prompt)
+        self.assertIn("omit material task parameters", prompt)
+        self.assertIn("progress is advisory", prompt)
+        self.assertIn("generic willingness only", contract_prompt)
         self.assertIn("Common ability IDs", prompt)
         self.assertIn("Common Ability Catalog JSON", prompt)
         self.assertNotIn("not " + "recommendations", prompt)
@@ -920,6 +919,46 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertEqual(
             interpreter.stages,
             ["quick_intent", "quick_intent_contract_repair"],
+        )
+
+    def test_repaired_response_discards_only_invalid_advisory_progress(self) -> None:
+        interpreter = OllamaGoalInterpreter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(text="去往前走个100米，帮我拿杯水过来。")
+        response = {
+            "message": {
+                "content": (
+                    '{"route":"robot_action","intent":"resource_delivery",'
+                    '"confidence":0.95,"fast_speech":"好呀，我来啦！",'
+                    '"progress":[{"kind":"native_response",'
+                    '"speech_act":"好呀，我来啦！"}]}'
+                )
+            }
+        }
+
+        with self.assertRaises(ValueError):
+            interpreter._decision_from_response(request, response)
+
+        decision = interpreter._decision_from_response(
+            request,
+            response,
+            stage="quick_intent_contract_repair",
+            allow_bounded_contract_recovery=True,
+        )
+
+        self.assertEqual(decision.route, "robot_action")
+        self.assertEqual(decision.intent, "resource_delivery")
+        self.assertEqual(decision.progress, [])
+        self.assertEqual(
+            decision.metadata["contract_recovery"],
+            {
+                "strategy": "discard_invalid_advisory_progress",
+                "recovered_paths": ["progress[0]"],
+            },
         )
 
     def test_session_memory_recovery_does_not_weaken_durable_or_forget_contracts(self) -> None:
@@ -2581,6 +2620,27 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                 {"type": "null"},
             ],
         )
+
+    def test_model_facing_schema_exposes_progress_shape_invariants(self) -> None:
+        schema = OllamaGoalInterpreter._route_response_schema()
+        progress = schema["$defs"]["FastProgressProposal"]
+
+        native_response = progress["allOf"][1]["then"]
+        self.assertEqual(native_response["required"], ["response_text"])
+        self.assertEqual(
+            native_response["properties"]["response_text"]["minLength"],
+            1,
+        )
+        self.assertEqual(
+            native_response["properties"]["capability_id"]["maxLength"],
+            0,
+        )
+        self.assertEqual(native_response["properties"]["args"]["maxProperties"], 0)
+
+        capability = progress["allOf"][0]["then"]
+        self.assertEqual(capability["required"], ["capability_id"])
+        self.assertEqual(capability["properties"]["capability_id"]["minLength"], 1)
+        self.assertEqual(capability["properties"]["response_text"]["maxLength"], 0)
 
     async def test_primary_tool_fast_speech_is_preserved_without_second_llm_call(self) -> None:
         class WeatherInterpreter(OllamaGoalInterpreter):

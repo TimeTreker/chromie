@@ -757,7 +757,9 @@ def test_social_attention_rejects_a_different_cue_that_conflicts_with_primary_ac
     asyncio.run(scenario())
 
 
-def test_social_attention_background_loop_does_not_wait_for_goal_association():
+def test_social_attention_background_loop_does_not_wait_for_goal_association(caplog):
+    caplog.set_level("INFO", logger="orchestrator.runtime.cognitive_runtime")
+
     async def scenario():
         candidate = CognitiveProgressCandidate(
             candidate_id="progress-reference-social",
@@ -826,6 +828,9 @@ def test_social_attention_background_loop_does_not_wait_for_goal_association():
         assert interaction_state["primary_progress"][0]["args"] == candidate.args
 
     asyncio.run(scenario())
+    assert "continuous_social_attention_event_done" in caplog.text
+    assert "event=understanding_ready" in caplog.text
+    assert "status=not_executed" in caplog.text
 
 
 def stateful_write_definition() -> SkillDefinition:

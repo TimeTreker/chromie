@@ -161,6 +161,17 @@ Otherwise Goal Association uses `unknown` or `provider_resolved` according to th
 contract. This prevents a location such as a neighborhood or city from being misrepresented as
 the source that supplied the requested information.
 
+Physical-resource spatial bindings require an explicit semantic home. A direction,
+distance, or location may describe the resource/acquisition route, the recipient, the
+delivery destination, or an independent requested effect; its type alone does not decide
+which. Goal Association's model owns that classification. Trusted code may detect that a
+typed spatial binding is still unlinked and require bounded model reconciliation, but it
+must not infer the role from a phrase or field name. The final DTO must represent the
+binding in the matching source/recipient/delivery contract or remove a redundant Goal
+alias after preserving the same meaning there. A `reason_summary` that calls the contract
+aligned cannot substitute for the actual fields, and repeated residual contradiction
+fails closed before planning.
+
 The acquisition and its evidence-dependent explanation also stay one semantic responsibility.
 Goal Association must not duplicate one information request into one capability Goal that
 retrieves evidence and another capability Goal whose only purpose is to answer from that same

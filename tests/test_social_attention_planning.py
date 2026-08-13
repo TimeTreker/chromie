@@ -41,6 +41,23 @@ class _AttentionOllama:
         return self.reply
 
 
+class _ScriptedAttentionOllama:
+    timeout_ms = 120000
+
+    def __init__(self, replies: list[dict[str, Any]]) -> None:
+        self.replies = list(replies)
+        self.prompts: list[tuple[str, dict[str, Any]]] = []
+
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        schema = kwargs["response_format"]
+        assert isinstance(schema, dict)
+        assert len(schema.get("allOf") or []) >= 2
+        self.prompts.append((prompt, kwargs))
+        if not self.replies:
+            raise AssertionError("unexpected Social Attention model call")
+        return self.replies.pop(0)
+
+
 class _FailingAttentionOllama:
     timeout_ms = 120000
 
@@ -208,6 +225,47 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("explicit user action remains mandatory", prompt)
         self.assertIn("different compatible cue", prompt)
 
+    def test_background_prompt_does_not_mistake_direct_work_for_exact_only(self) -> None:
+        planner = SocialAttentionPlanner(
+            AgentServices(
+                social_attention_mode="on",
+                social_attention_capability_ids=("soridormi.blink_eyes",),
+            )
+        )
+        request = SocialAttentionRequest(
+            session_id="voice-log-water",
+            turn_id="turn-fetch-water",
+            event="understanding_ready",
+            text="去往前走个100米，帮我拿杯水过来。",
+            language="zh-CN",
+            intent="semantic_capability_planning",
+            context={
+                "social_attention_interaction_state": {
+                    "primary_capability_ids": [],
+                    "primary_progress": [],
+                    "primary_work_known": False,
+                },
+                "social_interaction_style": {
+                    "owner_approved": True,
+                    "preset": "courteous",
+                },
+                "recent_auxiliary_behavior_evidence": [],
+                "social_attention_target_evidence": {"available": False},
+            },
+        )
+
+        prompt = planner._prompt(
+            request,
+            [self._blink().model_dump(mode="json")],
+        )
+
+        self.assertIn("Ordinary cooperative engagement", prompt)
+        self.assertIn("playful or explicitly emotional wording is not required", prompt)
+        self.assertIn("A clear or direct task is not evidence", prompt)
+        self.assertIn("only when it is actually supplied", prompt)
+        self.assertIn("independent-output candidate declared parallel-safe", prompt)
+        self.assertIn("Do not default to decision=none merely because speech", prompt)
+
     async def test_background_request_uses_session_id_when_live_candidates_exist(self) -> None:
         attention = _AttentionOllama(
             {
@@ -259,6 +317,245 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
         assert plan is not None
         self.assertEqual(plan.decision, "none")
         self.assertEqual(len(attention.prompts), 1)
+
+    async def test_contradictory_none_with_blink_gets_bounded_model_repair(self) -> None:
+        target = {
+            "target_ref": "none",
+            "source": "none",
+            "confidence": 0.0,
+            "metadata": {},
+        }
+        behavior = {
+            "capability_id": "soridormi.blink_eyes",
+            "args": {"count": 2},
+            "timing": "parallel",
+            "reason": "A small blink supports the warm work-start cue.",
+        }
+        attention = _ScriptedAttentionOllama(
+            [
+                {
+                    "decision": "none",
+                    "target": target,
+                    "behaviors": [behavior],
+                    "confidence": 0.82,
+                    "reason": "A small blink would make the interaction warmer.",
+                },
+                {
+                    "decision": "express",
+                    "target": target,
+                    "behaviors": [behavior],
+                    "confidence": 0.82,
+                    "reason": "A small blink would make the interaction warmer.",
+                },
+            ]
+        )
+        planner = SocialAttentionPlanner(
+            AgentServices(
+                social_attention_mode="on",
+                social_attention_ollama=attention,  # type: ignore[arg-type]
+                social_attention_capability_ids=("soridormi.blink_eyes",),
+            )
+        )
+        request = SocialAttentionRequest(
+            session_id="voice-log-water",
+            turn_id="turn-work-started",
+            event="work_started",
+            text="去往前走个100米，帮我拿杯水过来。",
+            language="zh-CN",
+            intent="semantic_capability_planning",
+            context={
+                "social_attention_candidates": [
+                    self._blink().model_dump(mode="json")
+                ],
+                "social_attention_interaction_state": {
+                    "primary_capability_ids": [
+                        "soridormi.acquire_and_deliver_resource"
+                    ]
+                },
+                "social_interaction_style": {
+                    "owner_approved": True,
+                    "warmth": "warm",
+                },
+            },
+        )
+
+        plan = await planner.plan(request)
+
+        self.assertIsNotNone(plan)
+        assert plan is not None
+        self.assertEqual(plan.decision, "express")
+        self.assertEqual(plan.behaviors[0].capability_id, "soridormi.blink_eyes")
+        self.assertTrue(plan.metadata["contract_repair"]["succeeded"])
+        self.assertEqual(len(attention.prompts), 2)
+        self.assertEqual(
+            attention.prompts[1][1]["prompt_family"],
+            "social_attention.contract_repair",
+        )
+        self.assertIn("decision=none with behaviors=[]", attention.prompts[1][0])
+
+    async def test_fresh_courteous_none_gets_independent_semantic_review(self) -> None:
+        target = {
+            "target_ref": "none",
+            "source": "none",
+            "confidence": 0.0,
+            "metadata": {},
+        }
+        attention = _ScriptedAttentionOllama(
+            [
+                {
+                    "decision": "none",
+                    "target": target,
+                    "behaviors": [],
+                    "confidence": 0.95,
+                    "reason": "The physical task is direct and needs no social context.",
+                },
+                {
+                    "purpose": "acknowledge",
+                    "decision": "express",
+                    "target": target,
+                    "behaviors": [
+                        {
+                            "capability_id": "soridormi.blink_eyes",
+                            "args": {"count": 1},
+                            "timing": "parallel",
+                            "reason": "A subtle blink acknowledges the fresh request.",
+                        }
+                    ],
+                    "confidence": 0.84,
+                    "reason": "Courteous acknowledgement is useful and non-disruptive.",
+                },
+            ]
+        )
+        planner = SocialAttentionPlanner(
+            AgentServices(
+                social_attention_mode="on",
+                social_attention_ollama=attention,  # type: ignore[arg-type]
+                social_attention_capability_ids=("soridormi.blink_eyes",),
+            )
+        )
+        request = SocialAttentionRequest(
+            session_id="voice-log-water",
+            turn_id="turn-fetch-water",
+            event="understanding_ready",
+            text="去往前走个100米，帮我拿杯水过来。",
+            language="zh-CN",
+            intent="semantic_capability_planning",
+            context={
+                "social_attention_candidates": [
+                    self._blink().model_dump(mode="json")
+                ],
+                "social_attention_interaction_state": {
+                    "primary_capability_ids": [],
+                    "primary_progress": [],
+                },
+                "social_interaction_style": {
+                    "owner_approved": True,
+                    "preset": "courteous",
+                },
+                "recent_auxiliary_behavior_evidence": [],
+            },
+        )
+
+        plan = await planner.plan(request)
+
+        self.assertIsNotNone(plan)
+        assert plan is not None
+        self.assertEqual(plan.decision, "express")
+        self.assertEqual(plan.behaviors[0].skill_id, "soridormi.blink_eyes")
+        self.assertTrue(plan.metadata["none_semantic_review"]["succeeded"])
+        self.assertEqual(len(attention.prompts), 2)
+        self.assertEqual(
+            attention.prompts[1][1]["prompt_family"],
+            "social_attention.none_semantic_review",
+        )
+        self.assertIn("expected default for this fresh acknowledgement", attention.prompts[1][0])
+        self.assertNotIn(
+            "The physical task is direct and needs no social context.",
+            attention.prompts[1][0],
+        )
+
+    async def test_none_review_invalid_expression_gets_one_contract_repair(self) -> None:
+        target = {
+            "target_ref": "none",
+            "source": "none",
+            "confidence": 0.0,
+            "metadata": {},
+        }
+        valid_behavior = {
+            "capability_id": "soridormi.blink_eyes",
+            "args": {"count": 1},
+            "timing": "parallel",
+            "reason": "A subtle fresh-turn acknowledgement.",
+        }
+        attention = _ScriptedAttentionOllama(
+            [
+                {
+                    "decision": "none",
+                    "target": target,
+                    "behaviors": [],
+                    "confidence": 0.9,
+                    "reason": "No cue selected initially.",
+                },
+                {
+                    "decision": "express",
+                    "target": target,
+                    "behaviors": [],
+                    "confidence": 0.84,
+                    "reason": "A cue is socially useful.",
+                },
+                {
+                    "purpose": "acknowledge",
+                    "decision": "express",
+                    "target": target,
+                    "behaviors": [valid_behavior],
+                    "confidence": 0.84,
+                    "reason": "A cue is socially useful.",
+                },
+            ]
+        )
+        planner = SocialAttentionPlanner(
+            AgentServices(
+                social_attention_mode="on",
+                social_attention_ollama=attention,  # type: ignore[arg-type]
+            )
+        )
+        request = SocialAttentionRequest(
+            session_id="review-contract-repair",
+            turn_id="review-contract-repair",
+            event="understanding_ready",
+            text="Please handle that.",
+            language="en-US",
+            intent="semantic_capability_planning",
+            context={
+                "social_attention_candidates": [
+                    self._blink().model_dump(mode="json")
+                ],
+                "social_interaction_style": {
+                    "owner_approved": True,
+                    "preset": "courteous",
+                },
+                "recent_auxiliary_behavior_evidence": [],
+            },
+        )
+
+        plan = await planner.plan(request)
+
+        self.assertIsNotNone(plan)
+        assert plan is not None
+        self.assertEqual(plan.decision, "express")
+        self.assertEqual(plan.behaviors[0].skill_id, "soridormi.blink_eyes")
+        self.assertTrue(plan.metadata["none_semantic_review"]["succeeded"])
+        self.assertEqual(len(attention.prompts), 3)
+        self.assertEqual(
+            attention.prompts[2][1]["prompt_family"],
+            "social_attention.none_semantic_review_contract_repair",
+        )
+        required = attention.prompts[0][1]["response_format"]["required"]
+        self.assertTrue(
+            {"decision", "target", "behaviors", "confidence", "reason"}.issubset(
+                required
+            )
+        )
 
     async def test_background_candidates_exclude_explicit_primary_activity(self) -> None:
         blink = self._blink().model_copy(

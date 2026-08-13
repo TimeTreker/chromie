@@ -243,8 +243,8 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         summary = run_level_a(args)
 
         self.assertTrue(summary["ok"], summary["errors"])
-        self.assertEqual(summary["case_count"], 9)
-        self.assertEqual(summary["passed"], 9)
+        self.assertEqual(summary["case_count"], 10)
+        self.assertEqual(summary["passed"], 10)
 
     def test_evidence_bound_cognitive_turn_closure_level_a_class_passes(
         self,

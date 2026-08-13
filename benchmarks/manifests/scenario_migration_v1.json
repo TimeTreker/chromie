@@ -6,8 +6,8 @@
   "authority": "benchmark_suite",
   "source_strategy": "referenced_in_place",
   "runtime_policy_authority": false,
-  "expected_inventory_total": 685,
-  "expected_normalized_total": 684,
+  "expected_inventory_total": 686,
+  "expected_normalized_total": 685,
   "allowed_datasets": [
     "adapter",
     "asr_noise",
@@ -79,7 +79,7 @@
       ],
       "target_reference": "integration/goal_driven_runtime",
       "migration_state": "referenced_in_place",
-      "expected_inventory_count": 15
+      "expected_inventory_count": 16
     },
     {
       "name": "interaction",

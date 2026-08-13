@@ -275,7 +275,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("AGENT_RESPONSE_COMPOSER_MODEL=gemma4:e4b", profile)
         self.assertIn("TTS_COSYVOICE_COMPACT_COGNITION=0", profile)
         self.assertIn("OLLAMA_MAX_LOADED_MODELS=1", profile)
-        self.assertIn("AGENT_DEEP_PLANNER_NUM_PREDICT=8192", profile)
+        self.assertIn("AGENT_DEEP_PLANNER_NUM_PREDICT=4096", profile)
 
         rtx5090 = (ROOT / "env" / "profiles" / "rtx5090.env").read_text(
             encoding="utf-8"
@@ -295,7 +295,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("AGENT_GOAL_INTERPRETER_LLM_NUM_CTX=32768", rtx5090)
         self.assertIn("AGENT_GOAL_ASSOCIATION_NUM_CTX=32768", rtx5090)
         self.assertIn("AGENT_TOOL_RESULT_INTERPRETER_NUM_CTX=32768", rtx5090)
-        self.assertIn("AGENT_DEEP_PLANNER_NUM_PREDICT=8192", rtx5090)
+        self.assertIn("AGENT_DEEP_PLANNER_NUM_PREDICT=4096", rtx5090)
         self.assertIn("AGENT_RESPONSE_COMPOSER_NUM_PREDICT=4096", rtx5090)
         self.assertIn("AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS=2048", rtx5090)
 

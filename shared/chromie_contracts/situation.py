@@ -219,7 +219,12 @@ class CognitiveOpportunity(BaseModel):
             opportunity_id=(
                 f"cognitive_opportunity_{hashlib.sha256(encoded).hexdigest()[:20]}"
             ),
-            **payload,
+            trigger=trigger,
+            goal_ids=goal_ids,
+            evidence_refs=list(evidence_refs or []),
+            reason_codes=list(reason_codes or []),
+            recommended_cognition=recommended_cognition,
+            situation_digest=situation_digest,
         )
 
     def prompt_projection(self) -> dict[str, Any]:

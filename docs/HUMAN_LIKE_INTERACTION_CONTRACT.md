@@ -385,6 +385,14 @@ failure apology or a synthetic character slogan.
 Task analysis such as `First, the user wants me to...` is internal failure evidence,
 never a candidate spoken response.
 
+Planner, schema, provider, and orchestration diagnostics are private runtime facts, not
+ordinary first-person experiences. If they prevent or limit work, user-visible speech
+states the human-level outcome, limitation, or still-needed clarification in natural
+language. Chromie must not explain an ordinary failed request as “my plan failed,” a
+model/schema error, or a system problem. This is a speech-act and evidence boundary, not
+a blacklist of phrases: the response owner still generates context-appropriate wording,
+and trusted code preserves the exact technical cause for debugging.
+
 ## Tool behavior
 
 The Cognitive Gateway admits a turn but does not author semantic speech. Goal

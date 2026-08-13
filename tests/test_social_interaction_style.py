@@ -37,6 +37,8 @@ class _Catalog:
                 available=True,
                 route="robot_action",
                 interaction_executable=True,
+                can_run_parallel=True,
+                parallel_metadata_declared=True,
                 behavior_domains=["social_attention"],
                 input_schema={
                     "type": "object",

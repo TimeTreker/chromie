@@ -284,17 +284,17 @@ before preview/submit. Additional guarded dry-run and
 runtime-cancellation modes are documented in
 [`../docs/ACCEPTANCE.md`](../docs/ACCEPTANCE.md).
 
-## Next task-agent direction
+## Current Soridormi capability direction
 
-The next implementation work is Chromie routing into Soridormi-declared
-no-motion task types, not low-level motion code. The paired Soridormi manifest
-already declares bounded locomotion, attention, gesture, sequence, stop,
-safe-idle, and planning-hold task surfaces; navigation, approach, and delivery
-remain structured refusals. Chromie can add routing, TaskGraph, and Skill
-Runtime tests that submit and monitor only those declared contracts while
-preserving Soridormi refusal metadata. Motion-control model training is
-deferred until Soridormi has a selected target body or simulator, calibration
-and telemetry, task-level metrics, and safety envelopes.
+Chromie plans only across Soridormi's advertised semantic capabilities, not
+low-level motion code. The paired provider currently declares bounded locomotion,
+attention, gesture, sequence, stop, safe-idle, planning-hold, and a complete
+`acquire_and_deliver_resource` leaf. That resource leaf is explicitly a
+simulation-only scripted/mock implementation; its internal navigation,
+acquisition, carrying, and handover stages stay provider-owned. Smaller real
+navigation, perception, grasp, or delivery leaves remain unavailable unless the
+provider later advertises and qualifies them. A different body backend changes
+Soridormi commissioning and safety evidence, not Chromie's Goal or Planner shape.
 
 ## Run locally
 

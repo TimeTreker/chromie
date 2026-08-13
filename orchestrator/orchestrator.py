@@ -6805,6 +6805,35 @@ class VoiceAssistant:
             if execution_started
             else "before any tool or body action started"
         )
+        # The full typed failure record remains in response metadata for audit,
+        # but wording generation receives only facts a person could reasonably
+        # hear about. Internal stage/class/retry labels previously primed the
+        # model to translate a planner failure into unnatural speech such as
+        # "my plan went wrong" even though the prompt prohibited that leak.
+        user_visible_fact_keys = (
+            "user_input_understood",
+            "user_should_repeat",
+            "interaction_response_constructed",
+            "provider_request_count",
+            "exact_capability_selected",
+            "capability_available_at_interpretation",
+            "missing_ability",
+            "execution_started",
+            "verified_result_available",
+            "capability_state",
+            "execution_state",
+            "result_state",
+            "provider_dispatch_started",
+            "failure_before_provider_dispatch",
+            "user_action_required",
+            "reason_codes",
+            "goal_statuses",
+        )
+        user_visible_failure_facts = {
+            key: failure_facts[key]
+            for key in user_visible_fact_keys
+            if key in failure_facts
+        }
         prompt = (
             "Write the exact words Chromie should say after a request failed "
             f"{phase}. The facts below are authoritative. "
@@ -6843,7 +6872,9 @@ class VoiceAssistant:
             "and result_state exactly alongside text.\n\n"
             f"Owner-approved identity JSON: {self._direct_llm_identity_json()}\n"
             f"Owner-approved mind summary: {self._direct_llm_mind_summary()}\n"
-            f"Trusted failure facts JSON: {json.dumps(failure_facts, ensure_ascii=False, sort_keys=True)}\n"
+            "User-visible failure facts JSON (the internal audit record was "
+            "intentionally withheld): "
+            f"{json.dumps(user_visible_failure_facts, ensure_ascii=False, sort_keys=True)}\n"
             f"User turn: {user_text}\n"
         )
         payload = {

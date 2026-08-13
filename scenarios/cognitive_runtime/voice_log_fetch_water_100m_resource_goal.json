@@ -1,0 +1,248 @@
+{
+  "schema_version": 1,
+  "id": "voice_log_fetch_water_100m_resource_goal",
+  "suite": "cognitive_runtime",
+  "level": "integration",
+  "description": "The retained Chinese voice episode keeps instrumental navigation inside one acquire-and-deliver responsibility and invokes the complete provider capability with exact nested semantics.",
+  "tags": [
+    "voice-log",
+    "daily-life",
+    "resource-acquisition",
+    "provider-owned-decomposition",
+    "natural-response"
+  ],
+  "input": {
+    "text": "去往前走个100米，帮我拿杯水过来。",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "mode": "apply",
+    "apply_lanes": [
+      "robot_action"
+    ],
+    "route_decision": {
+      "route": "robot_action",
+      "intent": "semantic_capability_planning",
+      "language": "zh-CN"
+    },
+    "goal_association": {
+      "turn_id": "turn-voice-log-water",
+      "new_goals": [
+        {
+          "goal_id": "goal-water",
+          "description": "从前方100米处拿一杯水并送给用户。",
+          "source_text": "去往前走个100米，帮我拿杯水过来。",
+          "object": {
+            "bindings": {
+              "distance": {
+                "name": "distance",
+                "entity_type": "distance",
+                "value": "100",
+                "confidence": 1.0
+              },
+              "direction": {
+                "name": "direction",
+                "entity_type": "direction",
+                "value": "前方",
+                "confidence": 1.0
+              }
+            }
+          },
+          "resource_responsibility": {
+            "responsibility_type": "acquire_and_deliver_resource",
+            "resource": {
+              "kind": "physical_object",
+              "description": "一杯水",
+              "quantity": "1",
+              "attributes": {}
+            },
+            "source": {
+              "status": "known",
+              "description": "前方100米处",
+              "bindings": {
+                "distance": {
+                  "name": "distance",
+                  "entity_type": "distance",
+                  "value": "100",
+                  "confidence": 1.0
+                },
+                "direction": {
+                  "name": "direction",
+                  "entity_type": "direction",
+                  "value": "前方",
+                  "confidence": 1.0
+                }
+              }
+            },
+            "recipient": {
+              "description": "用户"
+            },
+            "delivery_mode": "physical_handover"
+          },
+          "metadata": {
+            "responsibility_kind": "executable_action"
+          }
+        }
+      ],
+      "confidence": 1.0,
+      "metadata": {
+        "status": "resolved"
+      }
+    },
+    "fast_plan": {
+      "plan_id": "fast-voice-log-water",
+      "planner_tier": "fast",
+      "disposition": "execute",
+      "coverage": "complete",
+      "confidence": 1.0,
+      "goal_ids": [
+        "goal-water"
+      ],
+      "goal_summary": "从前方100米处拿一杯水并送给用户。",
+      "steps": [
+        {
+          "step_id": "fetch-water",
+          "skill_id": "soridormi.acquire_and_deliver_resource",
+          "args": {
+            "resource": {
+              "kind": "physical_object",
+              "description": "一杯水",
+              "quantity": "1",
+              "attributes": {}
+            },
+            "source": {
+              "status": "known",
+              "description": "前方100米处",
+              "bindings": {
+                "distance": {
+                  "name": "distance",
+                  "entity_type": "distance",
+                  "value": "100",
+                  "confidence": 1.0
+                },
+                "direction": {
+                  "name": "direction",
+                  "entity_type": "direction",
+                  "value": "前方",
+                  "confidence": 1.0
+                }
+              }
+            },
+            "recipient": {
+              "description": "用户"
+            }
+          },
+          "timing": "sequential",
+          "source_goal_ids": [
+            "goal-water"
+          ]
+        }
+      ],
+      "goal_outcomes": [
+        {
+          "goal_id": "goal-water",
+          "disposition": "execute",
+          "coverage": "complete",
+          "step_ids": [
+            "fetch-water"
+          ]
+        }
+      ],
+      "goal_satisfaction": {
+        "score": 1.0,
+        "status": "exact",
+        "satisfied_goal_ids": [
+          "goal-water"
+        ]
+      }
+    },
+    "capabilities": [
+      {
+        "skill_id": "soridormi.acquire_and_deliver_resource",
+        "provider_id": "soridormi.mcp",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "resource": {
+              "type": "object"
+            },
+            "source": {
+              "type": "object"
+            },
+            "recipient": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "resource",
+            "source",
+            "recipient"
+          ],
+          "additionalProperties": false
+        },
+        "requires_confirmation": false,
+        "can_run_parallel": false,
+        "exclusive_group": "resource_acquisition_delivery",
+        "resource_claims": [
+          "body.primary_motion"
+        ]
+      }
+    ],
+    "response_composition": {
+      "response_plan": {
+        "pre_action": {
+          "text": "好呀，我去拿给你。",
+          "speech_act": "inform",
+          "commitment_state": "evaluating",
+          "must_not_claim_completion": true,
+          "covers_goal_ids": [
+            "goal-water"
+          ]
+        }
+      }
+    }
+  },
+  "expect": {
+    "status": "applied",
+    "lane": "robot_action",
+    "planner_tier": "fast",
+    "disposition": "execute",
+    "coverage": "complete",
+    "interaction_status": "ok",
+    "goal_outcomes": [
+      {
+        "goal_id": "goal-water",
+        "disposition": "execute",
+        "coverage": "complete",
+        "step_ids": [
+          "fetch-water"
+        ]
+      }
+    ],
+    "capability_ids": [
+      "soridormi.acquire_and_deliver_resource"
+    ],
+    "capability_source_goal_ids": [
+      [
+        "goal-water"
+      ]
+    ],
+    "speech_covers_goal_ids": [
+      "goal-water"
+    ],
+    "speech_contains_all": [
+      "拿给你"
+    ],
+    "speech_forbids_all": [
+      "计划出错",
+      "规划",
+      "系统"
+    ],
+    "requires_confirmation": false,
+    "calls": [
+      "goal_association",
+      "fast_plan",
+      "response_composer"
+    ]
+  }
+}

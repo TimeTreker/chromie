@@ -441,6 +441,16 @@ class InteractionRuntime(_AgentPipeline):
                 continue
             if payload.get("interaction_executable") is not True:
                 continue
+            # In apply mode the background path cannot pause the primary turn for
+            # confirmation and the continuous runtime accepts only declared
+            # parallel-safe decoration. Do not label candidates "eligible" for the
+            # model when the trusted runtime would deterministically reject them.
+            if mode == "on" and (
+                bool(payload.get("requires_confirmation"))
+                or payload.get("can_run_parallel") is not True
+                or payload.get("parallel_metadata_declared") is not True
+            ):
+                continue
             domains = {
                 str(value).strip().lower()
                 for value in payload.get("behavior_domains") or []

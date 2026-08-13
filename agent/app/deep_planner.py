@@ -31,6 +31,7 @@ except ImportError:  # pragma: no cover
     from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 from .planner_contract import (
     EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
+    ResourceResponsibilityCapabilityGroundingError,
     ResourceResponsibilityCapabilityUnavailableError,
     canonical_goal_grounding,
     canonical_plan_response_schema,
@@ -47,6 +48,7 @@ from .planner_contract import (
     planner_response_goal_ids,
     planner_contract_diagnostics,
     review_coordinated_action_plan_coverage,
+    resource_grounding_repair_response_schema,
     situation_prompt_projection,
     validate_explicit_numeric_parameter_grounding,
     validate_external_response_evidence_boundary,
@@ -181,12 +183,20 @@ class DeepPlannerResolver:
         initial_raw_output: Any = None
         contract_repair_attempted = False
         initial_validation_errors = ""
+        resource_grounding_repair_error: (
+            ResourceResponsibilityCapabilityGroundingError | None
+        ) = None
         for attempt in range(self.max_replans + 1):
             raw: Any = None
             try:
                 active_response_schema = self._contract_revision_response_schema(
                     response_schema,
                     feedback=feedback,
+                )
+                active_response_schema = resource_grounding_repair_response_schema(
+                    active_response_schema,
+                    error=resource_grounding_repair_error,
+                    authoritative_goals=authoritative_goals,
                 )
                 if self._requires_safety_revision(feedback):
                     active_response_schema = self._safety_revision_response_schema(
@@ -271,6 +281,14 @@ class DeepPlannerResolver:
                 semantic_replan = self._is_semantic_replan_error(exc)
                 if attempt < self.max_replans and semantic_replan:
                     contract_repair_attempted = True
+                    resource_grounding_repair_error = (
+                        exc
+                        if isinstance(
+                            exc,
+                            ResourceResponsibilityCapabilityGroundingError,
+                        )
+                        else None
+                    )
                     initial_raw_output = raw
                     # Contract repair is a fresh schema-constrained regeneration,
                     # not an in-place JSON edit.  Supplying the invalid object as
@@ -1172,7 +1190,7 @@ class DeepPlannerResolver:
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
             f"{EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT}"
-            "Use the full catalog, preserve all independent responsibilities, constraints, conditions, ordering, concurrency, temporal scope, comparison period, and requested answer shape. Never silently rewrite simultaneous independent actions as before/after actions. An explicit ordered relation must remain sequential. Capability parallel-safety is permission to honor user-requested concurrency, never evidence that concurrency was requested. Every executable step must explicitly include timing; omission is invalid because it would erase the model's ordering or concurrency decision. When the user requests compatible actions to happen together, assign timing=parallel only when each selected capability explicitly declares parallel_metadata_declared=true and can_run_parallel=true and their exclusive/resource claims are compatible. Never invent an unstated feature of a capability in a reason or outcome; a physical action cannot satisfy a conversational or spoken-performance Goal unless its supplied semantics explicitly say so. Use a respond outcome for speech authored by Response Composer. Never satisfy a prohibition, negation, or hold-state constraint by invoking the positive action it forbids; if the catalog has no capability whose semantic scope actually enforces that negative state, clarify or report it unavailable. If safe parallel execution is unavailable or uncertain, clarify or propose an explicit safe adjustment rather than silently serializing the request. For a Goal with resource_responsibility, keep the entire acquire-and-deliver outcome as one semantic responsibility and use the current capability catalog as the dynamic decomposition boundary. Prefer one exact capability when its declared resource_contract.plan_provides covers the complete required resource state. If no one capability covers the Goal, compose multiple advertised capabilities whose matching semantic scopes and ordered plan_requires/plan_provides form a valid chain covering the required outcome. Never invent provider-internal navigation, perception, grasp, search, retry, carrying, or handover stages that are not separately advertised capabilities. Provider-local decomposition stays inside the selected capability. The Goal is provider-neutral: choose the smallest reliable complete capability set from current declared semantics, never from capability names or a hardcoded provider rule. When source.status=unknown, the selected chain must include a capability that can resolve it internally or otherwise avoid requiring an unresolved source state; do not invent a source. Capability semantic_scope and resource_contract metadata are authoritative applicability evidence. Never silently narrow a canonical goal to fit a capability or its enum defaults. If a goal is outside every available capability scope, clarify or report unavailable with zero steps. Resolve low-consequence "
+            "Use the full catalog, preserve all independent responsibilities, constraints, conditions, ordering, concurrency, temporal scope, comparison period, and requested answer shape. Never silently rewrite simultaneous independent actions as before/after actions. An explicit ordered relation must remain sequential. Capability parallel-safety is permission to honor user-requested concurrency, never evidence that concurrency was requested. Every executable step must explicitly include timing; omission is invalid because it would erase the model's ordering or concurrency decision. When the user requests compatible actions to happen together, assign timing=parallel only when each selected capability explicitly declares parallel_metadata_declared=true and can_run_parallel=true and their exclusive/resource claims are compatible. Never invent an unstated feature of a capability in a reason or outcome; a physical action cannot satisfy a conversational or spoken-performance Goal unless its supplied semantics explicitly say so. Use a respond outcome for speech authored by Response Composer. Never satisfy a prohibition, negation, or hold-state constraint by invoking the positive action it forbids; if the catalog has no capability whose semantic scope actually enforces that negative state, clarify or report it unavailable. If safe parallel execution is unavailable or uncertain, clarify or propose an explicit safe adjustment rather than silently serializing the request. For a Goal with resource_responsibility, keep the entire acquire-and-deliver outcome as one semantic responsibility and use the current capability catalog as the dynamic decomposition boundary. Prefer one exact capability when its declared resource_contract.plan_provides covers the complete required resource state. If no one capability covers the Goal, compose multiple advertised capabilities whose matching semantic scopes and ordered plan_requires/plan_provides form a valid chain covering the required outcome. Never invent provider-internal navigation, perception, grasp, search, retry, carrying, or handover stages that are not separately advertised capabilities. Provider-local decomposition stays inside the selected capability. The Goal is provider-neutral: choose the smallest reliable complete capability set from current declared semantics, never from capability names or a hardcoded provider rule. When source.status=unknown, the selected chain must include a capability that can resolve it internally or otherwise avoid requiring an unresolved source state; do not invent a source. Capability semantic_scope and resource_contract metadata are authoritative applicability evidence. When a selected Capability accepts resource, source, or recipient objects, copy each accepted object exactly from the canonical resource_responsibility, including nested quantity, source bindings, and recipient fields. Do not emit parameter_resolutions for nested fields of those complete structured arguments or invent top-level fields absent from the Capability schema. Never silently narrow a canonical goal to fit a capability or its enum defaults. If a goal is outside every available capability scope, clarify or report unavailable with zero steps. Resolve low-consequence "
             "parameters semantically when justified; otherwise return a specific natural clarification. Clarification is only for ambiguous user meaning or missing material information that the user can supply and whose answer can enable a matching catalog capability. When the Goal is already clear but no exact available capability covers the required outcome, return unavailable rather than asking for preferences, refinements, or details that cannot create the missing provider. Canonical Goal object.bindings are authoritative resolved parameters from Goal Association. Every material step argument, including location, date, target, person, and entity identity, must equal the matching binding; do not replace a binding with a value from older memory or re-resolve the original reference. For chromie.weather.lookup, keep args.location exactly equal to the canonical location binding. When the user or discourse context clearly supplies a hierarchical place, you may also provide location_context with locality, admin1, country, and aliases for that same place; never use it to select a different place. For chromie.memory.retrieve_verified_tool_result, resolved Goal bindings such as location and date belong inside the single material_args object. They are not missing direct step arguments, so do not emit separate location or date parameter_resolutions. If a resolution for that nested object is useful, its parameter must be material_args and its value must equal the complete step.args.material_args object. When independent goals have different terminal needs, use disposition=mixed, coverage=complete, and goal_outcomes so executable goals can proceed while only affected goals wait for clarification. Scope every blocking parameter resolution with source_goal_ids. Exact, safe-adjusted, or alternative executable plans "
             "must use coverage=complete and disposition=execute or mixed as appropriate. Every executable step must include source_goal_ids identifying exactly the goals it serves. Use plan_relation=exact for an exact plan. A safe_adjustment or material alternative must use the corresponding plan_relation, be described in response_text, set user_confirmation_required=true, and require "
             "confirmation downstream. For every missing parameter, return parameter_resolutions with a semantic strategy, concrete value when resolved, confidence, and rationale. Use safe_default only for low-consequence reversible values inside schema bounds. Use ask_user for material or risky values. Also return goal_satisfaction as prospective plan adequacy: planned steps count as satisfying their goals if successful, and pending execution alone is never an unmet requirement. An exact complete plan therefore uses status=exact with score at least 0.95 and lists the goals it is designed to satisfy. If essential information remains missing, use coverage=partial or uncertain with disposition=clarify and zero steps. "
@@ -1375,6 +1393,12 @@ class DeepPlannerResolver:
             authoritative_goals=canonical_goal_grounding(request.context),
             context=request.context,
         )
+        if capability_payload is not None:
+            validate_resource_responsibility_capability_grounding(
+                model_output,
+                authoritative_goals=canonical_goal_grounding(request.context),
+                capabilities=capability_payload,
+            )
         validate_explicit_numeric_parameter_grounding(
             model_output,
             authoritative_goals=canonical_goal_grounding(request.context),
@@ -1387,12 +1411,6 @@ class DeepPlannerResolver:
             model_output,
             authoritative_goals=canonical_goal_grounding(request.context),
         )
-        if capability_payload is not None:
-            validate_resource_responsibility_capability_grounding(
-                model_output,
-                authoritative_goals=canonical_goal_grounding(request.context),
-                capabilities=capability_payload,
-            )
         validate_external_response_evidence_boundary(
             model_output,
             context=request.context,

@@ -186,6 +186,7 @@ class _GoalPlanOutcomeBase(BaseModel):
 class ExecuteGoalPlanOutcome(_GoalPlanOutcomeBase):
     disposition: Literal["execute"]
     coverage: Literal["complete"]
+    unresolved: list[str] = Field(default_factory=list, max_length=0)
     step_ids: list[str] = Field(min_length=1)
 
     @field_validator("step_ids", mode="before")
@@ -197,6 +198,7 @@ class ExecuteGoalPlanOutcome(_GoalPlanOutcomeBase):
 class RespondGoalPlanOutcome(_GoalPlanOutcomeBase):
     disposition: Literal["respond"]
     coverage: Literal["complete"]
+    unresolved: list[str] = Field(default_factory=list, max_length=0)
     step_ids: list[str] = Field(default_factory=list, max_length=0)
     response_text: str = Field(min_length=1)
 
@@ -432,6 +434,11 @@ class CanonicalPlan(BaseModel):
             )
         if self.disposition in {"execute", "respond", "mixed"} and self.coverage != "complete":
             raise ValueError("respond, execute, and mixed plans require complete accounting coverage")
+        if self.disposition in {"execute", "respond"} and self.unresolved:
+            raise ValueError(
+                "complete execute or respond plans must not retain unresolved "
+                "planning work"
+            )
         resolution_keys = [(item.step_id, item.parameter) for item in self.parameter_resolutions]
         if len(resolution_keys) != len(set(resolution_keys)):
             raise ValueError("parameter resolution entries must be unique per step and parameter")

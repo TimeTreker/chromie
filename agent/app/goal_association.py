@@ -134,11 +134,14 @@ _FRESH_RESEGMENTATION_TRIGGERS = frozenset(
         "invalid_action_collection_binding",
         "invalid_location_binding_provenance",
         "embodied_responsibility_decomposition",
+        "resource_provider_stage_split_review",
         "mixed_capability_and_spoken_responsibilities",
         "multi_embodied_responsibility_review",
         "recommendation_route_spoken_responsibility_review",
         "tool_route_spoken_responsibility_review",
         "resource_result_delivery_split_review",
+        "resource_contract_loss_review",
+        "residual_resource_provider_stage_split_review",
         "responsibility_coverage_rejected",
     }
 )
@@ -401,6 +404,7 @@ class GoalAssociationModelResourceResponsibility(BaseModel):
 
     resource_kind: Literal["physical_object", "information"]
     resource_description: str = Field(min_length=1)
+    resource_quantity: str = ""
     source_status: Literal["known", "unknown", "provider_resolved"]
     source_description: str = ""
     source_binding_names: list[str] = Field(default_factory=list, max_length=8)
@@ -413,6 +417,7 @@ class GoalAssociationModelResourceResponsibility(BaseModel):
 
     @field_validator(
         "resource_description",
+        "resource_quantity",
         "source_description",
         "recipient_description",
         mode="before",
@@ -806,6 +811,21 @@ class GoalResponsibilityCoverageReview(BaseModel):
 
     @model_validator(mode="after")
     def validate_decision(self) -> "GoalResponsibilityCoverageReview":
+        items_by_excerpt: dict[str, list[GoalResponsibilityCoverageItem]] = {}
+        for item in self.items:
+            excerpt = " ".join(item.source_excerpt.casefold().split())
+            items_by_excerpt.setdefault(excerpt, []).append(item)
+        duplicate_excerpts = sorted(
+            excerpt
+            for excerpt, matching_items in items_by_excerpt.items()
+            if len(matching_items) > 1
+        )
+        if duplicate_excerpts:
+            raise ValueError(
+                "one semantic source fragment must have exactly one coverage item; "
+                "choose its single actual role and ownership judgment: "
+                + ", ".join(duplicate_excerpts)
+            )
         material = [
             item
             for item in self.items
@@ -1023,6 +1043,7 @@ class GoalAssociationResolver:
         responsibility_coverage_succeeded = False
         responsibility_coverage_attempt_count = 0
         responsibility_coverage_resegmented = False
+        constraint_representation_repair = False
         optional_referent_recovery: list[dict[str, Any]] = []
 
         try:
@@ -1205,6 +1226,19 @@ class GoalAssociationResolver:
                 request=request,
                 candidate_goals=candidate_goals,
             )
+            initial_had_resource_contract = self._raw_has_resource_contract(
+                initial_raw
+            )
+            if (
+                initial_had_resource_contract
+                and model_output.decision == "create_goals"
+                and not any(
+                    goal.resource_responsibility is not None
+                    for goal in model_output.new_goals
+                )
+                and "resource_contract_loss_review" not in review_triggers
+            ):
+                review_triggers.append("resource_contract_loss_review")
             if review_triggers:
                 semantic_review_attempted = True
                 semantic_review_attempt_count = 1
@@ -1259,6 +1293,306 @@ class GoalAssociationResolver:
                     turn_id=turn_id,
                     output_type=output_type,
                 )
+                resource_stage_adjudication = False
+                resource_contract_loss_adjudication = False
+                reviewed_output = output_type.model_validate(reviewed)
+                if (
+                    (
+                        initial_had_resource_contract
+                        and model_output.decision == "create_goals"
+                    )
+                    or any(
+                        goal.resource_responsibility is not None
+                        for goal in model_output.new_goals
+                    )
+                ) and not any(
+                    goal.resource_responsibility is not None
+                    for goal in reviewed_output.new_goals
+                ):
+                    resource_contract_loss_adjudication = True
+                    semantic_review_attempt_count += 1
+                    logger.info(
+                        "goal_association_resource_contract_loss_review_start sid=%s",
+                        request.sid,
+                    )
+                    resource_review = await self.ollama.generate(
+                        self._build_semantic_review_prompt(
+                            request=request,
+                            candidate_goals=candidate_goals,
+                            output_type=output_type,
+                            raw=reviewed,
+                            triggers=["resource_contract_loss_review"],
+                        ),
+                        system=self._semantic_review_system_prompt(
+                            output_type,
+                            fresh_resegmentation=True,
+                        ),
+                        options=generation_options,
+                        response_format=response_schema,
+                        prompt_family=(
+                            "goal_association.resource_contract_loss_adjudication"
+                        ),
+                        turn_id=request.sid,
+                        attempt=4,
+                    )
+                    if not isinstance(resource_review, dict):
+                        raise OllamaGenerationError(
+                            "goal-association resource-contract-loss review response "
+                            "is not a JSON object",
+                            failure_class="structured_output_invalid",
+                            failure_domain="model_contract",
+                            architecture_attribution="not_evaluated",
+                            retryable=True,
+                        )
+                    resource_review, recovered = (
+                        self._drop_invalid_optional_referent_introductions(
+                            resource_review
+                        )
+                    )
+                    optional_referent_recovery.extend(recovered)
+                    reviewed = resource_review
+                    accepted_raw = resource_review
+                    semantic_review_raw = resource_review
+                    resolution = await self._validate_contract_output(
+                        resource_review,
+                        request=request,
+                        turn_id=turn_id,
+                        output_type=output_type,
+                    )
+                    reviewed_output = output_type.model_validate(resource_review)
+                    if not any(
+                        goal.resource_responsibility is not None
+                        for goal in reviewed_output.new_goals
+                    ):
+                        semantic_review_attempt_count += 1
+                        logger.warning(
+                            "goal_association_resource_contract_loss_residual_"
+                            "repair_start sid=%s",
+                            request.sid,
+                        )
+                        resource_review = await self.ollama.generate(
+                            self._build_semantic_review_prompt(
+                                request=request,
+                                candidate_goals=candidate_goals,
+                                output_type=output_type,
+                                raw=resource_review,
+                                triggers=["resource_contract_loss_review"],
+                            )
+                            + (
+                                "\n\nThe preceding resource-contract-loss "
+                                "adjudication was schema-valid but still omitted "
+                                "resource_responsibility from every Goal. That did "
+                                "not satisfy the review contract. Return one final "
+                                "complete DTO that actually includes the grounded, "
+                                "provider-neutral resource responsibility. Preserve "
+                                "its identity, explicit quantity, source status and "
+                                "source bindings, recipient, delivery mode, and all "
+                                "instrumental spatial constraints. Apply the "
+                                "counterfactual independence test before retaining "
+                                "any provider-stage sibling Goal."
+                            ),
+                            system=self._semantic_review_system_prompt(
+                                output_type,
+                                fresh_resegmentation=False,
+                            ),
+                            options=generation_options,
+                            response_format=response_schema,
+                            prompt_family=(
+                                "goal_association.resource_contract_loss_residual_"
+                                "repair"
+                            ),
+                            turn_id=request.sid,
+                            attempt=5,
+                        )
+                        if not isinstance(resource_review, dict):
+                            raise OllamaGenerationError(
+                                "goal-association residual resource-contract-loss "
+                                "repair response is not a JSON object",
+                                failure_class="structured_output_invalid",
+                                failure_domain="model_contract",
+                                architecture_attribution="not_evaluated",
+                                retryable=True,
+                            )
+                        resource_review, recovered = (
+                            self._drop_invalid_optional_referent_introductions(
+                                resource_review
+                            )
+                        )
+                        optional_referent_recovery.extend(recovered)
+                        resolution = await self._validate_contract_output(
+                            resource_review,
+                            request=request,
+                            turn_id=turn_id,
+                            output_type=output_type,
+                        )
+                        reviewed_output = output_type.model_validate(resource_review)
+                        if not any(
+                            goal.resource_responsibility is not None
+                            for goal in reviewed_output.new_goals
+                        ):
+                            raise ValueError(
+                                "resource-contract-loss adjudication did not restore "
+                                "a resource responsibility after bounded repair"
+                            )
+                        reviewed = resource_review
+                        accepted_raw = resource_review
+                        semantic_review_raw = resource_review
+                        logger.info(
+                            "goal_association_resource_contract_loss_residual_"
+                            "repair_done sid=%s status=success",
+                            request.sid,
+                        )
+                    logger.info(
+                        "goal_association_resource_contract_loss_review_done "
+                        "sid=%s status=success",
+                        request.sid,
+                    )
+                if self._resource_stage_split_review_required(reviewed_output):
+                    resource_stage_adjudication = True
+                    semantic_review_attempt_count += 1
+                    stage_input_had_resource_contract = any(
+                        goal.resource_responsibility is not None
+                        for goal in reviewed_output.new_goals
+                    )
+                    logger.info(
+                        "goal_association_resource_stage_adjudication_start sid=%s",
+                        request.sid,
+                    )
+                    focused_review = await self.ollama.generate(
+                        self._build_semantic_review_prompt(
+                            request=request,
+                            candidate_goals=candidate_goals,
+                            output_type=output_type,
+                            raw=reviewed,
+                            triggers=[
+                                "residual_resource_provider_stage_split_review"
+                            ],
+                        ),
+                        system=self._semantic_review_system_prompt(
+                            output_type,
+                            fresh_resegmentation=True,
+                        ),
+                        options=generation_options,
+                        response_format=response_schema,
+                        prompt_family=(
+                            "goal_association.resource_stage_adjudication"
+                        ),
+                        turn_id=request.sid,
+                        attempt=4,
+                    )
+                    if not isinstance(focused_review, dict):
+                        raise OllamaGenerationError(
+                            "goal-association resource-stage adjudication response "
+                            "is not a JSON object",
+                            failure_class="structured_output_invalid",
+                            failure_domain="model_contract",
+                            architecture_attribution="not_evaluated",
+                            retryable=True,
+                        )
+                    focused_review, recovered = (
+                        self._drop_invalid_optional_referent_introductions(
+                            focused_review
+                        )
+                    )
+                    optional_referent_recovery.extend(recovered)
+                    reviewed = focused_review
+                    accepted_raw = focused_review
+                    semantic_review_raw = focused_review
+                    resolution = await self._validate_contract_output(
+                        focused_review,
+                        request=request,
+                        turn_id=turn_id,
+                        output_type=output_type,
+                    )
+                    reviewed_output = output_type.model_validate(focused_review)
+                    if stage_input_had_resource_contract and not any(
+                        goal.resource_responsibility is not None
+                        for goal in reviewed_output.new_goals
+                    ):
+                        semantic_review_attempt_count += 1
+                        logger.warning(
+                            "goal_association_resource_stage_contract_loss_repair_"
+                            "start sid=%s",
+                            request.sid,
+                        )
+                        focused_review = await self.ollama.generate(
+                            self._build_semantic_review_prompt(
+                                request=request,
+                                candidate_goals=candidate_goals,
+                                output_type=output_type,
+                                raw=focused_review,
+                                triggers=[
+                                    "resource_contract_loss_review",
+                                    "residual_resource_provider_stage_split_review",
+                                ],
+                            )
+                            + (
+                                "\n\nThe focused resource-stage adjudication lost the "
+                                "provider-neutral resource_responsibility even though "
+                                "the candidate it reviewed contained one. That is a "
+                                "contract loss, not a semantic decision. Return the full "
+                                "corrected DTO with one complete resource responsibility "
+                                "for the acquisition-and-delivery outcome. Re-run the "
+                                "inverse completion counterfactual for every embodied "
+                                "sibling; if a sibling is only an acquisition route or "
+                                "provider stage, move its material spatial bindings into "
+                                "the resource Goal and its known source."
+                            ),
+                            system=self._semantic_review_system_prompt(
+                                output_type,
+                                fresh_resegmentation=False,
+                            ),
+                            options=generation_options,
+                            response_format=response_schema,
+                            prompt_family=(
+                                "goal_association.resource_stage_contract_loss_repair"
+                            ),
+                            turn_id=request.sid,
+                            attempt=5,
+                        )
+                        if not isinstance(focused_review, dict):
+                            raise OllamaGenerationError(
+                                "goal-association resource-stage contract-loss repair "
+                                "response is not a JSON object",
+                                failure_class="structured_output_invalid",
+                                failure_domain="model_contract",
+                                architecture_attribution="not_evaluated",
+                                retryable=True,
+                            )
+                        focused_review, recovered = (
+                            self._drop_invalid_optional_referent_introductions(
+                                focused_review
+                            )
+                        )
+                        optional_referent_recovery.extend(recovered)
+                        resolution = await self._validate_contract_output(
+                            focused_review,
+                            request=request,
+                            turn_id=turn_id,
+                            output_type=output_type,
+                        )
+                        reviewed_output = output_type.model_validate(focused_review)
+                        if not any(
+                            goal.resource_responsibility is not None
+                            for goal in reviewed_output.new_goals
+                        ):
+                            raise ValueError(
+                                "resource-stage adjudication did not preserve the "
+                                "resource responsibility after bounded repair"
+                            )
+                        reviewed = focused_review
+                        accepted_raw = focused_review
+                        semantic_review_raw = focused_review
+                        logger.info(
+                            "goal_association_resource_stage_contract_loss_repair_"
+                            "done sid=%s status=success",
+                            request.sid,
+                        )
+                    logger.info(
+                        "goal_association_resource_stage_adjudication_done "
+                        "sid=%s status=success",
+                        request.sid,
+                    )
                 residual_review_triggers = (
                     self._residual_semantic_review_triggers(
                         output_type.model_validate(reviewed)
@@ -1359,14 +1693,25 @@ class GoalAssociationResolver:
                     "attempted": True,
                     "succeeded": True,
                     "strategy": (
-                        "model_owned_goal_independence_adjudication"
+                        "model_owned_resource_stage_adjudication"
+                        if resource_stage_adjudication
+                        else "model_owned_resource_contract_loss_adjudication"
+                        if resource_contract_loss_adjudication
+                        else "model_owned_goal_independence_adjudication"
                         if semantic_review_attempt_count > 1
                         else "model_owned_fresh_goal_resegmentation"
                         if fresh_resegmentation
                         else "model_owned_goal_association_review"
                     ),
                     "triggers": review_triggers,
-                    "residual_triggers": residual_review_triggers,
+                    "residual_triggers": [
+                        *(
+                            ["residual_resource_provider_stage_split_review"]
+                            if resource_stage_adjudication
+                            else []
+                        ),
+                        *residual_review_triggers,
+                    ],
                     "attempt_count": semantic_review_attempt_count,
                 }
                 resolution = resolution.model_copy(
@@ -1377,6 +1722,10 @@ class GoalAssociationResolver:
                     request.sid,
                 )
             coverage_candidate = output_type.model_validate(accepted_raw)
+            coverage_started_with_resource_contract = any(
+                goal.resource_responsibility is not None
+                for goal in coverage_candidate.new_goals
+            )
             if self._responsibility_coverage_required(
                 coverage_candidate,
                 request=request,
@@ -1396,6 +1745,204 @@ class GoalAssociationResolver:
                     attempt=5,
                 )
                 initial_coverage_decision = coverage_review.decision
+                if (
+                    coverage_review.decision == "accept"
+                    and self._resource_stage_split_review_required(
+                        coverage_candidate
+                    )
+                ):
+                    responsibility_coverage_attempt_count += 1
+                    coverage_review = (
+                        await self._run_responsibility_coverage_audit(
+                            request=request,
+                            raw=accepted_raw,
+                            generation_options=generation_options,
+                            prompt_family=(
+                                "goal_association.resource_stage_"
+                                "responsibility_coverage"
+                            ),
+                            attempt=6,
+                            resource_stage_focus=True,
+                            source_excerpts=[
+                                item.source_excerpt
+                                for item in coverage_review.items
+                            ],
+                        )
+                    )
+                coverage_requires_resource_contract = (
+                    self._coverage_preserves_resource_contract(
+                        coverage_review,
+                        raw=accepted_raw,
+                    )
+                )
+                if (
+                    coverage_review.decision == "reject"
+                    and self._coverage_rejects_only_constraint_representation(
+                        coverage_review
+                    )
+                ):
+                    responsibility_coverage_attempt_count = 2
+                    logger.info(
+                        "goal_association_initial_constraint_representation_repair_"
+                        "start sid=%s",
+                        request.sid,
+                    )
+                    constraint_corrected = await self.ollama.generate(
+                        self._build_constraint_representation_repair_prompt(
+                            request=request,
+                            raw=accepted_raw,
+                            coverage_review=coverage_review,
+                        ),
+                        system=self._constraint_representation_repair_system_prompt(),
+                        options=generation_options,
+                        response_format=(
+                            self._constraint_representation_response_schema(
+                                self._responsibility_resegmentation_response_schema(
+                                    response_schema,
+                                    output_type=output_type,
+                                    coverage_review=coverage_review,
+                                ),
+                                goal_count=len(coverage_candidate.new_goals),
+                            )
+                        ),
+                        prompt_family=(
+                            "goal_association.initial_constraint_representation_repair"
+                        ),
+                        turn_id=request.sid,
+                        attempt=6,
+                    )
+                    if not isinstance(constraint_corrected, dict):
+                        raise OllamaGenerationError(
+                            "goal-association initial constraint representation "
+                            "repair response is not a JSON object",
+                            failure_class="structured_output_invalid",
+                            failure_domain="model_contract",
+                            architecture_attribution="not_evaluated",
+                            retryable=True,
+                        )
+                    constraint_corrected, recovered = (
+                        self._drop_invalid_optional_referent_introductions(
+                            constraint_corrected
+                        )
+                    )
+                    optional_referent_recovery.extend(recovered)
+                    try:
+                        resolution = await self._validate_contract_output(
+                            constraint_corrected,
+                            request=request,
+                            turn_id=turn_id,
+                            output_type=output_type,
+                        )
+                    except (ValidationError, ValueError) as constraint_repair_exc:
+                        repair_attempted = True
+                        contract_repair_attempt_count += 1
+                        contract_repair_strategy = (
+                            "initial_constraint_representation_contract_revision"
+                        )
+                        constraint_validation_error = self._validation_error_json(
+                            constraint_repair_exc
+                        )
+                        logger.warning(
+                            "goal_association_initial_constraint_representation_"
+                            "contract_repair_start sid=%s validation_errors=%s",
+                            request.sid,
+                            constraint_validation_error,
+                        )
+                        contract_corrected = await self.ollama.generate(
+                            self._build_constraint_representation_contract_repair_prompt(
+                                request=request,
+                                original_raw=accepted_raw,
+                                invalid_raw=constraint_corrected,
+                                coverage_review=coverage_review,
+                                validation_error=constraint_validation_error,
+                            ),
+                            system=(
+                                self._constraint_representation_repair_system_prompt()
+                            ),
+                            options=generation_options,
+                            response_format=(
+                                self._constraint_representation_response_schema(
+                                    self._responsibility_resegmentation_response_schema(
+                                        response_schema,
+                                        output_type=output_type,
+                                        coverage_review=coverage_review,
+                                    ),
+                                    goal_count=len(coverage_candidate.new_goals),
+                                )
+                            ),
+                            prompt_family=(
+                                "goal_association.initial_constraint_representation_"
+                                "contract_repair"
+                            ),
+                            turn_id=request.sid,
+                            attempt=7,
+                        )
+                        if not isinstance(contract_corrected, dict):
+                            raise OllamaGenerationError(
+                                "goal-association initial constraint representation "
+                                "contract repair response is not a JSON object",
+                                failure_class="structured_output_invalid",
+                                failure_domain="model_contract",
+                                architecture_attribution="not_evaluated",
+                                retryable=True,
+                            ) from constraint_repair_exc
+                        contract_corrected, recovered = (
+                            self._drop_invalid_optional_referent_introductions(
+                                contract_corrected
+                            )
+                        )
+                        optional_referent_recovery.extend(recovered)
+                        constraint_corrected = contract_corrected
+                        repair_raw = contract_corrected
+                        resolution = await self._validate_contract_output(
+                            constraint_corrected,
+                            request=request,
+                            turn_id=turn_id,
+                            output_type=output_type,
+                        )
+                        contract_repair_succeeded = True
+                        repair_metadata = dict(resolution.metadata)
+                        repair_metadata["contract_repair"] = {
+                            "attempted": True,
+                            "succeeded": True,
+                            "strategy": contract_repair_strategy,
+                            "attempt_count": contract_repair_attempt_count,
+                        }
+                        resolution = resolution.model_copy(
+                            update={"metadata": repair_metadata}
+                        )
+                        logger.info(
+                            "goal_association_initial_constraint_representation_"
+                            "contract_repair_done sid=%s status=success",
+                            request.sid,
+                        )
+                    accepted_raw = constraint_corrected
+                    semantic_review_raw = constraint_corrected
+                    coverage_candidate = output_type.model_validate(
+                        constraint_corrected
+                    )
+                    coverage_review = await self._run_responsibility_coverage_audit(
+                        request=request,
+                        raw=constraint_corrected,
+                        generation_options=generation_options,
+                        prompt_family=(
+                            "goal_association.responsibility_coverage_constraint_repair"
+                        ),
+                        attempt=8,
+                    )
+                    if coverage_review.decision != "accept":
+                        logger.warning(
+                            "goal_association_initial_constraint_representation_"
+                            "repair_incomplete sid=%s continuing=fresh_resegmentation",
+                            request.sid,
+                        )
+                    else:
+                        logger.info(
+                            "goal_association_initial_constraint_representation_"
+                            "repair_done sid=%s status=success goals=%d",
+                            request.sid,
+                            len(coverage_candidate.new_goals),
+                        )
                 if coverage_review.decision == "reject":
                     responsibility_coverage_resegmented = True
                     logger.info(
@@ -1419,6 +1966,9 @@ class GoalAssociationResolver:
                                 response_schema,
                                 output_type=output_type,
                                 coverage_review=coverage_review,
+                                require_resource_contract=(
+                                    coverage_requires_resource_contract
+                                ),
                             )
                         ),
                         prompt_family=(
@@ -1443,16 +1993,302 @@ class GoalAssociationResolver:
                     )
                     optional_referent_recovery.extend(recovered)
                     pre_coverage_metadata = dict(resolution.metadata)
-                    resolution = await self._validate_contract_output(
-                        resegmented,
-                        request=request,
-                        turn_id=turn_id,
-                        output_type=output_type,
-                    )
+                    try:
+                        self._validate_resegmentation_goal_count(
+                            resegmented,
+                            output_type=output_type,
+                            coverage_review=coverage_review,
+                            require_resource_contract=(
+                                coverage_requires_resource_contract
+                            ),
+                        )
+                        resolution = await self._validate_contract_output(
+                            resegmented,
+                            request=request,
+                            turn_id=turn_id,
+                            output_type=output_type,
+                        )
+                    except (ValidationError, ValueError) as resegmentation_exc:
+                        repair_attempted = True
+                        contract_repair_attempt_count += 1
+                        contract_repair_strategy = (
+                            "responsibility_resegmentation_contract_revision"
+                        )
+                        resegmentation_validation_error = self._validation_error_json(
+                            resegmentation_exc
+                        )
+                        logger.warning(
+                            "goal_association_responsibility_resegmentation_contract_"
+                            "repair_start sid=%s validation_errors=%s",
+                            request.sid,
+                            resegmentation_validation_error,
+                        )
+                        repaired_resegmentation = await self.ollama.generate(
+                            self._build_responsibility_resegmentation_contract_repair_prompt(
+                                request=request,
+                                candidate_goals=candidate_goals,
+                                output_type=output_type,
+                                coverage_review=coverage_review,
+                                invalid_raw=resegmented,
+                                validation_error=resegmentation_validation_error,
+                            ),
+                            system=self._repair_system_prompt(output_type),
+                            options=generation_options,
+                            response_format=(
+                                self._preserve_known_source_binding_response_schema(
+                                    self._constraint_representation_response_schema(
+                                        self._responsibility_resegmentation_response_schema(
+                                            response_schema,
+                                            output_type=output_type,
+                                            coverage_review=coverage_review,
+                                            require_resource_contract=(
+                                                coverage_requires_resource_contract
+                                            ),
+                                        ),
+                                        goal_count=(
+                                            self._audited_new_goal_count(coverage_review)
+                                            or len(coverage_candidate.new_goals)
+                                        ),
+                                    ),
+                                    raw=resegmented,
+                                )
+                                if any(
+                                    item.role == "constraint"
+                                    and item.coverage == "missing"
+                                    for item in coverage_review.items
+                                )
+                                else self._responsibility_resegmentation_response_schema(
+                                    response_schema,
+                                    output_type=output_type,
+                                    coverage_review=coverage_review,
+                                    require_resource_contract=(
+                                        coverage_requires_resource_contract
+                                    ),
+                                )
+                            ),
+                            prompt_family=(
+                                "goal_association.responsibility_resegmentation_"
+                                "contract_repair"
+                            ),
+                            turn_id=request.sid,
+                            attempt=7,
+                        )
+                        if not isinstance(repaired_resegmentation, dict):
+                            raise OllamaGenerationError(
+                                "goal-association responsibility resegmentation "
+                                "contract repair response is not a JSON object",
+                                failure_class="structured_output_invalid",
+                                failure_domain="model_contract",
+                                architecture_attribution="not_evaluated",
+                                retryable=True,
+                            ) from resegmentation_exc
+                        repaired_resegmentation, recovered = (
+                            self._drop_invalid_optional_referent_introductions(
+                                repaired_resegmentation
+                            )
+                        )
+                        optional_referent_recovery.extend(recovered)
+                        resegmented = repaired_resegmentation
+                        repair_raw = repaired_resegmentation
+                        self._validate_resegmentation_goal_count(
+                            resegmented,
+                            output_type=output_type,
+                            coverage_review=coverage_review,
+                            require_resource_contract=(
+                                coverage_requires_resource_contract
+                            ),
+                        )
+                        try:
+                            resolution = await self._validate_contract_output(
+                                resegmented,
+                                request=request,
+                                turn_id=turn_id,
+                                output_type=output_type,
+                            )
+                        except (ValidationError, ValueError) as repaired_reseg_exc:
+                            contract_repair_attempt_count += 1
+                            repaired_reseg_validation_error = (
+                                self._validation_error_json(repaired_reseg_exc)
+                            )
+                            logger.warning(
+                                "goal_association_responsibility_resegmentation_"
+                                "contract_revision_start sid=%s validation_errors=%s",
+                                request.sid,
+                                repaired_reseg_validation_error,
+                            )
+                            revised_resegmentation = await self.ollama.generate(
+                                self._build_responsibility_resegmentation_contract_repair_prompt(
+                                    request=request,
+                                    candidate_goals=candidate_goals,
+                                    output_type=output_type,
+                                    coverage_review=coverage_review,
+                                    invalid_raw=resegmented,
+                                    validation_error=repaired_reseg_validation_error,
+                                )
+                                + "\n\nThe prior contract repair itself remained "
+                                "invalid. Fix the newly reported fields together; "
+                                "every source_binding_names entry must name an actual "
+                                "same-Goal binding, and canonical binding name/type "
+                                "pairs must not contradict each other. Preserve the "
+                                "audited Goal count and resource responsibility.",
+                                system=self._repair_system_prompt(output_type),
+                                options=generation_options,
+                                response_format=(
+                                    self._preserve_known_source_binding_response_schema(
+                                        self._constraint_representation_response_schema(
+                                            self._responsibility_resegmentation_response_schema(
+                                                response_schema,
+                                                output_type=output_type,
+                                                coverage_review=coverage_review,
+                                                require_resource_contract=(
+                                                    coverage_requires_resource_contract
+                                                ),
+                                            ),
+                                            goal_count=(
+                                                self._audited_new_goal_count(
+                                                    coverage_review
+                                                )
+                                                or len(
+                                                    coverage_candidate.new_goals
+                                                )
+                                            ),
+                                        ),
+                                        raw=resegmented,
+                                        infer_missing_link=True,
+                                    )
+                                ),
+                                prompt_family=(
+                                    "goal_association.responsibility_resegmentation_"
+                                    "contract_revision"
+                                ),
+                                turn_id=request.sid,
+                                attempt=8,
+                            )
+                            if not isinstance(revised_resegmentation, dict):
+                                raise OllamaGenerationError(
+                                    "goal-association responsibility resegmentation "
+                                    "contract revision response is not a JSON object",
+                                    failure_class="structured_output_invalid",
+                                    failure_domain="model_contract",
+                                    architecture_attribution="not_evaluated",
+                                    retryable=True,
+                                ) from repaired_reseg_exc
+                            revised_resegmentation, recovered = (
+                                self._drop_invalid_optional_referent_introductions(
+                                    revised_resegmentation
+                                )
+                            )
+                            optional_referent_recovery.extend(recovered)
+                            revised_model = output_type.model_validate(
+                                revised_resegmentation
+                            )
+                            revised_binding_conflicts = [
+                                *self._binding_semantic_contract_conflicts(
+                                    revised_model
+                                ),
+                                *self._resource_source_binding_contract_conflicts(
+                                    revised_model
+                                ),
+                            ]
+                            if revised_binding_conflicts:
+                                contract_repair_attempt_count += 1
+                                contract_repair_strategy = (
+                                    "responsibility_resegmentation_binding_revision"
+                                )
+                                logger.warning(
+                                    "goal_association_responsibility_resegmentation_"
+                                    "binding_revision_start sid=%s conflicts=%s",
+                                    request.sid,
+                                    ",".join(revised_binding_conflicts),
+                                )
+                                binding_revision_raw = await self.ollama.generate(
+                                    self._build_binding_conflict_repair_prompt(
+                                        request=request,
+                                        raw=revised_resegmentation,
+                                        conflicts=revised_binding_conflicts,
+                                    ),
+                                    system=self._binding_audit_system_prompt(),
+                                    options=generation_options,
+                                    response_format=self._binding_audit_response_schema(
+                                        len(
+                                            revised_resegmentation.get("new_goals")
+                                            or []
+                                        )
+                                    ),
+                                    prompt_family=(
+                                        "goal_association.responsibility_resegmentation_"
+                                        "binding_revision"
+                                    ),
+                                    turn_id=request.sid,
+                                    attempt=9,
+                                )
+                                if not isinstance(binding_revision_raw, dict):
+                                    raise OllamaGenerationError(
+                                        "goal-association binding revision response "
+                                        "is not a JSON object",
+                                        failure_class="structured_output_invalid",
+                                        failure_domain="model_contract",
+                                        architecture_attribution="not_evaluated",
+                                        retryable=True,
+                                    ) from repaired_reseg_exc
+                                binding_revision = (
+                                    GoalBindingAuditOutput.model_validate(
+                                        binding_revision_raw
+                                    )
+                                )
+                                revised_resegmentation = (
+                                    self._replace_goal_bindings_from_audit(
+                                        revised_resegmentation,
+                                        binding_revision,
+                                    )
+                                )
+                                repair_raw = revised_resegmentation
+                                logger.info(
+                                    "goal_association_responsibility_resegmentation_"
+                                    "binding_revision_done sid=%s status=success",
+                                    request.sid,
+                                )
+                            self._validate_resegmentation_goal_count(
+                                revised_resegmentation,
+                                output_type=output_type,
+                                coverage_review=coverage_review,
+                                require_resource_contract=(
+                                    coverage_requires_resource_contract
+                                ),
+                            )
+                            resolution = await self._validate_contract_output(
+                                revised_resegmentation,
+                                request=request,
+                                turn_id=turn_id,
+                                output_type=output_type,
+                            )
+                            resegmented = revised_resegmentation
+                            repair_raw = revised_resegmentation
+                            logger.info(
+                                "goal_association_responsibility_resegmentation_"
+                                "contract_revision_done sid=%s status=success",
+                                request.sid,
+                            )
+                        contract_repair_succeeded = True
+                        repair_metadata = dict(resolution.metadata)
+                        repair_metadata["contract_repair"] = {
+                            "attempted": True,
+                            "succeeded": True,
+                            "strategy": contract_repair_strategy,
+                            "attempt_count": contract_repair_attempt_count,
+                        }
+                        resolution = resolution.model_copy(
+                            update={"metadata": repair_metadata}
+                        )
+                        logger.info(
+                            "goal_association_responsibility_resegmentation_contract_"
+                            "repair_done sid=%s status=success",
+                            request.sid,
+                        )
                     accepted_raw = resegmented
                     semantic_review_raw = resegmented
                     coverage_candidate = output_type.model_validate(resegmented)
-                    responsibility_coverage_attempt_count = 2
+                    responsibility_coverage_attempt_count += 1
                     coverage_review = await self._run_responsibility_coverage_audit(
                         request=request,
                         raw=resegmented,
@@ -1463,9 +2299,232 @@ class GoalAssociationResolver:
                         attempt=7,
                     )
                     if coverage_review.decision != "accept":
-                        raise ValueError(
-                            "responsibility coverage remains incomplete after fresh "
-                            "model-owned resegmentation"
+                        responsibility_coverage_attempt_count += 1
+                        constraint_representation_repair = (
+                            self._coverage_rejects_only_constraint_representation(
+                                coverage_review
+                            )
+                        )
+                        logger.info(
+                            "goal_association_responsibility_resegmentation_repair_start "
+                            "sid=%s strategy=%s",
+                            request.sid,
+                            (
+                                "constraint_representation"
+                                if constraint_representation_repair
+                                else "fresh_resegmentation"
+                            ),
+                        )
+                        corrected = await self.ollama.generate(
+                            (
+                                self._build_constraint_representation_repair_prompt(
+                                    request=request,
+                                    raw=resegmented,
+                                    coverage_review=coverage_review,
+                                )
+                                if constraint_representation_repair
+                                else self._build_responsibility_resegmentation_prompt(
+                                    request=request,
+                                    candidate_goals=candidate_goals,
+                                    output_type=output_type,
+                                    coverage_review=coverage_review,
+                                )
+                            ),
+                            system=(
+                                self._constraint_representation_repair_system_prompt()
+                                if constraint_representation_repair
+                                else self._semantic_review_system_prompt(
+                                    output_type,
+                                    fresh_resegmentation=True,
+                                )
+                            ),
+                            options=generation_options,
+                            response_format=(
+                                self._responsibility_resegmentation_response_schema(
+                                    response_schema,
+                                    output_type=output_type,
+                                    coverage_review=coverage_review,
+                                    require_resource_contract=(
+                                        coverage_requires_resource_contract
+                                    ),
+                                )
+                            ),
+                            prompt_family=(
+                                "goal_association.constraint_representation_repair"
+                                if constraint_representation_repair
+                                else "goal_association.responsibility_resegmentation_repair"
+                            ),
+                            turn_id=request.sid,
+                            attempt=8,
+                        )
+                        if not isinstance(corrected, dict):
+                            raise OllamaGenerationError(
+                                "goal-association responsibility resegmentation repair "
+                                "response is not a JSON object",
+                                failure_class="structured_output_invalid",
+                                failure_domain="model_contract",
+                                architecture_attribution="not_evaluated",
+                                retryable=True,
+                            )
+                        corrected, recovered = (
+                            self._drop_invalid_optional_referent_introductions(
+                                corrected
+                            )
+                        )
+                        optional_referent_recovery.extend(recovered)
+                        try:
+                            self._validate_resegmentation_goal_count(
+                                corrected,
+                                output_type=output_type,
+                                coverage_review=coverage_review,
+                                require_resource_contract=(
+                                    coverage_requires_resource_contract
+                                ),
+                            )
+                            resolution = await self._validate_contract_output(
+                                corrected,
+                                request=request,
+                                turn_id=turn_id,
+                                output_type=output_type,
+                            )
+                        except (ValidationError, ValueError) as final_repair_exc:
+                            repair_attempted = True
+                            contract_repair_attempt_count += 1
+                            contract_repair_strategy = (
+                                "final_resegmentation_contract_revision"
+                            )
+                            final_validation_error = self._validation_error_json(
+                                final_repair_exc
+                            )
+                            logger.warning(
+                                "goal_association_final_resegmentation_contract_"
+                                "repair_start sid=%s validation_errors=%s",
+                                request.sid,
+                                final_validation_error,
+                            )
+                            final_corrected = await self.ollama.generate(
+                                (
+                                    self._build_constraint_representation_contract_repair_prompt(
+                                        request=request,
+                                        original_raw=resegmented,
+                                        invalid_raw=corrected,
+                                        coverage_review=coverage_review,
+                                        validation_error=final_validation_error,
+                                    )
+                                    if constraint_representation_repair
+                                    else self._layered_repair_prompt(
+                                        request=request,
+                                        candidate_goals=candidate_goals,
+                                        turn_id=turn_id,
+                                        output_type=output_type,
+                                        raw=corrected,
+                                        validation_error=final_validation_error,
+                                    )
+                                ),
+                                system=(
+                                    self._constraint_representation_repair_system_prompt()
+                                    if constraint_representation_repair
+                                    else self._repair_system_prompt(output_type)
+                                ),
+                                options=generation_options,
+                                response_format=(
+                                    self._constraint_representation_response_schema(
+                                        self._responsibility_resegmentation_response_schema(
+                                            response_schema,
+                                            output_type=output_type,
+                                            coverage_review=coverage_review,
+                                            require_resource_contract=(
+                                                coverage_requires_resource_contract
+                                            ),
+                                        ),
+                                        goal_count=len(coverage_candidate.new_goals),
+                                    )
+                                    if constraint_representation_repair
+                                    else self._responsibility_resegmentation_response_schema(
+                                        response_schema,
+                                        output_type=output_type,
+                                        coverage_review=coverage_review,
+                                        require_resource_contract=(
+                                            coverage_requires_resource_contract
+                                        ),
+                                    )
+                                ),
+                                prompt_family=(
+                                    "goal_association.final_resegmentation_"
+                                    "contract_repair"
+                                ),
+                                turn_id=request.sid,
+                                attempt=9,
+                            )
+                            if not isinstance(final_corrected, dict):
+                                raise OllamaGenerationError(
+                                    "goal-association final resegmentation contract "
+                                    "repair response is not a JSON object",
+                                    failure_class="structured_output_invalid",
+                                    failure_domain="model_contract",
+                                    architecture_attribution="not_evaluated",
+                                    retryable=True,
+                                ) from final_repair_exc
+                            final_corrected, recovered = (
+                                self._drop_invalid_optional_referent_introductions(
+                                    final_corrected
+                                )
+                            )
+                            optional_referent_recovery.extend(recovered)
+                            corrected = final_corrected
+                            repair_raw = final_corrected
+                            self._validate_resegmentation_goal_count(
+                                corrected,
+                                output_type=output_type,
+                                coverage_review=coverage_review,
+                                require_resource_contract=(
+                                    coverage_requires_resource_contract
+                                ),
+                            )
+                            resolution = await self._validate_contract_output(
+                                corrected,
+                                request=request,
+                                turn_id=turn_id,
+                                output_type=output_type,
+                            )
+                            contract_repair_succeeded = True
+                            repair_metadata = dict(resolution.metadata)
+                            repair_metadata["contract_repair"] = {
+                                "attempted": True,
+                                "succeeded": True,
+                                "strategy": contract_repair_strategy,
+                                "attempt_count": contract_repair_attempt_count,
+                            }
+                            resolution = resolution.model_copy(
+                                update={"metadata": repair_metadata}
+                            )
+                            logger.info(
+                                "goal_association_final_resegmentation_contract_"
+                                "repair_done sid=%s status=success",
+                                request.sid,
+                            )
+                        accepted_raw = corrected
+                        semantic_review_raw = corrected
+                        coverage_candidate = output_type.model_validate(corrected)
+                        coverage_review = await self._run_responsibility_coverage_audit(
+                            request=request,
+                            raw=corrected,
+                            generation_options=generation_options,
+                            prompt_family=(
+                                "goal_association.responsibility_coverage_final"
+                            ),
+                            attempt=9,
+                        )
+                        if coverage_review.decision != "accept":
+                            raise ValueError(
+                                "responsibility coverage remains incomplete after "
+                                "bounded model-owned resegmentation repair"
+                            )
+                        logger.info(
+                            "goal_association_responsibility_resegmentation_repair_done "
+                            "sid=%s status=success goals=%d",
+                            request.sid,
+                            len(coverage_candidate.new_goals),
                         )
                     resolution = resolution.model_copy(
                         update={
@@ -1481,6 +2540,374 @@ class GoalAssociationResolver:
                         request.sid,
                         len(coverage_candidate.new_goals),
                     )
+                    post_resegmentation_resource_reviewed = False
+                    if coverage_started_with_resource_contract and not any(
+                        goal.resource_responsibility is not None
+                        for goal in coverage_candidate.new_goals
+                    ):
+                        post_resegmentation_resource_reviewed = True
+                        semantic_review_attempted = True
+                        semantic_review_attempt_count += 1
+                        logger.info(
+                            "goal_association_post_resegmentation_resource_contract_"
+                            "loss_review_start sid=%s",
+                            request.sid,
+                        )
+                        restored_after_resegmentation = await self.ollama.generate(
+                            self._build_semantic_review_prompt(
+                                request=request,
+                                candidate_goals=candidate_goals,
+                                output_type=output_type,
+                                raw=accepted_raw,
+                                triggers=["resource_contract_loss_review"],
+                            ),
+                            system=self._semantic_review_system_prompt(
+                                output_type,
+                                fresh_resegmentation=True,
+                            ),
+                            options=generation_options,
+                            response_format=response_schema,
+                            prompt_family=(
+                                "goal_association.post_resegmentation_resource_"
+                                "contract_loss_adjudication"
+                            ),
+                            turn_id=request.sid,
+                            attempt=10,
+                        )
+                        if not isinstance(restored_after_resegmentation, dict):
+                            raise OllamaGenerationError(
+                                "goal-association post-resegmentation resource-"
+                                "contract-loss review response is not a JSON object",
+                                failure_class="structured_output_invalid",
+                                failure_domain="model_contract",
+                                architecture_attribution="not_evaluated",
+                                retryable=True,
+                            )
+                        restored_after_resegmentation, recovered = (
+                            self._drop_invalid_optional_referent_introductions(
+                                restored_after_resegmentation
+                            )
+                        )
+                        optional_referent_recovery.extend(recovered)
+                        resolution = await self._validate_contract_output(
+                            restored_after_resegmentation,
+                            request=request,
+                            turn_id=turn_id,
+                            output_type=output_type,
+                        )
+                        accepted_raw = restored_after_resegmentation
+                        semantic_review_raw = restored_after_resegmentation
+                        coverage_candidate = output_type.model_validate(
+                            restored_after_resegmentation
+                        )
+                        logger.info(
+                            "goal_association_post_resegmentation_resource_contract_"
+                            "loss_review_done sid=%s status=success",
+                            request.sid,
+                        )
+                    if self._resource_stage_split_review_required(
+                        coverage_candidate
+                    ):
+                        post_resegmentation_resource_reviewed = True
+                        semantic_review_attempted = True
+                        semantic_review_attempt_count += 1
+                        logger.info(
+                            "goal_association_post_resegmentation_resource_stage_"
+                            "adjudication_start sid=%s",
+                            request.sid,
+                        )
+                        focused_after_resegmentation = await self.ollama.generate(
+                            self._build_semantic_review_prompt(
+                                request=request,
+                                candidate_goals=candidate_goals,
+                                output_type=output_type,
+                                raw=accepted_raw,
+                                triggers=[
+                                    "residual_resource_provider_stage_split_review"
+                                ],
+                            ),
+                            system=self._semantic_review_system_prompt(
+                                output_type,
+                                fresh_resegmentation=True,
+                            ),
+                            options=generation_options,
+                            response_format=response_schema,
+                            prompt_family=(
+                                "goal_association.post_resegmentation_resource_stage_"
+                                "adjudication"
+                            ),
+                            turn_id=request.sid,
+                            attempt=11,
+                        )
+                        if not isinstance(focused_after_resegmentation, dict):
+                            raise OllamaGenerationError(
+                                "goal-association post-resegmentation resource-stage "
+                                "adjudication response is not a JSON object",
+                                failure_class="structured_output_invalid",
+                                failure_domain="model_contract",
+                                architecture_attribution="not_evaluated",
+                                retryable=True,
+                            )
+                        focused_after_resegmentation, recovered = (
+                            self._drop_invalid_optional_referent_introductions(
+                                focused_after_resegmentation
+                            )
+                        )
+                        optional_referent_recovery.extend(recovered)
+                        resolution = await self._validate_contract_output(
+                            focused_after_resegmentation,
+                            request=request,
+                            turn_id=turn_id,
+                            output_type=output_type,
+                        )
+                        accepted_raw = focused_after_resegmentation
+                        semantic_review_raw = focused_after_resegmentation
+                        coverage_candidate = output_type.model_validate(
+                            focused_after_resegmentation
+                        )
+                        logger.info(
+                            "goal_association_post_resegmentation_resource_stage_"
+                            "adjudication_done sid=%s status=success goals=%d",
+                            request.sid,
+                            len(coverage_candidate.new_goals),
+                        )
+                    if post_resegmentation_resource_reviewed:
+                        responsibility_coverage_attempt_count += 1
+                        coverage_review = await self._run_responsibility_coverage_audit(
+                            request=request,
+                            raw=accepted_raw,
+                            generation_options=generation_options,
+                            prompt_family=(
+                                "goal_association.responsibility_coverage_post_"
+                                "resource_review"
+                            ),
+                            attempt=12,
+                        )
+                        if coverage_review.decision != "accept":
+                            raise ValueError(
+                                "responsibility coverage rejected the bounded "
+                                "post-resegmentation resource review"
+                            )
+                    post_resegmentation_triggers = self._semantic_review_triggers(
+                        coverage_candidate,
+                        request=request,
+                        candidate_goals=candidate_goals,
+                    )
+                    if post_resegmentation_triggers:
+                        semantic_review_attempted = True
+                        semantic_review_attempt_count += 1
+                        pre_post_coverage_output = coverage_candidate
+                        logger.info(
+                            "goal_association_post_coverage_semantic_review_start "
+                            "sid=%s triggers=%s",
+                            request.sid,
+                            ",".join(post_resegmentation_triggers),
+                        )
+                        fresh_post_resegmentation = bool(
+                            _FRESH_RESEGMENTATION_TRIGGERS.intersection(
+                                post_resegmentation_triggers
+                            )
+                        )
+                        post_coverage_reviewed = await self.ollama.generate(
+                            self._build_semantic_review_prompt(
+                                request=request,
+                                candidate_goals=candidate_goals,
+                                output_type=output_type,
+                                raw=accepted_raw,
+                                triggers=post_resegmentation_triggers,
+                            ),
+                            system=self._semantic_review_system_prompt(
+                                output_type,
+                                fresh_resegmentation=fresh_post_resegmentation,
+                            ),
+                            options=generation_options,
+                            response_format=response_schema,
+                            prompt_family=(
+                                "goal_association.post_coverage_semantic_resegmentation"
+                                if fresh_post_resegmentation
+                                else "goal_association.post_coverage_semantic_review"
+                            ),
+                            turn_id=request.sid,
+                            attempt=10,
+                        )
+                        if not isinstance(post_coverage_reviewed, dict):
+                            raise OllamaGenerationError(
+                                "goal-association post-coverage semantic review "
+                                "response is not a JSON object",
+                                failure_class="structured_output_invalid",
+                                failure_domain="model_contract",
+                                architecture_attribution="not_evaluated",
+                                retryable=True,
+                            )
+                        post_coverage_reviewed, recovered = (
+                            self._drop_invalid_optional_referent_introductions(
+                                post_coverage_reviewed
+                            )
+                        )
+                        optional_referent_recovery.extend(recovered)
+                        resolution = await self._validate_contract_output(
+                            post_coverage_reviewed,
+                            request=request,
+                            turn_id=turn_id,
+                            output_type=output_type,
+                        )
+                        accepted_raw = post_coverage_reviewed
+                        semantic_review_raw = post_coverage_reviewed
+                        coverage_candidate = output_type.model_validate(
+                            post_coverage_reviewed
+                        )
+                        if any(
+                            goal.resource_responsibility is not None
+                            for goal in pre_post_coverage_output.new_goals
+                        ) and not any(
+                            goal.resource_responsibility is not None
+                            for goal in coverage_candidate.new_goals
+                        ):
+                            semantic_review_attempt_count += 1
+                            logger.info(
+                                "goal_association_post_coverage_resource_contract_"
+                                "loss_review_start sid=%s",
+                                request.sid,
+                            )
+                            restored_resource_review = await self.ollama.generate(
+                                self._build_semantic_review_prompt(
+                                    request=request,
+                                    candidate_goals=candidate_goals,
+                                    output_type=output_type,
+                                    raw=post_coverage_reviewed,
+                                    triggers=["resource_contract_loss_review"],
+                                ),
+                                system=self._semantic_review_system_prompt(
+                                    output_type,
+                                    fresh_resegmentation=True,
+                                ),
+                                options=generation_options,
+                                response_format=response_schema,
+                                prompt_family=(
+                                    "goal_association.post_coverage_resource_"
+                                    "contract_loss_adjudication"
+                                ),
+                                turn_id=request.sid,
+                                attempt=11,
+                            )
+                            if not isinstance(restored_resource_review, dict):
+                                raise OllamaGenerationError(
+                                    "goal-association post-coverage resource-contract-"
+                                    "loss review response is not a JSON object",
+                                    failure_class="structured_output_invalid",
+                                    failure_domain="model_contract",
+                                    architecture_attribution="not_evaluated",
+                                    retryable=True,
+                                )
+                            restored_resource_review, recovered = (
+                                self._drop_invalid_optional_referent_introductions(
+                                    restored_resource_review
+                                )
+                            )
+                            optional_referent_recovery.extend(recovered)
+                            resolution = await self._validate_contract_output(
+                                restored_resource_review,
+                                request=request,
+                                turn_id=turn_id,
+                                output_type=output_type,
+                            )
+                            post_coverage_reviewed = restored_resource_review
+                            accepted_raw = restored_resource_review
+                            semantic_review_raw = restored_resource_review
+                            coverage_candidate = output_type.model_validate(
+                                restored_resource_review
+                            )
+                            logger.info(
+                                "goal_association_post_coverage_resource_contract_"
+                                "loss_review_done sid=%s status=success",
+                                request.sid,
+                            )
+                        if self._resource_stage_split_review_required(
+                            coverage_candidate
+                        ):
+                            semantic_review_attempt_count += 1
+                            logger.info(
+                                "goal_association_post_coverage_resource_stage_"
+                                "adjudication_start sid=%s",
+                                request.sid,
+                            )
+                            focused_post_review = await self.ollama.generate(
+                                self._build_semantic_review_prompt(
+                                    request=request,
+                                    candidate_goals=candidate_goals,
+                                    output_type=output_type,
+                                    raw=post_coverage_reviewed,
+                                    triggers=[
+                                        "residual_resource_provider_stage_split_review"
+                                    ],
+                                ),
+                                system=self._semantic_review_system_prompt(
+                                    output_type,
+                                    fresh_resegmentation=True,
+                                ),
+                                options=generation_options,
+                                response_format=response_schema,
+                                prompt_family=(
+                                    "goal_association.post_coverage_resource_stage_"
+                                    "adjudication"
+                                ),
+                                turn_id=request.sid,
+                                attempt=12,
+                            )
+                            if not isinstance(focused_post_review, dict):
+                                raise OllamaGenerationError(
+                                    "goal-association post-coverage resource-stage "
+                                    "adjudication response is not a JSON object",
+                                    failure_class="structured_output_invalid",
+                                    failure_domain="model_contract",
+                                    architecture_attribution="not_evaluated",
+                                    retryable=True,
+                                )
+                            focused_post_review, recovered = (
+                                self._drop_invalid_optional_referent_introductions(
+                                    focused_post_review
+                                )
+                            )
+                            optional_referent_recovery.extend(recovered)
+                            resolution = await self._validate_contract_output(
+                                focused_post_review,
+                                request=request,
+                                turn_id=turn_id,
+                                output_type=output_type,
+                            )
+                            post_coverage_reviewed = focused_post_review
+                            accepted_raw = focused_post_review
+                            semantic_review_raw = focused_post_review
+                            coverage_candidate = output_type.model_validate(
+                                focused_post_review
+                            )
+                            logger.info(
+                                "goal_association_post_coverage_resource_stage_"
+                                "adjudication_done sid=%s status=success goals=%d",
+                                request.sid,
+                                len(coverage_candidate.new_goals),
+                            )
+                        responsibility_coverage_attempt_count += 1
+                        coverage_review = await self._run_responsibility_coverage_audit(
+                            request=request,
+                            raw=accepted_raw,
+                            generation_options=generation_options,
+                            prompt_family=(
+                                "goal_association.responsibility_coverage_post_review"
+                            ),
+                            attempt=13,
+                        )
+                        if coverage_review.decision != "accept":
+                            raise ValueError(
+                                "responsibility coverage rejected the bounded "
+                                "post-resegmentation semantic review"
+                            )
+                        logger.info(
+                            "goal_association_post_coverage_semantic_review_done "
+                            "sid=%s status=success goals=%d",
+                            request.sid,
+                            len(coverage_candidate.new_goals),
+                        )
                 responsibility_coverage_succeeded = True
                 coverage_metadata = dict(resolution.metadata)
                 coverage_metadata["responsibility_coverage"] = {
@@ -1502,6 +2929,799 @@ class GoalAssociationResolver:
                     request.sid,
                     coverage_review.decision,
                     responsibility_coverage_attempt_count,
+                )
+            source_alignment_candidate = output_type.model_validate(accepted_raw)
+            constraint_binding_alignment = (
+                self._covered_constraint_binding_review_required(
+                    source_alignment_candidate,
+                    coverage_review=(
+                        coverage_review
+                        if responsibility_coverage_attempted
+                        else None
+                    ),
+                )
+            )
+            if (
+                self._resource_source_alignment_review_required(
+                    source_alignment_candidate
+                )
+                or constraint_binding_alignment
+            ):
+                semantic_review_attempted = True
+                semantic_review_attempt_count += 1
+                logger.info(
+                    "goal_association_resource_source_alignment_review_start sid=%s",
+                    request.sid,
+                )
+                source_alignment_schema = (
+                    self._constraint_representation_response_schema(
+                        response_schema,
+                        goal_count=len(source_alignment_candidate.new_goals),
+                    )
+                )
+                source_alignment_schema = (
+                    self._resource_quantity_alignment_response_schema(
+                        source_alignment_schema,
+                        model_output=source_alignment_candidate,
+                    )
+                )
+                source_alignment_schema = (
+                    self._preserve_single_resource_contract_response_schema(
+                        source_alignment_schema,
+                        raw=accepted_raw,
+                    )
+                )
+                source_alignment_prompt = self._build_semantic_review_prompt(
+                    request=request,
+                    candidate_goals=candidate_goals,
+                    output_type=output_type,
+                    raw=accepted_raw,
+                    triggers=["resource_source_binding_alignment_review"],
+                )
+                if responsibility_coverage_attempted:
+                    source_alignment_prompt += (
+                        "\n\nIndependent responsibility-coverage audit JSON "
+                        "(model-authored semantic ownership evidence):\n"
+                        + self._bounded_json(
+                            coverage_review.model_dump(mode="json"),
+                            7000,
+                        )
+                        + "\n\nPreserve this audit's single role and Goal ownership "
+                        "judgments. In particular, a covered constraint mapped to a "
+                        "physical resource Goal is not a new responsibility. When it "
+                        "describes the provider-owned route or acquisition stage, "
+                        "materially represent it through typed bindings and the "
+                        "resource source contract; do not silently reclassify it as "
+                        "an unrelated movement or claim that the audit did not map "
+                        "it."
+                    )
+                source_alignment_attempt_count = 1
+                source_aligned = await self.ollama.generate(
+                    source_alignment_prompt,
+                    system=self._semantic_review_system_prompt(
+                        output_type,
+                        fresh_resegmentation=False,
+                    ),
+                    options=generation_options,
+                    response_format=source_alignment_schema,
+                    prompt_family=(
+                        "goal_association.resource_source_alignment_review"
+                    ),
+                    turn_id=request.sid,
+                    attempt=14,
+                )
+                if not isinstance(source_aligned, dict):
+                    raise OllamaGenerationError(
+                        "goal-association resource source-alignment review response "
+                        "is not a JSON object",
+                        failure_class="structured_output_invalid",
+                        failure_domain="model_contract",
+                        architecture_attribution="not_evaluated",
+                        retryable=True,
+                    )
+                source_aligned, recovered = (
+                    self._drop_invalid_optional_referent_introductions(source_aligned)
+                )
+                optional_referent_recovery.extend(recovered)
+                pre_alignment_metadata = dict(resolution.metadata)
+                try:
+                    self._validate_fixed_goal_count(
+                        source_aligned,
+                        expected=len(source_alignment_candidate.new_goals),
+                        stage="resource source-alignment review",
+                    )
+                    self._validate_resource_contract_count_preserved(
+                        source_aligned,
+                        baseline=accepted_raw,
+                        stage="resource source-alignment review",
+                    )
+                    resolution = await self._validate_contract_output(
+                        source_aligned,
+                        request=request,
+                        turn_id=turn_id,
+                        output_type=output_type,
+                    )
+                except (ValidationError, ValueError) as source_alignment_exc:
+                    source_alignment_attempt_count += 1
+                    source_alignment_validation_error = (
+                        self._validation_error_json(source_alignment_exc)
+                    )
+                    logger.warning(
+                        "goal_association_resource_source_alignment_contract_"
+                        "repair_start sid=%s validation_errors=%s",
+                        request.sid,
+                        source_alignment_validation_error,
+                    )
+                    repaired_source_alignment = await self.ollama.generate(
+                        self._build_semantic_review_prompt(
+                            request=request,
+                            candidate_goals=candidate_goals,
+                            output_type=output_type,
+                            raw=source_aligned,
+                            triggers=[
+                                "resource_source_binding_alignment_review"
+                            ],
+                        )
+                        + "\n\nThe previous source-alignment DTO contradicted its "
+                        "own explanation or failed the exact contract. Preserve the "
+                        "same resource responsibility and fixed Goal count. A known "
+                        "source must contain a grounded source_description or name "
+                        "the exact same-Goal typed spatial bindings in "
+                        "source_binding_names. Preserve every material distance, "
+                        "direction, and quantity as an actual binding and preserve "
+                        "resource_quantity; reason_summary is not a substitute for "
+                        "any DTO field.\n\nMechanical validation feedback JSON:\n"
+                        + source_alignment_validation_error,
+                        system=self._repair_system_prompt(output_type),
+                        options=generation_options,
+                        response_format=(
+                            self._preserve_known_source_binding_response_schema(
+                                source_alignment_schema,
+                                raw=source_aligned,
+                                infer_missing_link=True,
+                            )
+                        ),
+                        prompt_family=(
+                            "goal_association.resource_source_alignment_dto_repair"
+                        ),
+                        turn_id=request.sid,
+                        attempt=15,
+                    )
+                    if not isinstance(repaired_source_alignment, dict):
+                        raise OllamaGenerationError(
+                            "goal-association resource source-alignment contract "
+                            "repair response is not a JSON object",
+                            failure_class="structured_output_invalid",
+                            failure_domain="model_contract",
+                            architecture_attribution="not_evaluated",
+                            retryable=True,
+                        ) from source_alignment_exc
+                    repaired_source_alignment, recovered = (
+                        self._drop_invalid_optional_referent_introductions(
+                            repaired_source_alignment
+                        )
+                    )
+                    optional_referent_recovery.extend(recovered)
+                    self._validate_fixed_goal_count(
+                        repaired_source_alignment,
+                        expected=len(source_alignment_candidate.new_goals),
+                        stage="resource source-alignment DTO repair",
+                    )
+                    self._validate_resource_contract_count_preserved(
+                        repaired_source_alignment,
+                        baseline=accepted_raw,
+                        stage="resource source-alignment DTO repair",
+                    )
+                    resolution = await self._validate_contract_output(
+                        repaired_source_alignment,
+                        request=request,
+                        turn_id=turn_id,
+                        output_type=output_type,
+                    )
+                    source_aligned = repaired_source_alignment
+                    logger.info(
+                        "goal_association_resource_source_alignment_contract_"
+                        "repair_done sid=%s status=success",
+                        request.sid,
+                    )
+                aligned_candidate = output_type.model_validate(source_aligned)
+                if self._resource_spatial_source_alignment_repair_required(
+                    aligned_candidate
+                ):
+                    source_alignment_attempt_count += 1
+                    logger.info(
+                        "goal_association_resource_source_alignment_residual_"
+                        "repair_start sid=%s",
+                        request.sid,
+                    )
+                    residual_source_aligned = await self.ollama.generate(
+                        source_alignment_prompt
+                        + "\n\nThe previous alignment left the same typed spatial/"
+                        "resource contradiction unresolved. Re-run the semantic "
+                        "judgment and make the DTO match it. If the covered spatial "
+                        "constraint is a provider-owned acquisition route or locates "
+                        "the resource, set source_status=known, preserve or add its "
+                        "exact same-Goal direction and distance bindings, provide a "
+                        "grounded source_description, and list those names in "
+                        "source_binding_names. Audit and preserve every explicit "
+                        "resource quantity too. Do not say the movement is "
+                        "instrumental or the resource contract is aligned while "
+                        "leaving the source unknown or the fields empty. Return the "
+                        "complete corrected DTO, not another explanation.\n\n"
+                        "Previous unresolved alignment JSON:\n"
+                        + self._bounded_json(source_aligned, 7000),
+                        system=self._repair_system_prompt(output_type),
+                        options=generation_options,
+                        response_format=(
+                            self._constraint_representation_response_schema(
+                                response_schema,
+                                goal_count=len(aligned_candidate.new_goals),
+                            )
+                        ),
+                        prompt_family=(
+                            "goal_association.resource_source_alignment_"
+                            "residual_repair"
+                        ),
+                        turn_id=request.sid,
+                        attempt=16,
+                    )
+                    if not isinstance(residual_source_aligned, dict):
+                        raise OllamaGenerationError(
+                            "goal-association residual resource source-alignment "
+                            "repair response is not a JSON object",
+                            failure_class="structured_output_invalid",
+                            failure_domain="model_contract",
+                            architecture_attribution="not_evaluated",
+                            retryable=True,
+                        )
+                    residual_source_aligned, recovered = (
+                        self._drop_invalid_optional_referent_introductions(
+                            residual_source_aligned
+                        )
+                    )
+                    optional_referent_recovery.extend(recovered)
+                    try:
+                        self._validate_resource_contract_count_preserved(
+                            residual_source_aligned,
+                            baseline=accepted_raw,
+                            stage="residual resource source-alignment repair",
+                        )
+                        resolution = await self._validate_contract_output(
+                            residual_source_aligned,
+                            request=request,
+                            turn_id=turn_id,
+                            output_type=output_type,
+                        )
+                    except (
+                        ValidationError,
+                        ValueError,
+                    ) as residual_source_alignment_exc:
+                        source_alignment_attempt_count += 1
+                        residual_source_alignment_error = (
+                            self._validation_error_json(
+                                residual_source_alignment_exc
+                            )
+                        )
+                        logger.warning(
+                            "goal_association_resource_source_alignment_residual_"
+                            "dto_repair_start sid=%s validation_errors=%s",
+                            request.sid,
+                            residual_source_alignment_error,
+                        )
+                        residual_source_aligned = await self.ollama.generate(
+                            self._build_semantic_review_prompt(
+                                request=request,
+                                candidate_goals=candidate_goals,
+                                output_type=output_type,
+                                raw=residual_source_aligned,
+                                triggers=[
+                                    "resource_source_binding_alignment_review"
+                                ],
+                            )
+                            + "\n\nThe residual alignment chose a known source but "
+                            "returned an invalid source contract. Preserve that "
+                            "semantic decision and fixed Goal ownership. Add a "
+                            "grounded source_description and list the exact "
+                            "same-Goal spatial binding names in "
+                            "source_binding_names; preserve every material binding, "
+                            "resource quantity, recipient, and delivery mode. Return "
+                            "the complete corrected DTO.\n\nMechanical validation "
+                            "feedback JSON:\n"
+                            + residual_source_alignment_error,
+                            system=self._repair_system_prompt(output_type),
+                            options=generation_options,
+                            response_format=(
+                                self._preserve_known_source_binding_response_schema(
+                                    self._constraint_representation_response_schema(
+                                        response_schema,
+                                        goal_count=len(
+                                            aligned_candidate.new_goals
+                                        ),
+                                    ),
+                                    raw=residual_source_aligned,
+                                    infer_missing_link=True,
+                                )
+                            ),
+                            prompt_family=(
+                                "goal_association.resource_source_alignment_"
+                                "residual_dto_repair"
+                            ),
+                            turn_id=request.sid,
+                            attempt=17,
+                        )
+                        if not isinstance(residual_source_aligned, dict):
+                            raise OllamaGenerationError(
+                                "goal-association residual source-alignment DTO "
+                                "repair response is not a JSON object",
+                                failure_class="structured_output_invalid",
+                                failure_domain="model_contract",
+                                architecture_attribution="not_evaluated",
+                                retryable=True,
+                            ) from residual_source_alignment_exc
+                        residual_source_aligned, recovered = (
+                            self._drop_invalid_optional_referent_introductions(
+                                residual_source_aligned
+                            )
+                        )
+                        optional_referent_recovery.extend(recovered)
+                        self._validate_resource_contract_count_preserved(
+                            residual_source_aligned,
+                            baseline=accepted_raw,
+                            stage="residual resource source-alignment DTO repair",
+                        )
+                        resolution = await self._validate_contract_output(
+                            residual_source_aligned,
+                            request=request,
+                            turn_id=turn_id,
+                            output_type=output_type,
+                        )
+                        logger.info(
+                            "goal_association_resource_source_alignment_residual_"
+                            "dto_repair_done sid=%s status=success",
+                            request.sid,
+                        )
+                    aligned_candidate = output_type.model_validate(
+                        residual_source_aligned
+                    )
+                    if self._resource_spatial_source_alignment_repair_required(
+                        aligned_candidate
+                    ):
+                        raise ValueError(
+                            "resource spatial source alignment remained incomplete "
+                            "after bounded model-owned residual repair"
+                        )
+                    source_aligned = residual_source_aligned
+                    semantic_review_raw = residual_source_aligned
+                    logger.info(
+                        "goal_association_resource_source_alignment_residual_"
+                        "repair_done sid=%s status=success",
+                        request.sid,
+                    )
+                if self._physical_resource_quantity_audit_required(
+                    aligned_candidate
+                ):
+                    source_alignment_attempt_count += 1
+                    logger.info(
+                        "goal_association_resource_quantity_binding_audit_start "
+                        "sid=%s",
+                        request.sid,
+                    )
+                    quantity_binding_audit_raw = await self.ollama.generate(
+                        self._build_resource_quantity_binding_audit_prompt(
+                            request=request,
+                            raw=source_aligned,
+                        ),
+                        system=self._binding_audit_system_prompt(),
+                        options=generation_options,
+                        response_format=self._binding_audit_response_schema(
+                            len(aligned_candidate.new_goals)
+                        ),
+                        prompt_family=(
+                            "goal_association.resource_quantity_binding_audit"
+                        ),
+                        turn_id=request.sid,
+                        attempt=18,
+                    )
+                    if not isinstance(quantity_binding_audit_raw, dict):
+                        raise OllamaGenerationError(
+                            "goal-association resource quantity binding audit "
+                            "response is not a JSON object",
+                            failure_class="structured_output_invalid",
+                            failure_domain="model_contract",
+                            architecture_attribution="not_evaluated",
+                            retryable=True,
+                        )
+                    quantity_binding_audit = GoalBindingAuditOutput.model_validate(
+                        quantity_binding_audit_raw
+                    )
+                    source_alignment_attempt_count += 1
+                    quantity_binding_completeness_raw = await self.ollama.generate(
+                        self._build_resource_binding_completeness_review_prompt(
+                            request=request,
+                            raw=source_aligned,
+                        ),
+                        system=self._binding_audit_system_prompt(),
+                        options=generation_options,
+                        response_format=self._binding_audit_response_schema(
+                            len(aligned_candidate.new_goals)
+                        ),
+                        prompt_family=(
+                            "goal_association.resource_binding_completeness_review"
+                        ),
+                        turn_id=request.sid,
+                        attempt=19,
+                    )
+                    if not isinstance(quantity_binding_completeness_raw, dict):
+                        raise OllamaGenerationError(
+                            "goal-association resource binding completeness review "
+                            "response is not a JSON object",
+                            failure_class="structured_output_invalid",
+                            failure_domain="model_contract",
+                            architecture_attribution="not_evaluated",
+                            retryable=True,
+                        )
+                    quantity_binding_completeness = (
+                        GoalBindingAuditOutput.model_validate(
+                            quantity_binding_completeness_raw
+                        )
+                    )
+                    source_aligned = self._merge_goal_bindings_from_audit(
+                        source_aligned,
+                        quantity_binding_audit,
+                    )
+                    source_aligned = self._merge_goal_bindings_from_audit(
+                        source_aligned,
+                        quantity_binding_completeness,
+                    )
+                    resolution = await self._validate_contract_output(
+                        source_aligned,
+                        request=request,
+                        turn_id=turn_id,
+                        output_type=output_type,
+                    )
+                    aligned_candidate = output_type.model_validate(source_aligned)
+                    semantic_review_raw = source_aligned
+                    logger.info(
+                        "goal_association_resource_quantity_binding_audit_done "
+                        "sid=%s status=success",
+                        request.sid,
+                    )
+                if self._resource_quantity_contract_repair_required(
+                    aligned_candidate
+                ):
+                    source_alignment_attempt_count += 1
+                    logger.info(
+                        "goal_association_resource_quantity_alignment_contract_"
+                        "repair_start sid=%s",
+                        request.sid,
+                    )
+                    quantity_aligned = await self.ollama.generate(
+                        self._build_semantic_review_prompt(
+                            request=request,
+                            candidate_goals=candidate_goals,
+                            output_type=output_type,
+                            raw=source_aligned,
+                            triggers=[
+                                "resource_source_binding_alignment_review"
+                            ],
+                        )
+                        + "\n\nThe previous alignment created a typed resource-"
+                        "quantity binding but left resource_quantity empty. Preserve "
+                        "the complete Goal DTO and copy that model-authored normalized "
+                        "numeric string into resource_quantity. Re-check every typed "
+                        "spatial binding semantically: when it describes the physical "
+                        "resource source, preserve it and list its exact name in "
+                        "source_binding_names alongside the other source bindings. "
+                        "Do not delete the binding, resource contract, or source "
+                        "alignment, and do not "
+                        "substitute reason_summary for the field.",
+                        system=self._semantic_review_system_prompt(
+                            output_type,
+                            fresh_resegmentation=False,
+                        ),
+                        options=generation_options,
+                        response_format=(
+                            self._constraint_representation_response_schema(
+                                self._resource_quantity_alignment_response_schema(
+                                    response_schema,
+                                    model_output=aligned_candidate,
+                                ),
+                                goal_count=len(aligned_candidate.new_goals),
+                            )
+                        ),
+                        prompt_family=(
+                            "goal_association.resource_source_alignment_"
+                            "contract_repair"
+                        ),
+                        turn_id=request.sid,
+                        attempt=16,
+                    )
+                    if not isinstance(quantity_aligned, dict):
+                        raise OllamaGenerationError(
+                            "goal-association resource quantity-alignment contract "
+                            "repair response is not a JSON object",
+                            failure_class="structured_output_invalid",
+                            failure_domain="model_contract",
+                            architecture_attribution="not_evaluated",
+                            retryable=True,
+                        )
+                    quantity_aligned, recovered = (
+                        self._drop_invalid_optional_referent_introductions(
+                            quantity_aligned
+                        )
+                    )
+                    optional_referent_recovery.extend(recovered)
+                    self._validate_fixed_goal_count(
+                        quantity_aligned,
+                        expected=len(aligned_candidate.new_goals),
+                        stage="resource quantity-alignment contract repair",
+                    )
+                    resolution = await self._validate_contract_output(
+                        quantity_aligned,
+                        request=request,
+                        turn_id=turn_id,
+                        output_type=output_type,
+                    )
+                    if self._resource_quantity_contract_repair_required(
+                        output_type.model_validate(quantity_aligned)
+                    ):
+                        raise ValueError(
+                            "resource quantity alignment remained incomplete after "
+                            "bounded model-owned contract repair"
+                        )
+                    source_aligned = quantity_aligned
+                    semantic_review_raw = quantity_aligned
+                    logger.info(
+                        "goal_association_resource_quantity_alignment_contract_"
+                        "repair_done sid=%s status=success",
+                        request.sid,
+                    )
+                reconciled_candidate = output_type.model_validate(source_aligned)
+                if self._resource_unlinked_spatial_binding_review_required(
+                    reconciled_candidate
+                ):
+                    source_alignment_attempt_count += 1
+                    logger.info(
+                        "goal_association_resource_binding_reconciliation_start "
+                        "sid=%s",
+                        request.sid,
+                    )
+                    reconciled_source = await self.ollama.generate(
+                        self._build_semantic_review_prompt(
+                            request=request,
+                            candidate_goals=candidate_goals,
+                            output_type=output_type,
+                            raw=source_aligned,
+                            triggers=["resource_source_binding_alignment_review"],
+                        )
+                        + "\n\nA fresh independent binding audit added one or more "
+                        "typed spatial bindings that the current physical-resource "
+                        "source contract does not name. This is a semantic review "
+                        "trigger, not proof that every spatial binding is a source. "
+                        "Re-read the authoritative turn and reconcile the complete "
+                        "DTO. First collapse alternate binding names for the same "
+                        "material dimension into one canonical binding without losing "
+                        "its value. Then classify each remaining spatial binding: when "
+                        "it locates the resource or a provider-owned acquisition route, "
+                        "list its exact name in source_binding_names; when it instead "
+                        "describes the recipient or delivery destination, represent it "
+                        "there and do not call it source evidence. Preserve the fixed "
+                        "Goal ownership, resource identity and quantity, recipient, "
+                        "delivery mode, and every material user constraint. The actual "
+                        "DTO fields must match reason_summary. Return the complete "
+                        "corrected DTO.",
+                        system=self._semantic_review_system_prompt(
+                            output_type,
+                            fresh_resegmentation=False,
+                        ),
+                        options=generation_options,
+                        response_format=(
+                            self._preserve_single_resource_contract_response_schema(
+                                self._constraint_representation_response_schema(
+                                    response_schema,
+                                    goal_count=len(reconciled_candidate.new_goals),
+                                ),
+                                raw=source_aligned,
+                            )
+                        ),
+                        prompt_family=(
+                            "goal_association.resource_binding_reconciliation"
+                        ),
+                        turn_id=request.sid,
+                        attempt=20,
+                    )
+                    if not isinstance(reconciled_source, dict):
+                        raise OllamaGenerationError(
+                            "goal-association resource binding reconciliation response "
+                            "is not a JSON object",
+                            failure_class="structured_output_invalid",
+                            failure_domain="model_contract",
+                            architecture_attribution="not_evaluated",
+                            retryable=True,
+                        )
+                    reconciled_source, recovered = (
+                        self._drop_invalid_optional_referent_introductions(
+                            reconciled_source
+                        )
+                    )
+                    optional_referent_recovery.extend(recovered)
+                    self._validate_fixed_goal_count(
+                        reconciled_source,
+                        expected=len(reconciled_candidate.new_goals),
+                        stage="resource binding reconciliation",
+                    )
+                    self._validate_resource_contract_count_preserved(
+                        reconciled_source,
+                        baseline=source_aligned,
+                        stage="resource binding reconciliation",
+                    )
+                    resolution = await self._validate_contract_output(
+                        reconciled_source,
+                        request=request,
+                        turn_id=turn_id,
+                        output_type=output_type,
+                    )
+                    residual_reconciled_candidate = output_type.model_validate(
+                        reconciled_source
+                    )
+                    if self._resource_unlinked_spatial_binding_review_required(
+                        residual_reconciled_candidate
+                    ):
+                        source_alignment_attempt_count += 1
+                        logger.info(
+                            "goal_association_resource_binding_reconciliation_"
+                            "residual_repair_start sid=%s",
+                            request.sid,
+                        )
+                        residual_reconciled_source = await self.ollama.generate(
+                            self._build_semantic_review_prompt(
+                                request=request,
+                                candidate_goals=candidate_goals,
+                                output_type=output_type,
+                                raw=reconciled_source,
+                                triggers=[
+                                    "resource_source_binding_alignment_review"
+                                ],
+                            )
+                            + "\n\nThe preceding binding reconciliation remained "
+                            "internally incomplete: at least one typed spatial "
+                            "binding is still present on a physical-resource Goal "
+                            "but is not represented by its source, recipient, or "
+                            "delivery contract. Re-read the authoritative turn and "
+                            "return one final complete DTO whose fields express your "
+                            "semantic classification. If the binding locates the "
+                            "resource or its provider-owned acquisition route, retain "
+                            "it and list its exact canonical name in "
+                            "source_binding_names. If it instead locates the recipient "
+                            "or delivery destination, preserve that meaning in the "
+                            "corresponding description and remove the now-redundant "
+                            "unlinked Goal binding. Collapse aliases for the same "
+                            "dimension. Do not drop any material user constraint, "
+                            "resource identity or quantity, recipient, or delivery "
+                            "mode. A reason_summary alone does not resolve the DTO "
+                            "contradiction.",
+                            system=self._repair_system_prompt(output_type),
+                            options=generation_options,
+                            response_format=(
+                                self._preserve_single_resource_contract_response_schema(
+                                    self._constraint_representation_response_schema(
+                                        response_schema,
+                                        goal_count=len(
+                                            residual_reconciled_candidate.new_goals
+                                        ),
+                                    ),
+                                    raw=reconciled_source,
+                                )
+                            ),
+                            prompt_family=(
+                                "goal_association.resource_binding_reconciliation_"
+                                "residual_repair"
+                            ),
+                            turn_id=request.sid,
+                            attempt=21,
+                        )
+                        if not isinstance(residual_reconciled_source, dict):
+                            raise OllamaGenerationError(
+                                "goal-association residual resource binding "
+                                "reconciliation response is not a JSON object",
+                                failure_class="structured_output_invalid",
+                                failure_domain="model_contract",
+                                architecture_attribution="not_evaluated",
+                                retryable=True,
+                            )
+                        residual_reconciled_source, recovered = (
+                            self._drop_invalid_optional_referent_introductions(
+                                residual_reconciled_source
+                            )
+                        )
+                        optional_referent_recovery.extend(recovered)
+                        self._validate_fixed_goal_count(
+                            residual_reconciled_source,
+                            expected=len(
+                                residual_reconciled_candidate.new_goals
+                            ),
+                            stage="residual resource binding reconciliation",
+                        )
+                        self._validate_resource_contract_count_preserved(
+                            residual_reconciled_source,
+                            baseline=reconciled_source,
+                            stage="residual resource binding reconciliation",
+                        )
+                        resolution = await self._validate_contract_output(
+                            residual_reconciled_source,
+                            request=request,
+                            turn_id=turn_id,
+                            output_type=output_type,
+                        )
+                        if self._resource_unlinked_spatial_binding_review_required(
+                            output_type.model_validate(residual_reconciled_source)
+                        ):
+                            raise ValueError(
+                                "resource binding reconciliation remained incomplete "
+                                "after bounded model-owned residual repair"
+                            )
+                        reconciled_source = residual_reconciled_source
+                        logger.info(
+                            "goal_association_resource_binding_reconciliation_"
+                            "residual_repair_done sid=%s status=success",
+                            request.sid,
+                        )
+                    source_aligned = reconciled_source
+                    semantic_review_raw = reconciled_source
+                    logger.info(
+                        "goal_association_resource_binding_reconciliation_done "
+                        "sid=%s status=success",
+                        request.sid,
+                    )
+                accepted_raw = source_aligned
+                semantic_review_raw = source_aligned
+                alignment_metadata = {
+                    **pre_alignment_metadata,
+                    **dict(resolution.metadata),
+                }
+                alignment_metadata["resource_source_alignment"] = {
+                    "attempted": True,
+                    "succeeded": True,
+                    "strategy": "model_owned_typed_binding_alignment",
+                    "attempt_count": source_alignment_attempt_count,
+                }
+                resolution = resolution.model_copy(
+                    update={"metadata": alignment_metadata}
+                )
+                if responsibility_coverage_attempted:
+                    responsibility_coverage_attempt_count += 1
+                    coverage_review = await self._run_responsibility_coverage_audit(
+                        request=request,
+                        raw=accepted_raw,
+                        generation_options=generation_options,
+                        prompt_family=(
+                            "goal_association.responsibility_coverage_source_alignment"
+                        ),
+                        attempt=17,
+                    )
+                    if coverage_review.decision != "accept":
+                        raise ValueError(
+                            "responsibility coverage rejected the bounded resource "
+                            "source-alignment review"
+                        )
+                    coverage_metadata = dict(resolution.metadata)
+                    coverage_metadata["responsibility_coverage"] = {
+                        "attempted": True,
+                        "succeeded": True,
+                        "strategy": "independent_model_coverage_audit",
+                        "initial_decision": initial_coverage_decision,
+                        "final_decision": coverage_review.decision,
+                        "resegmented": responsibility_coverage_resegmented,
+                        "attempt_count": responsibility_coverage_attempt_count,
+                        "item_count": len(coverage_review.items),
+                    }
+                    resolution = resolution.model_copy(
+                        update={"metadata": coverage_metadata}
+                    )
+                logger.info(
+                    "goal_association_resource_source_alignment_review_done sid=%s "
+                    "status=success",
+                    request.sid,
                 )
             if self._binding_audit_required(accepted_raw):
                 semantic_review_attempted = True
@@ -1765,6 +3985,25 @@ class GoalAssociationResolver:
                 + ", ".join(collection_bindings),
                 trigger="invalid_action_collection_binding",
             )
+        binding_conflicts = self._binding_semantic_contract_conflicts(model_output)
+        if binding_conflicts:
+            raise ValueError(
+                "binding name and entity_type cannot declare conflicting canonical "
+                "parameter categories; preserve the intended parameter and correct "
+                "the contradictory field: "
+                + ", ".join(binding_conflicts)
+            )
+        resource_source_conflicts = (
+            self._resource_source_binding_contract_conflicts(model_output)
+        )
+        if resource_source_conflicts:
+            raise ValueError(
+                "resource source_binding_names must reference existing same-Goal "
+                "bindings that describe an actual source or spatial acquisition "
+                "constraint. Resource identity, requested quantity, recipient, and "
+                "delivery fields are not source evidence: "
+                + ", ".join(resource_source_conflicts)
+            )
         location_bindings = self._non_verbatim_explicit_location_bindings(
             model_output,
             request=request,
@@ -1808,6 +4047,151 @@ class GoalAssociationResolver:
                         f"{binding.entity_type}"
                     )
         return rejected
+
+    @staticmethod
+    def _binding_semantic_contract_conflicts(
+        model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
+    ) -> list[str]:
+        """Reject contradictions between model-authored canonical binding fields.
+
+        This does not infer a parameter from user wording. It only prevents a DTO
+        from calling the same binding two different canonical parameter kinds, such
+        as ``name=distance`` with ``entity_type=quantity``.
+        """
+
+        categories = {
+            "distance": {"distance"},
+            "direction": {"direction"},
+            "quantity": {
+                "amount",
+                "count",
+                "item_count",
+                "quantity",
+                "quantity_binding",
+                "resource_count",
+                "resource_quantity",
+            },
+        }
+        category_by_token = {
+            token: category
+            for category, tokens in categories.items()
+            for token in tokens
+        }
+        conflicts: list[str] = []
+        for goal_index, goal in enumerate(model_output.new_goals):
+            for binding_index, binding in enumerate(goal.bindings):
+                name = "_".join(
+                    binding.name.strip().casefold().replace("-", "_").split()
+                )
+                entity_type = "_".join(
+                    binding.entity_type.strip()
+                    .casefold()
+                    .replace("-", "_")
+                    .split()
+                )
+                name_category = category_by_token.get(name)
+                type_category = category_by_token.get(entity_type)
+                if (
+                    name_category is not None
+                    and type_category is not None
+                    and name_category != type_category
+                ):
+                    conflicts.append(
+                        f"new_goals[{goal_index}].bindings[{binding_index}]="
+                        f"{binding.name}/{binding.entity_type}"
+                    )
+        return conflicts
+
+    @staticmethod
+    def _resource_source_binding_contract_conflicts(
+        model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
+    ) -> list[str]:
+        """Report invalid model-declared links from a resource to source evidence.
+
+        This is a typed integrity check over fields the model already authored. It
+        does not infer a source, binding, parameter, or value from user wording.
+        Besides requiring a same-Goal binding, it prevents the resource's identity,
+        requested amount, recipient, or delivery mode from being relabelled as the
+        place/source from which that resource should be acquired. A focused model
+        revision remains responsible for the semantic repair.
+        """
+
+        non_source_names = {
+            "amount",
+            "count",
+            "delivery_mode",
+            "delivery_recipient",
+            "desired_item",
+            "item",
+            "item_count",
+            "object",
+            "quantity",
+            "recipient",
+            "resource",
+            "resource_count",
+            "resource_description",
+            "resource_identity",
+            "resource_kind",
+            "resource_quantity",
+            "target_item",
+        }
+        identity_or_quantity_types = {
+            "amount",
+            "count",
+            "item",
+            "object",
+            "physical_object",
+            "quantity",
+            "resource",
+            "resource_identity",
+            "resource_kind",
+        }
+        explicit_source_names = {
+            "direction",
+            "distance",
+            "location",
+            "origin",
+            "place",
+            "provider",
+            "source",
+            "source_location",
+            "source_provider",
+            "spatial_offset",
+        }
+
+        conflicts: list[str] = []
+        for goal_index, goal in enumerate(model_output.new_goals):
+            resource = goal.resource_responsibility
+            if resource is None:
+                continue
+            bindings_by_name = {binding.name: binding for binding in goal.bindings}
+            for source_name in resource.source_binding_names:
+                binding = bindings_by_name.get(source_name)
+                if binding is None:
+                    conflicts.append(
+                        f"new_goals[{goal_index}].resource_responsibility."
+                        f"source_binding_names[{source_name}]=missing_same_goal_binding"
+                    )
+                    continue
+                normalized_name = "_".join(
+                    binding.name.strip().casefold().replace("-", "_").split()
+                )
+                normalized_type = "_".join(
+                    binding.entity_type.strip()
+                    .casefold()
+                    .replace("-", "_")
+                    .split()
+                )
+                if normalized_name in non_source_names or (
+                    normalized_type in identity_or_quantity_types
+                    and normalized_name not in explicit_source_names
+                ):
+                    conflicts.append(
+                        f"new_goals[{goal_index}].resource_responsibility."
+                        f"source_binding_names[{source_name}]="
+                        f"non_source_semantics({binding.name}/{binding.entity_type})"
+                    )
+        return conflicts
 
     @staticmethod
     def _non_verbatim_explicit_location_bindings(
@@ -1917,6 +4301,17 @@ class GoalAssociationResolver:
             goal.resource_responsibility is not None
             for goal in model_output.new_goals
         )
+        has_resource_stage_sibling = any(
+            goal.responsibility_kind == "executable_action"
+            and goal.resource_responsibility is None
+            for goal in model_output.new_goals
+        )
+        if has_resource_work and has_resource_stage_sibling:
+            # A physical effect beside a resource responsibility can be a real
+            # independent outcome, but it is also the exact typed shape created
+            # when navigation, locating, carrying, or return is promoted out of
+            # the resource Goal. The reviewer, not the Host, decides which it is.
+            triggers.append("resource_provider_stage_split_review")
         has_unscoped_capability_sibling = any(
             goal.responsibility_kind == "capability_dependent"
             and goal.resource_responsibility is None
@@ -1994,6 +4389,240 @@ class GoalAssociationResolver:
             if has_capability_work and has_ordinary_spoken
             else []
         )
+
+    @staticmethod
+    def _resource_stage_split_review_required(
+        model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
+    ) -> bool:
+        """Detect only the typed shape that needs focused semantic adjudication."""
+
+        has_resource_work = any(
+            goal.resource_responsibility is not None
+            for goal in model_output.new_goals
+        )
+        has_embodied_sibling = any(
+            goal.responsibility_kind == "executable_action"
+            and goal.resource_responsibility is None
+            for goal in model_output.new_goals
+        )
+        return has_resource_work and has_embodied_sibling
+
+    @staticmethod
+    def _raw_has_resource_contract(raw: dict[str, Any] | None) -> bool:
+        """Observe only whether a model DTO structurally declared resource work."""
+
+        if not isinstance(raw, dict):
+            return False
+        goals = raw.get("new_goals")
+        return isinstance(goals, list) and any(
+            isinstance(goal, dict)
+            and isinstance(goal.get("resource_responsibility"), dict)
+            for goal in goals
+        )
+
+    @staticmethod
+    def _resource_source_alignment_review_required(
+        model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
+    ) -> bool:
+        """Trigger model review from a typed resource/binding disagreement."""
+
+        if GoalAssociationResolver._resource_spatial_source_alignment_repair_required(
+            model_output
+        ):
+            return True
+        for goal in model_output.new_goals:
+            responsibility = goal.resource_responsibility
+            if (
+                responsibility is None
+                or responsibility.resource_kind != "physical_object"
+            ):
+                continue
+            # An empty physical-object quantity may be legitimate when the human
+            # supplied no amount, but it is also the exact typed risk produced when
+            # a model preserves "one cup" only in prose. The model, not the Host,
+            # re-reads the authoritative turn and decides whether an explicit amount
+            # exists; this trigger merely requires that semantic audit.
+            if not responsibility.resource_quantity:
+                return True
+        return False
+
+    @staticmethod
+    def _resource_spatial_source_alignment_repair_required(
+        model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
+    ) -> bool:
+        """Detect a physical resource Goal whose spatial binding is still unlinked."""
+
+        spatial_types = {
+            "direction",
+            "distance",
+            "length",
+            "location",
+            "place",
+            "spatial_offset",
+        }
+        spatial_names = {"direction", "distance", "location", "source_location"}
+        return any(
+            goal.resource_responsibility is not None
+            and goal.resource_responsibility.resource_kind == "physical_object"
+            and goal.resource_responsibility.source_status == "unknown"
+            and any(
+                binding.entity_type.strip().casefold().replace("-", "_")
+                in spatial_types
+                or binding.name.strip().casefold().replace("-", "_")
+                in spatial_names
+                for binding in goal.bindings
+            )
+            for goal in model_output.new_goals
+        )
+
+    @staticmethod
+    def _resource_unlinked_spatial_binding_review_required(
+        model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
+    ) -> bool:
+        """Trigger semantic reconciliation after a binding audit adds spatial data.
+
+        The Host observes only a typed linkage risk. It does not decide whether an
+        unlinked direction, distance, or location is source, recipient, delivery, or
+        an independent effect; the focused model review owns that classification.
+        """
+
+        spatial_types = {
+            "direction",
+            "distance",
+            "length",
+            "location",
+            "place",
+            "spatial_measurement",
+            "spatial_offset",
+            "spatial_orientation",
+        }
+        spatial_names = {
+            "direction",
+            "distance",
+            "location",
+            "source_location",
+            "spatial_offset",
+        }
+        for goal in model_output.new_goals:
+            responsibility = goal.resource_responsibility
+            if (
+                responsibility is None
+                or responsibility.resource_kind != "physical_object"
+                or responsibility.source_status != "known"
+            ):
+                continue
+            linked_names = set(responsibility.source_binding_names)
+            if any(
+                binding.name not in linked_names
+                and (
+                    binding.entity_type.strip().casefold().replace("-", "_")
+                    in spatial_types
+                    or binding.name.strip().casefold().replace("-", "_")
+                    in spatial_names
+                )
+                for binding in goal.bindings
+            ):
+                return True
+        return False
+
+    @staticmethod
+    def _covered_constraint_binding_review_required(
+        model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
+        *,
+        coverage_review: GoalResponsibilityCoverageReview | None,
+    ) -> bool:
+        """Link a model-audited constraint to missing typed Goal provenance."""
+
+        if coverage_review is None:
+            return False
+        constrained_indices = {
+            goal_index
+            for item in coverage_review.items
+            if item.role == "constraint" and item.coverage == "covered"
+            for goal_index in item.candidate_goal_indices
+        }
+        for index in constrained_indices:
+            if index < 0 or index >= len(model_output.new_goals):
+                continue
+            goal = model_output.new_goals[index]
+            if (
+                goal.resource_responsibility is not None
+                and not goal.bindings
+            ):
+                return True
+        return False
+
+    @staticmethod
+    def _resource_quantity_contract_repair_required(
+        model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
+    ) -> bool:
+        """Detect a model-authored quantity binding missing from its resource DTO."""
+
+        quantity_names = {
+            "amount",
+            "count",
+            "item_count",
+            "quantity",
+            "quantity_binding",
+            "resource_count",
+            "resource_quantity",
+        }
+        return any(
+            goal.resource_responsibility is not None
+            and goal.resource_responsibility.resource_kind == "physical_object"
+            and not goal.resource_responsibility.resource_quantity
+            and any(
+                binding.name.strip().casefold().replace("-", "_")
+                in quantity_names
+                or binding.entity_type.strip().casefold().replace("-", "_")
+                in quantity_names
+                for binding in goal.bindings
+            )
+            for goal in model_output.new_goals
+        )
+
+    @staticmethod
+    def _physical_resource_quantity_audit_required(
+        model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
+    ) -> bool:
+        """Require model adjudication when a physical amount remains unstated."""
+
+        return any(
+            goal.resource_responsibility is not None
+            and goal.resource_responsibility.resource_kind == "physical_object"
+            and not goal.resource_responsibility.resource_quantity
+            for goal in model_output.new_goals
+        )
+
+    @classmethod
+    def _resource_quantity_alignment_response_schema(
+        cls,
+        response_schema: dict[str, Any],
+        *,
+        model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
+    ) -> dict[str, Any]:
+        """Require the redundant quantity field once the model named its binding."""
+
+        if not cls._resource_quantity_contract_repair_required(model_output):
+            return response_schema
+        schema = copy.deepcopy(response_schema)
+        resource_schema = schema.get("$defs", {}).get(
+            "GoalAssociationModelResourceResponsibility"
+        )
+        if not isinstance(resource_schema, dict):
+            return schema
+        quantity = resource_schema.get("properties", {}).get(
+            "resource_quantity"
+        )
+        if isinstance(quantity, dict):
+            quantity["minLength"] = 1
+            required = resource_schema.setdefault("required", [])
+            if (
+                isinstance(required, list)
+                and "resource_quantity" not in required
+            ):
+                required.append("resource_quantity")
+        return schema
 
     @staticmethod
     def _validation_error_json(exc: Exception) -> str:
@@ -2152,6 +4781,49 @@ class GoalAssociationResolver:
                 resolved_references["maxItems"] = 0
         schema.pop("oneOf", None)
         schema.pop("anyOf", None)
+        return GoalAssociationResolver._binding_semantic_contract_response_schema(
+            schema
+        )
+
+    @staticmethod
+    def _binding_semantic_contract_response_schema(
+        response_schema: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Expose the existing canonical binding invariant to constrained decoding."""
+
+        schema = copy.deepcopy(response_schema)
+        binding_schema = schema.get("$defs", {}).get(
+            "GoalAssociationModelBinding"
+        )
+        if not isinstance(binding_schema, dict):
+            return schema
+        categories = {
+            "distance": ["distance"],
+            "direction": ["direction"],
+            "quantity": [
+                "amount",
+                "count",
+                "item_count",
+                "quantity",
+                "quantity_binding",
+                "resource_count",
+                "resource_quantity",
+            ],
+        }
+        clauses = binding_schema.setdefault("allOf", [])
+        for names in categories.values():
+            clauses.append(
+                {
+                    "if": {
+                        "properties": {"name": {"enum": names}},
+                        "required": ["name"],
+                    },
+                    "then": {
+                        "properties": {"entity_type": {"enum": names}},
+                        "required": ["entity_type"],
+                    },
+                }
+            )
         return schema
 
     def _candidate_goals(self, request: AgentRunRequest) -> list[dict[str, Any]]:
@@ -2294,7 +4966,7 @@ class GoalAssociationResolver:
             "A greeting or politeness preamble attached to a substantive request is conversational framing, not a separate Goal unless the user independently asks for a social response. Owner-approved identity and personality shape expression only; never create a Goal merely to mention age, identity, warmth, curiosity, or another style trait. "
             "A factual lookup and the user's requested interpretation of that same evidence are one Goal when one capability result can satisfy both, such as checking weather and judging whether it is hot. Do not split evidence acquisition from the answer derived from that evidence. "
             "A physical action and a conversational answer or spoken performance are independent goals when the answer or performance is genuinely requested. Separate independently requested outcomes that can be accepted or rejected on their own. However, acquisition and delivery stages that together constitute one human responsibility are one Goal: navigating/searching, locating, grasping or retrieving, carrying, returning, and handing over are provider-owned stages of one physical resource delivery; external search, evidence retrieval, evaluation, and spoken explanation are stages of one information resource delivery. Do not split those implementation stages into separate Goals unless the user independently requests one stage as its own outcome. A simple acknowledgement, confirmation, willingness statement, or progress prelude for capability work is not a separate vocal_output Goal; it is prospective conversational output attached to the existing responsibility and every cognitive stage must use Interaction Context to avoid repeating an already fulfilled act. Before returning, verify that every independently satisfiable user responsibility appears in exactly one new_goals item: no merged unrelated outcomes and no duplicated responsibility across Goals. "
-            "For a responsibility whose human-level outcome is to obtain something and make it available to a recipient, include resource_responsibility. Use resource_kind=physical_object for embodied objects and delivery_mode=physical_handover. Use resource_kind=information for weather, restaurant or place recommendations, web research, current facts, and other grounded information; use delivery_mode=spoken_explanation unless the user explicitly requests structured output. Resource identity is not source evidence: naming or pointing at the desired object or information does not by itself say where it is or which source supplies it. Set source_status=known only when the user or discourse supplies an actual source, and then source_description or source_binding_names is mandatory. Set unknown when a required source is absent, including an unresolved demonstrative whose referent or location is not established. Use provider_resolved only when source selection is intentionally delegated to the eventual provider. source_binding_names may reference only bindings in the same Goal. This semantic object must never name or imply a provider, capability ID, website, search engine, execution mode, coordinates, grasp pose, or implementation plan. Provider selection belongs only to the Planner. Put every user-visible parameter such as count, duration, speed, direction, target, or requested content into both the natural-language description and a typed binding. When the user states an unambiguous quantity in words, normalize its binding value to the equivalent numeric string without units; the model owns that semantic normalization. Description text alone is not parameter provenance for planning. "
+            "For a responsibility whose human-level outcome is to obtain something and make it available to a recipient, include resource_responsibility. Use resource_kind=physical_object for embodied objects and delivery_mode=physical_handover. Use resource_kind=information for weather, restaurant or place recommendations, web research, current facts, and other grounded information; use delivery_mode=spoken_explanation unless the user explicitly requests structured output. Preserve an explicit resource amount in resource_quantity as a normalized numeric string without units; use an empty string only when no amount is supplied. Resource identity is not source evidence: naming or pointing at the desired object or information does not by itself say where it is or which source supplies it. Set source_status=known only when the user or discourse supplies an actual source, and then source_description or source_binding_names is mandatory. A direction or distance that locates the requested object belongs in that known source and its same-Goal bindings when it is instrumental to acquisition, rather than becoming an independent movement Goal. Set unknown when a required source is absent, including an unresolved demonstrative whose referent or location is not established. Use provider_resolved only when source selection is intentionally delegated to the eventual provider. source_binding_names may reference only bindings in the same Goal. This semantic object must never name or imply a provider, capability ID, website, search engine, execution mode, coordinates, grasp pose, or implementation plan. Provider selection belongs only to the Planner. Put every user-visible parameter such as count, duration, speed, direction, target, or requested content into both the natural-language description and a typed binding. When the user states an unambiguous quantity in words, normalize its binding value to the equivalent numeric string without units; the model owns that semantic normalization. Description text alone is not parameter provenance for planning. "
             "Also preserve semantic qualifiers such as temporal scope, comparison period, and requested answer shape. Never silently rewrite annual, seasonal, historical, comparative, or otherwise broad scope into current, today, tomorrow, or another narrower scope. If the intended scope is materially ambiguous, return clarification instead of choosing a narrower interpretation. "
             "Resolve references, pronouns, demonstratives, ellipsis, and task mentions before planning. Authority order is: explicit current user meaning; foreground scoped discourse referents; candidate Goal bindings; recent dialogue. Phrases such as ‘the last task I told you’ may semantically associate with an active, recoverable, or retained recent terminal Goal, but the model must decide that relationship from the supplied Goal state and dialogue—not from a Host phrase table. Tool-result memory is not reference-resolution authority and must never decide what an unresolved expression refers to. "
             "When the user introduces or explicitly corrects a salient entity, emit referent_updates. Use operation=correct with target_referent_ids when a new value supersedes an earlier referent in the current discourse; the old referent remains available in its own task scope but becomes background. Use operation=introduce for a new salient entity, and focus/background/retire only for supplied referent IDs. "
@@ -2543,15 +5215,88 @@ class GoalAssociationResolver:
             if "mixed_capability_and_spoken_responsibilities" in triggers
             else ""
         )
+        resource_contract_loss_guidance = (
+            "Two independent model passes disagreed about whether this turn owns a "
+            "resource acquisition-and-delivery responsibility: an earlier DTO included "
+            "one and a fresh semantic resegmentation removed every resource contract. "
+            "That typed disagreement is a review trigger, not proof that either pass "
+            "was correct. Re-segment again from the authoritative turn. If the human "
+            "outcome is to obtain an object or information and make it available to a "
+            "recipient, include one complete provider-neutral resource_responsibility. "
+            "Navigation, locating, pickup, carrying, return, and handoff stay inside "
+            "that Goal unless one stage is independently owed. Preserve instrumental "
+            "direction/distance as same-Goal bindings and known-source bindings. If the "
+            "human did not request acquisition and delivery, omit the resource contract "
+            "and preserve the genuinely independent outcomes.\n\n"
+            if "resource_contract_loss_review" in triggers
+            else ""
+        )
         resource_delivery_guidance = (
-            "A resource-backed Goal and another provider-required Goal with no own "
-            "bindings/resource contract coexist. Re-segment from the authoritative "
-            "turn and decide whether the latter has an independent evidence/effect "
-            "outcome. If it merely interprets, reports, recommends, or answers from "
-            "the resource Goal's result, it is delivery owned by that resource Goal, "
-            "not another Capability Goal. Preserve it only when it has a genuinely "
-            "independent outcome.\n\n"
+            (
+                "A resource-backed Goal and another provider-required Goal with no own "
+                "bindings/resource contract coexist. Re-segment from the authoritative "
+                "turn and decide whether the latter has an independent evidence/effect "
+                "outcome. If it merely interprets, reports, recommends, or answers from "
+                "the resource Goal's result, it is delivery owned by that resource Goal, "
+                "not another Capability Goal. Preserve it only when it has a genuinely "
+                "independent outcome.\n\n"
+            )
             if "resource_result_delivery_split_review" in triggers
+            else (
+                "A resource-backed Goal and a separate embodied Goal coexist. Apply a "
+                "counterfactual independence test: would the person still judge the "
+                "movement or manipulation as an independently owed outcome if the "
+                "resource were acquired and delivered by a provider that performed "
+                "that stage internally? If not, the movement is instrumental source "
+                "or delivery context and must remain inside one resource Goal. Spatial "
+                "direction, distance, search, pickup, carrying, return, and handoff may "
+                "all describe provider-owned stages; preserve their material meaning "
+                "as Goal bindings and resource source/recipient fields instead of "
+                "promoting them to sibling Goals. Keep a sibling only when the user "
+                "genuinely requests its observable effect for its own sake.\n\n"
+                if {
+                    "resource_provider_stage_split_review",
+                    "residual_resource_provider_stage_split_review",
+                }.intersection(triggers)
+                else ""
+            )
+        )
+        residual_resource_guidance = (
+            "A fresh resegmentation still retained a resource Goal beside an "
+            "embodied sibling, so perform one focused counterfactual adjudication. "
+            "A measurable direction, distance, or intermediate motion is not by "
+            "itself evidence of an independently owed outcome. Preserve the sibling "
+            "only when the authoritative turn supplies a purpose or acceptance "
+            "condition that the person would still require if the resource were "
+            "already delivered. Otherwise return one complete resource Goal and "
+            "transfer every material direction/distance binding into that Goal and "
+            "its source description/binding names. Return the full corrected DTO, "
+            "not an explanation of the merge.\n\n"
+            if "residual_resource_provider_stage_split_review" in triggers
+            else ""
+        )
+        resource_source_alignment_guidance = (
+            "A physical resource Goal has a typed binding that is not yet aligned "
+            "with its provider-neutral resource contract: either typed spatial data "
+            "coexists with source_status=unknown, or a typed amount/count coexists "
+            "with an empty resource_quantity. The trigger can also be an independent "
+            "coverage audit mapping a material constraint to a resource Goal that "
+            "still has no typed bindings. These shapes are review triggers, not proof "
+            "of what a binding means. Re-read the authoritative turn and audit "
+            "every explicit resource amount, direction, and distance together. When "
+            "an amount binding counts the requested resource, copy its normalized "
+            "numeric-string value into resource_quantity. When a spatial binding "
+            "locates the resource or a provider-owned acquisition stage, keep it on "
+            "the same Goal, set source_status=known, provide a grounded "
+            "source_description, and list the exact same-Goal binding names in "
+            "source_binding_names. Add any other explicit material direction or "
+            "distance from the turn as a typed same-Goal binding before listing it. "
+            "When a binding instead belongs to a genuinely independent outcome, "
+            "represent that outcome separately; when it is not resource/source "
+            "evidence, do not fabricate alignment. Preserve resource identity, "
+            "recipient, delivery mode, and all valid bindings. Return the complete "
+            "corrected DTO; reason_summary cannot substitute for typed fields.\n\n"
+            if "resource_source_binding_alignment_review" in triggers
             else ""
         )
         review_input = (
@@ -2574,7 +5319,10 @@ class GoalAssociationResolver:
             "dialogue context. Do not use phrase matching, binding equality, "
             "numeric suffixes, lexical overlap, or another deterministic shortcut.\n\n"
             + mixed_responsibility_guidance
+            + resource_contract_loss_guidance
             + resource_delivery_guidance
+            + residual_resource_guidance
+            + resource_source_alignment_guidance
             + "Classify each candidate's output_mode by the semantic work and evidence "
             "that complete the human outcome, not by grammar, verb choice, command "
             "framing, or the surrounding route. Embodied effects use body_action; "
@@ -2874,17 +5622,41 @@ class GoalAssociationResolver:
         generation_options: dict[str, Any],
         prompt_family: str,
         attempt: int,
+        resource_stage_focus: bool = False,
+        source_excerpts: list[str] | None = None,
     ) -> GoalResponsibilityCoverageReview:
         goal_count = len(raw.get("new_goals") or [])
-        coverage_raw = await self.ollama.generate(
-            self._build_responsibility_coverage_prompt(
+        prompt = (
+            self._build_resource_stage_coverage_prompt(
                 request=request,
                 raw=raw,
-            ),
-            system=self._responsibility_coverage_system_prompt(),
+            )
+            if resource_stage_focus
+            else self._build_responsibility_coverage_prompt(
+                request=request,
+                raw=raw,
+            )
+        )
+        if resource_stage_focus and source_excerpts:
+            prompt += (
+                "\n\nThe prior independent audit already established these exact "
+                "verbatim semantic source fragments. Preserve each exactly once "
+                "while re-adjudicating only its role, independence, coverage, and "
+                "Goal ownership:\n"
+                + self._bounded_json(list(dict.fromkeys(source_excerpts)), 3000)
+            )
+        system_prompt = (
+            self._resource_stage_coverage_system_prompt()
+            if resource_stage_focus
+            else self._responsibility_coverage_system_prompt()
+        )
+        coverage_raw = await self.ollama.generate(
+            prompt,
+            system=system_prompt,
             options=generation_options,
             response_format=self._responsibility_coverage_response_schema(
-                goal_count
+                goal_count,
+                source_excerpts=source_excerpts,
             ),
             prompt_family=prompt_family,
             turn_id=request.sid,
@@ -2902,6 +5674,7 @@ class GoalAssociationResolver:
         coverage_raw = self._normalize_responsibility_coverage_decision(
             coverage_raw,
             sid=request.sid,
+            goal_count=goal_count,
         )
         try:
             review = GoalResponsibilityCoverageReview.model_validate(coverage_raw)
@@ -2921,16 +5694,28 @@ class GoalAssociationResolver:
                 self._bounded_json(coverage_raw, 4000),
             )
             repaired_raw = await self.ollama.generate(
-                self._build_responsibility_coverage_repair_prompt(
-                    request=request,
-                    raw=raw,
-                    invalid_review=coverage_raw,
-                    validation_error=validation_error,
+                (
+                    prompt
+                    + "\n\nThe previous focused audit JSON was internally invalid. "
+                    "Re-run the same inverse counterfactual and correct the exact "
+                    "contract errors; do not preserve an earlier role merely to make "
+                    "the DTO validate.\n\nInvalid audit JSON:\n"
+                    + self._bounded_json(coverage_raw, 5000)
+                    + "\n\nMechanical validation feedback JSON:\n"
+                    + validation_error
+                    if resource_stage_focus
+                    else self._build_responsibility_coverage_repair_prompt(
+                        request=request,
+                        raw=raw,
+                        invalid_review=coverage_raw,
+                        validation_error=validation_error,
+                    )
                 ),
-                system=self._responsibility_coverage_system_prompt(),
+                system=system_prompt,
                 options=generation_options,
                 response_format=self._responsibility_coverage_response_schema(
-                    goal_count
+                    goal_count,
+                    source_excerpts=source_excerpts,
                 ),
                 prompt_family=f"{prompt_family}.contract_repair",
                 turn_id=request.sid,
@@ -2948,13 +5733,90 @@ class GoalAssociationResolver:
             repaired_raw = self._normalize_responsibility_coverage_decision(
                 repaired_raw,
                 sid=request.sid,
-            )
-            review = GoalResponsibilityCoverageReview.model_validate(repaired_raw)
-            self._validate_responsibility_coverage_review(
-                review,
-                request=request,
                 goal_count=goal_count,
             )
+            try:
+                review = GoalResponsibilityCoverageReview.model_validate(
+                    repaired_raw
+                )
+                self._validate_responsibility_coverage_review(
+                    review,
+                    request=request,
+                    goal_count=goal_count,
+                )
+            except (ValidationError, ValueError) as repaired_review_exc:
+                revision_error = self._validation_error_json(
+                    repaired_review_exc
+                )
+                logger.warning(
+                    "goal_association_responsibility_coverage_contract_revision_"
+                    "start sid=%s validation_errors=%s",
+                    request.sid,
+                    revision_error,
+                )
+                revised_raw = await self.ollama.generate(
+                    (
+                        prompt
+                        + "\n\nThe previous focused audit contract repair was still "
+                        "invalid. Re-run the inverse counterfactual and fix the newly "
+                        "reported contract/provenance error. Every source_excerpt "
+                        "must be one exact verbatim contiguous span from the final "
+                        "authoritative turn, and each semantic fragment must appear "
+                        "exactly once.\n\nInvalid repaired audit JSON:\n"
+                        + self._bounded_json(repaired_raw, 5000)
+                        + "\n\nMechanical validation feedback JSON:\n"
+                        + revision_error
+                        if resource_stage_focus
+                        else self._build_responsibility_coverage_repair_prompt(
+                            request=request,
+                            raw=raw,
+                            invalid_review=repaired_raw,
+                            validation_error=revision_error,
+                        )
+                        + "\n\nThis is the final bounded contract revision. Fix the "
+                        "newly reported error rather than repeating the previous "
+                        "repair. Every source_excerpt must be exact, contiguous, and "
+                        "present in the final authoritative turn; emit each semantic "
+                        "fragment exactly once."
+                    ),
+                    system=system_prompt,
+                    options=generation_options,
+                    response_format=self._responsibility_coverage_response_schema(
+                        goal_count,
+                        source_excerpts=source_excerpts,
+                    ),
+                    prompt_family=f"{prompt_family}.contract_revision",
+                    turn_id=request.sid,
+                    attempt=attempt + 2,
+                )
+                if not isinstance(revised_raw, dict):
+                    raise OllamaGenerationError(
+                        "goal-association responsibility coverage contract revision "
+                        "response is not a JSON object",
+                        failure_class="structured_output_invalid",
+                        failure_domain="model_contract",
+                        architecture_attribution="not_evaluated",
+                        retryable=True,
+                    ) from repaired_review_exc
+                revised_raw = self._normalize_responsibility_coverage_decision(
+                    revised_raw,
+                    sid=request.sid,
+                    goal_count=goal_count,
+                )
+                review = GoalResponsibilityCoverageReview.model_validate(
+                    revised_raw
+                )
+                self._validate_responsibility_coverage_review(
+                    review,
+                    request=request,
+                    goal_count=goal_count,
+                )
+                logger.info(
+                    "goal_association_responsibility_coverage_contract_revision_"
+                    "done sid=%s decision=%s",
+                    request.sid,
+                    review.decision,
+                )
             logger.info(
                 "goal_association_responsibility_coverage_contract_repair_done "
                 "sid=%s decision=%s",
@@ -2968,17 +5830,57 @@ class GoalAssociationResolver:
         raw: dict[str, Any],
         *,
         sid: str,
+        goal_count: int,
     ) -> dict[str, Any]:
-        """Resolve only the redundant decision from validated semantic items.
+        """Resolve redundant summary fields from validated semantic items.
 
         The model still owns every role, coverage, independence, and ownership
-        judgment. The Host merely prevents a contradictory top-level boolean from
-        discarding those same judgments.
+        judgment. The Host merely derives the unjustified-candidate inventory and
+        top-level decision from those same judgments so an omitted duplicate index
+        cannot discard an otherwise valid audit.
         """
 
         raw_items = raw.get("items")
         if not isinstance(raw_items, list):
             return raw
+        normalized_items = copy.deepcopy(raw_items)
+        removed_noncovered_indices = False
+        normalized_nonmaterial_fields = False
+        for item in normalized_items:
+            if not isinstance(item, dict):
+                continue
+            if item.get("role") in {"context", "framing"}:
+                if (
+                    item.get("coverage") != "covered"
+                    or item.get("independently_satisfiable") is not False
+                    or bool(item.get("candidate_goal_indices"))
+                ):
+                    item["coverage"] = "covered"
+                    item["independently_satisfiable"] = False
+                    item["candidate_goal_indices"] = []
+                    normalized_nonmaterial_fields = True
+                continue
+            if item.get("coverage") == "covered":
+                continue
+            if item.get("candidate_goal_indices"):
+                item["candidate_goal_indices"] = []
+                removed_noncovered_indices = True
+        if normalized_nonmaterial_fields:
+            logger.warning(
+                "goal_association_responsibility_coverage_nonmaterial_fields_"
+                "normalized sid=%s",
+                sid,
+            )
+            raw = {**raw, "items": normalized_items}
+            raw_items = normalized_items
+        if removed_noncovered_indices:
+            logger.warning(
+                "goal_association_responsibility_coverage_noncovered_ownership_"
+                "normalized sid=%s",
+                sid,
+            )
+            raw = {**raw, "items": normalized_items}
+            raw_items = normalized_items
         try:
             items = [
                 GoalResponsibilityCoverageItem.model_validate(item)
@@ -2988,28 +5890,46 @@ class GoalAssociationResolver:
             return raw
         if not items:
             return raw
-        raw_unjustified = raw.get("unjustified_candidate_indices") or []
-        if not isinstance(raw_unjustified, list) or not all(
-            isinstance(index, int) for index in raw_unjustified
-        ):
-            return raw
+        responsibility_owned_indices = {
+            goal_index
+            for item in items
+            if item.role == "responsibility" and item.coverage == "covered"
+            for goal_index in item.candidate_goal_indices
+        }
+        derived_unjustified = sorted(
+            set(range(max(0, goal_count))) - responsibility_owned_indices
+        )
         derived = GoalResponsibilityCoverageReview.derived_decision(
             items,
-            raw_unjustified,
+            derived_unjustified,
         )
-        if raw.get("decision") == derived:
+        if (
+            raw.get("decision") == derived
+            and raw.get("unjustified_candidate_indices") == derived_unjustified
+        ):
             return raw
         logger.warning(
             "goal_association_responsibility_coverage_decision_normalized "
-            "sid=%s model_decision=%s derived_decision=%s",
+            "sid=%s model_decision=%s derived_decision=%s "
+            "model_unjustified=%s derived_unjustified=%s",
             sid,
             raw.get("decision"),
             derived,
+            raw.get("unjustified_candidate_indices"),
+            derived_unjustified,
         )
-        return {**raw, "decision": derived}
+        return {
+            **raw,
+            "decision": derived,
+            "unjustified_candidate_indices": derived_unjustified,
+        }
 
     @staticmethod
-    def _responsibility_coverage_response_schema(goal_count: int) -> dict[str, Any]:
+    def _responsibility_coverage_response_schema(
+        goal_count: int,
+        *,
+        source_excerpts: list[str] | None = None,
+    ) -> dict[str, Any]:
         schema = copy.deepcopy(GoalResponsibilityCoverageReview.model_json_schema())
         item_schema = schema.get("$defs", {}).get("GoalResponsibilityCoverageItem")
         if isinstance(item_schema, dict):
@@ -3027,6 +5947,16 @@ class GoalAssociationResolver:
                 if isinstance(index_items, dict):
                     index_items["type"] = "integer"
                     index_items["enum"] = list(range(max(0, goal_count)))
+            preserved_excerpts = list(dict.fromkeys(source_excerpts or []))
+            source_excerpt = item_schema.get("properties", {}).get(
+                "source_excerpt"
+            )
+            if preserved_excerpts and isinstance(source_excerpt, dict):
+                source_excerpt["enum"] = preserved_excerpts
+                items = schema.get("properties", {}).get("items")
+                if isinstance(items, dict):
+                    items["minItems"] = len(preserved_excerpts)
+                    items["maxItems"] = len(preserved_excerpts)
         unjustified = schema.get("properties", {}).get(
             "unjustified_candidate_indices"
         )
@@ -3060,6 +5990,55 @@ class GoalAssociationResolver:
             "responsibility owner. Return JSON only."
         )
 
+    @staticmethod
+    def _resource_stage_coverage_system_prompt() -> str:
+        return (
+            "You are Chromie's focused resource-stage independence auditor. Apply "
+            "only the inverse completion counterfactual to the authoritative user "
+            "turn and the supplied resource Goal plus embodied sibling. Decide "
+            "whether the sibling is still independently owed after complete resource "
+            "delivery. Measurability, imperative grammar, execution order, or the "
+            "ability of a provider stage to fail separately never proves an "
+            "independent human outcome. Return the exact responsibility-coverage JSON "
+            "only."
+        )
+
+    def _build_resource_stage_coverage_prompt(
+        self,
+        *,
+        request: AgentRunRequest,
+        raw: dict[str, Any],
+    ) -> str:
+        return (
+            "A general audit was prepared to accept a physical resource Goal beside "
+            "an embodied sibling. Re-audit only that independence judgment from the "
+            "authoritative turn. Assume the requested resource has already been "
+            "successfully acquired, carried, returned, and handed to its recipient by "
+            "a provider. Would the person still require the sibling movement or "
+            "manipulation for its own separately stated purpose or acceptance "
+            "condition? Distinguish an action that is executable by itself from an "
+            "outcome that is independently owed: a separate verb, imperative clause, "
+            "sequence position, direction, or measurable distance proves only that an "
+            "action was described, not that the person wants its effect after resource "
+            "delivery is already complete.\n\n"
+            "If yes, emit a role=responsibility item for its verbatim source excerpt, "
+            "set independently_satisfiable=true, and keep its unique Goal owner. If "
+            "no, emit that excerpt as role=constraint with "
+            "independently_satisfiable=false, map it to the resource Goal it modifies, "
+            "and list the sibling candidate as unjustified. Navigation, direction, "
+            "distance, locating, pickup, carrying, return, and handoff normally remain "
+            "provider stages unless the turn states a separate purpose that remains "
+            "owed under this counterfactual. A bare route or motion immediately serving "
+            "acquisition has no independent acceptance condition merely because it could "
+            "be observed or fail separately. The resource acquisition-and-delivery "
+            "outcome itself remains one role=responsibility item. Do not rewrite "
+            "Goals or plan capabilities. The redundant top-level decision must match "
+            "the item judgments and unjustified indices.\n\n"
+            "Candidate Goal DTO JSON:\n"
+            f"{self._bounded_json(raw, 9000)}\n\n"
+            f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
+        )
+
     def _build_responsibility_coverage_prompt(
         self,
         *,
@@ -3071,7 +6050,11 @@ class GoalAssociationResolver:
             "Audit whether this candidate Goal segmentation completely accounts for "
             "the authoritative user's current semantic responsibilities. This is an "
             "independent audit: candidate Goal wording is not evidence that the "
-            "segmentation is complete.\n\n"
+            "segmentation is complete by itself. Inspect the complete candidate DTO: "
+            "description, output_mode, typed bindings, resource responsibility, and "
+            "source/recipient fields are the evidence for what each candidate "
+            "actually represents. Do not call a constraint missing when those fields "
+            "materially preserve it on the Goal that it modifies.\n\n"
             "For each semantically material fragment of the current turn, emit one "
             "items entry and copy source_excerpt as a verbatim contiguous span from "
             "the FINAL AUTHORITATIVE USER TURN. Use role=responsibility for a positive "
@@ -3085,13 +6068,22 @@ class GoalAssociationResolver:
             "with a broad desired social impression but no words, information, vocal "
             "performance, or second effect modality is specified, that impression is "
             "embodiment-wide framing on the concrete effect. Do not infer speech from "
-            "an adjective, state directive, conjunction, or imperative grammar.\n\n"
+            "an adjective, state directive, conjunction, or imperative grammar. Emit "
+            "each semantic fragment once: never duplicate the same source_excerpt "
+            "under both responsibility and constraint (or any other conflicting "
+            "roles); decide its one actual role.\n\n"
             "Set independently_satisfiable=true only when the user could reasonably "
             "judge that positive outcome completed even if sibling outcomes did not "
             "happen. Every independently satisfiable responsibility must own its own "
             "Goal candidate. Do not collapse separately observable requested effects "
             "merely because they can overlap in time, share one sentence, or use a "
-            "common provider. Conversely, do "
+            "common provider. For acquire-and-deliver meaning, apply the inverse "
+            "counterfactual too: navigation, distance, direction, locating, pickup, "
+            "carrying, return, and handoff are not independent positive outcomes when "
+            "the person would consider them satisfied by successful resource delivery "
+            "and would not still require that stage for its own sake. In that case map "
+            "the material fragment as a constraint on the one resource responsibility, "
+            "not as ownership evidence for another Goal. Conversely, do "
             "not promote greeting/politeness framing, implementation steps, result "
             "delivery, or a negative speech boundary into a separate Goal.\n\n"
             "For coverage=covered, map a responsibility to exactly one candidate Goal "
@@ -3099,7 +6091,13 @@ class GoalAssociationResolver:
             "coverage=missing when material meaning has no Goal owner, and "
             "clarification_required only when the human-level responsibility itself "
             "cannot be determined without asking the user. Context and framing have "
-            "no Goal indices. Coverage also requires the candidate's output_mode and "
+            "no Goal indices. For a represented constraint, the expected shape is "
+            "role=constraint, independently_satisfiable=false, coverage=covered, and "
+            "the affected Goal index or indices. Never mark a constraint missing "
+            "merely because it is not a responsibility, has no separate Goal, or is "
+            "an instrumental provider stage; mark it missing only when no candidate "
+            "DTO field preserves it on the outcome that it modifies. Coverage also "
+            "requires the candidate's output_mode and "
             "observable completion meaning to match the requested responsibility: "
             "speech cannot cover requested body motion, media control, external "
             "evidence work, or a vocal performance. Every Goal candidate must be "
@@ -3219,18 +6217,172 @@ class GoalAssociationResolver:
             raw={},
             triggers=["responsibility_coverage_rejected"],
         )
+        audited_goal_count = self._audited_new_goal_count(coverage_review)
+        audited_goal_count_guidance = (
+            "The independent audit identified exactly "
+            f"{audited_goal_count} independently satisfiable responsibility item(s). "
+            "Because this is fresh Goal segmentation with no prior Goal association, "
+            f"return exactly {audited_goal_count} new Goal item(s). Constraints, "
+            "context, framing, and unjustified candidates do not add Goal owners.\n\n"
+            if audited_goal_count is not None
+            else ""
+        )
         return (
             base
             + "\n\nIndependent responsibility-coverage audit JSON (semantic feedback "
             "only; re-segment from the authoritative turn rather than copying prior "
             "Goal labels):\n"
             + self._bounded_json(coverage_review.model_dump(mode="json"), 7000)
-            + "\n\nReturn a fresh complete Goal segmentation that gives every independently "
+            + "\n\n"
+            + audited_goal_count_guidance
+            + "\n\nEvery audit item marked coverage=missing is concrete correction "
+            "feedback. The replacement DTO must visibly preserve that source meaning "
+            "in the owning Goal's description and in every applicable typed field; "
+            "claiming in reason_summary that a constraint was 'integrated' does not "
+            "represent it. A provider-owned spatial, quantity, target, or timing stage "
+            "of resource acquisition remains subordinate to one resource Goal, but it "
+            "still needs its material Goal bindings. When direction or distance locates "
+            "the resource, set source_status=known, describe that source, and name those "
+            "same-Goal bindings in source_binding_names. Keep the provider-neutral "
+            "resource_responsibility with the resource identity, explicit normalized "
+            "quantity, recipient, and delivery mode. For example, an abstract request "
+            "to bring one item from eight meters to the left is one physical resource "
+            "Goal with distance and direction bindings, a known source referencing both "
+            "bindings, quantity=1, and physical handoff; it is neither two Goals nor a "
+            "bare body_action. This example is structural and is not phrase evidence.\n\n"
+            "Return a fresh complete Goal segmentation that gives every independently "
             "satisfiable responsibility exactly one Goal owner while keeping "
             "constraints/context/framing subordinate. If no audit item has "
             "coverage=clarification_required, the human responsibility is already "
             "semantically defined: return created Goals and keep clarification empty. "
             "Do not use clarification to explain your segmentation."
+        )
+
+    def _build_responsibility_resegmentation_contract_repair_prompt(
+        self,
+        *,
+        request: AgentRunRequest,
+        candidate_goals: list[dict[str, Any]],
+        output_type: (
+            type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
+        ),
+        coverage_review: GoalResponsibilityCoverageReview,
+        invalid_raw: dict[str, Any],
+        validation_error: str,
+    ) -> str:
+        return (
+            self._build_responsibility_resegmentation_prompt(
+                request=request,
+                candidate_goals=candidate_goals,
+                output_type=output_type,
+                coverage_review=coverage_review,
+            )
+            + "\n\nThe previous fresh resegmentation had the correct semantic job but "
+            "failed its exact DTO/provenance contract. Return the full resegmentation "
+            "again, preserving the audit-owned Goal count and fixing every reported "
+            "field together. If source_status is known, do not drop the source link "
+            "while repairing bindings: include a grounded source_description or "
+            "source_binding_names that reference existing same-Goal bindings. Never "
+            "claim in reason_summary that a field exists when it is absent from the "
+            "DTO. Do not restore an unjustified candidate.\n\nInvalid fresh "
+            "resegmentation JSON:\n"
+            + self._bounded_json(invalid_raw, 9000)
+            + "\n\nExact mechanical validation feedback JSON:\n"
+            + validation_error
+        )
+
+    @staticmethod
+    def _coverage_rejects_only_constraint_representation(
+        review: GoalResponsibilityCoverageReview,
+    ) -> bool:
+        """Detect a narrow representation repair without interpreting user text."""
+
+        blocking_items = [
+            item for item in review.items if item.coverage != "covered"
+        ]
+        return bool(blocking_items) and not review.unjustified_candidate_indices and all(
+            item.role == "constraint" and item.coverage == "missing"
+            for item in blocking_items
+        ) and all(
+            item.coverage == "covered"
+            for item in review.items
+            if item.role == "responsibility"
+        )
+
+    def _build_constraint_representation_repair_prompt(
+        self,
+        *,
+        request: AgentRunRequest,
+        raw: dict[str, Any],
+        coverage_review: GoalResponsibilityCoverageReview,
+    ) -> str:
+        return (
+            "Repair only the semantic representation of constraints in an already "
+            "model-segmented Goal DTO. An independent audit established that every "
+            "positive responsibility has exactly one justified Goal owner and found "
+            "no extra Goal, but one or more subordinate constraints are still missing. "
+            "Preserve the Goal count, order, and output_mode. Return the complete DTO.\n\n"
+            "For every coverage=missing constraint, use semantic reasoning over its "
+            "verbatim source excerpt and the authoritative turn to place its full "
+            "meaning in the affected Goal description and every applicable typed "
+            "binding. reason_summary never represents a constraint. Preserve all "
+            "existing valid fields and bindings. Do not add another Goal for a "
+            "provider-owned stage.\n\n"
+            "When the existing responsibility is physical acquisition and delivery, "
+            "the repaired Goal must retain a provider-neutral resource_responsibility: "
+            "physical_object, normalized resource quantity when explicit, the intended "
+            "recipient, and physical_handover. If a direction or distance locates the "
+            "resource, add same-Goal direction/distance bindings, set source_status to "
+            "known, describe the source, and list those binding names in "
+            "source_binding_names. Do not invent a source, provider, capability, "
+            "coordinate, grasp pose, speed, duration, or other execution detail. "
+            "If a constraint is non-spatial, represent only what its actual meaning "
+            "supports.\n\n"
+            "Abstract structural example: bringing one item from eight meters to the "
+            "left remains one physical resource Goal; its distance and direction are "
+            "typed bindings and known-source bindings, not another movement Goal. This "
+            "example is not phrase evidence.\n\n"
+            "Candidate Goal DTO JSON:\n"
+            f"{self._bounded_json(raw, 9000)}\n\n"
+            "Responsibility coverage audit JSON:\n"
+            f"{self._bounded_json(coverage_review.model_dump(mode='json'), 7000)}\n\n"
+            f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
+        )
+
+    def _build_constraint_representation_contract_repair_prompt(
+        self,
+        *,
+        request: AgentRunRequest,
+        original_raw: dict[str, Any],
+        invalid_raw: dict[str, Any],
+        coverage_review: GoalResponsibilityCoverageReview,
+        validation_error: str,
+    ) -> str:
+        return (
+            self._build_constraint_representation_repair_prompt(
+                request=request,
+                raw=original_raw,
+                coverage_review=coverage_review,
+            )
+            + "\n\nThe previous attempt at this same narrow repair was invalid. "
+            "Retry from the original candidate above; do not preserve duplicates, "
+            "drop the audited missing constraint, or change responsibility ownership. "
+            "Correct every exact schema/provenance error while still completing the "
+            "constraint representation repair.\n\nInvalid previous attempt JSON:\n"
+            + self._bounded_json(invalid_raw, 7000)
+            + "\n\nMechanical validation feedback JSON:\n"
+            + validation_error
+        )
+
+    @staticmethod
+    def _constraint_representation_repair_system_prompt() -> str:
+        return (
+            "You are Chromie's focused Goal constraint-representation repairer. "
+            "Responsibility ownership and Goal segmentation are fixed. Repair the "
+            "complete Goal DTO so every audited missing constraint is present in "
+            "authoritative descriptions, typed bindings, and provider-neutral resource "
+            "fields where semantically applicable. Never treat reason_summary as data. "
+            "Return schema-valid JSON only."
         )
 
     @staticmethod
@@ -3241,6 +6393,7 @@ class GoalAssociationResolver:
             type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
         ),
         coverage_review: GoalResponsibilityCoverageReview,
+        require_resource_contract: bool = False,
     ) -> dict[str, Any]:
         """Close the clarify branch when the audit found no semantic ambiguity."""
 
@@ -3261,7 +6414,294 @@ class GoalAssociationResolver:
             clarification["maxLength"] = 0
         new_goals = properties.get("new_goals")
         if isinstance(new_goals, dict):
-            new_goals["minItems"] = 1
+            goal_count = GoalAssociationResolver._audited_new_goal_count(
+                coverage_review
+            )
+            if goal_count is None:
+                new_goals["minItems"] = 1
+            else:
+                new_goals["minItems"] = goal_count
+                new_goals["maxItems"] = goal_count
+            if require_resource_contract and goal_count == 1:
+                items = new_goals.get("items")
+                ref = items.get("$ref") if isinstance(items, dict) else None
+                goal_schema = (
+                    schema.get("$defs", {}).get(ref.rsplit("/", 1)[-1])
+                    if isinstance(ref, str) and ref.startswith("#/$defs/")
+                    else None
+                )
+                if isinstance(goal_schema, dict):
+                    required = goal_schema.setdefault("required", [])
+                    if (
+                        isinstance(required, list)
+                        and "resource_responsibility" not in required
+                    ):
+                        required.append("resource_responsibility")
+                    resource_schema = goal_schema.get("properties", {}).get(
+                        "resource_responsibility"
+                    )
+                    if isinstance(resource_schema, dict):
+                        resource_variants = resource_schema.get("anyOf")
+                        if isinstance(resource_variants, list):
+                            non_null_variants = [
+                                variant
+                                for variant in resource_variants
+                                if not (
+                                    isinstance(variant, dict)
+                                    and variant.get("type") == "null"
+                                )
+                            ]
+                            if len(non_null_variants) == 1:
+                                goal_schema["properties"][
+                                    "resource_responsibility"
+                                ] = non_null_variants[0]
+        return schema
+
+    @staticmethod
+    def _coverage_preserves_resource_contract(
+        coverage_review: GoalResponsibilityCoverageReview,
+        *,
+        raw: dict[str, Any],
+    ) -> bool:
+        """Carry model-audited resource ownership through fresh resegmentation."""
+
+        goals = raw.get("new_goals")
+        if not isinstance(goals, list):
+            return False
+        resource_goal_indices = {
+            index
+            for index, goal in enumerate(goals)
+            if isinstance(goal, dict)
+            and isinstance(goal.get("resource_responsibility"), dict)
+        }
+        return any(
+            item.role == "responsibility"
+            and item.coverage == "covered"
+            and item.independently_satisfiable
+            and bool(
+                resource_goal_indices.intersection(item.candidate_goal_indices)
+            )
+            for item in coverage_review.items
+        )
+
+    @staticmethod
+    def _audited_new_goal_count(
+        coverage_review: GoalResponsibilityCoverageReview,
+    ) -> int | None:
+        """Project the model audit's independent responsibilities into a count."""
+
+        if any(
+            item.coverage == "clarification_required"
+            for item in coverage_review.items
+        ):
+            return None
+        count = sum(
+            1
+            for item in coverage_review.items
+            if item.role == "responsibility" and item.independently_satisfiable
+        )
+        return count or None
+
+    @classmethod
+    def _validate_resegmentation_goal_count(
+        cls,
+        raw: dict[str, Any],
+        *,
+        output_type: (
+            type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
+        ),
+        coverage_review: GoalResponsibilityCoverageReview,
+        require_resource_contract: bool = False,
+    ) -> None:
+        """Keep fresh segmentation consistent with its model-owned audit."""
+
+        goals = raw.get("new_goals")
+        if not isinstance(goals, list):
+            return
+        if output_type is GoalSegmentationModelOutput:
+            expected = cls._audited_new_goal_count(coverage_review)
+            if expected is not None and len(goals) != expected:
+                raise ValueError(
+                    "responsibility resegmentation Goal count must equal the "
+                    "independent model audit: "
+                    f"expected={expected} actual={len(goals)}"
+                )
+        if require_resource_contract and not cls._raw_has_resource_contract(raw):
+            raise ValueError(
+                "responsibility resegmentation dropped the resource contract owned "
+                "by the independent model coverage audit"
+            )
+
+    @staticmethod
+    def _validate_fixed_goal_count(
+        raw: dict[str, Any],
+        *,
+        expected: int,
+        stage: str,
+    ) -> None:
+        goals = raw.get("new_goals")
+        actual = len(goals) if isinstance(goals, list) else -1
+        if actual != expected:
+            raise ValueError(
+                f"{stage} must preserve the fixed Goal count: "
+                f"expected={expected} actual={actual}"
+            )
+
+    @staticmethod
+    def _constraint_representation_response_schema(
+        response_schema: dict[str, Any],
+        *,
+        goal_count: int,
+    ) -> dict[str, Any]:
+        """Mechanically retain fixed segmentation during a constraint-only repair."""
+
+        schema = copy.deepcopy(response_schema)
+        new_goals = schema.get("properties", {}).get("new_goals")
+        if not isinstance(new_goals, dict):
+            return schema
+        new_goals["minItems"] = goal_count
+        new_goals["maxItems"] = goal_count
+        if goal_count != 1:
+            return schema
+        items = new_goals.get("items")
+        if not isinstance(items, dict):
+            return schema
+        ref = items.get("$ref")
+        if not isinstance(ref, str) or not ref.startswith("#/$defs/"):
+            return schema
+        goal_schema = schema.get("$defs", {}).get(ref.rsplit("/", 1)[-1])
+        if not isinstance(goal_schema, dict):
+            return schema
+        bindings = goal_schema.get("properties", {}).get("bindings")
+        if isinstance(bindings, dict):
+            bindings["minItems"] = 1
+            required = goal_schema.setdefault("required", [])
+            if isinstance(required, list) and "bindings" not in required:
+                required.append("bindings")
+        return schema
+
+    @staticmethod
+    def _preserve_single_resource_contract_response_schema(
+        response_schema: dict[str, Any],
+        *,
+        raw: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Keep one fixed resource Goal resource-backed during field-only repair."""
+
+        goals = raw.get("new_goals")
+        if (
+            not isinstance(goals, list)
+            or len(goals) != 1
+            or not isinstance(goals[0], dict)
+            or not isinstance(goals[0].get("resource_responsibility"), dict)
+        ):
+            return response_schema
+        schema = copy.deepcopy(response_schema)
+        new_goals = schema.get("properties", {}).get("new_goals")
+        items = new_goals.get("items") if isinstance(new_goals, dict) else None
+        ref = items.get("$ref") if isinstance(items, dict) else None
+        goal_schema = (
+            schema.get("$defs", {}).get(ref.rsplit("/", 1)[-1])
+            if isinstance(ref, str) and ref.startswith("#/$defs/")
+            else None
+        )
+        if not isinstance(goal_schema, dict):
+            return response_schema
+        required = goal_schema.setdefault("required", [])
+        if isinstance(required, list) and "resource_responsibility" not in required:
+            required.append("resource_responsibility")
+        resource_schema = goal_schema.get("properties", {}).get(
+            "resource_responsibility"
+        )
+        variants = (
+            resource_schema.get("anyOf") if isinstance(resource_schema, dict) else None
+        )
+        if isinstance(variants, list):
+            non_null = [
+                variant
+                for variant in variants
+                if not (
+                    isinstance(variant, dict) and variant.get("type") == "null"
+                )
+            ]
+            if len(non_null) == 1:
+                goal_schema["properties"]["resource_responsibility"] = non_null[0]
+        return schema
+
+    @staticmethod
+    def _validate_resource_contract_count_preserved(
+        raw: dict[str, Any],
+        *,
+        baseline: dict[str, Any],
+        stage: str,
+    ) -> None:
+        """Reject field-only repair that silently changes resource ownership."""
+
+        def count(value: dict[str, Any]) -> int:
+            goals = value.get("new_goals")
+            return sum(
+                isinstance(goal, dict)
+                and isinstance(goal.get("resource_responsibility"), dict)
+                for goal in goals or []
+            )
+
+        expected = count(baseline)
+        actual = count(raw)
+        if expected != actual:
+            raise ValueError(
+                f"{stage} must preserve resource responsibility ownership: "
+                f"expected={expected} actual={actual}"
+            )
+
+    @staticmethod
+    def _preserve_known_source_binding_response_schema(
+        response_schema: dict[str, Any],
+        *,
+        raw: dict[str, Any],
+        infer_missing_link: bool = False,
+    ) -> dict[str, Any]:
+        """Require a model-declared known-source link to survive DTO repair."""
+
+        goals = raw.get("new_goals")
+        preserve_link = any(
+            isinstance(goal, dict)
+            and isinstance(goal.get("resource_responsibility"), dict)
+            and goal["resource_responsibility"].get("source_status") == "known"
+            and (
+                infer_missing_link
+                or bool(
+                    goal["resource_responsibility"].get("source_binding_names")
+                )
+            )
+            for goal in goals or []
+        )
+        if not preserve_link:
+            return response_schema
+        schema = copy.deepcopy(response_schema)
+        resource_schema = schema.get("$defs", {}).get(
+            "GoalAssociationModelResourceResponsibility"
+        )
+        if not isinstance(resource_schema, dict):
+            return schema
+        goal_schema = schema.get("$defs", {}).get("GoalAssociationModelGoal")
+        if isinstance(goal_schema, dict):
+            required = goal_schema.setdefault("required", [])
+            if (
+                isinstance(required, list)
+                and "resource_responsibility" not in required
+            ):
+                required.append("resource_responsibility")
+        source_bindings = resource_schema.get("properties", {}).get(
+            "source_binding_names"
+        )
+        if isinstance(source_bindings, dict):
+            source_bindings["minItems"] = 1
+            required = resource_schema.setdefault("required", [])
+            if (
+                isinstance(required, list)
+                and "source_binding_names" not in required
+            ):
+                required.append("source_binding_names")
         return schema
 
     @staticmethod
@@ -3317,6 +6757,177 @@ class GoalAssociationResolver:
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
         )
 
+    def _build_resource_quantity_binding_audit_prompt(
+        self,
+        *,
+        request: AgentRunRequest,
+        raw: dict[str, Any],
+    ) -> str:
+        return (
+            "Audit explicit material bindings for this fixed Goal DTO, focusing "
+            "on physical-resource quantity provenance. The Host observed only "
+            "that a physical resource contract still has an empty "
+            "resource_quantity; that trigger is not evidence that the person "
+            "actually supplied an amount. Re-read the authoritative user turn and "
+            "decide semantically.\n\n"
+            "Return one goal_bindings item for every Goal index exactly once and "
+            "return the complete list of explicit material bindings for each Goal. "
+            "Preserve every valid spatial and other material binding already in the "
+            "DTO. Audit direction and distance independently: when an explicit motion "
+            "or source phrase contains both, return both rather than treating the "
+            "distance as if it also represented direction; direction may be carried "
+            "by a motion verb or adverb rather than a standalone noun. If the person "
+            "explicitly and unambiguously quantified the requested "
+            "physical resource, add a quantity-category binding such as "
+            "name=quantity and entity_type=quantity with a normalized numeric-string "
+            "value. Here resource quantity means the count of requested deliverable "
+            "units, not their physical volume. A singular article, determiner, or "
+            "classifier/container construction may semantically specify one unit even "
+            "when that language conventionally omits the numeral; normalize it to 1 "
+            "only when the singular reading is unambiguous. If no amount was supplied, "
+            "do not invent one. Do not alter Goal "
+            "count, descriptions, resource fields, source ownership, or execution "
+            "semantics. The Host will merge only these model-authored bindings into "
+            "the fixed DTO and separately enforce the resource contract. Return only "
+            "the exact JSON object enforced out-of-band.\n\n"
+            f"Fixed Goal DTO JSON:\n{self._bounded_json(raw.get('new_goals') or [], 7000)}\n\n"
+            f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
+        )
+
+    def _build_resource_binding_completeness_review_prompt(
+        self,
+        *,
+        request: AgentRunRequest,
+        raw: dict[str, Any],
+    ) -> str:
+        goal_ownership_projection: list[dict[str, Any]] = []
+        for goal_index, item in enumerate(raw.get("new_goals") or []):
+            if not isinstance(item, dict):
+                continue
+            projection: dict[str, Any] = {
+                "goal_index": goal_index,
+                "description": item.get("description"),
+                "output_mode": item.get("output_mode"),
+            }
+            resource = item.get("resource_responsibility")
+            if isinstance(resource, dict):
+                projection["resource_responsibility"] = {
+                    key: resource.get(key)
+                    for key in (
+                        "resource_kind",
+                        "resource_description",
+                        "resource_quantity",
+                        "source_status",
+                        "source_description",
+                        "recipient_description",
+                        "delivery_mode",
+                    )
+                }
+            goal_ownership_projection.append(projection)
+        return (
+            "Independently review the completeness of a prior physical-resource "
+            "binding audit. Existing typed bindings and the prior audit are "
+            "intentionally withheld because copying either is not independent "
+            "semantic evidence. Keep the fixed Goal "
+            "count and return one goal_bindings item for every Goal index exactly "
+            "once. Re-read the authoritative turn and return the complete list of "
+            "explicit material bindings for each Goal.\n\n"
+            "Audit each spatial expression along independent dimensions. In "
+            "particular, distance does not subsume direction: a motion verb or "
+            "adverb may explicitly convey a direction even when no standalone "
+            "direction noun appears. When the meaning is explicit, normalize it to "
+            "a provider-neutral direction such as forward, backward, left, or right "
+            "regardless of the user's language. Also preserve every explicit resource-unit "
+            "count, including an unambiguous singular classifier/container as 1. "
+            "Do not invent a direction, amount, source, provider detail, or default. "
+            "Do not alter descriptions, resource contracts, Goal ownership, or "
+            "execution semantics. The Host will merge only the model-authored "
+            "bindings. Return only the exact JSON object enforced out-of-band.\n\n"
+            "Fixed Goal ownership projection JSON (binding candidates deliberately "
+            "omitted):\n"
+            f"{self._bounded_json(goal_ownership_projection, 7000)}\n\n"
+            f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
+        )
+
+    def _build_binding_conflict_repair_prompt(
+        self,
+        *,
+        request: AgentRunRequest,
+        raw: dict[str, Any],
+        conflicts: list[str],
+    ) -> str:
+        return (
+            self._build_binding_audit_prompt(request=request, raw=raw)
+            + "\n\nThis is a focused binding-contract revision. The supplied Goal "
+            "segmentation, descriptions, resource responsibilities, and Goal count "
+            "are fixed. Return the complete replacement bindings for every Goal. "
+            "A binding's canonical name and entity_type must describe the same "
+            "parameter category: distance/distance, direction/direction, and a "
+            "quantity-category name with a quantity-category entity type. Do not "
+            "repeat a contradictory pair. Every name already listed in a Goal's "
+            "source_binding_names must have an explicit binding with that identical "
+            "name on the same Goal; preserve and repair that binding rather than "
+            "moving it to a sibling Goal or deleting it.\n\nDetected binding-contract "
+            "conflicts JSON:\n"
+            + self._bounded_json(conflicts, 3000)
+        )
+
+    @staticmethod
+    def _replace_goal_bindings_from_audit(
+        raw: dict[str, Any],
+        audit: GoalBindingAuditOutput,
+    ) -> dict[str, Any]:
+        goals = raw.get("new_goals")
+        if not isinstance(goals, list):
+            raise ValueError("binding revision requires new_goals")
+        by_index = {
+            item.candidate_goal_index: item
+            for item in audit.goal_bindings
+        }
+        if set(by_index) != set(range(len(goals))):
+            raise ValueError(
+                "binding revision must cover every candidate Goal index exactly once"
+            )
+        revised = copy.deepcopy(raw)
+        for index, goal in enumerate(revised["new_goals"]):
+            goal["bindings"] = [
+                binding.model_dump(mode="json", exclude_none=True)
+                for binding in by_index[index].bindings
+            ]
+        return revised
+
+    @staticmethod
+    def _merge_goal_bindings_from_audit(
+        raw: dict[str, Any],
+        audit: GoalBindingAuditOutput,
+    ) -> dict[str, Any]:
+        goals = raw.get("new_goals")
+        if not isinstance(goals, list):
+            raise ValueError("binding audit requires new_goals")
+        by_index = {
+            item.candidate_goal_index: item
+            for item in audit.goal_bindings
+        }
+        if set(by_index) != set(range(len(goals))):
+            raise ValueError(
+                "binding audit must cover every candidate Goal index exactly once"
+            )
+        audited = copy.deepcopy(raw)
+        for index, goal in enumerate(audited["new_goals"]):
+            existing = {
+                str(item.get("name") or "").strip(): item
+                for item in list(goal.get("bindings") or [])
+                if isinstance(item, dict)
+                and str(item.get("name") or "").strip()
+            }
+            for binding in by_index[index].bindings:
+                existing.setdefault(
+                    binding.name,
+                    binding.model_dump(mode="json", exclude_none=True),
+                )
+            goal["bindings"] = list(existing.values())
+        return audited
+
     @staticmethod
     def _binding_audit_response_schema(goal_count: int) -> dict[str, Any]:
         schema = copy.deepcopy(GoalBindingAuditOutput.model_json_schema())
@@ -3339,7 +6950,9 @@ class GoalAssociationResolver:
                 index_schema["enum"] = list(range(max(0, goal_count)))
         schema["required"] = ["goal_bindings", "reason_summary"]
         schema["additionalProperties"] = False
-        return schema
+        return GoalAssociationResolver._binding_semantic_contract_response_schema(
+            schema
+        )
 
     @staticmethod
     def _binding_audit_system_prompt() -> str:
@@ -3696,6 +7309,7 @@ class GoalAssociationResolver:
                     resource=ResourceDescriptor(
                         kind=resource_item.resource_kind,
                         description=resource_item.resource_description,
+                        quantity=resource_item.resource_quantity,
                     ),
                     source=ResourceSource(
                         status=resource_item.source_status,

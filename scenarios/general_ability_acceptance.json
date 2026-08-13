@@ -623,6 +623,10 @@
         {
           "key": "cognitive_runtime/chat_turn_cannot_replay_completed_motion",
           "rationale": "A stale multi-goal projection left by completed motion cannot cross-authorize new physical effects on a social turn."
+        },
+        {
+          "key": "cognitive_runtime/voice_log_fetch_water_100m_resource_goal",
+          "rationale": "Instrumental navigation, pickup, return, and handoff remain one daily-life resource responsibility instead of fragmenting into incomplete sibling Goals."
         }
       ],
       "live_text_cases": [

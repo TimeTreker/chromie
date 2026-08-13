@@ -369,6 +369,10 @@ Tests should prove the semantic boundary rather than one fixed gesture:
 - repeated or unnecessary decoration may validly resolve to `decision=none`;
 - same-provider body overlap is accepted or rejected by declared provider
   concurrency and safety, not by Capability-name heuristics.
+- live behavior evidence retains the model decision, the exact materialized
+  auxiliary request, and its Trusted Capability Runtime result. An advisory
+  `decision=express` or a committed Ledger event alone does not prove that the
+  provider executed the decoration.
 
 See [Execution Lanes and Coordination](EXECUTION_LANES_AND_COORDINATION.md) for
 the execution boundary and [Project Charter](PROJECT_CHARTER.md) for the

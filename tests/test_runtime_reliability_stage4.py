@@ -384,6 +384,10 @@ class CognitiveFailureResponseComposerTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("不会", spoken)
         self.assertNotIn("没学会", spoken)
         self.assertIn("Do not expose internal planning, arrangement", session.payload["prompt"])
+        self.assertNotIn('"failure_stage"', session.payload["prompt"])
+        self.assertNotIn("structured_output_validation", session.payload["prompt"])
+        self.assertNotIn("goal_association", session.payload["prompt"])
+        self.assertIn('"capability_state": "available"', session.payload["prompt"])
         facts = response.metadata["failure_facts"]
         self.assertEqual(
             facts["selected_capability_ids"],

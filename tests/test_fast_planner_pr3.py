@@ -129,6 +129,53 @@ class GranularResourceCatalog(FakeCatalog):
         return self.items
 
 
+class CompleteResourceCatalog(FakeCatalog):
+    def __init__(self):
+        super().__init__()
+        self.items.append(
+            CatalogCapability(
+                capability_id="soridormi.acquire_and_deliver_resource",
+                agent_id="capability_agent",
+                description="Acquire and deliver a physical resource.",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "resource": {"type": "object"},
+                        "source": {"type": "object"},
+                        "recipient": {"type": "object"},
+                    },
+                    "required": ["resource", "source", "recipient"],
+                    "additionalProperties": False,
+                },
+                route="robot_action",
+                available=True,
+                interaction_executable=True,
+                prompt_tier="common",
+                hints={
+                    "semantic_scope": {
+                        "responsibility_type": "acquire_and_deliver_resource",
+                        "resource_kinds": ["physical_object"],
+                        "delivery_modes": ["physical_handover"],
+                    },
+                    "resource_contract": {
+                        "plan_requires": [],
+                        "plan_provides": [
+                            "resource_acquired",
+                            "resource_delivered",
+                        ],
+                        "completion_requires": [
+                            "resource_acquired",
+                            "resource_delivered",
+                        ],
+                    },
+                },
+            )
+        )
+
+    async def prompt_entries(self, **kwargs):
+        return self.items
+
+
 def request(text: str, route="robot_action", *, goal_ids=None):
     goal_ids = list(goal_ids or [])
     new_goals = [
@@ -492,6 +539,50 @@ class PlannerVocalResponsibilityTests(unittest.TestCase):
 
 
 class CanonicalPlanContractTests(unittest.TestCase):
+    def test_complete_execute_plan_cannot_retain_top_level_unresolved_work(self):
+        goal_id = "goal-resource"
+        reason = "Acquire and deliver one resource."
+        raw = multi_goal_plan(
+            disposition="execute",
+            coverage="complete",
+            goal_summary=reason,
+            steps=[
+                execute_step(
+                    "acquire-and-deliver",
+                    "soridormi.acquire_and_deliver_resource",
+                    {
+                        "resource": {
+                            "kind": "physical_object",
+                            "description": "one cup of water",
+                        },
+                        "source": {"status": "provider_resolved"},
+                        "recipient": {"description": "requester"},
+                    },
+                    [goal_id],
+                    reason,
+                )
+            ],
+            goal_outcomes={
+                goal_id: execute_outcome(
+                    goal_id,
+                    ["acquire-and-deliver"],
+                    reason,
+                )
+            },
+            goal_satisfaction=exact_satisfaction([goal_id], reason),
+            unresolved=[goal_id],
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "complete execute or respond planner output must not retain unresolved work",
+        ):
+            validate_planner_model_output(
+                raw,
+                planner_tier="fast",
+                expected_goal_ids_for_turn=[goal_id],
+            )
+
     def test_effectful_goal_cannot_be_declared_satisfied_with_zero_steps(self):
         raw = {
             "disposition": "respond",
@@ -1051,6 +1142,115 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.steps, [])
         self.assertTrue(plan.metadata["resource_composition_required"])
         self.assertFalse(plan.metadata["execution_allowed"])
+
+    def test_voice_log_resource_plan_grounds_nested_distance_and_quantity(self):
+        goal_id = "goal-water"
+        reason = "从前方100米处拿一杯水并送给用户。"
+        resource = {
+            "kind": "physical_object",
+            "description": "一杯水",
+            "quantity": "1",
+            "attributes": {},
+        }
+        source = {
+            "status": "known",
+            "description": "前方100米处",
+            "bindings": {
+                "distance": {
+                    "name": "distance",
+                    "entity_type": "distance",
+                    "value": "100",
+                    "confidence": 1.0,
+                },
+                "direction": {
+                    "name": "direction",
+                    "entity_type": "direction",
+                    "value": "前方",
+                    "confidence": 1.0,
+                },
+            },
+        }
+        recipient = {"description": "用户", "referent_id": None}
+        raw = multi_goal_plan(
+            disposition="execute",
+            coverage="complete",
+            goal_summary=reason,
+            steps=[
+                execute_step(
+                    "fetch-water",
+                    "soridormi.acquire_and_deliver_resource",
+                    {
+                        "resource": resource,
+                        "source": source,
+                        "recipient": recipient,
+                    },
+                    [goal_id],
+                    reason,
+                )
+            ],
+            goal_outcomes={
+                goal_id: execute_outcome(goal_id, ["fetch-water"], reason)
+            },
+            goal_satisfaction=exact_satisfaction([goal_id], reason),
+            parameter_resolutions=[],
+        )
+        coverage_review = {
+            "decision": "accept",
+            "confidence": 1.0,
+            "uncovered_requirements": [],
+            "reason": "The complete resource capability preserves the one responsibility.",
+        }
+        run_request = request(
+            "去往前走个100米，帮我拿杯水过来。",
+            goal_ids=[goal_id],
+        )
+        context = dict(run_request.context)
+        context["goal_association_resolution"] = {
+            "associations": [],
+            "new_goals": [
+                {
+                    "goal_id": goal_id,
+                    "description": reason,
+                    "source_text": run_request.text,
+                    "object": {
+                        "bindings": {
+                            "distance": source["bindings"]["distance"],
+                            "direction": source["bindings"]["direction"],
+                        }
+                    },
+                    "resource_responsibility": {
+                        "schema_version": 1,
+                        "responsibility_type": "acquire_and_deliver_resource",
+                        "resource": resource,
+                        "source": source,
+                        "recipient": recipient,
+                        "delivery_mode": "physical_handover",
+                        "metadata": {},
+                    },
+                    "metadata": {"responsibility_kind": "executable_action"},
+                }
+            ],
+        }
+        ollama = ScriptedOllama([raw, coverage_review])
+
+        plan = asyncio.run(
+            FastPlannerResolver(ollama, CompleteResourceCatalog()).resolve(
+                run_request.model_copy(update={"context": context})
+            )
+        )
+
+        self.assertEqual(plan.disposition, "execute")
+        self.assertEqual(
+            [step.capability_id for step in plan.steps],
+            ["soridormi.acquire_and_deliver_resource"],
+        )
+        self.assertEqual(plan.steps[0].args["source"], source)
+        self.assertEqual(plan.steps[0].args["resource"], resource)
+        self.assertEqual(plan.parameter_resolutions, [])
+        self.assertIn(
+            "do not emit parameter_resolutions for their nested fields",
+            ollama.prompts[0][0],
+        )
 
     def test_schema_invalid_capability_args_get_bounded_model_repair(self):
         invalid = {
@@ -1980,7 +2180,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "vx_mps": 0.2,
                         "vy_mps": 0.0,
                         "yaw_radps": 0.0,
-                        "duration_s": 20.0,
+                        "duration_s": 20.000000000000004,
                     },
                     ["goal-walk"],
                     "Use the exact requested speed and duration.",
@@ -2033,7 +2233,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.disposition, "execute")
         self.assertEqual(plan.steps[0].capability_id, "soridormi.walk_velocity")
         self.assertEqual(plan.steps[0].args["vx_mps"], 0.2)
-        self.assertEqual(plan.steps[0].args["duration_s"], 20.0)
+        self.assertEqual(plan.steps[0].args["duration_s"], 20.000000000000004)
         self.assertEqual(len(ollama.prompts), 1)
         response_schema = ollama.prompts[0][1]["response_format"]
         self.assertNotIn(

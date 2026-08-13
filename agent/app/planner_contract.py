@@ -282,6 +282,8 @@ class PlannerModelGoalOutcome(BaseModel):
         if self.disposition == "execute":
             if self.coverage != "complete" or not self.step_ids:
                 raise ValueError("execute goal outcome requires complete coverage and step_ids")
+            if self.unresolved:
+                raise ValueError("execute goal outcome must not retain unresolved work")
         elif self.disposition == "respond":
             if self.coverage != "complete" or not self.response_text.strip():
                 raise ValueError(
@@ -289,6 +291,8 @@ class PlannerModelGoalOutcome(BaseModel):
                 )
             if self.step_ids:
                 raise ValueError("respond goal outcome must not reference steps")
+            if self.unresolved:
+                raise ValueError("respond goal outcome must not retain unresolved work")
         elif self.disposition == "escalate":
             if self.coverage not in {"partial", "uncertain"}:
                 raise ValueError("escalate goal outcome requires partial or uncertain coverage")
@@ -407,6 +411,11 @@ class PlannerModelOutput(BaseModel):
             if self.coverage != "complete":
                 raise ValueError(
                     "execute, respond, and mixed planner output requires complete coverage"
+                )
+            if self.disposition in {"execute", "respond"} and self.unresolved:
+                raise ValueError(
+                    "complete execute or respond planner output must not retain "
+                    "unresolved work"
                 )
             if self.goal_satisfaction is None:
                 raise ValueError(
@@ -981,6 +990,17 @@ def validate_goal_responsibility_outcomes(
 class ResourceResponsibilityCapabilityGroundingError(ValueError):
     """A selected Capability does not satisfy a typed resource contract."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        goal_id: str = "",
+        complete_capability_ids: list[str] | None = None,
+    ) -> None:
+        self.goal_id = goal_id
+        self.complete_capability_ids = list(complete_capability_ids or [])
+        super().__init__(message)
+
 
 class ResourceResponsibilityCapabilityUnavailableError(
     ResourceResponsibilityCapabilityGroundingError
@@ -1131,6 +1151,11 @@ def validate_resource_responsibility_capability_grounding(
 
         resource = responsibility.get("resource")
         resource = resource if isinstance(resource, dict) else {}
+        responsibility_args = {
+            name: responsibility.get(name)
+            for name in ("resource", "source", "recipient")
+            if isinstance(responsibility.get(name), dict)
+        }
         expected_type = " ".join(
             str(responsibility.get("responsibility_type") or "").strip().split()
         )
@@ -1246,7 +1271,9 @@ def validate_resource_responsibility_capability_grounding(
                     raise ResourceResponsibilityCapabilityGroundingError(
                         message
                         + "; complete_capability_ids="
-                        + ",".join(complete_ids)
+                        + ",".join(complete_ids),
+                        goal_id=goal_id,
+                        complete_capability_ids=complete_ids,
                     )
                 if coverage_complete(reachable, response_delivery):
                     raise ResourceResponsibilityRequiresCompositionError(
@@ -1258,6 +1285,34 @@ def validate_resource_responsibility_capability_grounding(
                     message
                     + "; no supplied Capability set declares the required contract"
                 )
+            for argument_name, expected_value in responsibility_args.items():
+                if argument_name not in step.args:
+                    continue
+                if not _material_values_equal(
+                    step.args[argument_name],
+                    expected_value,
+                    list_compatible=False,
+                ):
+                    raise ResourceResponsibilityCapabilityGroundingError(
+                        "resource responsibility step argument contradicts the "
+                        "canonical Goal responsibility: "
+                        f"goal_id={goal_id}, capability_id={step.capability_id}, "
+                        f"argument={argument_name!r}",
+                        goal_id=goal_id,
+                        complete_capability_ids=(
+                            [step.capability_id]
+                            if len(owned_steps) == 1
+                            and not requires
+                            and required_terminal_states <= provides
+                            and (
+                                expected_kind == "physical_object"
+                                or "resource_delivered" in provides
+                                or final_delivery_owner
+                                == "chromie_response_layer"
+                            )
+                            else []
+                        ),
+                    )
             missing_preconditions = sorted(requires - resource_state)
             if missing_preconditions:
                 raise ResourceResponsibilityCapabilityGroundingError(
@@ -1302,7 +1357,9 @@ def validate_resource_responsibility_capability_grounding(
             raise ResourceResponsibilityCapabilityGroundingError(
                 message
                 + "; complete_capability_ids="
-                + ",".join(complete_ids)
+                + ",".join(complete_ids),
+                goal_id=goal_id,
+                complete_capability_ids=complete_ids,
             )
         if coverage_complete(reachable, response_delivery):
             additional_ids = [
@@ -1318,6 +1375,137 @@ def validate_resource_responsibility_capability_grounding(
         raise ResourceResponsibilityCapabilityUnavailableError(
             message + "; no supplied Capability set declares the missing resource coverage"
         )
+
+
+def resource_grounding_repair_response_schema(
+    base_schema: dict[str, Any],
+    *,
+    error: ResourceResponsibilityCapabilityGroundingError | None,
+    authoritative_goals: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Constrain repair to validator-proven complete resource work.
+
+    The semantic choice comes from the model-authored resource Goal and catalog
+    contracts already evaluated by the grounding validator. This projection only
+    prevents a bounded repair from selecting the same incomplete Capability again
+    or rewriting canonical nested resource arguments.
+    """
+
+    if error is None or not error.complete_capability_ids:
+        return base_schema
+    goals = [goal for goal in authoritative_goals if isinstance(goal, dict)]
+    goal = next(
+        (
+            item
+            for item in goals
+            if " ".join(str(item.get("goal_id") or "").strip().split())
+            == error.goal_id
+        ),
+        None,
+    )
+    if goal is None:
+        return base_schema
+    goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
+    responsibility = goal.get("resource_responsibility")
+    if (
+        not goal_id
+        or goal_id != error.goal_id
+        or not isinstance(responsibility, dict)
+    ):
+        return base_schema
+    exact_arguments = {
+        name: copy.deepcopy(responsibility[name])
+        for name in ("resource", "source", "recipient")
+        if isinstance(responsibility.get(name), dict)
+    }
+    if not exact_arguments:
+        return base_schema
+
+    schema = copy.deepcopy(base_schema)
+    step_schema = schema.get("$defs", {}).get("PlannerModelStep")
+    if not isinstance(step_schema, dict):
+        return base_schema
+    branches = step_schema.get("oneOf")
+    if not isinstance(branches, list):
+        return base_schema
+    complete_ids = set(error.complete_capability_ids)
+    retained: list[dict[str, Any]] = []
+    complete_branches: list[dict[str, Any]] = []
+    for branch in branches:
+        if not isinstance(branch, dict):
+            continue
+        properties = branch.get("properties")
+        if not isinstance(properties, dict):
+            continue
+        capability = properties.get("capability_id")
+        identifiers = capability.get("enum") if isinstance(capability, dict) else None
+        is_complete_capability = (
+            isinstance(identifiers, list)
+            and len(identifiers) == 1
+            and identifiers[0] in complete_ids
+        )
+        if (
+            not isinstance(identifiers, list)
+            or len(identifiers) != 1
+        ):
+            continue
+        if len(goals) == 1 and not is_complete_capability:
+            continue
+        args = properties.get("args")
+        argument_properties = (
+            args.get("properties") if isinstance(args, dict) else None
+        )
+        if not isinstance(argument_properties, dict):
+            continue
+        if is_complete_capability:
+            required = args.setdefault("required", [])
+            for name, value in exact_arguments.items():
+                if name not in argument_properties:
+                    continue
+                argument_properties[name] = {"const": value}
+                if isinstance(required, list) and name not in required:
+                    required.append(name)
+            complete_branches.append(branch)
+        retained.append(branch)
+    if not retained or not complete_branches:
+        return base_schema
+    step_schema["oneOf"] = retained
+    capability_property = step_schema.get("properties", {}).get("capability_id")
+    if isinstance(capability_property, dict):
+        capability_property["enum"] = sorted(
+            {
+                branch["properties"]["capability_id"]["enum"][0]
+                for branch in retained
+            }
+        )
+    steps = schema.get("properties", {}).get("steps")
+    if isinstance(steps, dict):
+        steps["minItems"] = 1
+        if len(goals) == 1:
+            steps["maxItems"] = 1
+        else:
+            steps["contains"] = {
+                "type": "object",
+                "properties": {
+                    "capability_id": {
+                        "type": "string",
+                        "enum": sorted(complete_ids),
+                    },
+                    "source_goal_ids": {
+                        "type": "array",
+                        "contains": {"const": error.goal_id},
+                        "minContains": 1,
+                    },
+                },
+                "required": ["capability_id", "source_goal_ids"],
+            }
+            steps["minContains"] = 1
+    parameter_resolutions = schema.get("properties", {}).get(
+        "parameter_resolutions"
+    )
+    if isinstance(parameter_resolutions, dict) and len(goals) == 1:
+        parameter_resolutions["maxItems"] = 0
+    return schema
 
 
 def coordinated_action_goal_ids(
@@ -2280,7 +2468,14 @@ def validate_explicit_numeric_parameter_grounding(
 
         return f"step_id={resolution.step_id!r}, parameter={resolution.parameter!r}"
 
+    def numerically_equal(left: Decimal, right: Decimal) -> bool:
+        """Ignore only representation-scale floating-point roundoff."""
+
+        scale = max(abs(left), abs(right), Decimal(1))
+        return abs(left - right) <= Decimal("1e-12") * scale
+
     goal_text: dict[str, str] = {}
+    resource_arguments_by_goal: dict[str, dict[str, Any]] = {}
     for goal in authoritative_goals:
         if not isinstance(goal, dict):
             continue
@@ -2307,9 +2502,48 @@ def validate_explicit_numeric_parameter_grounding(
                 and binding.get("value") is not None
                 and str(binding.get("value")).strip()
             )
+        responsibility = goal.get("resource_responsibility")
+        if isinstance(responsibility, dict):
+            resource_arguments_by_goal[goal_id] = {
+                name: responsibility.get(name)
+                for name in ("resource", "source", "recipient")
+                if isinstance(responsibility.get(name), dict)
+            }
         goal_text[goal_id] = " ".join(dict.fromkeys(parts))
 
     steps = {step.step_id: step for step in output.steps}
+    structured_numeric_grounding: dict[str, set[Decimal]] = {}
+
+    def nested_numbers(value: Any) -> set[Decimal]:
+        if isinstance(value, dict):
+            return {
+                number
+                for item in value.values()
+                for number in nested_numbers(item)
+            }
+        if isinstance(value, list):
+            return {
+                number
+                for item in value
+                for number in nested_numbers(item)
+            }
+        number = numeric(value)
+        return {number} if number is not None else set()
+
+    for step in output.steps:
+        for goal_id in step.source_goal_ids:
+            expected_arguments = resource_arguments_by_goal.get(goal_id, {})
+            for parameter, expected in expected_arguments.items():
+                actual = step.args.get(parameter)
+                if actual is None or not _material_values_equal(
+                    actual,
+                    expected,
+                    list_compatible=False,
+                ):
+                    continue
+                structured_numeric_grounding.setdefault(goal_id, set()).update(
+                    nested_numbers(actual)
+                )
     user_numeric_resolutions: list[tuple[PlanParameterResolution, Decimal]] = []
     unsupported_user_numeric_resolutions: list[
         tuple[PlanParameterResolution, Decimal, list[str]]
@@ -2331,7 +2565,7 @@ def validate_explicit_numeric_parameter_grounding(
         resolved_number = numeric(resolution.value)
         argument_number = numeric(step.args[resolution.parameter])
         if resolved_number is not None and argument_number is not None:
-            if resolved_number != argument_number:
+            if not numerically_equal(resolved_number, argument_number):
                 raise ValueError(
                     "parameter resolution value must equal the executable step argument: "
                     f"{resolution_location(resolution)} has "
@@ -2382,7 +2616,7 @@ def validate_explicit_numeric_parameter_grounding(
             if not any(
                 literal == value and goal_id in resolution.source_goal_ids
                 for resolution, value in user_numeric_resolutions
-            ):
+            ) and literal not in structured_numeric_grounding.get(goal_id, set()):
                 missing_numeric_grounding.append((goal_id, literal))
     if missing_numeric_grounding:
         missing = "; ".join(

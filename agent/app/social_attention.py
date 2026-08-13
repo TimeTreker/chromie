@@ -50,6 +50,20 @@ class SocialAttentionPlanner:
             else request.sid
         )
         prompt = self._prompt(request, candidates)
+        response_schema = self._response_schema(candidates)
+        system_prompt = (
+            "You are Chromie's background Social Attention planner. Choose only small, "
+            "scene-appropriate body decorations for the supplied interaction anchor from "
+            "the supplied catalog. Decorations must remain optional, non-disruptive, and "
+            "subordinate to the primary behavior. Do not use phrase-to-skill rules, do not "
+            "author or alter speech, and return JSON only."
+        )
+        generation_options = {
+            "temperature": 0.2,
+            "top_p": 0.9,
+            "num_ctx": int(self.services.social_attention_num_ctx),
+            "num_predict": int(self.services.social_attention_num_predict),
+        }
         started = time.perf_counter()
         logger.info(
             "social_attention_plan_start sid=%s mode=%s timeout_ms=%s num_ctx=%s "
@@ -65,20 +79,12 @@ class SocialAttentionPlanner:
         try:
             raw = await client.generate(
                 prompt,
-                system=(
-                    "You are Chromie's background Social Attention planner. Choose only small, "
-                    "scene-appropriate body decorations for the supplied interaction anchor from "
-                    "the supplied catalog. Decorations must remain optional, non-disruptive, and "
-                    "subordinate to the primary behavior. Do not use phrase-to-skill rules, do not "
-                    "author or alter speech, and return JSON only."
-                ),
-                options={
-                    "temperature": 0.2,
-                    "top_p": 0.9,
-                    "num_ctx": int(self.services.social_attention_num_ctx),
-                    "num_predict": int(self.services.social_attention_num_predict),
-                },
-                response_format=self._response_schema(candidates),
+                system=system_prompt,
+                options=generation_options,
+                response_format=response_schema,
+                prompt_family="social_attention.primary",
+                turn_id=session_id,
+                attempt=1,
             )
         except Exception as exc:
             planner_ms = (time.perf_counter() - started) * 1000.0
@@ -128,16 +134,57 @@ class SocialAttentionPlanner:
                 failure["error"],
             )
             return None
+        repair_attempted = False
+        repair_succeeded = False
+        semantic_review_attempted = False
+        semantic_review_succeeded = False
+        semantic_review_error = ""
+        validation_error: Exception | None = None
         try:
             plan = SocialAttentionPlan.model_validate(raw)
-        except ValidationError as exc:
+        except ValidationError as initial_exc:
+            repair_attempted = True
+            logger.warning(
+                "social_attention_contract_repair_start sid=%s validation_errors=%s",
+                session_id,
+                self._validation_error_json(initial_exc),
+            )
+            try:
+                repaired = await client.generate(
+                    self._repair_prompt(
+                        prompt=prompt,
+                        raw=raw,
+                        validation_error=initial_exc,
+                    ),
+                    system=system_prompt,
+                    options=generation_options,
+                    response_format=response_schema,
+                    prompt_family="social_attention.contract_repair",
+                    turn_id=session_id,
+                    attempt=2,
+                )
+                if not isinstance(repaired, dict):
+                    raise ValueError(
+                        "social attention contract repair did not return a JSON object"
+                    )
+                plan = SocialAttentionPlan.model_validate(repaired)
+                repair_succeeded = True
+                logger.info(
+                    "social_attention_contract_repair_done sid=%s status=success",
+                    session_id,
+                )
+            except Exception as repair_exc:
+                validation_error = repair_exc
+        if validation_error is not None:
             planner_ms = (time.perf_counter() - started) * 1000.0
             failure = {
-                **llm_failure_metadata(exc),
+                **llm_failure_metadata(validation_error),
                 "stage": "social_attention",
-                "error_type": type(exc).__name__,
-                "error": str(exc)[:500],
+                "error_type": type(validation_error).__name__,
+                "error": str(validation_error)[:500],
                 "elapsed_ms": round(planner_ms, 1),
+                "contract_repair_attempted": repair_attempted,
+                "contract_repair_succeeded": False,
             }
             request.context["social_attention_failure"] = failure
             logger.warning(
@@ -149,15 +196,92 @@ class SocialAttentionPlanner:
                 failure.get("architecture_attribution"),
                 str(bool(failure.get("retryable"))).lower(),
                 planner_ms,
-                exc,
+                validation_error,
             )
             return None
+        if self._none_semantic_review_warranted(request, candidates, plan):
+            semantic_review_attempted = True
+            logger.info(
+                "social_attention_none_semantic_review_start sid=%s",
+                session_id,
+            )
+            try:
+                reviewed = await client.generate(
+                    self._none_semantic_review_prompt(prompt=prompt),
+                    system=system_prompt,
+                    options={**generation_options, "temperature": 0.35},
+                    response_format=response_schema,
+                    prompt_family="social_attention.none_semantic_review",
+                    turn_id=session_id,
+                    attempt=3 if repair_attempted else 2,
+                )
+                if not isinstance(reviewed, dict):
+                    raise ValueError(
+                        "social attention none semantic review did not return a JSON object"
+                    )
+                try:
+                    plan = SocialAttentionPlan.model_validate(reviewed)
+                except ValidationError as review_validation_exc:
+                    reviewed_repair = await client.generate(
+                        self._repair_prompt(
+                            prompt=self._none_semantic_review_prompt(prompt=prompt),
+                            raw=reviewed,
+                            validation_error=review_validation_exc,
+                        ),
+                        system=system_prompt,
+                        options={**generation_options, "temperature": 0.2},
+                        response_format=response_schema,
+                        prompt_family=(
+                            "social_attention.none_semantic_review_contract_repair"
+                        ),
+                        turn_id=session_id,
+                        attempt=4 if repair_attempted else 3,
+                    )
+                    if not isinstance(reviewed_repair, dict):
+                        raise ValueError(
+                            "social attention none-review contract repair did not "
+                            "return a JSON object"
+                        ) from review_validation_exc
+                    plan = SocialAttentionPlan.model_validate(reviewed_repair)
+                semantic_review_succeeded = True
+                logger.info(
+                    "social_attention_none_semantic_review_done sid=%s "
+                    "status=success decision=%s behaviors=%s",
+                    session_id,
+                    plan.decision,
+                    len(plan.behaviors),
+                )
+            except Exception as review_exc:
+                # Decoration is fail-soft. Preserve the first valid no-decoration
+                # decision when its independent semantic review is unavailable.
+                semantic_review_error = (
+                    f"{type(review_exc).__name__}: {str(review_exc)[:400]}"
+                )
+                logger.warning(
+                    "social_attention_none_semantic_review_failed sid=%s error=%s",
+                    session_id,
+                    semantic_review_error,
+                )
         planner_ms = (time.perf_counter() - started) * 1000.0
         request.context.pop("social_attention_failure", None)
         plan.metadata = {
             **plan.metadata,
             "planner_ms": round(planner_ms, 1),
             "architecture_attribution": "not_evaluated",
+            "contract_repair": {
+                "attempted": repair_attempted,
+                "succeeded": repair_succeeded,
+                "attempt_count": 2 if repair_attempted else 1,
+            },
+            "none_semantic_review": {
+                "attempted": semantic_review_attempted,
+                "succeeded": semantic_review_succeeded,
+                **(
+                    {"error": semantic_review_error}
+                    if semantic_review_error
+                    else {}
+                ),
+            },
         }
         logger.info(
             "social_attention_plan_done sid=%s decision=%s behaviors=%s confidence=%.2f "
@@ -195,9 +319,158 @@ class SocialAttentionPlanner:
             if "capability_id" not in required:
                 required.append("capability_id")
         required = schema.setdefault("required", [])
-        if "decision" not in required:
-            required.append("decision")
+        for field_name in (
+            "decision",
+            "target",
+            "behaviors",
+            "confidence",
+            "reason",
+        ):
+            if field_name not in required:
+                required.append(field_name)
+        schema.setdefault("allOf", []).extend(
+            [
+                {
+                    "if": {
+                        "properties": {"decision": {"const": "none"}},
+                        "required": ["decision"],
+                    },
+                    "then": {
+                        "properties": {"behaviors": {"maxItems": 0}},
+                    },
+                },
+                {
+                    "if": {
+                        "properties": {"decision": {"const": "express"}},
+                        "required": ["decision"],
+                    },
+                    "then": {
+                        "properties": {"behaviors": {"minItems": 1}},
+                    },
+                },
+            ]
+        )
         return schema
+
+    @staticmethod
+    def _validation_error_json(exc: Exception) -> str:
+        payload: Any = (
+            exc.errors(include_url=False)
+            if isinstance(exc, ValidationError)
+            else [{"type": type(exc).__name__, "message": str(exc)[:1000]}]
+        )
+        return json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        )[:5000]
+
+    @classmethod
+    def _repair_prompt(
+        cls,
+        *,
+        prompt: str,
+        raw: dict[str, Any],
+        validation_error: Exception,
+    ) -> str:
+        return (
+            prompt
+            + "\n\nThe previous Social Attention JSON contradicted its own "
+            "decision/behavior contract. Reconsider the scene and return one complete "
+            "fresh plan. Keep a genuinely intended supported behavior with "
+            "decision=express, or return decision=none with behaviors=[]. Do not merely "
+            "flip a redundant field without rechecking social fit.\n\n"
+            "Previous invalid JSON:\n"
+            + json.dumps(raw, ensure_ascii=False, sort_keys=True)[:5000]
+            + "\n\nMechanical validation feedback JSON:\n"
+            + cls._validation_error_json(validation_error)
+        )
+
+    @staticmethod
+    def _none_semantic_review_warranted(
+        request: AgentRunRequest | SocialAttentionRequest,
+        candidates: list[dict[str, Any]],
+        plan: SocialAttentionPlan,
+    ) -> bool:
+        """Detect a fresh, policy-backed opportunity needing independent review.
+
+        This trigger does not select a gesture. It uses only typed policy, event,
+        recency, and catalog executability facts to decide whether a model-authored
+        ``none`` deserves one bounded second semantic judgment.
+        """
+
+        if plan.decision != "none":
+            return False
+        event = (
+            request.event
+            if isinstance(request, SocialAttentionRequest)
+            else str(request.context.get("social_attention_event") or "speaking")
+        )
+        if event not in {"understanding_ready", "work_started"}:
+            return False
+        style = request.context.get("social_interaction_style")
+        if not isinstance(style, dict) or style.get("owner_approved") is not True:
+            return False
+        recent = request.context.get("recent_auxiliary_behavior_evidence")
+        if isinstance(recent, list) and recent:
+            return False
+        interaction_state = request.context.get("social_attention_interaction_state")
+        raw_primary_ids = (
+            interaction_state.get("primary_capability_ids")
+            if isinstance(interaction_state, dict)
+            else []
+        )
+        if not isinstance(raw_primary_ids, list):
+            raw_primary_ids = []
+        primary_ids = {
+            str(item).strip()
+            for item in raw_primary_ids
+            if str(item).strip()
+        }
+        return any(
+            isinstance(candidate, dict)
+            and str(candidate.get("capability_id") or "").strip() not in primary_ids
+            and candidate.get("available") is not False
+            and candidate.get("interaction_executable") is True
+            and not bool(candidate.get("requires_confirmation"))
+            and candidate.get("can_run_parallel") is True
+            and candidate.get("parallel_metadata_declared") is True
+            for candidate in candidates
+        )
+
+    @staticmethod
+    def _none_semantic_review_prompt(
+        *,
+        prompt: str,
+    ) -> str:
+        return (
+            prompt
+            + "\n\nIndependently review the first planner's decision=none. Do not "
+            "copy, preserve, or assume that decision or its explanation is correct. "
+            "Re-evaluate the "
+            "actual interaction event, owner-approved style, recent evidence, and "
+            "eligible catalog semantics, then return one complete fresh plan. A "
+            "concrete, direct, or capability-dependent request is still interpersonal "
+            "engagement and is not evidence of exact-only action, stillness, no social "
+            "context, or inevitable competition. Those restrictions require actual "
+            "supplied evidence. The candidate list for this bounded review already "
+            "contains at least one execution-eligible independent or parallel-safe "
+            "cue, and recent evidence contains no decoration requiring cooldown. "
+            "Under an owner-approved courteous style, one subtle cue is the expected "
+            "default for this fresh acknowledgement moment unless the supplied scene "
+            "contains a concrete counter-signal. Absence of playful, emotional, or "
+            "explicitly social wording is not a counter-signal. When target evidence "
+            "is unavailable, select only an untargeted behavior and keep target.source "
+            "and target.target_ref equal to none. Preserve decision=none when actual "
+            "scene-specific "
+            "evidence genuinely makes stillness more natural, safer, repetitive, "
+            "unsupported, or conflicting. Never force expression merely to reverse "
+            "the first result. The first result's rationale is deliberately omitted "
+            "because it is not evidence. Return a fresh judgment from the interaction "
+            "context above."
+        )
 
     def _prompt(
         self,
@@ -244,9 +517,13 @@ class SocialAttentionPlanner:
             "Social Attention is subordinate decoration, never the user Goal. Blinking, gaze, nodding, and other supplied Capabilities are only possible expressions.\n"
             "Every explicit user action remains mandatory, exact, and completion-owning primary Activity when represented in interaction_state. "
             "Never replace it, duplicate its capability, change its count or args, or treat decoration as its completion. "
-            "When the utterance and supplied primary context support a playful, warm, or otherwise social framing, you may add at most a different compatible cue; this is optional, not an automatic consequence of any body-action request. "
-            "Choose none when the user requires exact-only action or stillness, or when no different compatible cue is supported.\n"
-            "Choose decision=none when speech alone is natural, when a gesture would be repetitive, distracting, "
+            "Ordinary cooperative engagement is itself a meaningful social anchor; playful or explicitly emotional wording is not required. "
+            "At understanding_ready or work_started, a fresh direct request can support one subtle acknowledgement or presence cue when the owner-approved style, event, candidate semantics, and concurrency metadata make that cue useful and non-disruptive. "
+            "A clear or direct task is not evidence that the user requires exact-only action or stillness. Treat exact-only action or stillness as a constraint only when it is actually supplied by the utterance or typed interaction state. "
+            "An independent-output candidate declared parallel-safe with the primary work does not compete merely because the primary task is explicit. "
+            "When the utterance and supplied primary context support playful, warm, courteous, or otherwise social engagement, you may add at most a different compatible cue; this is optional, not an automatic consequence of any body-action request. "
+            "Do not default to decision=none merely because speech can acknowledge or complete the interaction. "
+            "Choose decision=none when stillness is more natural for this particular scene, when the user actually requires exact-only action or stillness, or when a gesture would be repetitive, distracting, "
             "unsafe, unsupported, or likely to conflict with the primary task. Do not add a gesture merely because "
             "one is available.\n"
             "Use owner-approved Social Interaction Style and recent auxiliary evidence to keep variation contextual and restrained. "

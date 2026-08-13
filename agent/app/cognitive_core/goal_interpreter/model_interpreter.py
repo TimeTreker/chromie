@@ -32,7 +32,7 @@ except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_runtime.log_colors import colorize_for_cli
 
 from .fallback import fallback_decision
-from .schema import FastSpeech, RouteDecision, RouteRequest, finalize_decision
+from .schema import FastProgressProposal, RouteDecision, RouteRequest, finalize_decision
 
 
 def _raise_if_llm_budget_failure(exc: Exception) -> None:
@@ -1413,13 +1413,48 @@ class OllamaGoalInterpreter:
             "Cost Function:\n"
             "Speech-only conversation and capability availability=chat; catalog execution=robot_action; lookup=tool; planning=deep_thought; ambiguity=clarify. Never return interrupt or ignore; a separate focused addressedness stage owns ambient suppression.\n\n"
             "Output Contract:\n"
-            "Return one compact JSON object. Required keys: route, intent, confidence, fast_speech, progress. progress=[] or kind=capability exact supplied ID+args / kind=native_response complete conversational answer. fast_speech is one short progress notification or null; null for native immediate answer, equivalent delivered/pending speech, silence, or repetition. Use owner-approved child/family voice: first-person speech; no customer-service/workflow/status/processing narration. Never claim unobserved result, execution, or completion. Host derives the typed claim envelope. memory write=memory; recall=chat; durable memory needs current-turn consent. routes[] split responsibilities; actions[] use exact IDs and typed args (\"confidence\":0.0 means unknown). semantic_task_operations may advise create/update/resolve/replan against supplied task IDs. Omit agents, metadata, candidate_capabilities, explanations unless needed. Never output placeholder intents, hidden reasoning, free-form progress narration outside fast_speech, scratchpad, markdown, or text outside JSON."
+            "Return one compact JSON object. Required keys: route, intent, confidence, fast_speech, progress. fast_speech is brief speech or null for immediate, duplicate, or silent turns. Use owner-approved child/family voice in first-person speech, never customer-service/workflow/status/processing narration. For effectful work it is generic willingness/checking only: omit material task parameters and exact methods until downstream grounding; progress is advisory, not proof of executability. Never claim an unobserved result, execution, or completion. Host derives typed claim fields. memory write=memory; recall=chat; durable memory needs current-turn consent. routes[] split responsibilities; actions[] use exact IDs/args (\"confidence\":0.0 means unknown). semantic_task_operations may advise create/update/resolve/replan against supplied task IDs. Omit agents, metadata, candidate_capabilities, explanations unless needed. Never output placeholder intents, hidden reasoning, free-form progress narration outside fast_speech, scratchpad, markdown, or text outside JSON."
         )
 
     @staticmethod
     def _route_response_schema() -> dict[str, Any]:
         schema = RouteDecision.model_json_schema()
         properties = schema.get("properties", {})
+        progress_definition = schema.get("$defs", {}).get("FastProgressProposal")
+        if isinstance(progress_definition, dict):
+            progress_definition["allOf"] = [
+                {
+                    "if": {
+                        "properties": {"kind": {"const": "capability"}},
+                        "required": ["kind"],
+                    },
+                    "then": {
+                        "properties": {
+                            "capability_id": {"type": "string", "minLength": 1},
+                            "response_text": {"type": "string", "maxLength": 0},
+                        },
+                        "required": ["capability_id"],
+                    },
+                },
+                {
+                    "if": {
+                        "properties": {"kind": {"const": "native_response"}},
+                        "required": ["kind"],
+                    },
+                    "then": {
+                        "properties": {
+                            "capability_id": {"type": "string", "maxLength": 0},
+                            "args": {"type": "object", "maxProperties": 0},
+                            "response_text": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 600,
+                            },
+                        },
+                        "required": ["response_text"],
+                    },
+                },
+            ]
         # The model must explicitly decide whether a first progress notification
         # exists. Speech itself remains optional; silence is represented by JSON
         # null rather than by omitting the responsibility. Keep the model-facing
@@ -2436,12 +2471,12 @@ class OllamaGoalInterpreter:
         data: dict[str, Any],
         *,
         stage: str = "llm",
-        allow_session_memory_contract_recovery: bool = False,
+        allow_bounded_contract_recovery: bool = False,
     ) -> RouteDecision:
         content = data.get("message", {}).get("content", "")
         raw_summary = _raw_interpreter_output_summary(str(content or ""))
         parsed = _extract_json_object(content)
-        if allow_session_memory_contract_recovery:
+        if allow_bounded_contract_recovery:
             recovered_paths = self._remove_durable_fields_from_session_memory(parsed)
             if recovered_paths:
                 metadata = parsed.get("metadata")
@@ -2458,6 +2493,31 @@ class OllamaGoalInterpreter:
                     request.sid,
                     stage,
                     recovered_paths,
+                )
+            discarded_progress_paths = self._discard_invalid_progress_proposals(parsed)
+            if discarded_progress_paths:
+                metadata = parsed.get("metadata")
+                if not isinstance(metadata, dict):
+                    metadata = {}
+                prior_recovery = metadata.get("contract_recovery")
+                progress_recovery = {
+                    "strategy": "discard_invalid_advisory_progress",
+                    "recovered_paths": discarded_progress_paths,
+                }
+                if isinstance(prior_recovery, dict):
+                    metadata["contract_recovery"] = {
+                        "strategy": "bounded_contract_recovery",
+                        "recoveries": [prior_recovery, progress_recovery],
+                    }
+                else:
+                    metadata["contract_recovery"] = progress_recovery
+                parsed["metadata"] = metadata
+                logger.warning(
+                    "goal_interpreter_invalid_progress_discarded "
+                    "sid=%s stage=%s paths=%s",
+                    request.sid,
+                    stage,
+                    discarded_progress_paths,
                 )
         route_items = _route_items_from_parsed(parsed)
         dominant_route = _dominant_route_from_items(route_items)
@@ -2560,6 +2620,31 @@ class OllamaGoalInterpreter:
                     proposal.pop(field, None)
                     recovered.append(f"{path}.{field}")
         return recovered
+
+    @staticmethod
+    def _discard_invalid_progress_proposals(parsed: dict[str, Any]) -> list[str]:
+        """Fail closed per advisory progress item after one model repair.
+
+        Fast progress is optional cognitive evidence, never a Goal or execution
+        authorization.  Dropping an invalid item preserves the valid route
+        judgment without guessing a missing field or manufacturing readiness.
+        """
+
+        raw_progress = parsed.get("progress")
+        if not isinstance(raw_progress, list):
+            return []
+        retained: list[Any] = []
+        discarded: list[str] = []
+        for index, item in enumerate(raw_progress):
+            try:
+                FastProgressProposal.model_validate(item)
+            except (ValidationError, ValueError, TypeError):
+                discarded.append(f"progress[{index}]")
+            else:
+                retained.append(item)
+        if discarded:
+            parsed["progress"] = retained
+        return discarded
 
     async def _review_route_only_robot_action(
         self,
@@ -3351,7 +3436,7 @@ class OllamaGoalInterpreter:
                     request,
                     repaired,
                     stage="quick_intent_contract_repair",
-                    allow_session_memory_contract_recovery=True,
+                    allow_bounded_contract_recovery=True,
                 )
                 logger.info("Goal Interpreter model recovered with typed contract repair")
             except Exception as repair_exc:
