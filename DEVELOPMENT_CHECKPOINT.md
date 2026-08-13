@@ -1,112 +1,143 @@
 # Chromie Development Checkpoint
-
 Status: current resume point
-
-## Direction
-
-Continue the **Goal-driven single semantic authority** architecture as a
-readiness-driven Continuous Mind rather than a mandatory cognition pipeline.
-The Cognitive Gateway owns ingress and deterministic protective reflexes; the
-Cognitive Core owns meaning and responsibility; trusted Host/provider boundaries
-remain the only authorities for effects and evidence.
-
-The current General Progress implementation is a substrate, not the finished
-Mind model. Fast Understanding can surface a complete `native_response` or exact
-`capability` progress candidate; ready native conversation and trusted safe-read
-work may advance while Goal Association continues, and Goal Association later
-provides explicit canonical responsibility binding. Effectful work still waits
-for the applicable planning, confirmation, authorization, resource, and provider
-safety boundaries. Social Attention is a peer event lane and does not own Goals
-or completion.
-
-## Architecture checkpoint — Continuous Mind synthesis compressed
-
-The broad architecture discussion is now sufficiently complete to move from
-ontology expansion to detail validation and incremental implementation. Do not
-add a `BeliefManager`, `SituationManager`, `ReflectionManager`, generic priority
-engine, dependency graph, background-thought loop, or another cognitive framework
-merely because the corresponding human phenomenon has a useful name.
-
-The authoritative complete problem space remains in
-[Goal-Driven Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md#412-complete-continuous-mind-problem-space--retained-design-inventory).
-The compressed conclusion is
-[Continuous Mind synthesis](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md#414-continuous-mind-synthesis--compressed-architecture-baseline),
-and the implementation order is in
-[Roadmap](ROADMAP.md#immediate-architecture-line--continuous-mind-implementation-from-the-compressed-baseline).
-
-Current architecture baseline:
-
+Updated: 2026-08-13
+Base `main`: `94bcdce97ab915db0a51723fa8198f114d3d98bc`
+This is the fast handoff for the next development session. It summarizes the
+current project shape and resume point; canonical owners linked below win if a
+conflict appears and this checkpoint should then be refreshed.
+## Project in one minute
+Chromie is a local-first realtime interaction control plane for a voice assistant
+that can use embodied capabilities safely. Chromie owns user-facing cognition,
+Goal meaning and continuity, cross-provider planning, personal Vocal behavior,
+trusted authorization, coordination, and evidence reconciliation. Soridormi is a
+peer embodied Capability Provider beneath Activity. Its advertised capability
+granularity may change over time: a whole workflow can be one atomic capability,
+or Chromie can compose smaller advertised capabilities.
+The core separation is: **models reason about meaning; trusted mechanisms own
+authorization, execution, resources, and evidence.** Capability unavailable,
+execution failed, empty result, and successful result are different truths.
+Read first: [Project Charter](docs/PROJECT_CHARTER.md),
+[Goal-Driven Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md),
+[Execution Lanes](docs/EXECUTION_LANES_AND_COORDINATION.md),
+[Current Status](docs/STATUS.md), and [Roadmap](ROADMAP.md).
+## Current architecture
 ```text
-Durable Mind
-  Stable Mind
-  Goal       = canonical unfinished Responsibility
-  Memory
-
-Live Mind
-  Situation  = bounded, revisable, mostly reconstructable soft state
-
-Grounding/action substrate
-  Evidence/Ledger; Progress/Plan/Request/Execution/Outcome; Capability/provider truth
+admitted UserTurnEnvelope
+        |
+Cognitive Gateway ---- deterministic stop/cancel/emergency reflexes
+        |
+Goal-Driven Continuous Mind
+  |-> Fast Understanding -------> locally-ready native conversation
+  |-> safe-read progress -------> trusted non-effectful work when ready
+  `-> Goal Association ---------> canonical Goals / Responsibilities
+                                  |
+                            Fast / Deep Planner
+                                  |
+                             Canonical Plan
+                    .-------------+-------------.
+                    |                           |
+             Response Composer          Trusted Capability Runtime
+                    |                           |
+                  Vocal                Activity / providers
+                    '-------------+-------------'
+                                  |
+                         trusted evidence
+                                  |
+                   reconciliation -> result interpretation
 ```
-
-`Responsibility` and `Work` are architecture vocabulary, not approved parallel
-runtime objects: Goal owns the former; existing Progress/Plan/Execution artifacts
-express the latter. Intention, Commitment, Readiness, Attention, Salience,
-Concern, Reflection, Learning, Recovery, Common Ground, Affordance, and similar
-terms remain derived/process/policy/projection concepts unless a concrete case
-proves information loss without a new owner.
-
-The design rule remains: **design the whole Mind, implement the next invariant,
-and keep the permanent concept count small.** Individual scenarios are evidence
-for a general ability, never the architecture target.
-
-Key invariants now settled for detail work:
-
-- Reality enters through Evidence; Goal/Plan/model inference cannot manufacture
-  grounding.
-- Situation is current soft interpretation, not a copied world database or
-  historical authority.
-- A Goal materializes only for an owned outcome that remains unfinished and
-  needs semantic continuity; immediately completed ready progress need not create
-  durable Goal state.
-- Goal identity follows Responsibility continuity; refinement may revise current
-  Goal meaning with provenance, while a genuinely different Responsibility gets
-  a new Goal.
-- Decomposition belongs to Work/Plan unless an independent Responsibility truly
-  emerges; dependencies are usually Situation/world conditions rather than a
-  Goal graph.
-- Current canonical meaning may be revised; historical Evidence, execution
-  outcomes, and delivered speech are never silently rewritten. Repair forward.
-- Goal lifecycle is responsibility-level, not workflow-level: planning, waiting,
-  confirmation, scheduling, running, retry/recovery, provider failure, and timeout
-  belong to Work/runtime artifacts. Execution success/failure is evidence for
-  reconciliation and cannot by itself decide whether the Responsibility is
-  satisfied or abandoned.
-- Existing Work survives an upstream revision when it remains semantically
-  compatible; do not invalidate everything merely because a version changed.
-- Open Goals wait for relevant events rather than a polling thought loop. A state
-  change may require none, local, fast, slow, or overlapping cognition.
-- Memory is selective reusable past meaning; Reflection/learning are bounded
-  processes and cannot rewrite provider authority or Stable Mind.
-
-## Verification state
-
-`docs/STATUS.md` owns current implementation and evidence claims. General
-Progress plus the first Goal/Work truth-separation slice now cover ready progress,
-canonical Responsibility lifecycle, explicit execution-to-Goal reconciliation,
-and correction-driven reopening. They do not by themselves establish live-model
-latency, physical audio, simulator, or physical robot qualification.
-
-Before claiming the working tree is clean, run the canonical gate in a
-dependency-complete environment:
-
+Social Attention is background, interaction-anchored body decoration around
+ongoing behavior; it is not a Goal and not an execution lane.
+Durable Mind stays small: Stable Mind, unfinished Goals, selective Memory.
+Situation is bounded, revisable, mostly reconstructable live soft state.
+Evidence/Ledger plus Progress/Plan/Request/Execution/Outcome are the grounding and
+work substrate. `Responsibility` and `Work` are architecture vocabulary, not new
+parallel manager objects.
+## Settled boundaries
+- **Goal = canonical unfinished Responsibility.** Planning, waiting, confirmation,
+  scheduling, running, retry/recovery, and provider state belong to Work/runtime.
+- **Responsibility completeness is contained.** High-risk compound Goal
+  segmentation uses a separate model-owned coverage audit; the Host checks only
+  mechanical coverage invariants and fails closed on repeated incompleteness.
+- **`output_mode` is the sole model-authored Goal execution discriminant.** The
+  Host derives responsibility kind, execution lane, and provider requirement.
+  Reverse inference and model-authored copies are not supported protocol.
+- **Unavailability never erases a requested responsibility.** Preserve the Goal
+  and report the limitation; ordinary speech, media, or body motion cannot silently
+  substitute for a provider-required vocal or effectful outcome.
+- **Chromie has one personal Vocal domain.** Speech, expressive speech, recitation,
+  singing, humming, and nonverbal vocalization are modes of one voice.
+  `chromie.voice` is exclusive. Compatible body Activity may overlap Vocal;
+  simultaneous personal Vocal modes may not. Existing-media playback is Activity.
+- **Social Attention is decoration, not responsibility.** Small gaze/blink/nod/
+  wave/posture cues may accompany a socially anchored interaction through Activity,
+  fail-soft and with no Goal-completion authority. Explicitly requested versions of
+  the same physical actions are ordinary Activity. Idle liveliness is separate.
+- **Reality enters through evidence.** Provider evidence and reconciliation own
+  runtime truth; cognition may explain that truth but may not promote it.
+- **Semantic review is a local stage/pattern, not a global second Cognitive Core.**
+  Goal Association reviews Responsibility coverage; Planner reviews Plan coverage;
+  Response Composer reviews risky composition; Tool Result Interpreter reviews
+  effectful entailment. Do not add a generic ReviewManager without a genuinely
+  shared authority/state/lifecycle.
+- **Readiness is local, not pipeline-global.** A branch advances when its own
+  meaning, inputs, evidence, dependencies, and authority are sufficient.
+- **Stable Mind is not dynamic world knowledge.** Identity/personality/values may
+  be cached; changing facts such as weather, news, prices, schedules, and law are
+  acquired through trusted information paths.
+## Recent architecture closure
+Current `main` already contains:
+- `84edc92` — Vocal becomes Chromie's exclusive personal voice domain;
+- `0ad8c47` — Social Attention becomes background behavioral decoration;
+- `26b0b52` — Goal Association proves Responsibility coverage;
+- `f8fecb7` — `output_mode` becomes the sole Goal execution discriminant;
+- `f255bdd` — mixed effectful-result entailment regression is retained;
+- `8dd97e4` — root-cause regressions align with current semantic contracts;
+- `94bcdce` — best-known technical architecture becomes the Charter default.
+The compound failure that motivated several changes was conceptually
+`walk + sing + blink`: independently observable requested outcomes remain separate
+Responsibilities; an unavailable singing provider leaves an unavailable singing
+Goal rather than deleting/replacing it; final language may claim only the subset
+supported by trusted outcome evidence.
+## Do not resurrect
+- independent Router semantic authority;
+- `social_attention` as a third execution lane or standalone Goal;
+- `Speaking` as a sibling domain to singing/humming, or multiple personal mouths;
+- reverse `responsibility_kind -> output_mode` compatibility inference;
+- Host phrase tables/regexes deciding ordinary intent or planning;
+- a generic global semantic-review layer merely because local stages review;
+- random idle animation disguised as Social Attention;
+- silent capability substitution, evidence promotion, or response text as proof;
+- compatibility machinery for an owner-replaced architecture;
+- managers/layers/prompt mountains without a distinct required owner or invariant.
+## Engineering decision rule
+The Charter requires the **best-known technically justified architecture** as the
+default target. First determine what is technically strongest; then weigh current
+code, compatibility, migration effort, sunk cost, schedule, and diff size. Those
+costs matter but do not have architecture veto power. If the stronger design needs
+new owner authority, explain why it is stronger, alternatives, tradeoffs, risks,
+migration/removal impact, and the exact authority required, then ask the owner.
+Do not silently downgrade because authority is absent.
+This checkpoint does **not** grant blanket architecture authority to later
+sessions; use Charter governance when new authority is needed.
+## Resume point
+Do not add another top-level architecture layer without new evidence. The recent
+architecture defects are contained; next work should be evidence-driven validation
+and concrete root-cause repair at the earliest responsible boundary. High-value
+probes include compound Vocal+Activity requests, unavailable vocal modes, Social
+Attention during real greeting/listening without standalone decoration, and
+speech-to-later-Vocal resource release. Scenarios are probes for general invariants,
+not phrase-specific targets.
+Baseline non-social liveliness (idle blink/breathing/posture) remains deliberately
+separate from Social Attention and deferred until a concrete product requirement
+justifies its owner, policy, and execution semantics.
+## Resume and verification commands
+`docs/STATUS.md` owns implementation/evidence claims. Do not claim live-model,
+audio, MuJoCo, GPU, or physical-provider qualification unless that exact gate ran
+and retained evidence.
 ```bash
-./scripts/run_tests.sh
-```
-
-Useful focused ownership/structure checks are:
-
-```bash
+git switch main && git pull --ff-only
+git status --short
+git log -10 --oneline
 python scripts/check_repository_policies.py
 python scripts/check_test_ownership.py
 python scripts/runtime_configuration_inventory.py --check
@@ -114,47 +145,10 @@ python scripts/check_runtime_structure.py
 python scripts/check_docs.py
 python scripts/semantic_authority_audit.py --check
 ./scripts/benchmark_check.sh
+./scripts/run_tests.sh   # canonical gate in a dependency-complete environment
 ```
-
-Do not report Ruff, Mypy, GPU, microphone, speaker, MuJoCo, physical-provider,
-or live-model results unless those exact gates actually ran and retained their
-evidence.
-
-## Near-term implementation order from the compressed baseline
-
-1. **implemented:** Goal Responsibility lifecycle is separated from
-   Task/Plan/request/execution lifecycle; Goal satisfaction/reopening now crosses
-   explicit reconciliation rather than provider/request status projection;
-2. **implemented:** the minimum bounded Situation projection is reconstructed from
-   current authoritative references, revisioned across cognition, and never persisted
-   as a Belief/world-state database;
-3. **implemented:** transient materialization, compatible same-Responsibility refinement,
-   genuine replacement lineage, and trusted Work-stop/forward repair;
-4. **implemented:** trusted execution-state deltas derive ephemeral bounded
-   `CognitiveOpportunity` events for fast/slow reactivation without polling or a queue;
-5. **implemented:** slow opportunities selectively invoke typed Reflection; repeated
-   evidence may promote only ephemeral task/session memory, never Stable Mind or authority;
-6. **implemented:** restart restores unfinished Responsibility while current Work is
-   recoverable/revalidation-required; volatile Situation/provider/body/confirmation state
-   is discarded or archived as recovery provenance rather than restored as current truth;
-7. defer multi-user privacy/scoped durable consent, broader recovery/autonomy,
-   competence calibration, and richer continuation semantics until a concrete
-   slice requires their missing authority/lifecycle.
-
-Every slice must first identify the reusable cognitive invariant, map or remove
-existing concepts, retain general scenarios, and avoid a new permanent
-abstraction when an existing owner can represent the state correctly. If a new
-concept is proposed, the review must name the two behaviorally different states
-that would otherwise become indistinguishable.
-
-## Canonical owners
-
-- stable boundaries and principles: [Project Charter](docs/PROJECT_CHARTER.md)
-- cognitive constitution and complete problem space:
-  [Goal-Driven Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
-- executable turn/evidence lifecycle: [Cognitive Turn Loop](docs/COGNITIVE_TURN_LOOP.md)
-- delivery order: [Roadmap](ROADMAP.md)
-- implementation and evidence: [Current Status](docs/STATUS.md)
-- target workflow: [Target Evidence Closure](docs/TARGET_EVIDENCE_CLOSURE.md)
-- interfaces: [API Reference](docs/API_REFERENCE.md)
-- operation: [Runbook](CHROMIE_RUNBOOK.md)
+Canonical owners: [Charter](docs/PROJECT_CHARTER.md) ·
+[Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md) ·
+[Turn Loop](docs/COGNITIVE_TURN_LOOP.md) · [Roadmap](ROADMAP.md) ·
+[Status](docs/STATUS.md) · [Target Evidence](docs/TARGET_EVIDENCE_CLOSURE.md) ·
+[API](docs/API_REFERENCE.md) · [Runbook](CHROMIE_RUNBOOK.md).
