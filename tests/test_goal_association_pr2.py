@@ -8,6 +8,7 @@ from agent.app.goal_association import (
     GoalAssociationModelGoal,
     GoalAssociationModelOutput,
     GoalAssociationResolver,
+    GoalResponsibilityCoverageReview,
     GoalSegmentationModelOutput,
 )
 from agent.app.schema import AgentRunRequest, RouteDecision
@@ -15,6 +16,15 @@ from shared.chromie_contracts.goal import GoalAssociationResolution
 
 
 class GoalExecutionContractTests(unittest.TestCase):
+    def test_responsibility_coverage_cannot_accept_overmerged_independent_outcomes(self):
+        with self.assertRaisesRegex(ValueError, "over-merged"):
+            GoalResponsibilityCoverageReview.model_validate(
+                responsibility_coverage(
+                    responsibility_item("walk", 0),
+                    responsibility_item("sing", 0),
+                )
+            )
+
     def test_singing_is_speaking_and_requires_mode_specific_provider(self):
         goal = GoalAssociationModelGoal.model_validate(
             {
@@ -184,6 +194,32 @@ def binding_audit(*bindings_by_goal):
             for index, bindings in enumerate(bindings_by_goal)
         ],
         "reason_summary": "All candidate Goal bindings were audited.",
+    }
+
+
+def responsibility_item(
+    source_excerpt,
+    *goal_indices,
+    role="responsibility",
+    coverage="covered",
+    independently_satisfiable=True,
+):
+    return {
+        "source_excerpt": source_excerpt,
+        "role": role,
+        "coverage": coverage,
+        "independently_satisfiable": (
+            independently_satisfiable if role == "responsibility" else False
+        ),
+        "candidate_goal_indices": list(goal_indices),
+    }
+
+
+def responsibility_coverage(*items, decision="accept"):
+    return {
+        "decision": decision,
+        "items": list(items),
+        "reason_summary": "Candidate Goals account for the audited user meaning.",
     }
 
 
@@ -385,7 +421,18 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 "The physical Goal owns its contingent completion delivery."
             ),
         }
-        ollama = ScriptedOllama([invalid, corrected, corrected, adjudication])
+        coverage = responsibility_coverage(
+            responsibility_item("Pick up the red mug and hand it to me", 0),
+            responsibility_item(
+                "tell me when you have finished",
+                0,
+                role="constraint",
+                independently_satisfiable=False,
+            ),
+        )
+        ollama = ScriptedOllama(
+            [invalid, corrected, corrected, adjudication, coverage]
+        )
 
         result = asyncio.run(
             GoalAssociationResolver(ollama).resolve(
@@ -399,7 +446,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(len(ollama.prompts), 4)
+        self.assertEqual(len(ollama.prompts), 5)
         self.assertEqual(len(result.new_goals), 1)
         responsibility = result.new_goals[0].resource_responsibility
         self.assertIsNotNone(responsibility)
@@ -882,7 +929,17 @@ class GoalAssociationResolverTests(unittest.TestCase):
             [],
             [],
         )
-        ollama = ScriptedOllama([initial, reviewed, audited_bindings])
+        coverage = responsibility_coverage(
+            responsibility_item("往前走个15秒", 0),
+            responsibility_item("边走边唱歌", 1),
+            responsibility_item("眨眼睛", 2),
+            responsibility_item(
+                "你好",
+                role="framing",
+                independently_satisfiable=False,
+            ),
+        )
+        ollama = ScriptedOllama([initial, reviewed, coverage, audited_bindings])
 
         result = asyncio.run(
             GoalAssociationResolver(ollama).resolve(
@@ -893,7 +950,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(len(ollama.prompts), 3)
+        self.assertEqual(len(ollama.prompts), 4)
         self.assertEqual(
             result.metadata["semantic_review"]["strategy"],
             "model_owned_fresh_goal_resegmentation",
@@ -924,6 +981,10 @@ class GoalAssociationResolverTests(unittest.TestCase):
             result.metadata["binding_audit"]["strategy"],
             "model_owned_material_parameter_audit",
         )
+        self.assertEqual(
+            result.metadata["responsibility_coverage"]["final_decision"],
+            "accept",
+        )
         projection = result.prompt_projection()
         self.assertEqual(
             projection["new_goals"][1]["metadata"],
@@ -935,6 +996,125 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 "media_operation": "none",
             },
         )
+
+    def test_responsibility_coverage_rejects_persistently_collapsed_compound_goal(self):
+        collapsed = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "往前走15秒，同时唱歌和眨眼睛。",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "duration_s",
+                            "entity_type": "duration_seconds",
+                            "value": "15",
+                            "confidence": 1.0,
+                        }
+                    ],
+                }
+            ],
+            "confidence": 1.0,
+        }
+        rejected_coverage = responsibility_coverage(
+            responsibility_item("往前走个15秒", 0),
+            responsibility_item(
+                "边走边唱歌",
+                coverage="missing",
+            ),
+            responsibility_item(
+                "眨眼睛",
+                coverage="missing",
+            ),
+            decision="reject",
+        )
+        resegmented = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "往前走15秒。",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "duration_s",
+                            "entity_type": "duration_seconds",
+                            "value": "15",
+                            "confidence": 1.0,
+                        }
+                    ],
+                },
+                {
+                    "description": "边走边唱歌。",
+                    "output_mode": "singing",
+                    "bindings": [],
+                },
+                {
+                    "description": "同时眨眼睛。",
+                    "output_mode": "body_action",
+                    "bindings": [],
+                },
+            ],
+            "confidence": 1.0,
+        }
+        accepted_coverage = responsibility_coverage(
+            responsibility_item("往前走个15秒", 0),
+            responsibility_item("边走边唱歌", 1),
+            responsibility_item("眨眼睛", 2),
+        )
+        ollama = ScriptedOllama(
+            [
+                collapsed,
+                collapsed,
+                rejected_coverage,
+                resegmented,
+                accepted_coverage,
+                binding_audit([], [], []),
+            ]
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "你好，你往前走个15秒，然后边走边唱歌，同时眨眼睛。",
+                    language="zh-CN",
+                )
+            )
+        )
+
+        self.assertEqual(
+            [goal.metadata["output_mode"] for goal in result.new_goals],
+            ["body_action", "singing", "body_action"],
+        )
+        self.assertEqual(
+            result.metadata["responsibility_coverage"],
+            {
+                "attempted": True,
+                "succeeded": True,
+                "strategy": "independent_model_coverage_audit",
+                "initial_decision": "reject",
+                "final_decision": "accept",
+                "resegmented": True,
+                "attempt_count": 2,
+                "item_count": 3,
+            },
+        )
+        self.assertEqual(
+            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
+            [
+                "goal_association.primary",
+                "goal_association.semantic_resegmentation",
+                "goal_association.responsibility_coverage",
+                "goal_association.responsibility_resegmentation",
+                "goal_association.responsibility_coverage_recheck",
+                "goal_association.binding_audit",
+            ],
+        )
+        coverage_prompt = ollama.prompts[2][0]
+        self.assertIn("independently satisfiable responsibility", coverage_prompt)
+        self.assertIn("provider availability", coverage_prompt)
+        resegmentation_prompt = ollama.prompts[3][0]
+        self.assertIn("responsibility-coverage audit JSON", resegmentation_prompt)
+        self.assertIn("No previous Goal DTO is supplied", resegmentation_prompt)
 
     def test_invalid_typed_compound_uses_fresh_model_owned_resegmentation(self):
         invalid = {
@@ -1011,8 +1191,13 @@ class GoalAssociationResolverTests(unittest.TestCase):
             ],
             "confidence": 1.0,
         }
+        coverage = responsibility_coverage(
+            responsibility_item("往前走个15秒", 0),
+            responsibility_item("边走边唱歌", 1),
+            responsibility_item("眨眼睛", 2),
+        )
         ollama = ScriptedOllama(
-            [invalid, resegmented, binding_audit([], [], [])]
+            [invalid, resegmented, coverage, binding_audit([], [], [])]
         )
 
         result = asyncio.run(
@@ -1026,7 +1211,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(len(ollama.prompts), 3)
+        self.assertEqual(len(ollama.prompts), 4)
         repair_prompt, repair_kwargs = ollama.prompts[1]
         self.assertEqual(
             repair_kwargs["prompt_family"],
@@ -1764,7 +1949,11 @@ class GoalAssociationResolverTests(unittest.TestCase):
             ],
             "confidence": 1.0,
         }
-        ollama = ScriptedOllama([merged, reviewed])
+        coverage = responsibility_coverage(
+            responsibility_item("往前给我跑个50米", 0),
+            responsibility_item("帮我拿杯水，然后回来", 1),
+        )
+        ollama = ScriptedOllama([merged, reviewed, coverage])
 
         result = asyncio.run(
             GoalAssociationResolver(ollama).resolve(
@@ -1772,7 +1961,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(len(ollama.prompts), 3)
         self.assertEqual(
             [goal.description for goal in result.new_goals],
             ["往前移动50米。", "拿一杯水并带回给用户。"],
@@ -1859,7 +2048,16 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 "constraint rather than spoken content."
             ),
         }
-        ollama = ScriptedOllama([initial, initial, adjudication])
+        coverage = responsibility_coverage(
+            responsibility_item("nod twice", 0),
+            responsibility_item(
+                "do not give me more weather details",
+                0,
+                role="constraint",
+                independently_satisfiable=False,
+            ),
+        )
+        ollama = ScriptedOllama([initial, initial, adjudication, coverage])
 
         result = asyncio.run(
             GoalAssociationResolver(ollama).resolve(
@@ -1879,7 +2077,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             result.new_goals[0].metadata["responsibility_kind"],
             "executable_action",
         )
-        self.assertEqual(len(ollama.prompts), 3)
+        self.assertEqual(len(ollama.prompts), 4)
         self.assertEqual(
             result.metadata["semantic_review"]["strategy"],
             "model_owned_goal_independence_adjudication",
@@ -1965,7 +2163,11 @@ class GoalAssociationResolverTests(unittest.TestCase):
             ],
             "reason_summary": "Both outcomes are independently requested.",
         }
-        ollama = ScriptedOllama([mixed, mixed, adjudication])
+        coverage = responsibility_coverage(
+            responsibility_item("Blink twice", 0),
+            responsibility_item("tell me a short joke", 1),
+        )
+        ollama = ScriptedOllama([mixed, mixed, adjudication, coverage])
 
         result = asyncio.run(
             GoalAssociationResolver(ollama).resolve(
@@ -2025,7 +2227,11 @@ class GoalAssociationResolverTests(unittest.TestCase):
             ],
             "reason_summary": "Both independently requested outcomes are preserved.",
         }
-        ollama = ScriptedOllama([mixed, mixed, adjudication])
+        coverage = responsibility_coverage(
+            responsibility_item("Check today's weather in Neixiang County", 0),
+            responsibility_item("sing a short song", 1),
+        )
+        ollama = ScriptedOllama([mixed, mixed, adjudication, coverage])
 
         result = asyncio.run(
             GoalAssociationResolver(ollama).resolve(
@@ -2036,7 +2242,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(len(ollama.prompts), 3)
+        self.assertEqual(len(ollama.prompts), 4)
         self.assertEqual(
             [goal.metadata["responsibility_kind"] for goal in result.new_goals],
             ["capability_dependent", "vocal_output"],
@@ -2198,7 +2404,11 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 }
             ],
         )
-        ollama = ScriptedOllama([segmented, audited_bindings])
+        coverage = responsibility_coverage(
+            responsibility_item("Turn in place", 0),
+            responsibility_item("look at me for two seconds", 1),
+        )
+        ollama = ScriptedOllama([segmented, coverage, audited_bindings])
 
         result = asyncio.run(
             GoalAssociationResolver(ollama).resolve(
@@ -2209,9 +2419,9 @@ class GoalAssociationResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(len(ollama.prompts), 3)
         self.assertEqual(
-            ollama.prompts[1][1]["prompt_family"],
+            ollama.prompts[2][1]["prompt_family"],
             "goal_association.binding_audit",
         )
         self.assertEqual(
@@ -2222,7 +2432,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             result.metadata["binding_audit"]["strategy"],
             "model_owned_material_parameter_audit",
         )
-        audit_schema = ollama.prompts[1][1]["response_format"]
+        audit_schema = ollama.prompts[2][1]["response_format"]
         self.assertEqual(
             audit_schema["$defs"]["GoalBindingAuditItem"]["properties"]
             ["candidate_goal_index"]["enum"],
@@ -2465,6 +2675,11 @@ class GoalAssociationResolverTests(unittest.TestCase):
                     ],
                     "confidence": 1.0,
                 },
+                responsibility_coverage(
+                    responsibility_item("Walk for 15 seconds", 0),
+                    responsibility_item("blinking", 1),
+                    responsibility_item("singing", 2),
+                ),
                 binding_audit(
                     [
                         {
@@ -2489,7 +2704,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(len(ollama.prompts), 3)
+        self.assertEqual(len(ollama.prompts), 4)
         self.assertEqual(
             [goal.description for goal in result.new_goals],
             [
@@ -2596,8 +2811,13 @@ class GoalAssociationResolverTests(unittest.TestCase):
             ],
             "confidence": 1.0,
         }
+        coverage = responsibility_coverage(
+            responsibility_item("往前走个15秒", 0),
+            responsibility_item("边走边唱歌", 1),
+            responsibility_item("眨眼睛", 2),
+        )
         ollama = ScriptedOllama(
-            [initial, reviewed, binding_audit([], [], [])]
+            [initial, reviewed, coverage, binding_audit([], [], [])]
         )
 
         result = asyncio.run(
@@ -2606,7 +2826,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(len(ollama.prompts), 3)
+        self.assertEqual(len(ollama.prompts), 4)
         self.assertEqual(
             result.metadata["semantic_review"]["triggers"],
             ["multi_embodied_responsibility_review"],

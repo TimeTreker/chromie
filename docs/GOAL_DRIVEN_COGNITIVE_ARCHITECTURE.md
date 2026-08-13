@@ -1488,6 +1488,47 @@ Possible goals:
 2. obtain coffee;
 3. retrieve weather.
 
+#### 7.1.1 Responsibility coverage is an explicit trusted-boundary proof
+
+The semantic model still owns the judgment about what is an independent human
+outcome. The Host must not reproduce that judgment with verbs, regexes, action
+lists, or provider names. But accepting an unconstrained list of model-authored
+Goals is also insufficient: a model can understand several requested outcomes in
+its reasoning and still omit or over-merge one in the structured result.
+
+For effectful/high-risk segmentation, Goal Association therefore performs a
+separate focused responsibility-coverage audit over the authoritative user turn
+and the already proposed zero-based Goal candidates. The audit classifies each
+material current-turn fragment as one of:
+
+- `responsibility`: a positive outcome Chromie owes;
+- `constraint`: a modifier, prohibition, timing, or other boundary on owned work;
+- `context`: reference/background that does not itself require completion;
+- `framing`: politeness or social preamble attached to substantive work.
+
+Each item carries a verbatim current-turn `source_excerpt`. A covered positive
+responsibility owns exactly one Goal candidate; constraints may bind to affected
+Goals; context and framing own none. The model also states whether a positive
+responsibility is independently satisfiable. The trusted Host then checks only
+structure and provenance:
+
+- every accepted Goal candidate is justified by at least one covered positive
+  responsibility;
+- missing or clarification-required material meaning cannot pass an `accept`
+  review;
+- two independently satisfiable positive outcomes cannot be assigned to the
+  same Goal candidate;
+- every current-turn excerpt is source-grounded rather than translated or
+  invented;
+- unavailable provider support does not remove the semantic responsibility.
+
+A rejected audit authorizes one fresh model-owned resegmentation from the
+authoritative turn. The revised candidate set must pass one independent coverage
+recheck before canonical Goal state is committed. A second rejection fails
+closed. This creates containment without transferring semantic authority to the
+Host and directly prevents a compound request such as walking, singing, and
+blinking from silently becoming only one observable responsibility.
+
 ### 7.2 Plan steps are not goals
 
 Example:

@@ -152,6 +152,7 @@ _FRESH_RESEGMENTATION_TRIGGERS = frozenset(
         "tool_route_spoken_responsibility_review",
         "invalid_typed_execution_contract",
         "resource_result_delivery_split_review",
+        "responsibility_coverage_rejected",
     }
 )
 
@@ -794,6 +795,127 @@ class GoalAssociationModelOutput(BaseModel):
         return self
 
 
+class GoalResponsibilityCoverageItem(BaseModel):
+    """One independently audited semantic fragment from the authoritative turn.
+
+    The audit does not create Goals.  It explains how current user meaning is
+    accounted for by already proposed Goal candidates so the Host can reject a
+    structurally incomplete or over-merged segmentation without interpreting the
+    user's words itself.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    source_excerpt: str = Field(min_length=1, max_length=500)
+    role: Literal["responsibility", "constraint", "context", "framing"]
+    coverage: Literal["covered", "missing", "clarification_required"]
+    independently_satisfiable: bool = False
+    candidate_goal_indices: list[int] = Field(default_factory=list, max_length=8)
+
+    @field_validator("source_excerpt", mode="before")
+    @classmethod
+    def normalize_text(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return " ".join(value.strip().split())
+        return value
+
+    @field_validator("candidate_goal_indices")
+    @classmethod
+    def unique_goal_indices(cls, value: list[int]) -> list[int]:
+        if len(value) != len(set(value)):
+            raise ValueError("candidate_goal_indices must be unique")
+        return value
+
+    @model_validator(mode="after")
+    def validate_shape(self) -> "GoalResponsibilityCoverageItem":
+        if self.role != "responsibility" and self.independently_satisfiable:
+            raise ValueError(
+                "only a responsibility may be independently_satisfiable"
+            )
+        if self.role in {"context", "framing"}:
+            if self.coverage != "covered" or self.candidate_goal_indices:
+                raise ValueError(
+                    "context and framing are acknowledged without Goal ownership"
+                )
+            return self
+        if self.coverage == "covered":
+            if not self.candidate_goal_indices:
+                raise ValueError(
+                    "covered responsibility or constraint requires Goal ownership"
+                )
+            if self.role == "responsibility" and len(self.candidate_goal_indices) != 1:
+                raise ValueError(
+                    "one responsibility must map to exactly one Goal candidate"
+                )
+        elif self.candidate_goal_indices:
+            raise ValueError(
+                "missing or clarification-required meaning cannot claim Goal ownership"
+            )
+        return self
+
+
+class GoalResponsibilityCoverageReview(BaseModel):
+    """Independent model audit proving candidate Goal responsibility coverage."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    decision: Literal["accept", "reject"]
+    items: list[GoalResponsibilityCoverageItem] = Field(min_length=1, max_length=16)
+    reason_summary: str = Field(min_length=1, max_length=1200)
+
+    @field_validator("reason_summary", mode="before")
+    @classmethod
+    def normalize_reason_summary(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return " ".join(value.strip().split())
+        return value
+
+    @model_validator(mode="after")
+    def validate_decision(self) -> "GoalResponsibilityCoverageReview":
+        material = [
+            item
+            for item in self.items
+            if item.role in {"responsibility", "constraint"}
+        ]
+        if not material:
+            raise ValueError(
+                "coverage review for created Goals requires material user meaning"
+            )
+        uncovered = [
+            item
+            for item in material
+            if item.coverage in {"missing", "clarification_required"}
+        ]
+        independent_owner_counts: dict[int, int] = {}
+        for item in material:
+            if (
+                item.role == "responsibility"
+                and item.coverage == "covered"
+                and item.independently_satisfiable
+            ):
+                goal_index = item.candidate_goal_indices[0]
+                independent_owner_counts[goal_index] = (
+                    independent_owner_counts.get(goal_index, 0) + 1
+                )
+        overmerged = [
+            goal_index
+            for goal_index, count in independent_owner_counts.items()
+            if count > 1
+        ]
+        has_problem = bool(uncovered or overmerged)
+        if self.decision == "accept" and has_problem:
+            raise ValueError(
+                "accepted responsibility coverage cannot contain missing, ambiguous, "
+                "or over-merged independently satisfiable requirements"
+            )
+        if self.decision == "reject" and not has_problem:
+            raise ValueError(
+                "rejected responsibility coverage requires a missing, ambiguous, "
+                "or over-merged requirement"
+            )
+        return self
+
+
 class GoalIndependenceCandidateDecision(BaseModel):
     """Model-owned completion-mode judgment for one validated Goal candidate."""
 
@@ -980,6 +1102,10 @@ class GoalAssociationResolver:
         contract_repair_attempt_count = 0
         semantic_review_attempted = False
         semantic_review_attempt_count = 0
+        responsibility_coverage_attempted = False
+        responsibility_coverage_succeeded = False
+        responsibility_coverage_attempt_count = 0
+        responsibility_coverage_resegmented = False
         optional_referent_recovery: list[dict[str, Any]] = []
 
         try:
@@ -1348,6 +1474,127 @@ class GoalAssociationResolver:
                     "goal_association_semantic_review_done sid=%s status=success",
                     request.sid,
                 )
+            coverage_candidate = output_type.model_validate(accepted_raw)
+            if self._responsibility_coverage_required(
+                coverage_candidate,
+                request=request,
+            ):
+                responsibility_coverage_attempted = True
+                responsibility_coverage_attempt_count = 1
+                logger.info(
+                    "goal_association_responsibility_coverage_start sid=%s goals=%d",
+                    request.sid,
+                    len(coverage_candidate.new_goals),
+                )
+                coverage_review = await self._run_responsibility_coverage_audit(
+                    request=request,
+                    raw=accepted_raw,
+                    generation_options=generation_options,
+                    prompt_family="goal_association.responsibility_coverage",
+                    attempt=5,
+                )
+                initial_coverage_decision = coverage_review.decision
+                if coverage_review.decision == "reject":
+                    responsibility_coverage_resegmented = True
+                    logger.info(
+                        "goal_association_responsibility_resegmentation_start sid=%s",
+                        request.sid,
+                    )
+                    resegmented = await self.ollama.generate(
+                        self._build_responsibility_resegmentation_prompt(
+                            request=request,
+                            candidate_goals=candidate_goals,
+                            output_type=output_type,
+                            coverage_review=coverage_review,
+                        ),
+                        system=self._semantic_review_system_prompt(
+                            output_type,
+                            fresh_resegmentation=True,
+                        ),
+                        options=generation_options,
+                        response_format=response_schema,
+                        prompt_family=(
+                            "goal_association.responsibility_resegmentation"
+                        ),
+                        turn_id=request.sid,
+                        attempt=6,
+                    )
+                    if not isinstance(resegmented, dict):
+                        raise OllamaGenerationError(
+                            "goal-association responsibility resegmentation response "
+                            "is not a JSON object",
+                            failure_class="structured_output_invalid",
+                            failure_domain="model_contract",
+                            architecture_attribution="not_evaluated",
+                            retryable=True,
+                        )
+                    resegmented, recovered = (
+                        self._drop_invalid_optional_referent_introductions(
+                            resegmented
+                        )
+                    )
+                    optional_referent_recovery.extend(recovered)
+                    pre_coverage_metadata = dict(resolution.metadata)
+                    resolution = await self._validate_contract_output(
+                        resegmented,
+                        request=request,
+                        turn_id=turn_id,
+                        output_type=output_type,
+                    )
+                    accepted_raw = resegmented
+                    semantic_review_raw = resegmented
+                    coverage_candidate = output_type.model_validate(resegmented)
+                    responsibility_coverage_attempt_count = 2
+                    coverage_review = await self._run_responsibility_coverage_audit(
+                        request=request,
+                        raw=resegmented,
+                        generation_options=generation_options,
+                        prompt_family=(
+                            "goal_association.responsibility_coverage_recheck"
+                        ),
+                        attempt=7,
+                    )
+                    if coverage_review.decision != "accept":
+                        raise ValueError(
+                            "responsibility coverage remains incomplete after fresh "
+                            "model-owned resegmentation"
+                        )
+                    resolution = resolution.model_copy(
+                        update={
+                            "metadata": {
+                                **pre_coverage_metadata,
+                                **dict(resolution.metadata),
+                            }
+                        }
+                    )
+                    logger.info(
+                        "goal_association_responsibility_resegmentation_done sid=%s "
+                        "status=success goals=%d",
+                        request.sid,
+                        len(coverage_candidate.new_goals),
+                    )
+                responsibility_coverage_succeeded = True
+                coverage_metadata = dict(resolution.metadata)
+                coverage_metadata["responsibility_coverage"] = {
+                    "attempted": True,
+                    "succeeded": True,
+                    "strategy": "independent_model_coverage_audit",
+                    "initial_decision": initial_coverage_decision,
+                    "final_decision": coverage_review.decision,
+                    "resegmented": responsibility_coverage_resegmented,
+                    "attempt_count": responsibility_coverage_attempt_count,
+                    "item_count": len(coverage_review.items),
+                }
+                resolution = resolution.model_copy(
+                    update={"metadata": coverage_metadata}
+                )
+                logger.info(
+                    "goal_association_responsibility_coverage_done sid=%s "
+                    "status=success decision=%s attempts=%d",
+                    request.sid,
+                    coverage_review.decision,
+                    responsibility_coverage_attempt_count,
+                )
             if self._binding_audit_required(accepted_raw):
                 semantic_review_attempted = True
                 semantic_review_attempt_count += 1
@@ -1367,7 +1614,7 @@ class GoalAssociationResolver:
                     ),
                     prompt_family="goal_association.binding_audit",
                     turn_id=request.sid,
-                    attempt=5,
+                    attempt=8,
                 )
                 if not isinstance(binding_audit_raw, dict):
                     raise OllamaGenerationError(
@@ -1482,6 +1729,18 @@ class GoalAssociationResolver:
                 "contract_repair_succeeded": contract_repair_succeeded,
                 "semantic_review_attempted": semantic_review_attempted,
                 "semantic_review_succeeded": False,
+                "responsibility_coverage_attempted": (
+                    responsibility_coverage_attempted
+                ),
+                "responsibility_coverage_succeeded": (
+                    responsibility_coverage_succeeded
+                ),
+                "responsibility_coverage_attempt_count": (
+                    responsibility_coverage_attempt_count
+                ),
+                "responsibility_coverage_resegmented": (
+                    responsibility_coverage_resegmented
+                ),
                 **integrity_metadata,
             }
             if initial_validation_error:
@@ -1506,6 +1765,9 @@ class GoalAssociationResolver:
                 ),
                 confidence=0.0,
                 reason_summary=(
+                    "Goal responsibility coverage did not validate; no goal operation was accepted."
+                    if responsibility_coverage_attempted
+                    else
                     "Goal semantic review did not complete successfully; no goal operation was accepted."
                     if semantic_review_attempted
                     else "Goal association output did not satisfy the schema after one model repair attempt; no goal operation was accepted."
@@ -2691,6 +2953,234 @@ class GoalAssociationResolver:
             "Goals, and a concise reason as JSON. The Host "
             "validates structure and mechanically applies your semantic selection; "
             "it owns no semantic choice."
+        )
+
+    @staticmethod
+    def _responsibility_coverage_required(
+        model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
+        *,
+        request: AgentRunRequest,
+    ) -> bool:
+        """Return true for Goal sets where omission/over-merge is materially costly.
+
+        The Host does not inspect user wording.  It uses only already model-authored
+        Goal structure plus the advisory route as a reason to request an independent
+        semantic audit.  Ordinary single speech Goals stay on the fast path.
+        """
+
+        if not model_output.new_goals:
+            return False
+        high_signal_modes = {
+            "body_action",
+            "media_playback",
+            "expressive_speech",
+            "recitation",
+            "singing",
+            "humming",
+            "nonverbal_vocalization",
+        }
+        if any(goal.output_mode in high_signal_modes for goal in model_output.new_goals):
+            return True
+        if len(model_output.new_goals) > 1 and any(
+            goal.output_mode not in {"speech", "other"}
+            for goal in model_output.new_goals
+        ):
+            return True
+        route = str(getattr(getattr(request, "route_decision", None), "route", ""))
+        return route == "robot_action"
+
+    async def _run_responsibility_coverage_audit(
+        self,
+        *,
+        request: AgentRunRequest,
+        raw: dict[str, Any],
+        generation_options: dict[str, Any],
+        prompt_family: str,
+        attempt: int,
+    ) -> GoalResponsibilityCoverageReview:
+        goal_count = len(raw.get("new_goals") or [])
+        coverage_raw = await self.ollama.generate(
+            self._build_responsibility_coverage_prompt(
+                request=request,
+                raw=raw,
+            ),
+            system=self._responsibility_coverage_system_prompt(),
+            options=generation_options,
+            response_format=self._responsibility_coverage_response_schema(
+                goal_count
+            ),
+            prompt_family=prompt_family,
+            turn_id=request.sid,
+            attempt=attempt,
+        )
+        if not isinstance(coverage_raw, dict):
+            raise OllamaGenerationError(
+                "goal-association responsibility coverage response is not a JSON "
+                "object",
+                failure_class="structured_output_invalid",
+                failure_domain="model_contract",
+                architecture_attribution="not_evaluated",
+                retryable=True,
+            )
+        review = GoalResponsibilityCoverageReview.model_validate(coverage_raw)
+        self._validate_responsibility_coverage_review(
+            review,
+            request=request,
+            goal_count=goal_count,
+        )
+        return review
+
+    @staticmethod
+    def _responsibility_coverage_response_schema(goal_count: int) -> dict[str, Any]:
+        schema = copy.deepcopy(GoalResponsibilityCoverageReview.model_json_schema())
+        item_schema = schema.get("$defs", {}).get("GoalResponsibilityCoverageItem")
+        if isinstance(item_schema, dict):
+            item_schema["required"] = [
+                "source_excerpt",
+                "role",
+                "coverage",
+                "independently_satisfiable",
+                "candidate_goal_indices",
+            ]
+            indices = item_schema.get("properties", {}).get("candidate_goal_indices")
+            if isinstance(indices, dict):
+                indices["uniqueItems"] = True
+                index_items = indices.get("items")
+                if isinstance(index_items, dict):
+                    index_items["type"] = "integer"
+                    index_items["enum"] = list(range(max(0, goal_count)))
+        schema["required"] = ["decision", "items", "reason_summary"]
+        schema["additionalProperties"] = False
+        return schema
+
+    @staticmethod
+    def _responsibility_coverage_system_prompt() -> str:
+        return (
+            "You are Chromie's independent Goal responsibility-coverage auditor. "
+            "Read the authoritative user turn from scratch and compare its semantic "
+            "requirements with the supplied zero-based Goal candidates. Enumerate "
+            "material responsibilities, constraints, context, and conversational "
+            "framing without planning or selecting capabilities. A positive observable "
+            "outcome the user can independently judge is a responsibility, not a "
+            "constraint or decoration. Return JSON only."
+        )
+
+    def _build_responsibility_coverage_prompt(
+        self,
+        *,
+        request: AgentRunRequest,
+        raw: dict[str, Any],
+    ) -> str:
+        context = request.context if isinstance(request.context, dict) else {}
+        return (
+            "Audit whether this candidate Goal segmentation completely accounts for "
+            "the authoritative user's current semantic responsibilities. This is an "
+            "independent audit: candidate Goal wording is not evidence that the "
+            "segmentation is complete.\n\n"
+            "For each semantically material fragment of the current turn, emit one "
+            "items entry and copy source_excerpt as a verbatim contiguous span from "
+            "the FINAL AUTHORITATIVE USER TURN. Use role=responsibility for a positive "
+            "outcome Chromie owes, role=constraint for a modifier/prohibition/timing "
+            "condition on such an outcome, role=context for reference/background that "
+            "does not itself need completion, and role=framing for politeness or social "
+            "preamble attached to substantive work.\n\n"
+            "Set independently_satisfiable=true only when the user could reasonably "
+            "judge that positive outcome completed even if sibling outcomes did not "
+            "happen. Every independently satisfiable responsibility must own its own "
+            "Goal candidate. Do not collapse separately observable requested effects "
+            "merely because they can overlap in time, share one sentence, or use a "
+            "common provider. Conversely, do "
+            "not promote greeting/politeness framing, implementation steps, result "
+            "delivery, or a negative speech boundary into a separate Goal.\n\n"
+            "For coverage=covered, map a responsibility to exactly one candidate Goal "
+            "index; a constraint may map to one or more affected Goal indices. Use "
+            "coverage=missing when material meaning has no Goal owner, and "
+            "clarification_required only when the human-level responsibility itself "
+            "cannot be determined without asking the user. Context and framing have "
+            "no Goal indices. Every Goal candidate must be justified by at least one "
+            "covered responsibility. decision=accept only when no material meaning is "
+            "missing/ambiguous and no Goal candidate owns more than one independently "
+            "satisfiable responsibility. Otherwise decision=reject.\n\n"
+            "Do not add, remove, rename, plan, execute, or complete Goals. Do not use "
+            "provider availability to decide whether a responsibility exists. An "
+            "unavailable requested effect remains a responsibility.\n\n"
+            "Candidate Goal DTO JSON:\n"
+            f"{self._bounded_json(raw, 9000)}\n\n"
+            "Recent conversation JSON (reference context only; current-turn Goal "
+            "coverage must still be anchored by source_excerpt from the final turn):\n"
+            f"{self._bounded_json((context.get('history') or request.history or [])[-6:], 3000)}\n\n"
+            f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
+        )
+
+    @staticmethod
+    def _validate_responsibility_coverage_review(
+        review: GoalResponsibilityCoverageReview,
+        *,
+        request: AgentRunRequest,
+        goal_count: int,
+    ) -> None:
+        authoritative_turn = " ".join(request.text.strip().split()).casefold()
+        for index, item in enumerate(review.items):
+            excerpt = " ".join(item.source_excerpt.strip().split()).casefold()
+            if excerpt not in authoritative_turn:
+                raise ValueError(
+                    "responsibility coverage source_excerpt must be a verbatim "
+                    f"current-turn span: items[{index}]={item.source_excerpt!r}"
+                )
+            invalid_indices = [
+                goal_index
+                for goal_index in item.candidate_goal_indices
+                if goal_index < 0 or goal_index >= goal_count
+            ]
+            if invalid_indices:
+                raise ValueError(
+                    "responsibility coverage references unknown Goal candidate indices: "
+                    + ",".join(str(value) for value in invalid_indices)
+                )
+        if review.decision != "accept":
+            return
+        responsibility_owned_indices = {
+            goal_index
+            for item in review.items
+            if item.role == "responsibility" and item.coverage == "covered"
+            for goal_index in item.candidate_goal_indices
+        }
+        expected_indices = set(range(goal_count))
+        if responsibility_owned_indices != expected_indices:
+            missing = sorted(expected_indices - responsibility_owned_indices)
+            extra = sorted(responsibility_owned_indices - expected_indices)
+            raise ValueError(
+                "accepted responsibility coverage must justify every Goal candidate "
+                f"exactly through positive responsibility ownership; missing={missing} "
+                f"extra={extra}"
+            )
+
+    def _build_responsibility_resegmentation_prompt(
+        self,
+        *,
+        request: AgentRunRequest,
+        candidate_goals: list[dict[str, Any]],
+        output_type: (
+            type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
+        ),
+        coverage_review: GoalResponsibilityCoverageReview,
+    ) -> str:
+        base = self._build_semantic_review_prompt(
+            request=request,
+            candidate_goals=candidate_goals,
+            output_type=output_type,
+            raw={},
+            triggers=["responsibility_coverage_rejected"],
+        )
+        return (
+            base
+            + "\n\nIndependent responsibility-coverage audit JSON (semantic feedback "
+            "only; re-segment from the authoritative turn rather than copying prior "
+            "Goal labels):\n"
+            + self._bounded_json(coverage_review.model_dump(mode="json"), 7000)
+            + "\n\nReturn a fresh complete Goal segmentation that gives every independently "
+            "satisfiable responsibility exactly one Goal owner while keeping "
+            "constraints/context/framing subordinate."
         )
 
     @staticmethod

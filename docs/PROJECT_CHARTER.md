@@ -440,6 +440,21 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    through normal Cognitive Core / Goal reasoning rather than through the
    decoration plan. Social Attention is not a generic idle-animation loop;
    unanchored baseline embodiment belongs to a separate concern.
+30. **Semantic decomposition must prove responsibility coverage.** The model owns
+   the semantic judgment about which user outcomes are independent Goals; Host
+   code must not recover that meaning with phrase rules or action dictionaries.
+   For effectful or otherwise high-risk multi-responsibility segmentation, the
+   trusted Goal boundary may require a separate model-owned coverage audit over
+   the authoritative user turn. That audit explicitly accounts for positive
+   responsibilities, constraints, context, and conversational framing and maps
+   every covered positive responsibility to a zero-based Goal candidate. The
+   Host checks only mechanical invariants: every accepted Goal has positive
+   responsibility ownership, missing or clarification-required meaning cannot
+   be declared covered, and two independently satisfiable outcomes cannot share
+   one Goal. Provider availability never erases a requested responsibility. A
+   rejected audit permits one fresh model-owned resegmentation followed by one
+   recheck; repeated incompleteness fails closed rather than committing partial
+   canonical Goal truth.
 
 ### One personal voice; resources constrain coexistence
 
