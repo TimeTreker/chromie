@@ -438,7 +438,12 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             [
                 {
                     "decision": "create_goals",
-                    "new_goals": [{"description": "Respond naturally to F."}],
+                    "new_goals": [
+                        {
+                            "description": "Respond naturally to F.",
+                            "output_mode": "speech",
+                        }
+                    ],
                     "clarification": "",
                     "confidence": 1.0,
                     "reason_summary": "Treat the fragment as conversation.",
@@ -1089,8 +1094,9 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
 
     def test_courteous_social_attention_needs_concrete_restraint_for_none(self) -> None:
         source = inspect.getsource(ResponseComposerResolver._prompt)
-        self.assertIn("positive scene evidence for subtle embodiment", source)
-        self.assertIn("is not a concrete restraint", source)
+        self.assertIn("Social Attention must not author, rewrite, or semantically modify ResponsePlan text", source)
+        self.assertIn("meaningful direct engagement can justify one subtle decoration", source)
+        self.assertIn("decision=none with a concrete scene-specific reason", source)
         self.assertIn("not phrase matching or a fixed gesture rule", source)
 
 
