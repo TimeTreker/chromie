@@ -180,11 +180,20 @@ Capability authorization and execution.
 
 `POST /reflection` reuses the configured Deep Planner model only for a trusted `CognitiveOpportunity` whose `recommended_cognition` is `slow`. The Host supplies the exact affected Goal IDs and evidence references and binds those identities into the returned `ReflectionResolution`; the model cannot widen them. Reflection is optional post-outcome cognition and may propose replan, clarification, a user correction candidate, or bounded `task`/`session` Memory candidates. It cannot authorize effects, rewrite `ExecutionOutcome`/Evidence/history, change Stable Mind, or create provider capabilities. A Memory proposal is not durable by itself: the Host promotes only matching repeated-evidence candidates to ephemeral task/session Memory, while durable profile Memory retains the existing explicit-current-turn-consent boundary.
 
-`POST /social-attention/plan` accepts a `SocialAttentionRequest` describing one interaction-state event such as understanding becoming ready, work starting, evidence arriving, or speaking. It returns an auxiliary `SocialAttentionPlan`. The decoder constrains every behavior `capability_id` to the reviewed live candidate set. The endpoint only proposes; the Host independently validates target evidence, schemas, confirmation, resources, provider concurrency, and availability before the Trusted Capability Runtime may execute a behavior. The proposal owns no Goal state, speech meaning, or completion evidence.
+`POST /social-attention/plan` accepts a `SocialAttentionRequest` describing one interaction-state event such as understanding becoming ready, work starting, evidence arriving, or speaking. It returns an auxiliary `SocialAttentionPlan`. The decoder constrains every behavior `capability_id` to the reviewed live candidate set. A valid primary `decision=none` is terminal for that optional opportunity; no second critic may override it. Only an invalid primary DTO may receive one contract repair. The endpoint only proposes; the Host independently validates target evidence, schemas, confirmation, resources, provider concurrency, and availability before the Trusted Capability Runtime may execute a behavior. The proposal owns no Goal state, speech meaning, or completion evidence.
 
 `POST /compose-response-plan` is available when `AGENT_RESPONSE_COMPOSER_ENABLED=1`. It requires a terminal `CanonicalPlan` in request context and returns `ResponseCompositionResolution`. Ollama receives the exact `ResponseComposerModelOutput` schema: a `ResponsePlan`, optional advisory body-only `SocialAttentionPlan`, confidence, and rationale, with response-stage Goal IDs constrained to the immutable plan. The Host constructs composition identity, embeds the immutable plan and its SHA-256 fingerprint, requires every plan goal to be covered by response stages, and forbids pre-execution completion claims. One invalid schema result may receive a bounded same-stage repair using the original JSON and exact validation errors; a second invalid result fails closed. In the maintained Goal-driven runtime, Social Attention is background social-decoration cognition rather than an execution lane; this composition call receives background-loop ownership state so it does not make a duplicate social decision. Any accepted body decoration executes through Activity and never owns Goal completion. A fully bound `native_response` may reuse its already-started Vocal delivery evidence without calling Response Composer, while pure fully bound safe reads may use execution-only response materialization instead of waiting for pre-evidence composition.
 
 `POST /tools/execute` is a trusted provider boundary, not a semantic router. It accepts an exact `capability_id` and schema-valid arguments already produced by the Goal-driven planner. The Agent rejects unknown, unavailable, non-local, side-effecting, confirmation-gated, or non-`safe_read` capabilities and returns structured output without composing user speech. The Trusted Capability Runtime (legacy code name: Skill Runtime) remains responsible for provider registration, input validation, timing, cancellation, and correlated execution evidence. The first maintained binding is `chromie.weather.lookup`; additional local tools require an explicit manifest declaration and trusted provider binding rather than phrase rules.
+
+`chromie.weather.lookup` accepts the canonical place, `date=today|tomorrow`,
+and `period=day|tonight`. `tonight` is a narrower local day-part contract, not
+an alias for the calendar date. Its completed output therefore includes a
+non-null `forecast_period` with local start/end timestamps and period-scoped
+temperature, apparent-temperature, precipitation-probability, and condition
+evidence. If the provider cannot supply that hourly slice, execution fails with
+`forecast_period_unavailable`; daily or current values are never relabeled as
+tonight evidence. For a day-wide request, `forecast_period` is null.
 
 `POST /tool-result/interpret` is available when `AGENT_TOOL_RESULT_INTERPRETER_ENABLED=1`. It accepts the original user request plus one or more complete bounded `ToolResultEvidence` objects. The model returns a direct, summary, or detailed spoken response and exact evidence-ID/JSON-Pointer fact references. Trusted validation rejects stale or collection-valued references, unsupported numeric claims, internal identifiers, raw-payload narration, and speech outside the selected budgets. The full tool result remains in the execution bundle or Agent metadata; only the validated synthesis is spoken.
 
@@ -211,6 +220,38 @@ validated mode when it materializes canonical Goal metadata. Missing
 violations; there is no reverse inference or legacy execution-tuple compatibility
 path. This keeps one semantic source of truth at the model boundary and makes
 contradictory completion tuples structurally unrepresentable.
+For a resource responsibility, the live schema likewise has one writable nested
+authority: `resource_responsibility.resource`, `.source`, `.recipient`, and
+`.delivery_mode`. Resource identity, normalized numeric quantity, query-scope
+attributes, source bindings, recipient, and delivery are authored there exactly
+once. A resource Goal's generic `bindings` must be empty. The Host creates an
+output-only frozen flat grounding view for Planner consumers and records exact
+canonical-field provenance; neither the model nor a downstream consumer may
+write that view back into Goal semantics. Goal descriptions remain summaries and
+cannot override these typed fields.
+For a physical object, the canonical identity is the complete
+`resource.description` plus `quantity`; `resource.attributes` is decoder-closed.
+Acquisition location, distance, direction, and route are typed only in
+`source.bindings`, while recipient meaning is typed only in `recipient`.
+`resource.attributes` remains the typed query-scope owner for information
+resources such as weather location, time, and requested aspects.
+
+Every newly proposed Goal set crosses the same bounded transaction: primary
+interpretation, at most one DTO repair, one responsibility-coverage certificate,
+at most one fresh interpretation after certificate rejection, and one final
+certificate. The maximum is five logical semantic invocations. A fresh
+interpretation receives no DTO repair, and an invalid certificate receives no
+repair. Certificate output contains source-grounded item judgments only; the
+Host derives `accept`, `reconsider_once`, or `fail_closed` and may retain the
+immutable certificate as trace evidence without giving it Goal lifecycle
+authority.
+
+`GoalAssociationResolution.resolution_status` is the terminal contract:
+`resolved`, `needs_clarification`, or `fail_closed`. `fail_closed` contains no
+associations, new Goals, discourse mutations, progress bindings, clarification,
+or confidence and cannot be committed or passed to a Planner. A user-answerable
+semantic ambiguity uses `needs_clarification`; model, schema, audit, and retry
+failures never masquerade as such ambiguity.
 Mode-specific vocal output remains Vocal but requires provider evidence; a
 generic `respond` outcome or ordinary TTS cannot close it. The eventual spoken
 delivery of a capability result remains part of that capability-dependent Goal

@@ -269,7 +269,7 @@ class ResponseComposerCoordinationRepairTests(unittest.TestCase):
 
 
 class GoalAndCoverageRegressionTests(unittest.TestCase):
-    def test_single_new_goal_with_retained_context_requires_semantic_review(self) -> None:
+    def test_single_new_goal_with_retained_context_requires_coverage_proof(self) -> None:
         output = GoalAssociationModelOutput.model_validate(
             {
                 "decision": "create_goals",
@@ -283,13 +283,12 @@ class GoalAndCoverageRegressionTests(unittest.TestCase):
             }
         )
 
-        triggers = GoalAssociationResolver._semantic_review_triggers(
+        required = GoalAssociationResolver._responsibility_coverage_required(
             output,
             request=object(),  # the trigger uses no request fields
-            candidate_goals=[{"goal_id": "prior-goal"}],
         )
 
-        self.assertIn("single_new_goal_with_retained_context", triggers)
+        self.assertTrue(required)
 
     def test_typed_resource_goal_always_requires_coverage_audit(self) -> None:
         goal_ids = coordinated_action_goal_ids(

@@ -1193,6 +1193,32 @@ and explicitly discriminated:
 - `create_goals` for one natural-language description per independent new goal;
 - `clarify` for one concise user-facing question.
 
+Goal Association has one bounded semantic transaction. The primary model result
+may receive one mechanical DTO repair. Every newly proposed Goal set then receives
+one independent responsibility-coverage audit; pure association and clarification
+branches have no new candidate set to audit.
+An invalid audit fails closed. A rejected audit permits exactly one fresh
+interpretation from the authoritative turn; that fresh interpretation receives no
+DTO repair and must pass one final audit. No later stage may repair the audit,
+restore fields from an earlier candidate, align a revised candidate to an earlier
+candidate, or hand Goal meaning to Planner. The complete logical invocation DAG is:
+
+```text
+primary interpretation
+  -> optional one DTO repair
+  -> coverage audit
+  -> optional one fresh interpretation after semantic rejection
+  -> final coverage audit
+  -> commit or fail closed
+```
+
+Transport retry of the exact same model request is provider/client reliability,
+not another semantic invocation. Goal Association records both separately. A
+terminal semantic-contract failure commits no partial Goal, starts no effect, and
+does not become capability-unavailable, execution-failed, empty-result, or
+user-ambiguity truth. Clarification is valid only when the user can actually
+resolve ambiguous or missing semantic information.
+
 The declared decision selects the active branch. Harmless content emitted in an
 inactive branch is ignored structurally; it does not trigger semantic repair.
 `clarification` never carries reasoning, translations, route labels, model
@@ -1538,6 +1564,15 @@ recheck before canonical Goal state is committed. A second rejection fails
 closed. This creates containment without transferring semantic authority to the
 Host and directly prevents a compound request such as walking, singing, and
 blinking from silently becoming only one observable responsibility.
+
+The audit is an authority-ephemeral proof certificate, not a second mutable Goal
+model. It may be retained immutably in traces and reviewed evidence, but its only
+control effects are `accept`, `reconsider_once`, and `fail_closed`. Model output
+contains only the source-grounded item judgments needed for the proof: source
+excerpt, semantic role, coverage state, independence judgment, and candidate Goal
+mapping. The Host derives the overall verdict and the candidate indices lacking a
+positive responsibility owner. Those redundant values are not model-authored and
+therefore cannot need normalization or repair.
 
 ### 7.2 Plan steps are not goals
 

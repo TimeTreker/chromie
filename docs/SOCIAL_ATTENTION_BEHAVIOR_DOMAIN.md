@@ -349,6 +349,14 @@ alternate Chromie cognition mode.
 The maintained default is `on`. Contextual model selection may always produce
 `decision=none`.
 
+A valid primary `decision=none` is authoritative for that optional decoration
+opportunity. Social Attention does not invoke a second semantic critic merely
+because an eligible cue existed, and it never repairs a critic of a valid primary
+decision. Owner-approved courteous, warm, playful, or other expression tendencies
+belong in the primary context and policy. Because decoration is fail-soft, an
+invalid primary DTO may receive one contract repair; continued invalidity resolves
+to no decoration without affecting primary work.
+
 ## Testing and acceptance
 
 Tests should prove the semantic boundary rather than one fixed gesture:

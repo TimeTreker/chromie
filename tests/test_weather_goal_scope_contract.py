@@ -17,8 +17,11 @@ def test_weather_capability_declares_bounded_temporal_scope() -> None:
     )
     scope = tool.llm_hints["semantic_scope"]
     assert "today" in scope["supported_temporal_scopes"]
+    assert "tonight" in scope["supported_temporal_scopes"]
     assert "annual" in scope["unsupported_temporal_scopes"]
     assert scope["scope_mismatch_policy"] == "clarify_or_unavailable_never_narrow"
+    assert tool.input_schema["properties"]["period"]["enum"] == ["day", "tonight"]
+    assert "forecast_period" in tool.output_schema["required"]
 
 
 def test_safe_read_step_uses_model_owned_specific_language() -> None:
@@ -83,5 +86,7 @@ def test_goal_and_planner_prompts_forbid_scope_narrowing() -> None:
     assert "Never silently rewrite annual" in goal_prompt
     assert "Never silently narrow a goal" in fast_prompt
     assert "Never silently narrow a canonical goal" in deep_prompt
+    assert "calendar-date argument does not cover a finer day-part" in fast_prompt
+    assert "calendar-date argument does not cover a finer day-part" in deep_prompt
     assert "do not emit separate location or date parameter_resolutions" in fast_prompt
     assert "do not emit separate location or date parameter_resolutions" in deep_prompt

@@ -26,7 +26,7 @@ def _satisfaction(goal_id: str) -> dict:
     }
 
 
-def _weather_output(*, resolution_value=None, aspects=None) -> PlannerModelOutput:
+def _weather_output(*, resolution_value=None, aspects=None, extra_args=None) -> PlannerModelOutput:
     goal_id = "goal-weather"
     parameter_resolutions = []
     if resolution_value is not None:
@@ -53,7 +53,10 @@ def _weather_output(*, resolution_value=None, aspects=None) -> PlannerModelOutpu
                 {
                     "step_id": "weather",
                     "capability_id": "chromie.weather.lookup",
-                    "args": {"aspects": list(aspects or ASPECTS)},
+                    "args": {
+                        "aspects": list(aspects or ASPECTS),
+                        **dict(extra_args or {}),
+                    },
                     "timing": "sequential",
                     "source_goal_ids": [goal_id],
                     "reason_summary": "Fetch the requested weather aspects.",
@@ -95,6 +98,25 @@ def _weather_goal() -> dict:
         },
         "success_criteria": [],
     }
+
+
+def _information_weather_goal() -> dict:
+    goal = _weather_goal()
+    goal["object"]["bindings"]["time_frame"] = {
+        "entity_type": "time_frame",
+        "value": "tonight",
+    }
+    goal["resource_responsibility"] = {
+        "responsibility_type": "acquire_and_deliver_resource",
+        "resource": {
+            "kind": "information",
+            "description": "Chongqing weather tonight",
+        },
+        "source": {"status": "provider_resolved"},
+        "recipient": {"description": "requester"},
+        "delivery_mode": "spoken_explanation",
+    }
+    return goal
 
 
 class PlannerBindingRepresentationTests(unittest.TestCase):
@@ -430,6 +452,24 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
         validate_goal_binding_argument_grounding(
             _weather_output(),
             authoritative_goals=[_weather_goal()],
+        )
+
+    def test_information_step_rejects_calendar_date_that_omits_day_part(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "omits authoritative temporal scope",
+        ):
+            validate_goal_binding_argument_grounding(
+                _weather_output(extra_args={"date": "today"}),
+                authoritative_goals=[_information_weather_goal()],
+            )
+
+    def test_information_step_preserves_exact_day_part_argument(self):
+        validate_goal_binding_argument_grounding(
+            _weather_output(
+                extra_args={"date": "today", "period": "tonight"}
+            ),
+            authoritative_goals=[_information_weather_goal()],
         )
 
     def test_typed_list_binding_accepts_chinese_list_separators(self):

@@ -3639,7 +3639,10 @@ class GoalDrivenRuntimeCoordinator:
                     ),
                 )
                 timings["goal_association"] = (time.perf_counter() - stage) * 1000.0
-                association_status = str((association.metadata or {}).get("status") or "resolved")
+                # Terminal semantics are part of the validated contract.  Diagnostic
+                # metadata may explain a failure but must never decide whether Goal
+                # state is writable.
+                association_status = association.resolution_status
                 planning_context = dict(context)
                 planning_context["goal_association_resolution"] = association.prompt_projection()
 

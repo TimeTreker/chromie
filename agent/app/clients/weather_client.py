@@ -14,6 +14,7 @@ logger = logging.getLogger("chromie.agent.weather")
 
 WeatherDate = Literal["today", "tomorrow"]
 WeatherUnits = Literal["metric", "imperial", "auto"]
+WeatherPeriod = Literal["day", "tonight"]
 
 
 @dataclass(slots=True)
@@ -53,9 +54,25 @@ class WeatherLocationContext:
 class WeatherQuery:
     location: str
     date: WeatherDate = "today"
+    period: WeatherPeriod = "day"
     units: WeatherUnits = "metric"
     language: str = "en-US"
     location_context: WeatherLocationContext | None = None
+
+
+@dataclass(slots=True)
+class WeatherPeriodForecast:
+    """Provider-grounded forecast for an explicitly requested local period."""
+
+    scope: WeatherPeriod
+    start_local: str
+    end_local: str
+    temperature_min_c: float | None
+    temperature_max_c: float | None
+    apparent_temperature_min_c: float | None
+    apparent_temperature_max_c: float | None
+    precipitation_probability_max: float | None
+    weather_code: int | None
 
 
 @dataclass(slots=True)
@@ -75,6 +92,7 @@ class WeatherReport:
     requested_location: str | None = None
     provider_query: str | None = None
     provider_admin1: str | None = None
+    forecast_period: WeatherPeriodForecast | None = None
     source: str = "open-meteo"
 
 
@@ -547,32 +565,42 @@ class OpenMeteoWeatherClient:
                 longitude,
                 self.forecast_url,
             )
+            forecast_params = {
+                "latitude": latitude,
+                "longitude": longitude,
+                "current": ",".join(
+                    [
+                        "temperature_2m",
+                        "apparent_temperature",
+                        "precipitation",
+                        "weather_code",
+                        "wind_speed_10m",
+                    ]
+                ),
+                "daily": ",".join(
+                    [
+                        "weather_code",
+                        "temperature_2m_max",
+                        "temperature_2m_min",
+                        "precipitation_sum",
+                        "precipitation_probability_max",
+                    ]
+                ),
+                "timezone": "auto",
+                "forecast_days": 2,
+            }
+            if query.period == "tonight":
+                forecast_params["hourly"] = ",".join(
+                    [
+                        "temperature_2m",
+                        "apparent_temperature",
+                        "precipitation_probability",
+                        "weather_code",
+                    ]
+                )
             forecast_resp = await client.get(
                 self.forecast_url,
-                params={
-                    "latitude": latitude,
-                    "longitude": longitude,
-                    "current": ",".join(
-                        [
-                            "temperature_2m",
-                            "apparent_temperature",
-                            "precipitation",
-                            "weather_code",
-                            "wind_speed_10m",
-                        ]
-                    ),
-                    "daily": ",".join(
-                        [
-                            "weather_code",
-                            "temperature_2m_max",
-                            "temperature_2m_min",
-                            "precipitation_sum",
-                            "precipitation_probability_max",
-                        ]
-                    ),
-                    "timezone": "auto",
-                    "forecast_days": 2,
-                },
+                params=forecast_params,
             )
             forecast_resp.raise_for_status()
             forecast_data = forecast_resp.json()
@@ -597,6 +625,7 @@ class OpenMeteoWeatherClient:
             provider_admin1=result.get("admin1"),
             forecast=forecast_data,
             day_index=day_index,
+            period=query.period,
         )
         logger.info(
             "weather_report_built location=%r date=%r temp_c=%s high_c=%s low_c=%s code=%s",
@@ -760,6 +789,7 @@ class OpenMeteoWeatherClient:
         provider_admin1: Any,
         forecast: dict[str, Any],
         day_index: int,
+        period: WeatherPeriod = "day",
     ) -> WeatherReport:
         current = forecast.get("current") if isinstance(forecast, dict) else {}
         daily = forecast.get("daily") if isinstance(forecast, dict) else {}
@@ -779,6 +809,19 @@ class OpenMeteoWeatherClient:
             raw_current_code = current.get("weather_code")
             weather_code = raw_current_code if isinstance(raw_current_code, int) else None
 
+        period_forecast = self._period_forecast(
+            forecast=forecast,
+            daily=daily,
+            current=current,
+            day_index=day_index,
+            period=period,
+        )
+        if period == "tonight" and period_forecast is None:
+            raise WeatherLookupError(
+                "weather provider did not return the requested tonight forecast",
+                reason_code="forecast_period_unavailable",
+            )
+
         return WeatherReport(
             location_name=location_name,
             country=str(country) if country else None,
@@ -795,6 +838,96 @@ class OpenMeteoWeatherClient:
             requested_location=requested_location,
             provider_query=provider_query,
             provider_admin1=(str(provider_admin1) if provider_admin1 else None),
+            forecast_period=period_forecast,
+        )
+
+    def _period_forecast(
+        self,
+        *,
+        forecast: dict[str, Any],
+        daily: dict[str, Any],
+        current: dict[str, Any],
+        day_index: int,
+        period: WeatherPeriod,
+    ) -> WeatherPeriodForecast | None:
+        if period != "tonight":
+            return None
+        hourly = forecast.get("hourly") if isinstance(forecast, dict) else None
+        if not isinstance(hourly, dict):
+            return None
+        daily_times = daily.get("time")
+        if not isinstance(daily_times, list) or len(daily_times) <= day_index:
+            return None
+        target_date = str(daily_times[day_index] or "").strip()
+        times = hourly.get("time")
+        if not target_date or not isinstance(times, list):
+            return None
+
+        current_time = str(current.get("time") or "").strip()
+        selected_indices: list[int] = []
+        for index, raw_time in enumerate(times):
+            local_time = str(raw_time or "").strip()
+            if not local_time.startswith(target_date + "T"):
+                continue
+            clock = local_time.split("T", 1)[1]
+            if clock < "18:00" or clock >= "24:00":
+                continue
+            if current_time.startswith(target_date + "T") and local_time < current_time:
+                continue
+            selected_indices.append(index)
+        if not selected_indices:
+            return None
+
+        def numbers(key: str) -> list[float]:
+            values = hourly.get(key)
+            if not isinstance(values, list):
+                return []
+            return [
+                number
+                for index in selected_indices
+                if index < len(values)
+                and (number := self._number(values[index])) is not None
+            ]
+
+        temperatures = numbers("temperature_2m")
+        apparent_temperatures = numbers("apparent_temperature")
+        precipitation = numbers("precipitation_probability")
+        codes = hourly.get("weather_code")
+        weather_code: int | None = None
+        if isinstance(codes, list):
+            ranked_indices = list(selected_indices)
+            probability_values = hourly.get("precipitation_probability")
+            if isinstance(probability_values, list):
+                ranked_indices.sort(
+                    key=lambda index: (
+                        self._number(probability_values[index])
+                        if index < len(probability_values)
+                        and self._number(probability_values[index]) is not None
+                        else -1.0
+                    ),
+                    reverse=True,
+                )
+            for index in ranked_indices:
+                if index < len(codes) and isinstance(codes[index], int):
+                    weather_code = codes[index]
+                    break
+
+        return WeatherPeriodForecast(
+            scope="tonight",
+            start_local=str(times[selected_indices[0]]),
+            end_local=str(times[selected_indices[-1]]),
+            temperature_min_c=min(temperatures) if temperatures else None,
+            temperature_max_c=max(temperatures) if temperatures else None,
+            apparent_temperature_min_c=(
+                min(apparent_temperatures) if apparent_temperatures else None
+            ),
+            apparent_temperature_max_c=(
+                max(apparent_temperatures) if apparent_temperatures else None
+            ),
+            precipitation_probability_max=(
+                max(precipitation) if precipitation else None
+            ),
+            weather_code=weather_code,
         )
 
     @staticmethod

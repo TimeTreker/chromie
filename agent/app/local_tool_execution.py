@@ -151,6 +151,7 @@ class LocalToolExecutor:
             WeatherQuery(
                 location=str(args.get("location") or ""),
                 date=str(args.get("date") or "today"),
+                period=str(args.get("period") or "day"),
                 units=units,
                 language=language,
                 location_context=WeatherLocationContext.from_mapping(
@@ -230,6 +231,24 @@ def _weather_output(
     units: str,
     language: str,
 ) -> dict[str, Any]:
+    period = report.forecast_period
+    period_output = None
+    if period is not None:
+        period_output = {
+            "scope": period.scope,
+            "start_local": period.start_local,
+            "end_local": period.end_local,
+            "condition": weather_code_text(
+                period.weather_code,
+                zh=language.lower().startswith("zh"),
+            ),
+            "weather_code": period.weather_code,
+            "temperature_min_c": period.temperature_min_c,
+            "temperature_max_c": period.temperature_max_c,
+            "apparent_temperature_min_c": period.apparent_temperature_min_c,
+            "apparent_temperature_max_c": period.apparent_temperature_max_c,
+            "precipitation_probability_max": period.precipitation_probability_max,
+        }
     return {
         "location": report.location_name,
         "country": report.country,
@@ -247,6 +266,7 @@ def _weather_output(
         "precipitation_probability_max": report.precipitation_probability_max,
         "precipitation_sum_mm": report.precipitation_sum_mm,
         "wind_speed_kmh": report.wind_speed_kmh,
+        "forecast_period": period_output,
         # This is an exceptional user-safe fallback.  The normal answer is
         # composed later by the evidence-bound interpreter from the original
         # question and the complete structured observation below.

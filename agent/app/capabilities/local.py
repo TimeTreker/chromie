@@ -569,7 +569,8 @@ def chromie_manifests(
                 display_name="Lookup weather",
                 description=(
                     "Retrieve current weather or a short forecast for a named city "
-                    "or place. Use for user questions about today's weather, "
+                    "or place. Use for user questions about current, tonight's, or "
+                    "another supported short-range forecast, including today's or "
                     "tomorrow's weather, 天气/天气预报, temperature, rain, humidity, wind, or "
                     "forecast conditions. This is read-only and returns information; "
                     "it does not control the robot body."
@@ -613,6 +614,16 @@ def chromie_manifests(
                             "default": "today",
                             "description": "Forecast date requested by the user.",
                         },
+                        "period": {
+                            "type": "string",
+                            "enum": ["day", "tonight"],
+                            "default": "day",
+                            "description": (
+                                "Local-day evidence scope. Use tonight only when the "
+                                "canonical Goal asks about the evening/night period; "
+                                "a whole-day date is not equivalent evidence."
+                            ),
+                        },
                         "units": {
                             "type": "string",
                             "enum": ["metric", "imperial", "auto"],
@@ -639,6 +650,43 @@ def chromie_manifests(
                         "precipitation_probability_max": {"type": ["number", "null"]},
                         "precipitation_sum_mm": {"type": ["number", "null"]},
                         "wind_speed_kmh": {"type": ["number", "null"]},
+                        "forecast_period": {
+                            "type": ["object", "null"],
+                            "properties": {
+                                        "scope": {
+                                            "type": "string",
+                                            "enum": ["tonight"],
+                                        },
+                                        "start_local": {"type": "string", "minLength": 1},
+                                        "end_local": {"type": "string", "minLength": 1},
+                                        "condition": {"type": "string", "minLength": 1},
+                                        "weather_code": {"type": ["integer", "null"]},
+                                        "temperature_min_c": {"type": ["number", "null"]},
+                                        "temperature_max_c": {"type": ["number", "null"]},
+                                        "apparent_temperature_min_c": {
+                                            "type": ["number", "null"]
+                                        },
+                                        "apparent_temperature_max_c": {
+                                            "type": ["number", "null"]
+                                        },
+                                        "precipitation_probability_max": {
+                                            "type": ["number", "null"]
+                                        },
+                            },
+                            "required": [
+                                "scope",
+                                "start_local",
+                                "end_local",
+                                "condition",
+                                "weather_code",
+                                "temperature_min_c",
+                                "temperature_max_c",
+                                "apparent_temperature_min_c",
+                                "apparent_temperature_max_c",
+                                "precipitation_probability_max",
+                            ],
+                            "additionalProperties": False,
+                        },
                         "summary": {"type": "string", "minLength": 1},
                         "source": {"type": "string", "minLength": 1},
                     },
@@ -656,6 +704,7 @@ def chromie_manifests(
                         "precipitation_probability_max",
                         "precipitation_sum_mm",
                         "wind_speed_kmh",
+                        "forecast_period",
                         "summary",
                         "source",
                     ],
@@ -679,7 +728,7 @@ def chromie_manifests(
                         "tool requests and should be visible in the common capability context."
                     ),
                     "when_to_use": (
-                        "Use when the user asks about current, today's, tomorrow's, "
+                        "Use when the user asks about current, today's, tonight's, tomorrow's, "
                         "or upcoming weather or forecast for a city/location."
                     ),
                     "tool_name": "weather",
@@ -700,6 +749,7 @@ def chromie_manifests(
                         "supported_temporal_scopes": [
                             "current",
                             "today",
+                            "tonight",
                             "tomorrow",
                             "near_term_forecast",
                         ],

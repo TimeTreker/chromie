@@ -106,7 +106,7 @@ def validate_contract(
     skills = [
         item
         for item in getattr(response, "skills", [])
-        if str(item.skill_id).startswith("soridormi.")
+        if str(item.skill_id) != "chromie.speak"
     ]
     skill_ids = [item.skill_id for item in skills]
 
@@ -114,9 +114,12 @@ def validate_contract(
         errors.append(f"route={route.route!r}, expected {expected_route!r}")
 
     if expected_skills:
-        if route.route != "robot_action":
+        expects_only_soridormi = all(
+            skill_id.startswith("soridormi.") for skill_id in expected_skills
+        )
+        if expects_only_soridormi and route.route != "robot_action":
             errors.append(f"route={route.route!r}, expected 'robot_action'")
-        if route_actions and route_actions != expected_skills:
+        if expects_only_soridormi and route_actions and route_actions != expected_skills:
             errors.append(
                 "goal interpretation actions mismatch: "
                 f"expected {expected_skills!r}, got {route_actions!r}"
@@ -131,7 +134,7 @@ def validate_contract(
         if route_actions:
             errors.append(f"goal interpretation emitted Soridormi actions, expected none: {route_actions!r}")
         if skill_ids:
-            errors.append(f"interaction emitted Soridormi skills, expected none: {skill_ids!r}")
+            errors.append(f"interaction emitted executable skills, expected none: {skill_ids!r}")
 
     for index, key, expected in expected_args:
         if index >= len(skills):

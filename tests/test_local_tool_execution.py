@@ -84,6 +84,8 @@ class LocalToolExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("降水概率", result.output["summary"])
         self.assertEqual(client.queries[0].location, "北京")
         self.assertEqual(client.queries[0].language, "zh-CN")
+        self.assertEqual(client.queries[0].period, "day")
+        self.assertIsNone(result.output["forecast_period"])
 
     async def test_executor_preserves_typed_location_not_found_failure(self) -> None:
         executor = LocalToolExecutor(

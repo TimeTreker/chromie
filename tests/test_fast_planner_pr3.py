@@ -1159,7 +1159,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "distance": {
                     "name": "distance",
                     "entity_type": "distance",
-                    "value": "100",
+                    "value": "100m",
                     "confidence": 1.0,
                 },
                 "direction": {

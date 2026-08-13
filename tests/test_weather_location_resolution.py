@@ -14,6 +14,83 @@ from agent.app.clients.weather_client import (
 
 
 class WeatherLocationResolutionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_tonight_query_returns_hourly_period_evidence(self) -> None:
+        forecast_requests: list[httpx.Request] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path.endswith("/search"):
+                return httpx.Response(
+                    200,
+                    json={
+                        "results": [
+                            {
+                                "name": "Chongqing",
+                                "country": "China",
+                                "latitude": 29.56,
+                                "longitude": 106.55,
+                            }
+                        ]
+                    },
+                )
+            forecast_requests.append(request)
+            return httpx.Response(
+                200,
+                json={
+                    "timezone": "Asia/Shanghai",
+                    "current": {
+                        "time": "2026-08-13T17:00",
+                        "temperature_2m": 33.0,
+                        "apparent_temperature": 37.0,
+                        "weather_code": 2,
+                    },
+                    "daily": {
+                        "time": ["2026-08-13", "2026-08-14"],
+                        "weather_code": [2, 3],
+                        "temperature_2m_max": [35.0, 34.0],
+                        "temperature_2m_min": [27.0, 26.0],
+                        "precipitation_sum": [1.0, 2.0],
+                        "precipitation_probability_max": [60.0, 70.0],
+                    },
+                    "hourly": {
+                        "time": [
+                            "2026-08-13T17:00",
+                            "2026-08-13T18:00",
+                            "2026-08-13T20:00",
+                            "2026-08-13T23:00",
+                            "2026-08-14T18:00",
+                        ],
+                        "temperature_2m": [33.0, 32.0, 30.0, 28.0, 29.0],
+                        "apparent_temperature": [37.0, 36.0, 33.0, 30.0, 32.0],
+                        "precipitation_probability": [20.0, 40.0, 70.0, 30.0, 50.0],
+                        "weather_code": [2, 2, 61, 3, 3],
+                    },
+                },
+            )
+
+        client = OpenMeteoWeatherClient(
+            geocoding_url="https://example.test/v1/search",
+            forecast_url="https://example.test/v1/forecast",
+            transport=httpx.MockTransport(handler),
+        )
+
+        report = await client.lookup(
+            WeatherQuery(location="Chongqing", period="tonight")
+        )
+
+        params = parse_qs(forecast_requests[0].url.query.decode())
+        self.assertIn("hourly", params)
+        self.assertIsNotNone(report.forecast_period)
+        period = report.forecast_period
+        assert period is not None
+        self.assertEqual(period.scope, "tonight")
+        self.assertEqual(period.start_local, "2026-08-13T18:00")
+        self.assertEqual(period.end_local, "2026-08-13T23:00")
+        self.assertEqual(period.temperature_min_c, 28.0)
+        self.assertEqual(period.temperature_max_c, 32.0)
+        self.assertEqual(period.apparent_temperature_max_c, 36.0)
+        self.assertEqual(period.precipitation_probability_max, 70.0)
+        self.assertEqual(period.weather_code, 61)
+
     async def test_hierarchical_chinese_location_retries_locality_and_qualifies_admin1(self) -> None:
         geocode_queries: list[str] = []
         forecast_requests: list[httpx.Request] = []
