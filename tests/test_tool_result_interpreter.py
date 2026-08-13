@@ -425,6 +425,124 @@ class ToolResultInterpreterTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Identity affects voice only", review_prompt)
         self.assertNotIn("exact physical distance, pickup, carrying, return", review_prompt)
 
+    async def test_effectful_review_preserves_unavailable_vocal_sibling(self) -> None:
+        walk_data = {"completed": True, "motion_observed": True}
+        blink_data = {"completed": True, "blink_observed": True}
+        canonical_plan = CanonicalPlan(
+            plan_id="plan-walk-sing-blink-result",
+            planner_tier="deep",
+            disposition="mixed",
+            coverage="complete",
+            confidence=0.98,
+            goal_ids=["goal-walk", "goal-sing", "goal-blink"],
+            goal_summary="Walk, sing, and blink together.",
+            steps=[
+                {
+                    "step_id": "walk",
+                    "capability_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 15.0},
+                    "source_goal_ids": ["goal-walk"],
+                },
+                {
+                    "step_id": "blink",
+                    "capability_id": "soridormi.blink_eyes",
+                    "args": {},
+                    "source_goal_ids": ["goal-blink"],
+                },
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-walk",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["walk"],
+                },
+                {
+                    "goal_id": "goal-sing",
+                    "disposition": "unavailable",
+                    "coverage": "complete",
+                    "unresolved": ["No qualified singing provider is available."],
+                },
+                {
+                    "goal_id": "goal-blink",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["blink"],
+                },
+            ],
+        )
+        request = ToolResultInterpretationRequest(
+            sid="effectful-mixed-vocal-result",
+            user_request="往前走，同时唱歌和眨眼睛。",
+            language="zh-CN",
+            evidence=[
+                ToolResultEvidence(
+                    evidence_id="walk-result",
+                    tool_id="soridormi.walk_forward",
+                    status="completed",
+                    data=walk_data,
+                    output_sha256=canonical_value_sha256(walk_data),
+                ),
+                ToolResultEvidence(
+                    evidence_id="blink-result",
+                    tool_id="soridormi.blink_eyes",
+                    status="completed",
+                    data=blink_data,
+                    output_sha256=canonical_value_sha256(blink_data),
+                ),
+            ],
+            max_spoken_chars=72,
+            max_sentences=2,
+            context={
+                "identity": default_mind_profile().prompt_context()["identity"],
+                "personality_expression": default_mind_profile().prompt_context()[
+                    "personality_expression"
+                ],
+                "canonical_plan_resolution": canonical_plan.model_dump(mode="json"),
+                "effectful_result_review_required": True,
+            },
+        )
+        ollama = _ScriptedOllama(
+            [
+                {
+                    "spoken_response": "走路、唱歌、眨眼都完成啦！",
+                    "answer_mode": "direct",
+                    "selected_facts": [
+                        {"evidence_id": "walk-result", "json_pointer": "/completed"},
+                        {"evidence_id": "blink-result", "json_pointer": "/completed"},
+                    ],
+                    "confidence": 0.99,
+                    "rationale": "Both providers completed their requests.",
+                },
+                {
+                    "spoken_response": "走路和眨眼完成了，不过唱歌现在做不了。",
+                    "answer_mode": "direct",
+                    "selected_facts": [
+                        {"evidence_id": "walk-result", "json_pointer": "/completed"},
+                        {"evidence_id": "blink-result", "json_pointer": "/completed"},
+                    ],
+                    "confidence": 1.0,
+                    "rationale": (
+                        "Only walk and blink have completed evidence; the immutable "
+                        "Plan marks singing unavailable."
+                    ),
+                },
+            ]
+        )
+
+        result = await ToolResultInterpreter(ollama).interpret(request)
+
+        self.assertEqual(result.status, "resolved")
+        self.assertEqual(
+            result.spoken_response,
+            "走路和眨眼完成了，不过唱歌现在做不了。",
+        )
+        self.assertNotIn("唱歌、眨眼都完成", result.spoken_response)
+        self.assertTrue(result.metadata["effectful_semantic_review"])
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertIn('"goal_id":"goal-sing"', ollama.prompts[1])
+        self.assertIn('"disposition":"unavailable"', ollama.prompts[1])
+
     async def test_rejects_unknown_fact_pointer(self) -> None:
         ollama = _ScriptedOllama(
             {
