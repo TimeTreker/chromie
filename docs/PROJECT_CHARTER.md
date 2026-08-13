@@ -466,6 +466,38 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    compatibility inference. Do not accept a reverse mapping that can silently
    manufacture or downgrade semantic intent.
 
+32. **The best-known technical architecture is the default target.** Chromie
+   should pursue the technically strongest architecture we can justify from current
+   evidence, not merely the strongest architecture that fits the current codebase,
+   historical design, or previously granted implementation path. After mission,
+   correctness, safety, trusted boundaries, and explicit owner decisions are
+   respected, technical architecture quality is the top design priority. Evaluate a
+   solution by the strength and clarity of its invariants, ownership, semantics,
+   trust boundaries, failure behavior, reliability, maintainability, observability,
+   performance, extensibility, and long-term architectural coherence. Novelty, more
+   abstraction, or more layers are not improvements by themselves.
+
+   Current implementation status, backward compatibility, migration effort, sunk
+   cost, schedule, code churn, diff size, and short-term convenience are real
+   engineering considerations, but they are not architecture authorities and must
+   not become the primary reason to preserve a technically weaker design. Start by
+   identifying the best-known technical solution as if the existing implementation
+   did not have veto power; then account explicitly for migration and operating
+   costs. When two solutions are technically comparable, those costs may decide
+   between them. When one solution is materially stronger, do not silently downgrade
+   to the weaker one merely because it is cheaper or more compatible.
+
+   If the best-known solution requires authority beyond the current task -- for
+   example changing an owner-approved principle or architecture boundary, removing
+   compatibility, widening scope, accepting a material migration, or making another
+   consequential tradeoff -- the developer or coding agent must surface it to the
+   project owner. Explain why the solution is technically stronger, the credible
+   alternatives, tradeoffs and risks, migration/removal impact, and the exact
+   authority required. Ask for that authority instead of self-censoring the better
+   design. The owner decides whether to authorize it. Once authorized, land the
+   stronger architecture cleanly and remove obsolete paths rather than preserving a
+   known inferior design for convenience.
+
 ### One personal voice; resources constrain coexistence
 
 Chromie has one personal Vocal domain. Ordinary speech, expressive speech,
