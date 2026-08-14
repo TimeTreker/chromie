@@ -329,6 +329,60 @@ def _route_for_capability_id(capability_id: str, request: RouteRequest) -> str:
     return route if route in ROUTE_NAMES else "robot_action"
 
 
+def _single_lane_capability_route_conflict(
+    request: RouteRequest,
+    parsed: dict[str, Any],
+    *,
+    route_items: list[dict[str, Any]],
+) -> str | None:
+    """Reject an explicit semantic route that contradicts exact capability work.
+
+    Host normalization may fill a missing route or decode an exact capability ID.
+    It must not rewrite an explicit valid route and thereby reclassify the same
+    model-authored fast_speech under a different claim envelope. Multi-route
+    turns keep their per-responsibility semantics and are validated downstream.
+    """
+
+    if route_items:
+        return None
+    route = str(parsed.get("route") or "").strip()
+    if route not in ROUTE_NAMES:
+        return None
+    capability_ids = _capability_ids_from_request(request)
+    expected_routes: set[str] = set()
+
+    intent_capability_id = _known_capability_id(parsed.get("intent"), capability_ids)
+    if intent_capability_id:
+        expected_routes.add(_route_for_capability_id(intent_capability_id, request))
+
+    raw_progress = parsed.get("progress")
+    if isinstance(raw_progress, list):
+        for item in raw_progress:
+            if not isinstance(item, dict) or item.get("kind") != "capability":
+                continue
+            progress_capability_id = _known_capability_id(
+                item.get("capability_id"), capability_ids
+            )
+            if progress_capability_id:
+                expected_routes.add(
+                    _route_for_capability_id(progress_capability_id, request)
+                )
+
+    if len(expected_routes) == 1:
+        expected = next(iter(expected_routes))
+        if route != expected:
+            return (
+                f"explicit route {route!r} conflicts with exact capability work "
+                f"whose declared route is {expected!r}"
+            )
+    elif len(expected_routes) > 1:
+        return (
+            "single-lane Goal Interpreter output mixes exact capabilities with "
+            f"incompatible routes: {sorted(expected_routes)}"
+        )
+    return None
+
+
 def _known_capability_id(text: Any, capability_ids: set[str]) -> str:
     value = str(text or "").strip()
     if not value:
@@ -1226,19 +1280,19 @@ class OllamaGoalInterpreter:
             f"Active Task/Progress Snapshot JSON:{active_tasks_json}\n\n"
             f"{recent_goals_section}"
             "Current Job:\n"
-            "fast goal-interpretation and lane proposer with readiness candidates. The deterministic emergency/noise filter ran. Decide from meaning, bounded context. This is bounded cognitive evidence, not final goal meaning. Return calibrated confidence; never execute or authorize side effects. Terminal references do not reopen Goals. Memory write=memory; recall=chat. If current Mind/context fully answers ordinary conversation, put it only in progress as kind=native_response; otherwise do not answer.\n\n"
+            "fast goal-interpretation and lane proposer. The deterministic emergency/noise filter ran. Decide from meaning, bounded context. Understand the human outcome first. This is bounded cognitive evidence, not final goal meaning; never execute or authorize side effects. Return calibrated confidence. Terminal references do not reopen Goals. If current trusted Mind/context fully answers the responsibility with nothing else to do, emit only kind=native_response and fast_speech=null. Otherwise do not invent the result: propose remaining work and use fast_speech only as prospective acknowledgement/checking.\n\n"
             "Task Context Group:\n"
             f"Latest user input: {request.text}\n"
             f"Common ability IDs: {_bounded_json(common_ability_ids, max_chars=420)}\n"
             f"Common Ability Catalog JSON: {common_ability_catalog_json}\n"
             "Task Continuity:\n"
-            "Use bounded dialogue, Goals/progress, discourse, and Interaction Context; emit only the needed delta. Keep newer failed/goal-less dialogue salient. fast_speech is the first Goal Progress Communication milestone: normally one tiny polite acknowledgement; missing results limit claims, not responsiveness. An external truth check may acknowledge checking but never state a result before evidence. Omit for an immediate answer, equivalent notification delivered/pending, silence, or repetition. Heard speech/trusted terminal effects are done; scheduled/planned work is not. Preserve corrected bindings; clarify real ambiguity.\n"
+            "Use Goals/progress, dialogue, discourse, and Interaction Context; emit only the needed delta. Keep newer failed/goal-less dialogue salient. fast_speech is the first Goal Progress Communication milestone only when work remains: normally a tiny polite prospective acknowledgement/checking act, never a provider-dependent result or claim that checking already finished. native_response is the immediate answer and therefore requires fast_speech=null. For an external truth check, never state the result before evidence; missing results limit claims, not responsiveness. Omit duplicate fast_speech when an equivalent notification is delivered or pending. delivered speech/trusted terminal effects are done, scheduled/planned work is not.\n"
             "Capability Affordance Proposal:\n"
-            "Treat the Common Ability Catalog as a compact body/tool affordance interface: proposals, not authoritative grounding and not a phrase table. capability_inquiry means a meta-question about ability, not an ordinary task. Choose only when semantic scope entails the requested human outcome; topical similarity insufficient; respect scope/not_for and prefer an honest missing ability over substitution. Stable everyday reasoning stays conversational. One parameterized capability may leave args to CapabilityAgent. Isolated letters and low-information ASR fragments clarify. Capability progress requires grounded Goal meaning; otherwise omit capability progress; never guess/default them or imply checking/execution started. An exact confirmation-free safe-read with all required args explicit may emit kind=capability with exact ID/grounded args for trusted readiness while Goal Association continues. Never use native_response for provider-dependent evidence; it is only an immediate complete answer with no remaining evidence, memory, reference, effect, or deep-reasoning need. Current external facts use declared route + intent=capability:<exact capability_id>. Missing ability -> non-executable ability proposals in metadata.desired_abilities; name the specific limitation, never a generic 'new ability' or future-learning promise. Never invent args or completion.\n\n"
+            "Treat the Common Ability Catalog as a compact body/tool affordance interface: proposals, not authoritative grounding and not a phrase table. capability_inquiry means a meta-question about ability, not an ordinary task. Choose a Capability only when semantic scope entails the requested human outcome; topical similarity is insufficient; prefer an honest missing ability over substitution. Stable everyday reasoning needing no fresh evidence stays conversational. One parameterized capability may leave args to CapabilityAgent. Isolated letters and low-information ASR fragments clarify. Capability progress requires grounded Goal meaning; otherwise omit capability progress; never guess/default them or imply checking/execution started. Exact confirmation-free safe-read may emit kind=capability with exact ID/grounded args. Never use native_response for provider-dependent evidence. Current external facts use the declared route and intent=capability:<exact capability_id>. Missing ability -> non-executable ability proposals in metadata.desired_abilities.\n\n"
             "Cost Function:\n"
             "Speech-only conversation and capability availability=chat; catalog execution=robot_action; lookup=tool; planning=deep_thought; ambiguity=clarify. Never return interrupt or ignore; a separate focused addressedness stage owns ambient suppression.\n\n"
             "Output Contract:\n"
-            "Return one compact JSON object. Required keys: route, intent, confidence, fast_speech, progress. fast_speech is brief speech or null for immediate, duplicate, or silent turns. Use owner-approved child/family voice in first-person speech, never customer-service/workflow/status/processing narration. For effectful work it is generic willingness/checking only: omit material task parameters and exact methods until downstream grounding; progress is advisory, not proof of executability. Never claim an unobserved result, execution, or completion. Host derives typed claim fields. memory write=memory; recall=chat; durable memory needs current-turn consent. routes[] split responsibilities; actions[] use exact IDs/args (\"confidence\":0.0 means unknown). semantic_task_operations may advise create/update/resolve/replan against supplied task IDs. Omit agents, metadata, candidate_capabilities, explanations unless needed. Never output placeholder intents, hidden reasoning, free-form progress narration outside fast_speech, scratchpad, markdown, or text outside JSON."
+            "Return one compact JSON object. Required keys: route, intent, confidence, fast_speech, progress. Immediate complete answer: route=chat, kind=native_response, fast_speech=null. Work remains: no native_response for that responsibility; fast_speech is only prospective acknowledgement/checking. Exact capability work must agree with the explicit route. Use owner-approved child/family voice in first-person speech, never customer-service or processing narration. For effectful work fast_speech is generic willingness only: omit material task parameters/exact methods until grounding; progress is advisory, not proof. Never claim an unobserved result, execution, completion, or completed lookup. memory write=memory; recall=chat; durable memory needs current-turn consent. routes[] split responsibilities; actions[] use exact IDs/args (\"confidence\":0.0 means unknown). Omit agents, metadata, candidate_capabilities, explanations unless needed. Never output placeholder intents, hidden reasoning, scratchpad, markdown, or text outside JSON."
         )
 
     @staticmethod
@@ -1298,9 +1352,11 @@ class OllamaGoalInterpreter:
                 {"type": "null"},
             ],
             "description": (
-                "Required Goal Progress Communication decision: one brief natural "
-                "person-to-person prospective utterance, or null for intentional silence; "
-                "never a task/process/workflow status label."
+                "Required speech decision. When downstream work remains, use one brief "
+                "natural prospective acknowledgement/checking utterance. When the whole "
+                "responsibility is answered immediately by native_response, use null "
+                "because native_response itself is the immediate speech. Never put a "
+                "provider-dependent result or completed lookup claim here."
             ),
         }
         schema["required"] = list(
@@ -1391,7 +1447,13 @@ class OllamaGoalInterpreter:
                     "but revise every field named by the exact validation errors. "
                     "Do not infer durable-memory consent, a Capability, a route, or "
                     "an effect from the errors. Preserve the catalog-declared route for "
-                    "an already selected exact capability. If an invalid progress item "
+                    "an already selected exact capability. If the previous output paired "
+                    "an explicit chat route with exact capability work, correct the route "
+                    "to the declared capability route and rewrite fast_speech as only a "
+                    "prospective acknowledgement/checking utterance with no result facts. "
+                    "If current trusted Mind/context already answers the whole turn with "
+                    "nothing else to do, emit one native_response and set fast_speech=null; "
+                    "the native response itself is the immediate speech. If an invalid progress item "
                     "attempted a provider-dependent native_response, correct it to "
                     "kind=capability only when the exact safe-read capability and every "
                     "required arg are already explicitly grounded; otherwise omit the "
@@ -1851,6 +1913,11 @@ class OllamaGoalInterpreter:
                     discarded_progress_paths,
                 )
         route_items = _route_items_from_parsed(parsed)
+        route_conflict = _single_lane_capability_route_conflict(
+            request, parsed, route_items=route_items
+        )
+        if route_conflict is not None:
+            raise ValueError(route_conflict)
         dominant_route = _dominant_route_from_items(route_items)
         if "route" not in parsed and dominant_route:
             parsed["route"] = dominant_route
@@ -1900,7 +1967,9 @@ class OllamaGoalInterpreter:
                     route_from_intent.split("|", 1)[1].strip()[:160]
                 )
                 parsed["metadata"] = metadata
-            parsed["route"] = _route_for_capability_id(intent_capability_id, request)
+            # The explicit route already survived the contradiction check above.
+            # Normalize only the exact capability identity. Rewriting the route
+            # here would silently change the authority of the same fast_speech.
             parsed["intent"] = f"capability:{intent_capability_id}"
             parsed["reason"] = (
                 f"{parsed.get('reason')}; " if parsed.get("reason") else ""
@@ -1911,6 +1980,26 @@ class OllamaGoalInterpreter:
                 f"{parsed.get('reason')}; " if parsed.get("reason") else ""
             ) + "LLM returned route-only JSON; goal interpreter applied default confidence"
         decision = RouteDecision.model_validate(parsed)
+        if not decision.routes:
+            native_responses = [
+                item for item in decision.progress if item.kind == "native_response"
+            ]
+            capability_progress = [
+                item for item in decision.progress if item.kind == "capability"
+            ]
+            if native_responses and capability_progress:
+                raise ValueError(
+                    "single-lane Goal Interpreter output cannot both answer now and "
+                    "declare downstream capability work"
+                )
+            if native_responses:
+                if decision.route != "chat":
+                    raise ValueError("single-lane native_response requires route='chat'")
+                if decision.fast_speech is not None:
+                    raise ValueError(
+                        "single-lane native_response is the immediate answer; "
+                        "fast_speech must be null"
+                    )
         finalized = finalize_decision(decision, request, source="llm")
         self._log_decision_summary(request, finalized, stage=stage, raw_summary=raw_summary)
         return finalized

@@ -73,8 +73,10 @@ class RouteRequest(BaseModel):
 class FastSpeech(BaseModel):
     """The Goal Interpreter's source-authored first progress notification.
 
-    This is Goal Progress Communication, not a task result, memory commit,
-    physical execution claim, clarification, or Social Attention.
+    This is prospective Goal Progress Communication for work that still remains,
+    not a task result, immediate native answer, memory commit, physical execution
+    claim, clarification, or Social Attention. A complete immediate answer belongs
+    in ``FastProgressProposal(kind="native_response")`` and is spoken from there.
     """
 
     text: str = ""
@@ -146,9 +148,11 @@ class RouteItem(OptionalCapabilityIdentityModel):
 class FastProgressProposal(BaseModel):
     """Model-facing progress already understood by Fast Goal Interpretation.
 
-    The proposal is semantic evidence only.  Host/runtime decides whether the
-    proposed progress is locally ready, and Goal Association later binds it to
-    canonical Goals.
+    The proposal is semantic evidence only. ``native_response`` means current
+    trusted cognition already contains the complete conversational result and no
+    other work is required for that responsibility. ``capability`` means work/evidence
+    still remains. Host/runtime decides whether proposed progress is locally ready,
+    and Goal Association later binds it to canonical Goals.
     """
 
     model_config = ConfigDict(extra="forbid")

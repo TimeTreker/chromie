@@ -758,6 +758,15 @@ It is deliberately more general than a tool/read request. Current forms include:
   Understanding has already resolved and grounded in the current turn or
   authoritative bounded context.
 
+These two forms are mutually exclusive for one single-lane Responsibility. A
+`native_response` means there is nothing else to acquire or execute for that
+answer, so it is the immediate substantive speech and `fast_speech` is null. A
+`capability` candidate means work/evidence still remains; any `fast_speech` is
+therefore only a prospective acknowledgement/checking act and cannot contain the
+provider-dependent answer. Fast Goal Interpretation may author both kinds across
+independent Responsibilities in a multi-route turn, but one Responsibility must
+not simultaneously claim to be answered and still require capability work.
+
 A candidate is meaning, not authorization. A material entity or parameter that
 defines the owed human outcome cannot become ready progress while unresolved; Fast
 Understanding leaves that capability out of progress and Goal Association owns the
@@ -2533,8 +2542,13 @@ model-facing structured output must make that decision explicitly: `fast_speech`
 is one brief natural string or JSON `null`, never an omitted field. This makes the
 communication decision required without making speech mandatory. The Host derives
 route-specific purpose/commitment and other deterministic claim-envelope facts;
-the model does not redundantly copy those system invariants. No second production
-LLM re-decides or repairs that ordinary communication choice. Dynamic pre-Goal
+the model does not redundantly copy those system invariants. That mechanical
+normalization may fill an omitted route or normalize an exact catalog identity,
+but it must not rewrite an explicit valid semantic route when exact capability
+work contradicts it, because doing so would reclassify the same model-authored
+`fast_speech` under a stronger claim envelope. Such an inconsistent DTO gets at
+most the existing one mechanical retransmission. No second production LLM
+re-decides or repairs that ordinary communication choice. Dynamic pre-Goal
 speech must carry `claim_state=none` with empty capability and
 Goal claim IDs. Tool speech uses the typed `acknowledge_and_check`/
 `checking_only` contract before result evidence; a memory acknowledgement is

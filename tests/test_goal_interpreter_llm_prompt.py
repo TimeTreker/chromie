@@ -1804,6 +1804,175 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([stage for stage, _ in interpreter.calls], ["quick_intent"])
 
 
+    def test_explicit_chat_cannot_be_silently_reclassified_by_exact_capability_work(self) -> None:
+        interpreter = OllamaGoalInterpreter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            text="你好，今天重庆天气怎么样？",
+            language="zh-CN",
+            context={
+                "gateway_admission_complete": True,
+                "common_ability_catalog": [
+                    {
+                        "capability_id": "chromie.weather.lookup",
+                        "route": "tool",
+                        "available": True,
+                        "interaction_executable": True,
+                    }
+                ],
+            },
+        )
+        response = {
+            "message": {
+                "content": (
+                    '{"route":"chat","intent":"chromie.weather.lookup",'
+                    '"confidence":0.95,'
+                    '"fast_speech":"我刚刚查了天气，今天重庆是多云，温度25度，有点热哦！",'
+                    '"progress":[{"kind":"capability",'
+                    '"capability_id":"chromie.weather.lookup",'
+                    '"args":{"location":"重庆","date":"today"},'
+                    '"intent":"weather_lookup","confidence":0.95}]}'
+                )
+            }
+        }
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "explicit route 'chat' conflicts with exact capability work",
+        ):
+            interpreter._decision_from_response(request, response)
+
+    async def test_weather_route_conflict_gets_one_mechanical_retry_before_fast_speech(self) -> None:
+        class WeatherConflictInterpreter(OllamaGoalInterpreter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="test-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                )
+                self.stages: list[str] = []
+
+            async def _chat(self, payload: dict, *, stage: str = "unknown") -> dict:
+                self.stages.append(stage)
+                if stage == "quick_intent":
+                    return {
+                        "message": {
+                            "content": (
+                                '{"route":"chat","intent":"chromie.weather.lookup",'
+                                '"confidence":0.95,'
+                                '"fast_speech":"我刚刚查了天气，今天重庆是多云，温度25度，有点热哦！",'
+                                '"progress":[{"kind":"capability",'
+                                '"capability_id":"chromie.weather.lookup",'
+                                '"args":{"location":"重庆","date":"today"},'
+                                '"intent":"weather_lookup","confidence":0.95}]}'
+                            )
+                        }
+                    }
+                if stage != "quick_intent_contract_repair":
+                    raise AssertionError(f"unexpected stage: {stage}")
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"tool",'
+                            '"intent":"capability:chromie.weather.lookup",'
+                            '"confidence":0.95,'
+                            '"fast_speech":"好呀，我看看重庆今天的天气。",'
+                            '"progress":[{"kind":"capability",'
+                            '"capability_id":"chromie.weather.lookup",'
+                            '"args":{"location":"重庆","date":"today"},'
+                            '"intent":"weather_lookup","confidence":0.95}]}'
+                        )
+                    }
+                }
+
+        interpreter = WeatherConflictInterpreter()
+        decision = await interpreter.route(
+            RouteRequest(
+                text="你好，今天重庆天气怎么样？",
+                language="zh-CN",
+                context={
+                    "gateway_admission_complete": True,
+                    "common_ability_catalog": [
+                        {
+                            "capability_id": "chromie.weather.lookup",
+                            "route": "tool",
+                            "available": True,
+                            "interaction_executable": True,
+                        }
+                    ],
+                },
+            )
+        )
+
+        self.assertEqual(decision.route, "tool")
+        self.assertEqual(decision.intent, "capability:chromie.weather.lookup")
+        self.assertIsNotNone(decision.fast_speech)
+        assert decision.fast_speech is not None
+        self.assertEqual(decision.fast_speech.text, "好呀，我看看重庆今天的天气。")
+        self.assertNotIn("25度", decision.fast_speech.text)
+        self.assertEqual(
+            interpreter.stages,
+            ["quick_intent", "quick_intent_contract_repair"],
+        )
+        transaction = decision.metadata["goal_interpreter_transaction"]
+        self.assertTrue(transaction["contract_repair_attempted"])
+        self.assertFalse(transaction["semantic_repair_attempted"])
+
+    def test_single_lane_native_response_is_the_immediate_speech(self) -> None:
+        interpreter = OllamaGoalInterpreter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            text="你叫什么名字？",
+            language="zh-CN",
+            context={"gateway_admission_complete": True},
+        )
+        duplicate = {
+            "message": {
+                "content": (
+                    '{"route":"chat","intent":"identity_question",'
+                    '"confidence":0.98,"fast_speech":"我叫 Chromie。",'
+                    '"progress":[{"kind":"native_response",'
+                    '"response_text":"我叫 Chromie。",'
+                    '"speech_act":"answer","confidence":0.98}]}'
+                )
+            }
+        }
+        with self.assertRaisesRegex(
+            ValueError,
+            "native_response is the immediate answer; fast_speech must be null",
+        ):
+            interpreter._decision_from_response(request, duplicate)
+
+        accepted = interpreter._decision_from_response(
+            request,
+            {
+                "message": {
+                    "content": (
+                        '{"route":"chat","intent":"identity_question",'
+                        '"confidence":0.98,"fast_speech":null,'
+                        '"progress":[{"kind":"native_response",'
+                        '"response_text":"我叫 Chromie。",'
+                        '"speech_act":"answer","confidence":0.98}]}'
+                    )
+                }
+            },
+        )
+        self.assertIsNone(accepted.fast_speech)
+        self.assertEqual(len(accepted.progress), 1)
+        self.assertEqual(accepted.progress[0].kind, "native_response")
+        self.assertEqual(accepted.progress[0].response_text, "我叫 Chromie。")
+
+
+
 
 
 

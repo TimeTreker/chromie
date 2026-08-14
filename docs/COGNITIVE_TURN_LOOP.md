@@ -197,8 +197,14 @@ bounded conversation context without external acquisition, unresolved reference,
 provider evidence, effect, or deeper reasoning, it may author one substantive
 `native_response` and start it through the existing Vocal runtime while Goal
 Association continues. This is distinct from `fast_speech`: `fast_speech` only
-communicates progress, whereas `native_response` may satisfy a conversational
-Goal. The early Vocal result remains turn-scoped until Goal Association
+communicates prospective progress when work remains, whereas `native_response`
+may satisfy a conversational Goal. For one single-lane Responsibility the two
+are mutually exclusive: immediate complete answer means `native_response` with
+`fast_speech=null`; capability/evidence work means no provider-dependent result
+may appear in `fast_speech`. Host normalization cannot convert an explicit chat
+answer into capability acknowledgement merely because another field names an
+exact Capability; that DTO is contradictory and receives at most one mechanical
+retransmission. The early Vocal result remains turn-scoped until Goal Association
 explicitly binds that exact progress candidate to a canonical `spoken_response`
 Goal; canonical delivery may then reuse the exact speech/result instead of
 speaking it again. The Host may validate and bind that model-authored act but may

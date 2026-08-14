@@ -599,6 +599,18 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    enters Deep where supported by the canonical contracts. Do not run Deep in parallel merely
    to re-check work already resolved by Fast cognition.
 
+   **Fast outcome types do not borrow authority from each other.** Fast Goal
+   Interpretation first identifies the human Responsibility. If current trusted
+   cognition already contains the complete answer and no acquisition, memory,
+   effect, unresolved reference, or deeper reasoning remains, it may emit one
+   `native_response`, which is the immediate speech. If work remains, `fast_speech`
+   is only prospective Goal Progress Communication such as acknowledgement or
+   checking; it is never a provider-dependent result or a claim that the work
+   already happened. The Host may fill missing mechanical representation, but it
+   must not silently rewrite an explicit semantic route in a way that changes the
+   authority of already-authored speech. A contradictory Fast DTO may be
+   retransmitted once; it does not gain result authority through normalization.
+
 35. **Response is expression, not a second semantic mind.** Once authoritative
    responsibility, plan/evidence state, and permitted conversational act are known,
    Response composition chooses natural wording for the still-needed user-facing

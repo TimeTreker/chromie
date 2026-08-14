@@ -305,6 +305,16 @@ def audit() -> dict[str, Any]:
         errors.append(
             "Goal Interpreter no longer proves semantic repair is disabled"
         )
+    for required in (
+        "_single_lane_capability_route_conflict",
+        "single-lane native_response is the immediate answer; ",
+        "fast_speech must be null",
+    ):
+        if required not in goal_interpreter:
+            errors.append(
+                "Goal Interpreter lost Fast answer/work authority separation: "
+                + required
+            )
 
     goal_association = _read("agent/app/goal_association.py")
     if '"logical_invocation_budget": 5' not in goal_association:
@@ -420,6 +430,7 @@ def audit() -> dict[str, Any]:
     bounded_cognition_guards = {
         "gateway_attention_single_judgment": True,
         "goal_interpreter_two_call_budget": True,
+        "fast_goal_outcome_separation": True,
         "goal_association_five_call_budget": True,
         "planner_one_mechanical_regeneration": True,
         "host_semantic_replan_forbidden": True,
