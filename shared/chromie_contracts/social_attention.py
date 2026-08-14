@@ -36,20 +36,61 @@ def normalize_social_attention_mode(
 
 
 SocialAttentionEvent = Literal[
-    "understanding_ready",
-    "goal_associated",
-    "work_started",
-    "waiting",
-    "evidence_arrived",
-    "speaking",
+    "primary_activity_ready",
+    "primary_activity_started",
 ]
+SocialAttentionActivityKind = Literal[
+    "speech",
+    "body_action",
+    "vocal_performance",
+    "media_playback",
+    "mixed",
+]
+SocialAttentionActivityPhase = Literal["ready", "started"]
+
+
+class SocialAttentionActivityAnchor(BaseModel):
+    """A real human-observable primary Activity that Social Attention may decorate.
+
+    This anchor is deliberately downstream of cognition. Goal interpretation, Goal
+    Association, planning, evidence arrival, and other internal milestones are not
+    Activities and therefore cannot be used as Social Attention anchors.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    activity_id: str = Field(min_length=1, max_length=200)
+    kind: SocialAttentionActivityKind
+    phase: SocialAttentionActivityPhase
+    summary: str = Field(default="", max_length=500)
+    goal_ids: list[str] = Field(default_factory=list, max_length=24)
+    capability_ids: list[str] = Field(default_factory=list, max_length=24)
+
+    @field_validator("activity_id", "summary", mode="before")
+    @classmethod
+    def normalize_activity_text(cls, value: Any) -> str:
+        return " ".join(str(value or "").strip().split())
+
+    @field_validator("goal_ids", "capability_ids")
+    @classmethod
+    def normalize_activity_ids(cls, value: list[str]) -> list[str]:
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for item in value:
+            text = " ".join(str(item or "").strip().split())
+            if text and text not in seen:
+                seen.add(text)
+                normalized.append(text)
+        return normalized
 
 
 class SocialAttentionRequest(BaseModel):
-    """One event-scoped projection for background Social Attention.
+    """One Activity-scoped projection for optional background Social Attention.
 
-    The request carries an interaction anchor, not user-goal authority. It deliberately
-    has no planner disposition, capability authorization, or response text contract.
+    The request must carry a real primary human-observable Activity. Social Attention
+    may decorate that Activity but never creates a Goal, selects primary work, changes
+    completion semantics, or fires merely because an internal cognitive milestone
+    occurred.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -58,6 +99,7 @@ class SocialAttentionRequest(BaseModel):
     session_id: str = Field(min_length=1, max_length=160)
     turn_id: str = Field(min_length=1, max_length=160)
     event: SocialAttentionEvent
+    primary_activity: SocialAttentionActivityAnchor
     text: str = ""
     language: str = Field(default="auto", min_length=1, max_length=64)
     intent: str = Field(default="unknown", min_length=1, max_length=200)
@@ -68,6 +110,19 @@ class SocialAttentionRequest(BaseModel):
     @classmethod
     def normalize_request_text(cls, value: Any) -> str:
         return " ".join(str(value or "").strip().split())
+
+    @model_validator(mode="after")
+    def validate_activity_phase(self) -> "SocialAttentionRequest":
+        expected = (
+            "primary_activity_ready"
+            if self.primary_activity.phase == "ready"
+            else "primary_activity_started"
+        )
+        if self.event != expected:
+            raise ValueError(
+                "Social Attention event must describe the supplied primary Activity phase"
+            )
+        return self
 
 
 SocialAttentionDecision = Literal["none", "express"]

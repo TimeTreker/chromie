@@ -613,6 +613,33 @@ def _validate_llm_capability_decision(
     decision: RouteDecision,
     result: CapabilityCatalogResult,
 ) -> RouteDecision:
+    # Current Fast Goal Interpretation is responsibility-first. Once semantic
+    # responsibilities exist, the capability catalog is awareness only: do not
+    # bind, normalize, or inject any Capability identity here. Goal Association
+    # must canonicalize these responsibilities before Fast/Deep Planner chooses
+    # provider work. The legacy branches below remain only for compatibility
+    # with older directly-constructed RouteDecision fixtures and callers.
+    if decision.responsibilities:
+        decision.candidate_capabilities = []
+        if decision.route == "chat" and (
+            not decision.intent or decision.intent == "unknown"
+        ):
+            decision.intent = "general_conversation"
+        if decision.route == "deep_thought":
+            safe_speak_first = _safe_thinking_speak_first(
+                decision.speak_first,
+                language=decision.language or request.language or "auto",
+            )
+            decision.speak_first = safe_speak_first
+            decision.metadata = {
+                **(decision.metadata or {}),
+                "thinking_ack_allowed": bool(safe_speak_first),
+                "thinking_ack_source": (
+                    "quick_llm_speak_first" if safe_speak_first else "none"
+                ),
+            }
+        return finalize_decision(decision, request, source="llm")
+
     prompt_capabilities = request.context.get("prompt_capabilities_common")
     if not isinstance(prompt_capabilities, list):
         prompt_capabilities = []

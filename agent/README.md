@@ -82,13 +82,14 @@ common/rare preset lives in `capabilities/prompt_tiers.json`, loaded by
 `AGENT_CAPABILITY_PROMPT_TIER_PRESET`; it should be edited as data rather than
 as Python code. Experience can change ordinary prompt tiers through an overlay
 loaded by `AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES`, but safety-locked entries
-cannot be promoted into the fast common catalog. `chromie.speak` is a common,
-interaction-executable catalog entry so the quick Goal Interpretation can keep spoken parts
-of physical requests as normal skill proposals instead of dropping them into
-unstructured reply text.
-When Goal Interpretation compound `actions[]` include per-action confidence, the native
-runtime preserves it in each emitted `SkillRequest.metadata` as
-`goal_interpretation_action_confidence` for trace and evidence review.
+cannot be promoted into the fast common catalog. The Fast Goal Interpreter sees
+this catalog only as bounded ability awareness. It emits provider-neutral
+`responsibilities[]`; exact Capability selection, executable arguments, and action
+decomposition belong to Fast/Deep Planner after canonical Goal Association.
+`chromie.speak` therefore does not turn ordinary acknowledgement or requested speech
+into a Fast Goal Interpreter skill proposal. Deprecated compatibility requests that
+already contain exact `actions[]` may still be materialized by the legacy Agent adapter,
+but those fields are not current model-authored Fast Goal Interpretation output.
 
 TaskGraph endpoints:
 
@@ -166,13 +167,16 @@ See [`../docs/CONFIGURATION.md`](../docs/CONFIGURATION.md) for all settings.
 
 Social Attention is background social-decoration cognition, not an execution
 lane, Goal, fixed gesture list, or speech-expression channel. The maintained
-Goal-driven Host may start event-scoped `/social-attention/plan` work independently
-from Goal Association, ready capability work, and response preparation, but every
-plan remains anchored to the active interaction. The model may select eligible
-small body capabilities tagged `social_attention` or choose `none`; it does not
-own Goal meaning, response wording, completion, or authorization. Accepted
-Social Attention body requests execute through Activity as fail-soft auxiliary
-decoration.
+Goal-driven Host creates an event-scoped `/social-attention/plan` opportunity only
+for a concrete primary human-observable Activity such as scheduled speech/Vocal
+or prepared body/media/vocal-performance work. A scheduled Fast acknowledgement
+may therefore be decorated while Goal Association continues, because the speech
+itself is the anchor; provider readiness, Goal milestones, planning, waiting, and
+evidence arrival are not anchors. Each distinct primary Activity may independently
+choose eligible small body capabilities tagged `social_attention` or `none`. The
+model does not own Goal meaning, response wording, completion, or authorization.
+Accepted Social Attention body requests execute through Activity as fail-soft
+auxiliary decoration.
 
 Candidate discovery uses catalog behavior-domain metadata supplemented by
 `capabilities/behavior_domains.json`; `AGENT_SOCIAL_ATTENTION_CAPABILITIES` is

@@ -13,6 +13,7 @@ from agent.app.social_attention import SocialAttentionPlanner
 from agent.app.schema import AgentRunRequest
 from shared.chromie_contracts.interaction import FORBIDDEN_LOW_LEVEL_FIELDS, SkillRequest
 from shared.chromie_contracts.social_attention import (
+    SocialAttentionActivityAnchor,
     SocialAttentionPlan,
     SocialAttentionRequest,
 )
@@ -110,6 +111,15 @@ class _DomainCatalog(_Catalog):
 
 
 class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
+    @staticmethod
+    def _activity(activity_id: str = "activity-test") -> SocialAttentionActivityAnchor:
+        return SocialAttentionActivityAnchor(
+            activity_id=activity_id,
+            kind="speech",
+            phase="ready",
+            summary="Primary outward activity",
+        )
+
     def _request(self, *, route: str = "chat", intent: str = "general_conversation") -> AgentRunRequest:
         return AgentRunRequest.model_validate(
             {
@@ -190,7 +200,8 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
         request = SocialAttentionRequest(
             session_id="social-attention-test",
             turn_id="turn-explicit-blink",
-            event="understanding_ready",
+            event="primary_activity_ready",
+            primary_activity=self._activity(),
             text="Blink twice, and be cute.",
             language="en-US",
             intent="semantic_capability_planning",
@@ -222,8 +233,8 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('"social_interaction_style"', prompt)
         self.assertIn('"recent_auxiliary_behavior_evidence"', prompt)
         self.assertIn('"count": 2', prompt)
-        self.assertIn("explicit user action remains mandatory", prompt)
-        self.assertIn("different compatible cue", prompt)
+        self.assertIn("explicit primary action remains mandatory", prompt)
+        self.assertIn("another outward Activity", prompt)
 
     def test_background_prompt_does_not_mistake_direct_work_for_exact_only(self) -> None:
         planner = SocialAttentionPlanner(
@@ -235,7 +246,8 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
         request = SocialAttentionRequest(
             session_id="voice-log-water",
             turn_id="turn-fetch-water",
-            event="understanding_ready",
+            event="primary_activity_ready",
+            primary_activity=self._activity(),
             text="去往前走个100米，帮我拿杯水过来。",
             language="zh-CN",
             intent="semantic_capability_planning",
@@ -260,11 +272,11 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertIn("Ordinary cooperative engagement", prompt)
-        self.assertIn("playful or explicitly emotional wording is not required", prompt)
-        self.assertIn("A clear or direct task is not evidence", prompt)
-        self.assertIn("only when it is actually supplied", prompt)
-        self.assertIn("independent-output candidate declared parallel-safe", prompt)
-        self.assertIn("Do not default to decision=none merely because speech", prompt)
+        self.assertIn("Ordinary cooperative engagement", prompt)
+        self.assertIn("A clear task is not evidence", prompt)
+        self.assertIn("only when it is supplied", prompt)
+        self.assertIn("Primary Activity safety/resource ownership always wins", prompt)
+        self.assertIn("Choose decision=none whenever no expression adds social value", prompt)
 
     async def test_background_request_uses_session_id_when_live_candidates_exist(self) -> None:
         attention = _AttentionOllama(
@@ -291,7 +303,8 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
         request = SocialAttentionRequest(
             session_id="social-attention-background-session",
             turn_id="turn-explicit-blink",
-            event="understanding_ready",
+            event="primary_activity_ready",
+            primary_activity=self._activity(),
             text="Blink twice.",
             language="en-US",
             intent="semantic_capability_planning",
@@ -352,7 +365,8 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
         request = SocialAttentionRequest(
             session_id="voice-log-water",
             turn_id="turn-work-started",
-            event="work_started",
+            event="primary_activity_ready",
+            primary_activity=self._activity(),
             text="去往前走个100米，帮我拿杯水过来。",
             language="zh-CN",
             intent="semantic_capability_planning",
@@ -402,7 +416,8 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
         request = SocialAttentionRequest(
             session_id="voice-log-water",
             turn_id="turn-fetch-water",
-            event="understanding_ready",
+            event="primary_activity_ready",
+            primary_activity=self._activity(),
             text="去往前走个100米，帮我拿杯水过来。",
             language="zh-CN",
             intent="semantic_capability_planning",
@@ -447,7 +462,8 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
         request = SocialAttentionRequest(
             session_id="social-attention-background-session",
             turn_id="turn-explicit-blink-cute",
-            event="understanding_ready",
+            event="primary_activity_ready",
+            primary_activity=self._activity(),
             text="Blink twice and be cute.",
             language="en-US",
             intent="semantic_capability_planning",

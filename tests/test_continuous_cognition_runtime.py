@@ -44,6 +44,23 @@ INPUT_SCHEMA = {
 }
 
 
+def social_activity_context(
+    activity_id: str,
+    *,
+    kind: str = "speech",
+    capability_ids: list[str] | None = None,
+) -> dict:
+    return {
+        "social_attention_primary_activity": {
+            "activity_id": activity_id,
+            "kind": kind,
+            "phase": "ready",
+            "summary": "primary outward activity",
+            "capability_ids": list(capability_ids or []),
+        }
+    }
+
+
 def safe_read_definition(*, provider_id: str = "test.reference") -> SkillDefinition:
     return SkillDefinition(
         skill_id="chromie.reference.lookup",
@@ -180,50 +197,6 @@ class ContinuousClient:
     async def compose_response_plan(self, *args, **kwargs):
         self.calls.append("compose")
         raise AssertionError("pre-evidence Response Composer must not block a pure safe read")
-
-
-def test_fully_bound_safe_read_runs_with_goal_association_and_avoids_planner_composer():
-    async def scenario():
-        candidate = CognitiveProgressCandidate(
-            candidate_id="progress-reference",
-            capability_id="chromie.reference.lookup",
-            args={"query": "current status"},
-            intent="capability:chromie.reference.lookup",
-            confidence=0.99,
-        )
-        runtime = ReadyFakeRuntime()
-        client = ContinuousClient(runtime, information_goal("goal-reference", candidate.candidate_id))
-        coordinator = GoalDrivenRuntimeCoordinator(
-            agent_client=client,
-            adapter=CanonicalPlanRuntimeAdapter(runtime),
-            policy=CognitiveRuntimePolicy(mode="apply"),
-        )
-        result = await coordinator._resolve(
-            object(),
-            text="Check the current reference status.",
-            sid="session-1",
-            route_decision=SimpleNamespace(route="tool", intent="capability:chromie.reference.lookup"),
-            context={
-                "turn_id": "turn-1",
-                "progress_candidates": [candidate.model_dump(mode="json")],
-            },
-            history=[],
-            language="zh-CN",
-        )
-        assert result.status == "applied"
-        assert result.fast_plan is not None
-        assert result.fast_plan.metadata["resolver"] == "readiness_adoption"
-        assert result.metadata["fast_planner_path"] == "readiness_adoption"
-        assert result.metadata["ready_result_bound_count"] == 1
-        assert result.interaction_response is not None
-        assert len(result.interaction_response.skills) == 1
-        assert result.interaction_response.skills[0].args == {"query": "current status"}
-        assert client.calls == ["association"]
-        assert runtime.start_calls == 1
-        assert runtime.bind_calls == 1
-        assert runtime.cancel_calls == 0
-
-    asyncio.run(scenario())
 
 
 class ReadyConversationRuntime:
@@ -447,57 +420,6 @@ class CountingProvider:
         return None
 
 
-def test_ready_read_is_rebound_once_to_exact_canonical_request_without_second_provider_call():
-    async def scenario():
-        coordinator = InteractionRuntimeCoordinator(lambda payload: {"scheduled": True})
-        definition = safe_read_definition()
-        provider = CountingProvider()
-        coordinator.registry.register(definition)
-        coordinator.runtime.register_provider(provider)
-        candidate = CognitiveProgressCandidate(
-            candidate_id="progress-reference",
-            capability_id=definition.skill_id,
-            args={"query": "current status"},
-            intent="capability:chromie.reference.lookup",
-            confidence=0.99,
-        )
-        handle = await coordinator.start_ready_capability_read(
-            candidate,
-            session_id="session-1",
-            turn_id="turn-1",
-            language="zh-CN",
-        )
-        assert handle is not None
-        canonical = SkillRequest(
-            request_id="canonical-reference",
-            skill_id=definition.skill_id,
-            skill_version=definition.version,
-            args={"query": "current status"},
-            timing="parallel",
-            committed_output_schema_sha256=output_schema_sha256(definition.output_schema),
-            metadata={"source_goal_ids": ["goal-reference"]},
-        )
-        assert await coordinator.bind_ready_capability_read(
-            handle,
-            canonical_interaction_id="canonical-interaction",
-            canonical_request=canonical,
-        )
-        execution = await coordinator.execute(
-            InteractionResponse(
-                interaction_id="canonical-interaction",
-                skills=[canonical],
-                metadata={"language": "zh-CN"},
-            ),
-            session_id="session-1",
-        )
-        assert provider.calls == 1
-        assert len(execution.results) == 1
-        assert execution.results[0].request_id == "canonical-reference"
-        assert execution.results[0].metadata["readiness_candidate_reused"] is True
-
-    asyncio.run(scenario())
-
-
 def blink_definition() -> SkillDefinition:
     return SkillDefinition(
         skill_id="chromie.social.blink",
@@ -610,8 +532,8 @@ def test_independent_social_attention_uses_same_trusted_runtime_without_goal_aut
             plan=plan,
             session_id="session-social",
             turn_id="turn-social",
-            event="understanding_ready",
-            context={},
+            event="primary_activity_ready",
+            context=social_activity_context("activity-social"),
         )
 
         assert result["status"] == "completed"
@@ -625,7 +547,7 @@ def test_independent_social_attention_uses_same_trusted_runtime_without_goal_aut
     asyncio.run(scenario())
 
 
-def test_social_attention_same_turn_cooldown_skips_second_model_decision_after_behavior():
+def test_social_attention_cooldown_is_scoped_to_primary_activity_not_turn():
     async def scenario():
         runtime = InteractionRuntimeCoordinator(lambda payload: {"scheduled": True})
         definition = blink_definition()
@@ -638,7 +560,7 @@ def test_social_attention_same_turn_cooldown_skips_second_model_decision_after_b
         class Client:
             async def resolve_social_attention(self, *args, **kwargs):
                 request = kwargs["request"]
-                calls.append(request.event)
+                calls.append(request.primary_activity.activity_id)
                 return SocialAttentionPlan.model_validate(
                     {
                         "purpose": "acknowledge",
@@ -667,27 +589,36 @@ def test_social_attention_same_turn_cooldown_skips_second_model_decision_after_b
             sid="session-social-cooldown",
             turn_id="turn-social-cooldown",
             language="en-US",
-            intent="capability:chromie.reference.lookup",
-            context={},
+            intent="weather_lookup",
             history=[],
         )
         first = await coordinator._run_social_attention_event(
-            event="understanding_ready", **common
+            event="primary_activity_ready",
+            context=social_activity_context("activity-ack"),
+            **common,
         )
-        second = await coordinator._run_social_attention_event(
-            event="goal_associated", **common
+        duplicate = await coordinator._run_social_attention_event(
+            event="primary_activity_ready",
+            context=social_activity_context("activity-ack"),
+            **common,
+        )
+        later = await coordinator._run_social_attention_event(
+            event="primary_activity_ready",
+            context=social_activity_context("activity-final"),
+            **common,
         )
 
         assert first["materialized_count"] == 1
-        assert second == {
+        assert duplicate == {
             "status": "suppressed",
-            "event": "goal_associated",
+            "event": "primary_activity_ready",
             "decision": "none",
             "materialized_count": 0,
-            "reasons": ["same_turn_auxiliary_cooldown"],
+            "reasons": ["same_primary_activity_auxiliary_cooldown"],
         }
-        assert calls == ["understanding_ready"]
-        assert provider.calls == 1
+        assert later["materialized_count"] == 1
+        assert calls == ["activity-ack", "activity-final"]
+        assert provider.calls == 2
 
     asyncio.run(scenario())
 
@@ -719,11 +650,16 @@ def test_social_attention_cannot_duplicate_explicit_primary_activity():
             plan=plan,
             session_id="session-social-primary",
             turn_id="turn-social-primary",
-            event="understanding_ready",
+            event="primary_activity_ready",
             context={
+                **social_activity_context(
+                    "activity-social-primary",
+                    kind="body_action",
+                    capability_ids=[definition.skill_id],
+                ),
                 "social_attention_interaction_state": {
                     "primary_capability_ids": [definition.skill_id]
-                }
+                },
             },
         )
 
@@ -765,11 +701,16 @@ def test_social_attention_allows_a_different_compatible_auxiliary_cue():
             plan=plan,
             session_id="session-social-compatible",
             turn_id="turn-social-compatible",
-            event="understanding_ready",
+            event="primary_activity_ready",
             context={
+                **social_activity_context(
+                    "activity-social-compatible",
+                    kind="body_action",
+                    capability_ids=[primary.skill_id],
+                ),
                 "social_attention_interaction_state": {
                     "primary_capability_ids": [primary.skill_id]
-                }
+                },
             },
         )
 
@@ -809,11 +750,16 @@ def test_social_attention_rejects_a_different_cue_that_conflicts_with_primary_ac
             plan=plan,
             session_id="session-social-conflict",
             turn_id="turn-social-conflict",
-            event="understanding_ready",
+            event="primary_activity_ready",
             context={
+                **social_activity_context(
+                    "activity-social-conflict",
+                    kind="body_action",
+                    capability_ids=[primary.skill_id],
+                ),
                 "social_attention_interaction_state": {
                     "primary_capability_ids": [primary.skill_id]
-                }
+                },
             },
         )
 
@@ -825,80 +771,70 @@ def test_social_attention_rejects_a_different_cue_that_conflicts_with_primary_ac
     asyncio.run(scenario())
 
 
-def test_social_attention_background_loop_does_not_wait_for_goal_association(caplog):
+def test_social_attention_uses_scheduled_primary_speech_as_activity_anchor(caplog):
     caplog.set_level("INFO", logger="orchestrator.runtime.cognitive_runtime")
 
     async def scenario():
-        candidate = CognitiveProgressCandidate(
-            candidate_id="progress-reference-social",
-            capability_id="chromie.reference.lookup",
-            args={"query": "current status"},
-            intent="capability:chromie.reference.lookup",
-            confidence=0.99,
-        )
-        runtime = ReadyFakeRuntime()
-        association = information_goal("goal-reference-social", candidate.candidate_id)
-        social_planned = asyncio.Event()
+        captured = {}
+        planned = asyncio.Event()
 
-        class Client(ContinuousClient):
+        class Client:
             async def resolve_social_attention(self, *args, **kwargs):
-                self.calls.append("social")
-                social_planned.set()
+                request = kwargs["request"]
+                captured["event"] = request.event
+                captured["activity"] = request.primary_activity.model_dump(mode="json")
+                planned.set()
                 return SocialAttentionPlan(decision="none", reason="No expression needed.")
 
-            async def resolve_goal_association(self, *args, **kwargs):
-                self.calls.append("association")
-                await asyncio.wait_for(runtime.started.wait(), timeout=1.0)
-                await asyncio.wait_for(social_planned.wait(), timeout=1.0)
-                return association
-
-        client = Client(runtime, association)
+        runtime = SimpleNamespace()
         adapter = CanonicalPlanRuntimeAdapter(runtime)
-        social_executed = asyncio.Event()
-        captured_social_context = {}
 
         async def execute_social_attention_event(**kwargs):
-            captured_social_context.update(kwargs["context"])
-            social_executed.set()
             return {"status": "not_executed", "materialized_count": 0}
 
         adapter.execute_social_attention_event = execute_social_attention_event  # type: ignore[method-assign]
         coordinator = GoalDrivenRuntimeCoordinator(
-            agent_client=client,
+            agent_client=Client(),
             adapter=adapter,
             policy=CognitiveRuntimePolicy(mode="apply"),
         )
-        result = await coordinator._resolve(
-            object(),
-            text="Check the current reference status.",
-            sid="session-social-parallel",
-            route_decision=SimpleNamespace(
-                route="tool", intent="capability:chromie.reference.lookup"
-            ),
-            context={
-                "turn_id": "turn-1",
-                "progress_candidates": [candidate.model_dump(mode="json")],
-            },
-            history=[],
-            language="zh-CN",
+        context = {
+            "scheduled_turn_speech": [
+                {
+                    "status": "scheduled",
+                    "stage": "fast_first",
+                    "text": "好呀，我查一下。",
+                    "speech_event_id": "speech-fast-1",
+                }
+            ]
+        }
+        activity = coordinator._scheduled_speech_social_activity(
+            context, turn_id="turn-social-speech"
         )
-        await asyncio.wait_for(social_executed.wait(), timeout=1.0)
-        assert result.status == "applied"
-        assert "social" in client.calls
-        assert client.calls.index("social") < client.calls.index("association") or social_planned.is_set()
-        assert "compose" not in client.calls
-        interaction_state = captured_social_context[
-            "social_attention_interaction_state"
-        ]
-        assert interaction_state["primary_capability_ids"] == [
-            candidate.capability_id
-        ]
-        assert interaction_state["primary_progress"][0]["args"] == candidate.args
+        coordinator._queue_social_attention_for_activity(
+            object(),
+            activity=activity,
+            text="今天重庆天气怎么样？",
+            sid="session-social-speech",
+            turn_id="turn-social-speech",
+            language="zh-CN",
+            intent="weather_lookup",
+            context=context,
+            history=[],
+        )
+        await asyncio.wait_for(planned.wait(), timeout=1.0)
+        for _ in range(10):
+            if not coordinator._social_attention_workers:
+                break
+            await asyncio.sleep(0)
+
+        assert captured["event"] == "primary_activity_ready"
+        assert captured["activity"]["activity_id"] == "speech-fast-1"
+        assert captured["activity"]["kind"] == "speech"
+        assert captured["activity"]["summary"] == "好呀，我查一下。"
 
     asyncio.run(scenario())
-    assert "continuous_social_attention_event_done" in caplog.text
-    assert "event=understanding_ready" in caplog.text
-    assert "status=not_executed" in caplog.text
+    assert "event=primary_activity_ready" in caplog.text
 
 
 def stateful_write_definition() -> SkillDefinition:
@@ -930,107 +866,64 @@ def stateful_write_definition() -> SkillDefinition:
     )
 
 
-def test_effectful_candidate_never_starts_through_ready_read_boundary():
+def test_social_attention_lane_coalesces_duplicate_updates_for_one_primary_activity():
     async def scenario():
-        coordinator = InteractionRuntimeCoordinator(lambda payload: {"scheduled": True})
-        definition = stateful_write_definition()
-        coordinator.registry.register(definition)
-        candidate = CognitiveProgressCandidate(
-            candidate_id="progress-write",
-            capability_id=definition.skill_id,
-            args={"value": "change state"},
-            intent="capability:chromie.test.write",
-            confidence=0.99,
-        )
-
-        handle = await coordinator.start_ready_capability_read(
-            candidate,
-            session_id="session-write",
-            turn_id="turn-write",
-            language="en-US",
-        )
-
-        assert handle is None
-
-    asyncio.run(scenario())
-
-
-def test_malformed_safe_read_args_do_not_schedule_provider_work():
-    async def scenario():
-        coordinator = InteractionRuntimeCoordinator(lambda payload: {"scheduled": True})
-        definition = safe_read_definition()
-        provider = CountingProvider()
-        coordinator.registry.register(definition)
-        coordinator.runtime.register_provider(provider)
-        candidate = CognitiveProgressCandidate(
-            candidate_id="progress-reference-invalid",
-            capability_id=definition.skill_id,
-            args={},
-            intent="capability:chromie.reference.lookup",
-            confidence=0.99,
-        )
-
-        handle = await coordinator.start_ready_capability_read(
-            candidate,
-            session_id="session-invalid",
-            turn_id="turn-invalid",
-            language="zh-CN",
-        )
-        await asyncio.sleep(0)
-
-        assert handle is None
-        assert provider.calls == 0
-
-    asyncio.run(scenario())
-
-
-def test_social_attention_lane_coalesces_intermediate_state_while_one_decision_is_in_flight():
-    async def scenario():
-        runtime = ReadyFakeRuntime()
-        association = information_goal("goal-social-events", "progress-social-events")
         first_started = asyncio.Event()
         release_first = asyncio.Event()
         second_finished = asyncio.Event()
-        events: list[str] = []
+        activities: list[str] = []
 
-        class Client(ContinuousClient):
+        class Client:
             async def resolve_social_attention(self, *args, **kwargs):
                 request = kwargs["request"]
-                events.append(request.event)
-                if len(events) == 1:
+                activities.append(request.primary_activity.activity_id)
+                if len(activities) == 1:
                     first_started.set()
                     await release_first.wait()
                 else:
                     second_finished.set()
                 return SocialAttentionPlan(decision="none", reason="No expression needed.")
 
-        client = Client(runtime, association)
-        adapter = CanonicalPlanRuntimeAdapter(runtime)
+        adapter = CanonicalPlanRuntimeAdapter(SimpleNamespace())
 
         async def execute_social_attention_event(**kwargs):
             return {"status": "not_executed", "materialized_count": 0}
 
         adapter.execute_social_attention_event = execute_social_attention_event  # type: ignore[method-assign]
         coordinator = GoalDrivenRuntimeCoordinator(
-            agent_client=client,
+            agent_client=Client(),
             adapter=adapter,
             policy=CognitiveRuntimePolicy(mode="apply"),
         )
         common = dict(
             session=object(),
-            text="Check the current reference status.",
+            text="Tell me something.",
             sid="session-social-events",
             turn_id="turn-social-events",
-            language="zh-CN",
-            intent="capability:chromie.reference.lookup",
-            context={},
+            language="en-US",
+            intent="conversation",
             history=[],
         )
-        coordinator._queue_social_attention_event(event="understanding_ready", **common)
+        activity = coordinator._scheduled_speech_social_activity(
+            {
+                "scheduled_turn_speech": [
+                    {"text": "Sure.", "speech_event_id": "activity-speech-1"}
+                ]
+            },
+            turn_id="turn-social-events",
+        )
+        assert activity is not None
+        context = social_activity_context("activity-speech-1")
+        coordinator._queue_social_attention_event(
+            event="primary_activity_ready", context=context, **common
+        )
         await asyncio.wait_for(first_started.wait(), timeout=1.0)
-        coordinator._queue_social_attention_event(event="goal_associated", **common)
-        coordinator._queue_social_attention_event(event="work_started", **common)
-        coordinator._queue_social_attention_event(event="evidence_arrived", **common)
+        coordinator._queue_social_attention_event(
+            event="primary_activity_ready", context=context, **common
+        )
+        coordinator._queue_social_attention_event(
+            event="primary_activity_ready", context=context, **common
+        )
         release_first.set()
         await asyncio.wait_for(second_finished.wait(), timeout=1.0)
         for _ in range(10):
@@ -1038,7 +931,7 @@ def test_social_attention_lane_coalesces_intermediate_state_while_one_decision_i
                 break
             await asyncio.sleep(0)
 
-        assert events == ["understanding_ready", "evidence_arrived"]
+        assert activities == ["activity-speech-1", "activity-speech-1"]
         assert not coordinator._social_attention_pending
 
     asyncio.run(scenario())

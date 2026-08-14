@@ -221,8 +221,9 @@ no-action speech and no effectful skill.
 The legacy CapabilityAgent semantic planner is retained only as an explicit
 emergency compatibility path. It requires disabled or non-authoritative
 Goal-driven processing, host and Agent opt-in gates, and a per-turn emergency
-authority claim. Exact Goal Interpreter `actions[]` use a deterministic adapter and never
-call that planner. The Agent rejects an empty claim or a claim whose `turn_id`
+authority claim. Deprecated exact `actions[]` supplied through legacy Agent
+compatibility entrypoints use a deterministic adapter and never call that planner;
+current Fast Goal Interpretation does not author them. The Agent rejects an empty claim or a claim whose `turn_id`
 does not exactly match the request `sid`, which blocks cross-turn reuse. The
 claim is not stored as a consumed nonce, so this boundary does not independently
 prevent replay with the same `sid`. See

@@ -38,7 +38,7 @@ def audit() -> dict[str, Any]:
         "orchestrator.handle_routed_text/apply (mapped lane allowlisted)",
         "orchestrator.handle_routed_text/apply (mapped lane excluded)",
         "orchestrator.handle_routed_text/report_only",
-        "agent./interaction with exact Goal Interpretation actions",
+        "agent./interaction with deprecated exact actions compatibility input",
         "agent./interaction or /run emergency compatibility",
     }
     actual_entrypoints = {str(row.get("entrypoint") or "") for row in matrix}
@@ -306,7 +306,8 @@ def audit() -> dict[str, Any]:
             "Goal Interpreter no longer proves semantic repair is disabled"
         )
     for required in (
-        "_single_lane_capability_route_conflict",
+        "_reject_planner_shaped_fast_output",
+        "Capability selection belongs to Planner after Goal Association",
         "single-lane native_response is the immediate answer; ",
         "fast_speech must be null",
     ):
@@ -452,8 +453,9 @@ def audit() -> dict[str, Any]:
         "maintained_defaults": maintained_defaults,
         "bounded_cognition_guards": bounded_cognition_guards,
         "offline_equivalence_evidence": {
-            "exact_goal_interpretation_actions": (
-                "deterministic adapter path; semantic LLM call forbidden"
+            "deprecated_exact_actions_compatibility": (
+                "deterministic legacy adapter path only; current Fast Goal "
+                "Interpretation does not author actions and semantic LLM re-entry is forbidden"
             ),
             "legacy_capability_planner": (
                 "retained only behind host gate, Agent gate, and per-turn "

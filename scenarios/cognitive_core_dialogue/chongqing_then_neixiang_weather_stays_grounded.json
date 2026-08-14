@@ -3,7 +3,7 @@
   "id": "chongqing_then_neixiang_weather_stays_grounded",
   "suite": "cognitive_core_dialogue",
   "level": "integration",
-  "description": "After a successful Chongqing weather turn, an explicit Henan Neixiang County weather request must remain bound to Neixiang in Cognitive Core; the prior Chongqing location is history only and cannot replace the new weather query.",
+  "description": "After a Chongqing weather turn, an explicit Henan Neixiang County weather request remains bound to Neixiang as provider-neutral responsibility evidence; prior location is history only and provider choice remains Planner authority.",
   "tags": [
     "voice-log",
     "multi-turn",
@@ -65,24 +65,36 @@
             "stage": "quick_intent",
             "decision": {
               "route": "tool",
-              "intent": "weather_query",
+              "intent": "weather_lookup",
               "confidence": 0.96,
               "language": "zh-CN",
-              "metadata": {
-                "tool_name": "weather",
-                "weather_query": {
-                  "location": "重庆",
-                  "date": "today",
-                  "units": "metric"
+              "responsibilities": [
+                {
+                  "local_ref": "r1",
+                  "outcome": "告知用户重庆今天的天气、冷热和降雨情况",
+                  "bindings": {
+                    "location": "重庆",
+                    "date": "today",
+                    "aspects": [
+                      "weather",
+                      "temperature",
+                      "rain"
+                    ]
+                  },
+                  "completion_requires_work": true,
+                  "completion_requires_fresh_evidence": true,
+                  "confidence": 0.96
                 }
-              }
+              ],
+              "fast_speech": null,
+              "progress": []
             }
           }
         ]
       },
       "expect": {
         "route": "tool",
-        "intent": "weather_query",
+        "intent": "weather_lookup",
         "source": "llm",
         "llm_calls": 1,
         "llm_stages": [
@@ -90,6 +102,24 @@
         ],
         "task_types_include": [
           "task.use_tool"
+        ],
+        "responsibilities": [
+          {
+            "local_ref": "r1",
+            "outcome": "告知用户重庆今天的天气、冷热和降雨情况",
+            "bindings": {
+              "location": "重庆",
+              "date": "today",
+              "aspects": [
+                "weather",
+                "temperature",
+                "rain"
+              ]
+            },
+            "completion_requires_work": true,
+            "completion_requires_fresh_evidence": true,
+            "confidence": 0.96
+          }
         ]
       }
     },
@@ -103,24 +133,32 @@
             "stage": "quick_intent",
             "decision": {
               "route": "tool",
-              "intent": "weather_query",
+              "intent": "weather_lookup",
               "confidence": 0.97,
               "language": "zh-CN",
-              "metadata": {
-                "tool_name": "weather",
-                "weather_query": {
-                  "location": "河南省内乡县",
-                  "date": "today",
-                  "units": "metric"
+              "responsibilities": [
+                {
+                  "local_ref": "r1",
+                  "outcome": "告知用户河南省内乡县现在是否下雨",
+                  "bindings": {
+                    "location": "河南省内乡县",
+                    "date": "today",
+                    "question": "rain"
+                  },
+                  "completion_requires_work": true,
+                  "completion_requires_fresh_evidence": true,
+                  "confidence": 0.97
                 }
-              }
+              ],
+              "fast_speech": null,
+              "progress": []
             }
           }
         ]
       },
       "expect": {
         "route": "tool",
-        "intent": "weather_query",
+        "intent": "weather_lookup",
         "source": "llm",
         "llm_calls": 1,
         "llm_stages": [
@@ -129,9 +167,27 @@
         "history_contains": [
           "你好，今天重庆天气咋样？热不热，下雨了没？"
         ],
-        "metadata_json_contains": [
-          "河南省内乡县",
-          "weather_query"
+        "responsibilities": [
+          {
+            "local_ref": "r1",
+            "outcome": "告知用户河南省内乡县现在是否下雨",
+            "bindings": {
+              "location": "河南省内乡县",
+              "date": "today",
+              "question": "rain"
+            },
+            "completion_requires_work": true,
+            "completion_requires_fresh_evidence": true,
+            "confidence": 0.97
+          }
+        ],
+        "task_types_include": [
+          "task.use_tool"
+        ],
+        "metadata_json_forbid": [
+          "tool_name",
+          "weather_query",
+          "重庆"
         ]
       }
     }

@@ -3,7 +3,7 @@
   "id": "compound_low_confidence_action_delegates",
   "suite": "goal_interpretation",
   "level": "module",
-  "description": "A compound fast Goal Interpreter plan must delegate to deepthinking when one required action is below per-action confidence threshold instead of executing the high-confidence subset.",
+  "description": "A low-confidence effectful semantic interpretation delegates to deeper cognition before Goal Association; uncertainty is about the requested human responsibilities, not a Fast Goal Interpreter Capability action plan.",
   "tags": [
     "cognitive-core-agent-contract",
     "compound",
@@ -53,48 +53,52 @@
         }
       ]
     },
-    "llm_decision": {
-      "route": "robot_action",
-      "agents": [
-        "capability_agent",
-        "safety_agent",
-        "speaker_agent"
-      ],
-      "intent": "compound_common_catalog_task",
-      "confidence": 0.87,
-      "language": "en-US",
-      "source": "llm",
-      "actions": [
-        {
-          "capability_id": "soridormi.walk_forward",
-          "args": {
-            "duration_s": 20
-          },
-          "sequence": 0,
-          "timing": "sequential",
-          "confidence": 0.89
-        },
-        {
-          "capability_id": "chromie.speak",
-          "args": {
-            "text": "I can try a joke while walking.",
-            "style": "brief"
-          },
-          "sequence": 1,
-          "timing": "parallel",
-          "confidence": 0.31
-        },
-        {
-          "capability_id": "soridormi.blink_eyes",
-          "args": {
-            "count": 6
-          },
-          "sequence": 2,
-          "timing": "sequential",
-          "confidence": 0.84
+    "llm_script": [
+      {
+        "stage": "quick_intent",
+        "decision": {
+          "route": "robot_action",
+          "intent": "compound_activity_uncertain",
+          "confidence": 0.31,
+          "language": "en-US",
+          "responsibilities": [
+            {
+              "local_ref": "r1",
+              "outcome": "walk forward for 20 seconds",
+              "bindings": {
+                "direction": "forward",
+                "duration_s": 20
+              },
+              "completion_requires_work": true,
+              "completion_requires_fresh_evidence": false,
+              "confidence": 0.72
+            },
+            {
+              "local_ref": "r2",
+              "outcome": "say something humorous while walking",
+              "bindings": {
+                "concurrency": "while walking"
+              },
+              "completion_requires_work": true,
+              "completion_requires_fresh_evidence": false,
+              "confidence": 0.31
+            },
+            {
+              "local_ref": "r3",
+              "outcome": "blink while walking",
+              "bindings": {
+                "concurrency": "while walking"
+              },
+              "completion_requires_work": true,
+              "completion_requires_fresh_evidence": false,
+              "confidence": 0.7
+            }
+          ],
+          "fast_speech": null,
+          "progress": []
         }
-      ]
-    }
+      }
+    ]
   },
   "expect": {
     "route": "deep_thought",
@@ -108,14 +112,16 @@
       "task.execute_skill",
       "speech.speak"
     ],
-    "metadata_true": [],
     "metadata_json_contains": [
       "fast_goal_interpreter_review_request",
       "not_committed",
       "thinking_ack_source",
       "none",
-      "action[1] confidence 0.31 below threshold"
+      "quick_intent=compound_activity_uncertain"
     ],
-    "llm_calls": 1
+    "llm_calls": 1,
+    "llm_stages": [
+      "quick_intent"
+    ]
   }
 }

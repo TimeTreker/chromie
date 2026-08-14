@@ -522,9 +522,10 @@ preserves the user’s goal.
 
 For an enabled route, one turn has one authoritative semantic planner. In
 maintained `apply` mode that owner is the Goal-Driven Cognitive Core, currently
-implemented by the unified Goal-driven Runtime. Exact Goal Interpreter actions may be
-consumed only as compatibility-adapter input; they do not form a second semantic
-plan, and a turn acquired by the Goal-driven Runtime cannot fall through to the
+implemented by the unified Goal-driven Runtime. Deprecated exact `actions[]` from
+legacy Agent compatibility callers may be consumed only as adapter input; current Fast
+Goal Interpretation never authors them. They do not form a second semantic plan, and a
+turn acquired by the Goal-driven Runtime cannot fall through to the
 old CapabilityAgent planner after a failure.
 
 The old CapabilityAgent semantic planner is retained only as an explicit
@@ -746,35 +747,29 @@ A retained interaction outcome used for evaluation, scenario mining, and
 owner-reviewed improvement. Experience never silently changes safety policy or
 core principles.
 
-### 4.10 General progress candidate
+### 4.10 Fast Responsibility evidence and native progress
 
-`CognitiveProgressCandidate` is an implemented Fast-Understanding proposal for
-work that is already semantically concrete enough to be considered for progress.
-It is deliberately more general than a tool/read request. Current forms include:
+`CognitiveResponsibilityProposal` is the implemented provider-neutral Fast
+Understanding evidence for what human outcome appears to be owed. It carries a
+local reference, outcome, material semantic bindings, whether work remains, and
+whether fresh evidence is required. It is not a Goal, Plan, Capability selection,
+or execution authorization. Capability IDs, executable arguments, actions,
+providers, and execution methods are forbidden in its bindings.
 
-- `native_response`: a complete substantive conversational act that current
-  Mind/context can already support; and
-- `capability`: an exact capability plus material arguments that Fast
-  Understanding has already resolved and grounded in the current turn or
-  authoritative bounded context.
+`CognitiveProgressCandidate` is intentionally narrower: the maintained form is
+only `native_response`, a complete substantive conversational act that current
+Mind/context can already support without new acquisition, memory work, effect,
+unresolved reference, or deeper reasoning. For that Responsibility,
+`fast_speech` is null. When work or fresh evidence remains, `fast_speech` may be
+prospective acknowledgement/checking communication, but there is no capability
+progress candidate.
 
-These two forms are mutually exclusive for one single-lane Responsibility. A
-`native_response` means there is nothing else to acquire or execute for that
-answer, so it is the immediate substantive speech and `fast_speech` is null. A
-`capability` candidate means work/evidence still remains; any `fast_speech` is
-therefore only a prospective acknowledgement/checking act and cannot contain the
-provider-dependent answer. Fast Goal Interpretation may author both kinds across
-independent Responsibilities in a multi-route turn, but one Responsibility must
-not simultaneously claim to be answered and still require capability work.
-
-A candidate is meaning, not authorization. A material entity or parameter that
-defines the owed human outcome cannot become ready progress while unresolved; Fast
-Understanding leaves that capability out of progress and Goal Association owns the
-clarification. Planner/provider details may remain unresolved only after the human
-outcome itself is semantically defined. Trusted readiness policy decides what may
-advance now. Goal Association later supplies explicit canonical Goal binding when
-the responsibility persists or needs reconciliation. The Host does not infer Goal
-ownership from route names, text similarity, or capability resemblance.
+Goal Association independently verifies the Responsibility evidence and creates
+or associates the canonical Goal. Planner then sees that Goal plus the current
+Capability catalog and chooses how to accomplish it. The Host rejects or
+mechanically retransmits a Fast DTO that tries to select an exact Capability,
+executable args, or actions; it never repairs the boundary by normalizing that
+selection into valid Fast meaning.
 
 ### 4.11 Continuous Mind candidate vocabulary — retained problem-space inventory
 
@@ -951,8 +946,8 @@ Direction:
 - permission/consent are explicit cross-cutting authority facts;
 - `Converse` is native cognition, while `chromie.speak` remains transport/evidence;
   and
-- Social Attention reacts to interaction-state changes but never becomes a second
-  Goal or semantic planner.
+- Social Attention may decorate a concrete primary observable Activity but never
+  reacts merely to cognition-state changes or becomes a second Goal/semantic planner.
 
 #### G. Outcome reconciliation, reflection, memory, and learning
 
@@ -1441,20 +1436,20 @@ timescales, not a mandatory module pipeline:
 Admitted Observation / User Turn
   ↓
 Fast Understanding
+  ├─ provider-neutral Responsibility evidence ──────────────→ Goal cognition
   ├─ complete native conversational progress ───────────────→ Vocal
-  ├─ exact capability progress candidate ──────────────────→ readiness gate
-  │                                                           ├─ ready safe progress → trusted runtime
-  │                                                           └─ not ready → Goal/planning path
-  └─ unfinished / uncertain responsibility ────────────────→ Goal cognition
+  `─ optional prospective fast_speech ──────────────────────→ Vocal
 
-In parallel from the same interaction state:
+Goal cognition:
   Goal Association / continuity / relationship reasoning
-  background Social Attention decoration cognition
-  existing ready work and observations
+  → canonical Goal state
+  → Fast / Deep Planner selects exact Capability + executable arguments
+  → deterministic validation/authorization
+  → trusted execution → observation/evidence
 
-Goal/slow cognition as needed:
-  Goal state → intention/planning → deterministic validation/authorization
-             → trusted execution → observation/evidence
+In parallel only when a concrete primary observable Activity exists:
+  background Social Attention decoration cognition
+  existing already-authorized work and observations
 
 Every new observation:
   → reconcile current responsibility/progress
@@ -1462,24 +1457,25 @@ Every new observation:
   → optionally trigger bounded Reflection when surprise/importance warrants it
 ```
 
-The loop preserves one semantic authority even when work overlaps in time. A
-Fast candidate does not authorize itself; a started read or spoken response does
-not complete a Goal until the applicable canonical binding/evidence proves what
-responsibility it satisfied; an effectful Intention still crosses trusted
-planning and authorization.
+The loop preserves one semantic authority even when work overlaps in time. Fast
+Responsibility evidence does not authorize provider work; an early native spoken
+response does not complete a Goal until canonical binding proves what
+responsibility it satisfied; all Capability work crosses canonical Goal grounding,
+planning, and trusted authorization.
 
-Goal Association is therefore a continuity and responsibility-relation boundary,
-not a global start barrier. Planner is an intention-forming mechanism used when
-the responsibility is not already complete or cannot safely advance from current
-understanding. Response Composer is a still-needed-delta expression coordinator and has no
-Social Attention authoring authority. Background `SocialAttentionPlanner` is the
-single place that may decide optional decoration for an anchored event. Social
-Attention still never owns response wording. Provider observations are cognition events,
-not merely terminal inputs to a speech formatter.
+Goal Association is therefore the canonical Responsibility/continuity boundary
+for unfinished work, not a barrier to provider-free native speech. Planner is the
+exclusive intention-forming owner of Capability selection and executable arguments.
+Response Composer is a still-needed-delta expression coordinator and has no Social
+Attention authoring authority. Background `SocialAttentionPlanner` is the single
+place that may decide optional decoration for a concrete primary observable
+Activity; cognition milestones do not create anchors. Social Attention still never
+owns response wording. Provider observations are cognition events, not merely
+terminal inputs to a speech formatter.
 
-The implemented General Progress substrate covers immediate native conversation,
-exact capability candidates, explicit Goal binding, trusted early safe-read
-readiness, and background Social Attention decoration. Sections 4.11–4.13 retain the broader
+The implemented Fast substrate covers provider-neutral Responsibility evidence,
+immediate native conversation, explicit Goal binding, Planner-owned Capability
+selection, and primary-Activity-anchored Social Attention decoration. Sections 4.11–4.13 retain the broader
 problem-space inventory and the compression discipline that produced Section
 4.14. They are no longer an instruction to pre-create the candidate concepts as
 persistent state; future implementation starts from the compressed baseline and
@@ -1569,7 +1565,8 @@ coverage proof may permit one fresh source-based interpretation, whose model may
 choose a genuine clarification when the user can resolve the gap. Invalid or
 repeatedly incomplete output fails closed with no Goal commit or effect.
 
-Fast Goal Interpreter route and retrieval results are advisory projections. Its
+Fast Goal Interpreter route hints and Responsibility proposals are advisory
+projections. Exact Capability/retrieval selection is not part of this stage. Its
 maintained transaction is deliberately smaller than Goal Association's:
 
 ```text
@@ -1580,9 +1577,9 @@ primary fast interpretation
 
 It does not run an intent reviewer, semantic-route repair, generic-chat critic,
 capability-grounding reviewer, or repair-of-review chain. Deterministic code may
-validate schema, catalog identity, authorization-independent effect shape, and
-impossible route/intent combinations, but it may not manufacture ordinary user
-meaning. A valid low-confidence interpretation is delegated once to Deep
+validate schema, reject Planner-owned fields or exact Capability selection, and
+check impossible route/intent combinations, but it may not manufacture ordinary
+user meaning or turn a Capability choice into a Fast interpretation. A valid low-confidence interpretation is delegated once to Deep
 Thinking when its route could change responsibility, external work, memory, or
 effects. A
 schema-valid benign `chat` decision stays on the fast conversational path; low
@@ -2009,11 +2006,11 @@ runtime may dispatch that Responsibility immediately. Deep Planner is not a seco
 approval gate. Conversely, a Fast contract/provenance failure stops before execution;
 it does not gain semantic legitimacy by asking Deep to repair the same malformed Plan.
 
-For confirmation-free `safe_read` work, the existing readiness mechanism may start an
-exact grounded Capability candidate before Goal Association/planning completes and later
-bind that already-started request to the canonical Goal. This is Responsibility-local
-parallel progress, not speculative execution: effectful work still requires canonical
-Goal/Plan commitment and Host authorization.
+For confirmation-free `safe_read` work, provider execution still begins only after
+Goal Association has produced canonical Goal grounding and Planner has selected the
+exact Capability and executable arguments. Once that boundary is crossed, the valid
+Fast Plan may execute without waiting for unrelated Deep cognition. Pre-Goal Fast
+progress is provider-free speech, not provider execution.
 
 The planner model emits a flat semantic DTO, not the canonical transport
 envelope. Plan identity, schema version, planner tier, and authoritative
@@ -2344,11 +2341,11 @@ reconstructs action meaning from capability-specific phrase templates.
 ### 12.1 Social Attention is a behavior domain
 
 A turn may have an immutable user task plan, independent response language, and
-an optional background Social Attention expression plan. These are not authored
-as one compound object. `SocialAttentionPlanner` alone authors the decoration
-plan. Social Attention is not one skill and not a deterministic
-utterance-to-gesture mapping; it is optional body expression or deliberate
-stillness around an already-anchored interaction.
+zero or more optional Social Attention opportunities, one for each concrete
+primary human-observable Activity. These are not authored as one compound object.
+`SocialAttentionPlanner` alone authors each decoration plan. Social Attention is
+not one skill and not a deterministic utterance-to-gesture mapping; it is optional
+body expression or deliberate stillness attached to a primary Activity.
 
 The related shapes are:
 
@@ -2365,7 +2362,7 @@ explicit CanonicalPlan Activity responsibility. It is non-droppable and cannot
 be replaced with a more convenient gesture.
 
 `SocialAttentionPlan` is different. It exists only for optional decoration
-around an anchored interaction. Its `interaction_role=auxiliary_expression`
+around one concrete `primary_activity` anchor. Its `interaction_role=auxiliary_expression`
 means auxiliary embodied expression; it does not represent another speech
 channel. Decoration may support acknowledgement, listening, engagement, empathy,
 turn taking, deference, or neutral presence, but cannot satisfy, replace,
@@ -2373,9 +2370,10 @@ authorize, delay, or claim completion of a user Goal.
 
 ### 12.3 Model authority
 
-The Social Attention model receives bounded interaction state, target evidence,
-owner-approved Social Interaction Style, recent decoration evidence, and exact
-catalog candidates tagged with the `social_attention` behavior domain. It owns:
+The Social Attention model receives the exact `primary_activity` anchor, bounded
+interaction context, target evidence, owner-approved Social Interaction Style,
+recent decoration evidence, and exact catalog candidates tagged with the
+`social_attention` behavior domain. It owns:
 
 - whether small embodied decoration is useful now;
 - the social purpose;
@@ -2409,12 +2407,15 @@ policy. Soridormi backends preserve named-skill and semantic-argument contracts.
 Backend selection, controller adaptation, calibration, motion limits, collision
 safety, stop, and recovery remain provider responsibilities.
 
-### 12.5 Interaction anchor, target evidence, and conflict policy
+### 12.5 Primary Activity anchor, target evidence, and conflict policy
 
-Social Attention requires an interaction anchor. Listening, Vocal output,
-ongoing Activity, turn-taking, interaction-bound waiting, or another
-socially-relevant event can provide that anchor. Pure unanchored idle animation
-is a separate embodiment/liveliness concern.
+Social Attention requires a concrete primary human-observable Activity anchor.
+Scheduled/started speech or Vocal output, body Activity, handover, vocal
+performance, or media playback can provide that anchor. `understanding_ready`,
+Goal Association, planning, waiting, evidence arrival, and similar internal
+cognitive/runtime milestones cannot. Pure unanchored idle animation is a separate
+embodiment/liveliness concern. Each distinct primary Activity in one turn is an
+independent optional decoration opportunity.
 
 Target priority is:
 
@@ -2429,9 +2430,10 @@ Invalid, sequential, unavailable, repetitive, unnecessary, or conflicting
 auxiliary body decoration is dropped. There is no Social-Attention speech
 fallback: dropping decoration leaves ResponsePlan/Vocal output unchanged.
 Decoration never delays speech, emergency handling, or primary task execution.
-The Social Interaction Style controls frequency/restraint, and recent accepted
-or terminal decoration evidence supports cooldown without becoming Goal
-completion evidence.
+The Social Interaction Style controls frequency/restraint, and recent accepted or terminal decoration evidence supports repetition control for
+the same primary Activity without becoming Goal completion evidence. Decoration
+on one primary Activity does not globally suppress a later distinct Activity in
+the same turn.
 
 Accepted decoration executes through Activity with
 `auxiliary_social_attention=true` and `execution_role=social_decoration`.
@@ -2542,12 +2544,11 @@ model-facing structured output must make that decision explicitly: `fast_speech`
 is one brief natural string or JSON `null`, never an omitted field. This makes the
 communication decision required without making speech mandatory. The Host derives
 route-specific purpose/commitment and other deterministic claim-envelope facts;
-the model does not redundantly copy those system invariants. That mechanical
-normalization may fill an omitted route or normalize an exact catalog identity,
-but it must not rewrite an explicit valid semantic route when exact capability
-work contradicts it, because doing so would reclassify the same model-authored
-`fast_speech` under a stronger claim envelope. Such an inconsistent DTO gets at
-most the existing one mechanical retransmission. No second production LLM
+the model does not redundantly copy those system invariants. That mechanical normalization may fill representation-safe omissions, but it
+must never normalize an exact catalog identity, executable args, or actions into
+Fast Goal Interpreter authority. Such Planner-shaped output is rejected and gets
+at most the existing one mechanical DTO retransmission under the same user
+meaning. No second production LLM
 re-decides or repairs that ordinary communication choice. Dynamic pre-Goal
 speech must carry `claim_state=none` with empty capability and
 Goal claim IDs. Tool speech uses the typed `acknowledge_and_check`/
@@ -3001,8 +3002,9 @@ Operational details are maintained in
 ### PR8 — Single semantic authority and model-facing contract hardening
 
 Implementation status: the unified runtime is authoritative for configured
-lanes, exact Goal Interpreter actions are adapter-only, and the legacy CapabilityAgent
-planner is emergency-only behind matching per-turn authority. Goal Association
+lanes, deprecated exact `actions[]` are legacy-adapter-only rather than Fast Goal
+Interpreter output, and the legacy CapabilityAgent planner is emergency-only behind
+matching per-turn authority. Goal Association
 uses the exact model-facing schema while the host constructs canonical
 persistence objects.
 

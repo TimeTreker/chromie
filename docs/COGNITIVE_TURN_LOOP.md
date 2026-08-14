@@ -186,10 +186,11 @@ questions:
    allowed progress unsafe or falsely treating it as completion?
 
 When the answers are sufficient, that part may advance while unrelated cognition
-continues. This is the general runtime rule behind responsive conversation,
-bounded information acquisition, Social Attention, and later parallel work. It
-must not be implemented as a weather phrase rule, route shortcut, or second
-semantic authority.
+continues **only inside the authority already established for that part**. This is
+the general runtime rule behind responsive conversation and later parallel work;
+it never allows Fast Goal Interpretation to skip Goal Association or Planner for
+provider work. It must not be implemented as a weather phrase rule, route shortcut,
+or second semantic authority.
 
 A complete native conversational response is another locally ready form of
 progress. When Fast Understanding can already answer from the current Mind and
@@ -210,17 +211,15 @@ Goal; canonical delivery may then reuse the exact speech/result instead of
 speaking it again. The Host may validate and bind that model-authored act but may
 not rewrite it or infer its Goal from text similarity.
 
-A fully specified non-effectful read is the clearest case. Once the Core has
-sufficiently understood an exact bounded read and trusted code verifies that the
-registered operation is read-only, schema-valid, confirmation-free, and safe to
-perform, the read may start while Goal Association continues to determine
-continuity and relationships with existing Goals. The returned observation is
-retained with exact turn, capability/version, arguments, schema identity,
-timestamps, and provenance. It is not Goal completion evidence merely because
-it arrived early. If later canonical planning requires the exact same operation,
-deterministic correlation may reuse the observation; if the identities differ,
-the Host must not coerce them into equivalence and the canonical request proceeds
-normally.
+A fully specified non-effectful read still needs the correct semantic owners. Fast
+Goal Interpretation may already know the information Responsibility and material
+bindings such as location/date, but that does not make an exact provider request
+its output. Goal Association first binds or creates the canonical Goal; Fast or
+Deep Planner then selects the exact read Capability and executable arguments. Once
+that Plan is valid and the trusted runtime verifies read-only, schema, confirmation,
+and authorization constraints, the read may execute without waiting for unrelated
+later cognition. The resulting observation retains exact Goal/Plan, capability
+version, arguments, schema identity, timestamps, and provenance.
 
 Effectful work is different. Physical motion, object manipulation, writes,
 message sending, media effects, and other committed side effects remain behind
@@ -229,12 +228,13 @@ provider-safety barriers. Sufficient understanding may allow cognition,
 clarification, safe preparation, refusal, or another harmless branch to advance,
 but it is not execution authorization.
 
-The same principle applies to optional presentation work. Response composition,
-semantic polishing, or Social Attention must not become a barrier to an otherwise-
-ready non-effectful acquisition merely because those activities happen in the
-same interaction. Presentation failure remains local and must not reopen Goal
-Interpretation, planning, or another semantic reviewer. Runtime qualification
-should measure
+The same principle applies to optional presentation work. Response composition
+or semantic polishing must not become a barrier to already-authorized work. Social
+Attention is considered only when a concrete primary human-observable Activity
+(such as scheduled speech/Vocal or body Activity) exists; internal cognition or
+evidence arrival cannot create a decoration opportunity by itself. Presentation
+failure remains local and must not reopen Goal Interpretation, planning, or another
+semantic reviewer. Runtime qualification should measure
 at least the time to the first meaningful reaction and the time to the first
 useful result separately; reducing one must not hide a long unnecessary critical
 path in the other.
@@ -246,21 +246,27 @@ existing Goal: go out for dinner tonight
 
 user: "Will it rain heavily in Chongqing today?"
 
-admit + fast understanding
-  |-- sufficiently specified safe weather read ----------> provider
-  |                                                        |
-  |                                                        `-> trusted observation
-  |
-  `-- Goal Association ----------------------------------> relates the weather
-                                                           question to the
-                                                           existing dinner Goal
+Fast Goal Interpretation
+  |-- Responsibility: provide today's Chongqing weather
+  |-- bindings: location=Chongqing, time=today
+  `-- optional acknowledgement speech ------------------> Vocal
+
+Goal Association
+  `-- associate/create canonical weather Goal and its relationship to dinner
+
+Fast Planner
+  `-- select exact weather lookup Capability + executable args
+
+Trusted Capability Runtime
+  `-- provider -> trusted observation
 
 trusted observation + canonical Goal relationships
   -> evidence-qualified answer focused on whether rain affects the user's plan
 ```
 
-The weather lookup does not need to wait for the relationship analysis; the
-relationship analysis still improves what the result means to the user.
+The acknowledgement can overlap Goal Association because speech is already an
+observable Activity. The weather lookup itself cannot: provider work begins only
+after canonical Goal binding and Planner selection.
 
 ### 3.2 General Progress inside the Continuous Mind baseline
 
@@ -372,8 +378,10 @@ UserTurnEnvelope
   -> confirmation and commitment
 ```
 
-Fast and Deep planning use the same `CanonicalPlan` contract. Model reasoning
-chooses semantic goals, plan steps, parameters, ordering, and per-goal
+Fast and Deep planning use the same `CanonicalPlan` contract. Fast Goal
+Interpretation contributes provider-neutral Responsibility evidence; it does not
+choose plan steps or exact Capabilities. Planner model reasoning chooses semantic
+plan steps, parameters, ordering, and per-goal
 prospective outcomes. Deterministic code checks schemas, capability
 availability, source-effect bounds, resources, confirmation requirements, and
 forbidden low-level controls. Validation cannot invent missing meaning or
@@ -387,8 +395,8 @@ that path instead of being repaired by Deep. Deep Planner is invoked only for ge
 semantic ambiguity or coverage, nontrivial dependency, material alternative,
 novelty/broader context, or safety/resource reasoning that truly requires wider
 cognition. Independent Responsibilities may therefore progress at different cognitive
-depths; confirmation-free safe reads can use the existing readiness path while later
-Goal cognition continues. A purely mechanical Planner DTO/schema failure may be
+depths; once each has canonical Goal grounding, a confirmation-free safe read may
+execute while unrelated deeper cognition continues. A purely mechanical Planner DTO/schema failure may be
 regenerated once under the same semantic meaning. Fast semantic/grounding/coverage
 rejection may escalate once to Deep when broader reasoning is warranted. Deep
 semantic/grounding/coverage rejection is terminal for that cognition attempt and

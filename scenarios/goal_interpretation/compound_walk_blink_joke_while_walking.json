@@ -3,7 +3,7 @@
   "id": "compound_walk_blink_joke_while_walking",
   "suite": "goal_interpretation",
   "level": "module",
-  "description": "Regression from the 2026-07-03 text-MuJoCo run: a compound physical request with a spoken joke must keep speech as a skill task instead of collapsing to walk/blink only.",
+  "description": "Regression from the compound walk/blink/joke request: Fast Goal Interpretation must preserve all three human responsibilities and their concurrency meaning without turning speech or body behavior into Capability actions; Planner owns the executable decomposition.",
   "tags": [
     "voice-log",
     "cognitive-core-agent-contract",
@@ -23,7 +23,11 @@
     "catalog": {
       "matched": true,
       "suggested_route": "robot_action",
-      "suggested_agents": ["capability_agent", "safety_agent", "speaker_agent"],
+      "suggested_agents": [
+        "capability_agent",
+        "safety_agent",
+        "speaker_agent"
+      ],
       "catalog_version": 21,
       "capabilities": [
         {
@@ -52,54 +56,159 @@
         }
       ]
     },
-    "llm_decision": {
-      "route": "robot_action",
-      "agents": ["capability_agent", "safety_agent", "speaker_agent"],
-      "intent": "compound_common_catalog_task",
-      "confidence": 0.87,
-      "language": "en-US",
-      "source": "llm",
-      "actions": [
-        {
-          "capability_id": "soridormi.walk_forward",
-          "args": {"duration_s": 20},
-          "sequence": 0,
-          "timing": "sequential",
-          "confidence": 0.91
-        },
-        {
-          "capability_id": "chromie.speak",
-          "args": {
-            "text": "Why did the robot bring a map? Because every good walk needs direction.",
-            "style": "brief"
-          },
-          "sequence": 1,
-          "timing": "parallel",
-          "confidence": 0.86
-        },
-        {
-          "capability_id": "soridormi.blink_eyes",
-          "args": {"count": 6},
-          "sequence": 2,
-          "timing": "sequential",
-          "confidence": 0.88
+    "llm_script": [
+      {
+        "stage": "quick_intent",
+        "decision": {
+          "route": "robot_action",
+          "agents": [
+            "capability_agent",
+            "safety_agent",
+            "speaker_agent"
+          ],
+          "intent": "compound_common_catalog_task",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "actions": [
+            {
+              "capability_id": "soridormi.walk_forward",
+              "args": {
+                "duration_s": 20
+              },
+              "sequence": 0,
+              "timing": "sequential",
+              "confidence": 0.91
+            },
+            {
+              "capability_id": "chromie.speak",
+              "args": {
+                "text": "Why did the robot bring a map? Because every good walk needs direction.",
+                "style": "brief"
+              },
+              "sequence": 1,
+              "timing": "parallel",
+              "confidence": 0.86
+            },
+            {
+              "capability_id": "soridormi.blink_eyes",
+              "args": {
+                "count": 6
+              },
+              "sequence": 2,
+              "timing": "sequential",
+              "confidence": 0.88
+            }
+          ],
+          "responsibilities": [],
+          "fast_speech": null,
+          "progress": []
         }
-      ]
-    }
+      },
+      {
+        "stage": "quick_intent_contract_repair",
+        "decision": {
+          "route": "robot_action",
+          "intent": "compound_activity",
+          "confidence": 0.87,
+          "language": "en-US",
+          "responsibilities": [
+            {
+              "local_ref": "r1",
+              "outcome": "walk forward for 20 seconds",
+              "bindings": {
+                "direction": "forward",
+                "duration_s": 20
+              },
+              "completion_requires_work": true,
+              "completion_requires_fresh_evidence": false,
+              "confidence": 0.91
+            },
+            {
+              "local_ref": "r2",
+              "outcome": "tell a joke while walking",
+              "bindings": {
+                "concurrency": "while walking"
+              },
+              "completion_requires_work": true,
+              "completion_requires_fresh_evidence": false,
+              "confidence": 0.86
+            },
+            {
+              "local_ref": "r3",
+              "outcome": "blink repeatedly while walking",
+              "bindings": {
+                "concurrency": "while walking"
+              },
+              "completion_requires_work": true,
+              "completion_requires_fresh_evidence": false,
+              "confidence": 0.88
+            }
+          ],
+          "fast_speech": null,
+          "progress": []
+        }
+      }
+    ]
   },
   "expect": {
     "route": "robot_action",
-    "intent": "compound_common_catalog_task",
+    "intent": "compound_activity",
     "source": "llm",
-    "task_types_include": ["task.execute_skill", "speech.speak"],
-    "metadata_true": ["fast_goal_interpreter_compound_tasks"],
+    "task_types_include": [
+      "task.execute_robot_action"
+    ],
     "metadata_json_contains": [
+      "goal_interpreter_transaction"
+    ],
+    "llm_calls": 2,
+    "llm_stages": [
+      "quick_intent",
+      "quick_intent_contract_repair"
+    ],
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "walk forward for 20 seconds",
+        "bindings": {
+          "direction": "forward",
+          "duration_s": 20
+        },
+        "completion_requires_work": true,
+        "completion_requires_fresh_evidence": false,
+        "confidence": 0.91
+      },
+      {
+        "local_ref": "r2",
+        "outcome": "tell a joke while walking",
+        "bindings": {
+          "concurrency": "while walking"
+        },
+        "completion_requires_work": true,
+        "completion_requires_fresh_evidence": false,
+        "confidence": 0.86
+      },
+      {
+        "local_ref": "r3",
+        "outcome": "blink repeatedly while walking",
+        "bindings": {
+          "concurrency": "while walking"
+        },
+        "completion_requires_work": true,
+        "completion_requires_fresh_evidence": false,
+        "confidence": 0.88
+      }
+    ],
+    "actions": [],
+    "task_types_forbid": [
+      "task.execute_skill",
+      "speech.speak"
+    ],
+    "metadata_json_forbid": [
       "soridormi.walk_forward",
       "chromie.speak",
       "soridormi.blink_eyes",
-      "Why did the robot bring a map?",
       "fast_goal_interpreter_action_min_confidence"
-    ],
-    "llm_calls": 1
+    ]
   }
 }

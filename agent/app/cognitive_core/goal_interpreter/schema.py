@@ -6,10 +6,16 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 try:
-    from chromie_contracts.interaction import OptionalCapabilityIdentityModel
+    from chromie_contracts.interaction import (
+        OptionalCapabilityIdentityModel,
+        reject_forbidden_low_level_fields,
+    )
     from chromie_contracts.route import MemoryUpdateProposal
 except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.interaction import OptionalCapabilityIdentityModel
+    from shared.chromie_contracts.interaction import (
+        OptionalCapabilityIdentityModel,
+        reject_forbidden_low_level_fields,
+    )
     from shared.chromie_contracts.route import MemoryUpdateProposal
 
 try:
@@ -42,6 +48,33 @@ _SOURCE_FAST_SPEECH_ROUTE_CONTRACTS: dict[str, tuple[str, str]] = {
 
 
 logger = logging.getLogger("chromie.agent.goal_interpreter.schema")
+
+
+_PLANNER_OWNED_BINDING_FIELDS = frozenset({
+    "capability_id",
+    "skill_id",
+    "tool_name",
+    "provider_id",
+    "execution_method",
+    "executable_args",
+    "args",
+    "actions",
+})
+
+
+def _reject_planner_owned_bindings(value: Any, *, path: str = "bindings") -> Any:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            normalized = str(key or "").strip().casefold()
+            if normalized in _PLANNER_OWNED_BINDING_FIELDS:
+                raise ValueError(
+                    f"Planner-owned field {key!r} is forbidden in Fast responsibility {path}"
+                )
+            _reject_planner_owned_bindings(item, path=f"{path}.{key}")
+    elif isinstance(value, (list, tuple)):
+        for index, item in enumerate(value):
+            _reject_planner_owned_bindings(item, path=f"{path}[{index}]")
+    return value
 
 
 DEFAULT_AGENTS: dict[str, list[str]] = {
@@ -145,28 +178,63 @@ class RouteItem(OptionalCapabilityIdentityModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-class FastProgressProposal(BaseModel):
-    """Model-facing progress already understood by Fast Goal Interpretation.
+class FastResponsibilityProposal(BaseModel):
+    """Provider-neutral human outcome understood by Fast Goal Interpretation.
 
-    The proposal is semantic evidence only. ``native_response`` means current
-    trusted cognition already contains the complete conversational result and no
-    other work is required for that responsibility. ``capability`` means work/evidence
-    still remains. Host/runtime decides whether proposed progress is locally ready,
-    and Goal Association later binds it to canonical Goals.
+    This is semantic evidence for Goal Association, not a Goal, Plan, Capability
+    selection, or execution authorization. ``bindings`` preserve material meaning
+    already present in the user turn or trusted context without choosing how that
+    outcome will be achieved.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    kind: Literal["capability", "native_response"]
-    capability_id: str = Field(default="", max_length=200)
-    args: dict[str, Any] = Field(default_factory=dict)
-    response_text: str = Field(default="", max_length=600)
+    local_ref: str = Field(min_length=1, max_length=80)
+    outcome: str = Field(min_length=1, max_length=500)
+    bindings: dict[str, Any] = Field(default_factory=dict)
+    completion_requires_work: bool = False
+    completion_requires_fresh_evidence: bool = False
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+
+    @field_validator("local_ref", "outcome", mode="before")
+    @classmethod
+    def normalize_responsibility_text(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return " ".join(value.strip().split())
+        return value
+
+    @field_validator("bindings")
+    @classmethod
+    def reject_low_level_bindings(cls, value: dict[str, Any]) -> dict[str, Any]:
+        reject_forbidden_low_level_fields(value)
+        return _reject_planner_owned_bindings(value)
+
+    @model_validator(mode="after")
+    def validate_evidence_requirement(self) -> "FastResponsibilityProposal":
+        if self.completion_requires_fresh_evidence and not self.completion_requires_work:
+            raise ValueError(
+                "fresh evidence requirement implies completion_requires_work"
+            )
+        return self
+
+
+class FastProgressProposal(BaseModel):
+    """Complete immediate conversational progress from Fast Goal Interpretation.
+
+    Fast Goal Interpretation may expose only a ``native_response`` that is already
+    complete from trusted cognition. Capability-shaped work belongs to the Planner
+    after Goal Association and therefore cannot appear in this DTO.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["native_response"] = "native_response"
+    response_text: str = Field(min_length=1, max_length=600)
     speech_act: str = Field(default="inform", min_length=1, max_length=120)
     intent: str = Field(default="unknown", min_length=1, max_length=200)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
 
     @field_validator(
-        "capability_id",
         "response_text",
         "speech_act",
         "intent",
@@ -177,20 +245,6 @@ class FastProgressProposal(BaseModel):
         if isinstance(value, str):
             return " ".join(value.strip().split())
         return value
-
-    @model_validator(mode="after")
-    def validate_progress_shape(self) -> "FastProgressProposal":
-        if self.kind == "capability":
-            if not self.capability_id:
-                raise ValueError("capability progress requires capability_id")
-            if self.response_text:
-                raise ValueError("capability progress must not carry response_text")
-            return self
-        if self.capability_id or self.args:
-            raise ValueError("native_response progress must not carry capability work")
-        if not self.response_text:
-            raise ValueError("native_response progress requires response_text")
-        return self
 
 
 class RouteDecision(BaseModel):
@@ -208,6 +262,7 @@ class RouteDecision(BaseModel):
     should_speak: bool = True
     speak_first: str | None = None
     fast_speech: FastSpeech | None = None
+    responsibilities: list[FastResponsibilityProposal] = Field(default_factory=list, max_length=8)
     progress: list[FastProgressProposal] = Field(default_factory=list, max_length=8)
     memory_update: MemoryUpdateProposal | None = None
     actions: list[dict[str, Any]] = Field(default_factory=list)

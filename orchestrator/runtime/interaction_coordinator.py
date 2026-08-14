@@ -98,16 +98,6 @@ def _int_env(name: str, default: int, *, minimum: int = 0) -> int:
 
 
 @dataclass
-class ReadyCapabilityExecution:
-    """One turn-local trusted read started before canonical Goal planning closes."""
-
-    candidate: CognitiveProgressCandidate
-    interaction_id: str
-    request: SkillRequest
-    task: asyncio.Task[SkillRuntimeResult]
-
-
-@dataclass
 class ReadyNativeResponseExecution:
     """One Core-authored native response already entering the Vocal lane."""
 
@@ -235,87 +225,6 @@ class InteractionRuntimeCoordinator:
 
     def skill_definition(self, skill_id: str):
         return self.registry.get(skill_id)
-
-    async def start_ready_capability_read(
-        self,
-        candidate: CognitiveProgressCandidate,
-        *,
-        session_id: str,
-        turn_id: str,
-        language: str,
-    ) -> ReadyCapabilityExecution | None:
-        """Start one Core-authored exact read only when trusted readiness is proven.
-
-        The candidate is semantic input, never authorization.  This boundary
-        accepts only registered, available, confirmation-free, side-effect-free
-        safe reads with valid arguments and declared output evidence.
-        """
-
-        if candidate.kind != "capability":
-            return None
-        try:
-            await self.ensure_skill_definitions([candidate.capability_id])
-            definition = self.skill_definition(candidate.capability_id)
-        except (ValueError, RuntimeError):
-            return None
-        metadata = definition.metadata if isinstance(definition.metadata, dict) else {}
-        if (
-            not definition.available
-            or definition.requires_confirmation
-            or definition.requires_safety_monitor
-            or str(metadata.get("safety_class") or "") != "safe_read"
-            or metadata.get("side_effect_free") is not True
-        ):
-            return None
-        if validate_args_for_schema(candidate.args, definition.input_schema):
-            return None
-        try:
-            schema_digest = output_schema_sha256(definition.output_schema)
-        except (TypeError, ValueError):
-            return None
-
-        request = SkillRequest(
-            request_id=f"ready_{candidate.candidate_id}",
-            skill_id=candidate.capability_id,
-            skill_version=definition.version,
-            args=dict(candidate.args),
-            timing="parallel",
-            timeout_ms=definition.timeout_ms,
-            cancellable=definition.interruptible,
-            requires_confirmation=False,
-            idempotency_key=f"{turn_id}:{candidate.candidate_id}",
-            committed_output_schema_sha256=schema_digest,
-            metadata={
-                "source": "core_readiness_candidate",
-                "progress_candidate_id": candidate.candidate_id,
-                "turn_id": turn_id,
-                "session_id": session_id,
-                "language": language,
-                "safety_class": "safe_read",
-                "effectful": False,
-                "canonical_goal_binding_pending": True,
-                "goal_completion_authority": False,
-            },
-        )
-        interaction_id = f"ready_{turn_id}_{candidate.candidate_id}"
-        response = InteractionResponse(
-            interaction_id=interaction_id,
-            status="ok",
-            skills=[request],
-            metadata={
-                "source": "core_readiness_candidate",
-                "turn_id": turn_id,
-                "session_id": session_id,
-                "language": language,
-                "canonical_goal_binding_pending": True,
-                "goal_completion_authority": False,
-            },
-        )
-        # SkillRuntime is the trusted execution boundary; this provisional call
-        # intentionally bypasses canonical Interaction Ledger commitment because
-        # Goal Association has not yet attached the work to a canonical Goal.
-        task = asyncio.create_task(self.runtime.execute(response))
-        return ReadyCapabilityExecution(candidate, interaction_id, request, task)
 
     async def start_ready_native_response(
         self,
@@ -451,86 +360,6 @@ class InteractionRuntimeCoordinator:
             else None
         )
         self._preexecuted[(canonical_interaction_id, canonical_speech.id)] = (
-            rebound_result,
-            rebound_trace,
-        )
-        return True
-
-    async def cancel_ready_capability_read(
-        self, handle: ReadyCapabilityExecution
-    ) -> None:
-        if handle.task.done():
-            return
-        handle.task.cancel()
-        await asyncio.gather(handle.task, return_exceptions=True)
-
-    @staticmethod
-    def _ready_matches_request(
-        handle: ReadyCapabilityExecution,
-        request: SkillRequest,
-    ) -> bool:
-        return bool(
-            request.skill_id == handle.request.skill_id
-            and request.skill_version == handle.request.skill_version
-            and request.args == handle.request.args
-            and request.committed_output_schema_sha256
-            == handle.request.committed_output_schema_sha256
-        )
-
-    async def bind_ready_capability_read(
-        self,
-        handle: ReadyCapabilityExecution,
-        *,
-        canonical_interaction_id: str,
-        canonical_request: SkillRequest,
-    ) -> bool:
-        """Bind one finished early read to an exact canonical request one time."""
-
-        if not self._ready_matches_request(handle, canonical_request):
-            await self.cancel_ready_capability_read(handle)
-            return False
-        execution_outcome = (
-            await asyncio.gather(handle.task, return_exceptions=True)
-        )[0]
-        if isinstance(execution_outcome, BaseException):
-            return False
-        execution = execution_outcome
-        result = next(
-            (item for item in execution.results if item.request_id == handle.request.request_id),
-            None,
-        )
-        if result is None:
-            return False
-        trace = next(
-            (item for item in execution.traces if item.request_id == handle.request.request_id),
-            None,
-        )
-        rebound_result = result.model_copy(
-            deep=True,
-            update={
-                "request_id": canonical_request.request_id,
-                "capability_id": canonical_request.capability_id,
-                "skill_version": canonical_request.skill_version,
-                "metadata": {
-                    **dict(result.metadata or {}),
-                    "readiness_candidate_reused": True,
-                    "progress_candidate_id": handle.candidate.candidate_id,
-                },
-            },
-        )
-        rebound_trace = (
-            trace.model_copy(
-                deep=True,
-                update={
-                    "interaction_id": canonical_interaction_id,
-                    "request_id": canonical_request.request_id,
-                    "capability_id": canonical_request.capability_id,
-                },
-            )
-            if trace is not None
-            else None
-        )
-        self._preexecuted[(canonical_interaction_id, canonical_request.request_id)] = (
             rebound_result,
             rebound_trace,
         )

@@ -241,8 +241,9 @@ belongs on the Fast path. Once that Fast work is completely grounded, exactly
 capability-bound, deterministically safe/authorized, and needs no confirmation, it may
 be committed without waiting for Deep. Deep is not a reviewer of a successful Fast
 Plan; a Fast contract/provenance failure also does not justify asking Deep to repair the
-same work. Different independent Responsibilities may progress at different depths, so
-ready confirmation-free reads need not wait for unrelated deeper thinking. Deep Planner
+same work. Different independent Responsibilities may progress at different depths, so a
+confirmation-free read with canonical Goal grounding and a valid Fast Plan need
+not wait for unrelated deeper thinking. Deep Planner
 is exceptional and is justified by
 semantic uncertainty, incomplete or compound coverage, nontrivial dependencies,
 material alternatives, novelty or broader context, or safety/resource reasoning
@@ -661,10 +662,11 @@ format can block an otherwise correct plan.
 
 ## Social decoration during interaction
 
-Chromie may accompany speech, listening, or ongoing Activity with subtle
-nonverbal Social Attention decoration. The decoration is **not** the Goal. It is
-an optional way of making the already-intended interaction feel socially present
-rather than mechanically isolated.
+Chromie may accompany a concrete primary human-observable Activity—such as
+speech/Vocal, body movement, handover, vocal performance, or media playback—with
+subtle nonverbal Social Attention decoration. The decoration is **not** the Goal.
+It is an optional way of making the already-intended Activity feel socially
+present rather than mechanically isolated.
 
 For example, a greeting remains the same greeting text while Social Attention
 may add gaze toward the person, a natural blink, a small nod or wave, or another
@@ -672,7 +674,7 @@ qualified subtle body cue. Social Attention must not rewrite what Chromie says,
 create an extra user task, or make the greeting fail if the decoration cannot
 run.
 
-The Social Attention model receives the current interaction anchor, recent
+The Social Attention model receives the exact `primary_activity` anchor, recent
 context, owner-approved Social Interaction Style, bounded recent decoration
 evidence, eligible named body capabilities, target evidence, and semantic
 resource metadata. It may produce a structured `SocialAttentionPlan` with
@@ -681,7 +683,7 @@ body behavior; there is no Social-Attention speech-expression field or fallback.
 
 The same motion has different semantics depending on ownership. A user request
 such as "blink twice" is primary Activity responsibility. A blink selected while
-Chromie greets or listens is auxiliary decoration. The Capability may be the
+Chromie's greeting speech is the primary Activity is auxiliary decoration. The Capability may be the
 same, but only the first participates in Goal completion.
 
 An explicit action can also carry social framing. "Blink twice and be cute"
@@ -704,9 +706,11 @@ through Activity with `auxiliary_social_attention=true` and
 conflicting with Vocal, emergency handling, or primary Activity.
 
 Social Attention is not a generic idle-animation loop. Its decoration requires a
-meaningful interaction anchor such as listening, Vocal, Activity, turn-taking,
-or interaction-bound waiting. Pure baseline embodiment/liveliness outside a
-social interaction is a separate concern.
+concrete primary human-observable Activity anchor. `understanding_ready`, Goal
+Association, planning, waiting, evidence arrival, and other internal milestones
+are not anchors. Each distinct primary Activity is independently eligible; a
+previous decoration in the same turn is not a blanket suppression rule. Pure
+baseline embodiment/liveliness without a primary Activity is a separate concern.
 
 Backend selection, calibration, motion limits, collision safety, stop, and
 recovery remain provider-owned. Do not implement normal attention through rules

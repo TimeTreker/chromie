@@ -25,9 +25,10 @@ logger = logging.getLogger("chromie.agent.social_attention")
 class SocialAttentionPlanner:
     """Model-driven auxiliary body-decoration planning.
 
-    Social Attention is background social cognition. The model decides whether
-    a small body decoration would make the anchored interaction more socially
-    natural without changing its Goal, response text, or completion, and selects exact
+    Social Attention is background social cognition attached to a real primary
+    human-observable Activity. The model decides whether a small body decoration
+    would make that Activity more socially natural without changing its Goal, response
+    text, or completion, and selects exact
     catalog skills for the scene. Response wording remains owned by the normal
     cognitive/Response Composer path; this planner is body-only. Deterministic code validates
     schemas, evidence, safety, and resource conflicts without choosing actions.
@@ -249,22 +250,29 @@ class SocialAttentionPlanner:
             intent = request.intent
             route = ""
             priority = "normal"
-            actions: list[str] = []
+            primary_activity = request.primary_activity.model_dump(
+                mode="json", exclude_none=True
+            )
         else:
             language = request.language or request.route_decision.language
-            event = str(request.context.get("social_attention_event") or "speaking")
+            event = str(
+                request.context.get("social_attention_event")
+                or "primary_activity_ready"
+            )
             intent = request.route_decision.intent
             route = request.route_decision.route
             priority = request.route_decision.priority
-            actions = list(request.route_decision.actions or [])
+            primary_activity = (
+                request.context.get("social_attention_primary_activity") or {}
+            )
         payload = {
             "event": event,
+            "primary_activity": primary_activity,
             "user_utterance": request.text,
             "language": language,
             "route": route,
             "intent": intent,
             "priority": priority,
-            "goal_interpretation_actions": actions,
             "interaction_state": request.context.get("social_attention_interaction_state") or {},
             "social_interaction_style": request.context.get("social_interaction_style") or {},
             "recent_auxiliary_behavior_evidence": request.context.get(
@@ -278,30 +286,19 @@ class SocialAttentionPlanner:
             "max_behaviors": int(self.services.social_attention_max_behaviors),
         }
         return (
-            "Plan optional Social Attention for the supplied interaction event.\n"
-            "The event is a state transition such as understanding becoming ready, work starting, waiting, evidence arriving, or speaking; it is not a user Goal.\n"
+            "Plan optional Social Attention attached to the supplied primary human-observable Activity.\n"
+            "The primary_activity is the anchor. Goal interpretation, Goal Association, planning, waiting, evidence arrival, and other internal cognitive milestones are never Social Attention anchors.\n"
             "Social Attention is subordinate decoration, never the user Goal. Blinking, gaze, nodding, and other supplied Capabilities are only possible expressions.\n"
-            "Every explicit user action remains mandatory, exact, and completion-owning primary Activity when represented in interaction_state. "
-            "Never replace it, duplicate its capability, change its count or args, or treat decoration as its completion. "
-            "Ordinary cooperative engagement is itself a meaningful social anchor; playful or explicitly emotional wording is not required. "
-            "At understanding_ready or work_started, a fresh direct request can support one subtle acknowledgement or presence cue when the owner-approved style, event, candidate semantics, and concurrency metadata make that cue useful and non-disruptive. "
-            "A clear or direct task is not evidence that the user requires exact-only action or stillness. Treat exact-only action or stillness as a constraint only when it is actually supplied by the utterance or typed interaction state. "
-            "An independent-output candidate declared parallel-safe with the primary work does not compete merely because the primary task is explicit. "
-            "When the utterance and supplied primary context support playful, warm, courteous, or otherwise social engagement, you may add at most a different compatible cue; this is optional, not an automatic consequence of any body-action request. "
-            "Do not default to decision=none merely because speech can acknowledge or complete the interaction. "
-            "Choose decision=none when stillness is more natural for this particular scene, when the user actually requires exact-only action or stillness, or when a gesture would be repetitive, distracting, "
-            "unsafe, unsupported, or likely to conflict with the primary task. Do not add a gesture merely because "
-            "one is available.\n"
-            "Use owner-approved Social Interaction Style and recent auxiliary evidence to keep variation contextual and restrained. "
-            "A pleasant surprise is bounded contextual variation, never an unrelated random gesture.\n"
-            "Use only supplied semantic target evidence. Never invent a perceived person, target location, "
-            "body calibration, joint target, or controller parameter.\n"
-            "Do not create or change the user's primary task or response text. Do not add speech, tool calls, memory writes, or raw "
-            "joint/motor controls. Select only exact capability_id values from eligible_social_capabilities and provide "
-            "schema-valid semantic args. Every auxiliary behavior must use timing=parallel and remain optional.\n"
-            "Return one JSON object with keys decision, target, behaviors, confidence, reason, and optional metadata. "
-            "decision is none or express. target contains target_ref, source, relative_direction, confidence, metadata. "
-            "Each behavior contains capability_id, args, timing, and reason.\n\n"
+            "Every explicit primary action remains mandatory, exact, and completion-owning. Never replace it, duplicate its capability, change its count or args, or treat decoration as its completion. "
+            "Speech, a joke, walking, handover, vocal performance, media playback, or another outward Activity may each independently have no Social Attention or one small compatible expression. "
+            "Ordinary cooperative engagement can support a subtle acknowledgement or presence cue when the owner-approved style, Activity semantics, candidate semantics, and concurrency metadata make that cue useful and non-disruptive. "
+            "A clear task is not evidence that the user requires exact-only action or stillness. Treat exact-only action or stillness as a constraint only when it is supplied by the utterance or typed primary Activity state. "
+            "Choose decision=none whenever no expression adds social value, when stillness is more natural, or when a gesture would be repetitive, distracting, unsafe, unsupported, or conflict with the primary Activity. "
+            "Primary Activity safety/resource ownership always wins; Social Attention must disappear on conflict.\n"
+            "Use owner-approved Social Interaction Style and recent auxiliary evidence to keep variation contextual and restrained. A pleasant surprise is bounded contextual variation, never an unrelated random gesture.\n"
+            "Use only supplied semantic target evidence. Never invent a perceived person, target location, body calibration, joint target, or controller parameter.\n"
+            "Do not create or change the user's primary task or response text. Do not add speech, tool calls, memory writes, or raw joint/motor controls. Select only exact capability_id values from eligible_social_capabilities and provide schema-valid semantic args. Every auxiliary behavior must use timing=parallel and remain optional.\n"
+            "Return one JSON object with keys decision, target, behaviors, confidence, reason, and optional metadata. decision is none or express. target contains target_ref, source, relative_direction, confidence, metadata. Each behavior contains capability_id, args, timing, and reason.\n\n"
             f"Interaction context:\n{json.dumps(payload, ensure_ascii=False, sort_keys=True)}"
         )
 

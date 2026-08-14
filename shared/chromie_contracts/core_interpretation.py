@@ -6,8 +6,36 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .interaction import reject_forbidden_low_level_fields
 from .route import RouteDecision, RouteName
 from .user_turn import UserTurnEnvelope, normalize_turn_text
+
+
+_PLANNER_OWNED_BINDING_FIELDS = frozenset({
+    "capability_id",
+    "skill_id",
+    "tool_name",
+    "provider_id",
+    "execution_method",
+    "executable_args",
+    "args",
+    "actions",
+})
+
+
+def _reject_planner_owned_bindings(value: Any, *, path: str = "bindings") -> Any:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            normalized = str(key or "").strip().casefold()
+            if normalized in _PLANNER_OWNED_BINDING_FIELDS:
+                raise ValueError(
+                    f"Planner-owned field {key!r} is forbidden in responsibility {path}"
+                )
+            _reject_planner_owned_bindings(item, path=f"{path}.{key}")
+    elif isinstance(value, (list, tuple)):
+        for index, item in enumerate(value):
+            _reject_planner_owned_bindings(item, path=f"{path}[{index}]")
+    return value
 
 
 class CoreInterpretationUnavailable(BaseModel):
@@ -34,32 +62,65 @@ class CoreInterpretationUnavailable(BaseModel):
         return normalize_turn_text(str(value or ""))
 
 
-class CognitiveProgressCandidate(BaseModel):
-    """Core-authored bounded progress that may become locally ready before Goal closure.
+class CognitiveResponsibilityProposal(BaseModel):
+    """Core-owned provider-neutral interpretation of one human responsibility.
 
-    ``capability`` means the Core already understands one exact capability-shaped
-    piece of work; trusted runtime still decides whether it may execute now.
-    ``native_response`` means the Core already has a complete conversational
-    answer from Chromie's current Mind/context and no external acquisition or
-    committed effect is required.  Neither form is a canonical Goal or execution
-    authorization before Goal Association binds it.
+    Goal Association is still the only stage that can create or mutate canonical
+    Goals. This proposal preserves what Fast Goal Interpretation understood while
+    deliberately carrying no Capability identity, plan step, or execution method.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal[1] = 1
+    local_ref: str = Field(min_length=1, max_length=80)
+    outcome: str = Field(min_length=1, max_length=500)
+    bindings: dict[str, Any] = Field(default_factory=dict)
+    completion_requires_work: bool = False
+    completion_requires_fresh_evidence: bool = False
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+
+    @field_validator("local_ref", "outcome", mode="before")
+    @classmethod
+    def normalize_responsibility_text(cls, value: str) -> str:
+        return normalize_turn_text(str(value or ""))
+
+    @field_validator("bindings")
+    @classmethod
+    def reject_low_level_bindings(cls, value: dict[str, Any]) -> dict[str, Any]:
+        reject_forbidden_low_level_fields(value)
+        return _reject_planner_owned_bindings(value)
+
+    @model_validator(mode="after")
+    def validate_evidence_requirement(self) -> "CognitiveResponsibilityProposal":
+        if self.completion_requires_fresh_evidence and not self.completion_requires_work:
+            raise ValueError(
+                "fresh evidence requirement implies completion_requires_work"
+            )
+        return self
+
+
+class CognitiveProgressCandidate(BaseModel):
+    """Complete immediate conversational progress understood before Goal closure.
+
+    The only maintained pre-Goal readiness form is ``native_response``: trusted
+    cognition already contains the complete answer and no new work is needed for
+    that responsibility. Capability selection and executable arguments belong to
+    Fast/Deep Planner after Goal Association.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     schema_version: Literal[1] = 1
     candidate_id: str = Field(min_length=1, max_length=160)
-    kind: Literal["capability", "native_response"] = "capability"
-    capability_id: str = Field(default="", max_length=200)
-    args: dict[str, Any] = Field(default_factory=dict)
-    response_text: str = Field(default="", max_length=600)
+    kind: Literal["native_response"] = "native_response"
+    response_text: str = Field(min_length=1, max_length=600)
     speech_act: str = Field(default="inform", min_length=1, max_length=120)
     intent: str = Field(default="unknown", min_length=1, max_length=200)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
 
     @field_validator(
         "candidate_id",
-        "capability_id",
         "response_text",
         "speech_act",
         "intent",
@@ -69,36 +130,17 @@ class CognitiveProgressCandidate(BaseModel):
     def normalize_candidate_text(cls, value: str) -> str:
         return normalize_turn_text(str(value or ""))
 
-    @model_validator(mode="after")
-    def validate_candidate_shape(self) -> "CognitiveProgressCandidate":
-        if self.kind == "capability":
-            if not self.capability_id:
-                raise ValueError("capability progress requires capability_id")
-            if self.response_text:
-                raise ValueError("capability progress must not carry response_text")
-            return self
-        if self.capability_id or self.args:
-            raise ValueError("native_response progress must not carry capability work")
-        if not self.response_text:
-            raise ValueError("native_response progress requires response_text")
-        return self
-
     @staticmethod
     def stable_id(
         *,
         turn_id: str,
-        kind: str = "capability",
-        capability_id: str = "",
-        args: dict[str, Any] | None = None,
         response_text: str = "",
         speech_act: str = "inform",
     ) -> str:
         payload = json.dumps(
             {
                 "turn_id": normalize_turn_text(turn_id),
-                "kind": normalize_turn_text(kind),
-                "capability_id": normalize_turn_text(capability_id),
-                "args": dict(args or {}),
+                "kind": "native_response",
                 "response_text": normalize_turn_text(response_text),
                 "speech_act": normalize_turn_text(speech_act),
             },
@@ -128,6 +170,7 @@ class CoreInterpretationResult(BaseModel):
     intent: str = Field(default="unknown", min_length=1, max_length=200)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     language: str = Field(default="auto", min_length=1, max_length=64)
+    responsibilities: list[CognitiveResponsibilityProposal] = Field(default_factory=list)
     progress_candidates: list[CognitiveProgressCandidate] = Field(default_factory=list)
     projection_schema: Literal["route_decision_v1_compatibility"] = (
         "route_decision_v1_compatibility"
@@ -183,101 +226,55 @@ class CoreInterpretationResult(BaseModel):
         *,
         envelope: UserTurnEnvelope,
         decision: RouteDecision,
+        responsibility_proposals: list[dict[str, Any]] | None = None,
         progress_proposals: list[dict[str, Any]] | None = None,
     ) -> "CoreInterpretationResult":
+        responsibilities: list[CognitiveResponsibilityProposal] = []
+        seen_refs: set[str] = set()
+        for raw in responsibility_proposals or []:
+            if not isinstance(raw, dict):
+                continue
+            try:
+                proposal = CognitiveResponsibilityProposal.model_validate(raw)
+            except (ValueError, TypeError):
+                continue
+            if proposal.local_ref in seen_refs:
+                continue
+            seen_refs.add(proposal.local_ref)
+            responsibilities.append(proposal)
+
         progress_candidates: list[CognitiveProgressCandidate] = []
         seen_progress_ids: set[str] = set()
-
-        allowed_capability_ids = {
-            normalize_turn_text(str(item.capability_id or ""))
-            for item in decision.routes
-            if normalize_turn_text(str(item.capability_id or ""))
-        }
-        for action in decision.actions or []:
-            if isinstance(action, dict):
-                capability_id = normalize_turn_text(
-                    str(action.get("capability_id") or "")
-                )
-                if capability_id:
-                    allowed_capability_ids.add(capability_id)
-        if decision.intent.startswith("capability:"):
-            capability_id = normalize_turn_text(decision.intent.split(":", 1)[1])
-            if capability_id:
-                allowed_capability_ids.add(capability_id)
         conversational_scope = decision.route == "chat" or any(
             item.route == "chat" for item in decision.routes
         )
-
-        # Maintained Core callers pass explicit Fast Understanding progress.
-        # ``None`` retains route-derived capability candidates only for older
-        # compatibility callers and fixtures; an explicit [] means the model
-        # intentionally found no locally-ready progress.
-        if progress_proposals is None:
-            progress_proposals = [
-                {
-                    "kind": "capability",
-                    "capability_id": item.capability_id,
-                    "args": dict(item.args),
-                    "intent": item.intent,
-                    "confidence": item.confidence,
-                }
-                for item in decision.routes
-                if item.capability_id
-            ]
-
-        for raw in progress_proposals:
+        for raw in progress_proposals or []:
             if not isinstance(raw, dict):
                 continue
             kind = normalize_turn_text(str(raw.get("kind") or ""))
+            if kind != "native_response":
+                continue
+            response_text = normalize_turn_text(str(raw.get("response_text") or ""))
+            speech_act = normalize_turn_text(raw.get("speech_act") or "inform") or "inform"
+            if not conversational_scope or not response_text:
+                continue
             intent = normalize_turn_text(raw.get("intent") or decision.intent or "unknown") or "unknown"
             try:
                 confidence = float(raw.get("confidence", decision.confidence))
             except (TypeError, ValueError):
                 continue
-            if kind == "capability":
-                capability_id = normalize_turn_text(
-                    str(raw.get("capability_id") or "")
-                )
-                args = raw.get("args")
-                if capability_id not in allowed_capability_ids or not isinstance(args, dict):
-                    continue
-                candidate_id = CognitiveProgressCandidate.stable_id(
-                    turn_id=envelope.turn_id,
-                    kind="capability",
-                    capability_id=capability_id,
-                    args=args,
-                )
-                candidate = CognitiveProgressCandidate(
-                    candidate_id=candidate_id,
-                    kind="capability",
-                    capability_id=capability_id,
-                    args=dict(args),
-                    intent=intent,
-                    confidence=confidence,
-                )
-            elif kind == "native_response":
-                response_text = normalize_turn_text(
-                    str(raw.get("response_text") or "")
-                )
-                speech_act = normalize_turn_text(raw.get("speech_act") or "inform") or "inform"
-                if not conversational_scope or not response_text:
-                    continue
-                candidate_id = CognitiveProgressCandidate.stable_id(
-                    turn_id=envelope.turn_id,
-                    kind="native_response",
-                    response_text=response_text,
-                    speech_act=speech_act,
-                )
-                candidate = CognitiveProgressCandidate(
-                    candidate_id=candidate_id,
-                    kind="native_response",
-                    response_text=response_text,
-                    speech_act=speech_act,
-                    intent=intent,
-                    confidence=confidence,
-                )
-            else:
-                continue
+            candidate_id = CognitiveProgressCandidate.stable_id(
+                turn_id=envelope.turn_id,
+                response_text=response_text,
+                speech_act=speech_act,
+            )
+            candidate = CognitiveProgressCandidate(
+                candidate_id=candidate_id,
+                response_text=response_text,
+                speech_act=speech_act,
+                intent=intent,
+                confidence=confidence,
+            )
             if candidate.candidate_id in seen_progress_ids:
                 continue
             seen_progress_ids.add(candidate.candidate_id)
@@ -289,10 +286,12 @@ class CoreInterpretationResult(BaseModel):
             intent=normalize_turn_text(decision.intent or "unknown") or "unknown",
             confidence=decision.confidence,
             language=normalize_turn_text(decision.language or "auto") or "auto",
+            responsibilities=responsibilities,
             progress_candidates=progress_candidates,
             compatibility_projection=decision,
             projection_digest=cls.digest_projection(decision),
         )
+
 
     def route_decision_projection(self) -> RouteDecision:
         """Return a defensive copy for compatibility-only downstream adapters."""

@@ -945,6 +945,47 @@ def _evaluate_goal_interpretation_expectations(
             expect.get("fast_speech_must_not_claim_completion"),
         )
 
+    expected_responsibilities = expect.get("responsibilities")
+    if expected_responsibilities is not None:
+        if not isinstance(expected_responsibilities, list):
+            errors.append("expect.responsibilities must be a list")
+        else:
+            actual_responsibilities = list(decision.responsibilities or [])
+            if len(actual_responsibilities) != len(expected_responsibilities):
+                errors.append(
+                    "responsibilities "
+                    f"count={len(actual_responsibilities)}, expected "
+                    f"{len(expected_responsibilities)}; actual="
+                    f"{[item.model_dump(mode='json') for item in actual_responsibilities]!r}"
+                )
+            for index, expected_responsibility in enumerate(expected_responsibilities):
+                if index >= len(actual_responsibilities) or not isinstance(
+                    expected_responsibility, dict
+                ):
+                    continue
+                actual = actual_responsibilities[index]
+                for field in (
+                    "local_ref",
+                    "outcome",
+                    "completion_requires_work",
+                    "completion_requires_fresh_evidence",
+                ):
+                    if field in expected_responsibility:
+                        _expect_equal(
+                            errors,
+                            f"responsibilities[{index}].{field}",
+                            getattr(actual, field),
+                            expected_responsibility[field],
+                        )
+                expected_bindings = expected_responsibility.get("bindings")
+                if isinstance(expected_bindings, dict):
+                    for key, value in expected_bindings.items():
+                        if actual.bindings.get(key) != value:
+                            errors.append(
+                                f"responsibilities[{index}].bindings[{key!r}]="
+                                f"{actual.bindings.get(key)!r}, expected {value!r}"
+                            )
+
     task_types = _task_types_from_decision(decision)
     for item in _tuple_of_strings(expect.get("task_types_include")):
         if item not in task_types:
@@ -1159,6 +1200,10 @@ async def evaluate_goal_interpretation_scenario(scenario: BehaviorScenario) -> d
             "llm_calls": interpreter.calls,
             "llm_stages": list(interpreter.stages),
             "actions": list(decision.actions or []),
+            "responsibilities": [
+                item.model_dump(mode="json", exclude_none=True)
+                for item in decision.responsibilities
+            ],
             "task_types": task_types,
             "metadata": decision.metadata,
         },
@@ -1847,6 +1892,10 @@ async def evaluate_cognitive_core_dialogue_scenario(
                     "intent": decision.intent,
                     "confidence": decision.confidence,
                     "actions": list(decision.actions or []),
+                    "responsibilities": [
+                        item.model_dump(mode="json", exclude_none=True)
+                        for item in decision.responsibilities
+                    ],
                     "metadata": decision.metadata,
                 },
                 "llm_stages": list(interpreter.stages),

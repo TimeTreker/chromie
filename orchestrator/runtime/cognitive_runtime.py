@@ -49,6 +49,7 @@ from shared.chromie_contracts.response_composition import (
 )
 from shared.chromie_contracts.semantic_task import ResponsePlan
 from shared.chromie_contracts.social_attention import (
+    SocialAttentionActivityAnchor,
     SocialAttentionPlan,
     SocialAttentionRequest,
     normalize_social_attention_mode,
@@ -501,6 +502,8 @@ class CanonicalPlanRuntimeAdapter:
                 "semantic_args": dict(request.args),
                 "purpose": request.metadata.get("social_attention_purpose"),
                 "turn_id": request.metadata.get("turn_id"),
+                "primary_activity_id": request.metadata.get("primary_activity_id"),
+                "primary_activity_kind": request.metadata.get("primary_activity_kind"),
                 "canonical_plan_id": request.metadata.get("canonical_plan_id"),
                 "policy_mode": request.metadata.get("social_attention_policy_mode"),
             }
@@ -817,6 +820,18 @@ class CanonicalPlanRuntimeAdapter:
                 "materialized_count": 0,
             }
         runtime_context = dict(context or {})
+        try:
+            primary_activity = SocialAttentionActivityAnchor.model_validate(
+                runtime_context.get("social_attention_primary_activity")
+            )
+        except (ValidationError, TypeError, ValueError):
+            return {
+                "status": "rejected",
+                "decision": plan.decision,
+                "event": event,
+                "materialized_count": 0,
+                "reasons": ["missing_or_invalid_primary_activity_anchor"],
+            }
         target_error = self._attention_target_error(plan, runtime_context)
         if target_error:
             return {
@@ -931,7 +946,7 @@ class CanonicalPlanRuntimeAdapter:
                     continue
                 schema_digest = output_schema_sha256(definition.output_schema)
                 digest = hashlib.sha256(
-                    f"{turn_id}|{event}|{index}|{behavior.skill_id}".encode("utf-8")
+                    f"{turn_id}|{primary_activity.activity_id}|{event}|{index}|{behavior.skill_id}".encode("utf-8")
                 ).hexdigest()[:20]
                 request = SkillRequest(
                     request_id=f"social_{digest}",
@@ -942,7 +957,9 @@ class CanonicalPlanRuntimeAdapter:
                     timeout_ms=definition.timeout_ms,
                     cancellable=definition.interruptible,
                     requires_confirmation=False,
-                    idempotency_key=f"{turn_id}:social:{event}:{index}",
+                    idempotency_key=(
+                        f"{turn_id}:social:{primary_activity.activity_id}:{event}:{index}"
+                    ),
                     committed_output_schema_sha256=schema_digest,
                     metadata={
                         "source": "social_attention_plan",
@@ -959,6 +976,8 @@ class CanonicalPlanRuntimeAdapter:
                         "execution_role": "social_decoration",
                         "source_goal_ids": [],
                         "turn_id": turn_id,
+                        "primary_activity_id": primary_activity.activity_id,
+                        "primary_activity_kind": primary_activity.kind,
                     },
                 )
                 requests.append(request)
@@ -975,13 +994,18 @@ class CanonicalPlanRuntimeAdapter:
                 "materialized_count": 0,
                 "reasons": reasons,
             }
-        interaction_id = f"social_{turn_id}_{hashlib.sha256(event.encode('utf-8')).hexdigest()[:10]}"
+        interaction_id = (
+            f"social_{turn_id}_"
+            f"{hashlib.sha256(primary_activity.activity_id.encode('utf-8')).hexdigest()[:10]}"
+        )
         response_metadata: dict[str, Any] = {
             "source": "continuous_social_attention",
             "auxiliary_social_attention": True,
             "turn_id": turn_id,
             "session_id": session_id,
             "social_attention_event": event,
+            "primary_activity_id": primary_activity.activity_id,
+            "primary_activity_kind": primary_activity.kind,
         }
         envelope = runtime_context.get("user_turn_envelope")
         if isinstance(envelope, dict):
@@ -2057,6 +2081,131 @@ class GoalDrivenRuntimeCoordinator:
 
         task.add_done_callback(_done)
 
+    @staticmethod
+    def _scheduled_speech_social_activity(
+        context: dict[str, Any],
+        *,
+        turn_id: str,
+    ) -> SocialAttentionActivityAnchor | None:
+        """Project an actually scheduled fast utterance into an Activity anchor."""
+
+        rows = context.get("scheduled_turn_speech")
+        if not isinstance(rows, list):
+            return None
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            text = " ".join(str(row.get("text") or "").strip().split())
+            if not text:
+                continue
+            raw_id = " ".join(str(row.get("speech_event_id") or "").strip().split())
+            if not raw_id:
+                digest = hashlib.sha256(
+                    f"{turn_id}|scheduled_speech|{text}".encode("utf-8")
+                ).hexdigest()[:20]
+                raw_id = f"speech_{digest}"
+            return SocialAttentionActivityAnchor(
+                activity_id=raw_id,
+                kind="speech",
+                phase="ready",
+                summary=text,
+            )
+        return None
+
+    @staticmethod
+    def _resolution_social_activity(
+        resolution: CognitiveRuntimeResolution,
+        *,
+        turn_id: str,
+    ) -> SocialAttentionActivityAnchor | None:
+        """Return the primary human-observable Activity prepared by this resolution."""
+
+        interaction = resolution.interaction_response
+        if interaction is None:
+            return None
+        speech_texts = [
+            " ".join(str(item.text or "").strip().split())
+            for item in interaction.speech
+            if " ".join(str(item.text or "").strip().split())
+        ]
+        capability_ids = [
+            str(item.capability_id or "").strip()
+            for item in interaction.skills
+            if str(item.capability_id or "").strip()
+        ]
+        observable_capability_ids = [
+            capability_id
+            for capability_id in capability_ids
+            if capability_id.startswith("soridormi.")
+            or capability_id == VOCAL_PERFORMANCE_CAPABILITY_ID
+            or capability_id.startswith("chromie.media.")
+        ]
+        if not speech_texts and not observable_capability_ids:
+            return None
+        if speech_texts and observable_capability_ids:
+            kind = "mixed"
+        elif speech_texts:
+            kind = "speech"
+        elif all(
+            capability_id == VOCAL_PERFORMANCE_CAPABILITY_ID
+            for capability_id in observable_capability_ids
+        ):
+            kind = "vocal_performance"
+        elif all(
+            capability_id.startswith("chromie.media.")
+            for capability_id in observable_capability_ids
+        ):
+            kind = "media_playback"
+        else:
+            kind = "body_action"
+        summary = speech_texts[0] if speech_texts else ", ".join(observable_capability_ids)
+        goal_ids = list(resolution.terminal_plan.goal_ids) if resolution.terminal_plan else []
+        return SocialAttentionActivityAnchor(
+            activity_id=interaction.interaction_id,
+            kind=kind,
+            phase="ready",
+            summary=summary,
+            goal_ids=goal_ids,
+            capability_ids=observable_capability_ids,
+        )
+
+    def _queue_social_attention_for_activity(
+        self,
+        session: Any,
+        *,
+        activity: SocialAttentionActivityAnchor | None,
+        text: str,
+        sid: str,
+        turn_id: str,
+        language: str,
+        intent: str,
+        context: dict[str, Any],
+        history: list[dict[str, Any]],
+    ) -> None:
+        if activity is None:
+            return
+        event = (
+            "primary_activity_ready"
+            if activity.phase == "ready"
+            else "primary_activity_started"
+        )
+        self._queue_social_attention_event(
+            session,
+            event=event,
+            text=text,
+            sid=sid,
+            turn_id=turn_id,
+            language=language,
+            intent=intent,
+            context={
+                **context,
+                "social_attention_primary_activity": activity.model_dump(
+                    mode="json", exclude_none=True
+                ),
+            },
+            history=history,
+        )
+
     def _queue_social_attention_event(
         self,
         session: Any,
@@ -2074,10 +2223,16 @@ class GoalDrivenRuntimeCoordinator:
 
         if self.policy.mode != "apply" or self.adapter.social_attention_mode == "off":
             return
-        key = (sid, turn_id)
-        # Only the latest not-yet-processed state matters while one social model
-        # decision is already in flight. This keeps Social Attention continuous without
-        # turning every runtime event into another latency/compute tax.
+        raw_activity = context.get("social_attention_primary_activity")
+        if not isinstance(raw_activity, dict):
+            return
+        activity_id = str(raw_activity.get("activity_id") or "").strip()
+        if not activity_id:
+            return
+        key = (sid, activity_id)
+        # Coalesce only duplicate updates for the same primary Activity. Different
+        # observable Activities in one turn remain independently eligible for optional
+        # Social Attention.
         self._social_attention_pending[key] = {
             "session": session,
             "event": event,
@@ -2466,19 +2621,12 @@ class GoalDrivenRuntimeCoordinator:
         turn_id: str,
         language: str,
     ) -> dict[str, Any]:
-        """Start independently-ready Core progress without changing its meaning."""
+        """Start independently-ready native speech without changing its meaning."""
 
         runtime = self.adapter.interaction_runtime
 
         async def start(candidate: CognitiveProgressCandidate) -> Any:
-            if candidate.kind == "native_response":
-                return await runtime.start_ready_native_response(
-                    candidate,
-                    session_id=sid,
-                    turn_id=turn_id,
-                    language=language,
-                )
-            return await runtime.start_ready_capability_read(
+            return await runtime.start_ready_native_response(
                 candidate,
                 session_id=sid,
                 turn_id=turn_id,
@@ -2512,206 +2660,14 @@ class GoalDrivenRuntimeCoordinator:
         runtime = self.adapter.interaction_runtime
 
         async def cancel(candidate_id: str, handle: Any) -> None:
-            candidate = getattr(handle, "candidate", None)
-            if isinstance(candidate, CognitiveProgressCandidate) and candidate.kind == "native_response":
-                await runtime.cancel_ready_native_response(handle)
-            else:
-                await runtime.cancel_ready_capability_read(handle)
+            del candidate_id
+            await runtime.cancel_ready_native_response(handle)
 
         await asyncio.gather(
             *(cancel(candidate_id, handle) for candidate_id, handle in list(handles.items())),
             return_exceptions=True,
         )
         handles.clear()
-
-    async def _adopt_ready_plan(
-        self,
-        *,
-        association: GoalAssociationResolution,
-        candidates: dict[str, CognitiveProgressCandidate],
-        handles: dict[str, Any],
-        text: str,
-        sid: str,
-    ) -> CanonicalPlan | None:
-        """Compile already model-authored safe reads when GA proves complete coverage.
-
-        This method never selects a capability.  It only adopts exact Core
-        candidates explicitly bound by Goal Association and revalidates them
-        against the trusted live catalog.
-        """
-
-        if association.associations or not association.new_goals:
-            return None
-        goal_by_id = {goal.goal_id: goal for goal in association.new_goals if goal.goal_id}
-        if not goal_by_id or set(goal_by_id) != set(self._association_goal_ids(association)):
-            return None
-        if any(
-            str((goal.metadata or {}).get("output_mode") or "") != "capability_work"
-            or goal.resource_responsibility is None
-            or goal.resource_responsibility.resource.kind != "information"
-            for goal in goal_by_id.values()
-        ):
-            return None
-
-        covered_goals = {
-            goal_id
-            for binding in association.progress_bindings
-            for goal_id in binding.goal_ids
-        }
-        if covered_goals != set(goal_by_id):
-            return None
-        if not association.progress_bindings:
-            return None
-
-        step_rows: list[tuple[CognitiveProgressCandidate, Any, list[str]]] = []
-        for binding in association.progress_bindings:
-            candidate = candidates.get(binding.candidate_id)
-            handle = handles.get(binding.candidate_id)
-            if candidate is None or handle is None:
-                return None
-            try:
-                definition = self.adapter.interaction_runtime.skill_definition(
-                    candidate.capability_id
-                )
-            except ValueError:
-                return None
-            metadata = definition.metadata if isinstance(definition.metadata, dict) else {}
-            scope = metadata.get("semantic_scope")
-            if not isinstance(scope, dict):
-                return None
-            if scope.get("responsibility_type") != "acquire_and_deliver_resource":
-                return None
-            resource_kinds = {str(item) for item in scope.get("resource_kinds") or []}
-            if "information" not in resource_kinds:
-                return None
-            if (
-                str(metadata.get("safety_class") or "") != "safe_read"
-                or metadata.get("side_effect_free") is not True
-                or definition.requires_confirmation
-                or not definition.available
-            ):
-                return None
-            if validate_args_for_schema(candidate.args, definition.input_schema):
-                return None
-            if any(goal_id not in goal_by_id for goal_id in binding.goal_ids):
-                return None
-            step_rows.append((candidate, definition, list(binding.goal_ids)))
-
-        can_parallel = len(step_rows) > 1 and all(
-            bool(definition.can_run_parallel) for _, definition, _ in step_rows
-        )
-        steps: list[CanonicalPlanStep] = []
-        step_ids_by_goal: dict[str, list[str]] = {goal_id: [] for goal_id in goal_by_id}
-        for index, (candidate, definition, goal_ids) in enumerate(step_rows):
-            step_id = f"ready_step_{candidate.candidate_id.removeprefix('progress_')}"
-            steps.append(
-                CanonicalPlanStep(
-                    step_id=step_id,
-                    capability_id=candidate.capability_id,
-                    args=dict(candidate.args),
-                    timing="parallel" if can_parallel else "sequential",
-                    source_goal_ids=goal_ids,
-                    reason_summary="Adopt exact Core progress candidate bound by Goal Association.",
-                    metadata={
-                        "progress_candidate_id": candidate.candidate_id,
-                        "model_authored_before_goal_association": True,
-                        "definition_version": definition.version,
-                    },
-                )
-            )
-            for goal_id in goal_ids:
-                step_ids_by_goal[goal_id].append(step_id)
-
-        if any(not step_ids for step_ids in step_ids_by_goal.values()):
-            return None
-        goal_ids = list(goal_by_id)
-        satisfaction = GoalSatisfactionAssessment(
-            score=1.0,
-            status="exact",
-            satisfied_goal_ids=goal_ids,
-            unmet_goal_ids=[],
-            unmet_requirements=[],
-            rationale="Every canonical Goal is covered by explicitly bound readiness work.",
-        )
-        plan_seed = json.dumps(
-            [
-                {
-                    "candidate_id": candidate.candidate_id,
-                    "goal_ids": goal_ids_for_candidate,
-                }
-                for candidate, _, goal_ids_for_candidate in step_rows
-            ],
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        )
-        return CanonicalPlan(
-            plan_id=f"plan_ready_{hashlib.sha256((sid + plan_seed).encode('utf-8')).hexdigest()[:20]}",
-            planner_tier="fast",
-            disposition="execute",
-            coverage="complete",
-            confidence=min(
-                [association.confidence, *[item.confidence for item in association.progress_bindings]]
-            ),
-            goal_ids=goal_ids,
-            goal_summary=text,
-            steps=steps,
-            goal_outcomes=[
-                ExecuteGoalPlanOutcome(
-                    goal_id=goal_id,
-                    disposition="execute",
-                    coverage="complete",
-                    step_ids=step_ids_by_goal[goal_id],
-                    satisfaction=satisfaction,
-                    rationale="Covered by exact Core progress candidate(s).",
-                    metadata={"resolver": "readiness_adoption"},
-                )
-                for goal_id in goal_ids
-            ],
-            goal_satisfaction=satisfaction,
-            metadata={
-                "resolver": "readiness_adoption",
-                "status": "resolved",
-                "authority": "advisory",
-                "path_classification": "terminal",
-                "planner_llm_invoked": False,
-            },
-        )
-
-    async def _bind_ready_results(
-        self,
-        *,
-        association: GoalAssociationResolution,
-        handles: dict[str, Any],
-        interaction: InteractionResponse,
-    ) -> int:
-        bindings = {item.candidate_id: item for item in association.progress_bindings}
-        bound = 0
-        for candidate_id, handle in list(handles.items()):
-            binding = bindings.get(candidate_id)
-            if binding is None:
-                continue
-            expected_goals = set(binding.goal_ids)
-            canonical_request = next(
-                (
-                    request
-                    for request in interaction.skills
-                    if set(request.metadata.get("source_goal_ids") or []) == expected_goals
-                    and request.skill_id == handle.request.skill_id
-                    and request.args == handle.request.args
-                ),
-                None,
-            )
-            if canonical_request is None:
-                continue
-            if await self.adapter.interaction_runtime.bind_ready_capability_read(
-                handle,
-                canonical_interaction_id=interaction.interaction_id,
-                canonical_request=canonical_request,
-            ):
-                handles.pop(candidate_id, None)
-                bound += 1
-        return bound
 
     async def _run_social_attention_event(
         self,
@@ -2730,16 +2686,27 @@ class GoalDrivenRuntimeCoordinator:
         if not callable(resolver) or self.adapter.social_attention_mode == "off":
             return {"status": "not_available", "event": event}
 
-        # Social Attention is optional presentation. Once this turn has already
-        # materialized one accepted auxiliary behavior, later cognitive milestones
-        # must not spend another model call deciding another decoration for the same
-        # turn. This is a mechanical same-turn cooldown, not semantic judgment: if
-        # the earlier decision was `none`, no accepted-request evidence exists and a
-        # genuinely later social opportunity may still be considered.
+        social_context = dict(context)
+        raw_activity = social_context.get("social_attention_primary_activity")
+        try:
+            primary_activity = SocialAttentionActivityAnchor.model_validate(raw_activity)
+        except (ValidationError, TypeError, ValueError):
+            return {
+                "status": "suppressed",
+                "event": event,
+                "decision": "none",
+                "materialized_count": 0,
+                "reasons": ["missing_or_invalid_primary_activity_anchor"],
+            }
+
+        # Throttle per primary Activity, never per cognition turn. A fast acknowledgement
+        # and a later walk/final response are different observable Activities and may each
+        # independently receive optional Social Attention.
         recent = getattr(self.adapter, "recent_auxiliary_behavior_evidence", None)
         recent_evidence = recent(sid) if callable(recent) else []
         if any(
-            str(item.get("turn_id") or "").strip() == str(turn_id or "").strip()
+            str(item.get("primary_activity_id") or "").strip()
+            == primary_activity.activity_id
             for item in recent_evidence
             if isinstance(item, dict)
         ):
@@ -2748,14 +2715,13 @@ class GoalDrivenRuntimeCoordinator:
                 "event": event,
                 "decision": "none",
                 "materialized_count": 0,
-                "reasons": ["same_turn_auxiliary_cooldown"],
+                "reasons": ["same_primary_activity_auxiliary_cooldown"],
             }
 
-        social_context = dict(context)
         social_context["social_attention_event"] = event
         primary_progress: list[dict[str, Any]] = []
-        primary_capability_ids: list[str] = []
-        seen_primary_ids: set[str] = set()
+        primary_capability_ids: list[str] = list(primary_activity.capability_ids)
+        seen_primary_ids: set[str] = set(primary_capability_ids)
 
         def retain_primary_progress(rows: Any) -> None:
             if not isinstance(rows, list):
@@ -2792,15 +2758,17 @@ class GoalDrivenRuntimeCoordinator:
             retain_primary_progress(canonical_plan.get("steps"))
         social_context["social_attention_interaction_state"] = {
             "event": event,
+            "primary_activity": primary_activity.model_dump(mode="json", exclude_none=True),
             "primary_capability_ids": primary_capability_ids,
             "primary_progress": primary_progress,
-            "primary_work_known": bool(primary_progress),
+            "primary_work_known": bool(primary_activity.summary or primary_capability_ids),
         }
         social_context["recent_auxiliary_behavior_evidence"] = recent_evidence
         request = SocialAttentionRequest(
             session_id=sid,
             turn_id=turn_id,
             event=event,
+            primary_activity=primary_activity,
             text=text,
             language=language,
             intent=intent or "unknown",
@@ -2993,6 +2961,10 @@ class GoalDrivenRuntimeCoordinator:
                     exclude={"compatibility_projection"},
                 ),
                 "core_interpretation_projection_digest": (core_interpretation.projection_digest),
+                "responsibility_proposals": [
+                    item.model_dump(mode="json", exclude_none=True)
+                    for item in core_interpretation.responsibilities
+                ],
                 "progress_candidates": [
                     item.model_dump(mode="json", exclude_none=True)
                     for item in core_interpretation.progress_candidates
@@ -3055,6 +3027,38 @@ class GoalDrivenRuntimeCoordinator:
             )
             return resolution.model_copy(update={"metadata": metadata})
 
+        def queue_resolution_social_attention(
+            resolution: CognitiveRuntimeResolution,
+        ) -> None:
+            resolved_turn_id = (
+                turn_envelope.turn_id
+                if turn_envelope is not None
+                else self._context_turn_id(context, sid)
+            )
+            activity = self._resolution_social_activity(
+                resolution, turn_id=resolved_turn_id
+            )
+            social_context = dict(context)
+            if resolution.goal_association is not None:
+                social_context["goal_association"] = (
+                    resolution.goal_association.prompt_projection()
+                )
+            if resolution.terminal_plan is not None:
+                social_context["canonical_plan_resolution"] = (
+                    resolution.terminal_plan.prompt_projection()
+                )
+            self._queue_social_attention_for_activity(
+                session,
+                activity=activity,
+                text=text,
+                sid=sid,
+                turn_id=resolved_turn_id,
+                language=language,
+                intent=intent or "unknown",
+                context=social_context,
+                history=history,
+            )
+
         trace_scope = runtime_tracer.start_trace(
             correlations={
                 "session_id": sid,
@@ -3083,7 +3087,9 @@ class GoalDrivenRuntimeCoordinator:
             )
             if turn_envelope is not None:
                 resolution = resolution.model_copy(update={"turn_envelope": turn_envelope})
-            return attach_core_identity(resolution)
+            resolution = attach_core_identity(resolution)
+            queue_resolution_social_attention(resolution)
+            return resolution
         try:
             async with trace_scope:
                 async with runtime_tracer.span(
@@ -3104,6 +3110,7 @@ class GoalDrivenRuntimeCoordinator:
                     if turn_envelope is not None:
                         resolution = resolution.model_copy(update={"turn_envelope": turn_envelope})
                     resolution = attach_core_identity(resolution)
+                    queue_resolution_social_attention(resolution)
                     span.set_attribute("result_status", resolution.status)
                     span.set_attribute("lane", resolution.lane)
                     if resolution.status == "error":
@@ -3186,7 +3193,6 @@ class GoalDrivenRuntimeCoordinator:
                         "direct_vocal_output",
                         "native_response_readiness_adoption",
                         "terminal_missing_ability",
-                        "readiness_adoption",
                         "contract_failure",
                     }
                     and not deep_planner_invocation_reasons
@@ -3200,7 +3206,6 @@ class GoalDrivenRuntimeCoordinator:
                         "terminal",
                         "direct_vocal_output",
                         "native_response_readiness_adoption",
-                        "readiness_adoption",
                     }
                     and not deep_planner_invocation_reasons
                 ),
@@ -3306,9 +3311,11 @@ class GoalDrivenRuntimeCoordinator:
                         language=language,
                     )
                 )
-            self._queue_social_attention_event(
+            self._queue_social_attention_for_activity(
                 session,
-                event="understanding_ready",
+                activity=self._scheduled_speech_social_activity(
+                    context, turn_id=turn_id
+                ),
                 text=text,
                 sid=sid,
                 turn_id=turn_id,
@@ -3491,39 +3498,9 @@ class GoalDrivenRuntimeCoordinator:
                             )
                         goal_state_commit_stage = "goal_association"
 
-            self._queue_social_attention_event(
-                session,
-                event="goal_associated",
-                text=text,
-                sid=sid,
-                turn_id=turn_id,
-                language=language,
-                intent=str(getattr(route_decision, "intent", "") or "unknown"),
-                context={
-                    **context,
-                    "goal_association": association.prompt_projection(),
-                },
-                history=history,
-            )
             if ready_start_task is not None:
                 ready_handles = await ready_start_task
                 ready_start_task = None
-            if ready_handles:
-                self._queue_social_attention_event(
-                    session,
-                    event="work_started",
-                    text=text,
-                    sid=sid,
-                    turn_id=turn_id,
-                    language=language,
-                    intent=str(getattr(route_decision, "intent", "") or "unknown"),
-                    context={
-                        **context,
-                        "goal_association": association.prompt_projection(),
-                        "ready_progress_ids": sorted(ready_handles),
-                    },
-                    history=history,
-                )
 
             association_goal_ids = self._association_goal_ids(association)
             planning_situation = build_situation_projection(
@@ -3828,49 +3805,36 @@ class GoalDrivenRuntimeCoordinator:
                         },
                     )
 
-                adopted_plan = await self._adopt_ready_plan(
-                    association=association,
-                    candidates=progress_candidates,
-                    handles=ready_handles,
-                    text=text,
+                stage = time.perf_counter()
+                fast_plan = await self._observe_workflow_stage(
                     sid=sid,
-                )
-                if adopted_plan is not None:
-                    fast_plan = adopted_plan
-                    terminal_plan = adopted_plan
-                    fast_planner_path = "readiness_adoption"
-                    timings["fast_planner"] = 0.0
-                else:
-                    stage = time.perf_counter()
-                    fast_plan = await self._observe_workflow_stage(
-                        sid=sid,
-                        stage="fast_planner",
-                        input_payload={
-                            "user_text": text,
-                            "route_decision": route_decision,
-                            "goal_association": association,
-                            "interaction_context": planning_context.get(
-                                "interaction_context", {}
-                            ),
-                        },
-                        operation=self.agent_client.resolve_fast_plan(
-                            session,
-                            text=text,
-                            route_decision=route_decision,
-                            sid=sid,
-                            context=planning_context,
-                            history=history,
-                            timeout_ms=self.policy.fast_planner_timeout_ms,
+                    stage="fast_planner",
+                    input_payload={
+                        "user_text": text,
+                        "route_decision": route_decision,
+                        "goal_association": association,
+                        "interaction_context": planning_context.get(
+                            "interaction_context", {}
                         ),
-                    )
-                    timings["fast_planner"] = (time.perf_counter() - stage) * 1000.0
-                    fast_failure = self._optional_stage_failure_metadata(
-                        "fast_planner", fast_plan.metadata
-                    )
-                    if fast_failure is not None:
-                        stage_diagnostics.append(fast_failure)
-                    terminal_plan = fast_plan
-                    fast_planner_path = self._fast_plan_path(fast_plan)
+                    },
+                    operation=self.agent_client.resolve_fast_plan(
+                        session,
+                        text=text,
+                        route_decision=route_decision,
+                        sid=sid,
+                        context=planning_context,
+                        history=history,
+                        timeout_ms=self.policy.fast_planner_timeout_ms,
+                    ),
+                )
+                timings["fast_planner"] = (time.perf_counter() - stage) * 1000.0
+                fast_failure = self._optional_stage_failure_metadata(
+                    "fast_planner", fast_plan.metadata
+                )
+                if fast_failure is not None:
+                    stage_diagnostics.append(fast_failure)
+                terminal_plan = fast_plan
+                fast_planner_path = self._fast_plan_path(fast_plan)
                 if fast_plan.disposition == "escalate":
                     if fast_planner_path == "contract_failure":
                         # A malformed or grounding-invalid Fast plan is not evidence
@@ -4046,36 +4010,16 @@ class GoalDrivenRuntimeCoordinator:
                     )
                     timings["runtime_adapter"] = (time.perf_counter() - stage) * 1000.0
                     timings["response_composer"] = 0.0
-                    ready_bound_count = await self._bind_ready_results(
-                        association=association,
-                        handles=ready_handles,
-                        interaction=interaction,
-                    )
-                    if ready_bound_count:
-                        self._queue_social_attention_event(
-                            session,
-                            event="evidence_arrived",
-                            text=text,
-                            sid=sid,
-                            turn_id=turn_id,
-                            language=language,
-                            intent=str(getattr(route_decision, "intent", "") or "unknown"),
-                            context={
-                                **planning_context,
-                                "ready_result_bound_count": ready_bound_count,
-                            },
-                            history=history,
-                        )
                     interaction.metadata["goal_association"] = association.model_dump(
                         mode="json", exclude_none=True
                     )
                     if goal_state_commit_stage == "goal_association":
                         interaction.metadata["goal_state_results"] = goal_state_results
                     interaction.metadata["continuous_cognition"] = {
-                        "execution_started_before_goal_association_completed": bool(
+                        "native_response_progress_started_before_goal_association_completed": bool(
                             progress_candidates
                         ),
-                        "planner_llm_avoided": fast_planner_path == "readiness_adoption",
+                        "provider_work_started_before_goal_association_completed": False,
                         "response_composer_llm_avoided": True,
                         "ready_result_bound_count": ready_bound_count,
                     }
@@ -4239,26 +4183,6 @@ class GoalDrivenRuntimeCoordinator:
                     ),
                 )
                 timings["runtime_adapter"] = (time.perf_counter() - stage) * 1000.0
-                ready_bound_count = await self._bind_ready_results(
-                    association=association,
-                    handles=ready_handles,
-                    interaction=interaction,
-                )
-                if ready_bound_count:
-                    self._queue_social_attention_event(
-                        session,
-                        event="evidence_arrived",
-                        text=text,
-                        sid=sid,
-                        turn_id=turn_id,
-                        language=language,
-                        intent=str(getattr(route_decision, "intent", "") or "unknown"),
-                        context={
-                            **composition_context,
-                            "ready_result_bound_count": ready_bound_count,
-                        },
-                        history=history,
-                    )
                 if goal_state_commit_stage == "goal_association":
                     interaction.metadata["goal_association"] = association.model_dump(
                         mode="json", exclude_none=True

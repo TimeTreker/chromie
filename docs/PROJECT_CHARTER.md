@@ -426,26 +426,23 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    must be traceable to an authoritative typed Goal binding rather than model
    memory or an invented contextual guess.
 
-25. **Progress is gated by local readiness, not global cognitive completion.**
+25. **Progress is gated by local readiness without crossing semantic authority.**
    Chromie does not wait for every cognitive stage to finish before every useful
-   part of an interaction may advance. For each prospective piece of progress,
-   the owning cognitive/runtime boundary asks whether the current meaning,
-   required evidence and inputs, dependencies, and risk/authority state are
-   sufficient for *that progress*. If they are, it may advance while unrelated
-   Goal Association, deeper reasoning, response preparation, or other cognition
-   continues. If they are not, only that branch waits. The interaction critical
-   path therefore contains true semantic, evidence, safety, authorization, and
-   resource dependencies rather than a mandatory serialization of module names.
-   Effectful work still requires its normal canonical planning, confirmation,
-   authorization, and safety barriers. A complete native conversational answer
-   may enter the existing Vocal lane as soon as current Mind/context is
-   sufficient, while Goal Association continues; that substantive answer is not
-   `fast_speech`, which remains a progress-notification act. Bounded non-effectful
-   reads may likewise advance earlier when their exact request is sufficiently
-   understood and the trusted runtime can prove that executing the read has no
-   side effect or confirmation obligation. Early speech/read results carry no
-   Goal-completion authority until explicit canonical Goal binding and trusted
-   reconciliation establish the responsibility they satisfy.
+   part of an interaction may advance, but local readiness never grants an
+   upstream stage authority that belongs downstream. A complete native
+   conversational answer may enter the existing Vocal lane as soon as current
+   Mind/context is sufficient, while Goal Association continues; that substantive
+   answer is not `fast_speech`, which remains prospective Goal Progress
+   Communication when work is still owed. Provider/capability work is different:
+   Fast Goal Interpretation may describe the provider-neutral Responsibility and
+   its material bindings, but it may not choose a Capability, executable arguments,
+   or actions, and no provider request starts before Goal Association has created
+   or associated the canonical Goal and Planner has selected the execution method.
+   Once those authorities exist, unrelated later cognition need not serialize
+   already-ready work. Effectful work additionally retains its normal confirmation,
+   authorization, resource, and safety barriers. Early native speech carries no
+   Goal-completion authority until explicit canonical Goal binding establishes the
+   responsibility it satisfies.
 26. **Stable Mind is cacheable; live context is projected.** Chromie's identity,
    self-concept, personality, interaction style, worldview, values, and compact
    hard-boundary principles are owner-controlled, low-churn Mind state. They
@@ -483,21 +480,24 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    alternatives, or broader value reasoning may escalate to Deep cognition, but
    escalation cannot weaken an already applicable safety or authorization
    boundary.
-29. **Social Attention is background social decoration, not a Goal or execution
-   lane.** While Chromie is already engaged in a socially meaningful state such
-   as listening, Vocal output, Activity, turn-taking, or interaction-bound
-   waiting, Social Attention may add small contextual embodied cues such as gaze,
-   blink, nod, a small wave, or slight posture/orientation. Decoration is
-   optional, interruptible, non-disruptive, subordinate, and fail-soft: it must
+29. **Social Attention is optional decoration of a primary observable Activity,
+   not a Goal or execution lane.** A concrete human-observable Activity such as
+   scheduled speech/Vocal, body motion, handover, vocal performance, or media
+   playback may independently carry small contextual embodied cues such as gaze,
+   blink, nod, a small wave, or slight posture/orientation. The anchor is the
+   primary Activity itself, not `understanding_ready`, Goal Association, planning,
+   waiting, evidence arrival, or another internal cognitive milestone. Decoration
+   is optional, interruptible, non-disruptive, subordinate, and fail-soft: it must
    not author or alter response meaning, create or satisfy a Goal, delay or fail
-   primary work, weaken confirmation/safety, or appear in Vocal/Activity lane
-   coordination. Accepted body decoration executes through Activity with an
-   explicit auxiliary role and no Goal-completion authority. The same physical
-   Capability is ordinary Activity when explicitly requested by the user. A
-   social event important enough to change what Chromie should do must escalate
-   through normal Cognitive Core / Goal reasoning rather than through the
-   decoration plan. Social Attention is not a generic idle-animation loop;
-   unanchored baseline embodiment belongs to a separate concern.
+   primary work, weaken confirmation/safety, or appear as a third Vocal/Activity
+   lane. Accepted body decoration executes through Activity with an explicit
+   auxiliary role and no Goal-completion authority. Each distinct primary Activity
+   may independently choose `none` or expression; conflict or safety/resource
+   pressure simply removes that decoration. The same physical Capability is
+   ordinary Activity when explicitly requested by the user. A social event
+   important enough to change what Chromie should do must escalate through normal
+   Cognitive Core / Goal reasoning. Unanchored baseline embodiment remains a
+   separate concern.
 30. **Semantic decomposition must prove responsibility coverage.** The model owns
    the semantic judgment about which user outcomes are independent Goals; Host
    code must not recover that meaning with phrase rules or action dictionaries.
@@ -593,23 +593,26 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    that Fast path; it is not semantic evidence that Deep should repair the same Plan.
 
    **Cognitive depth is Responsibility-local.** Independent Responsibilities in one turn
-   need not share a single depth or wall-clock barrier. Already-grounded confirmation-free
-   safe reads may use the existing readiness path while Goal binding continues, and a
-   terminal valid Fast Plan may execute while genuinely uncertain remaining Responsibility
-   enters Deep where supported by the canonical contracts. Do not run Deep in parallel merely
-   to re-check work already resolved by Fast cognition.
+   need not share a single depth or wall-clock barrier. Once a Responsibility has canonical
+   Goal grounding, a terminal valid Fast Plan may execute while a genuinely uncertain
+   remaining Responsibility enters Deep where supported by the canonical contracts. Before
+   that Goal/Planner boundary, only provider-free conversational progress may advance. Do not
+   run Deep in parallel merely to re-check work already resolved by Fast cognition.
 
    **Fast outcome types do not borrow authority from each other.** Fast Goal
-   Interpretation first identifies the human Responsibility. If current trusted
-   cognition already contains the complete answer and no acquisition, memory,
-   effect, unresolved reference, or deeper reasoning remains, it may emit one
-   `native_response`, which is the immediate speech. If work remains, `fast_speech`
-   is only prospective Goal Progress Communication such as acknowledgement or
-   checking; it is never a provider-dependent result or a claim that the work
-   already happened. The Host may fill missing mechanical representation, but it
-   must not silently rewrite an explicit semantic route in a way that changes the
-   authority of already-authored speech. A contradictory Fast DTO may be
-   retransmitted once; it does not gain result authority through normalization.
+   Interpretation first emits provider-neutral human Responsibility proposals with
+   material semantic bindings and whether work/fresh evidence remains. If current
+   trusted cognition already contains the complete answer and no acquisition,
+   memory, effect, unresolved reference, or deeper reasoning remains, it may emit
+   one `native_response`, which is the immediate speech. If work remains,
+   `fast_speech` is only prospective Goal Progress Communication such as
+   acknowledgement or checking; it is never a provider-dependent result or a claim
+   that the work already happened. Exact Capability IDs, executable arguments, and
+   actions are Planner-owned and are invalid Fast Goal Interpreter output. The Host
+   may normalize representation-safe fields, but it must not convert a Capability
+   selection into Fast semantic authority. A contradictory Fast DTO may be
+   retransmitted once for mechanical contract repair; it does not gain Planner or
+   result authority through normalization.
 
 35. **Response is expression, not a second semantic mind.** Once authoritative
    responsibility, plan/evidence state, and permitted conversational act are known,
@@ -635,14 +638,14 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    cost where being wrong matters; do not turn perfectionism into architecture.
 
 37. **Social Attention has one semantic writer.** `SocialAttentionPlanner` alone
-   decides optional interaction-anchored decoration. Response Composer never authors
+   decides optional decoration for one concrete primary observable Activity. Response Composer never authors
    a `SocialAttentionPlan`; Goal/Planner stages do not decide it; the Host only
    supplies bounded context and validates/materializes accepted decoration. A valid
    `none` stands. Malformed, unavailable, conflicting, or unsafe decoration disappears
    locally without a second model call, speech recomposition, Goal/Plan mutation, or
-   reopened cognition. Once one auxiliary behavior has been accepted for a turn, later
-   milestones in that same turn are mechanically cooled down rather than spending another
-   model call on repetitive decoration. Model-facing candidates exclude
+   reopened cognition. Cooldown/repetition control is keyed to the concrete primary
+   Activity, not the whole turn: one accepted decoration does not suppress a later
+   distinct primary Activity in the same turn. Model-facing candidates exclude
    provider/backend/calibration identity so the social decision remains embodiment-independent.
 
 38. **Tool-result meaning has one writer and immutable truth proof.** Trusted tool/provider

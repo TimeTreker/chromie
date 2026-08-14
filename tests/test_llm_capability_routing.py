@@ -8,7 +8,11 @@ from agent.app.cognitive_core.goal_interpreter.fallback import (
     fallback_decision,
 )
 from agent.app.cognitive_core.goal_interpreter.engine import _validate_llm_capability_decision
-from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest
+from agent.app.cognitive_core.goal_interpreter.schema import (
+    FastResponsibilityProposal,
+    RouteDecision,
+    RouteRequest,
+)
 
 
 PLANNING = {
@@ -40,6 +44,40 @@ def catalog_result() -> CapabilityCatalogResult:
 
 
 class ConstrainedLlmCapabilityRoutingTests(unittest.TestCase):
+    def test_provider_neutral_responsibility_bypasses_legacy_capability_grounding(self) -> None:
+        request = RouteRequest(text="Walk forward quickly for 5 seconds.")
+        decision = RouteDecision(
+            route="robot_action",
+            intent="walk_forward",
+            confidence=0.95,
+            source="llm",
+            responsibilities=[
+                FastResponsibilityProposal(
+                    local_ref="r1",
+                    outcome="walk forward quickly for 5 seconds",
+                    bindings={
+                        "direction": "forward",
+                        "duration_s": 5,
+                        "pace": "quickly",
+                    },
+                    completion_requires_work=True,
+                    confidence=0.95,
+                )
+            ],
+        )
+
+        result = _validate_llm_capability_decision(request, decision, catalog_result())
+
+        self.assertEqual(result.route, "robot_action")
+        self.assertEqual(result.intent, "walk_forward")
+        self.assertEqual(len(result.responsibilities), 1)
+        self.assertEqual(result.candidate_capabilities, [])
+        self.assertEqual(result.actions, [])
+        self.assertEqual(
+            result.responsibilities[0].bindings,
+            {"direction": "forward", "duration_s": 5, "pace": "quickly"},
+        )
+
     def test_valid_executable_selection_is_preserved(self) -> None:
         request = RouteRequest(text="Walk forward at 0.15 speed for 5 seconds.")
         decision = RouteDecision(

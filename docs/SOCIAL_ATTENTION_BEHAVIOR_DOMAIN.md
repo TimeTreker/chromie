@@ -5,9 +5,9 @@
 Social Attention is Chromie's background social-decoration cognition.
 
 It does **not** decide the primary thing Chromie is trying to accomplish. It
-may add small, optional, non-disruptive embodied cues around an interaction that
-is already happening so that the same primary behavior feels socially present
-rather than mechanically isolated.
+may add small, optional, non-disruptive embodied cues to a concrete primary
+human-observable Activity that is already scheduled, prepared, or running so the
+same primary behavior feels socially present rather than mechanically isolated.
 
 A greeting illustrates the boundary:
 
@@ -29,8 +29,16 @@ create another Goal for the blink, or make the greeting incomplete when an
 optional decoration cannot run.
 
 In this document, **decoration** means semantic subordination, not meaningless
-random animation. A decoration is socially contextual, attached to a real
-interaction state, and lower priority than the responsibility it accompanies.
+random animation. A decoration is socially contextual, attached to one real
+primary Activity, and lower priority than the responsibility it accompanies.
+
+A **primary Activity anchor** is a concrete human-observable behavior such as
+scheduled/started speech or Vocal output, body movement, handover, vocal
+performance, or media playback. It is an umbrella interaction concept, not a new
+execution lane: the primary behavior may run in Vocal or Activity. Internal
+cognitive/runtime milestones such as `understanding_ready`, `goal_associated`,
+planning, waiting, `evidence_arrived`, or simple passage of time are **not**
+primary Activity anchors.
 
 ## Core invariants
 
@@ -46,10 +54,10 @@ Social Attention obeys all of the following:
    decoration decision.
 4. **Not a speech owner.** It never authors, rewrites, paraphrases, or changes
    the semantic content of ResponsePlan/Vocal output.
-5. **Anchored.** A decoration must accompany a meaningful social interaction
-   state such as listening, speaking, ongoing Activity, turn-taking, waiting in
-   an active interaction, or another evidence-backed social event. It does not
-   manufacture standalone work merely so that Chromie can move.
+5. **Primary-Activity anchored.** A decoration must accompany one concrete
+   human-observable primary Activity. Cognition milestones, planning state,
+   waiting, or evidence arrival do not create decoration opportunities. It does
+   not manufacture standalone work merely so that Chromie can move.
 6. **Small and non-disruptive.** Typical candidates are gaze, blink, a small
    nod, a small wave, a smile when supported by embodiment, or slight posture /
    body orientation. The live capability catalog remains authoritative.
@@ -61,6 +69,10 @@ Social Attention obeys all of the following:
    priority.
 9. **No completion authority.** Decoration evidence can say that a decoration
    ran; it cannot satisfy or prove completion of the primary Goal.
+10. **Eligibility is per primary Activity, not per turn.** One acknowledgement
+    speech may choose a blink and a later walk or final answer in the same turn
+    may independently choose another compatible cue. Cooldown/repetition policy
+    applies to the anchored Activity/evidence, not as a blanket once-per-turn ban.
 
 A socially important event that genuinely changes what Chromie should do next
 is no longer merely decoration. It must be elevated through normal Cognitive
@@ -144,19 +156,21 @@ incompatibility, repetition, or weak contextual support resolves to no
 decoration. A pleasant surprise therefore means bounded contextual variation,
 not a random extra movement.
 
-## Interaction anchor versus idle embodiment
+## Primary Activity anchor versus idle embodiment
 
 Social Attention is not a generic idle-animation system.
 
-A blink while Chromie is actively listening can be Social Attention because it
-belongs to a live social interaction. A purely autonomous blink while no social
-interaction exists may still be desirable for embodiment realism, but that is a
-separate baseline embodiment/liveliness concern and must not be represented as a
-fake Social Attention Goal or event.
+A blink accompanying Chromie's spoken acknowledgement, a gaze cue during a
+walk, or a small nod during a handover can be Social Attention because each cue
+is attached to a concrete primary Activity. Merely being in a listening/waiting
+state, finishing Goal Association, receiving evidence, or letting time pass is
+not enough. A purely autonomous blink may still be desirable for embodiment
+realism, but that is a separate baseline embodiment/liveliness concern and must
+not be represented as a fake Social Attention Goal or event.
 
-This prevents Social Attention from degrading into random gesture generation.
-The model should be reasoning about a social situation, not decorating elapsed
-time.
+This prevents Social Attention from degrading into random gesture generation or
+internal-pipeline decoration. The model reasons about how to accompany a real
+observable Activity, not how to decorate elapsed time or cognition milestones.
 
 ## Embodiment-independent boundary
 
@@ -229,7 +243,7 @@ the applicable cognitive/response owner.
 
 `SocialAttentionPlan` is advisory and body-only. The model decides:
 
-- whether a decoration is useful for the current anchored interaction;
+- whether a decoration is useful for the supplied `primary_activity` anchor;
 - its social purpose, such as listening, acknowledgement, engagement, empathy,
   turn-taking, deference, or neutral presence;
 - zero or more exact body Capability IDs from the supplied candidates when
@@ -296,6 +310,7 @@ embodiment-specific controller values.
 
 The Host / Trusted Capability Runtime may:
 
+- require a valid `primary_activity` anchor and correlate the event phase to it;
 - validate exact catalog membership and argument schemas;
 - verify target evidence;
 - enforce confirmation, safety, and availability policy;
@@ -303,7 +318,8 @@ The Host / Trusted Capability Runtime may:
 - detect resource and embodied-concurrency conflicts with primary Activity;
 - reject an auxiliary Capability that duplicates explicit primary Activity;
 - cap auxiliary behavior count;
-- apply emergency, latency, cooldown, and repetition suppression;
+- apply emergency, latency, cooldown, and repetition suppression scoped to the
+  anchored primary Activity/evidence;
 - require Social Attention body requests to remain parallel and conflict-free;
 - drop invalid optional decoration;
 - record accepted-request and terminal decoration evidence separately from Goal
@@ -316,6 +332,8 @@ The Host must not:
 - generate a gesture sequence from a social-purpose string;
 - invent response text or emotional interpretation for Social Attention;
 - let decoration delay Vocal, emergency handling, or primary Activity;
+- synthesize a Social Attention event from cognition milestones, planning,
+  waiting, or evidence arrival without a concrete observable Activity anchor;
 - select, suppress, or authorize decoration because the active body is a
   simulator versus physical robot.
 

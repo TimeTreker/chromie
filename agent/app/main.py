@@ -698,16 +698,21 @@ async def interpret_cognitive_turn(
             status_code=503,
             content=unavailable.model_dump(mode="json"),
         )
+    responsibility_proposals = [
+        item.model_dump(mode="json", exclude_none=True)
+        for item in decision.responsibilities
+    ]
     progress_proposals = [
         item.model_dump(mode="json", exclude_none=True)
         for item in decision.progress
     ]
     projection = SharedRouteDecision.model_validate(
-        decision.model_dump(mode="json", exclude={"progress"})
+        decision.model_dump(mode="json", exclude={"progress", "responsibilities"})
     )
     return CoreInterpretationResult.from_route_decision(
         envelope=envelope,
         decision=projection,
+        responsibility_proposals=responsibility_proposals,
         progress_proposals=progress_proposals,
     )
 

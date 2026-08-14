@@ -258,34 +258,42 @@ runtime/cognitive readiness question over the current understanding, evidence,
 dependencies, effects, confirmation state, authorization, hard-boundary
 principles, and resources.
 
-This distinction allows one semantic responsibility to cover both fast
+This distinction allows one semantic responsibility to cover both responsive
 information acquisition and carefully gated physical acquisition without a
-provider- or resource-kind router.
+provider- or resource-kind router. It does **not** let Fast Goal Interpretation
+perform the acquisition.
 
-For information, a sufficiently specified non-effectful read may often advance
-before Goal Association finishes relating the request to the rest of the user's
-work:
+For information, Fast Goal Interpretation may resolve the provider-neutral human
+need and material bindings early, while Goal Association decides continuity and
+canonical ownership. The provider request begins only after that Goal exists and
+Planner selects the exact acquisition method:
 
 ```text
 existing Goal: go out for dinner tonight
 
 user: "Will Chongqing get heavy rain today?"
 
-fast understanding
-  |-- current information need is already sufficiently specific
-  |-- exact safe read may start
-  |
-  `-- Goal Association continues
-        `-> the weather question informs the dinner Goal
+Fast Goal Interpretation
+  |-- Responsibility: provide today's Chongqing weather
+  |-- bindings: location=Chongqing, time=today
+  `-- optional acknowledgement speech
 
-weather evidence arrives
-  + Goal relationship is known
+Goal Association
+  `-- associate/create canonical weather Goal and relate it to dinner
+
+Fast Planner
+  `-- exact weather read Capability + executable args
+
+Trusted Capability Runtime
+  `-- weather evidence
+
+weather evidence + Goal relationship
   -> Chromie answers the rain question in the context that actually matters
 ```
 
-The acquisition is useful before the relationship analysis completes; the
-relationship analysis still changes prioritization and explanation. This is not
-a second information Goal and does not change the
+The semantic interpretation can be useful before relationship analysis completes,
+but provider acquisition is Planner-owned work after canonical Goal binding. This
+is not a second information Goal and does not change the
 `AcquireAndDeliverResource` contract.
 
 Physical resource delivery demonstrates the opposite readiness boundary. For
@@ -313,10 +321,11 @@ trusted sources with freshness/provenance and then interpreted for the Goal.
 They are not worldview, values, personality, or cached Mind content.
 
 The same readiness rule therefore generalizes beyond resources: ordinary
-conversation may respond as soon as its answer is complete; safe reads may
-advance when their exact inputs are sufficient; drafts or other reversible
-preparation may advance only within their declared non-effectful boundary; and
-committed external or physical effects remain gated by the stronger semantic,
+provider-free conversation may respond as soon as its answer is complete;
+Capability work may advance as soon as canonical Goal grounding, Planner
+selection, and its own authorization/dependency boundaries are sufficient; drafts
+or other reversible preparation may advance only within the authority of their
+owning stage; and committed external or physical effects retain the stronger
 confirmation, authorization, prohibition, and safety dependencies they require.
 
 ## Planner ownership and dynamic capability granularity

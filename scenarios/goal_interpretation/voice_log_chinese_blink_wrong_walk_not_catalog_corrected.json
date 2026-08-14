@@ -3,7 +3,7 @@
   "id": "voice_log_chinese_blink_wrong_walk_not_catalog_corrected",
   "suite": "goal_interpretation",
   "level": "module",
-  "description": "Regression from the 2026-07-03 live text check: if the fast Goal Interpreter LLM wrongly selects walking for Chinese blink ASR with high confidence, deterministic catalog scoring must not rewrite it to blink_eyes.",
+  "description": "Regression from the 2026-07-03 live text check: if Fast Goal Interpretation tries to select a walking Capability for a Chinese blink request, the DTO authority repair must recover provider-neutral blink meaning; the Host must not choose or substitute a catalog Capability.",
   "tags": [
     "voice-log",
     "zh-CN",
@@ -21,7 +21,11 @@
     "catalog": {
       "matched": true,
       "suggested_route": "robot_action",
-      "suggested_agents": ["capability_agent", "safety_agent", "speaker_agent"],
+      "suggested_agents": [
+        "capability_agent",
+        "safety_agent",
+        "speaker_agent"
+      ],
       "catalog_version": 14,
       "capabilities": [
         {
@@ -42,23 +46,81 @@
         }
       ]
     },
-    "llm_decision": {
-      "route": "robot_action",
-      "agents": ["capability_agent", "safety_agent", "speaker_agent"],
-      "intent": "capability:soridormi.walk_velocity",
-      "confidence": 0.9,
-      "language": "zh-CN",
-      "source": "llm",
-      "reason": "fast Goal Interpreter selected walking from a noisy Chinese blink phrase"
-    }
+    "llm_script": [
+      {
+        "stage": "quick_intent",
+        "decision": {
+          "route": "robot_action",
+          "agents": [
+            "capability_agent",
+            "safety_agent",
+            "speaker_agent"
+          ],
+          "intent": "capability:soridormi.walk_velocity",
+          "confidence": 0.9,
+          "language": "zh-CN",
+          "source": "llm",
+          "reason": "fast Goal Interpreter selected walking from a noisy Chinese blink phrase",
+          "responsibilities": [],
+          "fast_speech": null,
+          "progress": []
+        }
+      },
+      {
+        "stage": "quick_intent_contract_repair",
+        "decision": {
+          "route": "robot_action",
+          "intent": "blink_eyes",
+          "confidence": 0.93,
+          "language": "zh-CN",
+          "responsibilities": [
+            {
+              "local_ref": "r1",
+              "outcome": "眨眼",
+              "bindings": {},
+              "completion_requires_work": true,
+              "completion_requires_fresh_evidence": false,
+              "confidence": 0.93
+            }
+          ],
+          "fast_speech": null,
+          "progress": []
+        }
+      }
+    ]
   },
   "expect": {
     "route": "robot_action",
-    "intent": "capability:soridormi.walk_velocity",
+    "intent": "blink_eyes",
     "source": "llm",
-    "task_types_include": ["task.execute_skill"],
-    "metadata_json_contains": ["soridormi.walk_velocity"],
-    "metadata_json_forbid": ["\"capability_id\": \"soridormi.blink_eyes\"", "corrected low-score capability selection"],
-    "llm_calls": 1
+    "task_types_include": [
+      "task.execute_robot_action"
+    ],
+    "metadata_json_contains": [
+      "goal_interpreter_transaction"
+    ],
+    "metadata_json_forbid": [
+      "soridormi.walk_velocity",
+      "soridormi.blink_eyes",
+      "corrected low-score capability selection"
+    ],
+    "llm_calls": 2,
+    "llm_stages": [
+      "quick_intent",
+      "quick_intent_contract_repair"
+    ],
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "眨眼",
+        "bindings": {},
+        "completion_requires_work": true,
+        "completion_requires_fresh_evidence": false,
+        "confidence": 0.93
+      }
+    ],
+    "task_types_forbid": [
+      "task.execute_skill"
+    ]
   }
 }

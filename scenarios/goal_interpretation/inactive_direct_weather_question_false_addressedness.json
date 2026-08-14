@@ -61,17 +61,25 @@
         "stage": "quick_intent",
         "decision": {
           "route": "tool",
-          "intent": "weather_query",
+          "intent": "weather_lookup",
           "confidence": 0.95,
           "language": "zh-CN",
-          "metadata": {
-            "tool_name": "weather",
-            "weather_query": {
-              "location": "北京",
-              "date": "today",
-              "units": "metric"
+          "responsibilities": [
+            {
+              "local_ref": "r1",
+              "outcome": "告知用户北京今天是否下雨",
+              "bindings": {
+                "location": "北京",
+                "date": "today",
+                "question": "rain"
+              },
+              "completion_requires_work": true,
+              "completion_requires_fresh_evidence": true,
+              "confidence": 0.95
             }
-          }
+          ],
+          "fast_speech": null,
+          "progress": []
         }
       },
       {
@@ -86,7 +94,7 @@
   },
   "expect": {
     "route": "tool",
-    "intent": "weather_query",
+    "intent": "weather_lookup",
     "source": "llm",
     "should_speak": true,
     "llm_calls": 2,
@@ -103,7 +111,23 @@
     ],
     "metadata_json_forbid": [
       "semantic_addressedness_gate",
-      "ambient_speech"
+      "ambient_speech",
+      "tool_name",
+      "weather_query"
+    ],
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "告知用户北京今天是否下雨",
+        "bindings": {
+          "location": "北京",
+          "date": "today",
+          "question": "rain"
+        },
+        "completion_requires_work": true,
+        "completion_requires_fresh_evidence": true,
+        "confidence": 0.95
+      }
     ]
   }
 }

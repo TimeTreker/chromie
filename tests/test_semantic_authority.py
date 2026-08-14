@@ -120,7 +120,7 @@ class SemanticAuthorityContractTests(unittest.TestCase):
                 "orchestrator.handle_routed_text/apply (mapped lane allowlisted)",
                 "orchestrator.handle_routed_text/apply (mapped lane excluded)",
                 "orchestrator.handle_routed_text/report_only",
-                "agent./interaction with exact Goal Interpretation actions",
+                "agent./interaction with deprecated exact actions compatibility input",
                 "agent./interaction or /run emergency compatibility",
             },
         )
@@ -247,6 +247,7 @@ class SemanticAuthorityContractTests(unittest.TestCase):
             {
                 "gateway_attention_single_judgment": True,
                 "goal_interpreter_two_call_budget": True,
+                "fast_goal_outcome_separation": True,
                 "goal_association_five_call_budget": True,
                 "planner_one_mechanical_regeneration": True,
                 "host_semantic_replan_forbidden": True,

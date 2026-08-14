@@ -3,7 +3,7 @@
   "id": "weather_then_repeated_walk_stays_grounded",
   "suite": "cognitive_core_dialogue",
   "level": "integration",
-  "description": "After a weather query, repeated walking requests remain grounded because the model authors the walking Capability directly; the Host does not repair a stale weather decision or invent planner arguments.",
+  "description": "After a weather query, repeated walking requests remain grounded as provider-neutral responsibilities; prior weather context does not pollute the human outcome and Fast Goal Interpretation never selects the walking Capability.",
   "tags": [
     "voice-log",
     "multi-turn",
@@ -75,7 +75,7 @@
             "stage": "quick_intent",
             "decision": {
               "route": "tool",
-              "intent": "weather_query",
+              "intent": "weather_lookup",
               "confidence": 0.96,
               "language": "en-US",
               "fast_speech": {
@@ -84,21 +84,27 @@
                 "commitment": "checking_only",
                 "must_not_claim_completion": true
               },
-              "metadata": {
-                "tool_name": "weather",
-                "weather_query": {
-                  "location": "Beijing",
-                  "date": "today",
-                  "units": "metric"
+              "responsibilities": [
+                {
+                  "local_ref": "r1",
+                  "outcome": "provide today's Beijing weather",
+                  "bindings": {
+                    "location": "Beijing",
+                    "date": "today"
+                  },
+                  "completion_requires_work": true,
+                  "completion_requires_fresh_evidence": true,
+                  "confidence": 0.96
                 }
-              }
+              ],
+              "progress": []
             }
           }
         ]
       },
       "expect": {
         "route": "tool",
-        "intent": "weather_query",
+        "intent": "weather_lookup",
         "source": "llm",
         "llm_calls": 1,
         "llm_stages": [
@@ -110,6 +116,19 @@
         "fast_speech_must_not_claim_completion": true,
         "task_types_include": [
           "task.use_tool"
+        ],
+        "responsibilities": [
+          {
+            "local_ref": "r1",
+            "outcome": "provide today's Beijing weather",
+            "bindings": {
+              "location": "Beijing",
+              "date": "today"
+            },
+            "completion_requires_work": true,
+            "completion_requires_fresh_evidence": true,
+            "confidence": 0.96
+          }
         ]
       }
     },
@@ -123,16 +142,32 @@
             "stage": "quick_intent",
             "decision": {
               "route": "robot_action",
-              "intent": "capability:soridormi.walk_velocity",
+              "intent": "walk_forward",
               "confidence": 0.97,
-              "language": "en-US"
+              "language": "en-US",
+              "responsibilities": [
+                {
+                  "local_ref": "r1",
+                  "outcome": "walk forward quickly for 15 seconds",
+                  "bindings": {
+                    "direction": "forward",
+                    "duration_s": 15,
+                    "pace": "quickly"
+                  },
+                  "completion_requires_work": true,
+                  "completion_requires_fresh_evidence": false,
+                  "confidence": 0.97
+                }
+              ],
+              "fast_speech": null,
+              "progress": []
             }
           }
         ]
       },
       "expect": {
         "route": "robot_action",
-        "intent": "capability:soridormi.walk_velocity",
+        "intent": "walk_forward",
         "source": "llm",
         "llm_calls": 1,
         "llm_stages": [
@@ -143,9 +178,27 @@
         ],
         "actions": [],
         "task_types_include": [
-          "task.execute_skill"
+          "task.execute_robot_action"
         ],
-        "metadata_json_contains": [
+        "responsibilities": [
+          {
+            "local_ref": "r1",
+            "outcome": "walk forward quickly for 15 seconds",
+            "bindings": {
+              "direction": "forward",
+              "duration_s": 15,
+              "pace": "quickly"
+            },
+            "completion_requires_work": true,
+            "completion_requires_fresh_evidence": false,
+            "confidence": 0.97
+          }
+        ],
+        "task_types_forbid": [
+          "task.execute_skill",
+          "task.use_tool"
+        ],
+        "metadata_json_forbid": [
           "soridormi.walk_velocity"
         ]
       }
@@ -160,16 +213,32 @@
             "stage": "quick_intent",
             "decision": {
               "route": "robot_action",
-              "intent": "capability:soridormi.walk_velocity",
+              "intent": "walk_forward",
               "confidence": 0.97,
-              "language": "en-US"
+              "language": "en-US",
+              "responsibilities": [
+                {
+                  "local_ref": "r1",
+                  "outcome": "walk forward quickly for 15 seconds",
+                  "bindings": {
+                    "direction": "forward",
+                    "duration_s": 15,
+                    "pace": "quickly"
+                  },
+                  "completion_requires_work": true,
+                  "completion_requires_fresh_evidence": false,
+                  "confidence": 0.97
+                }
+              ],
+              "fast_speech": null,
+              "progress": []
             }
           }
         ]
       },
       "expect": {
         "route": "robot_action",
-        "intent": "capability:soridormi.walk_velocity",
+        "intent": "walk_forward",
         "source": "llm",
         "llm_calls": 1,
         "llm_stages": [
@@ -181,9 +250,27 @@
         ],
         "actions": [],
         "task_types_include": [
-          "task.execute_skill"
+          "task.execute_robot_action"
         ],
-        "metadata_json_contains": [
+        "responsibilities": [
+          {
+            "local_ref": "r1",
+            "outcome": "walk forward quickly for 15 seconds",
+            "bindings": {
+              "direction": "forward",
+              "duration_s": 15,
+              "pace": "quickly"
+            },
+            "completion_requires_work": true,
+            "completion_requires_fresh_evidence": false,
+            "confidence": 0.97
+          }
+        ],
+        "task_types_forbid": [
+          "task.execute_skill",
+          "task.use_tool"
+        ],
+        "metadata_json_forbid": [
           "soridormi.walk_velocity"
         ]
       }

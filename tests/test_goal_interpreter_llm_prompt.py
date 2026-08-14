@@ -17,12 +17,29 @@ from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
     is_allowed_model_ignore,
 )
 from agent.app.cognitive_core.goal_interpreter.fallback import InterpretationUnavailableError
-from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest
+from agent.app.cognitive_core.goal_interpreter.schema import (
+    FastResponsibilityProposal,
+    RouteDecision,
+    RouteRequest,
+)
 
 
 class GoalInterpreterLlmPromptTests(unittest.TestCase):
 
-
+    def test_fast_responsibility_rejects_planner_owned_bindings(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Planner-owned field"):
+            FastResponsibilityProposal(
+                local_ref="r1",
+                outcome="provide today's Chongqing weather",
+                bindings={
+                    "location": "重庆",
+                    "time": "today",
+                    "capability_id": "chromie.weather.lookup",
+                },
+                completion_requires_work=True,
+                completion_requires_fresh_evidence=True,
+                confidence=0.95,
+            )
 
     def test_system_prompt_names_goal_interpreter_role_and_context_boundaries(self) -> None:
         interpreter = OllamaGoalInterpreter(
@@ -35,7 +52,6 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         prompt = interpreter.load_system_prompt()
 
         self.assertIn("fast Goal Interpretation model", prompt)
-        self.assertNotIn("robot-brain", prompt)
         self.assertIn("Prompt Architecture", prompt)
         self.assertIn("Global Context Group", prompt)
         self.assertIn("Session Context Group", prompt)
@@ -45,64 +61,38 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertLess(prompt.index("Global Context Group"), prompt.index("Current Job"))
         self.assertLess(prompt.index("Current Job"), prompt.index("Task Context"))
         self.assertIn("Generalization-first principle", prompt)
-        self.assertIn("Do not replace normal semantic interpretation", prompt)
-        self.assertIn("Only deterministic", prompt)
-        self.assertIn("emergency/noise controls", prompt)
-        self.assertIn("phrase, pattern, regex", prompt)
-        self.assertIn("interpret the user turn", prompt)
-        self.assertIn("bounded semantic lanes", prompt)
-        self.assertIn("cognitive evidence", prompt)
-        self.assertIn("final plan", prompt)
-        self.assertIn("Route Taxonomy", prompt)
         self.assertIn("Responsibility Before Framing", prompt)
-        self.assertIn("substantive responsibility", prompt)
-        self.assertIn("do not collapse", prompt)
-        self.assertIn("trusted external or changing-fact lookup", prompt)
-        self.assertIn("Tool And Affordance Proposal", prompt)
-        self.assertIn("current external facts", prompt)
-        self.assertIn("trusted lookup capability", prompt)
-        self.assertIn("do not map a topic keyword", prompt)
-        self.assertNotIn("weather lookup uses route=tool", prompt)
-        self.assertIn("deep_thought", prompt)
-        self.assertIn("complex reasoning", prompt)
-        self.assertIn("task-session work", prompt)
-        self.assertIn("separately validated", prompt)
-        self.assertIn("long-horizon goals", prompt)
-        self.assertIn("routes[]", prompt)
-        self.assertIn("independent responsibilities", prompt)
+        self.assertIn("provider-neutral responsibilities", prompt)
+        self.assertIn("not canonical Goal meaning and not a Plan", prompt)
+        self.assertIn("completion_requires_fresh_evidence", prompt)
+        self.assertIn("Ability Awareness, Not Planning", prompt)
+        self.assertIn("not a selection surface", prompt)
+        self.assertIn("exact Capability selection is Planner-owned after Goal Association", prompt)
+        self.assertIn("Never emit kind=capability progress", prompt)
+        self.assertIn("Goal Progress Communication", prompt)
+        self.assertIn("not an independent Goal or Planner step", prompt)
+        self.assertIn("Current external facts", prompt)
+        self.assertIn("provider-neutral information responsibility", prompt)
         self.assertIn("Uncertainty And Confirmation Acting Rule", prompt)
-        self.assertIn("clarification", prompt)
-        self.assertIn("weak lexical or", prompt)
-        self.assertIn("substitute a", prompt)
-        self.assertNotIn("thinking_mode", prompt)
-        self.assertIn("Tool And Affordance Proposal", prompt)
-        self.assertIn("body/tool affordance", prompt)
-        self.assertIn("not a phrase table", prompt)
-        self.assertIn("CapabilityAgent", prompt)
-        self.assertIn("candidate proposals", prompt)
-        self.assertIn("execution authority", prompt)
-        self.assertIn("deep_thought", prompt)
-        self.assertIn("robot_action", prompt)
-        self.assertIn("confidence", prompt)
-        self.assertIn("supplied-memory recall", prompt)
-        self.assertIn("durable_with_explicit_consent", prompt)
-        self.assertIn("explicit current-turn consent", prompt)
-        self.assertIn("Memory writes", prompt)
-        self.assertIn("Recall is chat", prompt)
-        self.assertNotIn("intent=weather_query", prompt)
+        self.assertIn("Capability Inquiry And Execution", prompt)
+        self.assertIn("Availability questions stay chat", prompt)
+        self.assertIn("routes[]", prompt)
         self.assertIn("metadata.desired_abilities", prompt)
         self.assertIn("status=missing_ability", prompt)
-        self.assertIn("Return one compact JSON object", prompt)
-        self.assertIn("Required: route, intent, confidence, fast_speech", prompt)
-        self.assertIn("direct_to_tts", prompt)
-        self.assertIn("full_mind", prompt)
+        self.assertIn(
+            "Required: route, intent, confidence, responsibilities, fast_speech, progress",
+            prompt,
+        )
+        self.assertIn("progress[] contains native_response only", prompt)
         self.assertIn("child/family first-person speech", prompt)
         self.assertIn("processing narration", prompt)
         self.assertIn("Never output placeholder intents", prompt)
-        self.assertIn("Do not", prompt)
         self.assertIn("chain-of-thought", prompt)
-        self.assertIn("free-form progress narration", prompt)
-        self.assertLess(len(prompt), 5200)
+        self.assertNotIn("Tool And Affordance Proposal", prompt)
+        self.assertNotIn("CapabilityAgent", prompt)
+        self.assertNotIn("intent=weather_query", prompt)
+        self.assertNotIn("robot-brain", prompt)
+        self.assertLess(len(prompt), 6000)
 
 
     def test_goal_interpreter_observability_profiles_prompt_and_raw_tool_output(self) -> None:
@@ -139,7 +129,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
             '"metadata":{"tool_name":"weather","weather_query":{"location":"重庆","date":"today"}}}'
         )
 
-        self.assertIn("Tool And Affordance Proposal", system_text)
+        self.assertIn("Ability Awareness, Not Planning", system_text)
         self.assertIn("今天重庆天气怎么样？", user_text)
         self.assertTrue(flags["has_fast_speech_contract"])
         self.assertTrue(flags["has_tool_route_contract"])
@@ -162,7 +152,8 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         system = interpreter.load_system_prompt()
         self.assertIn("Capability Inquiry And Execution", system)
         self.assertIn("Availability questions stay chat", system)
-        self.assertIn("execution requests use robot_action", system)
+        self.assertIn("supported execution requests may use robot_action/tool as semantic route hints", system)
+        self.assertIn("exact Capability selection is Planner-owned after Goal Association", system)
         self.assertIn("semantic distinction, not a phrase pattern", system)
         self.assertIn("technical discussion about another person", system)
         self.assertIn("Addressedness", system)
@@ -227,10 +218,11 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         )
         prompt = interpreter.build_user_prompt(req)
         self.assertIn("capability_inquiry means a meta-question", prompt)
-        self.assertIn("semantic scope entails the requested human outcome", prompt)
-        self.assertIn("topical similarity", prompt)
+        self.assertIn("not a Fast Goal Interpreter selection surface", prompt)
+        self.assertIn("Topical similarity is insufficient", prompt)
         self.assertIn("prefer an honest missing ability over substitution", prompt)
         self.assertIn("Stable everyday reasoning", prompt)
+        self.assertIn("never choose a Capability", prompt)
 
     def test_semantic_ignore_requires_inactive_host_engagement_evidence(self) -> None:
         inactive = RouteRequest(
@@ -293,7 +285,6 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
                         "name": "Chromie",
                         "age_description": "6 years old",
                         "family_role": "the family's secretary",
-                        "pronouns": ["she", "her"],
                     },
                     "personality_expression": {
                         "owner_approved": True,
@@ -301,26 +292,12 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
                         "tool_use_style": "Say what you are checking in ordinary words.",
                         "maturity_boundary": "Be a smart six-year-old family secretary, never customer service.",
                     },
-                    "core_principles": [
-                        {
-                            "id": "protect_humans",
-                            "statement": "Protect humans first.",
-                        }
-                    ],
-                    "long_term_goals": [
-                        {
-                            "id": "useful_companion_robot",
-                            "statement": "Become a useful companion robot.",
-                        }
-                    ],
-                    "prompt_summary": "Core principles: protect humans; owner-approved.",
+                    "core_principles": [{"id": "protect_humans", "statement": "Protect humans first."}],
+                    "long_term_goals": [{"id": "useful_companion_robot", "statement": "Become a useful companion robot."}],
                     "owner_approval_required_for_core_changes": True,
                 },
                 "candidate_capabilities": [
-                    {
-                        "capability_id": "soridormi.walk_velocity",
-                        "interaction_executable": True,
-                    }
+                    {"capability_id": "soridormi.walk_velocity", "interaction_executable": True}
                 ],
                 "prompt_capabilities_common": [
                     {
@@ -342,7 +319,6 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
                                     "maximum": 6,
                                     "default": 2,
                                     "unit": "times",
-                                    "description": "Number of visible eye blinks.",
                                 }
                             },
                         },
@@ -361,85 +337,47 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("6 years old", prompt)
         self.assertIn("the family's secretary", prompt)
         self.assertIn("spoken_style", prompt)
-        self.assertIn("tool_use_style", prompt)
-        self.assertIn("maturity_boundary", prompt)
         self.assertIn("full owner-approved mind profile", prompt)
         self.assertIn("context_profile", prompt)
         self.assertIn("fast_minimal", prompt)
         self.assertIn("capability_safety", prompt)
         self.assertIn("full_mind", prompt)
-        self.assertIn("Session Context Group", prompt)
-        self.assertIn("Current Job", prompt)
-        self.assertIn("Task Context Group", prompt)
-        self.assertIn("Cost Function", prompt)
-        self.assertIn("Output Contract", prompt)
-        self.assertLess(prompt.index("Global Context Group"), prompt.index("Session Context Group"))
-        self.assertLess(prompt.index("Session Context Group"), prompt.index("Current Job"))
-        self.assertLess(prompt.index("Current Job"), prompt.index("Task Context Group"))
-        self.assertLess(prompt.index("Task Context Group"), prompt.index("Output Contract"))
-        self.assertIn("Decide from meaning, bounded context", prompt)
-        self.assertIn("deterministic emergency/noise filter", prompt)
-        self.assertIn("fast goal-interpretation and lane proposer", prompt)
-        self.assertIn("bounded cognitive evidence", prompt)
-        self.assertIn("not final goal meaning", prompt)
-        self.assertIn("Return calibrated confidence", prompt)
-        self.assertIn("fast_speech", prompt)
-        self.assertIn("first Goal Progress Communication milestone", prompt)
-        self.assertIn("omit material task parameters", prompt)
-        self.assertIn("progress is advisory", prompt)
+        self.assertIn("fast goal-interpretation and responsibility proposer", prompt)
+        self.assertIn("bounded cognitive evidence, not canonical Goal meaning", prompt)
+        self.assertIn("never choose a Capability", prompt)
+        self.assertIn("Ability Awareness, Not Planning", prompt)
+        self.assertIn("not a Fast Goal Interpreter selection surface", prompt)
+        self.assertIn("exact Capability choice belongs exclusively to Fast/Deep Planner after Goal Association", prompt)
+        self.assertIn("Do not output capability_id, skill_id, executable args, actions", prompt)
+        self.assertIn("responsibilities[]", prompt)
+        self.assertIn("completion_requires_fresh_evidence", prompt)
+        self.assertIn("progress[] may contain native_response only", prompt)
+        self.assertIn("Goal Progress Communication", prompt)
         self.assertIn("generic willingness only", contract_prompt)
         self.assertIn("Common ability IDs", prompt)
         self.assertIn("Common Ability Catalog JSON", prompt)
-        self.assertNotIn("not " + "recommendations", prompt)
-        self.assertIn("metadata.desired_abilities", prompt)
-        self.assertIn("Capability Affordance Proposal", prompt)
-        self.assertIn("not authoritative grounding", prompt)
-        self.assertIn("compact body/tool affordance interface", prompt)
-        self.assertIn("not a phrase table", prompt)
-        self.assertIn("One parameterized capability", prompt)
-        self.assertIn("CapabilityAgent", prompt)
-        self.assertIn("Capability progress requires grounded Goal meaning", prompt)
-        self.assertIn("omit capability progress", prompt)
-        self.assertIn("never guess/default them or imply checking/execution started", prompt)
-        self.assertIn("Isolated letters", prompt)
-        self.assertIn("low-information ASR fragments", prompt)
-        self.assertNotIn("Semantic Examples", prompt)
-        self.assertNotIn("no executable blink skill is in the compact skill catalog", prompt)
-        self.assertIn("Bounded session, memory, task, and robot/world context JSON", prompt)
-        self.assertIn("chromie_default_mind", prompt)
-        self.assertIn("Chromie", prompt)
-        self.assertIn("6 years old", prompt)
-        self.assertNotIn("Protect humans first.", prompt)
-        self.assertNotIn("Become a useful companion robot.", prompt)
-        self.assertNotIn("soridormi.walk_velocity", prompt)
         self.assertIn("soridormi.blink_eyes", prompt)
+        self.assertNotIn("soridormi.walk_velocity", prompt)
         self.assertIn("count", prompt)
         self.assertIn("required_args", prompt)
         self.assertIn("times", prompt)
         self.assertIn("low_risk_action", prompt)
         self.assertIn("robot_state", prompt)
-        self.assertIn("position", prompt)
         self.assertIn("last_task", prompt)
-        self.assertIn("authorize side effects", prompt)
-        self.assertIn("Speech-only conversation", prompt)
         self.assertIn("Never return interrupt or ignore", prompt)
-        self.assertIn("separate focused addressedness stage", prompt)
-        self.assertIn("Required keys: route, intent, confidence, fast_speech", prompt)
-        self.assertIn("routes[]", prompt)
-        self.assertIn("Allowed lanes", contract_prompt)
-        self.assertIn("Allowed context_profile", contract_prompt)
-        self.assertIn("Omit agents, metadata", prompt)
-        self.assertIn("non-executable ability proposals", prompt)
-        self.assertIn("\"confidence\":0.0", prompt)
+        self.assertIn(
+            "Required keys: route, intent, confidence, responsibilities, fast_speech, progress",
+            prompt,
+        )
+        self.assertIn("Omit agents, metadata, candidate_capabilities", prompt)
+        self.assertIn("non-executable semantic metadata", prompt)
+        self.assertNotIn("Capability Affordance Proposal", prompt)
+        self.assertNotIn("CapabilityAgent", prompt)
+        self.assertNotIn("Protect humans first.", prompt)
+        self.assertNotIn("Become a useful companion robot.", prompt)
         self.assertIn("chain-of-thought", contract_prompt)
-        self.assertIn("free-form progress narration", contract_prompt)
-        self.assertIn("placeholder intents", contract_prompt)
-        self.assertIn("fast_speech", prompt)
-        self.assertIn("owner-approved child/family voice", prompt)
-        self.assertIn("first-person speech", prompt)
-        self.assertIn("processing narration", prompt)
-        self.assertIn("Return one compact JSON object", prompt)
-        self.assertLess(len(prompt), 5200)
+        self.assertIn("processing narration", contract_prompt)
+        self.assertLess(len(prompt), 5800)
 
     def test_fast_interpreter_prompt_uses_common_ability_catalog_not_full_catalog(self) -> None:
         interpreter = OllamaGoalInterpreter(
@@ -921,7 +859,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertGreaterEqual(decision.confidence, 0.72)
         self.assertIn("default confidence", decision.reason or "")
 
-    def test_intent_only_weather_capability_uses_tool_route(self) -> None:
+    def test_intent_only_exact_capability_is_rejected_as_planner_owned(self) -> None:
         interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
@@ -943,16 +881,13 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
             },
         )
 
-        decision = interpreter._decision_from_response(
-            request,
-            {"message": {"content": '{"intent":"capability:chromie.weather.lookup","confidence":0.9}'}},
-        )
+        with self.assertRaisesRegex(ValueError, "Capability selection belongs to Planner"):
+            interpreter._decision_from_response(
+                request,
+                {"message": {"content": '{"intent":"capability:chromie.weather.lookup","confidence":0.9}'}},
+            )
 
-        self.assertEqual(decision.route, "tool")
-        self.assertEqual(decision.intent, "capability:chromie.weather.lookup")
-        self.assertIn("normalized capability route", decision.reason or "")
-
-    def test_skill_id_route_weather_capability_uses_tool_route(self) -> None:
+    def test_exact_capability_in_route_field_is_rejected_as_planner_owned(self) -> None:
         interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
@@ -974,14 +909,11 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
             },
         )
 
-        decision = interpreter._decision_from_response(
-            request,
-            {"message": {"content": '{"route":"chromie.weather.lookup","confidence":0.9}'}},
-        )
-
-        self.assertEqual(decision.route, "tool")
-        self.assertEqual(decision.intent, "capability:chromie.weather.lookup")
-        self.assertIn("normalized capability route", decision.reason or "")
+        with self.assertRaisesRegex(ValueError, "Capability selection belongs to Planner"):
+            interpreter._decision_from_response(
+                request,
+                {"message": {"content": '{"route":"chromie.weather.lookup","confidence":0.9}'}},
+            )
 
     def test_goal_interpreter_accepts_deep_thought_route(self) -> None:
         interpreter = OllamaGoalInterpreter(
@@ -1642,26 +1574,29 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
 
-    def test_model_facing_schema_exposes_progress_shape_invariants(self) -> None:
+    def test_model_facing_schema_exposes_responsibility_and_native_progress_boundary(self) -> None:
         schema = OllamaGoalInterpreter._route_response_schema()
         progress = schema["$defs"]["FastProgressProposal"]
+        responsibility = schema["$defs"]["FastResponsibilityProposal"]
+        route_item = schema["$defs"]["RouteItem"]
 
-        native_response = progress["allOf"][1]["then"]
-        self.assertEqual(native_response["required"], ["response_text"])
-        self.assertEqual(
-            native_response["properties"]["response_text"]["minLength"],
-            1,
-        )
-        self.assertEqual(
-            native_response["properties"]["capability_id"]["maxLength"],
-            0,
-        )
-        self.assertEqual(native_response["properties"]["args"]["maxProperties"], 0)
+        self.assertEqual(progress["properties"]["kind"]["const"], "native_response")
+        self.assertEqual(progress["required"], ["response_text"])
+        self.assertEqual(progress["properties"]["response_text"]["minLength"], 1)
+        self.assertNotIn("capability_id", progress["properties"])
+        self.assertNotIn("args", progress["properties"])
+        self.assertIn("Capability-shaped progress is forbidden", progress["description"])
 
-        capability = progress["allOf"][0]["then"]
-        self.assertEqual(capability["required"], ["capability_id"])
-        self.assertEqual(capability["properties"]["capability_id"]["minLength"], 1)
-        self.assertEqual(capability["properties"]["response_text"]["maxLength"], 0)
+        self.assertIn("outcome", responsibility["properties"])
+        self.assertIn("bindings", responsibility["properties"])
+        self.assertIn("completion_requires_work", responsibility["properties"])
+        self.assertIn("completion_requires_fresh_evidence", responsibility["properties"])
+        self.assertNotIn("capability_id", route_item["properties"])
+        self.assertNotIn("args", route_item["properties"])
+        self.assertNotIn("actions", route_item["properties"])
+        self.assertNotIn("actions", schema["properties"])
+        self.assertNotIn("candidate_capabilities", schema["properties"])
+        self.assertIn("responsibilities", schema["required"])
 
     async def test_primary_tool_fast_speech_is_preserved_without_second_llm_call(self) -> None:
         class WeatherInterpreter(OllamaGoalInterpreter):
@@ -1750,7 +1685,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(interpreter.stages, ["quick_intent"])
         self.assertNotIn("fast_speech_review", decision.metadata)
 
-    async def test_exact_capability_with_fast_model_hint_needs_no_fast_speech_reviewer(self) -> None:
+    async def test_exact_capability_output_gets_one_provider_neutral_contract_repair(self) -> None:
         class ExactHintInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
@@ -1763,18 +1698,30 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
 
             async def _chat(self, payload: dict, *, stage: str = "unknown") -> dict:
                 self.calls.append((stage, str(payload.get("model") or "")))
-                if stage != "quick_intent":
-                    self.fail("an exact catalog capability must remain in the single Fast interpretation transaction")
+                if stage == "quick_intent":
+                    return {
+                        "message": {
+                            "content": (
+                                '{"route":"robot_action",'
+                                '"intent":"soridormi.walk_forward|speed=quick",'
+                                '"confidence":0.95,'
+                                '"responsibilities":[],'
+                                '"fast_speech":"好呀，我知道啦。","progress":[]}'
+                            )
+                        }
+                    }
+                if stage != "quick_intent_contract_repair":
+                    raise AssertionError(f"unexpected stage: {stage}")
                 return {
                     "message": {
                         "content": (
-                            '{"route":"robot_action",'
-                            '"intent":"soridormi.walk_forward|speed=quick",'
+                            '{"route":"robot_action","intent":"move_forward_quickly",'
                             '"confidence":0.95,'
-                            '"fast_speech":{"text":"好呀，我知道啦。",'
-                            '"purpose":"acknowledge","commitment":"prelude_only",'
-                            '"claim_state":"none","claimed_capability_ids":[],'
-                            '"claimed_goal_ids":[],"must_not_claim_completion":true}}'
+                            '"responsibilities":[{"local_ref":"r1",'
+                            '"outcome":"move forward quickly","bindings":{"speed":"quick"},'
+                            '"completion_requires_work":true,'
+                            '"completion_requires_fresh_evidence":false,"confidence":0.95}],'
+                            '"fast_speech":"好呀，我知道啦。","progress":[]}'
                         )
                     }
                 }
@@ -1798,10 +1745,15 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             )
         )
 
-        self.assertEqual(decision.intent, "capability:soridormi.walk_forward")
-        self.assertEqual(decision.metadata["non_authoritative_capability_intent_hint"], "speed=quick")
+        self.assertEqual(decision.intent, "move_forward_quickly")
+        self.assertEqual(len(decision.responsibilities), 1)
+        self.assertEqual(decision.responsibilities[0].bindings, {"speed": "quick"})
         self.assertIsNotNone(decision.fast_speech)
-        self.assertEqual([stage for stage, _ in interpreter.calls], ["quick_intent"])
+        self.assertEqual(
+            [stage for stage, _ in interpreter.calls],
+            ["quick_intent", "quick_intent_contract_repair"],
+        )
+        self.assertNotIn("non_authoritative_capability_intent_hint", decision.metadata)
 
 
     def test_explicit_chat_cannot_be_silently_reclassified_by_exact_capability_work(self) -> None:
@@ -1842,11 +1794,11 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaisesRegex(
             ValueError,
-            "explicit route 'chat' conflicts with exact capability work",
+            "Capability selection belongs to Planner",
         ):
             interpreter._decision_from_response(request, response)
 
-    async def test_weather_route_conflict_gets_one_mechanical_retry_before_fast_speech(self) -> None:
+    async def test_weather_planner_shaped_output_gets_one_provider_neutral_repair(self) -> None:
         class WeatherConflictInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
@@ -1865,6 +1817,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                             "content": (
                                 '{"route":"chat","intent":"chromie.weather.lookup",'
                                 '"confidence":0.95,'
+                                '"responsibilities":[],'
                                 '"fast_speech":"我刚刚查了天气，今天重庆是多云，温度25度，有点热哦！",'
                                 '"progress":[{"kind":"capability",'
                                 '"capability_id":"chromie.weather.lookup",'
@@ -1878,14 +1831,13 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                 return {
                     "message": {
                         "content": (
-                            '{"route":"tool",'
-                            '"intent":"capability:chromie.weather.lookup",'
-                            '"confidence":0.95,'
-                            '"fast_speech":"好呀，我看看重庆今天的天气。",'
-                            '"progress":[{"kind":"capability",'
-                            '"capability_id":"chromie.weather.lookup",'
-                            '"args":{"location":"重庆","date":"today"},'
-                            '"intent":"weather_lookup","confidence":0.95}]}'
+                            '{"route":"tool","intent":"weather_lookup","confidence":0.95,'
+                            '"responsibilities":[{"local_ref":"r1",'
+                            '"outcome":"provide today\u2019s weather for 重庆",'
+                            '"bindings":{"location":"重庆","time":"today"},'
+                            '"completion_requires_work":true,'
+                            '"completion_requires_fresh_evidence":true,"confidence":0.95}],'
+                            '"fast_speech":"好呀，我看看重庆今天的天气。","progress":[]}'
                         )
                     }
                 }
@@ -1910,7 +1862,12 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(decision.route, "tool")
-        self.assertEqual(decision.intent, "capability:chromie.weather.lookup")
+        self.assertEqual(decision.intent, "weather_lookup")
+        self.assertEqual(len(decision.responsibilities), 1)
+        responsibility = decision.responsibilities[0]
+        self.assertEqual(responsibility.bindings, {"location": "重庆", "time": "today"})
+        self.assertTrue(responsibility.completion_requires_fresh_evidence)
+        self.assertEqual(decision.progress, [])
         self.assertIsNotNone(decision.fast_speech)
         assert decision.fast_speech is not None
         self.assertEqual(decision.fast_speech.text, "好呀，我看看重庆今天的天气。")

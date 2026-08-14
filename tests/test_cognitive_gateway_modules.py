@@ -331,7 +331,7 @@ class CognitiveGatewayModuleTests(unittest.TestCase):
             )
 
 
-    def test_core_interpretation_materializes_exact_progress_candidates_across_routes(self) -> None:
+    def test_core_interpretation_keeps_responsibility_evidence_provider_neutral(self) -> None:
         gateway = CognitiveGateway(clock=self.clock)
         capture = gateway.capture(
             "Look up the reference status, then move forward.",
@@ -354,60 +354,54 @@ class CognitiveGatewayModuleTests(unittest.TestCase):
                 reason="direct request",
             ),
         )
-        decision = RouteDecision.model_validate(
-            {
-                "route": "robot_action",
-                "intent": "compound_request",
-                "confidence": 0.98,
-                "language": "en-US",
-                "source": "llm",
-                "routes": [
-                    {
-                        "route": "tool",
-                        "intent": "chromie.reference.lookup",
-                        "capability_id": "chromie.reference.lookup",
-                        "args": {"query": "current status"},
-                        "confidence": 0.98,
-                    },
-                    {
-                        "route": "tool",
-                        "intent": "chromie.reference.lookup",
-                        "capability_id": "chromie.reference.lookup",
-                        "args": {"query": "current status"},
-                        "confidence": 0.98,
-                    },
-                    {
-                        "route": "robot_action",
-                        "intent": "soridormi.walk_forward",
-                        "capability_id": "soridormi.walk_forward",
-                        "args": {"distance_m": 1.0},
-                        "confidence": 0.96,
-                    },
-                ],
-            }
+        decision = RouteDecision(
+            route="robot_action",
+            intent="compound_request",
+            confidence=0.98,
+            language="en-US",
+            source="llm",
         )
 
         interpretation = CoreInterpretationResult.from_route_decision(
             envelope=envelope,
             decision=decision,
+            responsibility_proposals=[
+                {
+                    "local_ref": "r1",
+                    "outcome": "provide current reference status",
+                    "bindings": {"subject": "reference status"},
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.98,
+                },
+                {
+                    "local_ref": "r2",
+                    "outcome": "move forward",
+                    "bindings": {},
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.96,
+                },
+            ],
+            progress_proposals=[
+                {
+                    "kind": "capability",
+                    "capability_id": "chromie.reference.lookup",
+                    "args": {"query": "current status"},
+                }
+            ],
         )
 
-        self.assertEqual(len(interpretation.progress_candidates), 2)
-        by_capability = {item.capability_id: item for item in interpretation.progress_candidates}
+        self.assertEqual(interpretation.progress_candidates, [])
+        self.assertEqual(len(interpretation.responsibilities), 2)
+        self.assertEqual(interpretation.responsibilities[0].local_ref, "r1")
         self.assertEqual(
-            by_capability["chromie.reference.lookup"].args,
-            {"query": "current status"},
+            interpretation.responsibilities[0].bindings,
+            {"subject": "reference status"},
         )
-        self.assertEqual(
-            by_capability["soridormi.walk_forward"].args,
-            {"distance_m": 1.0},
-        )
-        self.assertTrue(
-            all(item.kind == "capability" for item in interpretation.progress_candidates)
-        )
-        self.assertTrue(
-            all(item.candidate_id.startswith("progress_") for item in interpretation.progress_candidates)
-        )
+        dumped = interpretation.model_dump(mode="json")
+        self.assertNotIn("capability_id", dumped["responsibilities"][0])
+        self.assertNotIn("args", dumped["responsibilities"][0])
 
     def test_core_interpretation_materializes_native_conversation_progress(self) -> None:
         gateway = CognitiveGateway(clock=self.clock)
@@ -459,8 +453,9 @@ class CognitiveGatewayModuleTests(unittest.TestCase):
         self.assertEqual(candidate.kind, "native_response")
         self.assertEqual(candidate.response_text, "I'm Chromie!")
         self.assertEqual(candidate.speech_act, "answer")
-        self.assertFalse(candidate.capability_id)
-        self.assertEqual(candidate.args, {})
+        dumped = candidate.model_dump(mode="json")
+        self.assertNotIn("capability_id", dumped)
+        self.assertNotIn("args", dumped)
 
     def test_native_response_progress_requires_conversational_scope(self) -> None:
         gateway = CognitiveGateway(clock=self.clock)

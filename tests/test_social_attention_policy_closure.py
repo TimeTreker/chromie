@@ -179,7 +179,7 @@ class SocialAttentionPolicyClosureTests(unittest.TestCase):
                 plan=_social_plan(),
                 session_id="social-policy",
                 turn_id="turn-1",
-                event="understanding_ready",
+                event="primary_activity_ready",
                 context={},
             )
         )
@@ -200,8 +200,15 @@ class SocialAttentionPolicyClosureTests(unittest.TestCase):
                 plan=_social_plan("soridormi.hardware_attention"),
                 session_id="social-policy",
                 turn_id="turn-2",
-                event="understanding_ready",
-                context={},
+                event="primary_activity_ready",
+                context={
+                    "social_attention_primary_activity": {
+                        "activity_id": "activity-turn-2",
+                        "kind": "speech",
+                        "phase": "ready",
+                        "summary": "primary speech",
+                    }
+                },
             )
         )
         self.assertEqual(outcome["status"], "completed")

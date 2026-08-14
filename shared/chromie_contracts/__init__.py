@@ -29,6 +29,7 @@ from .agent_skill import (
 from .route import MemoryUpdateProposal, RouteDecision, RouteItem, RouteRequest
 from .core_interpretation import (
     CognitiveProgressCandidate,
+    CognitiveResponsibilityProposal,
     CoreInterpretationResult,
     CoreInterpretationUnavailable,
 )
@@ -166,6 +167,9 @@ from .user_turn import (
     normalize_turn_text,
 )
 from .social_attention import (
+    SocialAttentionActivityAnchor,
+    SocialAttentionActivityKind,
+    SocialAttentionActivityPhase,
     SocialAttentionBehavior,
     SocialAttentionMode,
     SocialAttentionPlan,
@@ -370,6 +374,9 @@ __all__ = [
     "UserTurnChannel",
     "UserTurnEnvelope",
     "normalize_turn_text",
+    "SocialAttentionActivityAnchor",
+    "SocialAttentionActivityKind",
+    "SocialAttentionActivityPhase",
     "SocialAttentionBehavior",
     "SocialAttentionMode",
     "SocialAttentionPlan",

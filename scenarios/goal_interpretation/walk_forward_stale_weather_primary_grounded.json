@@ -3,7 +3,7 @@
   "id": "walk_forward_stale_weather_primary_grounded",
   "suite": "goal_interpretation",
   "level": "integration",
-  "description": "The walking request remains grounded because the quick model authors the exact walking Capability directly even when weather context is present; no Host-side semantic correction is required.",
+  "description": "The walking request remains semantically grounded even when weather context is present: Fast Goal Interpretation preserves direction, duration, and pace without selecting the walking Capability.",
   "tags": [
     "voice-log",
     "goal-interpretation-contract",
@@ -70,16 +70,32 @@
         "stage": "quick_intent",
         "decision": {
           "route": "robot_action",
-          "intent": "capability:soridormi.walk_velocity",
+          "intent": "walk_forward",
           "confidence": 0.97,
-          "language": "en-US"
+          "language": "en-US",
+          "responsibilities": [
+            {
+              "local_ref": "r1",
+              "outcome": "walk forward quickly for 15 seconds",
+              "bindings": {
+                "direction": "forward",
+                "duration_s": 15,
+                "pace": "quickly"
+              },
+              "completion_requires_work": true,
+              "completion_requires_fresh_evidence": false,
+              "confidence": 0.97
+            }
+          ],
+          "fast_speech": null,
+          "progress": []
         }
       }
     ]
   },
   "expect": {
     "route": "robot_action",
-    "intent": "capability:soridormi.walk_velocity",
+    "intent": "walk_forward",
     "source": "llm",
     "llm_calls": 1,
     "llm_stages": [
@@ -87,9 +103,26 @@
     ],
     "actions": [],
     "task_types_include": [
+      "task.execute_robot_action"
+    ],
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "walk forward quickly for 15 seconds",
+        "bindings": {
+          "direction": "forward",
+          "duration_s": 15,
+          "pace": "quickly"
+        },
+        "completion_requires_work": true,
+        "completion_requires_fresh_evidence": false,
+        "confidence": 0.97
+      }
+    ],
+    "task_types_forbid": [
       "task.execute_skill"
     ],
-    "metadata_json_contains": [
+    "metadata_json_forbid": [
       "soridormi.walk_velocity"
     ]
   }

@@ -3,7 +3,7 @@
   "id": "weather_pending_work_restores_truthful_fast_acknowledgement",
   "suite": "goal_interpretation",
   "level": "integration",
-  "description": "A slow weather lookup is acknowledged directly by the source Goal Interpreter once the Goal is understood; no second LLM reviewer repairs or re-decides the Fast Response.",
+  "description": "A weather responsibility that requires fresh evidence may carry one truthful source-authored acknowledgement; the Fast Goal Interpreter preserves location/date meaning but leaves provider selection to the Planner.",
   "tags": [
     "reported-live-voice",
     "weather",
@@ -42,17 +42,9 @@
         "stage": "quick_intent",
         "decision": {
           "route": "tool",
-          "intent": "capability:chromie.weather.lookup",
+          "intent": "weather_lookup",
           "confidence": 0.95,
           "language": "zh-CN",
-          "metadata": {
-            "tool_name": "weather",
-            "weather_query": {
-              "location": "北京",
-              "date": "today",
-              "units": "metric"
-            }
-          },
           "fast_speech": {
             "text": "好呀，我看看北京今天有没有下雨。",
             "purpose": "acknowledge_and_check",
@@ -61,14 +53,29 @@
             "claimed_capability_ids": [],
             "claimed_goal_ids": [],
             "must_not_claim_completion": true
-          }
+          },
+          "responsibilities": [
+            {
+              "local_ref": "r1",
+              "outcome": "告知用户北京今天是否下雨",
+              "bindings": {
+                "location": "北京",
+                "date": "today",
+                "question": "rain"
+              },
+              "completion_requires_work": true,
+              "completion_requires_fresh_evidence": true,
+              "confidence": 0.95
+            }
+          ],
+          "progress": []
         }
       }
     ]
   },
   "expect": {
     "route": "tool",
-    "intent": "capability:chromie.weather.lookup",
+    "intent": "weather_lookup",
     "source": "llm",
     "llm_calls": 1,
     "llm_stages": [
@@ -80,6 +87,23 @@
     "fast_speech_must_not_claim_completion": true,
     "task_types_include": [
       "task.use_tool"
+    ],
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "告知用户北京今天是否下雨",
+        "bindings": {
+          "location": "北京",
+          "date": "today",
+          "question": "rain"
+        },
+        "completion_requires_work": true,
+        "completion_requires_fresh_evidence": true,
+        "confidence": 0.95
+      }
+    ],
+    "task_types_forbid": [
+      "task.execute_skill"
     ]
   }
 }

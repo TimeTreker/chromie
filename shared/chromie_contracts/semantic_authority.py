@@ -96,13 +96,14 @@ def semantic_authority_route_matrix() -> list[dict[str, Any]]:
                 "apply preconditions pass"
             ),
             "planner_path": (
-                "Core readiness may start complete native Vocal, exact trusted "
-                "safe reads, while background Social Attention may prepare optional body decoration as Goal Association continues; "
-                "Goal Association explicitly binds progress to canonical Goals; completely "
-                "bound native conversation may adopt canonical speech without Planner or "
-                "Response Composer, completely bound safe reads may adopt a canonical Plan "
-                "without Fast Planner, otherwise Fast/Deep Planning applies; Response "
-                "Composer runs only when a new presentation decision still requires it"
+                "Core readiness may start only complete provider-free native Vocal while "
+                "Goal Association continues; provider work cannot start before canonical "
+                "Goal Association. Goal Association binds provider-neutral responsibilities "
+                "and native progress to canonical Goals; completely bound native conversation "
+                "may adopt canonical speech without Planner or Response Composer, otherwise "
+                "Fast/Deep Planner selects exact Capability work before trusted execution; "
+                "background Social Attention is separately anchored to concrete primary "
+                "human-observable Activities"
             ),
             "fallback": "fail_closed_after_authority_acquisition",
         },
@@ -132,7 +133,7 @@ def semantic_authority_route_matrix() -> list[dict[str, Any]]:
             "fallback": "legacy_agent_pipeline_remains_the_only_authority",
         },
         {
-            "entrypoint": "agent./interaction with exact Goal Interpretation actions",
+            "entrypoint": "agent./interaction with deprecated exact actions compatibility input",
             "owner": "goal_interpretation_action_adapter",
             "role": "adapter",
             "planner_path": "schema validation and SkillRequest materialization only",

@@ -50,23 +50,23 @@ capability name, is the decomposition boundary.
 
 ## Current compatibility boundary
 
-The service currently named Goal Interpreter has not yet been reduced to the narrow
-Cognitive Gateway role. It still performs the deployed emergency filter and
-addressedness review and also emits semantic/advisory route, intent, affordance,
-route-item, action, and task proposals. Those fields remain compatibility
-inputs, including the current lane and source-effect envelope; they are not a
-second semantic plan after the Goal-driven Runtime acquires a turn. Renaming the
-conceptual boundary therefore does not claim that the service migration is
-complete.
+The service currently named Goal Interpreter still performs the deployed emergency
+filter and addressedness review in addition to Fast semantic interpretation. Its
+maintained model-facing contract emits provider-neutral `responsibilities[]`, material
+bindings, and optional immediate communication; it does not author Capability IDs,
+executable arguments, or `actions[]`. The shared `RouteDecision` and legacy Agent
+entrypoints retain older action/task fields only as compatibility surfaces. Those
+fields are not current Fast Goal Interpreter authority and cannot become a second
+semantic plan after the Goal-driven Runtime acquires a turn.
 
 ## Entrypoint ownership
 
 | Entrypoint | Semantic owner | Role | Planner path | Failure behavior |
 |---|---|---|---|---|
 | Orchestrator turn in `apply`; mapped route lane is allowlisted and apply preconditions pass | Goal-Driven Cognitive Core (current Goal-driven Runtime) | authoritative | Goal Association → Fast Planner → terminal Deep Planner when required → Response Composer → trusted adapter | Fail closed after ownership is acquired. |
-| Orchestrator turn in `apply`; mapped route lane is excluded | Goal-Driven Cognitive Core policy boundary | authoritative fail-closed | No semantic planner is entered; exact Goal Interpretation actions remain unexecuted compatibility input only | Return a typed no-action/error outcome without legacy semantic re-entry. |
+| Orchestrator turn in `apply`; mapped route lane is excluded | Goal-Driven Cognitive Core policy boundary | authoritative fail-closed | No semantic planner is entered; deprecated externally supplied `actions[]` remain unexecuted compatibility input only | Return a typed no-action/error outcome without legacy semantic re-entry. |
 | Orchestrator turn in `report_only` | Goal-Driven Cognitive Core (current Goal-driven Runtime) | observer | Same stages, evidence only | The existing routed Agent path remains the only authority. |
-| Agent `/interaction` or `/run` with exact Goal Interpreter `actions[]` | No new semantic planner; Goal Interpreter-action materializer | adapter | Schema validation and `SkillRequest` materialization only | Invalid actions are blocked or clarified; no LLM reinterpretation. |
+| Agent `/interaction` or `/run` with deprecated exact `actions[]` compatibility input | No new semantic planner; legacy action materializer | adapter | Schema validation and `SkillRequest` materialization only | Invalid actions are blocked or clarified; no LLM reinterpretation and no claim that Fast Goal Interpretation authored them. |
 | Explicit compatibility emergency | Legacy CapabilityAgent | authoritative | Legacy capability semantic planner | Requires both service gates and a per-turn emergency claim. |
 
 The implemented direct speech-only branch runs after Goal Association for a
@@ -93,8 +93,9 @@ the Agent service.
 The CapabilityAgent remains in the repository for compatibility evidence and
 emergency operation. In normal operation it is an adapter:
 
-1. Exact Goal Interpreter `actions[]` are validated and converted to `SkillRequest`
-   objects without calling the CapabilityAgent LLM.
+1. Deprecated compatibility `actions[]` supplied directly to legacy Agent entrypoints
+   are validated and converted to `SkillRequest` objects without calling the
+   CapabilityAgent LLM. Current Fast Goal Interpretation does not author this field.
 2. A robot-action request without exact actions cannot invoke the old semantic
    planner by default.
 3. The old planner runs only when all three conditions are true:

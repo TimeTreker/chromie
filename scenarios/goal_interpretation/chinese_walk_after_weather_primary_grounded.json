@@ -3,7 +3,7 @@
   "id": "chinese_walk_after_weather_primary_grounded",
   "suite": "goal_interpretation",
   "level": "integration",
-  "description": "The walking request remains grounded because the quick model authors the exact walking Capability directly even when weather context is present; no Host-side semantic correction is required.",
+  "description": "A Chinese forward-motion request remains semantically grounded even with weather context present: Fast Goal Interpretation states the human outcome and material bindings, while Planner authority owns the walking Capability.",
   "tags": [
     "voice-log",
     "goal-interpretation-contract",
@@ -71,16 +71,32 @@
         "stage": "quick_intent",
         "decision": {
           "route": "robot_action",
-          "intent": "capability:soridormi.walk_velocity",
+          "intent": "move_forward",
           "confidence": 0.97,
-          "language": "zh-CN"
+          "language": "zh-CN",
+          "responsibilities": [
+            {
+              "local_ref": "r1",
+              "outcome": "快速向前移动十来秒",
+              "bindings": {
+                "direction": "forward",
+                "duration_text": "十来秒",
+                "pace": "faster"
+              },
+              "completion_requires_work": true,
+              "completion_requires_fresh_evidence": false,
+              "confidence": 0.97
+            }
+          ],
+          "fast_speech": null,
+          "progress": []
         }
       }
     ]
   },
   "expect": {
     "route": "robot_action",
-    "intent": "capability:soridormi.walk_velocity",
+    "intent": "move_forward",
     "source": "llm",
     "llm_calls": 1,
     "llm_stages": [
@@ -88,13 +104,28 @@
     ],
     "actions": [],
     "task_types_include": [
-      "task.execute_skill"
+      "task.execute_robot_action"
     ],
     "task_types_forbid": [
+      "task.execute_skill",
       "task.use_tool",
       "speech.answer"
     ],
-    "metadata_json_contains": [
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "快速向前移动十来秒",
+        "bindings": {
+          "direction": "forward",
+          "duration_text": "十来秒",
+          "pace": "faster"
+        },
+        "completion_requires_work": true,
+        "completion_requires_fresh_evidence": false,
+        "confidence": 0.97
+      }
+    ],
+    "metadata_json_forbid": [
       "soridormi.walk_velocity"
     ]
   }
