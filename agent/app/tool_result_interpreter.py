@@ -5,7 +5,7 @@ import copy
 import json
 import logging
 import re
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
@@ -49,6 +49,36 @@ class ToolResultModelOutput(BaseModel):
         return " ".join(str(value or "").strip().split())
 
 
+
+
+class ToolResultDTOContractError(ValueError):
+    """Mechanical model DTO failure eligible for one same-meaning retransmission."""
+
+
+class ToolResultSemanticValidationError(ValueError):
+    """Evidence/meaning violation; terminal for the current interpretation."""
+
+
+ToolResultTruthViolation = Literal[
+    "unsupported_effect_claim",
+    "unsupported_completion_claim",
+    "cross_goal_overclaim",
+    "capability_overclaim",
+    "evidence_scope_mismatch",
+    "safety_guarantee",
+    "other_consequential_claim",
+]
+
+
+class ToolResultTruthAudit(BaseModel):
+    """Immutable accept/reject proof for consequential result wording."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    violations: list[ToolResultTruthViolation] = Field(default_factory=list, max_length=8)
+    reason_summary: str = Field(default="", max_length=800)
+
+
 class ToolResultInterpreter:
     """Select and synthesize only the tool evidence needed by the user.
 
@@ -75,74 +105,109 @@ class ToolResultInterpreter:
     ) -> ToolResultInterpretation:
         evidence_by_id = {item.evidence_id: item for item in request.evidence}
         raw: Any = None
-        contract_repair_attempted = False
-        contract_repair_succeeded = False
+        previous_raw: Any = None
+        dto_regeneration_attempted = False
+        validation_errors = ""
+        truth_audit: ToolResultTruthAudit | None = None
+        truth_audit_attempted = False
         try:
-            raw = await self.ollama.generate(
-                self._prompt(request),
-                system=self._system_prompt(),
-                options={
-                    "temperature": 0.1,
-                    "top_p": 0.9,
-                    "num_ctx": self.num_ctx,
-                    "num_predict": self.num_predict,
-                },
-                response_format=self._response_schema(request),
-                prompt_family="tool_result_interpreter.primary",
-                turn_id=request.sid,
-                attempt=1,
-            )
-            effectful_reviewed = False
-            try:
-                output, effectful_reviewed = await self._validated_output(
-                    request,
-                    raw=raw,
-                    evidence_by_id=evidence_by_id,
-                )
-            except (ValidationError, ValueError) as exc:
-                contract_repair_attempted = True
+            for attempt in range(2):
                 raw = await self.ollama.generate(
-                    self._contract_repair_prompt(
-                        request,
-                        previous_output=raw,
-                        validation_error=exc,
+                    (
+                        self._dto_regeneration_prompt(
+                            request,
+                            previous_output=previous_raw,
+                            validation_error=validation_errors,
+                        )
+                        if dto_regeneration_attempted
+                        else self._prompt(request)
                     ),
-                    system=self._contract_repair_system_prompt(),
+                    system=(
+                        self._dto_regeneration_system_prompt()
+                        if dto_regeneration_attempted
+                        else self._system_prompt()
+                    ),
                     options={
-                        "temperature": 0,
+                        "temperature": 0 if dto_regeneration_attempted else 0.1,
                         "top_p": 0.9,
                         "num_ctx": self.num_ctx,
                         "num_predict": self.num_predict,
                     },
                     response_format=self._response_schema(request),
-                    prompt_family="tool_result_interpreter.contract_repair",
+                    prompt_family=(
+                        "tool_result_interpreter.dto_regeneration"
+                        if dto_regeneration_attempted
+                        else "tool_result_interpreter.primary"
+                    ),
                     turn_id=request.sid,
-                    attempt=2,
+                    attempt=attempt + 1,
                 )
-                output, effectful_reviewed = await self._validated_output(
-                    request,
-                    raw=raw,
-                    evidence_by_id=evidence_by_id,
+                try:
+                    output = self._model_output(raw)
+                except ToolResultDTOContractError as exc:
+                    if attempt == 0:
+                        dto_regeneration_attempted = True
+                        previous_raw = raw
+                        validation_errors = str(exc)[:3000]
+                        continue
+                    raise
+
+                selected_values = self._validate_fact_references(
+                    output.selected_facts, evidence_by_id=evidence_by_id
                 )
-                contract_repair_succeeded = True
-            return ToolResultInterpretation(
-                status="resolved",
-                spoken_response=output.spoken_response,
-                answer_mode=output.answer_mode,
-                selected_facts=output.selected_facts,
-                confidence=output.confidence,
-                rationale=output.rationale,
-                metadata={
-                    "resolver": "tool_result_interpreter",
-                    "contract": "ToolResultModelOutput",
-                    "evidence_count": len(request.evidence),
-                    "selected_fact_count": len(output.selected_facts),
-                    "effectful_semantic_review": effectful_reviewed,
-                    "contract_repair_attempted": contract_repair_attempted,
-                    "contract_repair_succeeded": contract_repair_succeeded,
-                    "full_tool_result_retained": True,
-                },
-            )
+                try:
+                    self._validate_spoken_response(
+                        request, output=output, selected_values=selected_values
+                    )
+                except ValueError as exc:
+                    raise ToolResultSemanticValidationError(str(exc)) from exc
+
+                if self._requires_effectful_review(request):
+                    truth_audit_attempted = True
+                    truth_audit = await self._run_truth_audit(
+                        request=request, candidate=output
+                    )
+                    if truth_audit.violations:
+                        raise ToolResultSemanticValidationError(
+                            "tool-result truth audit rejected consequential wording: "
+                            + ",".join(truth_audit.violations)
+                        )
+
+                return ToolResultInterpretation(
+                    status="resolved",
+                    spoken_response=output.spoken_response,
+                    answer_mode=output.answer_mode,
+                    selected_facts=output.selected_facts,
+                    confidence=output.confidence,
+                    rationale=output.rationale,
+                    metadata={
+                        "resolver": "tool_result_interpreter",
+                        "contract": "ToolResultModelOutput",
+                        "evidence_count": len(request.evidence),
+                        "selected_fact_count": len(output.selected_facts),
+                        "dto_regeneration_attempted": dto_regeneration_attempted,
+                        "dto_regeneration_succeeded": dto_regeneration_attempted,
+                        "result_truth_audit": {
+                            "attempted": truth_audit_attempted,
+                            "accepted": bool(
+                                truth_audit is not None and not truth_audit.violations
+                            ),
+                            "violations": (
+                                list(truth_audit.violations)
+                                if truth_audit is not None
+                                else []
+                            ),
+                            "reason_summary": (
+                                truth_audit.reason_summary
+                                if truth_audit is not None
+                                else ""
+                            ),
+                            "authority": "immutable_proof",
+                        },
+                        "full_tool_result_retained": True,
+                    },
+                )
+            raise AssertionError("unreachable tool-result interpretation loop")
         except Exception as exc:
             failure = llm_failure_metadata(exc)
             logger.warning(
@@ -160,15 +225,16 @@ class ToolResultInterpreter:
                     answer_mode="summary",
                     selected_facts=[],
                     confidence=0.0,
-                    rationale="Model interpretation was unavailable; trusted adapter fallback used.",
+                    rationale="Primary result wording was unavailable or rejected; trusted adapter fallback used.",
                     metadata={
                         "resolver": "tool_result_interpreter",
                         "fallback": True,
                         "error_type": type(exc).__name__,
                         "error": str(exc)[:300],
                         "raw_output": self._bounded(raw, 1200),
-                        "contract_repair_attempted": contract_repair_attempted,
-                        "contract_repair_succeeded": False,
+                        "dto_regeneration_attempted": dto_regeneration_attempted,
+                        "dto_regeneration_succeeded": False,
+                        "result_truth_audit_attempted": truth_audit_attempted,
                         "full_tool_result_retained": True,
                         **failure,
                     },
@@ -180,109 +246,85 @@ class ToolResultInterpreter:
                     "error_type": type(exc).__name__,
                     "error": str(exc)[:300],
                     "raw_output": self._bounded(raw, 1200),
-                    "contract_repair_attempted": contract_repair_attempted,
-                    "contract_repair_succeeded": False,
+                    "dto_regeneration_attempted": dto_regeneration_attempted,
+                    "dto_regeneration_succeeded": False,
+                    "result_truth_audit_attempted": truth_audit_attempted,
                     "full_tool_result_retained": True,
                     **failure,
                 },
             )
 
-    async def _validated_output(
-        self,
-        request: ToolResultInterpretationRequest,
-        *,
-        raw: Any,
-        evidence_by_id: dict[str, ToolResultEvidence],
-    ) -> tuple[ToolResultModelOutput, bool]:
-        """Validate one candidate and preserve the independent effectful review."""
-
-        output = ToolResultModelOutput.model_validate(raw)
-        effectful_reviewed = False
-        if self._requires_effectful_review(request):
-            reviewed = await self.ollama.generate(
-                self._effectful_review_prompt(request, candidate=output),
-                system=self._effectful_review_system_prompt(),
-                options={
-                    "temperature": 0,
-                    "top_p": 0.9,
-                    "num_ctx": self.num_ctx,
-                    "num_predict": self.num_predict,
-                },
-                response_format=self._response_schema(request),
-                prompt_family="tool_result_interpreter.effectful_review",
-                turn_id=request.sid,
-                attempt=1,
+    @staticmethod
+    def _model_output(raw: Any) -> ToolResultModelOutput:
+        if not isinstance(raw, dict):
+            raise ToolResultDTOContractError(
+                "tool result interpreter output is not a JSON object"
             )
-            if not isinstance(reviewed, dict):
-                raise ValueError(
-                    "effectful tool-result review output is not a JSON object"
-                )
-            output = ToolResultModelOutput.model_validate(reviewed)
-            effectful_reviewed = True
-        selected_values = self._validate_fact_references(
-            output.selected_facts,
-            evidence_by_id=evidence_by_id,
-        )
-        self._validate_spoken_response(
-            request,
-            output=output,
-            selected_values=selected_values,
-        )
-        return output, effectful_reviewed
+        try:
+            return ToolResultModelOutput.model_validate(raw)
+        except ValidationError as exc:
+            raise ToolResultDTOContractError(
+                json.dumps(exc.errors(include_url=False), ensure_ascii=False)[:3000]
+            ) from exc
 
-    def _contract_repair_prompt(
+    def _dto_regeneration_prompt(
         self,
         request: ToolResultInterpretationRequest,
         *,
         previous_output: Any,
-        validation_error: Exception,
+        validation_error: str,
     ) -> str:
-        """Ask the model to repair presentation only, never trusted evidence."""
+        """Retransmit one mechanically invalid DTO without reconsidering semantics."""
 
-        evidence_payload = [
-            {
-                "evidence_id": item.evidence_id,
-                "tool_id": item.tool_id,
-                "status": item.status,
-                "data": item.data,
-                "available_scalar_json_pointers": self._scalar_json_pointers(
-                    item.data
-                ),
-            }
-            for item in request.evidence
-        ]
         return (
-            "Repair the previous tool-result interpretation so it satisfies the "
-            "exact typed and evidence contract. Return the complete corrected JSON "
-            "object, not a patch. Keep the user's actual question as the target and "
-            "answer it directly. Do not weaken, omit, or work around the reported "
-            "validation failure. Do not change trusted evidence, invent a fact, cite "
-            "an unavailable JSON Pointer, add an unsupported number, expose internal "
-            "identifiers, or claim an unsupported physical outcome. Preserve the "
-            "target language and owner-approved personality. When the response is "
-            "over its selected character or sentence budget, rewrite it naturally "
-            "within that budget while retaining only the most useful supported facts.\n\n"
-            f"User request: {request.user_request}\n"
-            f"Target language: {request.language}\n"
-            f"Normal character budget: {request.max_spoken_chars}\n"
-            f"Normal sentence budget: {request.max_sentences}\n"
-            f"Detailed character budget: {request.detailed_max_spoken_chars}\n"
-            f"Detailed sentence budget: {request.detailed_max_sentences}\n"
-            f"Exact validation failure: {type(validation_error).__name__}: {validation_error}\n"
-            f"Previous output JSON: {self._bounded(previous_output, 5000)}\n"
-            f"Goal-scoped Interaction Context JSON: {self._bounded(request.context.get('interaction_context') or {}, 8000)}\n"
-            f"Trusted evidence JSON: {self._bounded(evidence_payload, 14000)}\n"
-            "Preserve only the still-needed post-evidence conversational delta; do not replay an acknowledgement, promise, or already delivered result when it adds nothing new. Return JSON only."
+            self._prompt(request)
+            + "\n\nThe previous output was mechanically invalid. Preserve the same "
+            "evidence selection and answer meaning; return only one schema-valid DTO. "
+            "Do not reconsider the user request, broaden evidence, or change capability/Goal "
+            "semantics.\nPrevious invalid JSON:\n"
+            + self._bounded(previous_output, 5000)
+            + "\nMechanical validation errors:\n"
+            + str(validation_error)[:3000]
         )
 
     @staticmethod
-    def _contract_repair_system_prompt() -> str:
+    def _dto_regeneration_system_prompt() -> str:
         return (
-            "You are Chromie's tool-result contract repairer. Repair only the "
-            "model-authored selection and spoken presentation. Trusted evidence, "
-            "the user's request, safety limits, and validation budgets are immutable. "
-            "Use semantic reasoning and return JSON only."
+            "You are retransmitting Chromie's already-intended tool-result DTO. "
+            "Fix representation only; do not reinterpret evidence or user meaning. "
+            "Return JSON only."
         )
+
+    async def _run_truth_audit(
+        self,
+        *,
+        request: ToolResultInterpretationRequest,
+        candidate: ToolResultModelOutput,
+    ) -> ToolResultTruthAudit:
+        raw = await self.ollama.generate(
+            self._effectful_review_prompt(request, candidate=candidate),
+            system=self._effectful_review_system_prompt(),
+            options={
+                "temperature": 0,
+                "top_p": 0.9,
+                "num_ctx": self.num_ctx,
+                "num_predict": min(self.num_predict, 192),
+            },
+            response_format=ToolResultTruthAudit.model_json_schema(),
+            prompt_family="tool_result_interpreter.truth_audit",
+            turn_id=request.sid,
+            attempt=1,
+        )
+        if not isinstance(raw, dict):
+            raise ToolResultSemanticValidationError(
+                "tool-result truth audit output is not a JSON object"
+            )
+        try:
+            return ToolResultTruthAudit.model_validate(raw)
+        except ValidationError as exc:
+            raise ToolResultSemanticValidationError(
+                "tool-result truth audit contract invalid"
+            ) from exc
 
     def _prompt(self, request: ToolResultInterpretationRequest) -> str:
         evidence_payload = [
@@ -365,9 +407,10 @@ class ToolResultInterpreter:
             for item in request.evidence
         ]
         return (
-            "Independently review the candidate tool-result answer for effectful "
-            "work and return the complete corrected ToolResultModelOutput JSON. "
-            "Judge semantic entailment, not wording overlap. Every user-facing claim "
+            "Audit the already-authored candidate tool-result answer for effectful "
+            "work. Return only an immutable ToolResultTruthAudit certificate; never "
+            "rewrite the answer, selected facts, Goal/Plan state, or evidence. Judge "
+            "semantic entailment, not wording overlap. Every user-facing claim "
             "must follow from the selected exact evidence facts and the immutable "
             "CanonicalPlan outcomes.\n\n"
             "A provider completion signal proves only the declared outcome of that "
@@ -392,14 +435,15 @@ class ToolResultInterpreter:
             f"{self._bounded(evidence_payload, 14000)}\n\n"
             "Candidate ToolResultModelOutput JSON:\n"
             f"{self._bounded(candidate.model_dump(mode='json'), 5000)}\n\n"
-            "Return only the complete corrected ToolResultModelOutput JSON object."
+            "Return only ToolResultTruthAudit JSON: violations plus a short reason_summary. "
+            "Use an empty violations list to accept the candidate."
         )
 
     @staticmethod
     def _effectful_review_system_prompt() -> str:
         return (
-            "You are Chromie's independent effectful-result entailment reviewer. "
-            "Keep only claims supported by exact evidence and immutable Plan outcomes. "
+            "You are Chromie's immutable effectful-result truth auditor. "
+            "Certify or reject the existing wording; never author replacement wording. "
             "Do not authorize actions or infer ability from identity. Return JSON only."
         )
 
@@ -436,6 +480,26 @@ class ToolResultInterpreter:
                     "additionalProperties": False,
                 }
             )
+        spoken = schema.get("properties", {}).get("spoken_response")
+        if isinstance(spoken, dict):
+            spoken["maxLength"] = max(1, int(request.detailed_max_spoken_chars))
+        schema.setdefault("allOf", []).append(
+            {
+                "if": {
+                    "properties": {"answer_mode": {"enum": ["direct", "summary"]}},
+                    "required": ["answer_mode"],
+                },
+                "then": {
+                    "properties": {
+                        "spoken_response": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": max(1, int(request.max_spoken_chars)),
+                        }
+                    }
+                },
+            }
+        )
         selected = schema.get("properties", {}).get("selected_facts")
         if isinstance(selected, dict):
             selected["items"] = (
@@ -597,4 +661,4 @@ class ToolResultInterpreter:
         return text if len(text) <= max_chars else text[:max_chars].rstrip() + "..."
 
 
-__all__ = ["ToolResultInterpreter", "ToolResultModelOutput"]
+__all__ = ["ToolResultInterpreter", "ToolResultModelOutput", "ToolResultTruthAudit"]

@@ -84,8 +84,8 @@ parallel manager objects.
 - **Proof is not a second semantic author.** Goal Association may retain immutable
   coverage evidence. Response Composer has one wording owner; a consequential truth
   check is one immutable accept/reject certificate and cannot rewrite Response, Goal,
-  Plan, or Social Attention. Tool Result Interpreter remains a later cleanup target;
-  do not add a generic ReviewManager or reviewer-of-reviewer flow.
+  Plan, or Social Attention. Tool Result Interpreter follows the same one-writer rule:
+  one evidence-bound answer, immutable truth proof, no semantic rewrite/reviewer chain.
 - **Readiness is local, not pipeline-global.** A branch advances when its own
   meaning, inputs, evidence, dependencies, and authority are sufficient.
 - **Stable Mind is not dynamic world knowledge.** Identity/personality/values may

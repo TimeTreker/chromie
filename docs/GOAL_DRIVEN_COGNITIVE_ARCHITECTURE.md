@@ -241,6 +241,20 @@ local.
 
 > Optional presentation must never reopen primary cognition.
 
+### Tool Result Interpretation has one evidence-bound writer
+
+Tool Result Interpreter turns trusted provider/tool evidence into the still-needed
+post-evidence conversational answer. It has one writer. A mechanically malformed
+model DTO may be retransmitted once with the same intended evidence selection and
+meaning, but evidence mismatch, unsupported numbers, scope overclaim, capability
+overclaim, or another semantic/truth violation is terminal for that interpretation.
+
+Effectful result wording may receive one immutable truth audit. The audit returns
+only bounded violations plus a reason; it cannot rewrite spoken_response, selected
+facts, Goal/Plan state, or evidence, and an invalid audit is terminal rather than
+repairable. An already-defined trusted fallback may still be used after rejection.
+This is the same one-writer/immutable-proof rule used by Response Composition.
+
 ### Social Attention is optional parallel expression
 
 Social Attention makes an already-anchored interaction feel socially alive. It is

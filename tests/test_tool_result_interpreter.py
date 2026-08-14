@@ -208,57 +208,40 @@ class ToolResultInterpreterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status, "fallback")
         self.assertEqual(result.spoken_response, "重庆很热，现在37℃，体感42℃。")
 
-    async def test_repairs_over_budget_grounded_answer_without_losing_evidence(self) -> None:
+    async def test_over_budget_grounded_answer_fails_without_semantic_repair(self) -> None:
         ollama = _ScriptedOllama(
             [
                 {
                     "spoken_response": "要带哦！重庆今天有雷雨。降雨概率很大。",
                     "answer_mode": "direct",
                     "selected_facts": [
-                        {
-                            "evidence_id": "weather-result",
-                            "json_pointer": "/condition",
-                        },
+                        {"evidence_id": "weather-result", "json_pointer": "/condition"},
                         {
                             "evidence_id": "weather-result",
                             "json_pointer": "/precipitation_probability",
                         },
                     ],
                     "confidence": 0.96,
-                    "rationale": "Grounded but one sentence over budget.",
+                    "rationale": "Grounded but over the sentence budget.",
                 },
                 {
-                    "spoken_response": "要带哦，重庆今天有雷雨，降雨概率不低。",
+                    "spoken_response": "这份旧式修复输出不应被调用。",
                     "answer_mode": "direct",
                     "selected_facts": [
-                        {
-                            "evidence_id": "weather-result",
-                            "json_pointer": "/condition",
-                        },
-                        {
-                            "evidence_id": "weather-result",
-                            "json_pointer": "/precipitation_probability",
-                        },
+                        {"evidence_id": "weather-result", "json_pointer": "/condition"}
                     ],
-                    "confidence": 0.96,
-                    "rationale": "Rewritten within the exact budget.",
+                    "confidence": 1.0,
+                    "rationale": "should not run",
                 },
             ]
         )
 
         result = await ToolResultInterpreter(ollama).interpret(self._request())
 
-        self.assertEqual(result.status, "resolved")
-        self.assertEqual(result.spoken_response, "要带哦，重庆今天有雷雨，降雨概率不低。")
-        self.assertTrue(result.metadata["contract_repair_attempted"])
-        self.assertTrue(result.metadata["contract_repair_succeeded"])
-        self.assertEqual(len(ollama.calls), 2)
-        self.assertEqual(
-            ollama.calls[1]["prompt_family"],
-            "tool_result_interpreter.contract_repair",
-        )
-        self.assertIn("sentence budget", ollama.prompts[1])
-        self.assertIn("Trusted evidence JSON", ollama.prompts[1])
+        self.assertEqual(result.status, "unavailable")
+        self.assertEqual(len(ollama.calls), 1)
+        self.assertFalse(result.metadata["dto_regeneration_attempted"])
+        self.assertNotIn("contract_repair_attempted", result.metadata)
 
     async def test_does_not_classify_workflow_narration_with_phrase_rules(self) -> None:
         ollama = _ScriptedOllama(
@@ -281,15 +264,11 @@ class ToolResultInterpreterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status, "resolved")
         self.assertEqual(result.spoken_response, "请求的任务已完成。观测结果是37℃。")
 
-    async def test_effectful_review_limits_result_to_completed_evidence(self) -> None:
+    async def test_effectful_truth_audit_rejects_overclaim_without_rewriting(self) -> None:
         data = {
             "completed": True,
             "no_motion": True,
-            "summary": (
-                "Soridormi runtime completed plan "
-                "soridormi-plan-fff70c38edb4."
-            ),
-            "plan_id": "soridormi-plan-fff70c38edb4",
+            "summary": "provider request completed without motion",
         }
         canonical_plan = CanonicalPlan(
             plan_id="plan-embodied-result",
@@ -297,9 +276,7 @@ class ToolResultInterpreterTests(unittest.IsolatedAsyncioTestCase):
             disposition="mixed",
             coverage="complete",
             confidence=0.9,
-            goal_ids=["goal-walk", "goal-water", "goal-return"],
-            goal_summary="Move forward, fetch water, and return.",
-            response_text="Only the bounded movement request was submitted.",
+            goal_ids=["goal-walk", "goal-water"],
             steps=[
                 {
                     "step_id": "walk",
@@ -321,32 +298,11 @@ class ToolResultInterpreterTests(unittest.IsolatedAsyncioTestCase):
                     "coverage": "complete",
                     "unresolved": ["No pickup capability."],
                 },
-                {
-                    "goal_id": "goal-return",
-                    "disposition": "unavailable",
-                    "coverage": "complete",
-                    "unresolved": ["No return step."],
-                },
             ],
-            goal_satisfaction={
-                "score": 0.0,
-                "status": "unsatisfied",
-                "satisfied_goal_ids": [],
-                "unmet_goal_ids": [
-                    "goal-walk",
-                    "goal-water",
-                    "goal-return",
-                ],
-                "unmet_requirements": [
-                    "physical motion",
-                    "fetch water",
-                    "return",
-                ],
-            },
         )
         request = ToolResultInterpretationRequest(
             sid="effectful-result",
-            user_request="你能往前跑50米，帮我拿杯水，然后回来吗？",
+            user_request="往前走，然后帮我拿杯水。",
             language="zh-CN",
             evidence=[
                 ToolResultEvidence(
@@ -360,95 +316,53 @@ class ToolResultInterpreterTests(unittest.IsolatedAsyncioTestCase):
             max_spoken_chars=72,
             max_sentences=2,
             context={
-                "identity": default_mind_profile().prompt_context()["identity"],
-                "personality_expression": default_mind_profile().prompt_context()[
-                    "personality_expression"
-                ],
                 "canonical_plan_resolution": canonical_plan.model_dump(mode="json"),
                 "effectful_result_review_required": True,
             },
         )
-        ollama = _ScriptedOllama(
-            [
-                {
-                    "spoken_response": (
-                        "好的！我已经跑完50米，拿到水又回来了，"
-                        "我保证全都安全完成了！"
-                    ),
-                    "answer_mode": "direct",
-                    "selected_facts": [
-                        {
-                            "evidence_id": "walk-result",
-                            "json_pointer": "/completed",
-                        }
-                    ],
-                    "confidence": 0.99,
-                    "rationale": "The provider completed the request.",
-                },
-                {
-                    "spoken_response": (
-                        "刚才没有真的往前走，拿水和回来也没有完成。"
-                    ),
-                    "answer_mode": "direct",
-                    "selected_facts": [
-                        {
-                            "evidence_id": "walk-result",
-                            "json_pointer": "/no_motion",
-                        }
-                    ],
-                    "confidence": 1.0,
-                    "rationale": (
-                        "no_motion proves that the completed provider request "
-                        "did not produce physical movement."
-                    ),
-                },
-            ]
-        )
+        candidate = {
+            "spoken_response": "都完成了，而且我保证很安全。",
+            "answer_mode": "direct",
+            "selected_facts": [
+                {"evidence_id": "walk-result", "json_pointer": "/completed"}
+            ],
+            "confidence": 0.99,
+            "rationale": "overclaim",
+        }
+        audit = {
+            "violations": ["cross_goal_overclaim", "safety_guarantee"],
+            "reason_summary": "The candidate exceeds observed evidence.",
+        }
+        ollama = _ScriptedOllama([candidate, audit])
 
         result = await ToolResultInterpreter(ollama).interpret(request)
 
-        self.assertEqual(result.status, "resolved")
+        self.assertEqual(result.status, "unavailable")
+        self.assertEqual(len(ollama.calls), 2)
         self.assertEqual(
-            result.spoken_response,
-            "刚才没有真的往前走，拿水和回来也没有完成。",
+            ollama.calls[1]["prompt_family"],
+            "tool_result_interpreter.truth_audit",
         )
-        self.assertNotIn("Soridormi", result.spoken_response)
-        self.assertNotIn("50米", result.spoken_response)
-        self.assertNotIn("保证", result.spoken_response)
-        self.assertTrue(result.metadata["effectful_semantic_review"])
-        self.assertEqual(len(ollama.prompts), 2)
-        review_prompt = ollama.prompts[1]
-        self.assertIn("completion signal proves only the declared outcome", review_prompt)
-        self.assertIn("selected trusted facts", review_prompt)
-        self.assertIn("Interaction Context", review_prompt)
-        self.assertIn("plan IDs", review_prompt)
-        self.assertIn("Identity affects voice only", review_prompt)
-        self.assertNotIn("exact physical distance, pickup, carrying, return", review_prompt)
+        self.assertIn("immutable ToolResultTruthAudit", ollama.prompts[1])
+        self.assertNotIn("complete corrected ToolResultModelOutput", ollama.prompts[1])
+        self.assertTrue(result.metadata["result_truth_audit_attempted"])
 
-    async def test_effectful_review_preserves_unavailable_vocal_sibling(self) -> None:
+    async def test_effectful_truth_audit_rejects_unavailable_sibling_overclaim(self) -> None:
         walk_data = {"completed": True, "motion_observed": True}
-        blink_data = {"completed": True, "blink_observed": True}
         canonical_plan = CanonicalPlan(
-            plan_id="plan-walk-sing-blink-result",
+            plan_id="plan-walk-sing-result",
             planner_tier="deep",
             disposition="mixed",
             coverage="complete",
             confidence=0.98,
-            goal_ids=["goal-walk", "goal-sing", "goal-blink"],
-            goal_summary="Walk, sing, and blink together.",
+            goal_ids=["goal-walk", "goal-sing"],
             steps=[
                 {
                     "step_id": "walk",
                     "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 15.0},
                     "source_goal_ids": ["goal-walk"],
-                },
-                {
-                    "step_id": "blink",
-                    "capability_id": "soridormi.blink_eyes",
-                    "args": {},
-                    "source_goal_ids": ["goal-blink"],
-                },
+                }
             ],
             goal_outcomes=[
                 {
@@ -463,17 +377,11 @@ class ToolResultInterpreterTests(unittest.IsolatedAsyncioTestCase):
                     "coverage": "complete",
                     "unresolved": ["No qualified singing provider is available."],
                 },
-                {
-                    "goal_id": "goal-blink",
-                    "disposition": "execute",
-                    "coverage": "complete",
-                    "step_ids": ["blink"],
-                },
             ],
         )
         request = ToolResultInterpretationRequest(
             sid="effectful-mixed-vocal-result",
-            user_request="往前走，同时唱歌和眨眼睛。",
+            user_request="往前走，同时唱歌。",
             language="zh-CN",
             evidence=[
                 ToolResultEvidence(
@@ -482,22 +390,11 @@ class ToolResultInterpreterTests(unittest.IsolatedAsyncioTestCase):
                     status="completed",
                     data=walk_data,
                     output_sha256=canonical_value_sha256(walk_data),
-                ),
-                ToolResultEvidence(
-                    evidence_id="blink-result",
-                    tool_id="soridormi.blink_eyes",
-                    status="completed",
-                    data=blink_data,
-                    output_sha256=canonical_value_sha256(blink_data),
-                ),
+                )
             ],
             max_spoken_chars=72,
             max_sentences=2,
             context={
-                "identity": default_mind_profile().prompt_context()["identity"],
-                "personality_expression": default_mind_profile().prompt_context()[
-                    "personality_expression"
-                ],
                 "canonical_plan_resolution": canonical_plan.model_dump(mode="json"),
                 "effectful_result_review_required": True,
             },
@@ -505,43 +402,55 @@ class ToolResultInterpreterTests(unittest.IsolatedAsyncioTestCase):
         ollama = _ScriptedOllama(
             [
                 {
-                    "spoken_response": "走路、唱歌、眨眼都完成啦！",
+                    "spoken_response": "走路和唱歌都完成啦！",
                     "answer_mode": "direct",
                     "selected_facts": [
-                        {"evidence_id": "walk-result", "json_pointer": "/completed"},
-                        {"evidence_id": "blink-result", "json_pointer": "/completed"},
+                        {"evidence_id": "walk-result", "json_pointer": "/completed"}
                     ],
                     "confidence": 0.99,
-                    "rationale": "Both providers completed their requests.",
+                    "rationale": "overclaim",
                 },
                 {
-                    "spoken_response": "走路和眨眼完成了，不过唱歌现在做不了。",
-                    "answer_mode": "direct",
-                    "selected_facts": [
-                        {"evidence_id": "walk-result", "json_pointer": "/completed"},
-                        {"evidence_id": "blink-result", "json_pointer": "/completed"},
-                    ],
-                    "confidence": 1.0,
-                    "rationale": (
-                        "Only walk and blink have completed evidence; the immutable "
-                        "Plan marks singing unavailable."
-                    ),
+                    "violations": ["cross_goal_overclaim"],
+                    "reason_summary": "Singing is unavailable in the immutable Plan.",
                 },
             ]
         )
 
         result = await ToolResultInterpreter(ollama).interpret(request)
 
-        self.assertEqual(result.status, "resolved")
-        self.assertEqual(
-            result.spoken_response,
-            "走路和眨眼完成了，不过唱歌现在做不了。",
-        )
-        self.assertNotIn("唱歌、眨眼都完成", result.spoken_response)
-        self.assertTrue(result.metadata["effectful_semantic_review"])
-        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(result.status, "unavailable")
+        self.assertEqual(len(ollama.calls), 2)
         self.assertIn('"goal_id":"goal-sing"', ollama.prompts[1])
         self.assertIn('"disposition":"unavailable"', ollama.prompts[1])
+
+    async def test_effectful_truth_audit_accepts_without_rewriting(self) -> None:
+        request = self._request().model_copy(
+            update={
+                "context": {
+                    **self._request().context,
+                    "effectful_result_review_required": True,
+                }
+            }
+        )
+        candidate = {
+            "spoken_response": "很热，现在37℃。",
+            "answer_mode": "direct",
+            "selected_facts": [
+                {"evidence_id": "weather-result", "json_pointer": "/temperature_c"}
+            ],
+            "confidence": 0.95,
+            "rationale": "exact fact",
+        }
+        audit = {"violations": [], "reason_summary": "Grounded in selected evidence."}
+        ollama = _ScriptedOllama([candidate, audit])
+
+        result = await ToolResultInterpreter(ollama).interpret(request)
+
+        self.assertEqual(result.status, "resolved")
+        self.assertEqual(result.spoken_response, candidate["spoken_response"])
+        self.assertEqual(len(ollama.calls), 2)
+        self.assertTrue(result.metadata["result_truth_audit"]["accepted"])
 
     async def test_rejects_unknown_fact_pointer(self) -> None:
         ollama = _ScriptedOllama(

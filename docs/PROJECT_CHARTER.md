@@ -616,7 +616,15 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    reopened cognition. Model-facing candidates exclude provider/backend/calibration
    identity so the social decision remains embodiment-independent.
 
-37. **Reflection learns forward; it does not rewrite history.** Trusted observations,
+38. **Tool-result meaning has one writer and immutable truth proof.** Trusted tool/provider
+   evidence is authoritative reality, while Tool Result Interpreter owns one natural
+   evidence-bound wording pass. Only a mechanically invalid DTO may be retransmitted
+   once without reconsidering meaning. Evidence/scope/capability overclaim is terminal
+   for that interpretation. Consequential result wording may receive one immutable
+   accept/reject truth certificate, but the certificate cannot rewrite speech, selected
+   facts, Goals, Plans, or evidence and cannot enter a repair workflow.
+
+39. **Reflection learns forward; it does not rewrite history.** Trusted observations,
    delivered speech, commitments, execution attempts, and outcomes remain historical
    evidence. Reflection may explain surprise, record an experience, calibrate future
    cognition, or propose future Goal/Plan/Memory changes through their normal owners.
