@@ -589,9 +589,12 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    Response composition chooses natural wording for the still-needed user-facing
    delta. It may be mechanically validated and must be rejected if it claims
    unsupported reality, but it may not reinterpret Goals, reopen planning, or gain
-   effect authority. Wording or presentation failure is local; it is not a reason to
-   restart primary cognition. **Optional presentation must never reopen primary
-   cognition.**
+   effect authority. The primary Response Composer is the only writer of response
+   wording. A consequential response may be checked by one immutable accept/reject
+   truth certificate, but that proof cannot author replacement wording or mutate
+   Goal/Plan/Social-Attention state, and it cannot enter its own repair workflow.
+   Wording or presentation failure is local; it is not a reason to restart primary
+   cognition. **Optional presentation must never reopen primary cognition.**
 
 36. **Harmless imperfection may pass; consequential uncertainty may not.** Human-like
    interaction does not require every low-risk turn or optional expression to be

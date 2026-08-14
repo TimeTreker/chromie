@@ -543,7 +543,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "f7536a8768eabe3a88805da9e9d986ce96b04a211ac00e9be4ee652156991766",
+      "body_sha256": "5a11334b4e11b20f5673fb52610cfd33c8a03ca35f540dd69809b1b982e7738a",
       "failure_signals": [
         "continue",
         "diagnostic",
@@ -559,12 +559,25 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "fecc22cb8aaa17ecd6ccbae05e9dc4aad1b1fd88727f0c4b861a5b19a5cb960a",
+      "body_sha256": "d0b5d711423c3b201288b7a9d580a64c8f7e4db74e7678dc24b178dbc0700d27",
       "failure_signals": [
         "continue",
         "diagnostic",
         "return",
         "state_update"
+      ]
+    },
+    {
+      "path": "agent/app/response_composer.py",
+      "symbol": "ResponseComposerResolver._run_response_truth_audit",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "agent",
+      "contract": "Map truth-audit transport/schema failure into one terminal ResponseComposerSemanticValidationError; never author replacement wording or retry the proof.",
+      "review_status": "reviewed",
+      "body_sha256": "e5a49b6309951566cb77024309ff299f0eae2a2ef8e99fa8ec88042c9586fa76",
+      "failure_signals": [
+        "raise"
       ]
     },
     {

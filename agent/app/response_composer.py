@@ -5,7 +5,7 @@ import hashlib
 import json
 import logging
 import copy
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -87,6 +87,41 @@ class ResponseComposerModelOutput(BaseModel):
     lane_coordination: list[LaneCoordinationGroup] = Field(default_factory=list)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     rationale: str = ""
+
+
+
+
+class ResponseComposerDTOContractError(ValueError):
+    """Mechanical Response Composer representation failure eligible for one retransmission."""
+
+
+class ResponseComposerSemanticValidationError(ValueError):
+    """Consequential response meaning/truth failure; terminal for this composition."""
+
+
+ResponseTruthViolation = Literal[
+    "unsupported_reality_claim",
+    "premature_effect_claim",
+    "unsupported_completion_claim",
+    "capability_overclaim",
+    "confirmation_mismatch",
+    "goal_scope_mismatch",
+    "other_consequential_claim",
+]
+
+
+class ResponseTruthAudit(BaseModel):
+    """Immutable proof certificate for consequential response wording.
+
+    The audit never rewrites ResponsePlan or any upstream semantic object. The Host
+    derives acceptance mechanically: an empty violations list accepts; any violation
+    rejects the composition. Invalid audit output is terminal and is never repaired.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    violations: list[ResponseTruthViolation] = Field(default_factory=list, max_length=8)
+    reason_summary: str = Field(default="", max_length=800)
 
 
 class ResponseComposerResolver:
@@ -178,14 +213,10 @@ class ResponseComposerResolver:
         response_schema = self._response_schema(plan, request.context)
         previous_raw: Any = None
         initial_validation_errors = ""
-        contract_repair_attempted = False
-        safe_read_semantic_review_attempted = False
-        safe_read_semantic_review_succeeded = False
-        effectful_semantic_review_attempted = False
-        effectful_semantic_review_succeeded = False
+        dto_regeneration_attempted = False
+        response_truth_audit: ResponseTruthAudit | None = None
+        response_truth_audit_attempted = False
         for attempt in range(2):
-            safe_read_semantic_review_succeeded = False
-            effectful_semantic_review_succeeded = False
             raw: Any = None
             try:
                 raw = await self.ollama.generate(
@@ -196,8 +227,8 @@ class ResponseComposerResolver:
                         validation_errors=initial_validation_errors,
                     ),
                     system=(
-                        self._repair_system_prompt()
-                        if contract_repair_attempted
+                        self._dto_regeneration_system_prompt()
+                        if dto_regeneration_attempted
                         else self._system_prompt()
                     ),
                     options={
@@ -208,15 +239,15 @@ class ResponseComposerResolver:
                     },
                     response_format=response_schema,
                     prompt_family=(
-                        "response_composer.repair"
-                        if contract_repair_attempted
+                        "response_composer.dto_regeneration"
+                        if dto_regeneration_attempted
                         else "response_composer.primary"
                     ),
                     turn_id=request.sid,
                     attempt=attempt + 1,
                 )
                 if not isinstance(raw, dict):
-                    raise ValueError("response composer output is not a JSON object")
+                    raise ResponseComposerDTOContractError("response composer output is not a JSON object")
                 raw = self._canonicalize_optional_social_attention_payload(raw)
                 raw = self._canonicalize_lane_coordination_payload(raw, plan=plan)
                 model_output = ResponseComposerModelOutput.model_validate(raw)
@@ -227,116 +258,6 @@ class ResponseComposerResolver:
                     model_output.response_plan = self._pure_safe_read_response_plan(
                         plan=plan,
                         context=request.context,
-                    )
-                safe_read_review_required = bool(
-                    self._is_safe_read_plan(plan, request.context)
-                    and not pure_safe_read
-                )
-                if safe_read_review_required:
-                    safe_read_semantic_review_attempted = True
-                    review_candidate = model_output
-                    logger.info(
-                        "response_composer_safe_read_semantic_review_start sid=%s",
-                        request.sid,
-                    )
-                    reviewed = await self.ollama.generate(
-                        self._safe_read_semantic_review_prompt(
-                            request=request,
-                            plan=plan,
-                            candidate=model_output,
-                        ),
-                        system=self._safe_read_semantic_review_system_prompt(),
-                        options={
-                            "temperature": 0,
-                            "top_p": 0.9,
-                            "num_ctx": self.num_ctx,
-                            "num_predict": self.num_predict,
-                        },
-                        response_format=response_schema,
-                        prompt_family="response_composer.safe_read_review",
-                        turn_id=request.sid,
-                        attempt=1,
-                    )
-                    if not isinstance(reviewed, dict):
-                        raise ValueError("safe-read semantic review output is not a JSON object")
-                    reviewed = self._canonicalize_optional_social_attention_payload(reviewed)
-                    reviewed = self._canonicalize_lane_coordination_payload(reviewed, plan=plan)
-                    reviewed_output = ResponseComposerModelOutput.model_validate(reviewed)
-                    if self._semantic_review_dropped_complete_goal_coverage(
-                        review_candidate,
-                        reviewed_output,
-                        plan=plan,
-                    ):
-                        logger.warning(
-                            "response_composer_safe_read_review_coverage_regression "
-                            "sid=%s preserved_candidate=true",
-                            request.sid,
-                        )
-                    else:
-                        raw = reviewed
-                        model_output = reviewed_output
-                        safe_read_semantic_review_succeeded = True
-                    logger.info(
-                        "response_composer_safe_read_semantic_review_done sid=%s status=%s",
-                        request.sid,
-                        (
-                            "success"
-                            if safe_read_semantic_review_succeeded
-                            else "coverage_regression_preserved_candidate"
-                        ),
-                    )
-                elif self._requires_effectful_semantic_review(plan, request.context):
-                    effectful_semantic_review_attempted = True
-                    review_candidate = model_output
-                    logger.info(
-                        "response_composer_effectful_semantic_review_start sid=%s",
-                        request.sid,
-                    )
-                    reviewed = await self.ollama.generate(
-                        self._effectful_semantic_review_prompt(
-                            request=request,
-                            plan=plan,
-                            candidate=model_output,
-                        ),
-                        system=self._effectful_semantic_review_system_prompt(),
-                        options={
-                            "temperature": 0,
-                            "top_p": 0.9,
-                            "num_ctx": self.num_ctx,
-                            "num_predict": self.num_predict,
-                        },
-                        response_format=response_schema,
-                        prompt_family="response_composer.effectful_review",
-                        turn_id=request.sid,
-                        attempt=1,
-                    )
-                    if not isinstance(reviewed, dict):
-                        raise ValueError("effectful semantic review output is not a JSON object")
-                    reviewed = self._canonicalize_optional_social_attention_payload(reviewed)
-                    reviewed = self._canonicalize_lane_coordination_payload(reviewed, plan=plan)
-                    reviewed_output = ResponseComposerModelOutput.model_validate(reviewed)
-                    if self._semantic_review_dropped_complete_goal_coverage(
-                        review_candidate,
-                        reviewed_output,
-                        plan=plan,
-                    ):
-                        logger.warning(
-                            "response_composer_effectful_review_coverage_regression "
-                            "sid=%s preserved_candidate=true",
-                            request.sid,
-                        )
-                    else:
-                        raw = reviewed
-                        model_output = reviewed_output
-                        effectful_semantic_review_succeeded = True
-                    logger.info(
-                        "response_composer_effectful_semantic_review_done sid=%s status=%s",
-                        request.sid,
-                        (
-                            "success"
-                            if effectful_semantic_review_succeeded
-                            else "coverage_regression_preserved_candidate"
-                        ),
                     )
                 repaired_response_plan, mixed_coverage_reasons = (
                     self._repair_mixed_execution_coverage(
@@ -349,10 +270,6 @@ class ResponseComposerResolver:
                     model_output = model_output.model_copy(
                         update={"response_plan": repaired_response_plan}
                     )
-                self._validate_social_attention_decision(
-                    model_output.social_attention_plan,
-                    context=request.context,
-                )
                 self._validate_safe_read_acknowledgement(
                     model_output.response_plan,
                     plan=plan,
@@ -373,6 +290,20 @@ class ResponseComposerResolver:
                     model_output.response_plan,
                     request=request,
                 )
+                if self._requires_response_truth_audit(
+                    plan, request.context, pure_safe_read=pure_safe_read
+                ):
+                    response_truth_audit_attempted = True
+                    response_truth_audit = await self._run_response_truth_audit(
+                        request=request,
+                        plan=plan,
+                        candidate=model_output,
+                    )
+                    if response_truth_audit.violations:
+                        raise ResponseComposerSemanticValidationError(
+                            "response truth audit rejected consequential wording: "
+                            + ",".join(response_truth_audit.violations)
+                        )
                 social_plan, social_reasons = self._validated_social_plan(
                     model_output.social_attention_plan,
                     plan=plan,
@@ -390,19 +321,6 @@ class ResponseComposerResolver:
                 validated_social_behavior_count = (
                     len(social_plan.behaviors) if social_plan is not None else 0
                 )
-                if (
-                    attempt == 0
-                    and model_social_decision == "express"
-                    and validated_social_decision == "none"
-                    and social_reasons
-                ):
-                    raise ValueError(
-                        "social_attention decision=express lost every proposed "
-                        "member during deterministic validation: "
-                        + "; ".join(social_reasons)
-                        + ". Revise to another eligible untargeted decorative behavior, "
-                        "or return decision=none with a concrete scene reason."
-                    )
                 response_plan, lane_coordination, lane_reasons = self._reconcile_lane_coordination(
                     response_plan=model_output.response_plan,
                     lane_coordination=model_output.lane_coordination,
@@ -465,21 +383,25 @@ class ResponseComposerResolver:
                         ),
                         "pure_safe_read_fast_act_reference_only": pure_safe_read,
                         "delivered_turn_speech_count": len(delivered_turn_speech),
-                        "contract_repair_attempted": contract_repair_attempted,
-                        "contract_repair_succeeded": contract_repair_attempted,
-                        "safe_read_semantic_review": {
-                            "attempted": safe_read_semantic_review_attempted,
-                            "succeeded": safe_read_semantic_review_succeeded,
-                            "strategy": (
-                                "fast_act_reference_or_post_execution_result"
-                                if pure_safe_read
-                                else "model_owned_pre_evidence_speech_review"
+                        "dto_regeneration_attempted": dto_regeneration_attempted,
+                        "dto_regeneration_succeeded": dto_regeneration_attempted,
+                        "response_truth_audit": {
+                            "attempted": response_truth_audit_attempted,
+                            "accepted": bool(
+                                response_truth_audit is not None
+                                and not response_truth_audit.violations
                             ),
-                        },
-                        "effectful_semantic_review": {
-                            "attempted": effectful_semantic_review_attempted,
-                            "succeeded": effectful_semantic_review_succeeded,
-                            "strategy": "model_owned_pre_execution_claim_review",
+                            "violations": (
+                                list(response_truth_audit.violations)
+                                if response_truth_audit is not None
+                                else []
+                            ),
+                            "reason_summary": (
+                                response_truth_audit.reason_summary
+                                if response_truth_audit is not None
+                                else ""
+                            ),
+                            "authority": "immutable_proof",
                         },
                     },
                 )
@@ -495,19 +417,12 @@ class ResponseComposerResolver:
                         "social_attention_candidate_count": (social_attention_candidate_count),
                         "social_attention_model_decision": model_social_decision,
                         "social_attention_validated_decision": (validated_social_decision),
-                        "contract_repair_attempted": contract_repair_attempted,
-                        "contract_repair_succeeded": contract_repair_attempted,
-                        "safe_read_semantic_review_attempted": (
-                            safe_read_semantic_review_attempted
-                        ),
-                        "safe_read_semantic_review_succeeded": (
-                            safe_read_semantic_review_succeeded
-                        ),
-                        "effectful_semantic_review_attempted": (
-                            effectful_semantic_review_attempted
-                        ),
-                        "effectful_semantic_review_succeeded": (
-                            effectful_semantic_review_succeeded
+                        "dto_regeneration_attempted": dto_regeneration_attempted,
+                        "dto_regeneration_succeeded": dto_regeneration_attempted,
+                        "response_truth_audit_attempted": response_truth_audit_attempted,
+                        "response_truth_audit_accepted": bool(
+                            response_truth_audit is not None
+                            and not response_truth_audit.violations
                         ),
                         "mixed_coverage_repair_reasons": mixed_coverage_reasons,
                     },
@@ -530,9 +445,9 @@ class ResponseComposerResolver:
                     stage="response_composer", exc=exc, request=request
                 )
                 if attempt == 0 and isinstance(
-                    exc, (ValidationError, json.JSONDecodeError, ValueError)
+                    exc, (ValidationError, json.JSONDecodeError, ResponseComposerDTOContractError)
                 ):
-                    contract_repair_attempted = True
+                    dto_regeneration_attempted = True
                     previous_raw = raw
                     initial_validation_errors = self._validation_error_json(exc)
                     continue
@@ -541,22 +456,22 @@ class ResponseComposerResolver:
                     plan=plan,
                     composition_id=composition_id,
                     failure=exc,
-                    contract_repair_attempted=contract_repair_attempted,
+                    dto_regeneration_attempted=dto_regeneration_attempted,
                 )
                 if fallback is not None:
                     return fallback
                 logger.warning(
                     "response_composer_contract_failure_evidence sid=%s "
-                    "initial_raw_output_ref=%s repair_raw_output_ref=%s "
-                    "initial_raw_output=%s repair_raw_output=%s",
+                    "initial_raw_output_ref=%s regeneration_raw_output_ref=%s "
+                    "initial_raw_output=%s regeneration_raw_output=%s",
                     request.sid,
-                    cognition_text_reference(previous_raw if contract_repair_attempted else None),
-                    cognition_text_reference(raw if contract_repair_attempted else None),
+                    cognition_text_reference(previous_raw if dto_regeneration_attempted else None),
+                    cognition_text_reference(raw if dto_regeneration_attempted else None),
                     self._bounded(previous_raw, 5000)
-                    if contract_repair_attempted and previous_raw is not None
+                    if dto_regeneration_attempted and previous_raw is not None
                     else "",
                     self._bounded(raw, 5000)
-                    if contract_repair_attempted and raw is not None
+                    if dto_regeneration_attempted and raw is not None
                     else "",
                 )
                 return ResponseCompositionResolution(
@@ -568,22 +483,16 @@ class ResponseComposerResolver:
                         "error_type": type(exc).__name__,
                         "error": str(exc)[:300],
                         "contract_schema": "ResponseComposerModelOutput",
-                        "contract_repair_attempted": contract_repair_attempted,
-                        "contract_repair_succeeded": False,
-                        "safe_read_semantic_review_attempted": (
-                            safe_read_semantic_review_attempted
-                        ),
-                        "safe_read_semantic_review_succeeded": False,
-                        "effectful_semantic_review_attempted": (
-                            effectful_semantic_review_attempted
-                        ),
-                        "effectful_semantic_review_succeeded": False,
+                        "dto_regeneration_attempted": dto_regeneration_attempted,
+                        "dto_regeneration_succeeded": False,
+                        "response_truth_audit_attempted": response_truth_audit_attempted,
+                        "response_truth_audit_accepted": False,
                         "initial_validation_errors": initial_validation_errors,
                         "initial_raw_output_ref": cognition_text_reference(
-                            previous_raw if contract_repair_attempted else None
+                            previous_raw if dto_regeneration_attempted else None
                         ),
-                        "repair_raw_output_ref": cognition_text_reference(
-                            raw if contract_repair_attempted else None
+                        "regeneration_raw_output_ref": cognition_text_reference(
+                            raw if dto_regeneration_attempted else None
                         ),
                         **integrity_metadata,
                         **failure,
@@ -635,7 +544,7 @@ class ResponseComposerResolver:
         plan: CanonicalPlan,
         composition_id: str,
         failure: Exception,
-        contract_repair_attempted: bool,
+        dto_regeneration_attempted: bool,
     ) -> ResponseCompositionResolution | None:
         """Preserve a validated pure execution Plan after presentation-only failure.
 
@@ -766,7 +675,7 @@ class ResponseComposerResolver:
                 "pure_safe_read_fast_act_reference_only": safe_read,
                 "original_failure_type": type(failure).__name__,
                 "original_failure": str(failure)[:300],
-                "contract_repair_attempted": contract_repair_attempted,
+                "dto_regeneration_attempted": dto_regeneration_attempted,
             },
         )
         logger.warning(
@@ -790,7 +699,7 @@ class ResponseComposerResolver:
                 "resolver": "response_composer",
                 "fail_soft_primary_activity": True,
                 "pure_safe_read_fast_act_reference_only": safe_read,
-                "contract_repair_attempted": contract_repair_attempted,
+                "dto_regeneration_attempted": dto_regeneration_attempted,
                 "original_failure_type": type(failure).__name__,
             },
         )
@@ -1127,39 +1036,6 @@ class ResponseComposerResolver:
         cls._validate_reused_turn_speech(repaired, context=context, plan=plan)
         return repaired, ["mixed_execute_goal_coverage_recovered_from_scheduled_fast_speech"]
 
-    @staticmethod
-    def _semantic_review_dropped_complete_goal_coverage(
-        candidate: ResponseComposerModelOutput,
-        reviewed: ResponseComposerModelOutput,
-        *,
-        plan: CanonicalPlan,
-    ) -> bool:
-        """Keep a semantic reviewer from erasing typed Goal coverage.
-
-        The reviewer may rewrite unsafe wording, but it cannot remove an
-        immutable Plan responsibility. If the pre-review DTO covered every Goal
-        and the review does not, retain the pre-review candidate so the ordinary
-        semantic and contract validators can either accept it or drive the one
-        bounded repair. No wording is classified or rewritten by the Host.
-        """
-
-        def covered(output: ResponseComposerModelOutput) -> set[str]:
-            response_plan = output.response_plan
-            return {
-                goal_id
-                for stage in (
-                    response_plan.immediate,
-                    response_plan.pre_action,
-                    *response_plan.progress,
-                    response_plan.final,
-                )
-                if stage is not None
-                for goal_id in stage.covers_goal_ids
-            }
-
-        expected = set(plan.goal_ids)
-        return covered(candidate) == expected and covered(reviewed) != expected
-
     @classmethod
     def _validate_reused_turn_speech(
         cls,
@@ -1488,11 +1364,26 @@ class ResponseComposerResolver:
         )
 
     @classmethod
-    def _requires_effectful_semantic_review(
+    def _requires_response_truth_audit(
         cls,
         plan: CanonicalPlan,
         context: dict[str, Any] | None,
+        *,
+        pure_safe_read: bool,
     ) -> bool:
+        """Spend a bounded proof call only where unsupported wording matters.
+
+        This is not another response author. The audit may only certify or reject
+        the already-authored ResponsePlan. Benign/pure-safe-read presentation stays
+        on the single writer call.
+        """
+
+        if pure_safe_read:
+            return False
+        if cls._is_safe_read_plan(plan, context):
+            return plan.disposition != "execute" or cls._confirmation_required(
+                plan, context
+            )
         execution_capabilities = (
             context.get("execution_capabilities") if isinstance(context, dict) else None
         )
@@ -1503,7 +1394,13 @@ class ResponseComposerResolver:
         )
         return bool(
             plan.goal_ids
-            and plan.disposition in {"execute", "mixed", "clarify", "unavailable", "refused"}
+            and plan.disposition in {
+                "execute",
+                "mixed",
+                "clarify",
+                "unavailable",
+                "refused",
+            }
             and (cls._has_effectful_goal_context(context) or has_non_read_execution)
         )
 
@@ -1529,20 +1426,6 @@ class ResponseComposerResolver:
             cls._social_attention_mode(context) != "off"
             and cls._social_attention_candidate_count(context) > 0
         )
-
-    @classmethod
-    def _validate_social_attention_decision(
-        cls,
-        value: Any,
-        *,
-        context: dict[str, Any] | None,
-    ) -> None:
-        if cls._social_attention_decision_required(context) and value is None:
-            raise ValueError(
-                "social_attention_plan is required when Social Attention policy "
-                "is enabled and reviewed candidates are available; return an "
-                "explicit decision=none or decision=express plan"
-            )
 
     @staticmethod
     def _social_attention_decision(value: Any) -> str:
@@ -1884,7 +1767,7 @@ class ResponseComposerResolver:
         response_schema = self._direct_response_schema(goal_ids, request.context)
         previous_raw: Any = None
         validation_errors = ""
-        repair_attempted = False
+        dto_regeneration_attempted = False
         for attempt in range(2):
             raw: Any = None
             try:
@@ -1896,7 +1779,7 @@ class ResponseComposerResolver:
                         validation_errors=validation_errors,
                     ),
                     system=(
-                        self._repair_system_prompt() if repair_attempted else self._system_prompt()
+                        self._dto_regeneration_system_prompt() if dto_regeneration_attempted else self._system_prompt()
                     ),
                     options={
                         "temperature": 0.2,
@@ -1906,21 +1789,17 @@ class ResponseComposerResolver:
                     },
                     response_format=response_schema,
                     prompt_family=(
-                        "response_composer.direct_repair"
-                        if repair_attempted
+                        "response_composer.direct_dto_regeneration"
+                        if dto_regeneration_attempted
                         else "response_composer.direct_primary"
                     ),
                     turn_id=request.sid,
                     attempt=attempt + 1,
                 )
                 if not isinstance(raw, dict):
-                    raise ValueError("response composer output is not a JSON object")
+                    raise ResponseComposerDTOContractError("response composer output is not a JSON object")
                 raw = self._canonicalize_optional_social_attention_payload(raw)
                 output = ResponseComposerModelOutput.model_validate(raw)
-                self._validate_social_attention_decision(
-                    output.social_attention_plan,
-                    context=request.context,
-                )
                 self._validate_direct_response_plan(
                     output.response_plan,
                     goal_ids=goal_ids,
@@ -1950,8 +1829,8 @@ class ResponseComposerResolver:
                         "goal_association_immutable": True,
                         "social_attention_validation_reasons": social_reasons,
                         "contract_schema": "ResponseComposerModelOutput",
-                        "contract_repair_attempted": repair_attempted,
-                        "contract_repair_succeeded": repair_attempted,
+                        "dto_regeneration_attempted": dto_regeneration_attempted,
+                        "dto_regeneration_succeeded": dto_regeneration_attempted,
                     },
                 )
                 return ResponseCompositionResolution(
@@ -1965,8 +1844,8 @@ class ResponseComposerResolver:
                         "authority": "advisory",
                         "resolver": "response_composer",
                         "planless_direct_response": True,
-                        "contract_repair_attempted": repair_attempted,
-                        "contract_repair_succeeded": repair_attempted,
+                        "dto_regeneration_attempted": dto_regeneration_attempted,
+                        "dto_regeneration_succeeded": dto_regeneration_attempted,
                     },
                 )
             except Exception as exc:
@@ -1982,9 +1861,9 @@ class ResponseComposerResolver:
                     failure["failure_domain"],
                 )
                 if attempt == 0 and isinstance(
-                    exc, (ValidationError, json.JSONDecodeError, ValueError)
+                    exc, (ValidationError, json.JSONDecodeError, ResponseComposerDTOContractError)
                 ):
-                    repair_attempted = True
+                    dto_regeneration_attempted = True
                     previous_raw = raw
                     validation_errors = self._validation_error_json(exc)
                     continue
@@ -1999,7 +1878,7 @@ class ResponseComposerResolver:
                         "authority": "advisory",
                         "resolver": "response_composer",
                         "planless_direct_response": True,
-                        "contract_repair_attempted": repair_attempted,
+                        "dto_regeneration_attempted": dto_regeneration_attempted,
                         **failure,
                     },
                 )
@@ -2084,9 +1963,9 @@ class ResponseComposerResolver:
         previous_raw: Any = None,
         validation_errors: str = "",
     ) -> str:
-        repair = ""
+        regeneration_context = ""
         if previous_raw is not None:
-            repair = (
+            regeneration_context = (
                 "Previous invalid response JSON:\n"
                 f"{self._bounded(previous_raw, 3000)}\n\n"
                 "Validation errors:\n"
@@ -2128,7 +2007,7 @@ class ResponseComposerResolver:
             "Social Attention is enabled and candidates exist, return a structurally "
             "complete decision: decision=express requires at least one supplied body "
             "behavior; a reason alone is invalid.\n\n"
-            + repair
+            + regeneration_context
             + "Return JSON with response_plan, social_attention_plan, lane_coordination=[], confidence, "
             "and rationale only."
         )
@@ -2224,10 +2103,24 @@ class ResponseComposerResolver:
         if mode == "off":
             return None, (["policy_off"] if value is not None else [])
         if value is None:
-            return None, (
-                ["missing_social_attention_decision"]
-                if self._social_attention_decision_required(context)
-                else []
+            if not self._social_attention_decision_required(context):
+                return None, []
+            reasons = ["missing_social_attention_decision"]
+            return (
+                SocialAttentionPlan(
+                    decision="none",
+                    reason=(
+                        "Optional social expression was omitted because the response "
+                        "composer did not provide a usable decoration decision."
+                    ),
+                    metadata={
+                        "authority": "advisory",
+                        "auxiliary_social_attention": True,
+                        "execution_permitted": False,
+                        "validation_reasons": reasons,
+                    },
+                ),
+                reasons,
             )
         try:
             proposed = SocialAttentionPlan.model_validate(value)
@@ -2338,8 +2231,9 @@ class ResponseComposerResolver:
         has_behavior = isinstance(behaviors, list) and any(
             isinstance(item, dict) for item in behaviors
         )
-        if decision == "none" and has_behavior:
+        if decision in {"", "none"} and has_behavior:
             metadata = value.get("metadata")
+            value["decision"] = "none"
             value["behaviors"] = []
             value["metadata"] = {
                 **(metadata if isinstance(metadata, dict) else {}),
@@ -2693,6 +2587,8 @@ class ResponseComposerResolver:
             return "target_ref does not match semantic target evidence"
         return None
 
+
+
     @staticmethod
     def _resource_set(candidate: dict[str, Any]) -> set[str]:
         return {
@@ -2768,8 +2664,8 @@ class ResponseComposerResolver:
             f"Recent auxiliary-behavior evidence JSON:\n{self._bounded(context.get('recent_auxiliary_behavior_evidence') or [], 5000)}\n\n"
             f"Social-attention candidates JSON:\n{self._bounded(context.get('social_attention_candidates') or [], 8000)}\n\n"
             f"Attention target evidence JSON:\n{self._bounded(context.get('social_attention_target_evidence') or {'available': False}, 2500)}\n\n"
-            f"Previous Response Composer output when revising:\n{self._bounded(previous_raw, 5000) if previous_raw is not None else 'null'}\n\n"
-            f"Exact contract validation errors when revising:\n{validation_errors or '[]'}\n\n"
+            f"Previous Response Composer output for mechanical DTO regeneration:\n{self._bounded(previous_raw, 5000) if previous_raw is not None else 'null'}\n\n"
+            f"Exact mechanical DTO validation errors:\n{validation_errors or '[]'}\n\n"
             "Compose one ResponsePlan, one explicit social-attention decision, and zero or more typed lane-coordination groups. When Social Attention policy is enabled and the candidate list is non-empty, social_attention_plan must be a SocialAttentionPlan with decision=express or decision=none; never omit it or return null. decision=express is structurally valid only when it contains at least one supplied decorative body behavior. A reason alone is not expression. Social Attention never authors or rewrites ResponsePlan text. When a requested action already owns a capability, do not duplicate that same capability as auxiliary Social Attention. If a proposed body expression conflicts with primary Activity, choose another eligible untargeted candidate or return decision=none with a concrete scene reason. When policy is off or the candidate list is empty, return social_attention_plan=null. "
             "The CanonicalPlan is immutable: do not alter, replace, add, remove, reorder, authorize, or execute its steps. CanonicalPlan.response_text is planner-authored prospective conversational intent, not execution evidence: preserve its meaning when it is still needed, suppress or reuse it when Interaction Context shows the same act is already delivered or pending, and supplement or correct it only when new context requires that delta. The verified tool-memory index contains provenance and bound arguments only, not answer facts. It may support honest wording that Chromie recently checked an exact matching subject and is retrieving it, but never state the remembered result before the memory retrieval step returns evidence. Conversation context may ground ordinary conversational repair, but never claim external facts without executed evidence. Answer the user's requested judgment or decision directly before supporting detail, and naturally acknowledge a prior context failure when the current turn calls for repair. "
             "Ground every user-specific statement in the newest turn, active Goals, or supplied conversation context. Do not invent the user's plans, schedule, preferences, relationships, experiences, feelings, or circumstances to make a response sound helpful. When a friendly supporting reason is useful but no personal fact was supplied, phrase it generally. "
@@ -2827,64 +2723,49 @@ class ResponseComposerResolver:
             capability_contract=(skill_contract,),
         )
 
-    def _safe_read_semantic_review_prompt(
-        self,
-        *,
-        request: AgentRunRequest,
-        plan: CanonicalPlan,
-        candidate: ResponseComposerModelOutput,
-    ) -> str:
-        return (
-            "Independently review the candidate Response Composer DTO and return "
-            "the complete final DTO as JSON. The immutable CanonicalPlan still "
-            "contains a pending safe read, and no result from that pending read "
-            "exists at this composition boundary. This review trigger is "
-            "mechanical; the semantic judgment and revised wording belong to you.\n\n"
-            "Review the meaning of every immediate spoken sentence. It may "
-            "naturally acknowledge the request, a correction, or that Chromie is "
-            "checking. It must not state or imply any measurement, observed "
-            "condition, recommendation, conclusion, or completed lookup. Prior "
-            "dialogue and another Goal's delivered result are not factual evidence "
-            "for the pending Goal, even when the current Goal changes only one "
-            "binding. Do not infer that a result exists from a location correction "
-            "or from the presence of a verified-memory index.\n\n"
-            "Speech already delivered in this current turn is authoritative "
-            "conversation context about what the user has heard, but it is not "
-            "evidence for the pending external result. Fast speech marked scheduled "
-            "is not proof that the user heard it, but it is a queued communicative "
-            "commitment that must not be duplicated while playback starts. Decide "
-            "whether delivered or scheduled speech already adequately fulfills the "
-            "pending-work acknowledgement. If so, reference its speech_event_id in "
-            "reused_speech_event_id, copy its text only as a playback-integrity field "
-            "into response_plan.immediate, set reuse_current_turn_speech=true and "
-            "speech_act to the event purpose, and cover the current Goal IDs without "
-            "requesting another utterance. If it was incomplete or later context makes it misleading, author only "
-            "the useful supplement or correction.\n\n"
-            "Use semantic reasoning rather than keyword, number, punctuation, "
-            "phrase, or lexical-overlap tests. If the candidate already contains "
-            "only truthful and still-needed pre-evidence acknowledgement, preserve "
-            "its natural wording. Otherwise omit, supplement, or revise it according "
-            "to the delivered conversational context. "
-            "Preserve the immutable Goal coverage and return a valid explicit "
-            "social-attention decision under the supplied DTO schema. Do not add "
-            "facts or task steps.\n\n"
-            f"Authoritative user turn:\n{request.text}\n\n"
-            "Authoritative effectful Goal context JSON:\n"
-            f"{self._bounded(request.context.get('active_goal_snapshots') or goal_association_prompt_projection(request.context), 7000)}\n\n"
-            "Speech already delivered in this current turn JSON:\n"
-            f"{self._bounded(self._delivered_turn_speech(request.context), 3600)}\n\n"
-            "Goal-scoped Interaction Context JSON:\n"
-            f"{self._bounded(request.context.get('interaction_context') or {}, 8000)}\n\n"
-            "Fast speech already scheduled in this current turn JSON (de-duplication only):\n"
-            f"{self._bounded(self._scheduled_turn_speech(request.context), 2400)}\n\n"
-            "Immutable CanonicalPlan JSON:\n"
-            f"{self._bounded(plan.prompt_projection(), 14000)}\n\n"
-            "Candidate Response Composer DTO JSON:\n"
-            f"{self._bounded(candidate.model_dump(mode='json'), 7000)}\n\n"
-            "Return only the complete ResponseComposerModelOutput JSON object."
-        )
 
-    def _effectful_semantic_review_prompt(
+    async def _run_response_truth_audit(
+        self,
+        *,
+        request: AgentRunRequest,
+        plan: CanonicalPlan,
+        candidate: ResponseComposerModelOutput,
+    ) -> ResponseTruthAudit:
+        """Return one immutable accept/reject proof; never rewrite the response."""
+
+        try:
+            raw = await self.ollama.generate(
+                self._response_truth_audit_prompt(
+                    request=request,
+                    plan=plan,
+                    candidate=candidate,
+                ),
+                system=self._response_truth_audit_system_prompt(),
+                options={
+                    "temperature": 0,
+                    "top_p": 0.9,
+                    "num_ctx": self.num_ctx,
+                    "num_predict": min(self.num_predict, 256),
+                },
+                response_format=ResponseTruthAudit.model_json_schema(),
+                prompt_family="response_composer.truth_audit",
+                turn_id=request.sid,
+                attempt=1,
+            )
+            if not isinstance(raw, dict):
+                raise ResponseComposerSemanticValidationError(
+                    "response truth audit did not return a JSON object"
+                )
+            return ResponseTruthAudit.model_validate(raw)
+        except ResponseComposerSemanticValidationError:
+            raise
+        except Exception as exc:
+            raise ResponseComposerSemanticValidationError(
+                "response truth audit was unavailable or invalid: "
+                f"{type(exc).__name__}: {str(exc)[:300]}"
+            ) from exc
+
+    def _response_truth_audit_prompt(
         self,
         *,
         request: AgentRunRequest,
@@ -2892,77 +2773,43 @@ class ResponseComposerResolver:
         candidate: ResponseComposerModelOutput,
     ) -> str:
         return (
-            "Independently review the candidate Response Composer DTO for pending "
-            "effectful work and return the complete final DTO as JSON. This review "
-            "happens before execution evidence exists. Keep the immutable Plan and "
-            "its supplied Capability semantics unchanged.\n\n"
-            "Every spoken claim must stay within what the immutable Plan and supplied "
-            "Capability contracts actually entail. Do not broaden a Capability from "
-            "its name, rationale, arguments, identity, or superficial similarity, and "
-            "do not infer an undeclared effect, guarantee, resource transition, or "
-            "completion of another responsibility. Identity affects expression only, "
-            "never ability. At this pre-execution boundary do not state that a pending "
-            "effect has already started or completed. Do not turn "
-            "internal safety checks, route checks, plans, providers, or execution "
-            "states into ordinary speech.\n\n"
-            "When the Plan contains unavailable, refused, or clarification outcomes, "
-            "state the limitation or question naturally instead of promising the whole "
-            "request. If the Plan has no executable steps, speech must not narrate, role-play, "
-            "or imply that any requested physical action is happening. If the spoken text "
-            "asks the user to approve an action or supported subset, its typed speech_act "
-            "must be ask_confirmation and commitment_state must be waiting_for_user, and the "
-            "immutable Plan must itself require confirmation; otherwise remove the approval "
-            "question and state the supported and unsupported scope without implying execution. "
-            "The typed speech_act and commitment_state must match the actual communicative "
-            "function of the sentence. Do not tell the user to wait while Chromie learns a new "
-            "physical ability during the current turn. When current-turn speech already gave an "
-            "adequate generic acknowledgement, or fast speech already scheduled that same acknowledgement, do not repeat it. Instead reference that speech_event_id in reused_speech_event_id, copy its text only as a playback-integrity field into immediate or pre_action, set reuse_current_turn_speech=true and speech_act to the event purpose, and cover the current Goal IDs so Runtime can reuse its delivery barrier without scheduling duplicate audio. Use concrete everyday wording "
-            "that sounds like Chromie, not customer service or a machine status message. Never "
-            "guarantee that an effectful action will be completed safely. Use semantic reasoning, "
-            "not phrase matching. Preserve complete immutable Goal coverage. covers_goal_ids is "
-            "typed responsibility bookkeeping, not a claim that speech executes a body action. "
-            "Never remove an executable Goal ID merely because the Activity lane owns its effect. "
-            "For a mixed execute/respond Plan, keep the requested authored response intact and "
-            "cover each pending execute Goal with truthful prospective acknowledgement in that "
-            "stage or a separate immediate/pre_action stage. Preserve the explicit social-attention "
-            "decision.\n\n"
+            "Audit one already-authored ResponsePlan against immutable plan/evidence "
+            "truth. You are a proof stage, not a response author. Never rewrite text, "
+            "Goals, Plans, Social Attention, or typed response stages. Return only an "
+            "immutable certificate with `violations` and `reason_summary`. The Host "
+            "derives acceptance mechanically: violations=[] accepts; any violation "
+            "rejects.\n\n"
+            "Report unsupported_reality_claim when the wording states fresh/external "
+            "facts not present in trusted evidence. Report premature_effect_claim when "
+            "pending physical/effectful work is worded as already happening or started. "
+            "Report unsupported_completion_claim when pending work is worded as done. "
+            "Report capability_overclaim when wording promises effects outside supplied "
+            "Capability semantics. Report confirmation_mismatch when approval wording "
+            "does not match the immutable Plan. Report goal_scope_mismatch when the "
+            "spoken act materially drops or substitutes an owed user-facing outcome. "
+            "Use other_consequential_claim only for another material truth/safety defect. "
+            "Harmless style variation is not a violation.\n\n"
             f"Authoritative user turn:\n{request.text}\n\n"
-            "Speech already delivered in this current turn JSON:\n"
-            f"{self._bounded(self._delivered_turn_speech(request.context), 3600)}\n\n"
-            "Goal-scoped Interaction Context JSON:\n"
-            f"{self._bounded(request.context.get('interaction_context') or {}, 8000)}\n\n"
-            "Fast speech already scheduled in this current turn JSON (de-duplication only; never execution evidence):\n"
-            f"{self._bounded(self._scheduled_turn_speech(request.context), 2400)}\n\n"
+            "Delivered evidence-bound dialogue JSON:\n"
+            f"{self._bounded(evidence_bound_dialogue(request.context, fallback_history=request.history), 3600)}\n\n"
+            "Speech already delivered in this turn JSON:\n"
+            f"{self._bounded(self._delivered_turn_speech(request.context), 2800)}\n\n"
             "Pending execution Capability semantics JSON:\n"
             f"{self._bounded(request.context.get('execution_capabilities') or [], 6000)}\n\n"
             "Immutable CanonicalPlan JSON:\n"
             f"{self._bounded(plan.prompt_projection(), 14000)}\n\n"
-            "Candidate Response Composer DTO JSON:\n"
-            f"{self._bounded(candidate.model_dump(mode='json'), 7000)}\n\n"
-            "Return only the complete ResponseComposerModelOutput JSON object."
+            "Candidate ResponsePlan JSON:\n"
+            f"{self._bounded(candidate.response_plan.model_dump(mode='json'), 7000)}\n\n"
+            "Return only ResponseTruthAudit JSON. Do not provide replacement wording."
         )
 
     @staticmethod
-    def _effectful_semantic_review_system_prompt() -> str:
+    def _response_truth_audit_system_prompt() -> str:
         return (
-            "You are Chromie's independent pre-execution claim reviewer. Use model "
-            "reasoning to keep speech childlike, truthful, and strictly bounded by "
-            "the immutable Plan and supplied Capability semantics. Identity affects "
-            "expression only, never ability. At this boundary no pending body action "
-            "has started. Judge the ordinary sentence meaning, not only typed fields: "
-            "wording that places Chromie already inside an ongoing movement must be "
-            "rewritten prospectively before approval. Host code does not inspect wording or "
-            "make the semantic judgment. Return JSON only."
-        )
-
-    @staticmethod
-    def _safe_read_semantic_review_system_prompt() -> str:
-        return (
-            "You are Chromie's independent pre-evidence speech semantic reviewer. "
-            "A pending safe read has no current result yet. Use model reasoning to "
-            "keep only truthful acknowledgement while preserving the typed "
-            "Response Composer contract. Host code does not inspect words or make "
-            "this semantic choice. Return JSON only."
+            "You are Chromie's bounded response-truth auditor. Judge consequential "
+            "ordinary sentence meaning against supplied immutable evidence and "
+            "Capability semantics. You have no authority to rewrite the response or "
+            "reinterpret upstream cognition. Return JSON only."
         )
 
     @staticmethod
@@ -2973,8 +2820,11 @@ class ResponseComposerResolver:
         )
 
     @staticmethod
-    def _repair_system_prompt() -> str:
+    def _dto_regeneration_system_prompt() -> str:
         return (
-            "You revise one Response Composer output using the immutable CanonicalPlan, exact validation errors, and the supplied ResponseComposerModelOutput JSON Schema. "
-            "Preserve truthful wording, the explicit Language hint, complete immutable Goal coverage, and valid model-authored conversational style, but correct the JSON structure and coordination invariants. covers_goal_ids is typed responsibility bookkeeping, not a claim that speech executes an Activity step. Never remove an executable Goal ID merely because the Activity lane owns its effect. In a mixed execute/respond Plan, preserve the still-needed requested authored response and cover pending execute Goals with truthful prospective acknowledgement when that conversational delta is not already fulfilled. The spoken text must actually use the authoritative language rather than merely describing it. Put speech_act, commitment_state, must_not_claim_completion, covers_goal_ids, coordination_id, delivery_role, reuse_current_turn_speech, and reused_speech_event_id directly on each response stage, never in metadata. For terminal respond, use exactly one final stage with commitment_state=completed and must_not_claim_completion=false. Do not shorten or rewrite otherwise valid speech merely to satisfy a Host style preference. For execute and mixed plans with pending effectful steps, use immediate and/or pre_action only when a still-needed speech delta or delivery barrier requires one; omit progress and final and keep must_not_claim_completion=true. For a pure safe_read/external_read execute Plan, a scheduled Fast event must be referenced as one immediate stage using its speech_event_id, exact text, purpose, and reuse_current_turn_speech=true. Without a pending Fast event, omit speech if the acknowledgement is already fulfilled, or author only a genuinely new prospective supplement/correction. For other pending work, if delivered or scheduled current-turn speech already adequately provided the acknowledgement, reference its speech_event_id in reused_speech_event_id and set reuse_current_turn_speech=true; Runtime will reuse that exact event instead of speaking it twice. Otherwise author only a required still-needed acknowledgement, supplement, or correction with reuse_current_turn_speech=false and no reused_speech_event_id. When the CanonicalPlan or supplied execution capability semantics require confirmation, explain any supplied adjustment or alternative, ask for approval with speech_act=ask_confirmation and commitment_state=waiting_for_user, and never claim that the action started. Confirmation or waiting speech must never join a lane_coordination group. Use lane_coordination only for best-effort overlap between Vocal and Activity with exact parallel CanonicalPlan step IDs and matching coordination_id values on participating speech stages. Social Attention is not a lane and its decorative body behaviors never carry coordination_id. For clarification, emit exactly one final stage with speech_act=clarify or ask_clarification and commitment_state=waiting_for_user. When Social Attention policy is enabled and reviewed candidates exist, social_attention_plan must be an explicit decision=none or decision=express object and must not be omitted or null; null is reserved for policy off or an empty candidate list. decision=express requires at least one supplied decorative body behavior. Never repeat a primary user-requested capability as auxiliary Social Attention; use another eligible decoration or decision=none. Return only the corrected JSON object."
+            "Retransmit the same Response Composer meaning under the supplied "
+            "ResponseComposerModelOutput schema. Fix only mechanical JSON/DTO contract "
+            "errors reported by validation. Do not reconsider the user, Goals, Plan, "
+            "evidence, capability meaning, or conversational intent; do not rewrite "
+            "already-valid spoken wording. Return JSON only."
         )

@@ -142,29 +142,38 @@ def _capability_ids(plan: Any) -> list[str]:
     return [str(item).strip() for item in values if str(item).strip()]
 
 
-def _validate_safe_read_semantic_review(
+def _validate_response_truth_audit_if_present(
     runtime_event: dict[str, Any],
     *,
     errors: list[str],
     label: str,
 ) -> None:
-    """Require retained proof of the model-owned pre-evidence speech review."""
+    """Validate retained immutable response-truth proof when this path used one.
+
+    Pure safe-read turns may legitimately skip the proof because their pre-evidence
+    speech is already constrained mechanically.  A retained proof, however, must
+    be an accepted immutable certificate; it is never a second response author.
+    """
 
     composition = runtime_event.get("composition")
-    review = (
-        composition.get("safe_read_semantic_review")
+    audit = (
+        composition.get("response_truth_audit")
         if isinstance(composition, dict)
         else None
     )
-    if not isinstance(review, dict):
-        errors.append(f"{label}: safe-read semantic review evidence is missing")
+    if audit is None:
         return
-    if review.get("attempted") is not True or review.get("succeeded") is not True:
-        errors.append(
-            f"{label}: safe-read semantic review did not complete successfully"
-        )
-    if review.get("strategy") != "model_owned_pre_evidence_speech_review":
-        errors.append(f"{label}: safe-read semantic review strategy is not model-owned")
+    if not isinstance(audit, dict):
+        errors.append(f"{label}: response truth audit evidence is malformed")
+        return
+    if audit.get("attempted") is not True or audit.get("accepted") is not True:
+        errors.append(f"{label}: response truth audit did not accept the composition")
+    violations = audit.get("violations")
+    if violations not in (None, []):
+        errors.append(f"{label}: response truth audit retained violations")
+    authority = audit.get("authority")
+    if authority not in (None, "immutable_proof"):
+        errors.append(f"{label}: response truth audit authority is not immutable proof")
 
 
 def _goal_ids(plan: Any) -> set[str]:
@@ -697,7 +706,7 @@ def verify(
                     )
             actual_capabilities = _capability_ids(plan)
             if weather_capability and weather_capability in actual_capabilities:
-                _validate_safe_read_semantic_review(
+                _validate_response_truth_audit_if_present(
                     runtime_event,
                     errors=errors,
                     label=label,

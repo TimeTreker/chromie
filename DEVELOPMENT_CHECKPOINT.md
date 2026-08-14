@@ -80,17 +80,17 @@ parallel manager objects.
 - **A valid Social Attention `none` is terminal.** Courteous or lively preference
   belongs in the primary decision context; no optional critic may override a
   valid primary stillness decision. Only invalid primary DTO shape receives one
-  repair.
+  same-meaning regeneration.
 - **Chromie is embodiment-independent.** Soridormi/MuJoCo is sufficient for the
   core embodied outcome; cognition must not know the backend, and physical-robot
   commissioning is optional provider work rather than a Chromie completion gate.
 - **Reality enters through evidence.** Provider evidence and reconciliation own
   runtime truth; cognition may explain that truth but may not promote it.
-- **Semantic review is a local stage/pattern, not a global second Cognitive Core.**
-  Goal Association reviews Responsibility coverage; Planner reviews Plan coverage;
-  Response Composer reviews risky composition; Tool Result Interpreter reviews
-  effectful entailment. Do not add a generic ReviewManager without a genuinely
-  shared authority/state/lifecycle.
+- **Proof is not a second semantic author.** Goal Association may retain immutable
+  coverage evidence. Response Composer has one wording owner; a consequential truth
+  check is one immutable accept/reject certificate and cannot rewrite Response, Goal,
+  Plan, or Social Attention. Tool Result Interpreter remains a later cleanup target;
+  do not add a generic ReviewManager or reviewer-of-reviewer flow.
 - **Readiness is local, not pipeline-global.** A branch advances when its own
   meaning, inputs, evidence, dependencies, and authority are sufficient.
 - **Stable Mind is not dynamic world knowledge.** Identity/personality/values may

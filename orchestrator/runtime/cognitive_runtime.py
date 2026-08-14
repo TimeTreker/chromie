@@ -412,11 +412,11 @@ class CognitiveEvidenceRecorder:
                 if coordinated is not None
                 else []
             ),
-            "safe_read_semantic_review": (
-                dict(composition.metadata.get("safe_read_semantic_review") or {})
+            "response_truth_audit": (
+                dict(composition.metadata.get("response_truth_audit") or {})
                 if composition
                 and isinstance(composition.metadata, dict)
-                and isinstance(composition.metadata.get("safe_read_semantic_review"), dict)
+                and isinstance(composition.metadata.get("response_truth_audit"), dict)
                 else None
             ),
         }

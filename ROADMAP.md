@@ -22,11 +22,12 @@ The owner-approved canonical flow is now documented before implementation. The
 next source work must make the runtime match it rather than extending historical
 repair/reviewer machinery. Implementation order:
 
-1. **Response authority cleanup.** Response Composer becomes expression over
-   authoritative Goal/Plan/Evidence state, not another semantic reviewer. Separate
-   mechanical DTO regeneration (at most once) from semantic/evidence rejection;
-   remove reviewer-of-reviewer and repair-of-repair behavior.
-2. **Optional presentation locality.** Social Attention and response polish may
+1. **Response authority cleanup — implemented in source.** Response Composer has one
+   wording owner; mechanical DTO regeneration is bounded to one same-meaning retry.
+   Consequential response truth checking is an immutable accept/reject certificate,
+   never a replacement Response author, and semantic/evidence rejection is terminal
+   to composition. Requalification remains separate from source closure.
+2. **Optional presentation locality — next.** Social Attention and response polish may
    fail locally. A valid Social Attention `none` stands; invalid decoration is
    dropped without recomposing speech or reopening Goal/Planner cognition. Resolve
    any duplicate Social Attention semantic ownership so one maintained path owns

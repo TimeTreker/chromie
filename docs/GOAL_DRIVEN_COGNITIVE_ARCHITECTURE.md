@@ -222,10 +222,17 @@ user-facing act. It may verify that wording does not claim unobserved completion
 or contradict a trusted limitation, but it cannot reinterpret the Goal, invent a
 new responsibility, reopen Planner authority, or authorize an effect.
 
-If wording is mechanically malformed, the representation may be regenerated once.
-If a response semantically violates trusted truth/evidence, reject it or use a
-contract-defined safe limitation; do not launch a second semantic reviewer whose
-output can then require another reviewer. A presentation problem is local.
+If wording is mechanically malformed, the representation may be regenerated once
+without changing its meaning. The primary Response Composer is the only writer of
+response wording. Consequential/evidence-sensitive wording may receive at most one
+immutable truth-proof audit whose output is only a bounded violation certificate;
+the proof may accept or reject the already-authored response, but it may not rewrite
+text, Goal coverage, Plans, Social Attention, or any upstream semantic state, and an
+invalid proof is terminal rather than repairable. Low-risk and mechanically bounded
+pure safe-read presentation may skip that proof. If a response violates trusted
+truth/evidence, reject it or use an already contract-defined fail-safe path; never
+launch a second response author or reviewer-of-reviewer. A presentation problem is
+local.
 
 > Optional presentation must never reopen primary cognition.
 

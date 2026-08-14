@@ -152,7 +152,7 @@ class ResponseComposerSocialAttentionContractTests(
             schema["$defs"]["SocialAttentionPlan"].get("required", []),
         )
 
-    async def test_missing_decision_repairs_to_explicit_none(self) -> None:
+    async def test_missing_decision_fails_soft_to_explicit_none_locally(self) -> None:
         ollama = _SequenceOllama(
             [
                 _response_output(include_social=False),
@@ -182,11 +182,15 @@ class ResponseComposerSocialAttentionContractTests(
         )
         self.assertEqual(
             composition.metadata["social_attention_model_decision"],
+            "missing",
+        )
+        self.assertEqual(
+            composition.metadata["social_attention_validated_decision"],
             "none",
         )
-        self.assertEqual(len(ollama.schemas), 2)
-        self.assertTrue(
-            resolution.metadata["contract_repair_attempted"]
+        self.assertEqual(len(ollama.schemas), 1)
+        self.assertFalse(
+            resolution.metadata["dto_regeneration_attempted"]
         )
 
     async def test_none_decision_discards_contradictory_optional_expression(self) -> None:
@@ -216,9 +220,9 @@ class ResponseComposerSocialAttentionContractTests(
         self.assertTrue(
             attention.metadata["canonicalized_conflicting_none_expression"]
         )
-        self.assertFalse(resolution.metadata["contract_repair_attempted"])
+        self.assertFalse(resolution.metadata["dto_regeneration_attempted"])
 
-    async def test_omitted_decision_with_behavior_requires_model_repair(self) -> None:
+    async def test_omitted_decision_with_behavior_is_dropped_locally(self) -> None:
         incomplete = _response_output(include_social=True)
         social = incomplete["social_attention_plan"]
         assert isinstance(social, dict)
@@ -243,8 +247,9 @@ class ResponseComposerSocialAttentionContractTests(
         attention = resolution.composition.social_attention_plan
         assert attention is not None
         self.assertEqual(attention.decision, "none")
-        self.assertEqual(len(ollama.schemas), 2)
-        self.assertTrue(resolution.metadata["contract_repair_attempted"])
+        self.assertEqual(attention.behaviors, [])
+        self.assertEqual(len(ollama.schemas), 1)
+        self.assertFalse(resolution.metadata["dto_regeneration_attempted"])
 
 
 if __name__ == "__main__":

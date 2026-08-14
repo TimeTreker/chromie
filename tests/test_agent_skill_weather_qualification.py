@@ -88,11 +88,13 @@ def _runtime(
         },
         "composition": {
             "status": "resolved",
-            "safe_read_semantic_review": (
+            "response_truth_audit": (
                 {
                     "attempted": True,
-                    "succeeded": True,
-                    "strategy": "model_owned_pre_evidence_speech_review",
+                    "accepted": True,
+                    "violations": [],
+                    "reason_summary": "Retained immutable truth proof accepted the response.",
+                    "authority": "immutable_proof",
                 }
                 if "chromie.weather.lookup" in capabilities
                 else None
@@ -487,7 +489,7 @@ class AgentSkillWeatherQualificationTests(unittest.TestCase):
         )
         self.assertIn("provider weather query", "\n".join(report["errors"]))
 
-    def test_weather_turn_requires_model_owned_safe_read_review_evidence(self) -> None:
+    def test_weather_turn_rejects_failed_response_truth_audit_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             identity, summary, events = self._fixture(root)
@@ -500,7 +502,7 @@ class AgentSkillWeatherQualificationTests(unittest.TestCase):
                     payload.get("sid") == "sid-weather-1"
                     and payload.get("event") == "cognitive_runtime_resolution"
                 ):
-                    payload["composition"]["safe_read_semantic_review"] = None
+                    payload["composition"]["response_truth_audit"] = {"attempted": True, "accepted": False, "violations": ["unsupported_reality_claim"], "authority": "immutable_proof"}
                     break
             events.write_text(
                 "".join(json.dumps(item) + "\n" for item in payloads),
@@ -516,7 +518,7 @@ class AgentSkillWeatherQualificationTests(unittest.TestCase):
         self.assertFalse(
             report["qualification"]["live_agent_skill_selection_validated"]
         )
-        self.assertIn("semantic review evidence is missing", "\n".join(report["errors"]))
+        self.assertIn("response truth audit did not accept", "\n".join(report["errors"]))
 
     def test_required_runtime_turn_must_finish_applied(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

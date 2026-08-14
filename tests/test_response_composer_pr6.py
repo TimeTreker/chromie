@@ -22,6 +22,8 @@ class FakeOllama:
 
     async def generate(self, prompt, **kwargs):
         self.prompts.append((prompt, kwargs))
+        if kwargs.get("prompt_family") == "response_composer.truth_audit":
+            return {"violations": [], "reason_summary": "accepted by test audit"}
         if isinstance(self.response, Exception):
             raise self.response
         return self.response
@@ -34,6 +36,10 @@ class ScriptedOllama:
 
     async def generate(self, prompt, **kwargs):
         self.prompts.append((prompt, kwargs))
+        if kwargs.get("prompt_family") == "response_composer.truth_audit":
+            if self.responses and isinstance(self.responses[0], dict) and "violations" in self.responses[0]:
+                return self.responses.pop(0)
+            return {"violations": [], "reason_summary": "accepted by test audit"}
         if not self.responses:
             raise AssertionError("unexpected extra model call")
         return self.responses.pop(0)
@@ -268,7 +274,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             )
         )
 
-    def test_live_bare_response_stage_list_repairs_under_exact_schema(self):
+    def test_live_bare_response_stage_list_regenerates_once_under_exact_schema(self):
         canonical = plan(
             disposition="execute",
             goals=["goal-look", "goal-blink"],
@@ -293,7 +299,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             "must_not_claim_completion": True,
             "response_text": "我会先看着你两秒，再眨两次眼。",
         }
-        repaired_stage = {
+        regenerated_stage = {
             "text": "我会先看着你两秒，再眨两次眼。",
             "speech_act": "inform",
             "commitment_state": "evaluating",
@@ -306,11 +312,11 @@ class ResponseComposerResolverTests(unittest.TestCase):
             "confidence": 0.9,
             "rationale": "Pre-action acknowledgement.",
         }
-        repaired = {
+        regenerated = {
             **invalid,
-            "response_plan": {"pre_action": repaired_stage},
+            "response_plan": {"pre_action": regenerated_stage},
         }
-        ollama = ScriptedOllama([invalid, repaired])
+        ollama = ScriptedOllama([invalid, regenerated])
 
         result = asyncio.run(
             ResponseComposerResolver(ollama).resolve(request(canonical))
@@ -321,7 +327,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             result.composition.response_plan.pre_action.covers_goal_ids,  # type: ignore[union-attr]
             ["goal-look", "goal-blink"],
         )
-        self.assertTrue(result.metadata["contract_repair_succeeded"])
+        self.assertTrue(result.metadata["dto_regeneration_succeeded"])
         self.assertEqual(len(ollama.prompts), 2)
         schema = ollama.prompts[0][1]["response_format"]
         self.assertEqual(schema["title"], "ResponseComposerModelOutput")
@@ -347,9 +353,9 @@ class ResponseComposerResolverTests(unittest.TestCase):
                 "covers_goal_ids",
             }.issubset(schema["$defs"]["ResponseStage"]["required"])
         )
-        repair_prompt = ollama.prompts[1][0]
-        self.assertIn('"response_text"', repair_prompt)
-        self.assertIn("model_type", repair_prompt)
+        regeneration_prompt = ollama.prompts[1][0]
+        self.assertIn('"response_text"', regeneration_prompt)
+        self.assertIn("model_type", regeneration_prompt)
 
     def test_repeated_bare_response_stage_list_fails_closed_with_both_raw_outputs(self):
         canonical = plan(goals=["goal-chat"])
@@ -362,14 +368,14 @@ class ResponseComposerResolverTests(unittest.TestCase):
         result = asyncio.run(ResponseComposerResolver(ollama).resolve(request(canonical)))
 
         self.assertEqual(result.status, "model_unavailable")
-        self.assertTrue(result.metadata["contract_repair_attempted"])
+        self.assertTrue(result.metadata["dto_regeneration_attempted"])
         self.assertGreater(result.metadata["initial_raw_output_ref"]["chars"], 0)
-        self.assertGreater(result.metadata["repair_raw_output_ref"]["chars"], 0)
+        self.assertGreater(result.metadata["regeneration_raw_output_ref"]["chars"], 0)
         self.assertNotIn("initial_raw_output", result.metadata)
-        self.assertNotIn("repair_raw_output", result.metadata)
+        self.assertNotIn("regeneration_raw_output", result.metadata)
         self.assertEqual(len(ollama.prompts), 2)
 
-    def test_coordination_invariant_failure_gets_one_bounded_repair(self):
+    def test_semantic_completion_claim_fails_without_dto_regeneration(self):
         canonical = plan(
             disposition="execute",
             goals=["goal-look", "goal-blink"],
@@ -398,26 +404,14 @@ class ResponseComposerResolverTests(unittest.TestCase):
                 }
             }
         }
-        repaired = {
-            "response_plan": {
-                "pre_action": {
-                    "text": "我会先看着你两秒，再眨两次眼。",
-                    "commitment_state": "evaluating",
-                    "must_not_claim_completion": True,
-                    "covers_goal_ids": ["goal-look", "goal-blink"],
-                }
-            }
-        }
-        ollama = ScriptedOllama([invalid, repaired])
+        ollama = ScriptedOllama([invalid])
 
         result = asyncio.run(ResponseComposerResolver(ollama).resolve(request(canonical)))
 
-        self.assertEqual(result.status, "resolved")
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertIn(
-            "execute pre-execution response must not include a final stage",
-            ollama.prompts[1][0],
-        )
+        self.assertEqual(result.status, "model_unavailable")
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertFalse(result.metadata["dto_regeneration_attempted"])
+        self.assertIn("final stage", result.metadata["error"])
 
     def test_effectful_pre_execution_stage_requires_audible_communication(self):
         canonical = plan(
@@ -748,7 +742,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             output["response_plan"]["pre_action"]["text"],
         )
 
-    def test_pure_activity_reuses_fast_speech_when_composer_repair_stays_invalid(self):
+    def test_pure_activity_reuses_fast_speech_after_semantic_composer_failure(self):
         canonical = plan(
             disposition="execute",
             goals=["goal-walk"],
@@ -818,7 +812,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertTrue(stage.reuse_current_turn_speech)
         self.assertEqual(stage.reused_speech_event_id, "speech-walk")
         self.assertEqual(stage.covers_goal_ids, ["goal-walk"])
-        self.assertEqual(len(ollama.prompts), 4)
+        self.assertEqual(len(ollama.prompts), 1)
 
     def test_pure_activity_preserves_unscheduled_core_fast_speech_after_composer_failure(self):
         canonical = plan(
@@ -882,7 +876,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertTrue(
             result.composition.metadata["core_authored_fast_speech_used"]
         )
-        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(len(ollama.prompts), 1)
 
     def test_mixed_plan_reuses_fast_speech_for_uncovered_execute_goal(self):
         canonical = CanonicalPlan(
@@ -983,7 +977,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
         )
         self.assertEqual(len(ollama.prompts), 2)
 
-    def test_confirmation_bound_mixed_completion_claim_repairs_before_language_check(self):
+    def test_confirmation_bound_completion_claim_fails_without_regeneration(self):
         canonical = CanonicalPlan(
             plan_id="plan-mixed-adjustment-repair",
             planner_tier="deep",
@@ -1030,33 +1024,13 @@ class ResponseComposerResolverTests(unittest.TestCase):
                 }
             }
         }
-        repaired = {
-            "response_plan": {
-                "pre_action": {
-                    "text": "我不能确认边走边眨眼是安全的，可以改为依次完成再给你唱一段吗？",
-                    "speech_act": "ask_confirmation",
-                    "commitment_state": "waiting_for_user",
-                    "must_not_claim_completion": True,
-                    "covers_goal_ids": ["goal-walk", "goal-song"],
-                }
-            }
-        }
-        ollama = ScriptedOllama([invalid, repaired])
+        ollama = ScriptedOllama([invalid])
 
-        result = asyncio.run(
-            ResponseComposerResolver(ollama).resolve(request(canonical))
-        )
+        result = asyncio.run(ResponseComposerResolver(ollama).resolve(request(canonical)))
 
-        self.assertEqual(result.status, "resolved")
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertIn(
-            "mixed pre-execution response must not include a final stage",
-            ollama.prompts[1][0],
-        )
-        self.assertEqual(
-            result.composition.response_plan.pre_action.commitment_state,  # type: ignore[union-attr]
-            "waiting_for_user",
-        )
+        self.assertEqual(result.status, "model_unavailable")
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertFalse(result.metadata["dto_regeneration_attempted"])
 
     def test_response_composer_prompt_preserves_user_language(self):
         canonical = plan(goals=["goal-greeting"])
@@ -1143,86 +1117,37 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertIn("immediate and/or pre_action stage covering every canonical goal", prompt)
         self.assertIn("omit progress and final", prompt)
 
-    def test_effectful_review_removes_unsupported_embodied_promises(self):
-        canonical = CanonicalPlan(
-            plan_id="plan-embodied-claim-review",
-            planner_tier="deep",
-            disposition="mixed",
-            coverage="complete",
-            confidence=0.93,
-            goal_ids=["goal-walk", "goal-water", "goal-return"],
-            goal_summary="Move forward, fetch water, and return.",
-            response_text="我只能先试着往前走一点，拿水和回来现在做不到。",
+    def test_effectful_truth_audit_rejects_unsupported_embodied_promises_without_rewrite(self):
+        canonical = plan(
+            disposition="execute",
+            goals=["goal-walk"],
             steps=[
                 {
                     "step_id": "walk",
-                    "capability_id": "soridormi.walk_forward",
-                    "args": {"duration_s": 2.0},
+                    "skill_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 15},
                     "source_goal_ids": ["goal-walk"],
                 }
             ],
-            goal_outcomes=[
-                {
-                    "goal_id": "goal-walk",
-                    "disposition": "execute",
-                    "coverage": "complete",
-                    "step_ids": ["walk"],
-                },
-                {
-                    "goal_id": "goal-water",
-                    "disposition": "unavailable",
-                    "coverage": "complete",
-                    "unresolved": ["No object pickup capability is available."],
-                },
-                {
-                    "goal_id": "goal-return",
-                    "disposition": "unavailable",
-                    "coverage": "complete",
-                    "unresolved": ["No return step is available."],
-                },
-            ],
-            goal_satisfaction={
-                "score": 0.34,
-                "status": "partial",
-                "satisfied_goal_ids": ["goal-walk"],
-                "unmet_goal_ids": ["goal-water", "goal-return"],
-                "unmet_requirements": ["fetch water", "return"],
-            },
         )
         unsafe = {
             "response_plan": {
                 "immediate": {
-                    "text": (
-                        "好的！我马上跑出去50米，拿一杯水，然后回来告诉你。"
-                        "我保证会安全完成哦！"
-                    ),
-                    "speech_act": "confirm",
-                    "commitment_state": "none",
-                    "must_not_claim_completion": True,
-                    "covers_goal_ids": [
-                        "goal-walk",
-                        "goal-water",
-                        "goal-return",
-                    ],
-                }
-            }
-        }
-        reviewed = {
-            "response_plan": {
-                "immediate": {
-                    "text": "好，我先看看我能不能往前走。拿水和回来现在做不到。",
-                    "speech_act": "inform",
+                    "text": "好的！我马上跑出去50米，拿一杯水，然后回来告诉你。我保证会安全完成哦！",
+                    "speech_act": "acknowledge",
                     "commitment_state": "evaluating",
                     "must_not_claim_completion": True,
-                    "covers_goal_ids": [
-                        "goal-walk",
-                        "goal-water",
-                        "goal-return",
-                    ],
+                    "covers_goal_ids": ["goal-walk"],
                 }
-            }
+            },
+            "confidence": 1.0,
+            "rationale": "Unsafe overclaim used only to test immutable truth proof.",
         }
-        ollama = ScriptedOllama([unsafe, reviewed])
+        audit = {
+            "violations": ["capability_overclaim", "premature_effect_claim"],
+            "reason_summary": "The wording promises unsupported acquisition/return and presents pending effects as imminent facts.",
+        }
+        ollama = ScriptedOllama([unsafe, audit])
 
         result = asyncio.run(
             ResponseComposerResolver(ollama).resolve(
@@ -1232,11 +1157,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
                         "execution_capabilities": [
                             {
                                 "capability_id": "soridormi.walk_forward",
-                                "description": (
-                                    "Move forward for a bounded duration. It does not "
-                                    "measure distance, pick up objects, or return "
-                                    "automatically."
-                                ),
+                                "description": "Move forward for a bounded duration only.",
                                 "effects": ["physical_motion"],
                                 "safety_class": "physical_motion",
                             }
@@ -1246,27 +1167,69 @@ class ResponseComposerResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(result.status, "resolved")
+        self.assertEqual(result.status, "model_unavailable")
         self.assertEqual(len(ollama.prompts), 2)
-        stage = result.composition.response_plan.immediate  # type: ignore[union-attr]
-        self.assertIsNotNone(stage)
-        assert stage is not None
-        self.assertEqual(
-            stage.text,
-            "好，我先看看我能不能往前走。拿水和回来现在做不到。",
-        )
-        self.assertNotIn("保证", stage.text)
-        self.assertNotIn("50米", stage.text)
-        self.assertTrue(result.metadata["effectful_semantic_review_succeeded"])
-        review_prompt = ollama.prompts[1][0]
-        self.assertIn("Identity affects expression only", review_prompt)
-        self.assertIn("Capability contracts actually entail", review_prompt)
-        self.assertIn("undeclared effect", review_prompt)
-        self.assertIn("internal safety checks", review_prompt)
-        self.assertIn("do not repeat it", review_prompt)
-        self.assertNotIn("object acquisition", review_prompt)
+        self.assertEqual(ollama.prompts[1][1]["prompt_family"], "response_composer.truth_audit")
+        self.assertFalse(result.metadata["dto_regeneration_attempted"])
+        self.assertTrue(result.metadata["response_truth_audit_attempted"])
+        self.assertIn("capability_overclaim", result.metadata["error"])
+        audit_prompt = ollama.prompts[1][0]
+        self.assertIn("proof stage", audit_prompt)
+        self.assertIn("Never rewrite", audit_prompt)
+        self.assertIn("Do not provide replacement wording", audit_prompt)
 
-    def test_effectful_clarification_is_semantically_reviewed_without_steps(self):
+    def test_invalid_truth_audit_is_terminal_and_never_repaired(self):
+        canonical = plan(
+            disposition="execute",
+            goals=["goal-walk"],
+            steps=[
+                {
+                    "step_id": "walk",
+                    "skill_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 10},
+                    "source_goal_ids": ["goal-walk"],
+                }
+            ],
+        )
+        candidate = {
+            "response_plan": {
+                "pre_action": {
+                    "text": "好，我准备往前走十秒。",
+                    "commitment_state": "evaluating",
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": ["goal-walk"],
+                }
+            }
+        }
+        invalid_audit = {
+            "violations": ["invented_reviewer_state"],
+            "reason_summary": "Invalid enum proves the proof itself is not repairable.",
+        }
+        ollama = ScriptedOllama([candidate, invalid_audit])
+
+        result = asyncio.run(
+            ResponseComposerResolver(ollama).resolve(
+                request(
+                    canonical,
+                    context={
+                        "execution_capabilities": [
+                            {
+                                "capability_id": "soridormi.walk_forward",
+                                "safety_class": "physical_motion",
+                            }
+                        ]
+                    },
+                )
+            )
+        )
+
+        self.assertEqual(result.status, "model_unavailable")
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertTrue(result.metadata["response_truth_audit_attempted"])
+        self.assertFalse(result.metadata["dto_regeneration_attempted"])
+        self.assertIn("truth audit was unavailable or invalid", result.metadata["error"])
+
+    def test_effectful_clarification_truth_violation_is_terminal(self):
         canonical = CanonicalPlan(
             plan_id="clarify-unsupported-show",
             planner_tier="deep",
@@ -1289,23 +1252,13 @@ class ResponseComposerResolverTests(unittest.TestCase):
             },
             "social_attention_plan": None,
             "confidence": 1.0,
-            "rationale": "The candidate narrates the requested performance.",
+            "rationale": "Unsafe role-play used only to test truth rejection.",
         }
-        reviewed = {
-            "response_plan": {
-                "final": {
-                    "text": "我还不会蹦跳、跑步和唱歌呢。要不要换成我会做的动作？",
-                    "speech_act": "ask_clarification",
-                    "commitment_state": "waiting_for_user",
-                    "must_not_claim_completion": True,
-                    "covers_goal_ids": ["goal-show"],
-                }
-            },
-            "social_attention_plan": None,
-            "confidence": 1.0,
-            "rationale": "The revised response states the limitation without role-play.",
+        audit = {
+            "violations": ["unsupported_reality_claim"],
+            "reason_summary": "The wording claims unsupported actions are happening.",
         }
-        ollama = ScriptedOllama([unsafe, reviewed])
+        ollama = ScriptedOllama([unsafe, audit])
 
         result = asyncio.run(
             ResponseComposerResolver(ollama).resolve(
@@ -1316,30 +1269,19 @@ class ResponseComposerResolverTests(unittest.TestCase):
                             "new_goals": [
                                 {
                                     "goal_id": "goal-show",
-                                    "metadata": {
-                                        "responsibility_kind": "executable_action"
-                                    },
+                                    "metadata": {"responsibility_kind": "executable_action"},
                                 }
                             ]
-                        },
-                        "execution_capabilities": [],
+                        }
                     },
                 )
             )
         )
 
+        self.assertEqual(result.status, "model_unavailable")
         self.assertEqual(len(ollama.prompts), 2)
-        stage = result.composition.response_plan.final  # type: ignore[union-attr]
-        self.assertIsNotNone(stage)
-        assert stage is not None
-        self.assertEqual(
-            stage.text,
-            "我还不会蹦跳、跑步和唱歌呢。要不要换成我会做的动作？",
-        )
-        review_prompt = ollama.prompts[1][0]
-        self.assertIn("no executable steps", review_prompt)
-        self.assertIn("role-play", review_prompt)
-        self.assertTrue(result.metadata["effectful_semantic_review_succeeded"])
+        self.assertEqual(ollama.prompts[1][1]["prompt_family"], "response_composer.truth_audit")
+        self.assertFalse(result.metadata["dto_regeneration_attempted"])
 
     def test_pure_safe_read_schema_allows_optional_still_needed_speech_delta(self):
         canonical = plan(
@@ -1386,7 +1328,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertTrue(
             result.composition.metadata["pure_safe_read_fast_act_reference_only"]
         )
-        self.assertFalse(result.metadata["safe_read_semantic_review_attempted"])
+        self.assertFalse(result.metadata["response_truth_audit_attempted"])
         self.assertEqual(len(ollama.prompts), 1)
 
     def test_pure_safe_read_dynamic_candidate_is_suppressed(self):
@@ -1427,8 +1369,8 @@ class ResponseComposerResolverTests(unittest.TestCase):
         )
         self.assertEqual(result.status, "resolved")
         self.assertIsNone(result.composition.response_plan.immediate)
-        self.assertFalse(result.metadata["contract_repair_attempted"])
-        self.assertFalse(result.metadata["safe_read_semantic_review_attempted"])
+        self.assertFalse(result.metadata["dto_regeneration_attempted"])
+        self.assertFalse(result.metadata["response_truth_audit_attempted"])
         self.assertEqual(len(ollama.prompts), 1)
 
     def test_pure_safe_read_skips_pre_evidence_semantic_review(self):
@@ -1464,8 +1406,8 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertEqual(result.status, "resolved")
         self.assertIsNone(result.composition.response_plan.immediate)
         self.assertEqual(len(ollama.prompts), 1)
-        self.assertFalse(result.metadata["safe_read_semantic_review_attempted"])
-        self.assertFalse(result.metadata["safe_read_semantic_review_succeeded"])
+        self.assertFalse(result.metadata["response_truth_audit_attempted"])
+        self.assertFalse(result.metadata["response_truth_audit_accepted"])
 
     def test_pure_safe_read_references_scheduled_fast_act(self):
         canonical = plan(
@@ -1532,7 +1474,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
         assert stage is not None
         self.assertTrue(stage.reuse_current_turn_speech)
         self.assertEqual(stage.reused_speech_event_id, "speech-weather")
-        self.assertFalse(result.metadata["contract_repair_attempted"])
+        self.assertFalse(result.metadata["dto_regeneration_attempted"])
         self.assertEqual(len(ollama.prompts), 1)
 
     def test_safe_read_unsafe_supplement_fails_soft_to_reviewed_fast_speech(self):
@@ -1592,8 +1534,8 @@ class ResponseComposerResolverTests(unittest.TestCase):
         )
 
         self.assertEqual(result.status, "resolved")
-        self.assertFalse(result.metadata["contract_repair_attempted"])
-        self.assertFalse(result.metadata["safe_read_semantic_review_attempted"])
+        self.assertFalse(result.metadata["dto_regeneration_attempted"])
+        self.assertFalse(result.metadata["response_truth_audit_attempted"])
         self.assertEqual(len(ollama.prompts), 1)
         assert result.composition is not None
         stage = result.composition.response_plan.immediate
@@ -1609,15 +1551,14 @@ class ResponseComposerResolverTests(unittest.TestCase):
             ["chromie.weather.lookup"],
         )
 
-    def test_mixed_safe_read_plan_still_receives_pre_evidence_semantic_review(self):
+    def test_mixed_safe_read_stale_result_is_rejected_before_optional_truth_proof(self):
         canonical = CanonicalPlan(
-            plan_id="plan-mixed-weather",
-            planner_tier="fast",
+            plan_id="plan-mixed-safe-read-proof",
+            planner_tier="deep",
             disposition="mixed",
             coverage="complete",
-            confidence=0.98,
+            confidence=1.0,
             goal_ids=["goal-weather", "goal-response"],
-            response_text="内乡今天有雷雨。",
             steps=[
                 {
                     "step_id": "weather",
@@ -1637,7 +1578,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
                     "goal_id": "goal-response",
                     "disposition": "respond",
                     "coverage": "complete",
-                    "response_text": "内乡今天有雷雨。",
+                    "response_text": "查完后告诉我。",
                 },
             ],
             goal_satisfaction={"score": 1.0, "status": "exact"},
@@ -1656,21 +1597,11 @@ class ResponseComposerResolverTests(unittest.TestCase):
             "confidence": 1.0,
             "rationale": "Incorrectly reused an earlier result.",
         }
-        reviewed = {
-            "response_plan": {
-                "immediate": {
-                    "text": "我先按你纠正的地点重新查一下。",
-                    "speech_act": "acknowledge",
-                    "commitment_state": "evaluating",
-                    "must_not_claim_completion": True,
-                    "covers_goal_ids": ["goal-weather", "goal-response"],
-                }
-            },
-            "social_attention_plan": None,
-            "confidence": 1.0,
-            "rationale": "Only a pre-evidence acknowledgement is truthful.",
+        audit = {
+            "violations": ["unsupported_reality_claim"],
+            "reason_summary": "No trusted current weather result supports the sentence.",
         }
-        ollama = ScriptedOllama([unsafe, reviewed])
+        ollama = ScriptedOllama([unsafe, audit])
 
         result = asyncio.run(
             ResponseComposerResolver(ollama).resolve(
@@ -1678,25 +1609,19 @@ class ResponseComposerResolverTests(unittest.TestCase):
                     canonical,
                     context={
                         "execution_capabilities": [
-                            {
-                                "capability_id": "chromie.weather.lookup",
-                                "safety_class": "safe_read",
-                            }
+                            {"capability_id": "chromie.weather.lookup", "safety_class": "safe_read"}
                         ]
                     },
                 )
             )
         )
 
-        self.assertEqual(result.status, "resolved")
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertEqual(
-            result.composition.response_plan.immediate.text,
-            "我先按你纠正的地点重新查一下。",
-        )
-        self.assertTrue(result.metadata["safe_read_semantic_review_succeeded"])
+        self.assertEqual(result.status, "model_unavailable")
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertFalse(result.metadata["response_truth_audit_attempted"])
+        self.assertFalse(result.metadata["dto_regeneration_attempted"])
 
-    def test_model_authored_host_envelope_fields_are_rejected_then_repaired(self):
+    def test_model_authored_host_envelope_fields_are_rejected_then_regenerated(self):
         canonical = plan(goals=["goal-chat"])
         response_plan = {
             "final": {"text": "你好。", "covers_goal_ids": ["goal-chat"]}
@@ -1708,8 +1633,8 @@ class ResponseComposerResolverTests(unittest.TestCase):
             "metadata": {"authority": "model"},
             "response_plan": response_plan,
         }
-        repaired = {"response_plan": response_plan}
-        ollama = ScriptedOllama([invalid, repaired])
+        regenerated = {"response_plan": response_plan}
+        ollama = ScriptedOllama([invalid, regenerated])
 
         result = asyncio.run(ResponseComposerResolver(ollama).resolve(request(canonical)))
 
@@ -1769,9 +1694,9 @@ class ResponseComposerResolverTests(unittest.TestCase):
             "（blinked twice）为什么机器人怕水？",
         )
 
-    def test_effectful_reviewer_cannot_drop_mixed_execute_goal_coverage(self):
+    def test_truth_proof_is_immutable_and_cannot_rewrite_mixed_goal_coverage(self):
         canonical = CanonicalPlan(
-            plan_id="plan-mixed-review-coverage",
+            plan_id="plan-mixed-proof-coverage",
             planner_tier="deep",
             disposition="mixed",
             coverage="complete",
@@ -1802,27 +1727,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             ],
             goal_satisfaction={"score": 1.0, "status": "exact"},
         )
-        first_candidate = {
-            "response_plan": {
-                "immediate": {
-                    "text": "*(Blinks twice)* Leaves reveal other pigments as chlorophyll fades.",
-                    "commitment_state": "evaluating",
-                    "must_not_claim_completion": True,
-                    "covers_goal_ids": ["goal-blink", "goal-leaves"],
-                }
-            }
-        }
-        dropped_review = {
-            "response_plan": {
-                "immediate": {
-                    "text": "Leaves reveal other pigments as chlorophyll fades.",
-                    "commitment_state": "evaluating",
-                    "must_not_claim_completion": True,
-                    "covers_goal_ids": ["goal-leaves"],
-                }
-            }
-        }
-        repaired_candidate = {
+        candidate = {
             "response_plan": {
                 "pre_action": {
                     "text": "我会眨两次眼；秋天叶绿素褪去后，其他色素就显出来了。",
@@ -1832,9 +1737,8 @@ class ResponseComposerResolverTests(unittest.TestCase):
                 }
             }
         }
-        ollama = ScriptedOllama(
-            [first_candidate, dropped_review, repaired_candidate, dropped_review]
-        )
+        audit = {"violations": [], "reason_summary": "Candidate is truthful."}
+        ollama = ScriptedOllama([candidate, audit])
 
         result = asyncio.run(
             ResponseComposerResolver(ollama).resolve(
@@ -1842,10 +1746,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
                     canonical,
                     context={
                         "execution_capabilities": [
-                            {
-                                "capability_id": "soridormi.blink_eyes",
-                                "safety_class": "low_risk_effect",
-                            }
+                            {"capability_id": "soridormi.blink_eyes", "safety_class": "low_risk_effect"}
                         ]
                     },
                 )
@@ -1853,13 +1754,14 @@ class ResponseComposerResolverTests(unittest.TestCase):
         )
 
         self.assertEqual(result.status, "resolved")
-        self.assertEqual(len(ollama.prompts), 4)
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(ollama.prompts[1][1]["prompt_family"], "response_composer.truth_audit")
         stage = result.composition.response_plan.pre_action  # type: ignore[union-attr]
         self.assertIsNotNone(stage)
         assert stage is not None
         self.assertEqual(set(stage.covers_goal_ids), {"goal-blink", "goal-leaves"})
-        self.assertNotIn("*(Blinks twice)*", stage.text)
-        self.assertIn("typed responsibility bookkeeping", ollama.prompts[1][0])
+        self.assertEqual(stage.text, candidate["response_plan"]["pre_action"]["text"])
+        self.assertTrue(result.metadata["response_truth_audit_accepted"])
 
     def test_mixed_authored_response_preserves_pending_execute_goal_without_extra_speech(self):
         canonical = CanonicalPlan(
