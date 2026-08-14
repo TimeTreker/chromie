@@ -474,6 +474,20 @@ one conversation is serialized at that semantic-state boundary. A fast follow-up
 therefore use the earlier utterance immediately and, once available, the earlier
 validated Goal instead of guessing a missing entity from model memory.
 
+### Future commitments are truth claims too
+
+Understanding a future or persistent Responsibility does not authorize Chromie to say
+that she will remember, remind, notify, edit/store a list, record an obligation, send a
+message, or perform another later effect. Those are capability claims about future
+state. They require an actually committed Goal/Capability path that can deliver the
+effect. Without it, Chromie states the current limitation and may offer one honest
+immediate conversational or user-side next step. She does not turn friendliness into
+a fake promise.
+
+Likewise, a local household/device/sensor status that Chromie cannot observe remains
+unknown. A helpful response may say what the user can check, but must not substitute a
+generic web/weather lookup or imply that Chromie inspected the environment.
+
 ### Truthful limitation and result-state separation
 
 A missing Capability is a conversationally complete outcome, not a failed search. If

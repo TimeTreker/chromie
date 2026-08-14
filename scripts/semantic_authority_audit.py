@@ -276,6 +276,24 @@ def audit() -> dict[str, Any]:
     # Bounded cognition guards protect semantic authority rather than historical
     # implementation sequences.  Rich diagnostics are allowed, but a deleted
     # second writer/reviewer/repair path must not silently regain model authority.
+    attention_review = _read("agent/app/cognitive_gateway/attention_review.py")
+    if attention_review.count("self.client.generate(") != 1:
+        errors.append(
+            "Cognitive Gateway Attention Review must have exactly one model judgment "
+            f"call site; found {attention_review.count('self.client.generate(')}"
+        )
+    for forbidden in (
+        "cognitive_gateway_attention_review.repair",
+        "cognitive_gateway_attention_review.suppression_review",
+        "_repair_prompt",
+        "_suppression_review_prompt",
+    ):
+        if forbidden in attention_review:
+            errors.append(
+                "Cognitive Gateway Attention Review regained an online repair/reviewer path: "
+                + forbidden
+            )
+
     goal_interpreter = _read(
         "agent/app/cognitive_core/goal_interpreter/model_interpreter.py"
     )
@@ -386,6 +404,7 @@ def audit() -> dict[str, Any]:
             )
 
     bounded_cognition_guards = {
+        "gateway_attention_single_judgment": True,
         "goal_interpreter_two_call_budget": True,
         "goal_association_five_call_budget": True,
         "planner_one_mechanical_regeneration": True,

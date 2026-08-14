@@ -1118,6 +1118,59 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertIn("Never rewrite", audit_prompt)
         self.assertIn("Do not provide replacement wording", audit_prompt)
 
+
+    def test_unavailable_capability_goal_rejects_unsupported_future_commitment(self):
+        canonical = plan(
+            disposition="unavailable",
+            goals=["goal-reminder"],
+            response_text="",
+        )
+        candidate = {
+            "response_plan": {
+                "final": {
+                    "text": "好，我明天会记得提醒你带钥匙。",
+                    "speech_act": "inform",
+                    "commitment_state": "none",
+                    "must_not_claim_completion": True,
+                }
+            },
+            "confidence": 0.9,
+            "rationale": "Unsupported future commitment used only for truth-audit coverage.",
+        }
+        audit = {
+            "violations": ["unsupported_future_commitment"],
+            "reason_summary": "No committed reminder capability can deliver the promised future effect.",
+        }
+        ollama = ScriptedOllama([candidate, audit])
+        result = asyncio.run(
+            ResponseComposerResolver(ollama).resolve(
+                request(
+                    canonical,
+                    context={
+                        "active_goal_snapshots": [
+                            {
+                                "goal_id": "goal-reminder",
+                                "description": "Remind the user tomorrow to bring keys.",
+                                "metadata": {
+                                    "responsibility_kind": "capability_dependent",
+                                    "provider_required": True,
+                                },
+                            }
+                        ]
+                    },
+                )
+            )
+        )
+        self.assertEqual(result.status, "model_unavailable")
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(
+            ollama.prompts[1][1]["prompt_family"],
+            "response_composer.truth_audit",
+        )
+        self.assertTrue(result.metadata["response_truth_audit_attempted"])
+        self.assertIn("unsupported_future_commitment", result.metadata["error"])
+        self.assertIn("remember, remind, notify", ollama.prompts[1][0])
+
     def test_invalid_truth_audit_is_terminal_and_never_repaired(self):
         canonical = plan(
             disposition="execute",

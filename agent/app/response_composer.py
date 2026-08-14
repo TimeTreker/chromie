@@ -91,6 +91,7 @@ ResponseTruthViolation = Literal[
     "premature_effect_claim",
     "unsupported_completion_claim",
     "capability_overclaim",
+    "unsupported_future_commitment",
     "confirmation_mismatch",
     "goal_scope_mismatch",
     "other_consequential_claim",
@@ -1374,13 +1375,13 @@ class ResponseComposerResolver:
             raise ValueError("spoken response must use the authoritative English language")
 
     @staticmethod
-    def _has_effectful_goal_context(
+    def _has_provider_required_goal_context(
         context: dict[str, Any] | None,
     ) -> bool:
         if not isinstance(context, dict):
             return False
 
-        def contains_effectful_goal(items: Any) -> bool:
+        def contains_provider_required_goal(items: Any) -> bool:
             if not isinstance(items, list):
                 return False
             for item in items:
@@ -1389,17 +1390,20 @@ class ResponseComposerResolver:
                 metadata = item.get("metadata")
                 if (
                     isinstance(metadata, dict)
-                    and str(metadata.get("responsibility_kind") or "").strip()
-                    == "executable_action"
+                    and (
+                        str(metadata.get("responsibility_kind") or "").strip()
+                        in {"executable_action", "capability_dependent"}
+                        or metadata.get("provider_required") is True
+                    )
                 ):
                     return True
             return False
 
-        if contains_effectful_goal(context.get("active_goal_snapshots")):
+        if contains_provider_required_goal(context.get("active_goal_snapshots")):
             return True
         association = goal_association_prompt_projection(context)
         return bool(
-            isinstance(association, dict) and contains_effectful_goal(association.get("new_goals"))
+            isinstance(association, dict) and contains_provider_required_goal(association.get("new_goals"))
         )
 
     @classmethod
@@ -1440,7 +1444,7 @@ class ResponseComposerResolver:
                 "unavailable",
                 "refused",
             }
-            and (cls._has_effectful_goal_context(context) or has_non_read_execution)
+            and (cls._has_provider_required_goal_context(context) or has_non_read_execution)
         )
 
     @staticmethod
@@ -2316,6 +2320,7 @@ class ResponseComposerResolver:
             "For mixed plans, coordinate executable and conversational goals in one natural response: use prospective wording for pending physical steps, do not narrate them with stage directions such as *Blinks twice*, do not claim completion, omit final while work is pending, and include a specific waiting_for_user clarification stage for every clarify outcome. "
             "Chromie has one Cognitive Core and two execution lanes: Vocal delivers model-authored communication and exact provider-qualified vocal performance, while Activity executes non-vocal provider work. Social Attention is background social cognition, not a third execution lane. It may add small optional body decorations such as gaze, blink, nod, smile, wave, or slight posture/orientation changes around an anchored interaction; accepted body decorations execute through Activity with auxiliary_social_attention=true and never own Goal completion. chromie.vocal.perform is a Vocal-lane provider step, never response transport and never an Activity step. The exact chromie.media.* family is persistent Activity-lane playback/control, never Vocal or vocal-performance evidence. Media may share the physical speaker with Vocal only under its declared duck_media_during_vocal mixer policy; describing that overlap must not mutate either Goal, playback identity, or cancellation scope. An optional acknowledgement about pending vocal or media work remains ordinary chromie.speak delivery and is not provider completion evidence. lane_coordination describes Vocal/Activity execution overlap only; it never coordinates Social Attention as a lane, creates another mind, selects a provider, authorizes an effect, or weakens provider safety. Copy an already-parallel chromie.vocal.perform step into vocal_step_ids; copy only already-parallel non-speech provider steps, including chromie.media.play, into activity_step_ids. A coordinated response stage may supply the Vocal member only when no provider vocal_step_ids are present; it must copy the same coordination_id and use delivery_role=activity_companion or performance. Social Attention behaviors never carry coordination_id; they remain opportunistic, parallel, fail-soft Activity decorations. Ordinary pre-action acknowledgement remains delivery_role=response with no coordination_id and keeps the playback-start barrier. Never coordinate ask_confirmation or waiting_for_user speech with effect execution. The maintained start policy is best_effort_parallel and the failure policy is independent; do not imply synchronized starts or atomic cross-provider cancellation. "
             "For clarify, emit exactly one final clarification stage that names the actual unresolved need naturally; do not add a second acknowledgement, progress line, promise, or status sentence. That stage must set speech_act=clarify or ask_clarification and commitment_state=waiting_for_user as direct fields, never inside metadata; waiting_for_user is a commitment_state, not a speech_act. For alternatives, explain the change and request approval. "
+            "For unavailable or refused work, state the actual capability/evidence boundary plainly and do not promise to perform the unavailable work later. When useful, offer at most one honest next step that is immediately conversational or explicitly supported by a supplied Capability; a user-side check or suggestion is allowed, but 'I will remember/remind/update/send it later' is not. "
             "Social Attention is independent background cognition. Response Composer may acknowledge that it exists conceptually, but it must not author a SocialAttentionPlan, choose decorative capabilities, or treat missing decoration as a response failure. Optional presentation must never reopen primary cognition. "
             "response_plan must be a JSON object with only immediate, pre_action, progress, and final fields; it is never a bare list. "
             "The decoder enforces the exact ResponseComposerModelOutput JSON Schema. Return JSON with response_plan, lane_coordination, confidence, and rationale only."
@@ -2417,7 +2422,12 @@ class ResponseComposerResolver:
             "pending physical/effectful work is worded as already happening or started. "
             "Report unsupported_completion_claim when pending work is worded as done. "
             "Report capability_overclaim when wording promises effects outside supplied "
-            "Capability semantics. Report confirmation_mismatch when approval wording "
+            "Capability semantics. Report unsupported_future_commitment when wording "
+            "claims Chromie will later remember, remind, notify, modify/store a list or "
+            "record, send a message, or perform another persistent future effect without "
+            "a committed Capability/Goal state that can actually deliver it. A friendly "
+            "suggestion the user can do now is not a future commitment. Report "
+            "confirmation_mismatch when approval wording "
             "does not match the immutable Plan. Report goal_scope_mismatch when the "
             "spoken act materially drops or substitutes an owed user-facing outcome. "
             "Use other_consequential_claim only for another material truth/safety defect. "

@@ -84,6 +84,9 @@ class AgentSkillSelectionTests(unittest.TestCase):
 
         self.assertIn("stable general knowledge", prompt)
         self.assertIn("use no_skill", prompt)
+        self.assertIn("household/device/sensor state", prompt)
+        self.assertIn("future reminder, list mutation", prompt)
+        self.assertIn("persistent state change is not information retrieval", prompt)
 
     def _write_package(
         self,

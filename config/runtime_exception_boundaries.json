@@ -353,20 +353,6 @@
       ]
     },
     {
-      "path": "agent/app/cognitive_gateway/attention_review.py",
-      "symbol": "AttentionReviewer.review",
-      "ordinal": 2,
-      "classification": "typed_failure_mapping",
-      "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "ad8a01cf2c4abe8f699ecef6404066813525b4567de44de2372cdd723359b5c7",
-      "failure_signals": [
-        "diagnostic",
-        "return"
-      ]
-    },
-    {
       "path": "agent/app/deep_planner.py",
       "symbol": "DeepPlannerResolver._resolve",
       "ordinal": 1,
@@ -374,7 +360,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "c579494f588026d872fbbe6df0223916d7e87592e209e5377c3d5bd19daabb1e",
+      "body_sha256": "17922d0eaba7a07715d4f1df6c32461336fbde22c0cb1fcc493232fd85092af3",
       "failure_signals": [
         "continue",
         "diagnostic",

@@ -8,6 +8,8 @@ from unittest import mock
 from agent.app.clients.ollama_client import OllamaGenerationError
 from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
     OllamaGoalInterpreter,
+    _compact_prompt_capabilities,
+    _compact_prompt_capability_lines,
     _catalog_observability_profile,
     _payload_message_texts,
     _prompt_feature_flags,
@@ -164,6 +166,71 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("semantic distinction, not a phrase pattern", system)
         self.assertIn("technical discussion about another person", system)
         self.assertIn("Addressedness", system)
+
+    def test_common_capability_projection_exposes_semantic_scope_and_negative_boundary(self) -> None:
+        projected = _compact_prompt_capabilities(
+            [
+                {
+                    "capability_id": "chromie.external_information.retrieve",
+                    "route": "tool",
+                    "description": "Retrieve grounded external information",
+                    "effects": ["read_only", "external_read"],
+                    "safety_class": "safe_read",
+                    "input_schema": {"type": "object", "properties": {}, "required": []},
+                    "hints": {
+                        "semantic_scope": {
+                            "responsibility_type": "acquire_and_deliver_resource",
+                            "resource_kinds": ["information"],
+                            "supported_request_kinds": ["fact_lookup", "news"],
+                            "domain": "external_information",
+                        },
+                        "when_not_to_use": (
+                            "Do not use for state mutation, reminders, lists, or local device state."
+                        ),
+                    },
+                }
+            ]
+        )
+        self.assertEqual(len(projected), 1)
+        self.assertIn("supported_request_kinds=fact_lookup,news", projected[0]["scope"])
+        self.assertIn("reminders", projected[0]["not_for"])
+        line = _compact_prompt_capability_lines(projected)[0]
+        self.assertIn("scope=", line)
+        self.assertIn("not_for=", line)
+
+    def test_user_prompt_requires_entailment_not_topical_capability_substitution(self) -> None:
+        interpreter = OllamaGoalInterpreter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        req = RouteRequest(
+            text="Remind me tomorrow to bring my keys.",
+            context={
+                "prompt_capabilities_common": [
+                    {
+                        "capability_id": "chromie.weather.lookup",
+                        "route": "tool",
+                        "description": "Lookup weather",
+                        "hints": {
+                            "semantic_scope": {
+                                "responsibility_type": "acquire_and_deliver_resource",
+                                "resource_kinds": ["information"],
+                                "domain": "weather_forecast",
+                            },
+                            "when_not_to_use": "Do not use outside weather/forecast questions.",
+                        },
+                    }
+                ]
+            },
+        )
+        prompt = interpreter.build_user_prompt(req)
+        self.assertIn("capability_inquiry means a meta-question", prompt)
+        self.assertIn("semantic scope entails the requested human outcome", prompt)
+        self.assertIn("topical similarity", prompt)
+        self.assertIn("prefer an honest missing ability over substitution", prompt)
+        self.assertIn("Stable everyday reasoning", prompt)
 
     def test_semantic_ignore_requires_inactive_host_engagement_evidence(self) -> None:
         inactive = RouteRequest(

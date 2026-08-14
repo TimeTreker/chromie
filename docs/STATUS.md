@@ -4,6 +4,10 @@ Chromie remains a development project, but its core voice and simulator-backed
 embodied path is implemented and has retained end-to-end evidence; “development”
 means ongoing qualification rather than an absent central loop. The maintained
 **Goal-driven single semantic authority** keeps ingress/reflex/admission in the Gateway, ordinary meaning and planning in Core, and effect authority in trusted Host/provider boundaries.
+## 2026-08-14 daily-life semantic correction (source-only)
+
+The generated-voice daily-life suite exposed seven semantic failures despite complete mechanical execution. Current source addresses reusable earliest boundaries rather than scenario phrases: Capability projections include declared semantic scope and negative-use boundaries; Goal coverage rejects persistent state change represented as information retrieval and treats preferences/background as constraints on one requested decision; local/private sensor state stays unknown without a trusted Provider; Deep Planning returns `unavailable` rather than fake clarification when provider ability is absent; Response truth auditing covers unsupported future/persistent commitments; and Gateway Attention consumes bounded recent dialogue with one fail-open judgment so a temporary user-authored addressing rule can survive nearby ambient speech.
+Agent Skill selection likewise rejects generic external-information methods for local sensor state or persistent mutations. This is a source-change claim only: the 16-scenario live voice suite must be rerun before any semantic qualification improvement is claimed.
 ## Current source state
 | Area | Implementation | Automatic verification | Target validation | Release readiness |
 |---|---|---|---|---|

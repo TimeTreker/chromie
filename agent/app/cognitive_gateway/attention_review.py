@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field
 
 try:
     from chromie_contracts.user_turn import (
@@ -73,12 +73,21 @@ class AttentionReviewer:
                 source="cognitive_gateway.attention_policy",
                 reason="attention gate is disabled",
             )
-        if engagement.get("active") is not False:
+
+        # Active provider/task work is already an explicit interaction anchor. A
+        # mere recent exchange is weaker: the user may have established a temporary
+        # addressedness rule (for example during a meeting or call), so review that
+        # turn once with bounded dialogue rather than blindly admitting everything
+        # inside the engagement timeout.
+        if (
+            engagement.get("active") is True
+            and str(engagement.get("evidence") or "") in {"active_task", "in_flight_turn"}
+        ):
             return self._admit(
                 request=request,
                 confidence=1.0,
                 source="cognitive_gateway.attention_policy",
-                reason="active interaction context admits the turn",
+                reason="active task context admits the turn",
             )
         if self.client is None:
             return self._admit(
@@ -94,7 +103,6 @@ class AttentionReviewer:
             "num_ctx": self.num_ctx,
             "num_predict": self.num_predict,
         }
-        source = "cognitive_gateway.attention_review_model"
         try:
             raw = await self.client.generate(
                 self._prompt(request),
@@ -107,40 +115,7 @@ class AttentionReviewer:
             )
             if not isinstance(raw, dict):
                 raise ValueError("attention model did not return a JSON object")
-            try:
-                result = self._validate_model_output(raw)
-            except (ValidationError, ValueError) as initial_exc:
-                logger.warning(
-                    "attention_review_contract_repair_start turn_id=%s "
-                    "error_type=%s error=%s raw_output=%s",
-                    request.turn_id,
-                    type(initial_exc).__name__,
-                    initial_exc,
-                    raw,
-                )
-                repaired = await self.client.generate(
-                    self._repair_prompt(
-                        request,
-                        initial_output=raw,
-                        validation_error=str(initial_exc),
-                    ),
-                    system=self._system_prompt(),
-                    options=options,
-                    response_format=self._response_schema(),
-                    prompt_family="cognitive_gateway_attention_review.repair",
-                    turn_id=request.turn_id,
-                    attempt=2,
-                )
-                if not isinstance(repaired, dict):
-                    raise ValueError(
-                        "attention model repair did not return a JSON object"
-                    )
-                result = self._validate_model_output(repaired)
-                source = "cognitive_gateway.attention_review_model_repaired"
-                logger.info(
-                    "attention_review_contract_repair_done turn_id=%s status=success",
-                    request.turn_id,
-                )
+            result = self._validate_model_output(raw)
         except Exception as exc:
             logger.warning(
                 "attention_review_failed turn_id=%s error_type=%s error=%s",
@@ -156,7 +131,6 @@ class AttentionReviewer:
             )
 
         fail_open_reason = self._admission_reason(result)
-
         if fail_open_reason:
             return AttentionReviewResult(
                 turn_id=request.turn_id,
@@ -165,86 +139,19 @@ class AttentionReviewer:
                 disposition="admit",
                 speech_act=result.speech_act,
                 confidence=result.confidence,
-                source=source,
+                source="cognitive_gateway.attention_review_model",
                 reason=f"attention review admitted: {fail_open_reason}",
             )
 
-        # Suppression discards the turn before ordinary Core semantics.  A
-        # schema-valid first answer is therefore not sufficient authority: ask
-        # the model to reconsider the semantic distinction independently and
-        # fail open on disagreement or an invalid review.  This stays inside
-        # the existing model-owned Attention Review instead of asking Host
-        # phrase rules to recognize questions, requests, or imperatives.
-        try:
-            reconsidered_raw = await self.client.generate(
-                self._suppression_review_prompt(
-                    request,
-                    initial_output=result.model_dump(mode="json"),
-                ),
-                system=self._system_prompt(),
-                options=options,
-                response_format=self._response_schema(),
-                prompt_family="cognitive_gateway_attention_review.suppression_review",
-                turn_id=request.turn_id,
-                attempt=1,
-            )
-            if not isinstance(reconsidered_raw, dict):
-                raise ValueError(
-                    "attention suppression review did not return a JSON object"
-                )
-            reconsidered = self._validate_model_output(reconsidered_raw)
-        except Exception as exc:
-            logger.warning(
-                "attention_suppression_review_failed turn_id=%s "
-                "error_type=%s error=%s",
-                request.turn_id,
-                type(exc).__name__,
-                exc,
-            )
-            return self._admit(
-                request=request,
-                confidence=0.0,
-                source="cognitive_gateway.attention_review_fail_open",
-                reason=(
-                    "attention suppression review failed open: "
-                    f"{type(exc).__name__}"
-                ),
-            )
-
-        reconsidered_reason = self._admission_reason(reconsidered)
-        if reconsidered_reason:
-            logger.info(
-                "attention_suppression_review_disagreed turn_id=%s "
-                "initial_speech_act=%s reconsidered_speech_act=%s reason=%s",
-                request.turn_id,
-                result.speech_act,
-                reconsidered.speech_act,
-                reconsidered_reason,
-            )
-            return AttentionReviewResult(
-                turn_id=request.turn_id,
-                session_id=request.session_id,
-                context_digest=request.context_digest,
-                disposition="admit",
-                speech_act=reconsidered.speech_act,
-                confidence=reconsidered.confidence,
-                source="cognitive_gateway.attention_review_model_reconsidered",
-                reason=(
-                    "attention suppression review admitted: "
-                    f"{reconsidered_reason}"
-                ),
-            )
         return AttentionReviewResult(
             turn_id=request.turn_id,
             session_id=request.session_id,
             context_digest=request.context_digest,
             disposition="suppress",
-            speech_act=reconsidered.speech_act,
-            confidence=min(result.confidence, reconsidered.confidence),
-            source="cognitive_gateway.attention_review_model_confirmed",
-            reason=(
-                "inactive turn independently confirmed as unaddressed ambient speech"
-            ),
+            speech_act=result.speech_act,
+            confidence=result.confidence,
+            source="cognitive_gateway.attention_review_model",
+            reason="inactive/restricted turn classified as unaddressed ambient speech",
         )
 
     def _admission_reason(self, result: _AttentionModelOutput) -> str:
@@ -348,7 +255,15 @@ class AttentionReviewer:
             "an unaddressed reply. A bare sequence such as 'Open the door, wave "
             "twice, then come back' is an addressed imperative, not dictation; "
             "dictation requires clear transcription, quotation, or wording-for-"
-            "another-recipient context. If the linguistic function or addressee is "
+            "another-recipient context. Recent bounded dialogue is context for "
+            "addressedness only. A prior user-authored temporary interaction rule such "
+            "as requiring a wake name, explicit address, or another stated condition "
+            "remains in force until the user revokes or replaces it. Under such a "
+            "rule, suppress ambient speech that does not satisfy the stated condition "
+            "even when it follows a recent exchange. Conversely, an ordinary reply in "
+            "an ongoing direct exchange is addressed when no restrictive rule is "
+            "active. Assistant wording never creates or relaxes the user's addressedness "
+            "rule. If the linguistic function, policy applicability, or addressee is "
             "genuinely ambiguous, use addressed=true and speech_act=unclear. "
             "addressed=false is valid only with reply, ambient_report, dictation, "
             "or narration. Return only the schema-valid JSON object."
@@ -358,55 +273,11 @@ class AttentionReviewer:
     def _prompt(request: AttentionReviewRequest) -> str:
         return (
             f"Host engagement evidence: {request.engagement}\n"
+            f"Recent bounded dialogue: {request.recent_dialogue}\n"
             f"Language hint: {request.language}\n"
             f"Latest transcript: {request.text}"
         )
 
-    @staticmethod
-    def _repair_prompt(
-        request: AttentionReviewRequest,
-        *,
-        initial_output: dict[str, Any],
-        validation_error: str,
-    ) -> str:
-        return (
-            "Revise the previous Attention Review output so the speech act and "
-            "addressedness agree. Preserve direct questions, requests, "
-            "imperatives, and greetings as addressed. Use addressed=false only "
-            "for an explicit reply, ambient_report, dictation, or narration. "
-            "Use addressed=true with unclear when ambiguity remains.\n"
-            f"Validation error: {validation_error[:500]}\n"
-            f"Previous output: {initial_output}\n"
-            f"Host engagement evidence: {request.engagement}\n"
-            f"Language hint: {request.language}\n"
-            f"Latest transcript: {request.text}"
-        )
-
-    @staticmethod
-    def _suppression_review_prompt(
-        request: AttentionReviewRequest,
-        *,
-        initial_output: dict[str, Any],
-    ) -> str:
-        return (
-            "Independently reconsider whether suppressing this transcript before "
-            "Chromie's Cognitive Core is definitely justified. The previous "
-            "classification is an untrusted proposal and may be semantically "
-            "wrong. Direct questions, requests, imperatives, greetings, and bare "
-            "sequences of requested actions are addressed even without Chromie's "
-            "name or the pronoun 'you'. In a pro-drop language, a command remains "
-            "addressed when its second-person subject is omitted; naming a separate "
-            "beneficiary or recipient does not make it ambient speech. Dictation "
-            "requires clear transcription, "
-            "quotation, or wording-for-another-recipient context; do not call a "
-            "bare action command dictation. If the speech function or addressee "
-            "is genuinely uncertain, return addressed=true and "
-            "speech_act=unclear. Return a fresh schema-valid judgment only.\n"
-            f"Previous proposal: {initial_output}\n"
-            f"Host engagement evidence: {request.engagement}\n"
-            f"Language hint: {request.language}\n"
-            f"Latest transcript: {request.text}"
-        )
 
 
 __all__ = ["AttentionReviewer"]

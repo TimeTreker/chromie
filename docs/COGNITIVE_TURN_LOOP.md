@@ -18,6 +18,15 @@ validated response stages described below are accepted post-evidence contract
 work, not implementation claims created by this documentation update. Current
 behavior and evidence remain authoritative in [STATUS.md](STATUS.md).
 
+## Bounded addressedness before Core semantics
+
+The Gateway's focused Attention Review consumes the latest transcript, Host engagement
+evidence, and a bounded recent-dialogue projection. Recent exchange is context, not an
+automatic addressedness grant: a temporary user-authored rule such as "wait until I say
+Chromie" can suppress ambient nearby speech while allowing a later explicitly addressed
+turn. The Attention model makes one judgment only. Invalid/unavailable output fails open
+to ordinary Core cognition; there is no Attention repair or suppression-review chain.
+
 ## 1. Decision
 
 Chromie uses a **manager-owned, evidence-driven cognitive turn loop**:

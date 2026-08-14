@@ -1104,12 +1104,11 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertFalse(_allows_null(schema["properties"]["goal_satisfaction"]))
 
-    def test_courteous_social_attention_needs_concrete_restraint_for_none(self) -> None:
+    def test_response_composer_keeps_social_attention_outside_expression_authority(self) -> None:
         source = inspect.getsource(ResponseComposerResolver._prompt)
-        self.assertIn("Social Attention must not author, rewrite, or semantically modify ResponsePlan text", source)
-        self.assertIn("meaningful direct engagement can justify one subtle decoration", source)
-        self.assertIn("decision=none with a concrete scene-specific reason", source)
-        self.assertIn("not phrase matching or a fixed gesture rule", source)
+        self.assertIn("Social Attention is independent background cognition", source)
+        self.assertIn("must not author a SocialAttentionPlan", source)
+        self.assertIn("Optional presentation must never reopen primary cognition", source)
 
 
 if __name__ == "__main__":

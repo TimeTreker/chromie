@@ -449,6 +449,13 @@ def _compact_prompt_capabilities(
             for effect in list(item.get("effects") or [])[:3]
             if str(effect).strip()
         ]
+        hints = item.get("hints") if isinstance(item.get("hints"), dict) else {}
+        metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+        semantic_scope = hints.get("semantic_scope")
+        if not isinstance(semantic_scope, dict) or not semantic_scope:
+            semantic_scope = metadata.get("semantic_scope")
+        if not isinstance(semantic_scope, dict):
+            semantic_scope = {}
         entry: dict[str, Any] = {
             "capability_id": capability_id,
             "route": str(item.get("route") or ""),
@@ -469,6 +476,22 @@ def _compact_prompt_capabilities(
             entry["required_args"] = required_args
         if args:
             entry["args"] = args
+        scope_parts: list[str] = []
+        for key in ("responsibility_type", "domain", "semantic_type", "acquisition"):
+            value = semantic_scope.get(key)
+            if isinstance(value, str) and value.strip():
+                scope_parts.append(f"{key}={value.strip()[:48]}")
+        for key in ("resource_kinds", "supported_request_kinds", "delivery_modes"):
+            values = semantic_scope.get(key)
+            if isinstance(values, list) and values:
+                scope_parts.append(
+                    f"{key}=" + ",".join(str(value)[:32] for value in values[:6])
+                )
+        if scope_parts:
+            entry["scope"] = ";".join(scope_parts)[:360]
+        when_not = hints.get("when_not_to_use")
+        if isinstance(when_not, str) and when_not.strip():
+            entry["not_for"] = " ".join(when_not.split())[:180]
         compact.append(entry)
     return compact
 
@@ -504,6 +527,12 @@ def _compact_prompt_capability_lines(entries: list[dict[str, Any]]) -> list[str]
         args = entry.get("args")
         if isinstance(args, list) and args:
             parts.append("args=" + ";".join(str(value) for value in args[:3]))
+        scope = str(entry.get("scope") or "").strip()
+        if scope:
+            parts.append("scope=" + scope)
+        not_for = str(entry.get("not_for") or "").strip()
+        if not_for:
+            parts.append("not_for=" + not_for)
         lines.append("|".join(parts))
     return lines
 
@@ -1205,7 +1234,7 @@ class OllamaGoalInterpreter:
             "Task Continuity:\n"
             "Use bounded dialogue, active/recent Goals, task progress, discourse, and Interaction Context; resolve by meaning, not lexical shortcuts, and emit the still-needed delta. Keep newer failed/goal-less dialogue salient. fast_speech is the first Goal Progress Communication milestone: normally one tiny polite acknowledgement; missing results limit claims, not responsiveness. An external truth check may acknowledge checking but never assert its result before evidence. Omit for an immediate answer, equivalent notification delivered/pending, silence, or repetition. Heard speech/trusted terminal effects are done; scheduled/planned work is not. Preserve exact corrected bindings; clarify real ambiguity.\n"
             "Capability Affordance Proposal:\n"
-            "Treat the Common Ability Catalog as a compact body/tool affordance interface: proposals, not authoritative grounding and not a phrase table. capability_inquiry=abilities; availability=chat; execution=robot_action. Bind exact methods. One parameterized capability may leave args to CapabilityAgent; compound capabilities may use actions[]. Isolated letters and low-information ASR fragments clarify; missing/ambiguous methods keep an open goal for CapabilityAgent. Capability progress requires grounded Goal meaning: material entities/parameters defining the owed outcome must come from user input or bounded context. Otherwise omit capability progress; never guess/default them or imply checking/execution started. Planner handles execution only after the outcome is defined. If current Mind/context fully answers conversation, progress may use kind=native_response with complete answer+speech_act; never while external/private/runtime evidence, memory retrieval, unresolved references, effects, or deeper reasoning remain. Current external facts use trusted lookup by meaning/context: route=tool, intent=capability:<exact capability_id>. Missing ability -> non-executable ability proposals in metadata.desired_abilities. Never invent args, claim completion, or emit low-level controls.\n\n"
+            "Treat the Common Ability Catalog as a compact body/tool affordance interface: proposals, not authoritative grounding and not a phrase table. capability_inquiry means a meta-question about ability, not an ordinary task. availability=chat; execution=robot_action. Choose only when semantic scope entails the requested human outcome; topical similarity is insufficient. Respect scope/not_for and prefer an honest missing ability over substitution. Stable everyday reasoning and advice needing no fresh evidence stay conversational. Bind exact methods. One parameterized capability may leave args to CapabilityAgent; compound capabilities may use actions[]. Isolated letters and low-information ASR fragments clarify; missing/ambiguous methods stay open for CapabilityAgent. Capability progress requires grounded Goal meaning; otherwise omit capability progress; never guess/default them or imply checking/execution started. native_response is only an immediate complete answer with no external/private/runtime evidence, memory, unresolved reference, effect, or deeper reasoning. Current external facts: route=tool, intent=capability:<exact capability_id>. Missing ability -> non-executable ability proposals in metadata.desired_abilities. Never invent args or completion.\n\n"
             "Cost Function:\n"
             "Speech-only conversation and capability availability=chat; catalog execution=robot_action; lookup=tool; planning=deep_thought; ambiguity=clarify. Never return interrupt or ignore; a separate focused addressedness stage owns ambient suppression.\n\n"
             "Output Contract:\n"

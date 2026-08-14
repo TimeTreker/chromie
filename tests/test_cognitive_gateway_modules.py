@@ -232,11 +232,24 @@ class CognitiveGatewayModuleTests(unittest.TestCase):
         )
         snapshot = gateway.assemble_context(
             capture,
-            {"interaction_engagement": {"active": False, "gate_enabled": True}},
+            {
+                "interaction_engagement": {"active": False, "gate_enabled": True},
+                "history": [
+                    {"role": "user", "text": "Wait until I say Chromie before responding."},
+                    {"role": "assistant", "text": "Okay."},
+                ],
+            },
         )
         request = gateway.attention_request(capture, snapshot)
         payload = request.model_dump(mode="json")
 
+        self.assertEqual(
+            payload["recent_dialogue"],
+            [
+                {"role": "user", "text": "Wait until I say Chromie before responding."},
+                {"role": "assistant", "text": "Okay."},
+            ],
+        )
         self.assertNotIn("route", payload)
         self.assertNotIn("intent", payload)
         self.assertNotIn("capability", payload)

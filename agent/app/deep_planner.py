@@ -300,7 +300,7 @@ class DeepPlannerResolver:
                 if isinstance(
                     exc, ResourceResponsibilityCapabilityUnavailableError
                 ):
-                    return self._clarify(
+                    return self._unavailable(
                         plan_id,
                         request,
                         "resource_responsibility_capability_unavailable",
@@ -1593,6 +1593,59 @@ class DeepPlannerResolver:
                 )
         errors.extend(parallel_plan_contract_errors(plan, capabilities))
         return errors
+
+    def _unavailable(
+        self,
+        plan_id: str,
+        request: AgentRunRequest,
+        reason: str,
+        *,
+        unresolved: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+        error: Exception | None = None,
+        attempts: int = 1,
+    ) -> CanonicalPlan:
+        """Return a terminal capability limitation without asking a fake question.
+
+        Missing provider ability is not user-semantic ambiguity. Additional user
+        detail cannot create an absent Capability, so Deep Planning reports the
+        limitation and lets Response Composer offer only honest conversational
+        next steps.
+        """
+
+        detail = dict(metadata or {})
+        detail.update(
+            {
+                "resolver": "deep_planner",
+                "status": "unavailable",
+                "authority": "advisory",
+                "attempt_count": attempts,
+                "max_contract_repairs": self.max_contract_repairs,
+                "reason": reason,
+            }
+        )
+        if error is not None:
+            detail.update(
+                {
+                    "error_type": type(error).__name__,
+                    "error": str(error)[:300],
+                    **llm_failure_metadata(error),
+                }
+            )
+        context = request.context if isinstance(request.context, dict) else {}
+        return CanonicalPlan(
+            plan_id=plan_id,
+            planner_tier="deep",
+            disposition="unavailable",
+            coverage="uncertain",
+            confidence=0.0,
+            goal_summary=request.text,
+            goal_ids=expected_goal_ids(context),
+            response_text="",
+            steps=[],
+            unresolved=list(unresolved or []),
+            metadata=detail,
+        )
 
     def _clarify(
         self,

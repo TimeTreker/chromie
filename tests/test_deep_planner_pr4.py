@@ -299,7 +299,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(plan.disposition, "clarify")
+        self.assertEqual(plan.disposition, "unavailable")
         self.assertEqual(plan.steps, [])
         self.assertEqual(
             plan.metadata["reason"],

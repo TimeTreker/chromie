@@ -109,6 +109,7 @@ class AttentionReviewRequest(BaseModel):
     text: str = Field(max_length=65536)
     language: str = Field(default="auto", min_length=1, max_length=64)
     engagement: dict[str, Any] = Field(default_factory=dict)
+    recent_dialogue: list[dict[str, Any]] = Field(default_factory=list, max_length=8)
 
     @field_validator("turn_id", "session_id", "language", mode="before")
     @classmethod

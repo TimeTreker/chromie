@@ -94,19 +94,18 @@ parallel manager objects.
 ## Recent architecture closure
 Current source bounds Goal/Planner reconsideration, keeps benign chat Fast, makes
 Deep/Host semantic rejection terminal, and implements the frozen human-like Core.
-
 Response Goal coverage is now a Host-derived read-only projection. The Response
 Composer model owns wording but cannot author `covers_goal_ids`; canonical Goal
 ownership and exact reused-speech provenance project that delivery bookkeeping
 mechanically. This removes another duplicate writable semantic truth without
 changing playback/evidence correlation.
-
 Response Composer is the single wording owner. `SocialAttentionPlanner` is the sole
 optional-decoration writer; malformed decoration fails soft and backend/calibration
 identity is stripped before model reasoning. Reflection is evidence-bound future
 adaptation: actions require recorded outcome/evidence, apply only to open Responsibility,
-and cannot reopen completed outcomes or current-turn authority. These are source claims
-only; no new target evidence is implied.
+and cannot reopen completed outcomes or current-turn authority.
+The current daily-life source correction also closes the general boundaries exposed by the generated-voice suite: Capability choice requires declared semantic entailment rather than topical proximity; state mutations are not information resources; local/private sensor state stays unknown without a trusted Provider; unavailable persistent work cannot be phrased as a future promise; and Gateway Attention uses bounded recent dialogue for temporary user-authored addressedness policy with one fail-open judgment and no online repair/reviewer chain.
+These are source claims only; no new target evidence is implied.
 ## Do not resurrect
 - independent Router semantic authority;
 - `social_attention` as a third execution lane or standalone Goal;
@@ -132,10 +131,11 @@ Do not silently downgrade because authority is absent.
 This checkpoint does **not** grant blanket architecture authority to later
 sessions; use Charter governance when new authority is needed.
 ## Resume point
-Docs-first design is complete. Next source work is Response/Social-Expression
-authority cleanup, meaningful Fast/Deep escalation, and deletion of remaining
-duplicate writable semantic truth or reviewer/repair chains. Do not add a new
-top-level layer. Historical target evidence remains revision-bound.
+Docs-first core design and the first authority cleanup are implemented. The next
+qualification step is to rerun the daily-life generated-voice suite against this source
+and compare semantic outcomes, especially capability grounding, Goal correction/reasoning,
+future-commitment truth, and temporary addressedness. Do not add a new top-level layer or
+phrase-specific case rules. Historical target evidence remains revision-bound.
 ## Resume and verification commands
 `docs/STATUS.md` owns implementation/evidence claims. Do not claim live-model,
 audio, MuJoCo, GPU, or physical-provider qualification unless that exact gate ran

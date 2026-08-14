@@ -165,7 +165,11 @@ _EXECUTION_CONTRACT_PROMPT = (
     "is stateful capability work: saying the reminder now does not complete that "
     "future effect. Represent the reminder's recipient, trigger, time, and content "
     "as ordinary typed Goal bindings; it is not an information acquisition resource "
-    "merely because its eventual notification is spoken. Embodied effects use "
+    "merely because its eventual notification is spoken. The same rule applies to "
+    "persistent state mutations such as adding/removing list items, recording an "
+    "obligation, changing a setting, or sending a later message: use capability_work "
+    "with ordinary typed bindings and no resource_responsibility unless the human "
+    "outcome is genuinely to acquire and deliver a resource. Embodied effects use "
     "body_action; lifecycle "
     "control of existing media uses media_playback; authored vocal performances "
     "use their exact vocal mode. The fact that a capability result will later be "
@@ -869,7 +873,7 @@ class GoalResponsibilityCoverageItem(BaseModel):
 
     source_excerpt: str = Field(min_length=1, max_length=500)
     role: Literal["responsibility", "constraint", "context", "framing"]
-    coverage: Literal["covered", "missing", "clarification_required"]
+    coverage: Literal["covered", "missing", "clarification_required", "representation_mismatch"]
     independently_satisfiable: bool = False
     candidate_goal_indices: list[int] = Field(default_factory=list, max_length=8)
 
@@ -940,15 +944,10 @@ class GoalResponsibilityCoverageCertificate(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def validate_unique_fragments(self) -> "GoalResponsibilityCoverageCertificate":
-        excerpts = [
-            " ".join(item.source_excerpt.casefold().split())
-            for item in self.items
-        ]
-        if len(excerpts) != len(set(excerpts)):
-            raise ValueError(
-                "one semantic source fragment must have exactly one coverage item"
-            )
+    def validate_material_evidence(self) -> "GoalResponsibilityCoverageCertificate":
+        # This certificate is immutable proof evidence, not a second canonical
+        # segmentation. Redundant/overlapping excerpts are diagnostically noisy but
+        # must not crash a valid semantic transaction by themselves.
         if not any(
             item.role in {"responsibility", "constraint"}
             for item in self.items
@@ -957,6 +956,7 @@ class GoalResponsibilityCoverageCertificate(BaseModel):
                 "coverage certificate for created Goals requires material user meaning"
             )
         return self
+
 
 
 
@@ -2126,7 +2126,7 @@ class GoalAssociationResolver:
             "A greeting or politeness preamble attached to a substantive request is conversational framing, not a separate Goal unless the user independently asks for a social response. Owner-approved identity and personality shape expression only; never create a Goal merely to mention age, identity, warmth, curiosity, or another style trait. "
             "A factual lookup and the user's requested interpretation of that same evidence are one Goal when one capability result can satisfy both, such as checking weather and judging whether it is hot. Multiple requested aspects of one information result, such as precipitation and whether the resulting temperature is cold, remain one information responsibility when the same result satisfies them. Do not split evidence acquisition, requested result aspects, or interpretation of that result into separate Goals. "
             "A physical action and a conversational answer or spoken performance are independent goals when the answer or performance is genuinely requested. Separate independently requested outcomes that can be accepted or rejected on their own. However, acquisition and delivery stages that together constitute one human responsibility are one Goal: navigating/searching, locating, grasping or retrieving, carrying, returning, and handing over are provider-owned stages of one physical resource delivery; external search, evidence retrieval, evaluation, and spoken explanation are stages of one information resource delivery. Do not split those implementation stages into separate Goals unless the user independently requests one stage as its own outcome. A simple acknowledgement, confirmation, willingness statement, or progress prelude for capability work is not a separate vocal_output Goal; it is prospective conversational output attached to the existing responsibility and every cognitive stage must use Interaction Context to avoid repeating an already fulfilled act. Before returning, verify that every independently satisfiable user responsibility appears in exactly one new_goals item: no merged unrelated outcomes and no duplicated responsibility across Goals. "
-            "For a responsibility whose human-level outcome is to obtain something and make it available to a recipient, include one nested resource_responsibility. That object is the sole writable resource authority. Put kind, description, normalized numeric-string quantity, typed query-scope attributes, source status/description/typed source bindings, recipient description/referent, and delivery_mode there exactly once. A physical_object resource always uses output_mode=body_action and delivery_mode=physical_handover. An information resource always uses output_mode=capability_work; its later spoken answer is delivery_mode=spoken_explanation, not output_mode=speech. Use kind=information for weather, recommendations, research, current facts, and other grounded information. Resource identity is not source evidence. A direction or distance that locates the requested physical object belongs directly in resource_responsibility.source.bindings when instrumental to acquisition, not in resource.attributes, top-level Goal bindings, or an independent movement Goal. Preserve explicit distance and direction as separate typed bindings where both are stated; use the normalized numeric value for distance while retaining its unit in source.description. source.description is summary only and never substitutes for typed source meaning, so source.status=known requires at least one source.bindings item and may represent only source meaning actually supplied by the user or discourse. Information query scope such as requested location, time, or requested aspects belongs in resource.attributes, not source. For a standard information lookup where the user names no external source, use source.status=provider_resolved because source selection is deliberately delegated; use unknown only when required acquisition-source meaning is genuinely absent and cannot be delegated. A resource Goal must keep top-level bindings empty; trusted code derives any legacy flat Planner view from the canonical resource object. This object must never name or imply a provider, capability ID, website, search engine, execution mode, coordinates, grasp pose, or implementation plan. Description is a human-readable summary, not parameter provenance and never overrides typed resource fields. "
+            "For a responsibility whose human-level outcome is to obtain something and make it available to a recipient, include one nested resource_responsibility. That object is the sole writable resource authority. Put kind, description, normalized numeric-string quantity, typed query-scope attributes, source status/description/typed source bindings, recipient description/referent, and delivery_mode there exactly once. A physical_object resource always uses output_mode=body_action and delivery_mode=physical_handover. An information resource always uses output_mode=capability_work; its later spoken answer is delivery_mode=spoken_explanation, not output_mode=speech. Use kind=information for weather, recommendations, research, current facts, and other grounded information. Resource identity is not source evidence. A direction or distance that locates the requested physical object belongs directly in resource_responsibility.source.bindings when instrumental to acquisition, not in resource.attributes, top-level Goal bindings, or an independent movement Goal. Preserve explicit distance and direction as separate typed bindings where both are stated; use the normalized numeric value for distance while retaining its unit in source.description. source.description is summary only and never substitutes for typed source meaning, so source.status=known requires at least one source.bindings item and may represent only source meaning actually supplied by the user or discourse. Information query scope such as requested location, time, or requested aspects belongs in resource.attributes, not source. For a standard public/external information lookup where the user names no external source, use source.status=provider_resolved because source selection is deliberately delegated. A question about local, private, household, device, sensor, or runtime state is different: when no matching trusted sensor/provider is supplied, use source.status=unknown and preserve the epistemic limitation instead of treating the web, weather, or another generic information provider as authority. Use unknown whenever required acquisition-source meaning is genuinely absent and cannot be delegated. A resource Goal must keep top-level bindings empty; trusted code derives any legacy flat Planner view from the canonical resource object. This object must never name or imply a provider, capability ID, website, search engine, execution mode, coordinates, grasp pose, or implementation plan. Description is a human-readable summary, not parameter provenance and never overrides typed resource fields. "
             "Also preserve semantic qualifiers such as temporal scope, comparison period, and requested answer shape. Never silently rewrite annual, seasonal, historical, comparative, or otherwise broad scope into current, today, tomorrow, or another narrower scope. If the intended scope is materially ambiguous, return clarification instead of choosing a narrower interpretation. "
             "Resolve references, pronouns, demonstratives, ellipsis, and task mentions before planning. Authority order is: explicit current user meaning; foreground scoped discourse referents; candidate Goal bindings; recent dialogue. First identify every material indirect referring expression, then require a unique value from that authority order and preserve it in a typed binding or supplied referent. Imperative grammar and a plausible generic noun such as device, object, person, task, or setting are never reference evidence. If two or more contextual candidates remain plausible, or none is supplied, ask a narrow clarification. Phrases such as ‘the last task I told you’ may semantically associate with an active, recoverable, or retained recent terminal Goal, but the model must decide that relationship from the supplied Goal state and dialogue—not from a Host phrase table. Tool-result memory is not reference-resolution authority and must never decide what an unresolved expression refers to. "
             "When the user introduces or explicitly corrects a salient entity, emit referent_updates only when the required discourse-index provenance is available. Use operation=correct with non-empty target_referent_ids copied from supplied discourse context when a new value supersedes an earlier referent; never emit an unscoped correction when no target referent ID was supplied. The canonical Goal association and typed bindings still preserve a correction even when no discourse-index update can be authored. The old referent remains available in its own task scope but becomes background. Use operation=introduce for a new salient entity, and focus/background/retire only for supplied referent IDs. "
@@ -2251,7 +2251,7 @@ class GoalAssociationResolver:
             + output_instructions
             + "Select exactly one decision branch. clarification is only a concise user-facing question and must be empty for non-clarify decisions. Each new_goals item contains description, output_mode, optional media_operation, bindings, optional supersedes_goal_ids, and optional provider-neutral resource_responsibility only. Choose output_mode from the work that actually completes the Goal; the Host derives the internal responsibility class, lane, and provider-evidence requirement. media_playback requires one exact media_operation; non-media Goals may omit it. "
             + _EXECUTION_CONTRACT_PROMPT
-            + " Preserve one nested resource_responsibility when the responsibility is genuinely to acquire and deliver a physical object or grounded information; never add it to a vocal performance or insert provider details. It is the sole writable resource authority. A physical_object resource requires output_mode=body_action and delivery_mode=physical_handover. An information resource requires output_mode=capability_work; spoken_explanation is its delivery_mode, never output_mode=speech. Put identity, normalized quantity, information query-scope attributes, source status/description/bindings, recipient, and delivery there exactly once and keep the resource Goal's top-level bindings empty. Physical acquisition distance, direction, location, and route facts belong in source.bindings, never resource.attributes; preserve an explicit distance and direction separately and normalize a numeric distance while retaining its unit in source.description. source.description is summary only, so source.status=known requires actual user- or discourse-supplied source meaning represented by one or more typed source.bindings; use unknown when required source meaning is absent and provider_resolved only when selection is deliberately delegated. Never repair missing human-level scope by inventing a default: if authoritative user, discourse, retained-Goal, and Situation context cannot resolve what Chromie owes, return top-level clarification. Preserve or repair explicit discourse resolution and referent updates; never use tool-result contents to infer a reference. "
+            + " Preserve one nested resource_responsibility when the responsibility is genuinely to acquire and deliver a physical object or grounded information; never add it to a vocal performance or insert provider details. It is the sole writable resource authority. A physical_object resource requires output_mode=body_action and delivery_mode=physical_handover. An information resource requires output_mode=capability_work; spoken_explanation is its delivery_mode, never output_mode=speech. Put identity, normalized quantity, information query-scope attributes, source status/description/bindings, recipient, and delivery there exactly once and keep the resource Goal's top-level bindings empty. Physical acquisition distance, direction, location, and route facts belong in source.bindings, never resource.attributes; preserve an explicit distance and direction separately and normalize a numeric distance while retaining its unit in source.description. source.description is summary only, so source.status=known requires actual user- or discourse-supplied source meaning represented by one or more typed source.bindings; use provider_resolved only for deliberately delegated public/external acquisition, and use unknown for local/private/runtime state when no matching trusted sensor/provider is supplied or whenever required source meaning cannot be delegated. Never repair missing human-level scope by inventing a default: if authoritative user, discourse, retained-Goal, and Situation context cannot resolve what Chromie owes, return top-level clarification. Preserve or repair explicit discourse resolution and referent updates; never use tool-result contents to infer a reference. "
             "The host owns every ID and persistence field. Re-segment every independently satisfiable responsibility from the authoritative user turn; do not preserve an invalid merge merely because it appeared in the previous output.\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
         )
@@ -2580,7 +2580,15 @@ class GoalAssociationResolver:
             "Read the authoritative user turn from scratch and compare its semantic "
             "requirements with the supplied zero-based Goal candidates. Enumerate "
             "material responsibilities, constraints, context, and conversational "
-            "framing without planning or selecting capabilities. A positive observable "
+            "framing without planning or selecting capabilities. Audit not only Goal "
+            "ownership but whether the candidate represents the same kind of human "
+            "outcome. A future reminder, list mutation, state change, message delivery, "
+            "or other persistent effect is not an information resource merely because "
+            "words or data are involved. Conversely, an immediate judgment, choice, "
+            "prioritization, or advice that needs no fresh external/private/runtime "
+            "evidence is conversational reasoning rather than information acquisition. "
+            "Use coverage=representation_mismatch when the candidate owns the words but "
+            "its completion semantics are the wrong kind. A positive observable "
             "outcome the user can independently judge is a responsibility, not a "
             "constraint or decoration. Do not invent a vocal outcome from a broad "
             "social impression when no words, information, or vocal performance were "
@@ -2616,7 +2624,11 @@ class GoalAssociationResolver:
             "outcome Chromie owes, role=constraint for a modifier/prohibition/timing "
             "condition on such an outcome, role=context for reference/background that "
             "does not itself need completion, and role=framing for politeness or social "
-            "preamble attached to substantive work. A manner, mood, persona, or social-"
+            "preamble attached to substantive work. Stated preferences, reasons, "
+            "candidate options, and background facts that merely constrain one requested "
+            "decision are context or constraints, not independent responsibilities, "
+            "unless the user separately asks for an observable outcome for each. A "
+            "manner, mood, persona, or social-"
             "presentation modifier attached to a requested effect is role=constraint "
             "on that effect; it is not a second responsibility merely because speech "
             "could also convey the style. When a concrete effect is requested together "
@@ -2663,10 +2675,16 @@ class GoalAssociationResolver:
             "merely because it is not a responsibility, has no separate Goal, or is "
             "an instrumental provider stage; mark it missing only when no candidate "
             "DTO field preserves it on the outcome that it modifies. Coverage also "
-            "requires the candidate's output_mode and "
-            "observable completion meaning to match the requested responsibility: "
-            "speech cannot cover requested body motion, media control, external "
-            "evidence work, or a vocal performance. Every Goal candidate must be "
+            "requires the candidate's output_mode, resource shape, and observable "
+            "completion meaning to match the requested responsibility. Use "
+            "coverage=representation_mismatch when a state mutation or deferred effect "
+            "(recording/updating something, scheduling a future notification, or sending "
+            "something later) is represented as an information resource, when provider-"
+            "backed evidence work is represented as ordinary speech, or when immediate "
+            "reasoning/advice with no fresh evidence need is represented as external "
+            "information acquisition. Speech cannot cover requested body motion, media "
+            "control, external evidence work, or a vocal performance. Every Goal "
+            "candidate must be "
             "justified by at least one covered role=responsibility item; a constraint "
             "alone never justifies another Goal. Do not author a top-level verdict or "
             "unjustified-candidate inventory; trusted code derives both from the item "

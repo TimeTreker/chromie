@@ -201,6 +201,20 @@ a different Provider may expose navigation, perception, grasp, return, and
 handover separately. That changes Work composition, not Goal meaning. Provider
 internals remain private until explicitly advertised as capabilities.
 
+### Addressedness is bounded interaction policy, not recent-turn inertia
+
+Cognitive Gateway Attention Review receives Host engagement evidence plus bounded
+recent accepted dialogue. A user-authored temporary interaction rule—such as requiring
+Chromie's wake name during a call—remains relevant addressedness context until the
+user revokes/replaces it or it falls outside the bounded conversation context. A recent
+exchange by itself does not make every nearby utterance addressed. Assistant wording
+never creates or relaxes the user's addressedness rule.
+
+Attention suppression is a fail-open boundary and therefore has one model judgment.
+Malformed or unavailable Attention output admits the turn; it is not repaired, and a
+second suppression reviewer cannot discard the turn. Deterministic stop/cancel/emergency
+reflexes remain separate and keep their immediate Host authority.
+
 ### One writable semantic truth; projections are mechanical
 
 Each material semantic fact has one model-writable canonical owner. Alternative
@@ -214,6 +228,27 @@ another mutable Goal model. It may be retained immutably in traces, but its only
 control authority is to accept the candidate, permit one fresh source-based
 interpretation, or fail closed. It may not mutate Goals or enter its own repair
 workflow.
+
+### Capability grounding requires semantic entailment
+
+A Capability is eligible only when its declared semantic scope can actually satisfy
+the human Responsibility. Topic overlap, a shared noun, a date/location field, or
+being the closest available tool is not grounding. Goal Interpretation receives a
+bounded projection of both positive semantic scope and negative `when_not_to_use`
+boundaries; Planner then validates the canonical Goal against the full registered
+Capability contract. When no exact Capability exists, Chromie preserves the understood
+Responsibility and returns an honest unavailable outcome rather than substituting
+weather, generic external information, or another merely adjacent tool.
+
+State mutation and information acquisition remain distinct. A deferred reminder,
+shopping-list edit, stored obligation, later message, device-setting change, or other
+persistent state effect is `capability_work` when it requires a Provider, but it is not
+an information `resource_responsibility` merely because words or data are involved.
+Conversely, ordinary fairness judgments, prioritization, advice, and other immediately
+satisfiable reasoning stay conversational when no fresh external/private/runtime
+evidence is required. Local/private/device/sensor state without a supplied trusted
+sensor or Provider remains epistemically unknown; a generic web or weather source is
+not silently promoted into authority for that state.
 
 ### Response is how Chromie says established meaning
 

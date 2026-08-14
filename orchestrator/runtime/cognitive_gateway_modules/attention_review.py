@@ -18,6 +18,16 @@ class AttentionReview:
         snapshot: GatewayContextSnapshot,
     ) -> AttentionReviewRequest:
         engagement = snapshot.context.get("interaction_engagement")
+        history = snapshot.context.get("history")
+        recent_dialogue: list[dict[str, str]] = []
+        if isinstance(history, list):
+            for item in history[-8:]:
+                if not isinstance(item, dict):
+                    continue
+                role = str(item.get("role") or "").strip().casefold()
+                text = " ".join(str(item.get("text") or "").strip().split())
+                if role in {"user", "assistant"} and text:
+                    recent_dialogue.append({"role": role, "text": text[:1200]})
         return AttentionReviewRequest(
             turn_id=capture.turn_id,
             session_id=capture.session_id,
@@ -25,6 +35,7 @@ class AttentionReview:
             text=capture.normalized_text,
             language=capture.language or "auto",
             engagement=(engagement if isinstance(engagement, dict) else {}),
+            recent_dialogue=recent_dialogue,
         )
 
     @staticmethod

@@ -572,6 +572,9 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertIn("stateful capability work", execution_contract)
         self.assertIn("saying the reminder now does not complete", execution_contract)
         self.assertIn("ordinary typed Goal bindings", execution_contract)
+        self.assertIn("persistent state mutations", execution_contract)
+        self.assertIn("local, private, household, device, sensor, or runtime state", execution_contract)
+        self.assertIn("source.status=unknown", execution_contract)
 
     def test_unscoped_optional_referent_correction_is_dropped(self):
         normalized, dropped = (
@@ -633,6 +636,55 @@ class GoalExecutionContractTests(unittest.TestCase):
                     "decision": "accept",
                 }
             )
+
+    def test_coverage_certificate_tolerates_redundant_overlapping_excerpt_evidence(self):
+        parsed = GoalResponsibilityCoverageCertificate.model_validate(
+            certificate(
+                coverage_item("帮我们选一个", 0),
+                coverage_item(
+                    "帮我们选一个",
+                    0,
+                    role="constraint",
+                    independently_satisfiable=False,
+                ),
+            )
+        )
+        verdict, problems = GoalAssociationResolver._coverage_verdict(
+            parsed, goal_count=1
+        )
+        self.assertEqual(verdict, "accept")
+        self.assertEqual(problems, [])
+
+    def test_representation_mismatch_rejects_state_change_as_information_resource(self):
+        parsed = GoalResponsibilityCoverageCertificate.model_validate(
+            certificate(
+                coverage_item(
+                    "Set a reminder for tomorrow morning",
+                    role="responsibility",
+                    coverage="representation_mismatch",
+                    independently_satisfiable=True,
+                )
+            )
+        )
+        verdict, problems = GoalAssociationResolver._coverage_verdict(
+            parsed, goal_count=1
+        )
+        self.assertEqual(verdict, "reject")
+        self.assertIn(
+            "representation_mismatch:responsibility:Set a reminder for tomorrow morning",
+            problems,
+        )
+
+    def test_coverage_prompt_distinguishes_preferences_state_changes_and_information(self):
+        resolver = GoalAssociationResolver(FakeOllama({}))
+        prompt = resolver._build_responsibility_coverage_prompt(
+            request=request("I want noodles, my sister wants rice; help us choose one.", language="en-US"),
+            raw=create_goals(goal("Choose lunch fairly.", "speech")),
+        )
+        self.assertIn("Stated preferences", prompt)
+        self.assertIn("state mutation or deferred effect", prompt)
+        self.assertIn("representation_mismatch", prompt)
+
 
 
 class GoalAssociationTransactionTests(unittest.TestCase):

@@ -245,6 +245,7 @@ class SemanticAuthorityContractTests(unittest.TestCase):
         self.assertEqual(
             report["bounded_cognition_guards"],
             {
+                "gateway_attention_single_judgment": True,
                 "goal_interpreter_two_call_budget": True,
                 "goal_association_five_call_budget": True,
                 "planner_one_mechanical_regeneration": True,
