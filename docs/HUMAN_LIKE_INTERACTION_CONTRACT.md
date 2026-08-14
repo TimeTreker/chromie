@@ -176,6 +176,42 @@ For one simple conversational act, one natural response is usually enough. If
 fast-first already answered a simple greeting or clarification, the final agent
 must not answer the same act again.
 
+## Human-like cognition is selective, not perfectionist
+
+Chromie should resemble ordinary human cognition in how effort follows meaning
+and consequence, not by inventing one software module for every human mental
+term. Obvious, low-risk interaction should be handled quickly. Genuine ambiguity,
+important independent responsibilities, risky/irreversible effects, nontrivial
+dependencies, or another uncertainty whose wrong answer matters may justify Deep
+cognition.
+
+A model's self-reported confidence is not a calibrated probability and must not
+become automatic escalation authority. The useful question is whether the
+remaining uncertainty matters for the next contemplated progress. Do not solve
+confidence calibration problems by adding confidence reviewers, route-specific
+review chains, or phrase exceptions.
+
+Fast and Deep are two depths of the same semantic Mind. Deep receives the
+authoritative turn/context and thinks more broadly; it is not a reviewer that
+patches Fast output. Mechanical DTO/schema failure may be regenerated once under
+the same meaning. Semantic failure either escalates once to its designated deeper
+cognition, asks a genuine clarification, or fails closed.
+
+Harmless imperfection is allowed to remain harmless. A missed optional blink or
+slightly imperfect phrase need not trigger another semantic call. Unsafe,
+unauthorized, irreversible, materially mis-grounded, or reality-falsifying output
+must stop before commitment. This is human-like restraint, not reduced safety.
+
+Response composition is expression of established meaning and evidence, not a
+second brain. Social Attention is optional parallel expression. Failure of either
+must remain local:
+
+> **Optional presentation must never reopen primary cognition.**
+
+Reflection closes the learning loop later. It can use immutable failure/outcome
+evidence to improve future behavior, but it must not rewrite past speech, Goal
+meaning, commitments, or provider reality to make the current turn look correct.
+
 ## Responsive speech and planning depth
 
 The routing and independently scheduled response-stage changes in this section
@@ -205,12 +241,13 @@ belongs on the Fast path. Deep Planner is exceptional and is justified by
 semantic uncertainty, incomplete or compound coverage, nontrivial dependencies,
 material alternatives, novelty or broader context, or safety/resource reasoning
 that requires the wider planning boundary. A structured semantic or plan
-validation rejection may justify Deep only when its failure contract explicitly
-requires broader reasoning. Technical schema/model-contract failure receives
-one mechanical DTO regeneration. Any later Deep recovery is explicitly classified as
-recovery, retains the Fast failure evidence, and fails closed unless it produces
-a valid plan; it is not semantic escalation. A confidence number alone neither
-permits a bypass nor requires escalation, and it never authorizes an effect.
+validation rejection may justify the one Fast-to-Deep escalation only when
+broader reasoning is actually warranted. A purely mechanical schema/DTO failure
+may be regenerated once under the same meaning. A Deep
+semantic/grounding/coverage rejection is terminal for that cognition attempt; it
+is not repaired by another same-tier semantic pass. A confidence number alone
+neither permits a bypass nor requires escalation, and it never authorizes an
+effect.
 
 Streaming changes delivery timing, not semantic authority. Raw model-token
 deltas, partial JSON, private reasoning, and incomplete sentences are not speech

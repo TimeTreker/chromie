@@ -16,6 +16,48 @@ Soridormi/provider work and is not a Chromie milestone or release prerequisite.
 Sequential milestone codes are not part of the current project model. Work is
 organized by capability, risk, and retained evidence.
 
+## Immediate architecture line — human-like cognitive flow cleanup
+
+The owner-approved canonical flow is now documented before implementation. The
+next source work must make the runtime match it rather than extending historical
+repair/reviewer machinery. Implementation order:
+
+1. **Response authority cleanup.** Response Composer becomes expression over
+   authoritative Goal/Plan/Evidence state, not another semantic reviewer. Separate
+   mechanical DTO regeneration (at most once) from semantic/evidence rejection;
+   remove reviewer-of-reviewer and repair-of-repair behavior.
+2. **Optional presentation locality.** Social Attention and response polish may
+   fail locally. A valid Social Attention `none` stands; invalid decoration is
+   dropped without recomposing speech or reopening Goal/Planner cognition. Resolve
+   any duplicate Social Attention semantic ownership so one maintained path owns
+   the decision.
+3. **Fast/Deep boundary.** Keep obvious low-risk interaction Fast even when model
+   confidence is imperfectly calibrated. Escalate when uncertainty/consequence
+   actually warrants deeper cognition. Deep consumes authoritative source meaning,
+   not Fast output as a repair target.
+4. **Semantic single-source audit.** For each material fact, keep one writable
+   semantic owner and derive downstream projections mechanically. Delete alignment
+   machinery whose only purpose is reconciling duplicate writable truth.
+5. **Reflection vocabulary and lifecycle.** Preserve evidence-driven future
+   reconsideration/replanning, but remove terminology that makes it look like
+   online repair of the current model output. Reflection learns forward and never
+   rewrites trusted history.
+6. **Outcome and call-budget regression matrix.** Tests protect user-visible
+   semantic outcomes, fail-closed behavior, single ownership, and bounded logical
+   model calls—not historical prompt/reviewer sequences.
+
+Exit criteria:
+
+- the Charter's canonical WORLD/PERSON → Gateway → Fast/Deep → Responsibility →
+  Goal → Planner → Provider → Action → Evidence → Response/Reflection flow is
+  reconstructable in source without a second semantic authority;
+- optional presentation cannot reopen primary cognition;
+- semantic rejection does not create a same-layer repair workflow;
+- mechanical DTO regeneration is distinguished and bounded to at most one retry;
+- retained behavior/general-ability/benchmark scenarios remain green; and
+- current Status records implementation/evidence honestly, without promoting this
+  design-only update into target validation.
+
 ## Immediate architecture line — Continuous Mind implementation from the compressed baseline
 
 The General Progress substrate remains the first implemented slice of

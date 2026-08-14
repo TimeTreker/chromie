@@ -32,8 +32,8 @@ receive
         -> delegate bounded work
         -> observe structured results
         -> reconcile every goal against evidence
-  -> compose one final response
-  -> close, wait, or replan
+  -> compose the still-needed response from authoritative state
+  -> close, wait, or reactivate later from new evidence/state
 ```
 
 This is the robot equivalent of a general tool-using agent loop, but it is not
@@ -134,10 +134,29 @@ Alternative terminal ingress states are:
 - `REFLEX_AND_ADMITTED` when the control must also be retained for goal-state
   reconciliation and a possible concise response.
 
-`REPLAN_REQUIRED` may return only to canonical planning, with a bounded budget
-and the original goals intact. It cannot return to input classification, widen
-the goal, bypass a new material confirmation, or repeat a physical action
-without fresh authorization. Physical TaskGraph work remains sequential.
+`REPLAN_REQUIRED` is a task-lifecycle state for unfinished Responsibility after
+new user meaning, trusted observations, failed Work, dependency change, or other
+new authoritative state. It is not permission to repair a rejected model output.
+It may return only to canonical planning with the original/current Goal authority
+intact. It cannot return to input classification, widen the Goal, bypass a new
+material confirmation, or repeat a physical action without fresh authorization.
+Physical TaskGraph work remains sequential.
+
+### 3.0 Fast/Deep escalation is cognition depth, not repair
+
+Fast handles meaning that is sufficiently obvious and cheap for the contemplated
+progress. Deep is exceptional and receives authoritative source meaning when
+remaining uncertainty or consequence justifies broader reasoning. A numeric
+confidence score is evidence, not the sole escalation switch. Harmless ordinary
+conversation should not pay a Deep-thinking tax merely because confidence is
+imperfectly calibrated.
+
+A mechanically malformed DTO may be regenerated once under the same meaning and
+schema. A semantic/grounding/coverage failure is not repaired by rewriting the
+previous model output: Fast may escalate once to its designated Deep cognition; a
+terminal Deep semantic rejection fails closed or asks a genuine user-resolvable
+clarification. The Host validates and contains; it does not become a third
+semantic planner.
 
 ### 3.1 Continuous progress and the critical path
 
@@ -196,9 +215,11 @@ clarification, safe preparation, refusal, or another harmless branch to advance,
 but it is not execution authorization.
 
 The same principle applies to optional presentation work. Response composition,
-semantic polishing, Social Attention, or presentation repair must not become a
-barrier to an otherwise-ready non-effectful acquisition merely because those
-activities happen in the same interaction. Runtime qualification should measure
+semantic polishing, or Social Attention must not become a barrier to an otherwise-
+ready non-effectful acquisition merely because those activities happen in the
+same interaction. Presentation failure remains local and must not reopen Goal
+Interpretation, planning, or another semantic reviewer. Runtime qualification
+should measure
 at least the time to the first meaningful reaction and the time to the first
 useful result separately; reducing one must not hide a long unnecessary critical
 path in the other.
@@ -344,16 +365,15 @@ forbidden low-level controls. Validation cannot invent missing meaning or
 rewrite the plan into a nearby action.
 
 Fast Planner owns complete bounded capability work. Deep Planner is invoked
-only for a recorded semantic escalation, unresolved ambiguity or coverage,
-nontrivial dependency, material alternative, novelty or broader context, or
-safety/resource reasoning that requires wider planning. A structured semantic
-or plan validation rejection may justify Deep only when its failure contract
-explicitly requires broader reasoning. Technical schema/model-contract failure
-receives one mechanical DTO regeneration. Any later Deep recovery is explicitly
-classified as recovery, retains the Fast failure evidence, and fails closed
-unless it produces a valid plan; it is not semantic escalation. A confidence
-number alone neither permits a bypass nor requires escalation, and it never
-authorizes an effect.
+only for unresolved ambiguity or coverage, nontrivial dependency, material
+alternative, novelty/broader context, or safety/resource reasoning that truly
+requires wider cognition. A purely mechanical Planner DTO/schema failure may be
+regenerated once under the same semantic meaning. Fast semantic/grounding/coverage
+rejection may escalate once to Deep when broader reasoning is warranted. Deep
+semantic/grounding/coverage rejection is terminal for that cognition attempt and
+must not trigger another same-tier semantic pass. A confidence number alone
+neither permits a bypass nor requires escalation, and it never authorizes an
+effect.
 
 ### 5.1 One Mind: stable cached prefix plus bounded live projections
 

@@ -80,6 +80,220 @@ is defined in [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md). This constitution
 defines what cognition must preserve; the loop document defines when each
 contract is produced and consumed.
 
+## Canonical human-like cognitive flow
+
+The Project Charter fixes the following flow as the primary mental model for
+Chromie. It is an ownership graph, not a requirement that every box run
+serially on every turn.
+
+```text
+                 WORLD / PERSON
+                       │
+                  Perception
+                       │
+                       ▼
+               Cognitive Gateway
+                       │
+               Is this worth attention?
+                       │
+                       ▼
+              Goal Interpretation
+                  /           \
+              obvious       uncertain /
+               cheap        consequential
+                │                │
+               Fast             Deep
+                \                /
+                 \              /
+                  ▼            ▼
+                 Responsibility
+                      │
+                     Goal
+                      │
+                      ▼
+                   Planner
+                      │
+            Available Capabilities
+                      │
+                      ▼
+                   Provider
+                      │
+                      ▼
+                    Action
+                      │
+                      ▼
+                   Evidence
+                      │
+              ┌───────┴────────┐
+              ▼                ▼
+          Response         Reflection
+              │                │
+              ▼                ▼
+           Person        Future cognition
+
+Social Attention
+= optional parallel expression around interaction
+```
+
+### Human-like does not mean perfectionist
+
+Normal people do not run an independent reviewer after every obvious thought.
+They act quickly when meaning is obvious and the cost of a small mistake is low,
+and they deliberate when uncertainty is real or the consequences matter. Chromie
+therefore treats a model's numeric confidence as one signal, not as an escalation
+authority. `hello` is still an obvious low-risk greeting even if one model run is
+poorly calibrated; an ambiguous destructive write or uncertain physical action is
+not cheap merely because its confidence happens to exceed a threshold.
+
+The governing question is:
+
+> Is the remaining uncertainty important enough to justify deeper cognition?
+
+Do not turn that question into another elaborate deterministic scoring system.
+The semantic model owns the ordinary judgment from meaning, bounded context,
+risk/effect information, and current responsibilities; trusted code contains
+hard safety/authorization boundaries.
+
+### Fast and Deep are depths of one Mind, not reviewer and repaired output
+
+Fast cognition handles obvious, inexpensive, locally understandable work. Deep
+cognition receives authoritative source meaning and broader context when the task
+is genuinely uncertain, consequential, dependent, novel, or long-horizon. Deep
+is not an editor for Fast JSON and must not become `review(FastOutput)`.
+
+A semantic failure should therefore cause one of four things: accept nothing and
+fail closed; ask a genuine user-resolvable clarification; escalate once to the
+designated deeper cognition from authoritative source meaning; or, where a
+specific bounded proof transaction exists, reconsider once from source. Rewriting
+previous model output repeatedly is not cognition.
+
+A purely mechanical DTO/schema failure is different. The same stage may
+regenerate the same representation once under the same meaning and schema. That
+is retransmission, not semantic repair. No repair-of-repair follows.
+
+### Responsibility is what Chromie owes; Work is how it advances
+
+Goal Association answers the human semantic question:
+
+> What independently observable outcome is still owed to the person?
+
+A Goal is the persistent representation of that Responsibility when it must
+survive beyond immediate progress. The Planner does not get to redefine what the
+person asked for because one current Provider happens to expose a convenient
+capability granularity.
+
+For example, after a successful water delivery the semantic question "is the
+walk still independently owed?" belongs at the Goal boundary. If the user meant
+"walk one hundred metres, then bring water", the walk remains an independent
+Responsibility. If the user meant "go to the place one hundred metres ahead and
+bring water", the movement is an instrumental constraint on the resource Goal.
+The answer comes from human-outcome meaning, not from Provider implementation.
+
+Planner then answers a different question:
+
+> Given these Goals and current advertised capabilities, what Work can satisfy
+> them now?
+
+Provider capability boundaries are dynamic. A complete advertised
+`acquire_and_deliver_resource` capability may be one atomic planning unit today;
+a different Provider may expose navigation, perception, grasp, return, and
+handover separately. That changes Work composition, not Goal meaning. Provider
+internals remain private until explicitly advertised as capabilities.
+
+### One writable semantic truth; projections are mechanical
+
+Each material semantic fact has one model-writable canonical owner. Alternative
+views needed by Planner, Host, tracing, or Provider arguments are read-only
+projections or references, not independently authored copies. Natural-language
+`description` fields summarize canonical semantics; they are not another source
+of truth that later code reconciles against typed fields.
+
+An ephemeral coverage certificate is evidence about candidate Goal semantics, not
+another mutable Goal model. It may be retained immutably in traces, but its only
+control authority is to accept the candidate, permit one fresh source-based
+interpretation, or fail closed. It may not mutate Goals or enter its own repair
+workflow.
+
+### Response is how Chromie says established meaning
+
+Response composition is downstream expression. It receives authoritative
+conversation/Goal/Plan/Evidence state and chooses the still-needed natural
+user-facing act. It may verify that wording does not claim unobserved completion
+or contradict a trusted limitation, but it cannot reinterpret the Goal, invent a
+new responsibility, reopen Planner authority, or authorize an effect.
+
+If wording is mechanically malformed, the representation may be regenerated once.
+If a response semantically violates trusted truth/evidence, reject it or use a
+contract-defined safe limitation; do not launch a second semantic reviewer whose
+output can then require another reviewer. A presentation problem is local.
+
+> Optional presentation must never reopen primary cognition.
+
+### Social Attention is optional parallel expression
+
+Social Attention makes an already-anchored interaction feel socially alive. It is
+not another Goal, execution lane, speech owner, or semantic planner. A gaze, blink,
+small nod/wave, or slight posture/orientation may accompany listening, speaking,
+Activity, waiting, or turn-taking when context and current body capabilities make
+it natural.
+
+If optional decoration is unavailable, invalid, conflicting, slow, repetitive,
+or simply unnecessary, drop it locally. Do not recompose speech, reinterpret the
+interaction, or make primary work fail because Chromie could not blink. A valid
+`none` is a complete Social Attention result, not an invitation to a second
+opinion. Baseline idle liveliness remains a separate concern.
+
+### Evidence owns reality; harmless imperfection may remain imperfect
+
+Models may propose meaning and action, but trusted Evidence owns what actually
+happened. Chromie must stop before unsafe, unauthorized, irreversible, materially
+mis-grounded, or reality-falsifying commitments. Those boundaries deserve strong
+validation.
+
+Not every imperfection deserves another cognitive call. Slightly awkward wording,
+a missed optional social cue, or another harmless variation may end locally. The
+architecture should spend complexity where being wrong matters rather than trying
+to make every low-risk interaction perfect through review chains.
+
+### Reflection learns forward
+
+Reflection consumes trusted experience after meaningful surprise, contradiction,
+failure, importance, or repetition. It may create evidence-backed proposals for
+future calibration, Memory, Goal/Plan reconsideration, or learning through the
+normal owning boundaries. It is selective slow cognition, not a synchronous
+reviewer after every turn.
+
+Reflection never rewrites delivered speech, provider evidence, execution history,
+or past commitments. When Chromie misunderstood something, the system may retain
+"I misunderstood that" as experience. It must not rewrite history to make the
+old turn look correct.
+
+### Reconstructability is an architecture test
+
+A new engineer should be able to explain an ordinary interaction by answering a
+small set of questions:
+
+1. What did the person mean and what independent outcome was owed?
+2. Why was Fast sufficient, or why did uncertainty/consequence justify Deep?
+3. What Goal/Responsibility was retained?
+4. Why did Planner choose the current capability composition?
+5. Which Provider executed it and what trusted Evidence resulted?
+6. What still-needed meaning did Response express?
+7. Did optional Social Attention add anything, and could its failure stay local?
+8. Is there anything worth learning later through Reflection?
+
+If the explanation instead depends on historical regression names such as
+`residual_*`, contract-loss recovery, reviewer-of-reviewer sequences, or knowing
+which previous patch introduced a special branch, the architecture is not
+reconstructable enough.
+
+Large code volume is not itself a defect. ASR, TTS, simulation, providers,
+capabilities, safety, evidence, memory, and real-world competence can legitimately
+make Chromie large. The dangerous complexity is accidental semantic complexity:
+code whose main purpose is to reconcile duplicate truths or repair previous
+repair stages. Capability complexity is allowed to grow; semantic recovery
+machinery must remain small and bounded.
+
 ## 2. Motivation
 
 A skill-first system tends to fail in predictable ways:
@@ -197,10 +411,11 @@ has not crossed an irreversible commitment boundary. The more consequential or
 irreversible the effect, the stronger the semantic, evidence, authorization,
 and safety prerequisites before progress may advance.
 
-Fast and Deep Planner remain useful planning roles, but they are not two stages
-that every responsibility must traverse. Deep Planner never sends a goal back to
-Fast Planner for another semantic decomposition pass. The tiers differ in
-context breadth, latency budget, horizon, and planning depth—not in capability
+Fast and Deep remain two cognitive/planning depths of one Mind, not a producer
+and reviewer. They are not stages that every responsibility must traverse. Deep
+receives authoritative source meaning and broader context; it does not edit Fast
+output or send a Goal back for another decomposition pass. The tiers differ in
+context breadth, latency budget, horizon, and reasoning depth—not in capability
 ownership or semantic authority.
 
 ### 3.6 Planning when needed; authorization before effect
@@ -305,9 +520,11 @@ When uncertain, Chromie asks naturally and specifically.
 
 ### 3.12 Graceful degradation
 
-Optional cognition may fail without corrupting the primary task. Social
-attention, response polish, and report-only review must not block or fabricate
-execution.
+Optional cognition or presentation may fail without corrupting or reopening the
+primary task. Social Attention and response polish are local: invalid or absent
+decoration is dropped, and wording/presentation failure cannot reinterpret a Goal
+or restart Planner authority. Optional presentation must never reopen primary
+cognition.
 
 ## 4. Core cognitive objects
 
@@ -1775,10 +1992,11 @@ step ownership and per-goal dispositions. The Host may mechanically normalize
 those cross-references so nonexistent or stale IDs cannot discard an otherwise
 coherent plan. It cannot create a step, choose a capability, or assign an
 unowned Goal: an `execute` outcome with no model-authored owned step remains
-invalid and returns to model repair. After validation, the Host adds the
-canonical identity envelope and converts the goal-keyed object to the ordered
-canonical outcome list; it does not infer semantic plan content from the user
-utterance.
+semantically invalid. Fast may escalate once to Deep when wider cognition is
+warranted; terminal Deep semantic invalidity fails closed. After validation, the
+Host adds the canonical identity envelope and converts the goal-keyed object to
+the ordered canonical outcome list; it does not infer semantic plan content from
+the user utterance.
 
 A typed effectful Goal cannot be declared satisfied merely because a planner
 returns complete coverage or response text. Before canonical planning, each
@@ -1786,11 +2004,12 @@ returns complete coverage or response text. Before canonical planning, each
 must own an executable step, have delivered evidence-bound dialogue for that
 same Goal, or carry an explicit `clarify`, `escalate`, `unavailable`, or
 `refused` outcome. An unresolved effectful Goal with zero owned steps and no
-such evidence is a contract failure: Fast may make its one mechanical contract
-revision and then escalate; Deep may make its one mechanical DTO regeneration and then
-fails closed or returns an explicit model-authored clarification/unavailable/
-refused outcome. The Host validates typed Goal metadata and ownership only; it
-does not infer effect from phrases and never invokes a third semantic planning
+such evidence is a semantic/grounding failure: Fast may escalate once to Deep
+when wider cognition is warranted; Deep then either returns a valid plan or an
+explicit model-authored clarification/unavailable/refused outcome, otherwise it
+fails closed. Only a purely mechanical DTO/schema defect may be regenerated once
+within the same tier. The Host validates typed Goal metadata and ownership only;
+it does not infer effect from phrases and never invokes a third semantic planning
 pass after rejecting the terminal plan.
 
 `plan_relation` and `user_confirmation_required` are typed semantic decisions

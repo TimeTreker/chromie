@@ -62,6 +62,33 @@ A socially important event that genuinely changes what Chromie should do next
 is no longer merely decoration. It must be elevated through normal Cognitive
 Core / Goal reasoning rather than smuggled into `SocialAttentionPlan`.
 
+
+### Optional presentation never reopens primary cognition
+
+Social Attention has no right to demand a second interpretation of an otherwise
+valid interaction. A valid `decision=none` stands. Missing courteous/lively style
+guidance belongs in the primary Social Attention context, not in a second-opinion
+critic that is biased toward producing a gesture. If the primary decoration DTO is
+mechanically invalid, it may be regenerated once; if decoration is still invalid,
+unavailable, conflicting, or semantically unsuitable, the decoration disappears
+locally.
+
+In particular:
+
+```text
+primary interaction is valid
+        +
+optional blink/nod/gaze is invalid or unavailable
+        |
+        v
+keep the primary interaction
+drop Social Attention decoration
+```
+
+Do not recompose speech, reinterpret the Goal, restart planning, or fail primary
+Activity because an auxiliary expression could not run. Optional presentation
+must never reopen primary cognition.
+
 ## Same motion, different semantic role
 
 The semantic role comes from **why the motion exists**, not from the actuator or

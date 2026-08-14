@@ -1,7 +1,7 @@
 # Chromie Development Checkpoint
 Status: current resume point
-Updated: 2026-08-13
-Base `main`: `0d15443a0fcb0184003d801e387c46d82f090036`
+Updated: 2026-08-14
+Base source: supplied `chromie_20260814_archive.zip` snapshot; Git revision is not embedded in the archive.
 This is the fast handoff for the next development session. It summarizes the
 current project shape and resume point; canonical owners linked below win if a
 conflict appears and this checkpoint should then be refreshed.
@@ -17,7 +17,9 @@ The core separation is: **models reason about meaning; trusted mechanisms own
 authorization, execution, resources, and evidence.** Capability unavailable,
 execution failed, empty result, and successful result are different truths.
 Read first: [Project Charter](docs/PROJECT_CHARTER.md),
-[Goal-Driven Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md),
+[Goal-Driven Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
+(the canonical WORLD/PERSON → Fast/Deep → Responsibility → Goal → Planner →
+Provider → Evidence → Response/Reflection design is frozen there),
 [Execution Lanes](docs/EXECUTION_LANES_AND_COORDINATION.md),
 [Current Status](docs/STATUS.md), and [Roadmap](ROADMAP.md).
 ## Current architecture
@@ -95,15 +97,16 @@ parallel manager objects.
   be cached; changing facts such as weather, news, prices, schedules, and law are
   acquired through trusted information paths.
 ## Recent architecture closure
-The working tree now replaces Goal Association's review/alignment chain with a
-bounded five-invocation transaction, one nested resource authority plus frozen
-Planner projection, and no valid-`none` Social Attention critic. The Fast Goal
-Interpreter now performs one primary interpretation plus at most one mechanical
-DTO repair; low-confidence `tool`, `memory`, or `robot_action` work delegates
-once to Deep Thinking, while schema-valid benign chat remains fast and semantic
-contradictions fail closed. Fast Planner may escalate once to Deep Planner; each tier
-may regenerate once only for a malformed DTO. Semantic/grounding/coverage/safety
-rejection in Deep and trusted Host rejection are terminal, not extra planning passes. This is source work, not a new target-evidence claim.
+The supplied source already bounds Goal Association/reconsideration, keeps
+schema-valid benign chat on the Fast path, permits Fast-to-Deep escalation for
+meaningful consequential uncertainty, limits same-tier regeneration to malformed
+DTOs, and makes Deep/Host semantic rejection terminal. The owner has now frozen
+the broader human-like cognitive flow in the Charter and Goal-Driven Cognitive
+Architecture **before further implementation**. Response is expression, Deep is
+deeper source-based cognition rather than repair, optional presentation never
+reopens primary cognition, one material semantic fact has one writable owner, and
+Reflection learns forward. This documentation update does not claim that remaining
+Response/Social-Expression cleanup is already implemented or target-qualified.
 ## Do not resurrect
 - independent Router semantic authority;
 - `social_attention` as a third execution lane or standalone Goal;
@@ -129,13 +132,10 @@ Do not silently downgrade because authority is absent.
 This checkpoint does **not** grant blanket architecture authority to later
 sessions; use Charter governance when new authority is needed.
 ## Resume point
-Do not add another top-level layer. Finish the canonical source gate, then clean
-committed qualification for the nested resource authority, bounded Goal
-Association transaction, terminal Social Attention `none`, bounded Fast/Deep
-cognitive escalation, and terminal Host validation. Historical
-`.chromie/acceptance/voice-log-water-fixed-67` predates this refactor and is not
-current-tree proof; it proves neither literal 100-metre travel, physical water,
-microphone/speaker behavior, nor hardware.
+Docs-first design is complete. Next source work is Response/Social-Expression
+authority cleanup, meaningful Fast/Deep escalation, and deletion of remaining
+duplicate writable semantic truth or reviewer/repair chains. Do not add a new
+top-level layer. Historical target evidence remains revision-bound.
 ## Resume and verification commands
 `docs/STATUS.md` owns implementation/evidence claims. Do not claim live-model,
 audio, MuJoCo, GPU, or physical-provider qualification unless that exact gate ran

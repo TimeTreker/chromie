@@ -80,17 +80,64 @@ genuinely different speech act; it does not paraphrase the same acknowledgement 
 Chromie is a local-first realtime interaction control plane for voice assistants
 that can invoke embodied capabilities safely.
 
-The intended user experience is:
+The intended user experience and canonical cognitive flow are:
 
 ```text
-natural speech
--> Cognitive Gateway: normalize, apply protective reflexes, and review attention
--> Goal-Driven Cognitive Core: understand goals, decompose, plan, and coordinate
--> validated speech and typed capability requests
--> trusted execution
--> observable completion, failure, cancellation, or recovery
--> concise spoken feedback
+                 WORLD / PERSON
+                       │
+                  Perception
+                       │
+                       ▼
+               Cognitive Gateway
+                       │
+               Is this worth attention?
+                       │
+                       ▼
+              Goal Interpretation
+                  /           \
+              obvious       uncertain /
+               cheap        consequential
+                │                │
+               Fast             Deep
+                \                /
+                 \              /
+                  ▼            ▼
+                 Responsibility
+                      │
+                     Goal
+                      │
+                      ▼
+                   Planner
+                      │
+            Available Capabilities
+                      │
+                      ▼
+                   Provider
+                      │
+                      ▼
+                    Action
+                      │
+                      ▼
+                   Evidence
+                      │
+              ┌───────┴────────┐
+              ▼                ▼
+          Response         Reflection
+              │                │
+              ▼                ▼
+           Person        Future cognition
+
+Social Attention
+= optional parallel expression around interaction
 ```
+
+This diagram is a stable architecture invariant. It describes ownership and
+information flow, not a mandatory synchronous wall-clock pipeline. Fast and Deep
+are two depths of one Mind; Responsibility/Goal owns what Chromie owes, Planner
+owns how to advance it with current capabilities, Providers own execution inside
+advertised contracts, Evidence owns reality, Response expresses established
+meaning/truth, Reflection improves future cognition, and Social Attention remains
+optional parallel expression rather than another responsibility or semantic mind.
 
 Chromie should make this loop responsive, interruptible, understandable, and
 portable across qualified embodied providers without exposing low-level robot
@@ -197,8 +244,8 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
 2. **Robot thinking belongs to the Cognitive Core, models, and contracts.**
    Outside deterministic operational controls, normal conversation, memory,
    tool, robot-action,
-   capability-selection, body-goal interpretation, planning, low-confidence
-   escalation, and deep-thought behavior must be decided by LLM reasoning over
+   capability-selection, body-goal interpretation, planning, Fast/Deep cognitive
+   depth, and deep-thought behavior must be decided by LLM reasoning over
    language meaning, bounded context, capability descriptions, schemas, and
    task memory. Catalog search, score thresholds, regression fixtures, regexes,
    and phrase tables may retrieve candidates or validate and reject model
@@ -510,23 +557,65 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    known inferior design for convenience.
 
 33. **Cognitive reconsideration is bounded, source-based, and non-recursive.**
-   A model output that is mechanically malformed may receive at most one
-   same-stage DTO repair under the same authoritative meaning and schema. A
-   semantic doubt or contradiction must not be repaired by repeatedly rewriting
-   the previous model output: the stage either escalates once from the original
-   admitted meaning to its designated deeper cognition, follows an explicitly
-   bounded transaction such as Principle 30, or fails closed. Low-confidence Fast
-   Understanding may delegate once to Deep Thinking before Goal truth is
-   committed when uncertainty could change responsibility, external work,
-   memory, or effects. A schema-valid benign chat route remains fast;
-   confidence is not a universal escalation trigger. Fast Planning may escalate once to Deep Planning. A planner tier may
-   regenerate once only for a mechanically malformed DTO; Deep semantic, grounding,
-   coverage, confidence/satisfaction, or safety rejection is terminal. Trusted Host validation
-   is terminal authority and cannot invoke another semantic planner after rejecting
-   the resulting plan. No later planner may reinterpret or repair already committed
-   Goal meaning. Failure evidence may be retained immutably for Reflection,
-   evaluation, and future improvement, but it has no authority to mutate the
-   current turn, authorize an effect, or create a repair-of-repair workflow.
+   Mechanical representation failure and semantic uncertainty are different
+   events. A model output that is only mechanically malformed may be regenerated
+   at most once under the same authoritative meaning and schema; this is DTO
+   retransmission, not another semantic judgment. Semantic doubt, contradiction,
+   grounding failure, or incomplete responsibility coverage must never trigger a
+   repair chain over previous model output. The stage either accepts, escalates
+   once from authoritative source meaning to its designated deeper cognition,
+   follows an explicitly bounded source-based transaction such as Principle 30,
+   clarifies when the user can resolve genuine ambiguity, or fails closed. Fast
+   cognition may delegate once to Deep cognition before commitment. Deep semantic
+   rejection is terminal for that cognition attempt; Host validation is terminal
+   authority and cannot invoke another semantic planner. No later planner or
+   presenter may reinterpret already committed Goal meaning. Failure evidence may
+   be retained immutably for Reflection, evaluation, and future improvement, but
+   it has no authority to rewrite the current turn, authorize an effect, or create
+   a repair-of-repair workflow.
+
+34. **Fast versus Deep is selected by meaningful uncertainty, not confidence alone.**
+   Cheap, obvious, low-consequence interaction should remain fast even when a
+   model's self-reported confidence is imperfectly calibrated. Deeper cognition is
+   justified when uncertainty is semantically real or materially consequential:
+   independent responsibilities, risky or irreversible effects, important missing
+   context, nontrivial alternatives/dependencies, or another ambiguity whose wrong
+   interpretation matters. Confidence is evidence for that judgment, never the sole
+   escalation authority. Do not build confidence-review machinery merely to make a
+   numeric score look consistent.
+
+35. **Response is expression, not a second semantic mind.** Once authoritative
+   responsibility, plan/evidence state, and permitted conversational act are known,
+   Response composition chooses natural wording for the still-needed user-facing
+   delta. It may be mechanically validated and must be rejected if it claims
+   unsupported reality, but it may not reinterpret Goals, reopen planning, or gain
+   effect authority. Wording or presentation failure is local; it is not a reason to
+   restart primary cognition. **Optional presentation must never reopen primary
+   cognition.**
+
+36. **Harmless imperfection may pass; consequential uncertainty may not.** Human-like
+   interaction does not require every low-risk turn or optional expression to be
+   perfected through repeated review. A missed blink, slightly imperfect wording,
+   or harmless conversational variation may simply end locally. False claims about
+   reality, unsafe or irreversible effects, unauthorized writes, material Goal loss,
+   or other consequential uncertainty must stop before commitment. Spend cognitive
+   cost where being wrong matters; do not turn perfectionism into architecture.
+
+37. **Reflection learns forward; it does not rewrite history.** Trusted observations,
+   delivered speech, commitments, execution attempts, and outcomes remain historical
+   evidence. Reflection may explain surprise, record an experience, calibrate future
+   cognition, or propose future Goal/Plan/Memory changes through their normal owners.
+   It must not retroactively make a failed interpretation 'what Chromie meant all
+   along', mutate completed evidence, or repair the current turn after the fact.
+
+38. **The architecture must be reconstructable from a small set of responsibilities.**
+   A normal interaction should be explainable without knowing historical regression
+   names or repair sequences: what did the person ask, what did Chromie owe, why was
+   Fast or Deep warranted, which capability/Provider advanced the Goal, what actually
+   happened, what was said, and what may be learned later? If explaining an ordinary
+   interaction requires knowledge of previous bug-specific recovery machinery, the
+   architecture is too complicated. Project complexity should grow primarily with
+   real capabilities and evidence boundaries, not with semantic recovery workflows.
 
 ### One personal voice; resources constrain coexistence
 
