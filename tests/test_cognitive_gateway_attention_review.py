@@ -233,6 +233,20 @@ class CognitiveGatewayAttentionReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.speech_act, "unclear")
         self.assertIn("failed open", result.reason)
 
+    def test_attention_prompt_preserves_pro_drop_commands_as_addressed(self) -> None:
+        prompt = AttentionReviewer._system_prompt()
+        suppression_prompt = AttentionReviewer._suppression_review_prompt(
+            self.request("A subject-omitted command."),
+            initial_output={
+                "addressed": False,
+                "speech_act": "ambient_report",
+                "confidence": 0.95,
+            },
+        )
+        self.assertIn("pro-drop languages", prompt)
+        self.assertIn("third-person beneficiary or recipient", prompt)
+        self.assertIn("pro-drop language", suppression_prompt)
+
 
 if __name__ == "__main__":
     unittest.main()

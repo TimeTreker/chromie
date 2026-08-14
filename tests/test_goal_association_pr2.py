@@ -555,6 +555,42 @@ class GoalExecutionContractTests(unittest.TestCase):
             "resource.attributes",
             coverage_prompt,
         )
+        self.assertIn("Reference grounding is part of responsibility coverage", coverage_prompt)
+        self.assertIn("silently invents a generic object", coverage_prompt)
+        self.assertIn("multiple scene candidates remain plausible", coverage_prompt)
+
+        execution_contract = resolver._build_prompt(
+            request(
+                "Set a reminder for later.",
+                language="en-US",
+                route="chat",
+            ),
+            [],
+            output_type=GoalSegmentationModelOutput,
+        )
+        self.assertIn("deferred reminder", execution_contract)
+        self.assertIn("stateful capability work", execution_contract)
+        self.assertIn("saying the reminder now does not complete", execution_contract)
+        self.assertIn("ordinary typed Goal bindings", execution_contract)
+
+    def test_unscoped_optional_referent_correction_is_dropped(self):
+        normalized, dropped = (
+            GoalAssociationResolver._drop_invalid_optional_referent_introductions(
+                {
+                    "decision": "create_goals",
+                    "referent_updates": [
+                        {
+                            "operation": "correct",
+                            "canonical_value": "Dad",
+                            "target_referent_ids": [],
+                        }
+                    ],
+                }
+            )
+        )
+
+        self.assertEqual(normalized["referent_updates"], [])
+        self.assertEqual(dropped[0]["reason"], "missing_target_referent_ids")
 
     def test_deterministic_resource_projection_is_frozen(self):
         canonical = AcquireAndDeliverResource(
@@ -782,6 +818,51 @@ class GoalAssociationTransactionTests(unittest.TestCase):
                 "goal_association.responsibility_coverage",
                 "goal_association.fresh_interpretation",
                 "goal_association.responsibility_coverage_final",
+            ],
+        )
+
+    def test_ungrounded_reference_reconsideration_can_end_in_clarification(self):
+        initial = create_goals(
+            goal("Turn off the current device.", "body_action")
+        )
+        rejected = certificate(
+            coverage_item(
+                "Turn it off",
+                role="responsibility",
+                coverage="clarification_required",
+                independently_satisfiable=False,
+            )
+        )
+        clarified = {
+            "decision": "clarify",
+            "clarification": "Which device do you mean?",
+            "confidence": 0.95,
+            "reason_summary": "The device reference is unresolved.",
+        }
+        ollama = ScriptedOllama([initial, rejected, clarified])
+        result = self._resolve(
+            ollama,
+            request("Turn it off.", language="en-US", route="robot_action"),
+        )
+
+        self.assertEqual(result.resolution_status, "needs_clarification")
+        self.assertEqual(result.clarification, "Which device do you mean?")
+        self.assertEqual(
+            ollama.prompts[2][1]["response_format"]["properties"]["decision"]["enum"],
+            ["clarify"],
+        )
+        self.assertEqual(
+            result.metadata["responsibility_coverage"]["final_verdict"],
+            "clarification",
+        )
+        self.assert_transaction(
+            result,
+            ollama,
+            terminal="needs_clarification",
+            families=[
+                "goal_association.primary",
+                "goal_association.responsibility_coverage",
+                "goal_association.fresh_interpretation",
             ],
         )
 

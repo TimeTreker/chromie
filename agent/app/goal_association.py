@@ -159,8 +159,14 @@ _EXECUTION_CONTRACT_PROMPT = (
     "fields in the model schema. Use capability_work only when completion depends on "
     "fresh external, private, or runtime evidence from a registered non-vocal "
     "Capability. Stable general knowledge, reasoning, creative content, and an "
-    "immediate conversational reminder that Chromie can author without fresh "
-    "evidence use ordinary speech. Embodied effects use body_action; lifecycle "
+    "immediate user-facing reminder or piece of advice that Chromie can author "
+    "and deliver in the current exchange use ordinary speech. A deferred reminder, "
+    "scheduled notification, recorded obligation, or later message to another person "
+    "is stateful capability work: saying the reminder now does not complete that "
+    "future effect. Represent the reminder's recipient, trigger, time, and content "
+    "as ordinary typed Goal bindings; it is not an information acquisition resource "
+    "merely because its eventual notification is spoken. Embodied effects use "
+    "body_action; lifecycle "
     "control of existing media uses media_playback; authored vocal performances "
     "use their exact vocal mode. The fact that a capability result will later be "
     "spoken does not turn its owned work into speech. If no matching provider is "
@@ -1171,6 +1177,10 @@ class GoalAssociationResolver:
                 if verdict == "reject":
                     semantic_reconsideration_attempted = True
                     coverage_metadata["reconsidered"] = True
+                    clarification_required = any(
+                        item.coverage == "clarification_required"
+                        for item in certificate.items
+                    )
                     reconsidered_raw = normalize_raw(
                         await invoke(
                             self._build_fresh_interpretation_prompt(
@@ -1178,12 +1188,25 @@ class GoalAssociationResolver:
                                 candidate_goals=candidate_goals,
                                 output_type=output_type,
                                 problems=problems,
+                                force_clarification=clarification_required,
                             ),
                             system=self._semantic_review_system_prompt(
                                 output_type,
                                 fresh_resegmentation=True,
                             ),
-                            response_format=response_schema,
+                            response_format=(
+                                self._response_schema(
+                                    output_type,
+                                    candidate_goals,
+                                    self._discourse_referents(request),
+                                    progress_candidates=(
+                                        request.context.get("progress_candidates") or []
+                                    ),
+                                    clarification_only=True,
+                                )
+                                if clarification_required
+                                else response_schema
+                            ),
                             prompt_family="goal_association.fresh_interpretation",
                         ),
                         stage="fresh interpretation",
@@ -1198,37 +1221,43 @@ class GoalAssociationResolver:
                     )
                     accepted_raw = reconsidered_raw
                     reconsidered_output = output_type.model_validate(accepted_raw)
-                    certificate_raw = await invoke(
-                        self._build_responsibility_coverage_prompt(
-                            request=request,
-                            raw=accepted_raw,
-                        ),
-                        system=self._responsibility_coverage_system_prompt(),
-                        response_format=self._coverage_certificate_response_schema(
-                            len(reconsidered_output.new_goals)
-                        ),
-                        prompt_family=(
-                            "goal_association.responsibility_coverage_final"
-                        ),
-                    )
-                    final_certificate = self._validate_coverage_certificate(
-                        certificate_raw,
+                    if self._responsibility_coverage_required(
+                        reconsidered_output,
                         request=request,
-                        goal_count=len(reconsidered_output.new_goals),
-                    )
-                    final_verdict, final_problems = self._coverage_verdict(
-                        final_certificate,
-                        goal_count=len(reconsidered_output.new_goals),
-                    )
-                    coverage_metadata["final_verdict"] = final_verdict
-                    coverage_metadata["certificate"] = (
-                        final_certificate.model_dump(mode="json")
-                    )
-                    if final_verdict != "accept":
-                        raise ValueError(
-                            "fresh Goal interpretation failed final responsibility "
-                            "coverage: " + "; ".join(final_problems)
+                    ):
+                        certificate_raw = await invoke(
+                            self._build_responsibility_coverage_prompt(
+                                request=request,
+                                raw=accepted_raw,
+                            ),
+                            system=self._responsibility_coverage_system_prompt(),
+                            response_format=self._coverage_certificate_response_schema(
+                                len(reconsidered_output.new_goals)
+                            ),
+                            prompt_family=(
+                                "goal_association.responsibility_coverage_final"
+                            ),
                         )
+                        final_certificate = self._validate_coverage_certificate(
+                            certificate_raw,
+                            request=request,
+                            goal_count=len(reconsidered_output.new_goals),
+                        )
+                        final_verdict, final_problems = self._coverage_verdict(
+                            final_certificate,
+                            goal_count=len(reconsidered_output.new_goals),
+                        )
+                        coverage_metadata["final_verdict"] = final_verdict
+                        coverage_metadata["certificate"] = (
+                            final_certificate.model_dump(mode="json")
+                        )
+                        if final_verdict != "accept":
+                            raise ValueError(
+                                "fresh Goal interpretation failed final responsibility "
+                                "coverage: " + "; ".join(final_problems)
+                            )
+                    else:
+                        coverage_metadata["final_verdict"] = "clarification"
                 else:
                     coverage_metadata["final_verdict"] = "accept"
                 coverage_metadata["succeeded"] = True
@@ -1330,10 +1359,13 @@ class GoalAssociationResolver:
     def _drop_invalid_optional_referent_introductions(
         raw: dict[str, Any],
     ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-        """Drop only semantically empty, unscoped optional introductions.
+        """Drop only semantically unusable optional referent-index updates.
 
-        Referent corrections, focus changes, retirements, and introductions with
-        actual entity content remain contract-authoritative and still fail closed.
+        Referent focus changes, retirements, and introductions with actual entity
+        content remain contract-authoritative and still fail closed. A correction
+        without any supplied target referent cannot update the discourse index; the
+        canonical Goal association and coverage audit remain responsible for the
+        actual correction meaning.
         A model-added ``introduce`` item with neither an entity type nor canonical
         value cannot ground any Goal binding and must not discard otherwise valid
         Goals.
@@ -1366,6 +1398,15 @@ class GoalAssociationResolver:
                         "path": f"referent_updates[{index}]",
                         "operation": "introduce",
                         "reason": "missing_entity_type_and_canonical_value",
+                    }
+                )
+                continue
+            if operation == "correct" and not target_referent_ids:
+                dropped.append(
+                    {
+                        "path": f"referent_updates[{index}]",
+                        "operation": "correct",
+                        "reason": "missing_target_referent_ids",
                     }
                 )
                 continue
@@ -2087,8 +2128,8 @@ class GoalAssociationResolver:
             "A physical action and a conversational answer or spoken performance are independent goals when the answer or performance is genuinely requested. Separate independently requested outcomes that can be accepted or rejected on their own. However, acquisition and delivery stages that together constitute one human responsibility are one Goal: navigating/searching, locating, grasping or retrieving, carrying, returning, and handing over are provider-owned stages of one physical resource delivery; external search, evidence retrieval, evaluation, and spoken explanation are stages of one information resource delivery. Do not split those implementation stages into separate Goals unless the user independently requests one stage as its own outcome. A simple acknowledgement, confirmation, willingness statement, or progress prelude for capability work is not a separate vocal_output Goal; it is prospective conversational output attached to the existing responsibility and every cognitive stage must use Interaction Context to avoid repeating an already fulfilled act. Before returning, verify that every independently satisfiable user responsibility appears in exactly one new_goals item: no merged unrelated outcomes and no duplicated responsibility across Goals. "
             "For a responsibility whose human-level outcome is to obtain something and make it available to a recipient, include one nested resource_responsibility. That object is the sole writable resource authority. Put kind, description, normalized numeric-string quantity, typed query-scope attributes, source status/description/typed source bindings, recipient description/referent, and delivery_mode there exactly once. A physical_object resource always uses output_mode=body_action and delivery_mode=physical_handover. An information resource always uses output_mode=capability_work; its later spoken answer is delivery_mode=spoken_explanation, not output_mode=speech. Use kind=information for weather, recommendations, research, current facts, and other grounded information. Resource identity is not source evidence. A direction or distance that locates the requested physical object belongs directly in resource_responsibility.source.bindings when instrumental to acquisition, not in resource.attributes, top-level Goal bindings, or an independent movement Goal. Preserve explicit distance and direction as separate typed bindings where both are stated; use the normalized numeric value for distance while retaining its unit in source.description. source.description is summary only and never substitutes for typed source meaning, so source.status=known requires at least one source.bindings item and may represent only source meaning actually supplied by the user or discourse. Information query scope such as requested location, time, or requested aspects belongs in resource.attributes, not source. For a standard information lookup where the user names no external source, use source.status=provider_resolved because source selection is deliberately delegated; use unknown only when required acquisition-source meaning is genuinely absent and cannot be delegated. A resource Goal must keep top-level bindings empty; trusted code derives any legacy flat Planner view from the canonical resource object. This object must never name or imply a provider, capability ID, website, search engine, execution mode, coordinates, grasp pose, or implementation plan. Description is a human-readable summary, not parameter provenance and never overrides typed resource fields. "
             "Also preserve semantic qualifiers such as temporal scope, comparison period, and requested answer shape. Never silently rewrite annual, seasonal, historical, comparative, or otherwise broad scope into current, today, tomorrow, or another narrower scope. If the intended scope is materially ambiguous, return clarification instead of choosing a narrower interpretation. "
-            "Resolve references, pronouns, demonstratives, ellipsis, and task mentions before planning. Authority order is: explicit current user meaning; foreground scoped discourse referents; candidate Goal bindings; recent dialogue. Phrases such as ‘the last task I told you’ may semantically associate with an active, recoverable, or retained recent terminal Goal, but the model must decide that relationship from the supplied Goal state and dialogue—not from a Host phrase table. Tool-result memory is not reference-resolution authority and must never decide what an unresolved expression refers to. "
-            "When the user introduces or explicitly corrects a salient entity, emit referent_updates. Use operation=correct with target_referent_ids when a new value supersedes an earlier referent in the current discourse; the old referent remains available in its own task scope but becomes background. Use operation=introduce for a new salient entity, and focus/background/retire only for supplied referent IDs. "
+            "Resolve references, pronouns, demonstratives, ellipsis, and task mentions before planning. Authority order is: explicit current user meaning; foreground scoped discourse referents; candidate Goal bindings; recent dialogue. First identify every material indirect referring expression, then require a unique value from that authority order and preserve it in a typed binding or supplied referent. Imperative grammar and a plausible generic noun such as device, object, person, task, or setting are never reference evidence. If two or more contextual candidates remain plausible, or none is supplied, ask a narrow clarification. Phrases such as ‘the last task I told you’ may semantically associate with an active, recoverable, or retained recent terminal Goal, but the model must decide that relationship from the supplied Goal state and dialogue—not from a Host phrase table. Tool-result memory is not reference-resolution authority and must never decide what an unresolved expression refers to. "
+            "When the user introduces or explicitly corrects a salient entity, emit referent_updates only when the required discourse-index provenance is available. Use operation=correct with non-empty target_referent_ids copied from supplied discourse context when a new value supersedes an earlier referent; never emit an unscoped correction when no target referent ID was supplied. The canonical Goal association and typed bindings still preserve a correction even when no discourse-index update can be authored. The old referent remains available in its own task scope but becomes background. Use operation=introduce for a new salient entity, and focus/background/retire only for supplied referent IDs. "
             "Use resolved_references only for indirect references whose denotation must be selected from a supplied discourse referent or active Goal binding, such as pronouns, demonstratives, ellipsis, aliases, corrections, or task mentions. Do not emit resolved_references for an ordinary explicit entity mention such as a directly named place; represent that meaning in the new Goal bindings and, when it is salient for future dialogue, in referent_updates. Every resolved_references item must copy a supplied referent_id and include explicit confidence. If resolution is materially ambiguous, return decision=clarify rather than selecting a value from stale evidence or recency alone. "
             "Each non-resource Goal must include top-level typed bindings for material entities and parameters already resolved here, including explicit counts, durations, speeds, directions, and targets. A resource Goal instead keeps top-level bindings empty and owns every material resource fact only in its canonical nested object. For an information resource such as weather, put a resolved place in resource.attributes as a binding named location, and preserve requested time and result aspects there as their own typed attributes. Downstream planners receive a deterministic read-only projection of those canonical fields rather than a second model-authored copy. "
             "For a location named directly in the final authoritative user turn, copy the complete location value verbatim as one contiguous span in the user's language. Never translate, transliterate, shorten, or expand a directly named location. A directly supplied location is a resolved semantic binding, not a claim that provider canonicalization has already succeeded. Do not ask the user for administrative granularity merely because multiple real-world places might share that value; create the fully bound Goal and let the downstream Capability resolve the exact value or report provider ambiguity. Clarify only when the user's intended location is genuinely underdetermined in the dialogue. Only an indirect reference resolved from a supplied referent may use the referent's canonical value instead. For an indirect location, copy the supplied referent_id into both the location binding and resolved_references, and copy the indirect user surface into resolved_references.surface_form. "
@@ -2505,7 +2546,15 @@ class GoalAssociationResolver:
             type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
         ),
         problems: list[str],
+        force_clarification: bool = False,
     ) -> str:
+        terminal_instruction = (
+            "The independent proof established that material meaning is unresolved. "
+            "Return decision=clarify with exactly one concise question that asks for "
+            "that missing meaning; do not create or associate Goals. "
+            if force_clarification
+            else ""
+        )
         return (
             self._build_prompt(
                 request,
@@ -2518,7 +2567,9 @@ class GoalAssociationResolver:
             "The following compact defects are proof feedback, not Goal labels and "
             "not permission to copy a previous DTO:\n"
             + self._bounded_json(problems, 3000)
-            + "\nReturn one complete final DTO. This interpretation receives no "
+            + "\n"
+            + terminal_instruction
+            + "Return one complete final DTO. This interpretation receives no "
             "contract repair; invalid or incomplete output fails closed."
         )
 
@@ -2533,7 +2584,12 @@ class GoalAssociationResolver:
             "outcome the user can independently judge is a responsibility, not a "
             "constraint or decoration. Do not invent a vocal outcome from a broad "
             "social impression when no words, information, or vocal performance were "
-            "requested. Trusted code derives whether any Goal candidate lacks a "
+            "requested. Audit reference grounding too: an unresolved pronoun, "
+            "demonstrative, ellipsis, correction, or other indirect reference cannot "
+            "be treated as resolved merely because a candidate description invented "
+            "a plausible referent. Use clarification_required when no supplied turn or "
+            "dialogue evidence uniquely grounds material meaning. Trusted code derives "
+            "whether any Goal candidate lacks a "
             "positive responsibility owner. Return JSON only."
         )
 
@@ -2630,6 +2686,19 @@ class GoalAssociationResolver:
             "duplicate writable ownership is not covered even when the source copy is "
             "correct. Classify the meaning in context; "
             "do not decide its role from a field name alone.\n\n"
+            "Reference grounding is part of responsibility coverage. Before assigning "
+            "coverage, explicitly identify each material indirect referring expression "
+            "in the authoritative turn and audit its grounding independently. A material "
+            "pronoun, demonstrative, ellipsis, correction, or other indirect "
+            "reference is covered only when the candidate copies an explicit current-"
+            "turn value or a supplied discourse referent with its referent_id. A "
+            "candidate description that silently invents a generic object, device, "
+            "person, task, or setting does not resolve the reference. Mark the "
+            "containing responsibility or constraint clarification_required when the "
+            "supplied evidence does not select exactly one meaning, including when "
+            "multiple scene candidates remain plausible. Candidate prose alone cannot "
+            "ground an indirect target; require the explicit current-turn value or the "
+            "typed referent-backed binding before marking it covered.\n\n"
             "Do not add, remove, rename, plan, execute, or complete Goals. Do not use "
             "provider availability to decide whether a responsibility exists. An "
             "unavailable requested effect remains a responsibility.\n\n"

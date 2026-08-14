@@ -205,7 +205,7 @@ without duplicating the scenario body.
 
 The maintained Git-controlled daily communication asset is
 [`benchmarks/datasets/daily_conversation/scenarios/`](../benchmarks/datasets/daily_conversation/scenarios/).
-It provides 150 Chromie-specific Chinese and English semantic scenarios across
+It provides 166 Chromie-specific Chinese and English semantic scenarios across
 fifteen daily-life cohorts. They define acceptable behavior regions and hybrid
 review rubrics, not canonical response strings. Their LLM-reviewed-candidate
 status is dataset coverage, not independent model qualification or release
@@ -777,6 +777,11 @@ and stage fields to the scenario artifacts, then inspect the exact prompt,
 schema, raw output, parsed output, repair attempts, and downstream result in the
 root-cause order above. The file can contain conversation and memory content and
 must be inspected or sanitized before it leaves the operator's machine.
+
+The maintained 16-case daily-life generated-voice cohort references the
+canonical daily-conversation scenarios directly and can collect this capsule
+once after the whole run. Its executable judge-diagnose-fix-rerun method is
+owned by [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md#72-daily-life-generated-voice-repair-loop).
 
 Coding agents must follow the executable
 [LLM-versus-workflow root-cause method](../CONTRIBUTING.md#llm-versus-workflow-root-cause-method)

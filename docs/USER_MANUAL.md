@@ -253,6 +253,24 @@ Use Chromie's generated voice for repeatable Chinese and English qualification:
 python scripts/closed_loop_e2e.py --start-services --capture auto
 ```
 
+To run the maintained everyday bilingual cohort with saved generated user
+speech entering ASR before Chromie, and collect one debug bundle after the
+cohort:
+
+```bash
+BUILD=1 python scripts/closed_loop_e2e.py \
+  --manifest benchmarks/manifests/daily_life_voice_e2e_v1.json \
+  --workflow-only --workflow-input tts-asr \
+  --start-services --capture auto --require-current-agent-source \
+  --collect-debug-bundle
+```
+
+Review `summary.json`, `semantic-review-bundle.json`, and every per-case result
+in the printed output directory. A mechanically successful run still needs an
+evidence-grounded semantic verdict for natural, truthful, Chromie-like behavior.
+Follow [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md#72-daily-life-generated-voice-repair-loop)
+for diagnosis and reruns.
+
 This checks TTS -> ASR directly and then injects text into the complete cognitive
 workflow, captures the actual playback stream, and transcribes that output with
 ASR. It never asks the operator to pronounce English or Chinese. Use

@@ -4,8 +4,9 @@
 The maintained path is deliberately human-voice independent:
 
 * transport: source text -> Chromie TTS -> PCM/WAV -> Chromie ASR;
-* workflow: injected user text -> Gateway/Core/Agent/tools -> TTS -> real host
-  playback capture -> ASR verification.
+* workflow: user text, or generated user speech -> ASR, then
+  Gateway/Core/Agent/tools -> TTS -> real host playback capture -> ASR
+  verification.
 
 Chinese and English use the same evidence contract. ASR is used as an automated
 observer of generated/playback audio, not as a test of an operator's accent.
@@ -18,6 +19,7 @@ import asyncio
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import hashlib
 import json
 import logging
 import math
@@ -27,7 +29,6 @@ import shutil
 import subprocess
 import sys
 import tarfile
-import threading
 import time
 import uuid
 import wave
@@ -57,6 +58,12 @@ from benchmarks.review.bundle import build_review_bundle  # noqa: E402
 
 DEFAULT_MANIFEST = ROOT / "benchmarks" / "manifests" / "closed_loop_e2e_v1.json"
 DEFAULT_OUTPUT_ROOT = ROOT / ".chromie" / "acceptance" / "closed-loop-e2e"
+AGENT_SOURCE_TREES = (
+    (ROOT / "agent" / "app", "app"),
+    (ROOT / "agent-skills", "agent-skills"),
+    (ROOT / "shared" / "chromie_contracts", "chromie_contracts"),
+    (ROOT / "shared" / "chromie_runtime", "chromie_runtime"),
+)
 
 
 @dataclass(frozen=True)
@@ -74,6 +81,13 @@ class ClosedLoopCase:
     primary_outcomes: tuple[str, ...] = ()
     semantic_dimensions: tuple[str, ...] = ()
     review_rubric: dict[str, Any] | None = None
+    source_path: str = "benchmarks/manifests/closed_loop_e2e_v1.json"
+    datasets: tuple[str, ...] = ("closed_loop_audio", "bilingual_and_asr_noise")
+    context: dict[str, Any] | None = None
+    capabilities: tuple[str, ...] = ()
+    acceptable_auxiliary: tuple[str, ...] = ()
+    forbidden_behaviors: tuple[str, ...] = ()
+    invariants: tuple[str, ...] = ()
 
     def user_turns(self) -> tuple[str, ...]:
         return self.turns or (self.text,)
@@ -158,6 +172,72 @@ class PulseMonitorCapture(CaptureBackend):
                 "utf-8", errors="replace"
             )
             raise RuntimeError(f"parec failed to start: {stderr.strip()}")
+
+    def stop(self) -> None:
+        if self.process is None:
+            return
+        self.process.terminate()
+        try:
+            self.process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            self.process.kill()
+            self.process.wait(timeout=5)
+        self.process = None
+
+
+class PipeWireMonitorCapture(CaptureBackend):
+    """Record the default PipeWire sink's monitor ports with pw-record."""
+
+    name = "pipewire-monitor"
+
+    def __init__(self, path: Path, *, sample_rate: int = 16000) -> None:
+        super().__init__(path)
+        self.sample_rate = sample_rate
+        self.process: subprocess.Popen[bytes] | None = None
+        self.target = self.discover_target()
+
+    @staticmethod
+    def available() -> bool:
+        return bool(shutil.which("wpctl") and shutil.which("pw-record"))
+
+    @staticmethod
+    def discover_target() -> str:
+        if not PipeWireMonitorCapture.available():
+            raise RuntimeError("PipeWire monitor capture requires wpctl and pw-record")
+        inspected = subprocess.check_output(
+            ["wpctl", "inspect", "@DEFAULT_AUDIO_SINK@"],
+            text=True,
+        )
+        if 'media.class = "Audio/Sink"' not in inspected:
+            raise RuntimeError("PipeWire default audio sink was not found")
+        for raw_line in inspected.splitlines():
+            line = raw_line.strip().lstrip("* ")
+            if line.startswith("object.serial = "):
+                return line.split("=", 1)[1].strip().strip('"')
+        raise RuntimeError("PipeWire default audio sink has no object.serial")
+
+    def start(self) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.process = subprocess.Popen(
+            [
+                "pw-record",
+                f"--target={self.target}",
+                "--properties=stream.capture.sink=true",
+                f"--rate={self.sample_rate}",
+                "--channels=1",
+                "--format=s16",
+                "--container=wav",
+                str(self.path),
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+        )
+        time.sleep(0.25)
+        if self.process.poll() is not None:
+            stderr = (self.process.stderr.read() if self.process.stderr else b"").decode(
+                "utf-8", errors="replace"
+            )
+            raise RuntimeError(f"pw-record failed to start: {stderr.strip()}")
 
     def stop(self) -> None:
         if self.process is None:
@@ -373,7 +453,127 @@ def collect_run_diagnostics(output_dir: Path) -> list[dict[str, Any]]:
     return records
 
 
-def parse_cases(payload: dict[str, Any], key: str) -> list[ClosedLoopCase]:
+def _source_tree_digest(trees: Sequence[tuple[Path, str]]) -> str:
+    digest = hashlib.sha256()
+    for source_root, label in sorted(trees, key=lambda item: item[1]):
+        if not source_root.is_dir():
+            raise FileNotFoundError(source_root)
+        for path in sorted(source_root.rglob("*")):
+            if (
+                not path.is_file()
+                or "__pycache__" in path.parts
+                or path.suffix in {".pyc", ".pyo"}
+            ):
+                continue
+            relative = path.relative_to(source_root).as_posix()
+            digest.update(f"{label}/{relative}\0".encode("utf-8"))
+            digest.update(path.read_bytes())
+            digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def agent_runtime_source_identity() -> dict[str, Any]:
+    host_digest = _source_tree_digest(AGENT_SOURCE_TREES)
+    container_script = """
+from pathlib import Path
+import hashlib
+import json
+
+trees = (
+    (Path('/app/app'), 'app'),
+    (Path('/app/agent-skills'), 'agent-skills'),
+    (Path('/app/chromie_contracts'), 'chromie_contracts'),
+    (Path('/app/chromie_runtime'), 'chromie_runtime'),
+)
+digest = hashlib.sha256()
+for source_root, label in sorted(trees, key=lambda item: item[1]):
+    if not source_root.is_dir():
+        raise FileNotFoundError(source_root)
+    for path in sorted(source_root.rglob('*')):
+        if not path.is_file() or '__pycache__' in path.parts or path.suffix in {'.pyc', '.pyo'}:
+            continue
+        relative = path.relative_to(source_root).as_posix()
+        digest.update(f'{label}/{relative}\\0'.encode('utf-8'))
+        digest.update(path.read_bytes())
+        digest.update(b'\\0')
+print(json.dumps({'digest': digest.hexdigest()}))
+"""
+    try:
+        completed = subprocess.run(
+            ["docker", "exec", "chromie-agent", "python", "-c", container_script],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=120,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return {
+            "host_digest": host_digest,
+            "container_digest": None,
+            "matches": False,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+    container_digest = None
+    error = completed.stderr.strip() or None
+    if completed.returncode == 0:
+        try:
+            payload = json.loads(completed.stdout)
+            container_digest = str(payload.get("digest") or "") or None
+        except (json.JSONDecodeError, AttributeError) as exc:
+            error = f"{type(exc).__name__}: {exc}"
+    return {
+        "host_digest": host_digest,
+        "container_digest": container_digest,
+        "matches": bool(container_digest) and container_digest == host_digest,
+        "returncode": completed.returncode,
+        "error": error,
+    }
+
+
+def _manifest_source_path(manifest_path: Path | None) -> str:
+    if manifest_path is None:
+        return DEFAULT_MANIFEST.relative_to(ROOT).as_posix()
+    resolved = manifest_path.resolve()
+    try:
+        return resolved.relative_to(ROOT).as_posix()
+    except ValueError:
+        return str(resolved)
+
+
+def _load_referenced_scenario(row: dict[str, Any], key: str) -> tuple[dict[str, Any], str]:
+    allowed = {"scenario_path", "speaker_id", "max_error_rate"}
+    unexpected = sorted(set(row) - allowed)
+    if unexpected:
+        raise ValueError(
+            f"manifest {key} scenario reference has semantic overrides: "
+            + ", ".join(unexpected)
+        )
+    raw_path = str(row.get("scenario_path") or "").strip()
+    if not raw_path:
+        raise ValueError(f"manifest {key} scenario reference needs scenario_path")
+    scenario_path = Path(raw_path)
+    if not scenario_path.is_absolute():
+        scenario_path = ROOT / scenario_path
+    scenario = read_json(scenario_path)
+    if scenario.get("schema_version") != 1:
+        raise ValueError(f"{scenario_path}: unsupported scenario schema")
+    try:
+        source_path = scenario_path.resolve().relative_to(ROOT).as_posix()
+    except ValueError:
+        source_path = str(scenario_path.resolve())
+    adapted = dict(scenario)
+    adapted["speaker_id"] = row.get("speaker_id") or "default"
+    adapted["max_error_rate"] = row.get("max_error_rate", 0.35)
+    return adapted, source_path
+
+
+def parse_cases(
+    payload: dict[str, Any],
+    key: str,
+    *,
+    manifest_path: Path | None = None,
+) -> list[ClosedLoopCase]:
     rows = payload.get(key)
     if not isinstance(rows, list):
         raise ValueError(f"manifest field {key!r} must be an array")
@@ -381,6 +581,11 @@ def parse_cases(payload: dict[str, Any], key: str) -> list[ClosedLoopCase]:
     for row in rows:
         if not isinstance(row, dict):
             raise ValueError(f"manifest {key} item must be an object")
+        source_path = _manifest_source_path(manifest_path)
+        datasets = ("closed_loop_audio", "bilingual_and_asr_noise")
+        if "scenario_path" in row:
+            row, source_path = _load_referenced_scenario(row, key)
+            datasets = ("daily_conversation",)
         oracle = row.get("oracle_policy") or {}
         if not isinstance(oracle, dict):
             raise ValueError(f"manifest {key} oracle_policy must be an object")
@@ -397,19 +602,22 @@ def parse_cases(payload: dict[str, Any], key: str) -> list[ClosedLoopCase]:
             raise ValueError(f"manifest {key} {mode} oracle needs deterministic_sources")
         if mode in {"semantic_review", "hybrid"} and not semantic_dimensions:
             raise ValueError(f"manifest {key} {mode} oracle needs semantic_dimensions")
-        raw_turns = row.get("turns")
+        inputs = row.get("inputs") if isinstance(row.get("inputs"), dict) else {}
+        raw_turns = row.get("turns", inputs.get("turns"))
         turns = tuple(
             str(value).strip()
             for value in raw_turns
             if str(value).strip()
         ) if isinstance(raw_turns, list) else ()
-        text = str(row.get("text") or (turns[0] if turns else "")).strip()
+        text = str(
+            row.get("text") or inputs.get("text") or (turns[0] if turns else "")
+        ).strip()
         if not text:
             raise ValueError(f"manifest {key} item {row.get('id')!r} needs text or turns")
         cases.append(
             ClosedLoopCase(
                 case_id=str(row["id"]),
-                language=str(row["language"]),
+                language=str(row.get("language") or inputs["language"]),
                 text=text,
                 speaker_id=str(row.get("speaker_id") or "default"),
                 turns=turns,
@@ -418,13 +626,34 @@ def parse_cases(payload: dict[str, Any], key: str) -> list[ClosedLoopCase]:
                 expected_all=tuple(str(v) for v in row.get("expected_all", [])),
                 oracle_mode=mode,
                 deterministic_sources=deterministic_sources,
-                primary_outcomes=tuple(str(v) for v in row.get("primary_outcomes", [])),
+                primary_outcomes=tuple(
+                    str(v)
+                    for v in (
+                        row.get("primary_outcomes")
+                        or ([row["primary_outcome"]] if row.get("primary_outcome") else [])
+                    )
+                ),
                 semantic_dimensions=semantic_dimensions,
                 review_rubric=(
                     dict(row.get("review_rubric") or {})
                     if isinstance(row.get("review_rubric") or {}, dict)
                     else None
                 ),
+                source_path=source_path,
+                datasets=datasets,
+                context=(
+                    dict(row.get("context") or {})
+                    if isinstance(row.get("context") or {}, dict)
+                    else None
+                ),
+                capabilities=tuple(str(v) for v in row.get("capabilities", [])),
+                acceptable_auxiliary=tuple(
+                    str(v) for v in row.get("acceptable_auxiliary_behavior", [])
+                ),
+                forbidden_behaviors=tuple(
+                    str(v) for v in row.get("forbidden_behaviors", [])
+                ),
+                invariants=tuple(str(v) for v in row.get("invariants", [])),
             )
         )
     return cases
@@ -516,17 +745,34 @@ async def transcribe_audio(asr_url: str, audio: AudioData, *, timeout_s: float) 
     return str(response.get("text") or "").strip()
 
 
-async def synthesize_case(tts_url: str, case: ClosedLoopCase, *, timeout_s: float) -> AudioData:
+async def synthesize_text(
+    tts_url: str,
+    text: str,
+    speaker_id: str,
+    *,
+    request_id: str,
+    timeout_s: float,
+) -> AudioData:
     client = TTSClient(tts_url, default_sample_rate=24000)
     pcm, rate = await asyncio.wait_for(
         client.synthesize(
-            text=case.text,
-            speaker_id=case.speaker_id,
-            request_id=f"closed-loop-{case.case_id}-{uuid.uuid4().hex[:10]}",
+            text=text,
+            speaker_id=speaker_id,
+            request_id=request_id,
         ),
         timeout=timeout_s,
     )
     return AudioData(pcm, rate, 1)
+
+
+async def synthesize_case(tts_url: str, case: ClosedLoopCase, *, timeout_s: float) -> AudioData:
+    return await synthesize_text(
+        tts_url,
+        case.text,
+        case.speaker_id,
+        request_id=f"closed-loop-{case.case_id}-{uuid.uuid4().hex[:10]}",
+        timeout_s=timeout_s,
+    )
 
 
 def choose_capture_backend(
@@ -536,7 +782,13 @@ def choose_capture_backend(
     input_device: int | str | None,
 ) -> CaptureBackend:
     if name == "monitor":
-        return PulseMonitorCapture(path)
+        if PulseMonitorCapture.available():
+            return PulseMonitorCapture(path)
+        if PipeWireMonitorCapture.available():
+            return PipeWireMonitorCapture(path)
+        raise RuntimeError(
+            "monitor capture requires pactl/parec or wpctl/pw-record"
+        )
     if name == "acoustic":
         if not PhysicalMicrophoneCapture.available():
             raise RuntimeError("acoustic capture requires sounddevice")
@@ -545,6 +797,8 @@ def choose_capture_backend(
         raise ValueError(f"unknown capture backend {name!r}")
     if PulseMonitorCapture.available():
         return PulseMonitorCapture(path)
+    if PipeWireMonitorCapture.available():
+        return PipeWireMonitorCapture(path)
     if PhysicalMicrophoneCapture.available():
         return PhysicalMicrophoneCapture(path, device=input_device)
     raise RuntimeError("no playback capture backend is available")
@@ -579,6 +833,14 @@ def expected_term_result(case: ClosedLoopCase, text: str) -> dict[str, Any]:
         "passed": any_ok and all_ok,
         "applied": True,
     }
+
+
+def workflow_input_channel(mode: str) -> str:
+    if mode == "tts-asr":
+        return "voice"
+    if mode == "text":
+        return "text"
+    raise ValueError(f"unknown workflow input mode {mode!r}")
 
 
 async def run_transport_case(
@@ -626,7 +888,7 @@ async def run_transport_case(
             fixture,
             timeout_s=timeout_s,
         )
-        time.sleep(0.75)
+        await asyncio.sleep(0.75)
     captured = trim_silence(read_wav(captured_wav))
     trimmed_wav = case_dir / "playback-capture-trimmed.wav"
     write_pcm16_wav(
@@ -726,6 +988,7 @@ async def run_workflow_case(
     assistant = VoiceAssistant()
     error = ""
     turn_records: list[dict[str, Any]] = []
+    input_records: list[dict[str, Any]] = []
     delivered_events: list[dict[str, Any]] = []
     delivered_text = ""
     hypothesis = ""
@@ -739,8 +1002,62 @@ async def run_workflow_case(
     try:
         with capture:
             for index, user_text in enumerate(case.user_turns(), start=1):
+                routed_text = user_text
+                input_record: dict[str, Any] = {
+                    "turn_index": index,
+                    "mode": args.workflow_input,
+                    "reference_text": user_text,
+                    "asr_transcript": None,
+                    "metrics": None,
+                    "passed": True,
+                    "wav": None,
+                }
+                if args.workflow_input == "tts-asr":
+                    input_wav = case_dir / "input" / f"turn-{index:02d}-tts.wav"
+                    synthesized_input = await synthesize_text(
+                        args.tts_url,
+                        user_text,
+                        case.speaker_id,
+                        request_id=(
+                            f"closed-loop-input-{case.case_id}-{index}-"
+                            f"{uuid.uuid4().hex[:10]}"
+                        ),
+                        timeout_s=args.timeout,
+                    )
+                    write_pcm16_wav(
+                        input_wav,
+                        pcm16=synthesized_input.pcm16,
+                        sample_rate=synthesized_input.sample_rate,
+                        channels=1,
+                    )
+                    routed_text = await transcribe_audio(
+                        args.asr_url,
+                        synthesized_input,
+                        timeout_s=args.timeout,
+                    )
+                    input_metrics = transcript_metrics(
+                        case.language,
+                        user_text,
+                        routed_text,
+                    )
+                    input_record.update(
+                        {
+                            "asr_transcript": routed_text,
+                            "metrics": input_metrics,
+                            "passed": bool(routed_text)
+                            and input_metrics["error_rate"] <= case.max_error_rate,
+                            "wav": str(input_wav),
+                        }
+                    )
+                input_records.append(input_record)
+                if not routed_text:
+                    raise RuntimeError(f"ASR returned no text for input turn {index}")
                 sid = assistant.create_session()
-                await assistant.handle_routed_text(user_text, sid, channel="text")
+                await assistant.handle_routed_text(
+                    routed_text,
+                    sid,
+                    channel=workflow_input_channel(args.workflow_input),
+                )
                 await wait_for_session_done(
                     assistant,
                     sid,
@@ -759,6 +1076,7 @@ async def run_workflow_case(
                         "turn_index": index,
                         "session_id": sid,
                         "user_text": user_text,
+                        "routed_text": routed_text,
                         "delivered_text": turn_text,
                         "delivered_speech_events": turn_events,
                     }
@@ -791,8 +1109,12 @@ async def run_workflow_case(
         ]
         unique_delivery = len(event_ids) == len(set(event_ids))
         all_turns_finished = len(turn_records) == len(case.user_turns())
+        input_audio_passed = all(
+            bool(record.get("passed")) for record in input_records
+        )
         mechanical_passed = (
-            audio_passed
+            input_audio_passed
+            and audio_passed
             and semantic["passed"]
             and unique_delivery
             and all_turns_finished
@@ -818,6 +1140,8 @@ async def run_workflow_case(
         "language": case.language,
         "user_text": case.text,
         "user_turns": list(case.user_turns()),
+        "workflow_input": args.workflow_input,
+        "input_audio": input_records,
         "turns": turn_records,
         "capture_backend": capture.name,
         "delivered_speech_events": delivered_events,
@@ -838,6 +1162,10 @@ async def run_workflow_case(
             "pending" if semantic_review_required and status != "fail" else "not_required"
         ),
         "audio_passed": audio_passed,
+        "input_audio_passed": (
+            len(input_records) == len(case.user_turns())
+            and all(bool(record.get("passed")) for record in input_records)
+        ),
         "all_turns_finished": len(turn_records) == len(case.user_turns()),
         "unique_delivery": len(
             {
@@ -857,6 +1185,11 @@ async def run_workflow_case(
         "trimmed_wav": str(trimmed_wav),
         "artifacts": [
             str(case_dir / "session-events.jsonl"),
+            *[
+                str(record["wav"])
+                for record in input_records
+                if record.get("wav")
+            ],
             str(captured_wav),
             str(trimmed_wav),
             str(case_dir / "result.json"),
@@ -883,10 +1216,14 @@ def closed_loop_review_bundle(
                 "schema_version": 1,
                 "id": case.case_id,
                 "layer": "e2e",
-                "datasets": ["closed_loop_audio", "bilingual_and_asr_noise"],
+                "datasets": list(case.datasets),
                 "source": {
-                    "path": "benchmarks/manifests/closed_loop_e2e_v1.json",
-                    "adapter": "closed_loop_e2e_v1",
+                    "path": case.source_path,
+                    "adapter": (
+                        "daily_conversation_v1"
+                        if "daily_conversation" in case.datasets
+                        else "closed_loop_e2e_v1"
+                    ),
                     "source_index": None,
                     "source_id": case.case_id,
                 },
@@ -895,13 +1232,22 @@ def closed_loop_review_bundle(
                     "turns": list(case.user_turns()),
                     "language": case.language,
                 },
-                "context": {},
-                "capabilities": [],
+                "context": dict(case.context or {}),
+                "capabilities": list(case.capabilities),
                 "expectations": {
                     "primary_outcomes": list(case.primary_outcomes),
-                    "acceptable_auxiliary": [],
-                    "forbidden_behaviors": [],
+                    "acceptable_auxiliary": list(case.acceptable_auxiliary),
+                    "forbidden_behaviors": list(case.forbidden_behaviors),
                     "invariants": [
+                        *list(case.invariants),
+                        *(
+                            [
+                                "generated user speech is transcribed by ASR before "
+                                "Chromie receives the turn"
+                            ]
+                            if result.get("workflow_input") == "tts-asr"
+                            else []
+                        ),
                         "generated speech is delivered through playback",
                         "captured playback substantially matches delivered speech",
                     ],
@@ -919,6 +1265,24 @@ def closed_loop_review_bundle(
             }
         )
         invariant_results = [
+            *(
+                [
+                    {
+                        "name": (
+                            "generated user speech is transcribed by ASR before "
+                            "Chromie receives the turn"
+                        ),
+                        "passed": bool(result.get("input_audio_passed")),
+                        "detail": (
+                            None
+                            if result.get("input_audio_passed")
+                            else f"input audio={result.get('input_audio')}"
+                        ),
+                    }
+                ]
+                if result.get("workflow_input") == "tts-asr"
+                else []
+            ),
             {
                 "name": "generated speech is delivered through playback",
                 "passed": bool(result.get("delivered_text")),
@@ -946,7 +1310,10 @@ def closed_loop_review_bundle(
                     "evidence_level": "live_service",
                     "model": None,
                     "prompt_revision": None,
-                    "metadata": {"transport": "closed_loop_playback_asr"},
+                    "metadata": {
+                        "transport": "closed_loop_playback_asr",
+                        "workflow_input": result.get("workflow_input", "text"),
+                    },
                 },
                 "observations": {
                     "primary_task_passed": None if semantic_required else not deterministic_failed,
@@ -958,6 +1325,7 @@ def closed_loop_review_bundle(
                     "evidence": [
                         {
                             "turns": result.get("turns"),
+                            "input_audio": result.get("input_audio"),
                             "delivered_speech_events": result.get(
                                 "delivered_speech_events"
                             ),
@@ -1044,6 +1412,51 @@ def stop_services() -> None:
     )
 
 
+def collect_debug_bundle(output_dir: Path) -> dict[str, Any]:
+    logs_dir = output_dir / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    stdout_path = logs_dir / "collect-debug-bundle.stdout.txt"
+    stderr_path = logs_dir / "collect-debug-bundle.stderr.txt"
+    try:
+        completed = subprocess.run(
+            [str(ROOT / "scripts" / "collect_debug_bundle.sh")],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=300,
+        )
+        stdout_path.write_text(completed.stdout, encoding="utf-8")
+        stderr_path.write_text(completed.stderr, encoding="utf-8")
+        archive = next(
+            (
+                line.strip()
+                for line in reversed(completed.stdout.splitlines())
+                if line.strip().endswith(".tar.gz")
+            ),
+            None,
+        )
+        return {
+            "requested": True,
+            "returncode": completed.returncode,
+            "archive": archive,
+            "stdout": str(stdout_path),
+            "stderr": str(stderr_path),
+            "succeeded": completed.returncode == 0 and bool(archive),
+        }
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        stderr_path.write_text(f"{type(exc).__name__}: {exc}\n", encoding="utf-8")
+        return {
+            "requested": True,
+            "returncode": None,
+            "archive": None,
+            "stdout": str(stdout_path),
+            "stderr": str(stderr_path),
+            "succeeded": False,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+
+
 async def run(args: argparse.Namespace) -> dict[str, Any]:
     manifest = read_json(args.manifest)
     if manifest.get("schema_version") != 1:
@@ -1055,9 +1468,11 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
     }
     selected_case_ids = {str(value).strip() for value in args.case if str(value).strip()}
     transport_cases = filter_language(
-        parse_cases(manifest, "transport_cases"), languages
+        parse_cases(manifest, "transport_cases", manifest_path=args.manifest), languages
     )
-    workflow_cases = filter_language(parse_cases(manifest, "workflow_cases"), languages)
+    workflow_cases = filter_language(
+        parse_cases(manifest, "workflow_cases", manifest_path=args.manifest), languages
+    )
     if selected_case_ids:
         transport_cases = [case for case in transport_cases if case.case_id in selected_case_ids]
         workflow_cases = [case for case in workflow_cases if case.case_id in selected_case_ids]
@@ -1069,6 +1484,20 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
     log_handler = install_python_log_capture(output_dir / "logs" / "python-runtime.log")
     input_device = parse_device(args.input_device)
+    runtime_agent_source = (
+        agent_runtime_source_identity()
+        if workflow_cases and not args.transport_only
+        else None
+    )
+    if (
+        args.require_current_agent_source
+        and runtime_agent_source is not None
+        and not runtime_agent_source.get("matches")
+    ):
+        raise RuntimeError(
+            "deployed chromie-agent source does not match the current worktree: "
+            + json.dumps(runtime_agent_source, sort_keys=True)
+        )
 
     transport_results: list[dict[str, Any]] = []
     workflow_results: list[dict[str, Any]] = []
@@ -1098,6 +1527,11 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
     diagnostics = (
         collect_run_diagnostics(output_dir) if args.collect_diagnostics else []
     )
+    debug_bundle = (
+        collect_debug_bundle(output_dir)
+        if args.collect_debug_bundle
+        else {"requested": False, "succeeded": None, "archive": None}
+    )
     mechanical_passed = all(
         bool(row.get("passed")) for row in transport_results
     ) and all(bool(row.get("mechanical_passed")) for row in workflow_results)
@@ -1116,11 +1550,18 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
         "schema_version": 2,
         "qualification_id": manifest.get("qualification_id"),
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "source_revision": subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
+        "source_revision": (
+            await asyncio.to_thread(
+                subprocess.check_output,
+                ["git", "rev-parse", "HEAD"],
+                cwd=ROOT,
+                text=True,
+            )
         ).strip(),
         "languages": sorted(languages),
         "capture_requested": args.capture,
+        "workflow_input": args.workflow_input,
+        "runtime_agent_source": runtime_agent_source,
         "transport": transport_results,
         "workflow": workflow_results,
         "mechanical_passed": mechanical_passed,
@@ -1134,9 +1575,12 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
         "deterministic_truth_source": "declared_fixtures_contracts_and_invariants",
         "semantic_review_bundle": str(output_dir / "semantic-review-bundle.json"),
         "diagnostics": diagnostics,
+        "debug_bundle": debug_bundle,
         "claim": (
             "Automated generated-speech closed-loop evidence. It validates bilingual "
-            "TTS/ASR transport and captured workflow playback. Mechanical boundaries "
+            "TTS/ASR transport and captured workflow playback. When workflow_input is "
+            "tts-asr, saved generated user speech is transcribed before its transcript "
+            "enters Chromie. Mechanical boundaries "
             "are evaluated deterministically; semantic workflow quality remains pending "
             "external LLM or human review. It does not claim human speech-recognition "
             "accuracy."
@@ -1186,10 +1630,34 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--transport-only", action="store_true")
     parser.add_argument("--workflow-only", action="store_true")
     parser.add_argument(
+        "--workflow-input",
+        choices=("text", "tts-asr"),
+        default="text",
+        help=(
+            "Route original text directly, or synthesize every user turn, save it, "
+            "transcribe it with ASR, and route only the transcript."
+        ),
+    )
+    parser.add_argument(
         "--collect-diagnostics",
         action=argparse.BooleanOptionalAction,
         default=True,
         help="Collect Git, Docker, runtime-profile, and GPU diagnostics.",
+    )
+    parser.add_argument(
+        "--collect-debug-bundle",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Run collect_debug_bundle.sh once after the selected cohort finishes.",
+    )
+    parser.add_argument(
+        "--require-current-agent-source",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help=(
+            "Fail before workflow execution unless the deployed chromie-agent "
+            "source trees match the current worktree."
+        ),
     )
     parser.add_argument(
         "--archive",

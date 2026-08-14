@@ -12,27 +12,27 @@
   },
   "coverage_contract": {
     "minimum_scenarios": 100,
-    "expected_scenarios": 150,
+    "expected_scenarios": 166,
     "cohorts": {
       "greetings_presence": 10,
-      "family_home": 10,
-      "school_learning": 10,
-      "routines_plans": 10,
-      "meals_wellbeing": 10,
+      "family_home": 12,
+      "school_learning": 12,
+      "routines_plans": 12,
+      "meals_wellbeing": 12,
       "feelings_support": 10,
       "play_creativity": 10,
       "identity_body": 10,
-      "practical_information_tools": 10,
+      "practical_information_tools": 12,
       "preferences_boundaries": 10,
-      "multi_turn_continuity": 10,
-      "uncertainty_repair": 10,
+      "multi_turn_continuity": 12,
+      "uncertainty_repair": 12,
       "friends_social_life": 10,
-      "shared_space_etiquette": 10,
+      "shared_space_etiquette": 12,
       "casual_chat_curiosity": 10
     },
     "languages": {
-      "en-US": 75,
-      "zh-CN": 75
+      "en-US": 83,
+      "zh-CN": 83
     },
     "canonical_response_strings": 0
   }

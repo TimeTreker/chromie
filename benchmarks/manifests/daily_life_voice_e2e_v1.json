@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "qualification_id": "daily-life-generated-voice-e2e-v1",
+  "transport_cases": [],
+  "workflow_cases": [
+    {
+      "scenario_path": "benchmarks/datasets/daily_conversation/scenarios/family_home/grandpa_arrival_status.json",
+      "speaker_id": "chromie_zh",
+      "max_error_rate": 0.45
+    },
+    {
+      "scenario_path": "benchmarks/datasets/daily_conversation/scenarios/family_home/washing_machine_status.json",
+      "speaker_id": "chromie_en",
+      "max_error_rate": 0.45
+    },
+    {
+      "scenario_path": "benchmarks/datasets/daily_conversation/scenarios/meals_wellbeing/family_lunch_choice.json",
+      "speaker_id": "chromie_zh",
+      "max_error_rate": 0.45
+    },
+    {
+      "scenario_path": "benchmarks/datasets/daily_conversation/scenarios/meals_wellbeing/rice_left_out_overnight.json",
+      "speaker_id": "chromie_en",
+      "max_error_rate": 0.45
+    },
+    {
+      "scenario_path": "benchmarks/datasets/daily_conversation/scenarios/multi_turn_continuity/edit_shopping_list.json",
+      "speaker_id": "chromie_en",
+      "max_error_rate": 0.45
+    },
+    {
+      "scenario_path": "benchmarks/datasets/daily_conversation/scenarios/multi_turn_continuity/umbrella_recipient_correction.json",
+      "speaker_id": "chromie_zh",
+      "max_error_rate": 0.45
+    },
+    {
+      "scenario_path": "benchmarks/datasets/daily_conversation/scenarios/practical_information_tools/next_bus_without_live_data.json",
+      "speaker_id": "chromie_en",
+      "max_error_rate": 0.45
+    },
+    {
+      "scenario_path": "benchmarks/datasets/daily_conversation/scenarios/practical_information_tools/package_status_without_tracking.json",
+      "speaker_id": "chromie_zh",
+      "max_error_rate": 0.45
+    },
+    {
+      "scenario_path": "benchmarks/datasets/daily_conversation/scenarios/routines_plans/leaving_home_reminder.json",
+      "speaker_id": "chromie_zh",
+      "max_error_rate": 0.45
+    },
+    {
+      "scenario_path": "benchmarks/datasets/daily_conversation/scenarios/routines_plans/running_late_priorities.json",
+      "speaker_id": "chromie_en",
+      "max_error_rate": 0.45
+    },
+    {
+      "scenario_path": "benchmarks/datasets/daily_conversation/scenarios/school_learning/forgot_assignment_page.json",
+      "speaker_id": "chromie_zh",
+      "max_error_rate": 0.45
+    },
+    {
+      "scenario_path": "benchmarks/datasets/daily_conversation/scenarios/school_learning/homework_priority_plan.json",
+      "speaker_id": "chromie_en",
+      "max_error_rate": 0.45
+    },
+    {
+      "scenario_path": "benchmarks/datasets/daily_conversation/scenarios/shared_space_etiquette/quiet_answer_during_piano_practice.json",
+      "speaker_id": "chromie_zh",
+      "max_error_rate": 0.45
+    },
+    {
+      "scenario_path": "benchmarks/datasets/daily_conversation/scenarios/shared_space_etiquette/video_call_addressing_boundary.json",
+      "speaker_id": "chromie_en",
+      "max_error_rate": 0.45
+    },
+    {
+      "scenario_path": "benchmarks/datasets/daily_conversation/scenarios/uncertainty_repair/ambiguous_device_power_off.json",
+      "speaker_id": "chromie_en",
+      "max_error_rate": 0.45
+    },
+    {
+      "scenario_path": "benchmarks/datasets/daily_conversation/scenarios/uncertainty_repair/lower_which_setting.json",
+      "speaker_id": "chromie_zh",
+      "max_error_rate": 0.45
+    }
+  ]
+}

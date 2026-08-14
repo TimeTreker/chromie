@@ -4,13 +4,15 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
-import wave
-
+from unittest.mock import patch
 import numpy as np
 
 from scripts.closed_loop_e2e import (
     AudioData,
     ClosedLoopCase,
+    PipeWireMonitorCapture,
+    _source_tree_digest,
+    collect_debug_bundle,
     closed_loop_review_bundle,
     expected_term_result,
     parse_cases,
@@ -18,6 +20,7 @@ from scripts.closed_loop_e2e import (
     resample_pcm16,
     transcript_metrics,
     trim_silence,
+    workflow_input_channel,
 )
 
 
@@ -73,9 +76,47 @@ class ClosedLoopE2ETests(unittest.TestCase):
         )
         self.assertEqual(case.text, "Remember that my test color is blue.")
 
+    def test_daily_voice_manifest_references_canonical_scenarios(self) -> None:
+        manifest_path = Path("benchmarks/manifests/daily_life_voice_e2e_v1.json")
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        cases = parse_cases(
+            payload,
+            "workflow_cases",
+            manifest_path=manifest_path,
+        )
+        self.assertEqual(len(cases), 16)
+        self.assertEqual(
+            {case.language.split("-", 1)[0] for case in cases},
+            {"en", "zh"},
+        )
+        self.assertTrue(all(case.datasets == ("daily_conversation",) for case in cases))
+        self.assertTrue(all(case.source_path.endswith(".json") for case in cases))
+        self.assertTrue(all(case.primary_outcomes for case in cases))
+        self.assertTrue(all(case.forbidden_behaviors for case in cases))
+        self.assertTrue(any(len(case.user_turns()) > 1 for case in cases))
+
+    def test_scenario_reference_rejects_semantic_overrides(self) -> None:
+        payload = {
+            "workflow_cases": [
+                {
+                    "scenario_path": (
+                        "benchmarks/datasets/daily_conversation/scenarios/"
+                        "family_home/washing_machine_status.json"
+                    ),
+                    "primary_outcomes": ["weaken the canonical expectation"],
+                }
+            ]
+        }
+        with self.assertRaisesRegex(ValueError, "semantic overrides"):
+            parse_cases(payload, "workflow_cases")
+
     def test_primary_error_uses_cer_for_chinese_and_wer_for_english(self) -> None:
         self.assertEqual(primary_error("zh-CN", "你好", "你好")[0], "cer")
         self.assertEqual(primary_error("en-US", "hello there", "hello there")[0], "wer")
+
+    def test_generated_voice_routes_as_a_final_asr_input(self) -> None:
+        self.assertEqual(workflow_input_channel("tts-asr"), "voice")
+        self.assertEqual(workflow_input_channel("text"), "text")
 
     def test_transcript_metrics_ignore_case_and_punctuation(self) -> None:
         metrics = transcript_metrics(
@@ -133,6 +174,18 @@ class ClosedLoopE2ETests(unittest.TestCase):
         trimmed = trim_silence(audio)
         self.assertGreater(len(trimmed.pcm16), len(tone.tobytes()))
         self.assertLess(len(trimmed.pcm16), len(audio.pcm16))
+
+    def test_pipewire_monitor_resolves_default_sink_serial(self) -> None:
+        inspected = """id 66, type PipeWire:Interface:Node
+  * media.class = \"Audio/Sink\"
+  * object.serial = \"95\"
+"""
+        with patch.object(PipeWireMonitorCapture, "available", return_value=True):
+            with patch(
+                "scripts.closed_loop_e2e.subprocess.check_output",
+                return_value=inspected,
+            ):
+                self.assertEqual(PipeWireMonitorCapture.discover_target(), "95")
 
     def test_default_manifest_exists_and_is_bilingual(self) -> None:
         path = Path("benchmarks/manifests/closed_loop_e2e_v1.json")
@@ -212,6 +265,81 @@ class ClosedLoopE2ETests(unittest.TestCase):
         )
         normalized = bundle["scenarios"][0]["scenario"]
         self.assertEqual(normalized["inputs"]["turns"], ["How do you help?"])
+
+    def test_daily_review_bundle_retains_canonical_behavior_boundaries(self) -> None:
+        manifest_path = Path("benchmarks/manifests/daily_life_voice_e2e_v1.json")
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        case = parse_cases(
+            payload,
+            "workflow_cases",
+            manifest_path=manifest_path,
+        )[0]
+        bundle = closed_loop_review_bundle(
+            [case],
+            [
+                {
+                    "id": case.case_id,
+                    "status": "review",
+                    "mechanical_passed": True,
+                    "semantic_review_required": True,
+                    "workflow_input": "tts-asr",
+                    "input_audio_passed": True,
+                    "input_audio": [{"passed": True}],
+                    "oracle_policy": {
+                        "mode": case.oracle_mode,
+                        "deterministic_sources": list(case.deterministic_sources),
+                        "semantic_dimensions": list(case.semantic_dimensions),
+                        "semantic_blocking": True,
+                    },
+                    "delivered_text": "I do not have evidence that Grandpa arrived.",
+                    "delivered_speech_events": [{"text": "I do not know yet."}],
+                    "captured_transcript": "I do not know yet.",
+                    "metrics": {"cer": 0.0},
+                    "audio_passed": True,
+                    "artifacts": ["result.json"],
+                    "error": None,
+                }
+            ],
+        )
+        normalized = bundle["scenarios"][0]["scenario"]
+        self.assertEqual(normalized["datasets"], ["daily_conversation"])
+        self.assertEqual(normalized["source"]["path"], case.source_path)
+        self.assertEqual(
+            normalized["expectations"]["forbidden_behaviors"],
+            list(case.forbidden_behaviors),
+        )
+
+    def test_debug_bundle_is_collected_once_and_retained_in_run_logs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp)
+            with patch("scripts.closed_loop_e2e.subprocess.run") as run:
+                run.return_value.returncode = 0
+                run.return_value.stdout = (
+                    "Debug bundle created:\n/tmp/chromie_debug_bundle.tar.gz\n"
+                )
+                run.return_value.stderr = ""
+                result = collect_debug_bundle(output_dir)
+            run.assert_called_once()
+            self.assertTrue(result["succeeded"])
+            self.assertEqual(
+                result["archive"],
+                "/tmp/chromie_debug_bundle.tar.gz",
+            )
+            self.assertTrue(Path(result["stdout"]).exists())
+
+    def test_source_tree_digest_is_content_and_path_sensitive(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first = root / "first"
+            second = root / "second"
+            first.mkdir()
+            second.mkdir()
+            (first / "module.py").write_text("value = 1\n", encoding="utf-8")
+            (second / "contract.py").write_text("name = 'x'\n", encoding="utf-8")
+            initial = _source_tree_digest(((first, "app"), (second, "contracts")))
+            (first / "module.py").write_text("value = 2\n", encoding="utf-8")
+            changed = _source_tree_digest(((first, "app"), (second, "contracts")))
+            self.assertNotEqual(initial, changed)
 
 
 if __name__ == "__main__":

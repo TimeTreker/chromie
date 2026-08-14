@@ -1123,6 +1123,22 @@ English cases. The runner retains two related evidence paths:
 2. injected user text -> Cognitive Gateway/Core/Agent/tools -> TTS -> actual
    host playback capture -> Chromie ASR.
 
+The daily-life qualification adds generated user speech before the second path:
+
+```bash
+BUILD=1 python scripts/closed_loop_e2e.py \
+  --manifest benchmarks/manifests/daily_life_voice_e2e_v1.json \
+  --workflow-only --workflow-input tts-asr \
+  --start-services --capture auto --require-current-agent-source \
+  --collect-debug-bundle
+```
+
+Here each saved user-turn WAV is transcribed by ASR and only that transcript
+enters Chromie. The one end-of-cohort debug bundle and semantic review bundle
+support the required root-cause and human-like-behavior judgment loop. This
+mode does not pass generated input through VAD and remains generated-speech,
+not physical microphone or arbitrary human-speech evidence.
+
 `--capture auto` prefers the default Pulse/PipeWire sink monitor, so the
 workflow validates the emitted speaker stream without room noise. When monitor
 capture is unavailable it uses the physical microphone while Chromie's own TTS

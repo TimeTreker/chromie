@@ -258,6 +258,69 @@ When evidence supports only a hypothesis, label it as an inference and retain th
 next test needed to confirm or reject it. Do not present correlation, a nearby
 error, or the last visible symptom as the root cause.
 
+### 7.2 Daily-life generated-voice repair loop
+
+Use the maintained daily-life voice cohort when qualifying ordinary household,
+school, routine, shared-space, uncertainty, and continuity behavior:
+
+```bash
+BUILD=1 python scripts/closed_loop_e2e.py \
+  --manifest benchmarks/manifests/daily_life_voice_e2e_v1.json \
+  --workflow-only \
+  --workflow-input tts-asr \
+  --start-services \
+  --capture auto \
+  --require-current-agent-source \
+  --collect-debug-bundle
+```
+
+This is one qualification run with isolated scenario conversations. Isolation
+prevents one case from leaking state into another; ordered turns within a
+scenario retain one bounded conversation. For every user turn the runner asks
+TTS to generate speech, saves the WAV, sends that audio to ASR, and routes only
+the ASR transcript into Chromie. It then captures Chromie's actual playback and
+uses ASR to compare it with the delivered speech event. The input WAV,
+transcript, response events, playback WAV, session evidence, and per-case result
+are retained under one output directory.
+
+`BUILD=1` rebuilds the maintained service images, and
+`--require-current-agent-source` compares the deployed Agent source digest with
+the current worktree before the first workflow case. A Git revision recorded by
+the host is not proof that an older service image runs that revision.
+
+The runner invokes `scripts/collect_debug_bundle.sh` exactly once after all
+selected cases finish. Inspect `summary.json`, `semantic-review-bundle.json`,
+each `workflow/<scenario-id>/result.json`, and the debug archive before changing
+code. Correlate scenario, session, turn, trace, stage, and call IDs. Compare the
+exact prompt, context, schema, raw model output, parsed or repaired value, next
+workflow state, delivered speech, and playback transcript at the earliest wrong
+boundary.
+
+Mechanical success is necessary but not a conversational pass. Judge the
+declared outcome, rubric, acceptable region, forbidden behaviors, and invariants
+for every case. Chromie should understand the intended everyday request,
+preserve corrections and prior turns, ground claims in available evidence and
+capabilities, express uncertainty naturally, stay concise, and sound like
+Chromie rather than customer support, a schema, or an internal workflow. Judge
+meaning rather than exact wording. Unsupported effects, invented facts, lost
+Goals, unsafe behavior, critical LLM-integrity or service failures, and missing
+safe idle are hard failures that cannot be averaged away.
+
+For each fail or partial verdict, retain the observed turn and classify the
+initiating trigger, earliest responsible boundary, root cause, downstream
+symptoms, contributing conditions, and remaining evidence gaps. Add the
+smallest focused regression, make a general architecture, contract, context,
+prompt, provider, or validation fix at that boundary, and never add a phrase
+rule for the fixture. Rerun the focused case with repeatable `--case`, then the
+whole daily-life cohort, its applicable general-ability class, and the canonical
+repository gates. Repeat until every deterministic boundary passes and every
+semantic case has an evidence-grounded pass verdict.
+
+This path is automated generated-speech evidence. It does not exercise VAD or
+prove arbitrary human speech, a physical microphone, room acoustics, or robot
+hardware. Use the maintained voice-acceptance profiles and supervised evidence
+for those stronger claims.
+
 ## 8. Model mocking policy
 
 Mocked model outputs should reproduce both successful and pathological cases:
