@@ -225,7 +225,11 @@ new responsibility, reopen Planner authority, or authorize an effect.
 
 If wording is mechanically malformed, the representation may be regenerated once
 without changing its meaning. The primary Response Composer is the only writer of
-response wording. Consequential/evidence-sensitive wording may receive at most one
+response wording. Response stages do **not** author Goal coverage: `covers_goal_ids`
+is a read-only Host projection from the immutable CanonicalPlan, per-Goal outcomes,
+and exact reused-speech provenance. The model-facing schema permits no writable Goal
+IDs in response stages, and any supplied duplicate copy is discarded before typed
+validation. Consequential/evidence-sensitive wording may receive at most one
 immutable truth-proof audit whose output is only a bounded violation certificate;
 the proof may accept or reject the already-authored response, but it may not rewrite
 text, Goal coverage, Plans, Social Attention, or any upstream semantic state, and an

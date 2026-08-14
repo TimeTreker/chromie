@@ -590,7 +590,10 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    delta. It may be mechanically validated and must be rejected if it claims
    unsupported reality, but it may not reinterpret Goals, reopen planning, or gain
    effect authority. The primary Response Composer is the only writer of response
-   wording. A consequential response may be checked by one immutable accept/reject
+   wording. Response-stage Goal coverage is not model-authored semantic truth:
+   `covers_goal_ids` is mechanically projected from the immutable Plan/outcomes and
+   exact reused-speech provenance after wording is accepted. A consequential response
+   may be checked by one immutable accept/reject
    truth certificate, but that proof cannot author replacement wording or mutate
    Goal/Plan/Social-Attention state, and it cannot enter its own repair workflow.
    Wording or presentation failure is local; it is not a reason to restart primary

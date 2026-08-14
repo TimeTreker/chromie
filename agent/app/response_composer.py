@@ -217,6 +217,7 @@ class ResponseComposerResolver:
                 if not isinstance(raw, dict):
                     raise ResponseComposerDTOContractError("response composer output is not a JSON object")
                 raw = self._canonicalize_lane_coordination_payload(raw, plan=plan)
+                raw = self._strip_model_authored_goal_coverage(raw)
                 model_output = ResponseComposerModelOutput.model_validate(raw)
                 if pure_safe_read:
                     # Pure safe-read presentation has no new pre-evidence semantic
@@ -226,17 +227,16 @@ class ResponseComposerResolver:
                         plan=plan,
                         context=request.context,
                     )
-                repaired_response_plan, mixed_coverage_reasons = (
-                    self._repair_mixed_execution_coverage(
+                projected_response_plan, coverage_projection_reasons = (
+                    self._project_goal_coverage(
                         model_output.response_plan,
                         plan=plan,
                         context=request.context,
                     )
                 )
-                if mixed_coverage_reasons:
-                    model_output = model_output.model_copy(
-                        update={"response_plan": repaired_response_plan}
-                    )
+                model_output = model_output.model_copy(
+                    update={"response_plan": projected_response_plan}
+                )
                 self._validate_safe_read_acknowledgement(
                     model_output.response_plan,
                     plan=plan,
@@ -290,7 +290,7 @@ class ResponseComposerResolver:
                         "resolver": "response_composer",
                         "task_plan_immutable": True,
                         "lane_coordination_validation_reasons": lane_reasons,
-                        "mixed_coverage_repair_reasons": mixed_coverage_reasons,
+                        "goal_coverage_projection_reasons": coverage_projection_reasons,
                         "contract_schema": "ResponseComposerModelOutput",
                         "safe_read_speech_required": (
                             self._is_safe_read_plan(plan, request.context)
@@ -340,7 +340,7 @@ class ResponseComposerResolver:
                             response_truth_audit is not None
                             and not response_truth_audit.violations
                         ),
-                        "mixed_coverage_repair_reasons": mixed_coverage_reasons,
+                        "goal_coverage_projection_reasons": coverage_projection_reasons,
                     },
                 )
             except Exception as exc:
@@ -814,129 +814,266 @@ class ResponseComposerResolver:
             .split()
         )
 
+    @staticmethod
+    def _strip_model_authored_goal_coverage(raw: dict[str, Any]) -> dict[str, Any]:
+        """Remove duplicate writable Goal coverage from model-authored response DTOs.
+
+        Goal ownership already exists in the immutable CanonicalPlan/Goal Association.
+        Response Composer owns wording only.  Stage ``covers_goal_ids`` is therefore a
+        Host-derived projection and any model-authored copy is discarded before typed
+        validation.
+        """
+
+        normalized = copy.deepcopy(raw)
+        response_plan = normalized.get("response_plan")
+        if not isinstance(response_plan, dict):
+            return normalized
+        for key in ("immediate", "pre_action", "final"):
+            stage = response_plan.get(key)
+            if isinstance(stage, dict):
+                stage.pop("covers_goal_ids", None)
+        progress = response_plan.get("progress")
+        if isinstance(progress, list):
+            for stage in progress:
+                if isinstance(stage, dict):
+                    stage.pop("covers_goal_ids", None)
+        return normalized
+
+    @staticmethod
+    def _project_direct_goal_coverage(
+        response_plan: ResponsePlan, *, goal_ids: list[str]
+    ) -> ResponsePlan:
+        if response_plan.final is None:
+            return response_plan
+        return response_plan.model_copy(
+            update={
+                "final": response_plan.final.model_copy(
+                    update={"covers_goal_ids": list(dict.fromkeys(goal_ids))}
+                )
+            }
+        )
+
     @classmethod
-    def _repair_mixed_execution_coverage(
+    def _project_goal_coverage(
         cls,
         response_plan: ResponsePlan,
         *,
         plan: CanonicalPlan,
         context: dict[str, Any] | None,
     ) -> tuple[ResponsePlan, list[str]]:
-        """Reuse reviewed current-turn speech for uncovered mixed execute Goals.
+        """Project immutable Goal ownership onto response stages mechanically.
 
-        A mixed response can legitimately use one stage for a requested spoken
-        outcome and a separate, already scheduled fast acknowledgement for the
-        pending Activity.  Response Composer sometimes covers only the spoken
-        Goal, which must not cancel the immutable validated Activity Plan.  This
-        adapter may extend typed bookkeeping on an already truthful mixed-plan
-        response stage, or reference an exact scheduled/playback-started
-        robot-action speech event. It never invents speech, changes a Capability,
-        covers a non-execute Goal mechanically, or claims that pending execution
-        has happened.
+        ``covers_goal_ids`` is delivery bookkeeping, not a second semantic decision.
+        The projection uses only CanonicalPlan goal outcomes, response phase/commitment,
+        and exact reused current-turn speech provenance.  It never infers new Goals,
+        rewrites wording, changes execution, or promotes evidence.
         """
 
-        if (
-            plan.disposition != "mixed"
-            or not plan.steps
-            or cls._confirmation_required(plan, context)
-            or plan.waiting_goal_ids()
-        ):
-            return response_plan, []
-        execute_goal_ids = set(plan.executable_goal_ids())
-        if not execute_goal_ids:
-            return response_plan, []
-        stages = [
-            stage
-            for stage in (
-                response_plan.immediate,
-                response_plan.pre_action,
-                *response_plan.progress,
-                response_plan.final,
-            )
-            if stage is not None
+        payload = response_plan.model_dump(mode="python", exclude_none=True)
+        raw_stages: list[tuple[str, dict[str, Any]]] = []
+        for key in ("immediate", "pre_action"):
+            stage = payload.get(key)
+            if isinstance(stage, dict):
+                stage["covers_goal_ids"] = []
+                raw_stages.append((key, stage))
+        progress = payload.get("progress")
+        if isinstance(progress, list):
+            for stage in progress:
+                if isinstance(stage, dict):
+                    stage["covers_goal_ids"] = []
+                    raw_stages.append(("progress", stage))
+        final = payload.get("final")
+        if isinstance(final, dict):
+            final["covers_goal_ids"] = []
+            raw_stages.append(("final", final))
+
+        ordered_goal_ids = list(dict.fromkeys(plan.goal_ids))
+        if not ordered_goal_ids or not raw_stages:
+            return ResponsePlan.model_validate(payload), []
+
+        goal_set = set(ordered_goal_ids)
+        outcome_disposition = {
+            outcome.goal_id: outcome.disposition for outcome in plan.goal_outcomes
+        }
+        execute_ids = [
+            goal_id for goal_id in ordered_goal_ids
+            if outcome_disposition.get(goal_id) == "execute"
         ]
-        covered = {goal_id for stage in stages for goal_id in stage.covers_goal_ids}
-        missing = set(plan.goal_ids) - covered
-        if not missing:
-            return response_plan, []
-        if not missing.issubset(execute_goal_ids):
-            return response_plan, []
-        non_execute_goal_ids = set(plan.goal_ids) - execute_goal_ids
-        if not non_execute_goal_ids.issubset(covered):
-            return response_plan, []
+        clarify_ids = [
+            goal_id for goal_id in ordered_goal_ids
+            if outcome_disposition.get(goal_id) == "clarify"
+        ]
+        respond_ids = [
+            goal_id for goal_id in ordered_goal_ids
+            if outcome_disposition.get(goal_id) == "respond"
+        ]
+        other_ids = [
+            goal_id for goal_id in ordered_goal_ids
+            if goal_id not in set(execute_ids + clarify_ids + respond_ids)
+        ]
+        if not plan.goal_outcomes:
+            if plan.disposition == "execute":
+                execute_ids = ordered_goal_ids
+            elif plan.disposition == "clarify":
+                clarify_ids = ordered_goal_ids
+            else:
+                respond_ids = ordered_goal_ids
 
-        reusable = cls._reusable_turn_speech(context)
-        candidate = next(
-            (
-                item
-                for item in reversed(reusable)
-                if str(item.get("route") or "").strip() in {"", "robot_action"}
-                and str(item.get("text") or "").strip()
-                and cls._speech_event_id(item)
-            ),
-            None,
-        )
-        if candidate is None:
-            # ``covers_goal_ids`` records which immutable responsibilities the
-            # composition preserves; it does not assert that stage text executes
-            # an Activity step. If no exact acknowledgement event can represent
-            # the pending work, retain the already truthful authored response
-            # while mechanically preserving the missing execute responsibility.
-            for field_name in ("immediate", "pre_action"):
-                stage = getattr(response_plan, field_name)
-                if (
-                    stage is not None
-                    and stage.must_not_claim_completion
-                    and stage.commitment_state in {"none", "heard", "evaluating"}
-                    and non_execute_goal_ids.intersection(stage.covers_goal_ids)
-                ):
-                    ordered_missing = [
-                        goal_id for goal_id in plan.goal_ids if goal_id in missing
-                    ]
-                    updated_ids = list(
-                        dict.fromkeys([*stage.covers_goal_ids, *ordered_missing])
-                    )
-                    repaired = response_plan.model_copy(
-                        update={
-                            field_name: stage.model_copy(
-                                update={"covers_goal_ids": updated_ids}
-                            )
-                        }
-                    )
-                    return repaired, [
-                        "mixed_execute_goal_coverage_extended_on_truthful_response_stage"
-                    ]
-            return response_plan, []
-        candidate_text = " ".join(str(candidate["text"]).strip().split())
-        ordered_missing = [goal_id for goal_id in plan.goal_ids if goal_id in missing]
+        reasons: list[str] = []
+        reusable_by_event_id = {
+            cls._speech_event_id(item): item
+            for item in cls._reusable_turn_speech(context)
+            if cls._speech_event_id(item)
+        }
 
-        for field_name in ("immediate", "pre_action"):
-            stage = getattr(response_plan, field_name)
-            if (
-                stage is not None
-                and stage.reuse_current_turn_speech
-                and stage.reused_speech_event_id == cls._speech_event_id(candidate)
-            ):
-                updated_ids = list(dict.fromkeys([*stage.covers_goal_ids, *ordered_missing]))
-                repaired = response_plan.model_copy(
-                    update={field_name: stage.model_copy(update={"covers_goal_ids": updated_ids})}
+        # Exact reused speech keeps the Goal provenance of the event it references.
+        for _, stage in raw_stages:
+            if not stage.get("reuse_current_turn_speech"):
+                continue
+            event_id = " ".join(str(stage.get("reused_speech_event_id") or "").strip().split())
+            event = reusable_by_event_id.get(event_id)
+            if not isinstance(event, dict):
+                continue
+            event_goal_ids = [
+                normalized
+                for item in event.get("source_goal_ids") or []
+                if (normalized := " ".join(str(item or "").strip().split())) in goal_set
+            ]
+            if event_goal_ids:
+                stage["covers_goal_ids"] = list(dict.fromkeys(event_goal_ids))
+                reasons.append("reused_speech_goal_provenance_projected")
+
+        def assigned() -> set[str]:
+            return {
+                goal_id
+                for _, stage in raw_stages
+                for goal_id in stage.get("covers_goal_ids") or []
+            }
+
+        def can_extend(stage: dict[str, Any]) -> bool:
+            if not stage.get("reuse_current_turn_speech"):
+                return True
+            event_id = " ".join(str(stage.get("reused_speech_event_id") or "").strip().split())
+            event = reusable_by_event_id.get(event_id)
+            return not isinstance(event, dict) or not list(event.get("source_goal_ids") or [])
+
+        def add(stage: dict[str, Any] | None, goal_ids: list[str], reason: str) -> None:
+            if stage is None or not goal_ids or not can_extend(stage):
+                return
+            existing = list(stage.get("covers_goal_ids") or [])
+            additions = [goal_id for goal_id in goal_ids if goal_id not in existing]
+            if additions:
+                stage["covers_goal_ids"] = [*existing, *additions]
+                reasons.append(reason)
+
+        def first_stage(*, clarification: bool | None = None, prefer_pre_action: bool = False) -> dict[str, Any] | None:
+            candidates = list(raw_stages)
+            if prefer_pre_action:
+                candidates.sort(key=lambda item: 0 if item[0] == "pre_action" else 1)
+            for _, stage in candidates:
+                is_clarification = (
+                    str(stage.get("speech_act") or "").strip().casefold()
+                    in {"clarify", "ask_clarification"}
+                    or str(stage.get("commitment_state") or "").strip() == "waiting_for_user"
                 )
-                return repaired, ["mixed_execute_goal_coverage_extended_from_reused_turn_speech"]
+                if clarification is not None and is_clarification != clarification:
+                    continue
+                if can_extend(stage):
+                    return stage
+            return None
 
-        if response_plan.pre_action is not None:
-            return response_plan, []
-        stage = ResponseStage(
-            text=candidate_text,
-            speech_act=str(candidate.get("purpose") or "acknowledge"),
-            commitment_state="heard",
-            must_not_claim_completion=True,
-            reuse_current_turn_speech=True,
-            reused_speech_event_id=cls._speech_event_id(candidate),
-            covers_goal_ids=ordered_missing,
-        )
-        repaired = response_plan.model_copy(update={"pre_action": stage})
-        cls._validate_reused_turn_speech(repaired, context=context, plan=plan)
-        return repaired, ["mixed_execute_goal_coverage_recovered_from_scheduled_fast_speech"]
+        if plan.disposition in {"respond", "unavailable", "refused"}:
+            add(
+                next((stage for phase, stage in raw_stages if phase == "final"), raw_stages[0][1]),
+                ordered_goal_ids,
+                "terminal_goal_coverage_projected",
+            )
+        elif plan.disposition == "clarify":
+            add(
+                first_stage(clarification=True) or raw_stages[0][1],
+                clarify_ids or ordered_goal_ids,
+                "clarification_goal_coverage_projected",
+            )
+        else:
+            if clarify_ids:
+                add(
+                    first_stage(clarification=True),
+                    clarify_ids,
+                    "clarification_goal_coverage_projected",
+                )
+            if respond_ids:
+                add(
+                    first_stage(clarification=False) or first_stage(),
+                    respond_ids,
+                    "response_goal_coverage_projected",
+                )
+            if execute_ids:
+                # Execution coverage belongs to one prospective speech barrier. Prefer
+                # a stage that is not already carrying a conversational/clarification
+                # responsibility. When an exact pending Fast acknowledgement exists,
+                # keep the responsibilities separate and project that event below.
+                pending_fast_ack = any(
+                    str(item.get("route") or "").strip() in {"", "robot_action"}
+                    and str(item.get("text") or "").strip()
+                    and cls._speech_event_id(item)
+                    and not list(item.get("source_goal_ids") or [])
+                    for item in cls._reusable_turn_speech(context)
+                )
+                execute_stage = next(
+                    (
+                        stage
+                        for phase, stage in sorted(
+                            raw_stages, key=lambda item: 0 if item[0] == "pre_action" else 1
+                        )
+                        if can_extend(stage) and not list(stage.get("covers_goal_ids") or [])
+                    ),
+                    None,
+                )
+                if execute_stage is None and not pending_fast_ack:
+                    execute_stage = first_stage(clarification=False, prefer_pre_action=True)
+                    if execute_stage is None:
+                        execute_stage = first_stage(prefer_pre_action=True)
+                add(execute_stage, execute_ids, "execute_goal_coverage_projected")
+            if other_ids:
+                add(first_stage() or raw_stages[0][1], other_ids, "other_goal_coverage_projected")
+
+        missing = [goal_id for goal_id in ordered_goal_ids if goal_id not in assigned()]
+        if missing and plan.disposition == "mixed" and set(missing).issubset(set(execute_ids)):
+            # Reuse an exact already-scheduled Fast acknowledgement when the current
+            # authored response is only the non-execute part of a mixed Plan.
+            candidate = next(
+                (
+                    item
+                    for item in reversed(cls._reusable_turn_speech(context))
+                    if str(item.get("route") or "").strip() in {"", "robot_action"}
+                    and str(item.get("text") or "").strip()
+                    and cls._speech_event_id(item)
+                    and not list(item.get("source_goal_ids") or [])
+                ),
+                None,
+            )
+            if candidate is not None and payload.get("pre_action") is None:
+                payload["pre_action"] = ResponseStage(
+                    text=" ".join(str(candidate["text"]).strip().split()),
+                    speech_act=str(candidate.get("purpose") or "acknowledge"),
+                    commitment_state="heard",
+                    must_not_claim_completion=True,
+                    reuse_current_turn_speech=True,
+                    reused_speech_event_id=cls._speech_event_id(candidate),
+                    covers_goal_ids=missing,
+                ).model_dump(mode="python", exclude_none=True)
+                reasons.append("execute_goal_coverage_projected_from_existing_fast_speech")
+                missing = []
+
+        # Preserve one canonical Goal ordering in every derived projection.
+        ordering = {goal_id: index for index, goal_id in enumerate(ordered_goal_ids)}
+        for _, stage in raw_stages:
+            stage["covers_goal_ids"] = sorted(
+                list(dict.fromkeys(stage.get("covers_goal_ids") or [])),
+                key=lambda goal_id: ordering.get(goal_id, len(ordering)),
+            )
+        projected = ResponsePlan.model_validate(payload)
+        return projected, list(dict.fromkeys(reasons))
 
     @classmethod
     def _validate_reused_turn_speech(
@@ -1321,20 +1458,12 @@ class ResponseComposerResolver:
                 if isinstance(properties, dict):
                     covers_goal_ids = properties.get("covers_goal_ids")
                     if isinstance(covers_goal_ids, dict):
-                        covers_goal_ids["items"] = (
-                            {"type": "string", "enum": goal_ids} if goal_ids else {"type": "string"}
-                        )
-                        if goal_ids:
-                            covers_goal_ids["minItems"] = 1
-                        else:
-                            # Goal Association can legitimately return a
-                            # clarification before a canonical goal exists.
-                            # In that state an invented goal ID is never valid.
-                            covers_goal_ids["maxItems"] = 0
-                        covers_goal_ids["uniqueItems"] = True
+                        # Goal coverage is Host-derived from the immutable Plan.
+                        # The model may omit the field or return the schema default only.
+                        covers_goal_ids["maxItems"] = 0
                         required = node.setdefault("required", [])
-                        if "covers_goal_ids" not in required:
-                            required.append("covers_goal_ids")
+                        if "covers_goal_ids" in required:
+                            required.remove("covers_goal_ids")
                 for value in node.values():
                     constrain(value)
             elif isinstance(node, list):
@@ -1350,7 +1479,6 @@ class ResponseComposerResolver:
                 "speech_act",
                 "commitment_state",
                 "must_not_claim_completion",
-                "covers_goal_ids",
             ):
                 if field_name not in stage_required:
                     stage_required.append(field_name)
@@ -1609,7 +1737,15 @@ class ResponseComposerResolver:
                 )
                 if not isinstance(raw, dict):
                     raise ResponseComposerDTOContractError("response composer output is not a JSON object")
+                raw = self._strip_model_authored_goal_coverage(raw)
                 output = ResponseComposerModelOutput.model_validate(raw)
+                output = output.model_copy(
+                    update={
+                        "response_plan": self._project_direct_goal_coverage(
+                            output.response_plan, goal_ids=goal_ids
+                        )
+                    }
+                )
                 self._validate_direct_response_plan(
                     output.response_plan,
                     goal_ids=goal_ids,
@@ -1723,7 +1859,6 @@ class ResponseComposerResolver:
                 "speech_act",
                 "commitment_state",
                 "must_not_claim_completion",
-                "covers_goal_ids",
             ):
                 if name not in required:
                     required.append(name)
@@ -1738,10 +1873,7 @@ class ResponseComposerResolver:
             }
             covers = properties.get("covers_goal_ids")
             if isinstance(covers, dict):
-                covers["items"] = {"type": "string", "enum": goal_ids}
-                covers["minItems"] = len(goal_ids)
-                covers["maxItems"] = len(goal_ids)
-                covers["uniqueItems"] = True
+                covers["maxItems"] = 0
         response_schema = schema.get("$defs", {}).get("ResponsePlan")
         if isinstance(response_schema, dict):
             properties = response_schema.get("properties", {})
@@ -2024,9 +2156,6 @@ class ResponseComposerResolver:
                     if step.step_id in parallel_activity_step_ids
                 ]
 
-        respond_goal_ids = {
-            outcome.goal_id for outcome in plan.goal_outcomes if outcome.disposition == "respond"
-        }
         stages = cls._raw_response_stages(normalized.get("response_plan"))
         for group in valid_groups:
             lanes = {str(value).strip() for value in group.get("lanes") or []}
@@ -2057,13 +2186,6 @@ class ResponseComposerResolver:
                 continue
             candidates = []
             for stage in stages:
-                covered = {
-                    str(value).strip()
-                    for value in stage.get("covers_goal_ids") or []
-                    if str(value).strip()
-                }
-                if not covered.intersection(respond_goal_ids):
-                    continue
                 if (
                     str(stage.get("speech_act") or "").strip().casefold() == "ask_confirmation"
                     or str(stage.get("commitment_state") or "").strip() == "waiting_for_user"
@@ -2185,7 +2307,7 @@ class ResponseComposerResolver:
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
             "The explicit Language hint is authoritative for spoken output unless the user explicitly asks for translation or a different language. When it is zh-CN, speak Chinese only; do not mirror a bilingual greeting, switch to English, or follow the language of identity/internal context. "
-            "Every plan goal_id must be covered exactly through response stage covers_goal_ids; do not invent goal IDs. "
+            "Do not author covers_goal_ids. Goal coverage is immutable Host-derived delivery bookkeeping projected from the CanonicalPlan after wording is accepted. "
             "For a terminal respond plan, emit exactly one final stage, omit immediate/pre_action/progress, set commitment_state=completed, and set must_not_claim_completion=false. This marks the conversational response itself as complete; it does not claim that an unexecuted action occurred. Greeting wording and length are ordinary model-authored conversational choices; use the full scene, recent relationship context, and owner-approved personality without a fixed greeting template or Host-imposed brevity target. "
             "For execute plans this is pre-execution composition. Effectful or confirmation-bound work must emit an immediate and/or pre_action stage covering every canonical goal, use only none/heard/evaluating/waiting_for_user commitments, set must_not_claim_completion=true, omit progress and final, and phrase the speech naturally. speech_act=none and punctuation-only placeholder text are not audible communication and cannot satisfy the playback/effect barrier. Reuse an exact scheduled acknowledgement when it already owns this act; otherwise author one real prospective acknowledgement. "
             "When the CanonicalPlan or supplied execution capability semantics require confirmation, explain any supplied adjustment or alternative without claiming it started, ask the user to approve it, set speech_act=ask_confirmation and commitment_state=waiting_for_user, and do not imply that approval has already been granted. "
@@ -2193,7 +2315,7 @@ class ResponseComposerResolver:
             "For a pure execute plan whose pending capabilities are all safe_read or external_read, never author new pre-evidence speech. If scheduled Fast speech has not reached playback_started, represent that exact event as one immediate reused-speech stage so Runtime can reuse or fulfill it; otherwise omit immediate and pre_action speech. Never state any pending measurement, condition, recommendation, conclusion, or completed lookup before matching trusted evidence exists. The post-execution tool-result interpreter owns the evidence-bound factual result. A mixed plan with an independent respond responsibility may still require model-authored speech; that speech must cover only the still-needed conversational responsibility and must not substitute for pending effect evidence. Do not mention internal tools, APIs, execution, backend, evidence IDs, or memory implementation. "
             "For mixed plans, coordinate executable and conversational goals in one natural response: use prospective wording for pending physical steps, do not narrate them with stage directions such as *Blinks twice*, do not claim completion, omit final while work is pending, and include a specific waiting_for_user clarification stage for every clarify outcome. "
             "Chromie has one Cognitive Core and two execution lanes: Vocal delivers model-authored communication and exact provider-qualified vocal performance, while Activity executes non-vocal provider work. Social Attention is background social cognition, not a third execution lane. It may add small optional body decorations such as gaze, blink, nod, smile, wave, or slight posture/orientation changes around an anchored interaction; accepted body decorations execute through Activity with auxiliary_social_attention=true and never own Goal completion. chromie.vocal.perform is a Vocal-lane provider step, never response transport and never an Activity step. The exact chromie.media.* family is persistent Activity-lane playback/control, never Vocal or vocal-performance evidence. Media may share the physical speaker with Vocal only under its declared duck_media_during_vocal mixer policy; describing that overlap must not mutate either Goal, playback identity, or cancellation scope. An optional acknowledgement about pending vocal or media work remains ordinary chromie.speak delivery and is not provider completion evidence. lane_coordination describes Vocal/Activity execution overlap only; it never coordinates Social Attention as a lane, creates another mind, selects a provider, authorizes an effect, or weakens provider safety. Copy an already-parallel chromie.vocal.perform step into vocal_step_ids; copy only already-parallel non-speech provider steps, including chromie.media.play, into activity_step_ids. A coordinated response stage may supply the Vocal member only when no provider vocal_step_ids are present; it must copy the same coordination_id and use delivery_role=activity_companion or performance. Social Attention behaviors never carry coordination_id; they remain opportunistic, parallel, fail-soft Activity decorations. Ordinary pre-action acknowledgement remains delivery_role=response with no coordination_id and keeps the playback-start barrier. Never coordinate ask_confirmation or waiting_for_user speech with effect execution. The maintained start policy is best_effort_parallel and the failure policy is independent; do not imply synchronized starts or atomic cross-provider cancellation. "
-            "For clarify, emit exactly one final clarification stage that names the actual unresolved need naturally; do not add a second acknowledgement, progress line, promise, or status sentence. That stage must set speech_act=clarify or ask_clarification and commitment_state=waiting_for_user as direct fields, never inside metadata; waiting_for_user is a commitment_state, not a speech_act. When the CanonicalPlan has no goal_ids, every covers_goal_ids list must be empty. For alternatives, explain the change and request approval. "
+            "For clarify, emit exactly one final clarification stage that names the actual unresolved need naturally; do not add a second acknowledgement, progress line, promise, or status sentence. That stage must set speech_act=clarify or ask_clarification and commitment_state=waiting_for_user as direct fields, never inside metadata; waiting_for_user is a commitment_state, not a speech_act. For alternatives, explain the change and request approval. "
             "Social Attention is independent background cognition. Response Composer may acknowledge that it exists conceptually, but it must not author a SocialAttentionPlan, choose decorative capabilities, or treat missing decoration as a response failure. Optional presentation must never reopen primary cognition. "
             "response_plan must be a JSON object with only immediate, pre_action, progress, and final fields; it is never a bare list. "
             "The decoder enforces the exact ResponseComposerModelOutput JSON Schema. Return JSON with response_plan, lane_coordination, confidence, and rationale only."

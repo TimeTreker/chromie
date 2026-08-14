@@ -282,13 +282,11 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertEqual(schema["$defs"]["ResponsePlan"]["type"], "object")
         self.assertNotIn("SocialAttentionPlan", schema["$defs"])
         self.assertEqual(ollama.prompts[1][1]["response_format"], schema)
-        self.assertEqual(
-            schema["$defs"]["ResponseStage"]["properties"]["covers_goal_ids"]["items"]["enum"],
-            ["goal-look", "goal-blink"],
-        )
-        self.assertIn(
+        covers_schema = schema["$defs"]["ResponseStage"]["properties"]["covers_goal_ids"]
+        self.assertEqual(covers_schema["maxItems"], 0)
+        self.assertNotIn(
             "covers_goal_ids",
-            schema["$defs"]["ResponseStage"]["required"],
+            schema["$defs"]["ResponseStage"].get("required", []),
         )
         self.assertTrue(
             {
@@ -296,7 +294,6 @@ class ResponseComposerResolverTests(unittest.TestCase):
                 "speech_act",
                 "commitment_state",
                 "must_not_claim_completion",
-                "covers_goal_ids",
             }.issubset(schema["$defs"]["ResponseStage"]["required"])
         )
         regeneration_prompt = ollama.prompts[1][0]
@@ -915,8 +912,8 @@ class ResponseComposerResolverTests(unittest.TestCase):
         )
         self.assertEqual(pre_action.text, "好，我准备往前走十五秒。")
         self.assertIn(
-            "mixed_execute_goal_coverage_recovered_from_scheduled_fast_speech",
-            result.metadata["mixed_coverage_repair_reasons"],
+            "execute_goal_coverage_projected_from_existing_fast_speech",
+            result.metadata["goal_coverage_projection_reasons"],
         )
         self.assertEqual(len(ollama.prompts), 2)
 
@@ -1773,8 +1770,8 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertEqual(set(stage.covers_goal_ids), {"goal-blink", "goal-leaves"})
         self.assertEqual(stage.text, candidate["response_plan"]["immediate"]["text"])
         self.assertIn(
-            "mixed_execute_goal_coverage_extended_on_truthful_response_stage",
-            result.composition.metadata["mixed_coverage_repair_reasons"],  # type: ignore[union-attr]
+            "execute_goal_coverage_projected",
+            result.composition.metadata["goal_coverage_projection_reasons"],  # type: ignore[union-attr]
         )
 
     def test_mixed_execute_and_clarify_composes_one_truthful_response(self):

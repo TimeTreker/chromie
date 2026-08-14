@@ -94,6 +94,13 @@ parallel manager objects.
 ## Recent architecture closure
 Current source bounds Goal/Planner reconsideration, keeps benign chat Fast, makes
 Deep/Host semantic rejection terminal, and implements the frozen human-like Core.
+
+Response Goal coverage is now a Host-derived read-only projection. The Response
+Composer model owns wording but cannot author `covers_goal_ids`; canonical Goal
+ownership and exact reused-speech provenance project that delivery bookkeeping
+mechanically. This removes another duplicate writable semantic truth without
+changing playback/evidence correlation.
+
 Response Composer is the single wording owner. `SocialAttentionPlanner` is now the
 single optional-decoration writer; Response composition contains no Social-Attention
 DTO, malformed decoration fails soft without repair, and backend/calibration identity
