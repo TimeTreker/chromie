@@ -82,6 +82,31 @@ class ReflectionResolver:
                 reason_codes=opportunity.reason_codes,
                 reason_summary="Slow Reflection was not required for this opportunity.",
             )
+        if not opportunity.evidence_refs:
+            return ReflectionResolution(
+                opportunity_id=opportunity.opportunity_id,
+                goal_ids=opportunity.goal_ids,
+                evidence_refs=[],
+                reason_codes=opportunity.reason_codes,
+                reason_summary="Reflection requires trusted evidence before future adaptation.",
+            )
+        if opportunity.trigger == "execution_outcome":
+            outcome_bundle = context.get("execution_outcome_bundle")
+            outcome_id = (
+                str(outcome_bundle.get("outcome_id") or "").strip()
+                if isinstance(outcome_bundle, dict)
+                else ""
+            )
+            if not outcome_id or outcome_id not in opportunity.evidence_refs:
+                return ReflectionResolution(
+                    opportunity_id=opportunity.opportunity_id,
+                    goal_ids=opportunity.goal_ids,
+                    evidence_refs=opportunity.evidence_refs,
+                    reason_codes=opportunity.reason_codes,
+                    reason_summary=(
+                        "Reflection execution evidence did not match the trusted opportunity."
+                    ),
+                )
 
         raw = await self.ollama.generate(
             self._prompt(request, opportunity),
@@ -124,9 +149,10 @@ class ReflectionResolver:
     ) -> str:
         context = request.context if isinstance(request.context, dict) else {}
         return (
-            "Reflect only because trusted runtime raised a slow cognitive opportunity. "
-            "Decide whether the still-open responsibility needs replanning, clarification, "
-            "a forward user correction, or a reusable memory proposal. Do not rewrite or "
+            "Reflect only because trusted runtime raised a slow cognitive opportunity from "
+            "recorded evidence. Decide whether the still-open responsibility needs future "
+            "replanning, clarification, a forward user correction, or a reusable memory "
+            "proposal. Do not rewrite or "
             "reinterpret historical execution facts. Do not authorize effects. Do not change "
             "identity, personality, values, safety policy, provider capability, or permissions. "
             "A one-off failure is normally not worth memory; propose memory only for a pattern "
@@ -143,7 +169,7 @@ class ReflectionResolver:
     @staticmethod
     def _system_prompt() -> str:
         return (
-            "You are Chromie's selective Reflection ability. Reflection proposes forward repair "
+            "You are Chromie's selective Reflection ability. Reflection proposes future adaptation "
             "from trusted evidence. It never rewrites history, grants authority, or silently "
             "changes Stable Mind. Keep actions minimal and evidence-grounded."
         )

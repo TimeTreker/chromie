@@ -284,15 +284,18 @@ to make every low-risk interaction perfect through review chains.
 ### Reflection learns forward
 
 Reflection consumes trusted experience after meaningful surprise, contradiction,
-failure, importance, or repetition. It may create evidence-backed proposals for
-future calibration, Memory, Goal/Plan reconsideration, or learning through the
-normal owning boundaries. It is selective slow cognition, not a synchronous
-reviewer after every turn.
+failure, importance, or repetition. A model-authored Reflection action is valid only
+when runtime binds it to recorded outcome/evidence references and the affected
+Responsibility is still open. It may create evidence-backed proposals for future
+calibration, Memory, Goal/Plan reconsideration, clarification, or a future user
+correction through the normal owning boundaries. It is selective slow cognition, not
+a synchronous reviewer after every turn.
 
 Reflection never rewrites delivered speech, provider evidence, execution history,
-or past commitments. When Chromie misunderstood something, the system may retain
-"I misunderstood that" as experience. It must not rewrite history to make the
-old turn look correct.
+past commitments, or a completed outcome. It cannot reopen current-turn semantic or
+effect authority. When Chromie misunderstood something, the system may retain
+"I misunderstood that" as experience and adapt a later attempt; it must not rewrite
+history to make the old turn look correct.
 
 ### Reconstructability is an architecture test
 

@@ -34,8 +34,8 @@ class ReflectionMemoryCandidate(BaseModel):
 class ReflectionResolution(BaseModel):
     """Ephemeral result of selective slow cognition over trusted evidence.
 
-    Reflection may propose future repair. It never rewrites Evidence,
-    ExecutionOutcome, delivered speech, Stable Mind, or effect authority.
+    Reflection may propose evidence-driven future adaptation. It never rewrites
+    Evidence, ExecutionOutcome, delivered speech, Stable Mind, or effect authority.
     Goal/evidence references are supplied by trusted runtime, not chosen by the
     model-facing Reflection output.
     """
@@ -84,6 +84,8 @@ class ReflectionResolution(BaseModel):
             raise ValueError("correction_text requires correct_user action")
         if "correct_user" in self.actions and not self.correction_text:
             raise ValueError("correct_user action requires correction_text")
+        if self.actions and not self.evidence_refs:
+            raise ValueError("Reflection actions require trusted evidence_refs")
         if self.memory_candidates and "propose_memory" not in self.actions:
             raise ValueError("memory_candidates require propose_memory action")
         if "propose_memory" in self.actions and not self.memory_candidates:

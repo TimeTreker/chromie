@@ -141,7 +141,7 @@ def test_reflection_replans_without_changing_responsibility_and_promotes_only_re
 
     assert first_result[0]["memory_promoted"] == 0
     assert context["semantic_goal"]["responsibility_status"] == "open"
-    assert context["plan_status"] == "reflection_replan_requested"
+    assert context["plan_status"] == "reflection_future_replan_requested"
     assert not any(
         item["kind"] == "experience"
         for item in manager.snapshot()["extracted_memory"]
@@ -166,3 +166,100 @@ def test_reflection_replans_without_changing_responsibility_and_promotes_only_re
     assert len(experience) == 1
     assert experience[0]["persistence_policy"] == "ephemeral"
     assert manager.snapshot()["durable_profile_memory"]["entries"] == []
+
+
+def test_slow_reflection_without_trusted_evidence_does_not_invoke_model() -> None:
+    opportunity = CognitiveOpportunity.create(
+        trigger="execution_outcome",
+        goal_ids=["goal-arm"],
+        evidence_refs=[],
+        reason_codes=["grasp_failed"],
+        recommended_cognition="slow",
+    )
+    ollama = FakeOllama({"actions": ["replan"]})
+    request = AgentRunRequest(
+        sid="sid-reflect-no-evidence",
+        text="Please keep trying.",
+        route_decision=RouteDecision(
+            route="robot_action",
+            intent="selective_reflection",
+            confidence=1.0,
+            source="llm",
+            language="en-US",
+        ),
+        context={
+            "cognitive_opportunity": opportunity.prompt_projection(),
+            "execution_outcome_bundle": {},
+            "active_goal_snapshots": [{"goal_id": "goal-arm"}],
+        },
+    )
+
+    result = asyncio.run(ReflectionResolver(ollama).resolve(request))
+
+    assert ollama.calls == 0
+    assert result.actions == []
+    assert "trusted evidence" in result.reason_summary
+
+
+def test_reflection_cannot_reopen_completed_outcome() -> None:
+    manager = ConversationStateManager(base_conversation_id="reflection-completed")
+    manager.apply_semantic_task_operations_atomically(
+        [
+            {
+                "operation_id": "create-goal",
+                "operation": "create",
+                "goal": {
+                    "goal_id": "goal-arm-complete",
+                    "description": "Bring the cup.",
+                    "source_text": "Bring the cup.",
+                },
+            }
+        ],
+        sid="sid-create-complete",
+        user_text="Bring the cup.",
+    )
+    context = manager._task_context_by_goal_id("goal-arm-complete")
+    assert context is not None
+    context["evidence_summary"] = {
+        "execution_outcome": {
+            "outcome_id": "outcome-complete",
+            "turn_id": "turn-complete",
+            "evidence_ids": ["evidence-complete"],
+            "status": "completed",
+        }
+    }
+    before = context.copy()
+    resolution = ReflectionResolution(
+        opportunity_id="opportunity-complete",
+        goal_ids=["goal-arm-complete"],
+        evidence_refs=["outcome-complete", "evidence-complete"],
+        reason_codes=["late_reflection"],
+        actions=["replan"],
+        reason_summary="Try again.",
+    )
+
+    result = manager.apply_reflection_resolution(resolution, sid="sid-complete")
+
+    assert result == [
+        {
+            "goal_id": "goal-arm-complete",
+            "applied": False,
+            "reason": "reflection_completed_outcome_is_terminal",
+        }
+    ]
+    assert context.get("plan_status") == before.get("plan_status")
+    assert context["semantic_goal"]["description"] == "Bring the cup."
+
+
+def test_reflection_actions_require_evidence_refs() -> None:
+    import pytest
+
+    with pytest.raises(ValueError, match="trusted evidence_refs"):
+        ReflectionResolution(
+            opportunity_id="opportunity-no-evidence",
+            goal_ids=["goal-arm"],
+            evidence_refs=[],
+            reason_codes=["grasp_failed"],
+            actions=["replan"],
+            reason_summary="Try another route.",
+        )

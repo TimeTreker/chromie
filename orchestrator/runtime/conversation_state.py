@@ -4682,9 +4682,9 @@ class ConversationStateManager:
         *,
         sid: str | None,
     ) -> list[dict[str, Any]]:
-        """Apply bounded forward-repair proposals without rewriting history.
+        """Apply bounded future-adaptation proposals without rewriting history.
 
-        Reflection may request replanning and may propose non-durable task/session
+        Reflection may request future replanning and may propose non-durable task/session
         memory. Memory promotion is accepted only after matching reason evidence
         has appeared in an earlier Reflection for the same Goal. Durable profile
         memory remains exclusively behind the existing explicit-consent boundary.
@@ -4720,18 +4720,33 @@ class ConversationStateManager:
             )
             if not isinstance(recorded, dict):
                 raise ValueError("reflection requires recorded execution evidence")
-            allowed_refs = {str(recorded.get("outcome_id") or "").strip()}
+            recorded_outcome_id = str(recorded.get("outcome_id") or "").strip()
+            allowed_refs = {recorded_outcome_id}
             allowed_refs.update(
                 str(item).strip()
                 for item in recorded.get("evidence_ids") or []
                 if str(item).strip()
             )
+            if reflected.actions and (
+                not recorded_outcome_id
+                or recorded_outcome_id not in reflected.evidence_refs
+            ):
+                raise ValueError(
+                    "reflection actions require the recorded execution outcome reference"
+                )
             unknown_refs = set(reflected.evidence_refs) - allowed_refs
             if unknown_refs:
                 raise ValueError(
                     "reflection references evidence outside the recorded outcome: "
                     + ",".join(sorted(unknown_refs))
                 )
+            if reflected.actions and str(recorded.get("status") or "").strip() == "completed":
+                results.append({
+                    "goal_id": goal_id,
+                    "applied": False,
+                    "reason": "reflection_completed_outcome_is_terminal",
+                })
+                continue
 
             metadata = context.get("metadata")
             if not isinstance(metadata, dict):
@@ -4753,13 +4768,13 @@ class ConversationStateManager:
             if "replan" in reflected.actions:
                 context["status"] = "planning"
                 context["commitment_state"] = "evaluating"
-                context["plan_status"] = "reflection_replan_requested"
+                context["plan_status"] = "reflection_future_replan_requested"
             if "clarify" in reflected.actions:
                 context["status"] = "waiting_for_user"
                 context["commitment_state"] = "waiting_for_user"
-                context["plan_status"] = "reflection_clarification_needed"
+                context["plan_status"] = "reflection_future_clarification_needed"
             if "correct_user" in reflected.actions:
-                metadata["reflection_correction_candidate"] = {
+                metadata["reflection_future_correction_candidate"] = {
                     "text": reflected.correction_text,
                     "opportunity_id": reflected.opportunity_id,
                     "evidence_refs": list(reflected.evidence_refs),
@@ -4804,6 +4819,7 @@ class ConversationStateManager:
                 "memory_promoted": promoted,
                 "repeated_pattern": repeated_pattern,
                 "responsibility_status": self._goal_responsibility_status(context),
+                "future_adaptation": True,
             })
 
         if memory_entries:

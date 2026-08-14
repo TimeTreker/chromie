@@ -626,12 +626,15 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
 
 39. **Reflection learns forward; it does not rewrite history.** Trusted observations,
    delivered speech, commitments, execution attempts, and outcomes remain historical
-   evidence. Reflection may explain surprise, record an experience, calibrate future
-   cognition, or propose future Goal/Plan/Memory changes through their normal owners.
-   It must not retroactively make a failed interpretation 'what Chromie meant all
-   along', mutate completed evidence, or repair the current turn after the fact.
+   evidence. Any Reflection action must be bound to trusted outcome/evidence references
+   supplied by runtime, may affect only still-open Responsibility, and cannot reopen a
+   completed outcome. Reflection may explain surprise, record an experience, calibrate
+   future cognition, or propose future Goal/Plan/Memory changes through their normal
+   owners. It must not retroactively make a failed interpretation 'what Chromie meant
+   all along', mutate completed evidence, or repair/reopen the current turn after the
+   fact.
 
-38. **The architecture must be reconstructable from a small set of responsibilities.**
+40. **The architecture must be reconstructable from a small set of responsibilities.**
    A normal interaction should be explainable without knowing historical regression
    names or repair sequences: what did the person ask, what did Chromie owe, why was
    Fast or Deep warranted, which capability/Provider advanced the Goal, what actually

@@ -101,12 +101,12 @@ ownership and exact reused-speech provenance project that delivery bookkeeping
 mechanically. This removes another duplicate writable semantic truth without
 changing playback/evidence correlation.
 
-Response Composer is the single wording owner. `SocialAttentionPlanner` is now the
-single optional-decoration writer; Response composition contains no Social-Attention
-DTO, malformed decoration fails soft without repair, and backend/calibration identity
-is stripped before model reasoning. Reflection learns forward. These are source
-claims only; no new target evidence is implied.
-
+Response Composer is the single wording owner. `SocialAttentionPlanner` is the sole
+optional-decoration writer; malformed decoration fails soft and backend/calibration
+identity is stripped before model reasoning. Reflection is evidence-bound future
+adaptation: actions require recorded outcome/evidence, apply only to open Responsibility,
+and cannot reopen completed outcomes or current-turn authority. These are source claims
+only; no new target evidence is implied.
 ## Do not resurrect
 - independent Router semantic authority;
 - `social_attention` as a third execution lane or standalone Goal;
