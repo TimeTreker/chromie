@@ -145,34 +145,4 @@ def semantic_authority_route_matrix() -> list[dict[str, Any]]:
             "planner_path": "legacy CapabilityAgent semantic planner",
             "fallback": "requires explicit service enablement and per-turn claim",
         },
-        {
-            "entrypoint": (
-                "post_interrupt_correction/apply "
-                "(mapped lane allowlisted)"
-            ),
-            "owner": "goal_driven_runtime",
-            "role": "authoritative",
-            "selection": (
-                "corrected mapped route lane is in ORCH_COGNITIVE_APPLY_LANES "
-                "and the apply preconditions pass"
-            ),
-            "planner_path": "same apply coordinator as normal routed text",
-            "fallback": "fail_closed_after_authority_acquisition",
-        },
-        {
-            "entrypoint": (
-                "post_interrupt_correction/compatibility "
-                "(mapped lane excluded)"
-            ),
-            "owner": "goal_driven_runtime",
-            "role": "authoritative",
-            "selection": (
-                "corrected mapped route lane is not in "
-                "ORCH_COGNITIVE_APPLY_LANES"
-            ),
-            "planner_path": (
-                "no planner is entered; the Host fails closed and physical resume stays locked"
-            ),
-            "fallback": "fail_closed_without_legacy_reentry",
-        },
     ]

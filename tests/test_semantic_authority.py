@@ -121,8 +121,6 @@ class SemanticAuthorityContractTests(unittest.TestCase):
                 "orchestrator.handle_routed_text/report_only",
                 "agent./interaction with exact Goal Interpretation actions",
                 "agent./interaction or /run emergency compatibility",
-                "post_interrupt_correction/apply (mapped lane allowlisted)",
-                "post_interrupt_correction/compatibility (mapped lane excluded)",
             },
         )
         for row in matrix:
@@ -134,7 +132,6 @@ class SemanticAuthorityContractTests(unittest.TestCase):
             if row["entrypoint"]
             in {
                 "orchestrator.handle_routed_text/apply (mapped lane allowlisted)",
-                "post_interrupt_correction/apply (mapped lane allowlisted)",
             }
         ]
         self.assertTrue(
@@ -152,7 +149,6 @@ class SemanticAuthorityContractTests(unittest.TestCase):
             if row["entrypoint"]
             in {
                 "orchestrator.handle_routed_text/apply (mapped lane excluded)",
-                "post_interrupt_correction/compatibility (mapped lane excluded)",
             }
         ]
         self.assertTrue(

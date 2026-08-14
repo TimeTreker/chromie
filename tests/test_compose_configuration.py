@@ -77,7 +77,6 @@ class ComposeConfigurationTests(unittest.TestCase):
         self.assertIn("AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE: ${AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE:-24h}", agent_block)
         self.assertIn("AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP: ${AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP:-1}", agent_block)
         self.assertIn("AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS: ${AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS:-60000}", agent_block)
-        self.assertIn("AGENT_GOAL_INTERPRETER_REVIEW_MODEL: ${AGENT_GOAL_INTERPRETER_REVIEW_MODEL:-gemma4:e2b}", agent_block)
         self.assertIn("AGENT_GOAL_INTERPRETER_TIMEOUT_MS: ${AGENT_GOAL_INTERPRETER_TIMEOUT_MS:-5400}", agent_block)
         self.assertIn("AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS: ${AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS:-5400}", agent_block)
         self.assertIn("AGENT_GOAL_INTERPRETER_LLM_NUM_CTX: ${AGENT_GOAL_INTERPRETER_LLM_NUM_CTX:-4096}", agent_block)
@@ -98,10 +97,8 @@ class ComposeConfigurationTests(unittest.TestCase):
             "AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_CACHE_TTL_MS: ${AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_CACHE_TTL_MS:-5000}",
             agent_block,
         )
-        self.assertIn(
-            "AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED: ${AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED:-0}",
-            agent_block,
-        )
+        self.assertNotIn("AGENT_GOAL_INTERPRETER_REVIEW_MODEL", agent_block)
+        self.assertNotIn("AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED", agent_block)
 
     def test_agent_is_the_only_cognitive_service_and_owns_goal_interpretation(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")

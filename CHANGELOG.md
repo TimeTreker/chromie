@@ -5,6 +5,7 @@ remains available in Git history.
 
 ## Unreleased
 
+- Bounded Fast Goal Interpretation to one mechanical DTO repair and one risk-tiered Deep handoff: benign low-confidence chat stays fast, consequential uncertainty escalates, and repeated malformed or contradictory output fails closed.
 - Collapsed physical-object and information fetch/delivery into one canonical
   `AcquireAndDeliverResource` semantic responsibility. `resource.kind` and
   `delivery_mode` now drive provider matching; legacy `responsibility_variant` is

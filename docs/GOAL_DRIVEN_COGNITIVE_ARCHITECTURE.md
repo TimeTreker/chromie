@@ -1272,18 +1272,39 @@ maintained transaction is deliberately smaller than Goal Association's:
 ```text
 primary fast interpretation
   -> optional one mechanical DTO repair
-  -> accept, delegate low confidence to Deep Thinking, or fail closed
+  -> accept, delegate uncertain tool/memory/robot work to Deep Thinking, or fail closed
 ```
 
 It does not run an intent reviewer, semantic-route repair, generic-chat critic,
 capability-grounding reviewer, or repair-of-review chain. Deterministic code may
 validate schema, catalog identity, authorization-independent effect shape, and
 impossible route/intent combinations, but it may not manufacture ordinary user
-meaning. A valid low-confidence interpretation is delegated once to Deep Thinking
-with the original admitted turn and bounded evidence; Deep Thinking is a deeper
-interpretation before commitment, not a patch of the Fast DTO. A semantic
-contradiction or a second malformed DTO is retained as technical evidence and
-fails closed.
+meaning. A valid low-confidence interpretation is delegated once to Deep
+Thinking when its route could change responsibility, external work, memory, or
+effects. A
+schema-valid benign `chat` decision stays on the fast conversational path; low
+confidence in its fine-grained conversational label does not justify another
+semantic model call. Deep Thinking receives the original admitted turn and
+bounded evidence; it is deeper cognition before commitment, not a patch of the
+Fast DTO. A semantic contradiction or a second malformed DTO is retained as
+technical evidence and fails closed.
+
+The confidence threshold is risk-tiered rather than universal:
+
+| Fast result | Control action |
+|---|---|
+| schema-valid `chat`, at any confidence | Keep the fast conversational lane; normalize only structural defaults such as `intent=general_conversation`. |
+| schema-valid non-chat result at or above threshold | Continue through the normal typed validators. |
+| schema-valid low-confidence `tool`, `memory`, or `robot_action` | Delegate once to Deep Thinking from the authoritative admitted turn; commit no work first. |
+| explicit `deep_thought` | Enter Deep Thinking once without another Fast semantic reviewer. |
+| malformed DTO | Permit one same-stage mechanical DTO repair. |
+| semantic contradiction or second malformed DTO | Fail closed, retain evidence for evaluation/Reflection, and authorize no effect. |
+
+Removed online reviewers therefore have explicit replacement owners: DTO shape is
+owned by the one mechanical repair; uncertain consequential meaning by Deep
+Thinking; capability identity and arguments by typed catalog/schema validators;
+plan complexity by Deep Planner; and trusted plan rejection by terminal Host
+validation. None of those owners may rewrite committed Goal meaning.
 
 Transport retry of the exact same immutable request may be handled by the client
 as provider reliability evidence, but it is not a new semantic invocation and may
@@ -1723,8 +1744,9 @@ novelty or broader context, or safety/resource reasoning requires the wider
 planning boundary. Fast-to-Deep is the one planning escalation, not repair of an
 already committed Goal or execution result. Deep Planner receives the original
 Goal truth, the Fast draft and failure evidence, and the full planning boundary.
-It may make at most one same-tier schema/validator-feedback revision; continued
-invalidity fails closed. Model confidence alone neither grants a direct/Fast
+It may regenerate once only when its structured DTO is mechanically malformed;
+semantic grounding, coverage, confidence/satisfaction, capability, or safety
+rejection is terminal and fails closed. Model confidence alone neither grants a direct/Fast
 bypass nor replaces deterministic effect and safety validation.
 
 It may produce:
@@ -1765,7 +1787,7 @@ must own an executable step, have delivered evidence-bound dialogue for that
 same Goal, or carry an explicit `clarify`, `escalate`, `unavailable`, or
 `refused` outcome. An unresolved effectful Goal with zero owned steps and no
 such evidence is a contract failure: Fast may make its one mechanical contract
-revision and then escalate; Deep may make its one same-tier revision and then
+revision and then escalate; Deep may make its one mechanical DTO regeneration and then
 fails closed or returns an explicit model-authored clarification/unavailable/
 refused outcome. The Host validates typed Goal metadata and ownership only; it
 does not infer effect from phrases and never invokes a third semantic planning
@@ -1816,7 +1838,7 @@ result: material alternative requiring confirmation
 
 Requirements:
 
-- maximum replan count;
+- maximum mechanical DTO regeneration count;
 - explicit rejection reason;
 - monotonically increasing plan version;
 - no identical retry;
@@ -2564,21 +2586,21 @@ Exit criteria:
 - walk-and-blink cannot narrow to walking;
 - identical validator path for fast plans.
 
-### PR4 — Deep Planner and bounded replan
+### PR4 — Terminal Deep Planner and bounded DTO regeneration
 
 Deliver:
 
 - full-registry deep planning;
 - exact, safe-adjustment, alternative, clarification, unavailable, refused;
 - structured validator rejection feedback;
-- bounded same-tier replan;
+- mechanical DTO regeneration only;
 - explicit no-return-to-fast invariant.
 
 Exit criteria:
 
 - conditional and composed plans;
 - resource conflict alternative;
-- replan-budget exhaustion behavior;
+- mechanical DTO-regeneration exhaustion behavior;
 - no planner recursion.
 
 ### PR5 — Parameter resolution and goal satisfaction

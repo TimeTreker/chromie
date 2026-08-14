@@ -198,7 +198,7 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    Outside deterministic operational controls, normal conversation, memory,
    tool, robot-action,
    capability-selection, body-goal interpretation, planning, low-confidence
-   correction, and deep-thought behavior must be decided by LLM reasoning over
+   escalation, and deep-thought behavior must be decided by LLM reasoning over
    language meaning, bounded context, capability descriptions, schemas, and
    task memory. Catalog search, score thresholds, regression fixtures, regexes,
    and phrase tables may retrieve candidates or validate and reject model
@@ -517,8 +517,11 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    admitted meaning to its designated deeper cognition, follows an explicitly
    bounded transaction such as Principle 30, or fails closed. Low-confidence Fast
    Understanding may delegate once to Deep Thinking before Goal truth is
-   committed. Fast Planning may escalate once to Deep Planning; Deep Planning may
-   make at most one same-tier validator-feedback revision. Trusted Host validation
+   committed when uncertainty could change responsibility, external work,
+   memory, or effects. A schema-valid benign chat route remains fast;
+   confidence is not a universal escalation trigger. Fast Planning may escalate once to Deep Planning. A planner tier may
+   regenerate once only for a mechanically malformed DTO; Deep semantic, grounding,
+   coverage, confidence/satisfaction, or safety rejection is terminal. Trusted Host validation
    is terminal authority and cannot invoke another semantic planner after rejecting
    the resulting plan. No later planner may reinterpret or repair already committed
    Goal meaning. Failure evidence may be retained immutably for Reflection,

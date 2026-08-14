@@ -40,8 +40,6 @@ def audit() -> dict[str, Any]:
         "orchestrator.handle_routed_text/report_only",
         "agent./interaction with exact Goal Interpretation actions",
         "agent./interaction or /run emergency compatibility",
-        "post_interrupt_correction/apply (mapped lane allowlisted)",
-        "post_interrupt_correction/compatibility (mapped lane excluded)",
     }
     actual_entrypoints = {str(row.get("entrypoint") or "") for row in matrix}
     if actual_entrypoints != expected_entrypoints:
@@ -62,8 +60,7 @@ def audit() -> dict[str, Any]:
         if row.get("entrypoint")
         in {
             "orchestrator.handle_routed_text/apply (mapped lane allowlisted)",
-            "post_interrupt_correction/apply (mapped lane allowlisted)",
-        }
+            }
     ]
     for row in apply_rows:
         if row.get("owner") != "goal_driven_runtime":
@@ -81,8 +78,7 @@ def audit() -> dict[str, Any]:
         if row.get("entrypoint")
         in {
             "orchestrator.handle_routed_text/apply (mapped lane excluded)",
-            "post_interrupt_correction/compatibility (mapped lane excluded)",
-        }
+            }
     ]
     for row in excluded_rows:
         if row.get("owner") != "goal_driven_runtime":
@@ -183,12 +179,14 @@ def audit() -> dict[str, Any]:
         "_goal_driven_authority_context",
         "_legacy_agent_authority_context",
         '"status": "error"',
-        "post_interrupt_compatibility_path",
     ):
         if required not in orchestrator:
             errors.append(f"Orchestrator authority boundary missing: {required}")
 
-    if orchestrator.count("context=agent_context") < 4:
+    # The maintained compatibility surface has exactly two Agent semantic call
+    # sites: /interaction and /run. Post-interrupt semantic re-entry was removed,
+    # so every remaining compatibility call must carry the explicit authority claim.
+    if orchestrator.count("context=agent_context") < 2:
         errors.append(
             "Orchestrator does not pass an explicit authority claim through every "
             "/interaction and /run compatibility call site"

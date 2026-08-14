@@ -275,7 +275,7 @@ class VocalDeclarationAndPlannerTests(unittest.TestCase):
             history=[],
         )
 
-        plan = asyncio.run(DeepPlannerResolver(model, catalog, max_replans=0).resolve(request))
+        plan = asyncio.run(DeepPlannerResolver(model, catalog, max_contract_repairs=0).resolve(request))
 
         self.assertEqual(plan.disposition, "execute")
         self.assertEqual(len(plan.steps), 1)

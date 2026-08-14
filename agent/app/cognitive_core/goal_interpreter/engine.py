@@ -72,7 +72,6 @@ async def initialize_goal_interpreter() -> None:
 goal_interpreter = OllamaGoalInterpreter(
     ollama_url=settings.ollama_url,
     model=settings.model,
-    review_model=settings.review_model,
     timeout_ms=settings.llm_timeout_ms,
     review_timeout_ms=settings.review_timeout_ms,
     confidence_threshold=settings.confidence_threshold,
@@ -111,12 +110,6 @@ def interpretation_profile() -> dict[str, Any]:
                 "description": "Deterministic stop, cancel, silence, emergency, and unusable-audio handling before model interpretation.",
                 "routes": ["interrupt", "ignore"],
                 "llm": False,
-            },
-            {
-                "id": "post_interrupt_review",
-                "description": "Optional semantic review after an interrupt has already been applied.",
-                "routes": ["chat", "deep_thought", "robot_action", "tool", "memory", "clarify", "interrupt", "ignore"],
-                "llm": settings.mode in {"hybrid", "llm_only"} and settings.post_interrupt_review_enabled,
             },
             {
                 "id": "quick_intent",
@@ -931,6 +924,25 @@ def _validate_llm_capability_decision(
     return finalize_decision(decision, request, source="llm")
 
 
+def _should_delegate_low_confidence_to_deep(
+    decision: RouteDecision,
+) -> bool:
+    """Escalate uncertain meaning only when it can change owned work or effects.
+
+    A schema-valid ``chat`` decision is non-effectful and may remain on the fast
+    conversational path even when its fine-grained intent confidence is low.
+    Deep Thinking remains available when Fast explicitly selects ``deep_thought``;
+    low-confidence tool, memory, or embodied work is delegated because an error
+    there could change responsibilities, external work, or effects.  This is a
+    risk boundary, not a semantic repair of the Fast output.
+    """
+
+    return (
+        decision.confidence < settings.confidence_threshold
+        and decision.route in {"tool", "memory", "robot_action"}
+    )
+
+
 def _deep_thought_from_low_confidence(
     request: RouteRequest,
     decision: RouteDecision,
@@ -1122,156 +1134,6 @@ def _attach_stage_context(
     }
 
 
-def _decision_summary(decision: RouteDecision) -> dict:
-    return {
-        "route": decision.route,
-        "agents": list(decision.agents),
-        "intent": decision.intent,
-        "confidence": decision.confidence,
-        "language": decision.language,
-        "priority": decision.priority,
-        "interrupt_current": decision.interrupt_current,
-        "needs_agent": decision.needs_agent,
-        "should_speak": decision.should_speak,
-        "speak_first": decision.speak_first,
-        "actions": list(decision.actions),
-        "candidate_capabilities": list(decision.candidate_capabilities),
-        "reason": decision.reason,
-        "source": decision.source,
-        "metadata": {
-            key: value
-            for key, value in (decision.metadata or {}).items()
-            if key not in {"route_stage_outputs", "task_list", "task_proposals", "route_merge"}
-        },
-    }
-
-
-def _attach_post_interrupt_review(
-    interrupt_decision: RouteDecision,
-    advisory: RouteDecision | None,
-    *,
-    status: str,
-    reason: str | None = None,
-) -> RouteDecision:
-    outputs = [
-        route_stage_output(
-            interrupt_decision,
-            stage="emergency_filter",
-            status="triggered",
-        )
-    ]
-    review: dict = {"status": status}
-    if reason:
-        review["reason"] = reason
-
-    if advisory is not None:
-        review["decision"] = _decision_summary(advisory)
-        if status == "corrected":
-            outputs.append(
-                route_stage_output(
-                    advisory,
-                    stage="post_interrupt_review",
-                    status="corrected_after_interrupt",
-                )
-            )
-            review["post_interrupt_decision"] = _decision_summary(advisory)
-        else:
-            outputs.append(
-                route_stage_output(
-                    advisory,
-                    stage="post_interrupt_review",
-                    status=status,
-                    tasks=[],
-                )
-            )
-
-    interrupt_decision.metadata = {
-        **(interrupt_decision.metadata or {}),
-        "post_interrupt_review": review,
-    }
-    if status == "corrected" and advisory is not None:
-        interrupt_decision.metadata["post_interrupt_decision"] = _decision_summary(advisory)
-    return annotate_stage_outputs(
-        interrupt_decision,
-        outputs,
-        merge_strategy="safety_interrupt_then_semantic_review",
-        merge_reason=reason,
-        selected_stage="emergency_filter",
-    )
-
-
-async def _review_priority_interrupt(
-    request: RouteRequest,
-    interrupt_decision: RouteDecision,
-) -> RouteDecision:
-    if not settings.post_interrupt_review_enabled:
-        return interrupt_decision
-    if settings.mode not in {"hybrid", "llm_only"}:
-        return interrupt_decision
-    if interrupt_decision.route != "interrupt":
-        return interrupt_decision
-
-    snapshot_method = getattr(capability_catalog, "snapshot", None)
-    try:
-        catalog_snapshot = await snapshot_method() if callable(snapshot_method) else {}
-    except Exception as exc:
-        logger.warning("post-interrupt catalog snapshot failed: %s", exc)
-        catalog_snapshot = {"live_refresh_error": f"{type(exc).__name__}: {exc}"}
-    prompt_capabilities_all = _prompt_catalog_capabilities(
-        catalog_snapshot,
-        scope="all",
-    )
-    prompt_capabilities_common = _prompt_catalog_capabilities(
-        catalog_snapshot,
-        scope="common",
-    )
-    catalog_result = _catalog_result_from_snapshot(request, catalog_snapshot)
-
-    _attach_stage_context(
-        request,
-        emergency_matched=True,
-        catalog_result=catalog_result,
-        prompt_capabilities_common=prompt_capabilities_common,
-        prompt_capabilities_all=prompt_capabilities_all,
-    )
-    interrupt_decision.candidate_capabilities = list(prompt_capabilities_common)
-
-    try:
-        advisory = await goal_interpreter.review_after_priority_interrupt(
-            request,
-            interrupt_decision,
-        )
-    except Exception as exc:
-        logger.warning("post-interrupt semantic review failed: %s", exc)
-        return _attach_post_interrupt_review(
-            interrupt_decision,
-            None,
-            status="unavailable",
-            reason=f"review_error:{type(exc).__name__}",
-        )
-
-    if advisory.route in {"interrupt", "ignore"}:
-        return _attach_post_interrupt_review(
-            interrupt_decision,
-            advisory,
-            status="confirmed" if advisory.route == "interrupt" else "ignored",
-        )
-    if advisory.confidence < settings.confidence_threshold:
-        return _attach_post_interrupt_review(
-            interrupt_decision,
-            advisory,
-            status="uncertain",
-            reason=(
-                f"confidence {advisory.confidence:.2f} below threshold "
-                f"{settings.confidence_threshold:.2f}"
-            ),
-        )
-    return _attach_post_interrupt_review(
-        interrupt_decision,
-        advisory,
-        status="corrected",
-    )
-
 
 
 async def interpret_turn(request: RouteRequest) -> RouteDecision:
@@ -1289,7 +1151,7 @@ async def interpret_turn(request: RouteRequest) -> RouteDecision:
         else route_by_priority_rules(request)
     )
     if priority is not None:
-        decision = await _review_priority_interrupt(request, priority)
+        decision = priority
         emergency_matched = True
 
     if decision is None:
@@ -1359,10 +1221,7 @@ async def interpret_turn(request: RouteRequest) -> RouteDecision:
                             llm_decision,
                             catalog_result,
                         )
-                    elif (
-                        llm_decision.confidence < settings.confidence_threshold
-                        and llm_decision.route not in {"deep_thought", "clarify"}
-                    ):
+                    elif _should_delegate_low_confidence_to_deep(llm_decision):
                         decision = _deep_thought_from_low_confidence(request, llm_decision)
                     else:
                         decision = _validate_llm_capability_decision(

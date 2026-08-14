@@ -973,7 +973,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("ledger-fast-marker", prompt)
         self.assertIn("plan only the still-needed conversational and effectful delta", prompt)
 
-    def test_effectful_zero_step_false_satisfaction_repairs_then_escalates(self):
+    def test_effectful_zero_step_false_satisfaction_escalates_without_same_tier_repair(self):
         invalid = {
             "disposition": "respond",
             "coverage": "complete",
@@ -1015,12 +1015,13 @@ class FastPlannerResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(plan.disposition, "escalate")
-        self.assertEqual(plan.metadata["path_classification"], "contract_failure")
+        self.assertEqual(plan.metadata["path_classification"], "semantic_escalation")
+        self.assertEqual(plan.escalation_reason, "fast_planner_semantic_validation_failed")
         self.assertIn(
             "unresolved effectful goal requires an executable step",
-            plan.metadata["initial_validation_errors"],
+            plan.metadata["error"],
         )
 
     def test_missing_resource_provider_escalates_without_hard_model_failure(self):
@@ -1609,7 +1610,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("complete multi-goal planner output requires goal_outcomes", repair_prompt)
         self.assertIn("regenerate one fresh complete model-authored plan object", repair_prompt)
         self.assertIn(
-            "Previous Fast Planner output when doing a semantic replan:\nnull",
+            "Previous Fast Planner output when doing a mechanical DTO regeneration:\nnull",
             repair_prompt,
         )
 
@@ -2032,7 +2033,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         self.assertIn("one short sentence each", ollama.prompts[0][0])
 
-    def test_explicit_numeric_grounding_mismatch_gets_bounded_model_repair(self):
+    def test_explicit_numeric_grounding_mismatch_escalates_without_same_tier_repair(self):
         invalid = multi_goal_plan(
             disposition="execute",
             coverage="complete",
@@ -2109,12 +2110,14 @@ class FastPlannerResolverTests(unittest.TestCase):
             FastPlannerResolver(ollama, FakeCatalog()).resolve(run_request)
         )
 
-        self.assertEqual(plan.steps[0].args["duration_s"], 2.0)
-        self.assertTrue(plan.metadata["contract_repair_succeeded"])
-        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.steps, [])
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertEqual(plan.metadata["path_classification"], "semantic_escalation")
+        self.assertEqual(plan.escalation_reason, "fast_planner_semantic_validation_failed")
         self.assertIn(
             "explicit numeric goal value has no matching user_supplied",
-            ollama.prompts[1][0],
+            plan.metadata["error"],
         )
 
     def test_numeric_grounding_accepts_stable_source_goal_provenance(self):

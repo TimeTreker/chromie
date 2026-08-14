@@ -99,11 +99,11 @@ The working tree now replaces Goal Association's review/alignment chain with a
 bounded five-invocation transaction, one nested resource authority plus frozen
 Planner projection, and no valid-`none` Social Attention critic. The Fast Goal
 Interpreter now performs one primary interpretation plus at most one mechanical
-DTO repair; low confidence delegates once to Deep Thinking, while semantic
-contradictions fail closed. Fast Planner may escalate once to Deep Planner, Deep
-owns at most one same-tier revision, and trusted Host rejection is terminal rather
-than a third semantic-planning pass. This is source work, not a new target-evidence
-claim.
+DTO repair; low-confidence `tool`, `memory`, or `robot_action` work delegates
+once to Deep Thinking, while schema-valid benign chat remains fast and semantic
+contradictions fail closed. Fast Planner may escalate once to Deep Planner; each tier
+may regenerate once only for a malformed DTO. Semantic/grounding/coverage/safety
+rejection in Deep and trusted Host rejection are terminal, not extra planning passes. This is source work, not a new target-evidence claim.
 ## Do not resurrect
 - independent Router semantic authority;
 - `social_attention` as a third execution lane or standalone Goal;

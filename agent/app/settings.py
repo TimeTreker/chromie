@@ -450,9 +450,6 @@ class Settings(BaseModel):
         default_factory=lambda: int(os.getenv("AGENT_DEEP_PLANNER_MAX_CAPABILITIES", "96")), ge=1, le=256
     )
     deep_planner_min_goal_satisfaction: float = Field(default_factory=lambda: float(os.getenv("AGENT_DEEP_PLANNER_MIN_GOAL_SATISFACTION", "0.75")), ge=0.0, le=1.0)
-    deep_planner_max_replans: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_DEEP_PLANNER_MAX_REPLANS", "1")), ge=0, le=1
-    )
     response_composer_enabled: bool = Field(
         default_factory=lambda: os.getenv("AGENT_RESPONSE_COMPOSER_ENABLED", "1").strip().lower()
         not in {"0", "false", "no", "off"}
@@ -533,7 +530,6 @@ class GoalInterpreterSettings(BaseModel):
     rules_first: bool = True
     ollama_url: str = Field(default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_OLLAMA_URL", "http://chromie-llm:11434"))
     model: str = Field(default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_MODEL", "qwen3:4b"))
-    review_model: str = Field(default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_REVIEW_MODEL", "gemma4:e2b"))
     timeout_ms: int = Field(default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_TIMEOUT_MS", "5400")))
     llm_timeout_ms: int = Field(default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS", os.getenv("AGENT_GOAL_INTERPRETER_TIMEOUT_MS", "5400"))))
     llm_num_ctx: int = Field(
@@ -574,10 +570,6 @@ class GoalInterpreterSettings(BaseModel):
     )
     capability_catalog_cache_ttl_ms: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_CACHE_TTL_MS", "5000"))
-    )
-    post_interrupt_review_enabled: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED", "0").strip().lower()
-        not in {"0", "false", "no", "off"}
     )
     log_level: str = Field(default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_LOG_LEVEL", os.getenv("LOG_LEVEL", "INFO")))
 

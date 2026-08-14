@@ -105,7 +105,7 @@
         },
         {
           "key": "goal_interpretation/walk_forward_stale_weather_primary_grounded",
-          "rationale": "An internally inconsistent stale weather route is semantically repaired to the exact walking affordance."
+          "rationale": "The fast model must author the exact walking affordance despite stale weather context; the Host must not reconstruct it through semantic repair."
         },
         {
           "key": "cognitive_core_dialogue/weather_then_repeated_walk_stays_grounded",
@@ -488,6 +488,10 @@
         {
           "key": "goal_interpretation/weather_pending_work_restores_truthful_fast_acknowledgement",
           "rationale": "A safe-read route may acknowledge understanding and evaluation immediately while reserving every result claim for trusted evidence."
+        },
+        {
+          "key": "goal_interpretation/low_confidence_greeting_stays_fast_chat",
+          "rationale": "A schema-valid low-confidence greeting remains non-effectful fast conversation instead of consuming Deep Thinking or inheriting another lane."
         }
       ],
       "live_text_cases": [

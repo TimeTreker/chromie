@@ -191,7 +191,7 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
         self.assertEqual(plan.disposition, "clarify")
         self.assertEqual(plan.parameter_resolutions[0].strategy, "ask_user")
 
-    def test_complete_plan_below_satisfaction_threshold_is_replanned(self):
+    def test_complete_plan_below_satisfaction_threshold_fails_closed_without_replan(self):
         low = {
             "disposition": "execute",
             "coverage": "complete",
@@ -214,11 +214,17 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
                 ollama,
                 Catalog(),
                 min_goal_satisfaction=0.95,
-                max_replans=1,
+                max_contract_repairs=1,
             ).resolve(request("多眨几下眼睛。", goal_ids=["goal-blink"]))
         )
-        self.assertEqual(plan.steps[0].args["count"], 4)
-        self.assertIn("goal_satisfaction_below_threshold", ollama.prompts[1])
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertEqual(plan.disposition, "clarify")
+        self.assertEqual(plan.steps, [])
+        self.assertEqual(plan.metadata["reason"], "deep_planner_semantic_validation_rejected")
+        self.assertEqual(
+            plan.metadata["validation_feedback"][0]["type"],
+            "goal_satisfaction_below_threshold",
+        )
 
     def test_prompt_assigns_importance_reasoning_to_model(self):
         raw = {

@@ -999,6 +999,15 @@ def validate_goal_responsibility_outcomes(
         )
 
 
+class PlannerDTOContractError(ValueError):
+    """Planner output is mechanically malformed or internally inconsistent.
+
+    This error is the only same-tier regeneration trigger. Semantic grounding,
+    capability coverage, responsibility, evidence, and safety failures must not
+    be rewritten by the same planner tier.
+    """
+
+
 class ResourceResponsibilityCapabilityGroundingError(ValueError):
     """A selected Capability does not satisfy a typed resource contract."""
 
@@ -2667,12 +2676,12 @@ def validate_explicit_numeric_parameter_grounding(
             continue
         step = steps.get(resolution.step_id)
         if step is None:
-            raise ValueError(
+            raise PlannerDTOContractError(
                 "parameter resolution references unknown executable step "
                 f"({resolution_location(resolution)})"
             )
         if resolution.parameter not in step.args:
-            raise ValueError(
+            raise PlannerDTOContractError(
                 "parameter resolution references an argument absent from its step: "
                 f"{resolution_location(resolution)}"
             )
@@ -2680,7 +2689,7 @@ def validate_explicit_numeric_parameter_grounding(
         argument_number = numeric(step.args[resolution.parameter])
         if resolved_number is not None and argument_number is not None:
             if not numerically_equal(resolved_number, argument_number):
-                raise ValueError(
+                raise PlannerDTOContractError(
                     "parameter resolution value must equal the executable step argument: "
                     f"{resolution_location(resolution)} has "
                     f"resolution={resolution.value!r}, step={step.args[resolution.parameter]!r}"
@@ -2693,7 +2702,7 @@ def validate_explicit_numeric_parameter_grounding(
                 or isinstance(step.args[resolution.parameter], list)
             ),
         ):
-            raise ValueError(
+            raise PlannerDTOContractError(
                 "parameter resolution value must equal the executable step argument: "
                 f"{resolution_location(resolution)}"
             )
@@ -2702,7 +2711,7 @@ def validate_explicit_numeric_parameter_grounding(
             continue
         source_goal_ids = list(dict.fromkeys(resolution.source_goal_ids))
         if not source_goal_ids:
-            raise ValueError(
+            raise PlannerDTOContractError(
                 "numeric user_supplied parameter resolution requires source_goal_ids: "
                 f"{resolution_location(resolution)}"
             )
@@ -2899,8 +2908,9 @@ def canonical_plan_response_schema(
     This schema deliberately excludes the host-owned CanonicalPlan envelope.
     The host supplies its plan identity, tier, schema version, and exact Goal
     Association IDs after validating this semantic DTO. Cross-field invariants
-    remain enforced by ``PlannerModelOutput`` and ``CanonicalPlan`` with one
-    bounded same-tier model repair. Fast Planner uses the same decoder-tight
+    remain enforced by ``PlannerModelOutput`` and ``CanonicalPlan``. A planner
+    may regenerate once only when this DTO is mechanically malformed; semantic
+    rejection is not a same-tier repair trigger. Fast Planner uses the same decoder-tight
     per-goal shape for one or many goals so the schema never instructs the model
     to omit fields that deterministic validation requires.
     """
@@ -4121,7 +4131,7 @@ def planner_contract_diagnostics(
     Pydantic intentionally validates nested values before parent model validators.
     That means one invalid nested satisfaction object can hide a missing
     ``step_ids`` or ``response_text`` defect in the same goal outcome.  The
-    planners allow only one same-tier/schema repair, so repair feedback must
+    planners allow only one mechanical DTO regeneration, so validation feedback must
     expose all independently observable structural defects from the original
     model output rather than only the first validation layer that failed.
 

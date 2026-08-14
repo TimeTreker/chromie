@@ -114,7 +114,6 @@ class GoalInterpreterTransactionTests(unittest.IsolatedAsyncioTestCase):
                 super().__init__(
                     ollama_url="http://example.invalid",
                     model="quick-model",
-                    review_model="quality-model",
                     timeout_ms=800,
                     confidence_threshold=0.55,
                 )
@@ -152,7 +151,6 @@ class GoalInterpreterTransactionTests(unittest.IsolatedAsyncioTestCase):
                 super().__init__(
                     ollama_url="http://example.invalid",
                     model="quick-model",
-                    review_model="quality-model",
                     timeout_ms=800,
                     confidence_threshold=0.55,
                 )
@@ -190,7 +188,6 @@ class GoalInterpreterTransactionTests(unittest.IsolatedAsyncioTestCase):
                 super().__init__(
                     ollama_url="http://example.invalid",
                     model="quick-model",
-                    review_model="quality-model",
                     timeout_ms=800,
                     confidence_threshold=0.55,
                 )
@@ -237,7 +234,53 @@ class GoalInterpreterTransactionTests(unittest.IsolatedAsyncioTestCase):
 
 
 class DeepThinkingHandoffTests(unittest.IsolatedAsyncioTestCase):
-    async def test_low_confidence_chat_uses_existing_deep_thinking_handoff(self) -> None:
+    async def test_low_confidence_consequential_routes_use_existing_deep_handoff(
+        self,
+    ) -> None:
+        class Catalog:
+            async def snapshot(self) -> dict:
+                return {"catalog_version": 1, "capabilities": []}
+
+        class Interpreter:
+            def __init__(self, route: str) -> None:
+                self.route_name = route
+
+            async def route(self, request: RouteRequest) -> RouteDecision:
+                del request
+                return RouteDecision(
+                    route=self.route_name,
+                    intent="unknown",
+                    confidence=0.31,
+                    source="llm",
+                    reason="fast interpretation is uncertain",
+                )
+
+        for route in ("robot_action", "tool", "memory"):
+            with self.subTest(route=route):
+                request = RouteRequest(
+                    text="Please help with this request safely.",
+                    language="en-US",
+                    context={"gateway_admission_complete": True},
+                )
+                with mock.patch.object(
+                    engine.settings, "mode", "hybrid"
+                ), mock.patch.object(
+                    engine.settings, "confidence_threshold", 0.55
+                ), mock.patch.object(
+                    engine, "capability_catalog", Catalog()
+                ), mock.patch.object(
+                    engine, "goal_interpreter", Interpreter(route)
+                ):
+                    decision = await engine.interpret_turn(request)
+
+                self.assertEqual(decision.route, "deep_thought")
+                self.assertEqual(decision.intent, "deep_thought_low_confidence")
+                review = decision.metadata["fast_goal_interpreter_review_request"]
+                self.assertEqual(review["quick_route"], route)
+                self.assertEqual(review["execution_state"], "not_committed")
+                self.assertIn("deepthinking_agent", decision.agents)
+
+    async def test_low_confidence_benign_chat_remains_on_fast_path(self) -> None:
         class Catalog:
             async def snapshot(self) -> dict:
                 return {"catalog_version": 1, "capabilities": []}
@@ -247,14 +290,14 @@ class DeepThinkingHandoffTests(unittest.IsolatedAsyncioTestCase):
                 del request
                 return RouteDecision(
                     route="chat",
-                    intent="uncertain_explanation",
-                    confidence=0.31,
+                    intent="unknown",
+                    confidence=0.0,
                     source="llm",
-                    reason="fast interpretation is uncertain",
+                    reason="fine-grained conversational intent is uncertain",
                 )
 
         request = RouteRequest(
-            text="Please reason carefully about the trade-offs in this design.",
+            text="Hello, how are you doing?",
             language="en-US",
             context={"gateway_admission_complete": True},
         )
@@ -265,12 +308,10 @@ class DeepThinkingHandoffTests(unittest.IsolatedAsyncioTestCase):
         ):
             decision = await engine.interpret_turn(request)
 
-        self.assertEqual(decision.route, "deep_thought")
-        self.assertEqual(decision.intent, "deep_thought_low_confidence")
-        review = decision.metadata["fast_goal_interpreter_review_request"]
-        self.assertEqual(review["quick_route"], "chat")
-        self.assertEqual(review["execution_state"], "not_committed")
-        self.assertIn("deepthinking_agent", decision.agents)
+        self.assertEqual(decision.route, "chat")
+        self.assertEqual(decision.intent, "general_conversation")
+        self.assertIn("conversation_agent", decision.agents)
+        self.assertNotIn("deepthinking_agent", decision.agents)
 
 
 if __name__ == "__main__":

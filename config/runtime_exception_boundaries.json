@@ -244,34 +244,6 @@
     },
     {
       "path": "agent/app/cognitive_core/goal_interpreter/engine.py",
-      "symbol": "_review_priority_interrupt",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "3ea924133a7aaf997ea9a251911caba298d273aab239400ad1a77e4334933e5c",
-      "failure_signals": [
-        "diagnostic",
-        "state_update"
-      ]
-    },
-    {
-      "path": "agent/app/cognitive_core/goal_interpreter/engine.py",
-      "symbol": "_review_priority_interrupt",
-      "ordinal": 2,
-      "classification": "typed_failure_mapping",
-      "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "1ed9c0cb49076f1658392c89fa275b6625c25b16d5d3f758cfd09662d888635b",
-      "failure_signals": [
-        "diagnostic",
-        "return"
-      ]
-    },
-    {
-      "path": "agent/app/cognitive_core/goal_interpreter/engine.py",
       "symbol": "initialize_goal_interpreter",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
@@ -402,7 +374,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "166d196b5abb1f9dfc93a27c3b86be9015f3291306439fe61893a2010770836d",
+      "body_sha256": "c579494f588026d872fbbe6df0223916d7e87592e209e5377c3d5bd19daabb1e",
       "failure_signals": [
         "continue",
         "diagnostic",
@@ -445,7 +417,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "3474fac17e6be218099a2df859c9176a8148107b2111f60596b70a3218d9610e",
+      "body_sha256": "3cd707eabcd320e1b9ff0d31c46b1cc6cbaa2157c3f79a9e0a7666550758e97d",
       "failure_signals": [
         "continue",
         "diagnostic",
@@ -1144,20 +1116,6 @@
     },
     {
       "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._post_interrupt_corrected_decision",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "d16f6b0ea77c00cf169fd903d5693a82d67e865a2e75f9ad0f16ec2b059af2e7",
-      "failure_signals": [
-        "diagnostic",
-        "return"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant._reconcile_reflex_cancellation_receipt",
       "ordinal": 1,
       "classification": "typed_failure_mapping",
@@ -1375,19 +1333,6 @@
       "failure_signals": [
         "diagnostic",
         "return"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._run_post_interrupt_correction",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "cd599096be9e66ebea96c988f0609c9b2ab710047b3a3c21a63089cc4cb76883",
-      "failure_signals": [
-        "diagnostic"
       ]
     },
     {
@@ -2440,6 +2385,6 @@
       ]
     }
   ],
-  "reviewed_at": "2026-08-13",
+  "reviewed_at": "2026-08-14",
   "review_contract": "Classification and normalized source handler body reviewed; any handler body or failure-signal change requires re-audit."
 }

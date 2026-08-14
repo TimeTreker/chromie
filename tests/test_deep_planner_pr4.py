@@ -160,7 +160,7 @@ class CanonicalDeepPlanContractTests(unittest.TestCase):
 
 
 class DeepPlannerResolverTests(unittest.TestCase):
-    def test_effectful_zero_step_false_satisfaction_repairs_then_clarifies(self):
+    def test_effectful_zero_step_false_satisfaction_fails_closed_without_same_tier_repair(self):
         invalid = {
             "disposition": "respond",
             "coverage": "complete",
@@ -210,17 +210,18 @@ class DeepPlannerResolverTests(unittest.TestCase):
             DeepPlannerResolver(
                 ollama,
                 FullCatalog(),
-                max_replans=1,
+                max_contract_repairs=1,
             ).resolve(run_request.model_copy(update={"context": context}))
         )
 
-        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(plan.disposition, "clarify")
         self.assertEqual(plan.steps, [])
-        self.assertTrue(plan.metadata["contract_repair_attempted"])
+        self.assertFalse(plan.metadata["contract_repair_attempted"])
+        self.assertEqual(plan.metadata["reason"], "deep_planner_semantic_validation_failed")
         self.assertIn(
             "unresolved effectful goal requires an executable step",
-            plan.metadata["initial_validation_errors"],
+            plan.metadata["error"],
         )
 
     def test_missing_resource_provider_clarifies_without_hard_model_failure(self):
@@ -867,7 +868,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             )
         )
 
-    def test_single_parallel_label_is_repaired_without_safety_adjustment(self):
+    def test_single_parallel_label_is_canonicalized_without_model_repair(self):
         parallel = {
             "disposition": "execute",
             "coverage": "complete",
@@ -891,17 +892,17 @@ class DeepPlannerResolverTests(unittest.TestCase):
         ollama = SequencedOllama([parallel, repaired])
 
         plan = asyncio.run(
-            DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(
+            DeepPlannerResolver(ollama, FullCatalog(), max_contract_repairs=1).resolve(
                 request("Walk forward.")
             )
         )
 
+        self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(plan.disposition, "execute")
         self.assertEqual(plan.steps[0].timing, "sequential")
         self.assertEqual(plan.metadata["plan_relation"], "exact")
         self.assertFalse(plan.metadata["user_confirmation_required"])
-        self.assertIn("parallel_step_count", ollama.prompts[1][0])
-        self.assertIn("malformed scheduling annotation", ollama.prompts[1][0])
+        self.assertFalse(plan.metadata["contract_repair_attempted"])
 
     def test_mixed_plan_does_not_require_duplicate_per_goal_satisfaction(self):
         goal_ids = ["goal-blink", "goal-song"]
@@ -1034,7 +1035,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertIn("confirmation-bound plan relation", prompt)
         self.assertNotIn("walking is not running", prompt)
 
-    def test_semantic_coverage_rejection_replans_without_safety_adjustment(self):
+    def test_semantic_coverage_rejection_is_terminal_without_deep_replan(self):
         goal_ids = ["goal-walk", "goal-sing"]
         run_request = request(
             "Walk while singing.",
@@ -1158,17 +1159,17 @@ class DeepPlannerResolverTests(unittest.TestCase):
         )
 
         plan = asyncio.run(
-            DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(
+            DeepPlannerResolver(ollama, FullCatalog(), max_contract_repairs=1).resolve(
                 run_request
             )
         )
 
-        self.assertEqual(plan.disposition, "mixed")
-        self.assertEqual(plan.response_text, "")
-        self.assertEqual(plan.metadata["plan_relation"], "exact")
-        self.assertFalse(plan.metadata["user_confirmation_required"])
-        self.assertEqual(plan.metadata["coverage_review"]["status"], "accepted")
-        self.assertNotIn("safety revision", ollama.prompts[2][0].casefold())
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(plan.disposition, "clarify")
+        self.assertEqual(plan.steps, [])
+        self.assertEqual(plan.metadata["reason"], "coordinated_action_coverage_incomplete")
+        self.assertFalse(plan.metadata["execution_allowed"])
+        self.assertIn("The selected movement does not fully implement the body mode.", plan.unresolved)
 
     def test_full_catalog_exact_plan(self):
         raw = {"disposition":"execute","coverage":"complete","confidence":0.91,"goal_ids":["goal-action"],"goal_summary":"walk then blink","steps":[
@@ -1182,7 +1183,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertEqual(catalog.scopes, ["all"])
         self.assertEqual(plan.metadata["attempt_count"], 1)
 
-    def test_coordinated_action_review_rejects_partial_plan_after_replan(self):
+    def test_coordinated_action_review_rejection_is_terminal(self):
         partial = {
             "disposition": "execute",
             "coverage": "complete",
@@ -1237,20 +1238,18 @@ class DeepPlannerResolverTests(unittest.TestCase):
         )
 
         plan = asyncio.run(
-            DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(
+            DeepPlannerResolver(ollama, FullCatalog(), max_contract_repairs=1).resolve(
                 run_request.model_copy(update={"context": context})
             )
         )
 
+        self.assertEqual(len(ollama.prompts), 2)
         self.assertEqual(plan.disposition, "clarify")
         self.assertEqual(plan.steps, [])
         self.assertIn("blinking", plan.unresolved)
         self.assertIn("singing", plan.unresolved)
         self.assertFalse(plan.metadata["execution_allowed"])
-        self.assertIn(
-            "coordinated_action_coverage_incomplete",
-            ollama.prompts[2][0],
-        )
+        self.assertEqual(plan.metadata["reason"], "coordinated_action_coverage_incomplete")
 
     def test_invalid_first_plan_is_revised_once_in_same_tier(self):
         invalid = {"disposition":"execute","coverage":"complete","confidence":0.92,"goal_ids":["goal-action"],"steps":[
@@ -1260,13 +1259,13 @@ class DeepPlannerResolverTests(unittest.TestCase):
             {"step_id":"blink","capability_id":"soridormi.blink_eyes","args":{"count":4},"source_goal_ids":["goal-action"]}
         ],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         ollama = SequencedOllama([invalid, revised])
-        plan = asyncio.run(DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(request("眨眼。")))
+        plan = asyncio.run(DeepPlannerResolver(ollama, FullCatalog(), max_contract_repairs=1).resolve(request("眨眼。")))
         self.assertEqual(plan.steps[0].args["count"], 4)
         self.assertEqual(plan.metadata["attempt_count"], 2)
         self.assertIn("invalid_args", ollama.prompts[1][0])
         self.assertNotIn("Fast Planner decides again", ollama.prompts[1][0])
 
-    def test_explicit_numeric_goal_requires_deep_parameter_provenance(self):
+    def test_explicit_numeric_goal_missing_provenance_fails_closed(self):
         invalid = {
             "disposition": "execute",
             "coverage": "complete",
@@ -1307,8 +1306,10 @@ class DeepPlannerResolverTests(unittest.TestCase):
             DeepPlannerResolver(ollama, FullCatalog()).resolve(run_request)
         )
 
-        self.assertEqual(plan.disposition, "execute")
-        self.assertEqual(plan.parameter_resolutions[0].parameter, "duration_s")
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertEqual(plan.disposition, "clarify")
+        self.assertEqual(plan.steps, [])
+        self.assertEqual(plan.metadata["reason"], "deep_planner_semantic_validation_failed")
         self.assertIn(
             "Select a capability whose argument schema can represent the supplied value",
             ollama.prompts[0][0],
@@ -1317,9 +1318,9 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "include a user_supplied parameter_resolution",
             ollama.prompts[0][0],
         )
-        self.assertIn("no matching user_supplied", ollama.prompts[1][0])
+        self.assertIn("no matching user_supplied", plan.metadata["error"])
 
-    def test_parallel_plan_is_revised_when_provider_forbids_overlap(self):
+    def test_unsafe_parallel_plan_fails_closed_without_deep_replan(self):
         parallel = {
             "disposition": "execute",
             "coverage": "complete",
@@ -1357,14 +1358,19 @@ class DeepPlannerResolverTests(unittest.TestCase):
         ollama = SequencedOllama([parallel, revised])
 
         plan = asyncio.run(
-            DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(
+            DeepPlannerResolver(ollama, FullCatalog(), max_contract_repairs=1).resolve(
                 request("Walk while blinking.")
             )
         )
 
-        self.assertEqual([step.timing for step in plan.steps], ["sequential", "sequential"])
-        self.assertEqual(plan.metadata["plan_relation"], "alternative")
-        self.assertIn("parallel_capability_not_declared_safe", ollama.prompts[1][0])
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertEqual(plan.disposition, "clarify")
+        self.assertEqual(plan.steps, [])
+        self.assertEqual(plan.metadata["reason"], "deep_planner_semantic_validation_rejected")
+        self.assertIn(
+            "parallel_capability_not_declared_safe",
+            [item["type"] for item in plan.metadata["validation_feedback"]],
+        )
 
     def test_contract_repair_reports_hidden_multi_goal_defects_together(self):
         goal_ids = ["goal-walk", "goal-blink"]
@@ -1424,7 +1430,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         ollama = SequencedOllama([invalid])
 
         plan = asyncio.run(
-            DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(
+            DeepPlannerResolver(ollama, FullCatalog(), max_contract_repairs=1).resolve(
                 request("Walk for one second, then blink twice.", goal_ids=goal_ids)
             )
         )
@@ -1488,7 +1494,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         ollama = SequencedOllama([invalid, repaired])
 
         plan = asyncio.run(
-            DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(
+            DeepPlannerResolver(ollama, FullCatalog(), max_contract_repairs=1).resolve(
                 request("Blink twice and tell me a short joke.", goal_ids=goal_ids)
             )
         )
@@ -1689,7 +1695,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         ollama = SequencedOllama([invalid, repaired, coverage_review])
 
         plan = asyncio.run(
-            DeepPlannerResolver(ollama, catalog, max_replans=1).resolve(
+            DeepPlannerResolver(ollama, catalog, max_contract_repairs=1).resolve(
                 run_request
             )
         )
@@ -1781,7 +1787,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         ollama = SequencedOllama([invalid, repaired])
 
         plan = asyncio.run(
-            DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(
+            DeepPlannerResolver(ollama, FullCatalog(), max_contract_repairs=1).resolve(
                 request("Blink twice and tell me a short joke.", goal_ids=goal_ids)
             )
         )
@@ -2039,7 +2045,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         ollama = SequencedOllama([branch_minimal, repaired])
 
         plan = asyncio.run(
-            DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(
+            DeepPlannerResolver(ollama, FullCatalog(), max_contract_repairs=1).resolve(
                 request(
                     "Look at me for two seconds, then blink twice.",
                     goal_ids=goal_ids,
@@ -2088,7 +2094,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             DeepPlannerResolver(
                 SequencedOllama([invalid, invalid]),
                 FullCatalog(),
-                max_replans=1,
+                max_contract_repairs=1,
             ).resolve(
                 request(
                     "Walk and blink.",
@@ -2585,7 +2591,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         ollama = SequencedOllama([invalid])
 
         plan = asyncio.run(
-            DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(req)
+            DeepPlannerResolver(ollama, FullCatalog(), max_contract_repairs=1).resolve(req)
         )
 
         self.assertEqual(plan.goal_outcomes[0].step_ids, ["blink"])
@@ -2662,7 +2668,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         ollama = SequencedOllama([invalid, revised])
 
         plan = asyncio.run(
-            DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(req)
+            DeepPlannerResolver(ollama, FullCatalog(), max_contract_repairs=1).resolve(req)
         )
 
         self.assertEqual(plan.goal_ids, ["goal-look"])
@@ -2670,7 +2676,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertIn("goal_ids_do_not_match_goal_association", ollama.prompts[1][0])
         self.assertIn("Do not create goals for internal status checks", ollama.prompts[0][0])
 
-    def test_transport_failure_does_not_consume_semantic_replan(self):
+    def test_transport_failure_does_not_consume_contract_retry(self):
         error = OllamaGenerationError(
             "model timed out",
             failure_class="timeout",
@@ -2681,7 +2687,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         ollama = SequencedOllama([error])
 
         plan = asyncio.run(
-            DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(
+            DeepPlannerResolver(ollama, FullCatalog(), max_contract_repairs=1).resolve(
                 request("眨眼。")
             )
         )
@@ -2703,7 +2709,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         ollama = SequencedOllama([invalid, revised])
 
         plan = asyncio.run(
-            DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(
+            DeepPlannerResolver(ollama, FullCatalog(), max_contract_repairs=1).resolve(
                 request("往前走。")
             )
         )
@@ -2745,7 +2751,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         ollama = SequencedOllama([invalid, revised])
 
         plan = asyncio.run(
-            DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(
+            DeepPlannerResolver(ollama, FullCatalog(), max_contract_repairs=1).resolve(
                 request("眨两下眼。")
             )
         )
@@ -2782,7 +2788,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             DeepPlannerResolver(
                 SequencedOllama([invalid]),
                 FullCatalog(),
-                max_replans=0,
+                max_contract_repairs=0,
             ).resolve(request("眨两下眼。"))
         )
 
@@ -2795,7 +2801,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         invalid = {"disposition":"execute","coverage":"complete","confidence":0.92,"goal_ids":["goal-action"],"steps":[
             {"capability_id":"invented.skill","args":{}}
         ],"goal_satisfaction":{"score":1.0,"status":"exact"}}
-        plan = asyncio.run(DeepPlannerResolver(SequencedOllama([invalid, invalid]), FullCatalog(), max_replans=1).resolve(request()))
+        plan = asyncio.run(DeepPlannerResolver(SequencedOllama([invalid, invalid]), FullCatalog(), max_contract_repairs=1).resolve(request()))
         self.assertEqual(plan.disposition, "clarify")
         self.assertEqual(plan.steps, [])
         self.assertEqual(plan.metadata["attempt_count"], 2)

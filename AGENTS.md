@@ -76,8 +76,11 @@ semantics become clearer.
   only for deterministic operational controls such as stop, cancel, emergency,
   silence, or unusable input. They must never select semantic lanes, Goals,
   Agent Skills, Capabilities, memory content, deep-thinking delegation, or
-  social behavior. Semantic uncertainty must use model repair, clarification,
-  or fail-closed behavior rather than a phrase fallback.
+  social behavior. Consequential low-confidence meaning must delegate once from
+  the authoritative turn to its designated deeper cognition, ask a genuine
+  user-resolvable clarification, or fail closed. A same-stage retry may repair
+  only a mechanically malformed DTO, at most once; it must not rewrite
+  semantics or grow into a repair chain.
 - For every user-reported behavior defect, follow the executable
   scenario-driven loop without waiting for the user to request it again:
   retain the originating single- or multi-turn episode, reproduce the earliest

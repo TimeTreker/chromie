@@ -19,7 +19,6 @@ class MissingAbilityPrimaryInterpretationTests(unittest.IsolatedAsyncioTestCase)
         return OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
-            review_model="review-model",
             timeout_ms=800,
             confidence_threshold=0.55,
         )
@@ -68,7 +67,6 @@ class MissingAbilityPrimaryInterpretationTests(unittest.IsolatedAsyncioTestCase)
                 super().__init__(
                     ollama_url="http://example.invalid",
                     model="quick-model",
-                    review_model="quality-model",
                     timeout_ms=800,
                     confidence_threshold=0.55,
                 )

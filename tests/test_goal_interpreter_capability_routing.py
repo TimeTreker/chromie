@@ -575,126 +575,6 @@ class InterpreterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.metadata["route_merge"]["selected_stage"], "emergency_filter")
         self.assertEqual(decision.metadata["route_merge"]["task_count"], 2)
 
-    async def test_priority_interrupt_can_be_semantically_confirmed_by_second_interpreter(self) -> None:
-        from agent.app.cognitive_core.goal_interpreter import engine as main
-
-        result = CapabilityCatalogResult(query="stop now", matched=False, matches=[])
-        goal_interpreter = _LlmInterpreter(
-            RouteDecision(
-                route="chat",
-                agents=["conversation_agent", "speaker_agent"],
-                intent="general_conversation",
-                confidence=0.45,
-                language="en-US",
-                source="fallback",
-            ),
-            interrupt_review_decision=RouteDecision(
-                route="interrupt",
-                agents=[],
-                intent="stop_current_output",
-                confidence=0.98,
-                language="en-US",
-                source="llm",
-                reason="The user really asked to stop.",
-            ),
-        )
-        with patch.object(main.settings, "mode", "hybrid"), patch.object(
-            main.settings, "post_interrupt_review_enabled", True
-        ), patch.object(
-            main, "capability_catalog", _Catalog(result)
-        ), patch.object(main, "goal_interpreter", goal_interpreter):
-            decision = await main.interpret_turn(RouteRequest(text="Stop now."))
-
-        self.assertEqual(decision.route, "interrupt")
-        self.assertTrue(decision.interrupt_current)
-        self.assertEqual(goal_interpreter.calls, 0)
-        self.assertEqual(goal_interpreter.interrupt_review_calls, 1)
-        self.assertEqual(
-            [item["stage"] for item in decision.metadata["route_stage_outputs"]],
-            ["emergency_filter", "post_interrupt_review"],
-        )
-        self.assertEqual(decision.metadata["post_interrupt_review"]["status"], "confirmed")
-        self.assertNotIn("post_interrupt_decision", decision.metadata)
-        self.assertEqual(
-            [item["task_type"] for item in decision.metadata["task_list"]],
-            ["task.cancel_current_action", "body.stop_motion"],
-        )
-        self.assertEqual(
-            decision.metadata["route_merge"]["strategy"],
-            "safety_interrupt_then_semantic_review",
-        )
-        self.assertEqual(decision.metadata["route_merge"]["selected_stage"], "emergency_filter")
-        self.assertEqual(decision.metadata["route_merge"]["proposal_count"], 2)
-        self.assertEqual(
-            decision.metadata["route_merge"]["task_source_stages"],
-            ["emergency_filter"],
-        )
-
-    async def test_priority_interrupt_can_record_corrected_second_interpreter_task(self) -> None:
-        from agent.app.cognitive_core.goal_interpreter import engine as main
-
-        result = CapabilityCatalogResult(query="stop", matched=False, matches=[])
-        goal_interpreter = _LlmInterpreter(
-            RouteDecision(
-                route="interrupt",
-                agents=[],
-                intent="stop_current_output",
-                confidence=0.99,
-                language="en-US",
-                source="llm",
-            ),
-            interrupt_review_decision=RouteDecision(
-                route="chat",
-                agents=["conversation_agent", "speaker_agent"],
-                intent="explain_phrase",
-                confidence=0.86,
-                language="en-US",
-                source="llm",
-                speak_first="Sorry, I heard that as a stop command; I will answer the phrase instead.",
-                reason="The user was asking about the phrase stop by.",
-            ),
-        )
-        with patch.object(main.settings, "mode", "hybrid"), patch.object(
-            main.settings, "post_interrupt_review_enabled", True
-        ), patch.object(
-            main, "capability_catalog", _Catalog(result)
-        ), patch.object(main, "goal_interpreter", goal_interpreter):
-            decision = await main.interpret_turn(
-                RouteRequest(
-                    text="Stop.",
-                    context={"asr_alternatives": ["Stop by the table means what?"]},
-                )
-            )
-
-        self.assertEqual(decision.route, "interrupt")
-        self.assertTrue(decision.interrupt_current)
-        self.assertEqual(decision.metadata["post_interrupt_review"]["status"], "corrected")
-        correction = decision.metadata["post_interrupt_decision"]
-        self.assertEqual(correction["route"], "chat")
-        self.assertEqual(correction["intent"], "explain_phrase")
-        self.assertIn("Sorry", correction["speak_first"])
-        self.assertEqual(
-            [item["task_type"] for item in decision.metadata["task_list"]],
-            ["task.cancel_current_action", "body.stop_motion", "speech.fast_reply"],
-        )
-        self.assertTrue(decision.metadata["task_list"][2]["direct_to_tts"])
-        self.assertEqual(decision.metadata["task_list"][2]["context_profile"], "fast_minimal")
-        self.assertEqual(
-            [item["source_stage"] for item in decision.metadata["task_list"]],
-            ["emergency_filter", "emergency_filter", "post_interrupt_review"],
-        )
-        self.assertEqual(
-            decision.metadata["route_merge"]["strategy"],
-            "safety_interrupt_then_semantic_review",
-        )
-        self.assertEqual(decision.metadata["route_merge"]["final_route"], "interrupt")
-        self.assertEqual(decision.metadata["route_merge"]["selected_stage"], "emergency_filter")
-        self.assertEqual(decision.metadata["route_merge"]["task_count"], 3)
-        self.assertEqual(
-            decision.metadata["route_merge"]["task_source_stages"],
-            ["emergency_filter", "post_interrupt_review"],
-        )
-
     async def test_interpretation_profile_lists_quick_and_deep_lanes(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
@@ -706,13 +586,11 @@ class InterpreterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("emergency_filter", lanes)
         self.assertIn("quick_intent", lanes)
         self.assertIn("route_validation", lanes)
-        self.assertIn("post_interrupt_review", lanes)
         self.assertIn("deep_thought", lanes)
         self.assertFalse(lanes["emergency_filter"]["llm"])
         self.assertIn("interrupt", lanes["emergency_filter"]["routes"])
         self.assertIn("robot_action", lanes["quick_intent"]["routes"])
         self.assertFalse(lanes["route_validation"]["llm"])
-        self.assertIn("interrupt", lanes["post_interrupt_review"]["routes"])
         self.assertIn("deep_thought", lanes["deep_thought"]["routes"])
 
     async def test_chat_catalog_match_does_not_select_speech_tool_as_intent(self) -> None:

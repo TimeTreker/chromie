@@ -349,7 +349,7 @@ nontrivial dependency, material alternative, novelty or broader context, or
 safety/resource reasoning that requires wider planning. A structured semantic
 or plan validation rejection may justify Deep only when its failure contract
 explicitly requires broader reasoning. Technical schema/model-contract failure
-receives bounded same-tier repair. Any later Deep recovery is explicitly
+receives one mechanical DTO regeneration. Any later Deep recovery is explicitly
 classified as recovery, retains the Fast failure evidence, and fails closed
 unless it produces a valid plan; it is not semantic escalation. A confidence
 number alone neither permits a bypass nor requires escalation, and it never
@@ -841,8 +841,8 @@ evidence.
 
 The loop is bounded:
 
-- one contract repair per model stage;
-- one configured semantic replan budget;
+- at most one mechanical DTO regeneration at a model stage that owns a structured-output contract;
+- no same-tier semantic replan budget;
 - explicit tool and provider timeouts;
 - cancellation propagated through the host and provider;
 - no unlimited Agent handoff or tool-call loop;

@@ -77,14 +77,12 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE"], "24h")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP"], "1")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS"], "60000")
-        self.assertEqual(values["AGENT_GOAL_INTERPRETER_REVIEW_MODEL"], "gemma4:e2b")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_TIMEOUT_MS"], "5400")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS"], "5400")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_LLM_NUM_CTX"], "4096")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT"], "512")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS"], "2500")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_CACHE_TTL_MS"], "5000")
-        self.assertEqual(values["AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED"], "0")
 
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         for name in (
@@ -498,7 +496,6 @@ class RuntimeConfigurationTests(unittest.TestCase):
         )
         self.assertIn("CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE", verifier)
         self.assertIn("AGENT_GOAL_INTERPRETER_MODEL", verifier)
-        self.assertIn("AGENT_GOAL_INTERPRETER_REVIEW_MODEL", verifier)
         self.assertIn("AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL", verifier)
         self.assertIn("OLLAMA_CONTEXT_LENGTH", verifier)
         self.assertIn("AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS", verifier)
@@ -517,9 +514,6 @@ class RuntimeConfigurationTests(unittest.TestCase):
                 "EFFECTIVE_COGNITIVE_GATEWAY_ATTENTION_MODEL"
             ),
             "Fast intent (Goal Interpreter)": "EFFECTIVE_AGENT_GOAL_INTERPRETER_MODEL",
-            "Post-interrupt review (optional)": (
-                "EFFECTIVE_AGENT_GOAL_INTERPRETER_REVIEW_MODEL"
-            ),
             "Goal Association": "EFFECTIVE_GOAL_ASSOCIATION_MODEL",
             "Fast Planner": "EFFECTIVE_FAST_PLANNER_MODEL",
             "Deep Planner": "EFFECTIVE_DEEP_PLANNER_MODEL",

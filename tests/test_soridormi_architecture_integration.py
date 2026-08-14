@@ -5,7 +5,6 @@ from typing import Any
 
 from agent.app.tool_invocation import ToolCallOutcome, ToolInvocationContext
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
-from orchestrator.runtime.post_interrupt import lock_post_interrupt_physical_resume
 from orchestrator.runtime.soridormi_skill_provider import (
     SoridormiMcpSkillProvider,
     SoridormiNamedSkillAdapter,
@@ -180,41 +179,6 @@ class SoridormiArchitectureIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("target_coordinates", chromie_intent)
         self.assertNotIn("x", chromie_intent)
         self.assertNotIn("y", chromie_intent)
-
-    async def test_post_interrupt_body_correction_requires_fresh_confirmation(
-        self,
-    ) -> None:
-        invoker = _ArchitectureInvoker()
-        coordinator = InteractionRuntimeCoordinator(
-            lambda args: {"scheduled": True},
-            soridormi_invoker=invoker,
-        )
-        response, locked_request_ids = lock_post_interrupt_physical_resume(
-            InteractionResponse(
-                skills=[
-                    {
-                        "request_id": "wave-after-stop",
-                        "skill_id": "soridormi.wave_hand",
-                        "args": {"count": 1},
-                    }
-                ],
-                metadata={"post_interrupt_correction": True},
-            )
-        )
-
-        self.assertEqual(locked_request_ids, ("wave-after-stop",))
-        with self.assertRaisesRegex(ValueError, "requires confirmation"):
-            await coordinator.execute(response, session_id="sid-locked")
-        self.assertNotIn("soridormi.skill.create_plan", [c[0] for c in invoker.calls])
-
-        confirmed = await coordinator.execute(
-            response,
-            session_id="sid-confirmed",
-            confirmed_request_ids=set(locked_request_ids),
-        )
-
-        self.assertEqual(confirmed.status, "completed")
-        self.assertIn("soridormi.skill.create_plan", [c[0] for c in invoker.calls])
 
     def test_old_provider_name_is_backward_compatible_alias(self) -> None:
         self.assertIs(SoridormiMcpSkillProvider, SoridormiNamedSkillAdapter)

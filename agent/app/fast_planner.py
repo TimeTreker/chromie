@@ -21,7 +21,7 @@ from .cognitive_identity import (
 )
 from .planner_contract import (
     EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
-    ResourceResponsibilityCapabilityGroundingError,
+    PlannerDTOContractError,
     ResourceResponsibilityCapabilityUnavailableError,
     ResourceResponsibilityRequiresCompositionError,
     canonical_resource_argument_response_schema,
@@ -42,7 +42,6 @@ from .planner_contract import (
     retained_evidence_response_review_required,
     review_coordinated_action_plan_coverage,
     review_retained_evidence_response,
-    resource_grounding_repair_response_schema,
     situation_prompt_projection,
     validate_explicit_numeric_parameter_grounding,
     validate_external_response_evidence_boundary,
@@ -71,7 +70,7 @@ except ImportError:  # pragma: no cover
 logger = logging.getLogger("chromie.agent.fast_planner")
 
 
-class _CapabilityArgumentValidationError(ValueError):
+class _CapabilityArgumentValidationError(PlannerDTOContractError):
     def __init__(self, feedback: list[dict[str, Any]]) -> None:
         self.feedback = [dict(item) for item in feedback]
         super().__init__(
@@ -231,10 +230,6 @@ class FastPlannerResolver:
         initial_raw_output: Any = None
         initial_validation_errors = ""
         contract_repair_attempted = False
-        resource_grounding_repair_error: (
-            ResourceResponsibilityCapabilityGroundingError | None
-        ) = None
-
         for attempt in range(self.max_contract_repairs + 1):
             raw: Any = None
             try:
@@ -246,11 +241,6 @@ class FastPlannerResolver:
                     )
                     if contract_repair_attempted
                     else response_schema
-                )
-                active_response_schema = resource_grounding_repair_response_schema(
-                    active_response_schema,
-                    error=resource_grounding_repair_error,
-                    authoritative_goals=authoritative_goals,
                 )
                 raw = await self.ollama.generate(
                     self._layered_prompt(
@@ -293,28 +283,37 @@ class FastPlannerResolver:
                         request.sid,
                         self._bounded(provenance_repairs, 2000),
                     )
-                normalized = (
-                    self._normalize_multi_goal(
+                try:
+                    normalized = (
+                        self._normalize_multi_goal(
+                            raw,
+                            request=request,
+                            plan_id=plan_id,
+                            expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+                        )
+                        if multi_goal_contract
+                        else self._normalize(
+                            raw,
+                            request=request,
+                            plan_id=plan_id,
+                            expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+                        )
+                    )
+                    plan = CanonicalPlan.model_validate(normalized)
+                    validated_model_output = validate_planner_model_output(
                         raw,
-                        request=request,
-                        plan_id=plan_id,
+                        planner_tier="fast",
                         expected_goal_ids_for_turn=expected_goal_ids_for_turn,
                     )
-                    if multi_goal_contract
-                    else self._normalize(
-                        raw,
-                        request=request,
-                        plan_id=plan_id,
-                        expected_goal_ids_for_turn=expected_goal_ids_for_turn,
-                    )
-                )
-                plan = CanonicalPlan.model_validate(normalized)
-                validated_model_output = validate_planner_model_output(
-                    raw,
-                    planner_tier="fast",
-                    expected_goal_ids_for_turn=expected_goal_ids_for_turn,
-                )
+                except (ValidationError, ValueError) as exc:
+                    raise PlannerDTOContractError(str(exc)) from exc
+
                 authoritative_goals = canonical_goal_grounding(request.context)
+                validate_goal_responsibility_outcomes(
+                    validated_model_output,
+                    authoritative_goals=authoritative_goals,
+                    context=request.context,
+                )
                 validate_resource_responsibility_capability_grounding(
                     validated_model_output,
                     authoritative_goals=authoritative_goals,
@@ -388,17 +387,9 @@ class FastPlannerResolver:
                         },
                     )
                 if attempt < self.max_contract_repairs and isinstance(
-                    exc, (ValidationError, json.JSONDecodeError, ValueError)
+                    exc, (PlannerDTOContractError, json.JSONDecodeError)
                 ):
                     contract_repair_attempted = True
-                    resource_grounding_repair_error = (
-                        exc
-                        if isinstance(
-                            exc,
-                            ResourceResponsibilityCapabilityGroundingError,
-                        )
-                        else None
-                    )
                     initial_raw_output = raw
                     # Regenerate from authoritative grounding instead of asking
                     # the model to edit invalid JSON in place.  In live runs,
@@ -436,14 +427,26 @@ class FastPlannerResolver:
                 integrity_metadata = cognitive_integrity_metadata(
                     stage="fast_planner", exc=exc, request=request
                 )
+                mechanical_contract_error = isinstance(
+                    exc, (PlannerDTOContractError, json.JSONDecodeError)
+                )
+                semantic_validation_failure = isinstance(exc, ValueError) and not mechanical_contract_error
                 return self._escalation(
                     plan_id,
                     request,
-                    "fast_planner_model_contract_failed"
-                    if contract_repair_attempted
-                    else "fast_planner_unavailable",
+                    (
+                        "fast_planner_model_contract_failed"
+                        if contract_repair_attempted or mechanical_contract_error
+                        else "fast_planner_semantic_validation_failed"
+                        if semantic_validation_failure
+                        else "fast_planner_unavailable"
+                    ),
                     error=exc,
-                    path_classification="contract_failure",
+                    path_classification=(
+                        "semantic_escalation"
+                        if semantic_validation_failure
+                        else "contract_failure"
+                    ),
                     metadata={
                         "contract_schema": contract_schema,
                         "canonical_contract": "CanonicalPlan",
@@ -849,7 +852,7 @@ class FastPlannerResolver:
                 f"{goal_progress_communication_prompt('Fast Planner')}\n\n"
                 f"Goal-scoped Interaction Context JSON:\n{self._bounded(context.get('interaction_context') or {}, 7000)}\n\n"
                 "Use Interaction Context to plan only the still-needed conversational and effectful delta. Preserve each typed event's owner and state: generated or scheduled speech is not proof the user heard it, committed work is not completion, and only execution_closure terminal events reference trusted Activity completion evidence. Do not treat missing or undelivered speech as fulfilled communication. Decide whether any new planner response_text materially helps the current human interaction, and prefer no extra speech when it would be filler or repetition. Do not repeat an already delivered or pending semantic act, or re-plan an already completed effect, unless the current meaning requires an explicit repeat, retry after failure, correction, changed state, new evidence, or clarification. It cannot override the authoritative current Goals or Canonical Plan contract. "
-                f"Previous Fast Planner output when doing a semantic replan:\n{self._bounded(previous_raw, 3500) if previous_raw is not None else 'null'}\n\n"
+                f"Previous Fast Planner output when doing a mechanical DTO regeneration:\n{self._bounded(previous_raw, 3500) if previous_raw is not None else 'null'}\n\n"
                 "When validation errors are present, regenerate one fresh complete model-authored plan object from the authoritative goals and catalog. Author the semantic plan directly. Do not classify text with lexical rules and do not expect the host to choose a capability, arguments, ordering, ownership, response, disposition, coverage, or satisfaction for you. "
                 "Every top-level field and every nested field in FastPlannerMultiGoalPlanOutput is required. Use exact catalog capability IDs and schema-valid args. The verified tool-memory index contains no answer facts. When an exact fresh index entry matches every authoritative Goal binding, execute chromie.memory.retrieve_verified_tool_result with that evidence_id, original tool_id, and the same material arguments; never use a respond outcome directly from the index. If no exact fresh entry exists, execute the supplied fresh read capability. For a scheduled, running, or recoverable safe-read goal, reuse the bound capability and exact arguments and execute or retry it; never answer from another task's result. On a tool or other executable route, response_text is optional prospective conversational intent, not execution evidence. Use Interaction Context to leave it empty when an equivalent acknowledgement or commitment is already delivered or pending and nothing new needs saying. When there is a genuinely new acknowledgement, limitation, correction, confirmation need, or other conversational delta, author it naturally without predicting an external result or claiming execution/completion. A response_text never satisfies the executable Goal; post-execution factual claims require matching evidence. "
                 f"{argument_grounding_contract}"
@@ -889,7 +892,7 @@ class FastPlannerResolver:
             f"{goal_progress_communication_prompt('Fast Planner')}\n\n"
                 f"Goal-scoped Interaction Context JSON:\n{self._bounded(context.get('interaction_context') or {}, 7000)}\n\n"
             "Use Interaction Context to plan only the still-needed conversational and effectful delta. Preserve each typed event's owner and state: generated or scheduled speech is not proof the user heard it, committed work is not completion, and only execution_closure terminal events reference trusted Activity completion evidence. Do not treat missing or undelivered speech as fulfilled communication. Decide whether any new planner response_text materially helps the current human interaction, and prefer no extra speech when it would be filler or repetition. Do not repeat an already delivered or pending semantic act, or re-plan an already completed effect, unless the current meaning requires an explicit repeat, retry after failure, correction, changed state, new evidence, or clarification. It cannot override the authoritative current Goals or Canonical Plan contract. "
-            f"Previous Fast Planner output when doing a semantic replan:\n{self._bounded(previous_raw, 3500) if previous_raw is not None else 'null'}\n\n"
+            f"Previous Fast Planner output when doing a mechanical DTO regeneration:\n{self._bounded(previous_raw, 3500) if previous_raw is not None else 'null'}\n\n"
             "When validation errors are present and the previous output is null, regenerate one fresh complete object from the authoritative turn, goals, catalog, and every listed defect. Do not patch, quote, splice, annotate, or embed JSON fragments inside rationale or response strings. "
             "Decide whether the executable common catalog completely covers every independent responsibility in the current user turn. A verified tool-memory index entry is only metadata that an exact prior result may be retrievable; it is never answer evidence. After Goal Association has fixed all material bindings, select chromie.memory.retrieve_verified_tool_result only when one index entry exactly matches the required tool_id and material arguments and is fresh enough for the user request. Otherwise select the fresh read capability. A status follow-up for a scheduled, running, or recoverable safe read must resume or retry the bound skill with its exact arguments when no matching completed memory entry exists. Never invent weather, temperature, status, price, schedule, or another external result from model memory or from index metadata. "
             "There are exactly two legal output shapes for one or many goals. A terminal plan uses coverage=complete, a goal_outcomes entry keyed exactly once by every canonical Goal ID, and non-null prospective satisfaction. A semantic escalation uses disposition=escalate, coverage=partial or uncertain, steps=[], one escalate outcome for every canonical Goal ID, non-exact prospective satisfaction, and a specific non-empty escalation_reason. "
@@ -993,11 +996,6 @@ class FastPlannerResolver:
             planner_tier="fast",
             expected_goal_ids_for_turn=expected_goal_ids_for_turn,
         )
-        validate_goal_responsibility_outcomes(
-            model_output,
-            authoritative_goals=canonical_goal_grounding(request.context),
-            context=request.context,
-        )
         out = model_output.model_dump(mode="python")
         out.pop("plan_relation", None)
         out.pop("user_confirmation_required", None)
@@ -1036,11 +1034,6 @@ class FastPlannerResolver:
             raw,
             planner_tier="fast",
             expected_goal_ids_for_turn=expected_goal_ids_for_turn,
-        )
-        validate_goal_responsibility_outcomes(
-            model_output,
-            authoritative_goals=canonical_goal_grounding(request.context),
-            context=request.context,
         )
         out = model_output.model_dump(mode="python")
         out.pop("plan_relation", None)

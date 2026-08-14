@@ -17,7 +17,7 @@ class BehaviorTruthSuiteTests(unittest.IsolatedAsyncioTestCase):
     async def test_all_behavior_scenario_suites(self) -> None:
         expected_counts = {
             "adapter": 4,
-            "goal_interpretation": 28,
+            "goal_interpretation": 29,
             "cognitive_core_dialogue": 3,
             "interaction": 29,
             "dialogue": 319,

@@ -590,49 +590,6 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(generated)
         self.assertFalse(scheduled)
 
-    def test_post_interrupt_corrected_decision_is_normal_followup(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-        interrupt = RouteDecision(
-            route="interrupt",
-            intent="stop_current_output",
-            confidence=0.99,
-            metadata={
-                "post_interrupt_review": {"status": "corrected"},
-                "post_interrupt_decision": {
-                    "route": "chat",
-                    "agents": ["conversation_agent", "speaker_agent"],
-                    "intent": "explain_phrase",
-                    "confidence": 0.86,
-                    "language": "en-US",
-                    "source": "llm",
-                    "speak_first": "Sorry, I misheard that as a stop command.",
-                },
-            },
-        )
-
-        corrected = assistant._post_interrupt_corrected_decision(interrupt)
-
-        self.assertIsNotNone(corrected)
-        assert corrected is not None
-        self.assertEqual(corrected.route, "chat")
-        self.assertFalse(corrected.interrupt_current)
-        self.assertTrue(corrected.metadata["post_interrupt_correction"])
-        self.assertEqual(
-            corrected.metadata["original_interrupt_intent"],
-            "stop_current_output",
-        )
-
-    def test_post_interrupt_confirmed_decision_has_no_followup(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-        interrupt = RouteDecision(
-            route="interrupt",
-            intent="stop_current_output",
-            confidence=0.99,
-            metadata={"post_interrupt_review": {"status": "confirmed"}},
-        )
-
-        self.assertIsNone(assistant._post_interrupt_corrected_decision(interrupt))
-
     async def test_multi_goal_confirmation_denial_closes_all_scoped_goals(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.confirmation_dialogue = orchestrator_module.ConfirmationDialogue(

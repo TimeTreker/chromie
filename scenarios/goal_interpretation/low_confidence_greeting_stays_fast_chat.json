@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "id": "low_confidence_greeting_stays_fast_chat",
+  "suite": "goal_interpretation",
+  "level": "module",
+  "description": "A schema-valid low-confidence greeting stays on the non-effectful fast chat lane instead of paying for Deep Thinking.",
+  "tags": [
+    "chat",
+    "low-confidence",
+    "bounded-cognition",
+    "latency"
+  ],
+  "input": {
+    "text": "Hello Chromie, how are you doing?",
+    "language": "en-US"
+  },
+  "stub": {
+    "interpretation_mode": "hybrid",
+    "catalog": {
+      "matched": false,
+      "catalog_version": 91,
+      "capabilities": []
+    },
+    "llm_decision": {
+      "route": "chat",
+      "agents": [],
+      "intent": "unknown",
+      "confidence": 0.0,
+      "language": "en-US",
+      "source": "llm",
+      "reason": "fine-grained conversational intent is uncertain"
+    }
+  },
+  "expect": {
+    "route": "chat",
+    "intent": "general_conversation",
+    "source": "llm",
+    "task_types_include": [
+      "speech.answer"
+    ],
+    "task_types_forbid": [
+      "cognition.delegate_deep_thought",
+      "cognition.deep_think"
+    ],
+    "llm_calls": 1
+  }
+}

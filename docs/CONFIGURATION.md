@@ -260,7 +260,6 @@ uncertainty, malformed output, and model failure all fail open.
 | `AGENT_GOAL_INTERPRETER_MODE` | Explicit `rules_only`, `hybrid`, or `llm_only`. |
 | `AGENT_GOAL_INTERPRETER_USE_LLM` | `1`; selects `hybrid` when `AGENT_GOAL_INTERPRETER_MODE` is absent. This uses the fast Goal Interpreter model for semantic interpretation while the emergency filter remains deterministic. |
 | `AGENT_GOAL_INTERPRETER_MODEL` | `qwen3:4b` in common configuration. |
-| `AGENT_GOAL_INTERPRETER_REVIEW_MODEL` | `gemma4:e2b` in common configuration; reserved for the optional post-interrupt compatibility review only. It is not an ordinary semantic repair model. |
 | `AGENT_GOAL_INTERPRETER_OLLAMA_URL` | Goal-Interpreter-to-Ollama base URL inside the Agent deployment. |
 | `AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | `5400` in common low-latency configuration; kept aligned with the fast semantic interpretation budget. |
 | `AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS` | `5400` in common configuration for the compact fast Goal Interpreter model path. |
@@ -269,12 +268,11 @@ uncertainty, malformed output, and model failure all fail open.
 | `AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE` | `24h`; sent on Goal Interpreter Ollama calls so the warmed routing model remains resident. |
 | `AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP` | `1`; the Agent startup lifecycle warms the Goal Interpreter LLM during startup so the first live turn does not pay cold model load time. |
 | `AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS` | `60000`; startup warm budget for the Goal Interpreter model. The longer budget covers observed laptop-GPU cold loads without declaring a healthy warmup failed just before completion. Failure is logged and the service still starts. |
-| `AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS` | `2500` in common configuration for the optional post-interrupt compatibility review. Ordinary Fast interpretation never enters a second semantic reviewer. |
-| `AGENT_GOAL_INTERPRETER_CONFIDENCE_THRESHOLD` | `0.55`. |
+| `AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS` | `2500` in common configuration for the focused inactive-addressedness review on the same Fast Goal Interpreter model. It is not a semantic repair budget. |
+| `AGENT_GOAL_INTERPRETER_CONFIDENCE_THRESHOLD` | `0.55`. Applies to routes whose uncertainty could change responsibility, external work, memory, or effects: low-confidence `tool`, `memory`, and `robot_action` delegate once to Deep Thinking. A schema-valid benign `chat` route remains fast; this is not a universal escalation threshold. |
 | `AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_URL` | Agent capability-catalog base URL; Compose default `http://chromie-agent:8092`. |
 | `AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_TIMEOUT_MS` | Goal Interpreter budget for one catalog snapshot; common default `400`. Catalog failure falls back safely and the Agent rechecks in-process. |
 | `AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_CACHE_TTL_MS` | `5000`; short Goal-Interpreter-side cache for the prompt catalog snapshot. The fast Goal Interpretation path uses this snapshot's unlocked common entries, not per-utterance search matches, and execution is revalidated downstream. |
-| `AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED` | `0` in common low-latency runtime; when enabled, after an interrupt has already been applied, the reviewer may confirm the stop or attach a corrected non-interrupt route in metadata. |
 | `AGENT_GOAL_INTERPRETER_LOG_LEVEL` / `LOG_LEVEL` | Component/global logging level. |
 | `CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_RAW` / `AGENT_GOAL_INTERPRETER_DEBUG_RAW` | `0`; when enabled, the embedded Goal Interpreter logs the full raw LLM JSON output after the default bounded raw-output summary. |
 | `CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_PROMPT` / `AGENT_GOAL_INTERPRETER_DEBUG_PROMPT` | `0`; when enabled, the embedded Goal Interpreter logs bounded system/user prompt text. Default logs only prompt hashes, sizes, feature flags, and catalog counts. |
@@ -335,12 +333,11 @@ certificate-repair fallback.
 | `AGENT_DEEP_PLANNER_ENABLED` | `1`; exposes the full-catalog advisory Deep Planner. |
 | `AGENT_DEEP_PLANNER_MODEL` | `gemma4:e2b`; model used after Fast Planner escalation. |
 | `AGENT_DEEP_PLANNER_TIMEOUT_MS` | `9000`; Deep Planner model timeout. |
-| `AGENT_DEEP_PLANNER_MIN_CONFIDENCE` | `0.65`; complete deep plans below this threshold receive bounded same-tier revision. |
-| `AGENT_DEEP_PLANNER_MIN_GOAL_SATISFACTION` | `0.75`; complete deep plans below this semantic goal-satisfaction score receive bounded same-tier revision. |
+| `AGENT_DEEP_PLANNER_MIN_CONFIDENCE` | `0.65`; a complete Deep plan below this threshold fails closed. Confidence does not authorize another Deep semantic pass. |
+| `AGENT_DEEP_PLANNER_MIN_GOAL_SATISFACTION` | `0.75`; a complete Deep plan below this prospective goal-satisfaction threshold fails closed. It is not a replan trigger. |
 | `AGENT_DEEP_PLANNER_NUM_CTX` | `8192`; bounded full-catalog planning context. |
 | `AGENT_DEEP_PLANNER_NUM_PREDICT` | `1024`; flat semantic planner-DTO JSON budget. |
 | `AGENT_DEEP_PLANNER_MAX_CAPABILITIES` | `96`; maximum full catalog entries supplied. |
-| `AGENT_DEEP_PLANNER_MAX_REPLANS` | `1`; maximum same-tier schema or validator-feedback revision inside Deep Planner. Continued invalidity fails closed. |
 | `ORCH_DEEP_PLANNER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Deep Planning remains terminal in the unified runtime. |
 | `ORCH_DEEP_PLANNER_TIMEOUT_MS` | `10000`; host timeout for report-only deep planning. |
 | `AGENT_RESPONSE_COMPOSER_ENABLED` | `1`; exposes advisory composition of an immutable terminal `CanonicalPlan` with a goal-scoped `ResponsePlan` and optional auxiliary `SocialAttentionPlan`. |
@@ -469,14 +466,16 @@ the complete correlated evidence record.
 Cognitive Gateway owns the hard operational filter and focused addressedness
 review before Core entry. Interrupt, silence, and unusable-audio handling stay
 deterministic in every mode. Goal Interpretation receives only an admitted
-envelope and no longer performs ambient suppression. The optional
-post-interrupt semantic review runs only after that interrupt is already applied,
-so it cannot delay cancellation; it may only confirm the stop or attach a
-corrected follow-up interpretation. The quick intent stage uses catalog-bounded
-LLM reasoning when `AGENT_GOAL_INTERPRETER_MODE` is `hybrid` or `llm_only`.
-The deep-thought stage is reached when quick intent returns low confidence or
-explicitly chooses `deep_thought`; it is handled by the Agent deepthinking
-module, not by the fast Goal Interpreter model. Soft deterministic validators may correct
+envelope and no longer performs ambient suppression. An applied interrupt is terminal for that turn: there is no post-interrupt
+semantic correction pass. Any false-positive stop remains evidence for later
+Reflection or a new user turn rather than reopening execution authority. The quick
+intent stage uses catalog-bounded LLM reasoning when `AGENT_GOAL_INTERPRETER_MODE` is `hybrid` or `llm_only`.
+The deep-thought stage is reached when quick intent explicitly chooses
+`deep_thought`, or when low-confidence `tool`, `memory`, or `robot_action`
+work could change responsibility, external work, memory, or effects. A
+schema-valid benign `chat` route remains on the fast conversational path even
+when its fine-grained intent confidence is low. Deep cognition is handled by the
+Agent deepthinking module, not by a second Fast Goal Interpreter reviewer. Soft deterministic validators may correct
 impossible or unsafe route choices between stages, but they must not answer the
 user or select normal intent by phrase matching.
 

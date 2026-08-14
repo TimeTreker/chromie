@@ -465,7 +465,6 @@ deep_planner_resolver = (
         num_ctx=settings.deep_planner_num_ctx,
         num_predict=settings.deep_planner_num_predict,
         max_capabilities=settings.deep_planner_max_capabilities,
-        max_replans=settings.deep_planner_max_replans,
         min_goal_satisfaction=settings.deep_planner_min_goal_satisfaction,
     )
     if deep_planner_client is not None

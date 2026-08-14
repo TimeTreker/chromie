@@ -29,7 +29,6 @@ MODEL_PLAN_KEYS = (
     "OLLAMA_MODEL",
     "AGENT_GOAL_INTERPRETER_MODEL",
     "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
-    "AGENT_GOAL_INTERPRETER_REVIEW_MODEL",
     "AGENT_GOAL_ASSOCIATION_MODEL",
     "AGENT_FAST_PLANNER_MODEL",
     "AGENT_DEEP_PLANNER_MODEL",
@@ -457,10 +456,6 @@ def active_models(values: Mapping[str, str]) -> list[str]:
 
     if enabled(values.get("AGENT_GOAL_INTERPRETER_USE_LLM")):
         append(values.get("AGENT_GOAL_INTERPRETER_MODEL"))
-        if values.get("AGENT_GOAL_INTERPRETER_REVIEW_MODEL") and enabled(
-            values.get("AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED")
-        ):
-            append(values.get("AGENT_GOAL_INTERPRETER_REVIEW_MODEL"))
     if enabled(values.get("AGENT_COGNITIVE_GATEWAY_ATTENTION_ENABLED"), default=True):
         append(values.get("AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL"))
 

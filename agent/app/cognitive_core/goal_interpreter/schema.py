@@ -254,9 +254,8 @@ class HealthResponse(BaseModel):
 
 STAGE_ORDER: dict[str, int] = {
     "emergency_filter": 0,
-    "post_interrupt_review": 1,
-    "quick_intent": 2,
-    "deep_thought": 3,
+    "quick_intent": 1,
+    "deep_thought": 2,
 }
 ROUTE_MERGE_SCHEMA_VERSION = 1
 

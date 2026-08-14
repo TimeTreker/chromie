@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import inspect
-import json
 import unittest
 from typing import Any
+from unittest import mock
 
-from agent.app.cognitive_core.goal_interpreter.model_interpreter import OllamaGoalInterpreter
-from agent.app.cognitive_core.goal_interpreter.schema import FastSpeech, RouteDecision, RouteItem, RouteRequest, finalize_decision
+from agent.app.cognitive_core.goal_interpreter.schema import (
+    FastSpeech,
+    RouteDecision,
+    RouteItem,
+    RouteRequest,
+)
 
 
 WEATHER_CAPABILITY = {
@@ -19,44 +23,54 @@ WEATHER_CAPABILITY = {
 }
 
 
-class _EmptyReviewInterpreter(OllamaGoalInterpreter):
-    async def _chat_logged(
-        self,
-        payload: dict[str, Any],
-        *,
-        stage: str,
-        request=None,
-    ) -> dict[str, Any]:
-        return {"message": {"content": ""}, "done": True, "done_reason": "stop"}
+class _Catalog:
+    async def snapshot(self, *, refresh: bool = False) -> dict[str, Any]:
+        del refresh
+        return {
+            "catalog_version": 1,
+            "capabilities": [WEATHER_CAPABILITY],
+        }
 
+
+class _Interpreter:
+    def __init__(self, decision: RouteDecision) -> None:
+        self.decision = decision
+        self.calls = 0
+
+    async def route(self, request: RouteRequest) -> RouteDecision:
+        del request
+        self.calls += 1
+        return self.decision
 
 
 class WeatherAffordanceTests(unittest.IsolatedAsyncioTestCase):
-    def _interpreter(self, cls=_EmptyReviewInterpreter):
-        return cls(
-            ollama_url="http://example.invalid",
-            model="qwen3:4b",
-            review_model="qwen3:4b",
-            timeout_ms=800,
-            review_timeout_ms=800,
-            confidence_threshold=0.55,
-        )
-
     @staticmethod
-    def _request(text: str) -> RouteRequest:
+    def _request(text: str, *, language: str = "en-US") -> RouteRequest:
         return RouteRequest(
             sid="weather-contract-test",
             text=text,
-            language="en-US",
-            context={
-                "common_ability_catalog": [WEATHER_CAPABILITY],
-                "prompt_capabilities_common": [WEATHER_CAPABILITY],
-            },
+            language=language,
+            context={"gateway_admission_complete": True},
         )
+
+    async def _interpret(
+        self,
+        request: RouteRequest,
+        decision: RouteDecision,
+    ) -> tuple[RouteDecision, _Interpreter]:
+        from agent.app.cognitive_core.goal_interpreter import engine
+
+        interpreter = _Interpreter(decision)
+        with mock.patch.object(engine.settings, "mode", "hybrid"), mock.patch.object(
+            engine, "capability_catalog", _Catalog()
+        ), mock.patch.object(engine, "goal_interpreter", interpreter):
+            result = await engine.interpret_turn(request)
+        return result, interpreter
 
     async def test_weather_semantics_do_not_trigger_host_route_repair(self) -> None:
         request = self._request("what is the weather in Chongqing today")
-        model_authored = finalize_decision(
+        result, interpreter = await self._interpret(
+            request,
             RouteDecision(
                 route="chat",
                 routes=[
@@ -72,22 +86,17 @@ class WeatherAffordanceTests(unittest.IsolatedAsyncioTestCase):
                 source="llm",
                 metadata={"tool_name": "weather"},
             ),
-            request,
-            source="llm",
         )
 
-        result = await self._interpreter()._repair_route_intent_contract(
-            request,
-            model_authored,
-        )
-
-        self.assertIs(result, model_authored)
+        self.assertEqual(interpreter.calls, 1)
         self.assertEqual(result.route, "chat")
+        self.assertEqual(result.intent, "weather_query")
         self.assertNotIn("semantic_route_repair", result.metadata)
 
     async def test_weather_intent_alone_does_not_create_host_conflict(self) -> None:
         request = self._request("what is the weather in Chongqing today")
-        model_authored = finalize_decision(
+        result, _ = await self._interpret(
+            request,
             RouteDecision(
                 route="chat",
                 intent="weather_query",
@@ -96,24 +105,17 @@ class WeatherAffordanceTests(unittest.IsolatedAsyncioTestCase):
                 source="llm",
                 metadata={"tool_name": "weather"},
             ),
-            request,
-            source="llm",
         )
 
-        result = await self._interpreter()._repair_route_intent_contract(
-            request,
-            model_authored,
-        )
-
-        self.assertIs(result, model_authored)
         self.assertEqual(result.route, "chat")
         self.assertFalse(result.metadata.get("llm_clarification_required", False))
 
-    async def test_failed_underspecified_robot_review_never_uses_keyword_recovery(
+    async def test_underspecified_robot_output_never_uses_keyword_recovery_or_executes(
         self,
     ) -> None:
-        request = self._request("重庆今天天气情况怎么样？")
-        bad_quick_decision = finalize_decision(
+        request = self._request("重庆今天天气情况怎么样？", language="zh-CN")
+        result, interpreter = await self._interpret(
+            request,
             RouteDecision(
                 route="robot_action",
                 intent="physical_motion",
@@ -121,29 +123,35 @@ class WeatherAffordanceTests(unittest.IsolatedAsyncioTestCase):
                 language="zh-CN",
                 source="llm",
             ),
-            request,
-            source="llm",
         )
 
-        result = await self._interpreter()._review_route_only_robot_action(
-            request,
-            bad_quick_decision,
+        self.assertEqual(interpreter.calls, 1)
+        self.assertEqual(result.route, "robot_action")
+        self.assertEqual(result.intent, "semantic_capability_planning")
+        self.assertEqual(result.confidence, 0.0)
+        self.assertEqual(result.actions, [])
+        self.assertEqual(result.candidate_capabilities, [])
+        self.assertEqual(
+            result.metadata.get("capability_grounding", {}).get("status"),
+            "unresolved_requires_planner",
         )
-
-        self.assertEqual(result.route, "clarify")
-        self.assertEqual(result.intent, "clarify_uncertain_request")
-        self.assertEqual(result.skills if hasattr(result, "skills") else [], [])
-        self.assertIn("semantic review failed", result.reason or "")
+        self.assertTrue(
+            result.metadata.get("core_semantic_handoff", {}).get(
+                "must_not_execute_partial_route"
+            )
+        )
+        self.assertNotIn("semantic_route_repair", result.metadata)
 
     async def test_valid_model_weather_contract_is_not_rejected_by_text_keywords(
         self,
     ) -> None:
-        request = self._request("你能查天信吗？")
-        decision = finalize_decision(
+        request = self._request("你能查天信吗？", language="zh-CN")
+        result, _ = await self._interpret(
+            request,
             RouteDecision(
                 route="tool",
                 agents=["tool_agent", "speaker_agent"],
-                intent="weather_query",
+                intent="capability:chromie.weather.lookup",
                 confidence=0.95,
                 language="zh-CN",
                 fast_speech=FastSpeech(
@@ -162,24 +170,22 @@ class WeatherAffordanceTests(unittest.IsolatedAsyncioTestCase):
                 },
                 source="llm",
             ),
-            request,
-            source="llm",
         )
 
-        result = await self._interpreter()._repair_route_intent_contract(
-            request,
-            decision,
-        )
-
-        self.assertIs(result, decision)
         self.assertEqual(result.route, "tool")
         self.assertEqual(
             result.metadata.get("weather_query", {}).get("location"),
             "天信",
         )
+        self.assertNotIn("semantic_route_repair", result.metadata)
 
     def test_goal_interpreter_source_has_no_weather_phrase_rule(self) -> None:
-        source = inspect.getsource(__import__("agent.app.cognitive_core.goal_interpreter.engine", fromlist=["*"]))
+        source = inspect.getsource(
+            __import__(
+                "agent.app.cognitive_core.goal_interpreter.engine",
+                fromlist=["*"],
+            )
+        )
         for forbidden in (
             "_is_weather_like_text",
             "_ZH_WEATHER_TERMS",

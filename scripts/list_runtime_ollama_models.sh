@@ -36,10 +36,6 @@ fi
 
 if is_enabled "${AGENT_GOAL_INTERPRETER_USE_LLM:-0}"; then
   append_model "${AGENT_GOAL_INTERPRETER_MODEL:-}"
-  if [ -n "${AGENT_GOAL_INTERPRETER_REVIEW_MODEL:-}" ] && \
-    is_enabled "${AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED:-0}"; then
-    append_model "$AGENT_GOAL_INTERPRETER_REVIEW_MODEL"
-  fi
 fi
 
 if is_enabled "${AGENT_USE_LLM:-1}"; then

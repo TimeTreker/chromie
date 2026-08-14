@@ -80,7 +80,6 @@ ROUTE_ITEM_PRIMARY_RANK = {
 }
 REVIEW_STAGES = {
     "addressedness_review",
-    "post_interrupt_review",
 }
 
 
@@ -1105,7 +1104,6 @@ class OllamaGoalInterpreter:
         *,
         ollama_url: str,
         model: str,
-        review_model: str | None = None,
         timeout_ms: int,
         review_timeout_ms: int | None = None,
         confidence_threshold: float,
@@ -1116,7 +1114,6 @@ class OllamaGoalInterpreter:
     ) -> None:
         self.ollama_url = ollama_url.rstrip("/")
         self.model = model
-        self.review_model = (review_model or "").strip()
         self.timeout_s = max(0.1, timeout_ms / 1000.0)
         self.review_timeout_s = max(
             0.1,
@@ -1440,79 +1437,6 @@ class OllamaGoalInterpreter:
                 # latency on every inactive turn.
                 "num_ctx": self.num_ctx,
                 "num_predict": 32,
-            },
-        }
-
-    def build_post_interrupt_review_payload(
-        self,
-        request: RouteRequest,
-        interrupt_decision: RouteDecision,
-    ) -> dict[str, Any]:
-        abilities_json = _bounded_json(
-            _compact_candidate_capabilities(_review_capabilities_from_request(request)),
-            max_chars=1800,
-        )
-        mind = request.context.get("mind", {})
-        session_context = _bounded_json(_context_without_prompt_globals(request.context), max_chars=1800)
-        interrupt_json = _bounded_json(
-            {
-                "route": interrupt_decision.route,
-                "intent": interrupt_decision.intent,
-                "confidence": interrupt_decision.confidence,
-                "reason": interrupt_decision.reason,
-                "source": interrupt_decision.source,
-            },
-            max_chars=500,
-        )
-        return {
-            "model": self.review_model or self.model,
-            "stream": False,
-            "think": False,
-            "format": "json",
-            **({"keep_alive": self.keep_alive} if self.keep_alive else {}),
-            "messages": [
-                {
-                    "role": "system",
-                    "content": (
-                        "Global Context Group:\n"
-                        f"{_goal_interpretation_global_context_section(mind)}\n\n"
-                        "Session Context Group:\n"
-                        f"- Language hint: {request.language or 'auto'}\n"
-                        f"- Bounded session context JSON: {session_context}\n"
-                        f"- Already-applied emergency-filter decision JSON: {interrupt_json}\n\n"
-                        "Current Job:\n"
-                        "- You are Chromie's post-interrupt semantic reviewer.\n"
-                        "- The host has already applied the deterministic interrupt/cancel lane immediately for safety.\n"
-                        "- Your job is only to confirm that interpretation or propose the correct non-interrupt route if the text was misheard/misread.\n"
-                        "- Decide from meaning, context, and supplied abilities; do not create phrase rules.\n\n"
-                        "Task Context Group:\n"
-                        "- Choose interrupt when the user truly asked to stop, cancel, pause, be quiet, or halt current work.\n"
-                        "- Choose a non-interrupt route when the text merely mentions stop, uses stop in another meaning, or asks for a different chat/tool/memory/body task.\n"
-                        "- If correcting to robot_action, use intent capability:<exact capability_id> when a supplied common ability clearly fits.\n"
-                        "- Physical actions are still only proposals; downstream planning and the Trusted Capability Runtime must validate and confirm them.\n\n"
-                        "Output Contract:\n"
-                        "- Return one compact RouteDecision JSON object.\n"
-                        "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify, interrupt, ignore.\n"
-                        "- Do not output chain-of-thought, hidden reasoning, analysis, free-form progress narration outside structured speech fields, scratchpad text, markdown, or any text outside the JSON object.\n"
-                        "- If the emergency interpretation was correct, return route=interrupt and intent=stop_current_output.\n"
-                        "- If it was a misunderstanding, return the corrected non-interrupt route with confidence >= 0.72 when clear.\n"
-                        "- For a correction, speak_first may contain one brief apology/correction sentence, but must not claim a physical action or tool side effect has executed."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        "Task Context Group:\n"
-                        f"- Latest user input: {request.text}\n"
-                        f"- Common ability catalog JSON: {abilities_json}"
-                    ),
-                },
-            ],
-            "options": {
-                "temperature": 0,
-                "top_p": 0.9,
-                "num_ctx": self.num_ctx,
-                "num_predict": max(128, self.num_predict),
             },
         }
 
@@ -2052,28 +1976,6 @@ class OllamaGoalInterpreter:
         ):
             return "robot_action_missing_semantic_intent"
         return None
-
-    async def review_after_priority_interrupt(
-        self,
-        request: RouteRequest,
-        interrupt_decision: RouteDecision,
-    ) -> RouteDecision:
-        data = await self._chat_logged(
-            self.build_post_interrupt_review_payload(request, interrupt_decision),
-            stage="post_interrupt_review",
-            request=request,
-        )
-        decision = self._decision_from_response(request, data, stage="post_interrupt_review")
-        if decision.route == "interrupt":
-            decision.intent = "stop_current_output"
-            decision.reason = (
-                f"{decision.reason}; " if decision.reason else ""
-            ) + "post-interrupt review confirmed deterministic interrupt"
-            return decision
-        decision.reason = (
-            f"{decision.reason}; " if decision.reason else ""
-        ) + "post-interrupt review corrected deterministic interrupt"
-        return decision
 
     async def _review_inactive_addressedness(
         self,

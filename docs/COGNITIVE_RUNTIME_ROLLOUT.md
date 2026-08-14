@@ -54,7 +54,7 @@ User Turn
 ```
 
 The main planning direction is acyclic. Deep planning never returns semantic
-work to Fast planning. Deep Planner may make one bounded same-tier revision
+work to Fast planning. Deep Planner may make one one mechanical DTO regeneration
 inside its own transaction. Trusted Host validation is terminal and does not
 invoke another semantic planner after rejecting the terminal plan.
 
@@ -242,9 +242,10 @@ ORCH_RESPONSE_COMPOSER_TIMEOUT_MS=5000
 ```
 
 The total budget prevents a sequence of individually legal calls from creating
-unbounded turn latency. Fast Planner may escalate once to Deep Planner, and Deep
-Planner owns its one bounded internal revision. Host validation cannot spend the
-remaining runtime budget on another semantic planning pass.
+unbounded turn latency. Fast Planner may escalate once to Deep Planner. Either planner tier may
+regenerate once only for a mechanically malformed DTO. Deep semantic rejection is
+terminal, and Host validation cannot spend the remaining runtime budget on another
+semantic planning pass.
 
 A timeout produces a structured fallback cause. It never authorizes partial
 work.
@@ -269,9 +270,9 @@ Validation includes:
 
 If one step is invalid, no effectful step is committed.
 
-The validator either accepts the terminal plan or rejects it. Deep Planner has
-already consumed any permitted internal revision before returning that plan; a
-Host rejection therefore fails closed, commits no Goal state, and starts no
+The validator either accepts the terminal plan or rejects it. Deep Planner has already produced its terminal semantic plan; any permitted
+same-tier regeneration was mechanical DTO recovery only. A Host rejection therefore
+fails closed, commits no Goal state, and starts no
 effect.
 
 ## 8. Runtime adaptation
@@ -638,7 +639,7 @@ Before widening an apply lane, review:
 1. Does Goal Association preserve existing Goals instead of creating duplicates?
 2. Do Fast plans apply only with complete high-confidence coverage?
 3. Do compound Goals escalate without leaking partial skills?
-4. Does Deep consume at most one internal revision before terminal Host validation?
+4. Does Deep avoid same-tier semantic replanning and permit at most one mechanical DTO regeneration before terminal Host validation?
 5. Are material alternatives held for request-bound approval?
 6. Does speech match the current plan and execution state?
 7. Are all applied events recorded only after host preparation and Goal commit?
@@ -653,7 +654,7 @@ PR7 implementation is automatically verified when:
 - the unified pipeline supports `off`, `report_only`, and `apply`;
 - apply is lane-gated and rollback-safe;
 - Fast escalation reaches Deep once and never returns to Fast;
-- Deep owns at most one internal revision and trusted runtime rejection fails closed;
+- Deep performs no same-tier semantic replan; at most one mechanical DTO regeneration is allowed, and trusted runtime rejection fails closed;
 - invalid or partial plans commit no effectful skill;
 - Goal-state application is atomic;
 - response composition is fingerprint-bound to the terminal plan;

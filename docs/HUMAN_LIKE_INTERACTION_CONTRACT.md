@@ -207,7 +207,7 @@ material alternatives, novelty or broader context, or safety/resource reasoning
 that requires the wider planning boundary. A structured semantic or plan
 validation rejection may justify Deep only when its failure contract explicitly
 requires broader reasoning. Technical schema/model-contract failure receives
-bounded same-tier repair. Any later Deep recovery is explicitly classified as
+one mechanical DTO regeneration. Any later Deep recovery is explicitly classified as
 recovery, retains the Fast failure evidence, and fails closed unless it produces
 a valid plan; it is not semantic escalation. A confidence number alone neither
 permits a bypass nor requires escalation, and it never authorizes an effect.

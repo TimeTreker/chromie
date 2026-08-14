@@ -105,9 +105,10 @@ adding a manager because a useful explanatory term exists.
    safe-idle recovery. The dependency-complete source gate and rebuilt clean
    generated-speech/GPU profile remain bound to `90aa72a`. Current source
    replaces the former online semantic-review/recovery chain with bounded Fast
-   interpretation, one Deep escalation for low confidence, and terminal Host
-   validation. Hard semantic, delivery-evidence, safety, provider, or provenance
-   failures remain non-averageable blockers.
+   interpretation, one risk-bounded Deep escalation for uncertain `tool`,
+   `memory`, or `robot_action` work, and terminal Host validation. Hard semantic,
+   delivery-evidence, safety, provider, or provenance failures remain
+   non-averageable blockers.
 4. Keep every admitted non-operational turn on one Goal-driven semantic path.
    Interpretation failure must remain an explicit unavailable outcome; it must
    never be converted into plausible chat, tool, memory, or motion intent.
@@ -231,8 +232,9 @@ Exit criteria:
 ### Interpretation and capability grounding
 
 - Preserve one Fast Goal Interpretation transaction: one primary interpretation,
-  at most one mechanical DTO repair, then accept, delegate low confidence once to
-  Deep Thinking, or fail closed.
+  at most one mechanical DTO repair, then accept, delegate low-confidence
+  `tool`, `memory`, or `robot_action` work once to Deep Thinking, or fail closed.
+  Schema-valid benign chat remains on the fast conversational path.
 - Treat non-empty interpretation failure as `interpretation_unavailable`; never
   rewrite it into plausible chat, tool, memory, or motion intent.
 - Keep semantic reconsideration source-based. Do not restore intent reviewers,
@@ -243,16 +245,17 @@ Exit criteria:
   immutable evidence, not a second Goal authority.
 - Revalidate capability IDs, argument schemas, confidence, confirmation policy,
   resources, and effect envelopes at trusted boundaries. Fast may escalate once
-  to Deep Planner; Deep owns at most one internal revision; Host rejection is
-  terminal.
+  to Deep Planner; same-tier regeneration is reserved for one mechanically malformed
+  DTO only; semantic rejection in Deep and trusted Host rejection are terminal.
 - Expand general-ability scenarios rather than phrase-specific routing rules.
 
 Exit criteria:
 
 - no fallback invents an ordinary semantic lane;
 - a second malformed Fast DTO or semantic contradiction fails closed;
-- low-confidence Fast meaning reaches Deep Thinking without an intermediate
-  semantic repair model;
+- low-confidence Fast meaning that could change responsibility, external work,
+  memory, or effects reaches Deep Thinking without an intermediate semantic
+  repair model; low-confidence benign chat remains fast;
 - an effectful Goal has an owned executable step, delivered evidence for the
   same Goal, or an explicit clarify/escalate/unavailable/refused outcome;
 - compound body requests retain ordered exact capabilities;

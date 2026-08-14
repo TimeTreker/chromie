@@ -68,8 +68,6 @@ complete.
 | Orchestrator turn in `report_only` | Goal-Driven Cognitive Core (current Goal-driven Runtime) | observer | Same stages, evidence only | The existing routed Agent path remains the only authority. |
 | Agent `/interaction` or `/run` with exact Goal Interpreter `actions[]` | No new semantic planner; Goal Interpreter-action materializer | adapter | Schema validation and `SkillRequest` materialization only | Invalid actions are blocked or clarified; no LLM reinterpretation. |
 | Explicit compatibility emergency | Legacy CapabilityAgent | authoritative | Legacy capability semantic planner | Requires both service gates and a per-turn emergency claim. |
-| Post-interrupt correction in `apply`; corrected mapped lane is allowlisted | Goal-Driven Cognitive Core (current Goal-driven Runtime) | authoritative | Same apply coordinator as a normal turn | Fail closed after ownership is acquired. |
-| Post-interrupt correction in `apply`; corrected mapped lane is excluded | Goal-Driven Cognitive Core policy boundary | authoritative fail-closed | No semantic planner is entered; exact actions remain unexecuted compatibility input only and physical resume stays locked | Return a typed no-action/error outcome without legacy semantic re-entry. |
 
 The implemented direct speech-only branch runs after Goal Association for a
 complete non-effectful spoken-response Goal. Response Composer authors the
@@ -149,9 +147,9 @@ emergency-fallback tests while adding boundary tests that establish:
 - empty and mismatched turn claims are rejected before any LLM call;
 - both gates plus the emergency claim enable the retained compatibility planner;
 - Goal-driven failures never emit a `legacy_fallback` status;
-- allowlisted mapped lanes at apply and post-interrupt entrypoints name
-  Goal-driven Runtime as their only authority after acquisition, while
-  excluded mapped lanes fail closed without legacy semantic re-entry;
+- allowlisted mapped lanes at apply name Goal-driven Runtime as their only
+  authority after acquisition, while excluded mapped lanes fail closed without
+  legacy semantic re-entry;
 - maintained profiles use `apply`, `fail_closed`, and disabled legacy gates.
 
 Run the dependency-light audit with:
@@ -176,7 +174,7 @@ On the NVIDIA workstation, retain evidence for:
 
 - real Goal Association and Planner outputs across common and ambiguous turns;
 - execute-plus-clarify multi-goal continuation;
-- post-interrupt correction without duplicate execution;
+- terminal interrupt handling without post-interrupt semantic re-entry;
 - Soridormi/MuJoCo skill execution and safe-idle closure;
 - voice ASR/TTS behavior.
 

@@ -144,7 +144,6 @@ class _ScriptedGoalInterpreter(OllamaGoalInterpreter):
         super().__init__(
             ollama_url="http://scenario.invalid",
             model="scenario-fast-goal-interpreter",
-            review_model="scenario-review-goal-interpreter",
             timeout_ms=1000,
             review_timeout_ms=1000,
             confidence_threshold=0.55,

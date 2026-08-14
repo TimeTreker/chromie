@@ -31,7 +31,7 @@ except ImportError:  # pragma: no cover
     from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 from .planner_contract import (
     EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
-    ResourceResponsibilityCapabilityGroundingError,
+    PlannerDTOContractError,
     ResourceResponsibilityCapabilityUnavailableError,
     canonical_resource_argument_response_schema,
     canonical_goal_grounding,
@@ -49,7 +49,6 @@ from .planner_contract import (
     planner_response_goal_ids,
     planner_contract_diagnostics,
     review_coordinated_action_plan_coverage,
-    resource_grounding_repair_response_schema,
     situation_prompt_projection,
     validate_explicit_numeric_parameter_grounding,
     validate_external_response_evidence_boundary,
@@ -69,7 +68,7 @@ logger = logging.getLogger("chromie.agent.deep_planner")
 
 
 class DeepPlannerResolver:
-    """Full-catalog semantic planner with one bounded same-tier revision."""
+    """Terminal full-catalog semantic planner with one bounded mechanical DTO regeneration."""
 
     TRACE_MODULE = TraceModule(
         name="agent.deep_planner",
@@ -87,7 +86,7 @@ class DeepPlannerResolver:
         num_ctx: int = 8192,
         num_predict: int = 1024,
         max_capabilities: int = 96,
-        max_replans: int = 1,
+        max_contract_repairs: int = 1,
         min_goal_satisfaction: float = 0.75,
     ) -> None:
         self.ollama = ollama
@@ -96,7 +95,7 @@ class DeepPlannerResolver:
         self.num_ctx = max(4096, int(num_ctx))
         self.num_predict = max(256, int(num_predict))
         self.max_capabilities = max(1, min(256, int(max_capabilities)))
-        self.max_replans = max(0, min(1, int(max_replans)))
+        self.max_contract_repairs = max(0, min(1, int(max_contract_repairs)))
         self.min_goal_satisfaction = max(0.0, min(1.0, float(min_goal_satisfaction)))
 
     async def resolve(self, request: AgentRunRequest) -> CanonicalPlan:
@@ -112,7 +111,7 @@ class DeepPlannerResolver:
                         "num_ctx": self.num_ctx,
                         "num_predict": self.num_predict,
                         "max_capabilities": self.max_capabilities,
-                        "max_replans": self.max_replans,
+                        "max_contract_repairs": self.max_contract_repairs,
                     },
                 ) as span:
                     result = await self._resolve(request)
@@ -188,20 +187,12 @@ class DeepPlannerResolver:
         initial_raw_output: Any = None
         contract_repair_attempted = False
         initial_validation_errors = ""
-        resource_grounding_repair_error: (
-            ResourceResponsibilityCapabilityGroundingError | None
-        ) = None
-        for attempt in range(self.max_replans + 1):
+        for attempt in range(self.max_contract_repairs + 1):
             raw: Any = None
             try:
                 active_response_schema = self._contract_revision_response_schema(
                     response_schema,
                     feedback=feedback,
-                )
-                active_response_schema = resource_grounding_repair_response_schema(
-                    active_response_schema,
-                    error=resource_grounding_repair_error,
-                    authoritative_goals=authoritative_goals,
                 )
                 if self._requires_safety_revision(feedback):
                     active_response_schema = self._safety_revision_response_schema(
@@ -225,7 +216,7 @@ class DeepPlannerResolver:
                     attempt=attempt + 1,
                 )
                 if not isinstance(raw, dict):
-                    raise ValueError("deep planner response is not a JSON object")
+                    raise PlannerDTOContractError("deep planner response is not a JSON object")
                 raw, provenance_repairs = (
                     normalize_schema_default_parameter_provenance(
                         raw,
@@ -242,18 +233,55 @@ class DeepPlannerResolver:
                         request.sid,
                         self._bounded(provenance_repairs, 2000),
                     )
-                self._validate_parallel_timing_preservation(
-                    raw,
+                try:
+                    self._validate_parallel_timing_preservation(
+                        raw,
+                        context=request.context,
+                    )
+                    plan = CanonicalPlan.model_validate(
+                        self._normalize(
+                            raw,
+                            request=request,
+                            plan_id=plan_id,
+                            expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+                            capability_payload=payload,
+                        )
+                    )
+                    validated_model_output = validate_planner_model_output(
+                        raw,
+                        planner_tier="deep",
+                        expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+                    )
+                except (ValidationError, ValueError) as exc:
+                    if isinstance(exc, PlannerDTOContractError):
+                        raise
+                    raise PlannerDTOContractError(str(exc)) from exc
+
+                validate_goal_responsibility_outcomes(
+                    validated_model_output,
+                    authoritative_goals=canonical_goal_grounding(request.context),
                     context=request.context,
                 )
-                plan = CanonicalPlan.model_validate(
-                    self._normalize(
-                        raw,
-                        request=request,
-                        plan_id=plan_id,
-                        expected_goal_ids_for_turn=expected_goal_ids_for_turn,
-                        capability_payload=payload,
-                    )
+                validate_resource_responsibility_capability_grounding(
+                    validated_model_output,
+                    authoritative_goals=canonical_goal_grounding(request.context),
+                    capabilities=payload,
+                )
+                validate_explicit_numeric_parameter_grounding(
+                    validated_model_output,
+                    authoritative_goals=canonical_goal_grounding(request.context),
+                )
+                validate_goal_binding_argument_grounding(
+                    validated_model_output,
+                    authoritative_goals=canonical_goal_grounding(request.context),
+                )
+                validate_user_supplied_parameter_provenance(
+                    validated_model_output,
+                    authoritative_goals=canonical_goal_grounding(request.context),
+                )
+                validate_external_response_evidence_boundary(
+                    validated_model_output,
+                    context=request.context,
                 )
             except Exception as exc:
                 failure = llm_failure_metadata(exc)
@@ -283,17 +311,11 @@ class DeepPlannerResolver:
                             "resource_contract_unavailable": True,
                         },
                     )
-                semantic_replan = self._is_semantic_replan_error(exc)
-                if attempt < self.max_replans and semantic_replan:
+                mechanical_contract_error = isinstance(
+                    exc, (PlannerDTOContractError, json.JSONDecodeError)
+                )
+                if attempt < self.max_contract_repairs and mechanical_contract_error:
                     contract_repair_attempted = True
-                    resource_grounding_repair_error = (
-                        exc
-                        if isinstance(
-                            exc,
-                            ResourceResponsibilityCapabilityGroundingError,
-                        )
-                        else None
-                    )
                     initial_raw_output = raw
                     # Contract repair is a fresh schema-constrained regeneration,
                     # not an in-place JSON edit.  Supplying the invalid object as
@@ -350,8 +372,8 @@ class DeepPlannerResolver:
                     plan_id,
                     request,
                     "deep_planner_model_contract_failed"
-                    if contract_repair_attempted or semantic_replan
-                    else "deep_planner_unavailable",
+                    if contract_repair_attempted or mechanical_contract_error
+                    else "deep_planner_semantic_validation_failed",
                     error=exc,
                     attempts=attempt + 1,
                     metadata={
@@ -432,13 +454,6 @@ class DeepPlannerResolver:
                             coverage_review.uncovered_requirements,
                             coverage_review.reason,
                         )
-                        if attempt < self.max_replans:
-                            feedback = self._merge_feedback(
-                                persistent_safety_feedback,
-                                [review_error],
-                            )
-                            previous_raw = raw
-                            continue
                         return self._clarify(
                             plan_id,
                             request,
@@ -465,7 +480,7 @@ class DeepPlannerResolver:
                         "authority": "advisory",
                         "attempt_count": attempt + 1,
                         "full_capability_count": len(payload),
-                        "max_replans": self.max_replans,
+                        "max_contract_repairs": self.max_contract_repairs,
                         "min_goal_satisfaction": self.min_goal_satisfaction,
                         "contract_schema": "DeepPlannerModelOutput",
                         "canonical_contract": "CanonicalPlan",
@@ -486,17 +501,41 @@ class DeepPlannerResolver:
                         request.sid,
                     )
                 return plan.model_copy(update={"metadata": metadata})
-            if attempt < self.max_replans:
+            mechanical_error_types = {
+                "invalid_args",
+                "parameter_resolution_unknown_step",
+                "missing_goal_satisfaction",
+            }
+            if (
+                attempt < self.max_contract_repairs
+                and errors
+                and all(str(item.get("type") or "") in mechanical_error_types for item in errors)
+            ):
+                contract_repair_attempted = True
+                initial_raw_output = raw
+                initial_validation_errors = json.dumps(
+                    errors,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    default=str,
+                )[:12000]
                 feedback = self._merge_feedback(
                     persistent_safety_feedback,
                     errors,
                 )
-                previous_raw = raw
+                previous_raw = None
+                logger.warning(
+                    "deep_planner_contract_repair_start sid=%s attempt=%s validation_errors=%s",
+                    request.sid,
+                    attempt + 1,
+                    initial_validation_errors,
+                )
                 continue
             return self._clarify(
                 plan_id,
                 request,
-                "validation_rejected_after_replan",
+                "deep_planner_semantic_validation_rejected",
                 unresolved=[
                     item.get("step_id") or item.get("skill_id") or item["type"] for item in errors
                 ],
@@ -504,22 +543,15 @@ class DeepPlannerResolver:
                     "validation_feedback": errors,
                     "contract_schema": "DeepPlannerModelOutput",
                     "canonical_contract": "CanonicalPlan",
-                    "initial_raw_output_ref": cognition_text_reference(previous_raw),
-                    "repair_raw_output_ref": cognition_text_reference(raw),
+                    "initial_raw_output_ref": cognition_text_reference(initial_raw_output),
+                    "repair_raw_output_ref": cognition_text_reference(
+                        raw if contract_repair_attempted else None
+                    ),
                 },
                 attempts=attempt + 1,
             )
         raise AssertionError("unreachable")
 
-    @staticmethod
-    def _is_semantic_replan_error(exc: Exception) -> bool:
-        """Return true only when another model answer can repair the failure.
-
-        Transport, timeout, context-window, and output-budget failures are not
-        semantic plan defects and must not consume the bounded same-tier replan.
-        """
-
-        return isinstance(exc, (json.JSONDecodeError, ValidationError, ValueError))
 
     @staticmethod
     def _validation_error_items(
@@ -1186,7 +1218,7 @@ class DeepPlannerResolver:
             "current Deep Planner step IDs. Never copy them into current "
             "steps[].step_id or goal_outcomes.*.step_ids; only IDs authored in "
             "this output's steps array are eligible.\n\n"
-            f"Previous Deep Planner model output JSON, when doing a semantic runtime replan:\n{previous_section}\n\n"
+            f"Previous Deep Planner model output JSON, when doing a mechanical DTO regeneration:\n{previous_section}\n\n"
             f"Deterministic validation feedback from the previous deep-plan or trusted host-runtime attempt:\n{feedback_section}\n\n"
             "When validation feedback is present but the previous output is null, regenerate one fresh complete object from the authoritative turn, goals, catalog, and all listed defects. Do not patch, quote, splice, annotate, or embed JSON fragments inside rationale or response strings. "
             "When validation feedback reports parallel_step_count=1, the parallel label has no peer and is a malformed scheduling annotation rather than a user-visible concurrency plan; regenerate that exact one-step plan with timing=sequential. When validation feedback says multi-step parallel execution is not affirmatively safe, never silently change those parallel steps to an exact sequential plan. Either author plan_relation=safe_adjustment or alternative with user_confirmation_required=true and response_text explaining the timing change, or return a zero-step clarification/unavailable result. "
@@ -1367,14 +1399,14 @@ class DeepPlannerResolver:
     def _system_prompt() -> str:
         return (
             "You are Chromie's Deep Planner. Plan only the final authoritative user turn and canonical goals supplied at the end of the prompt. "
-            "You may revise once from structured validator feedback, but you never call or return to the Fast Planner. "
+            "A same-tier regeneration is allowed only once for a mechanically malformed DTO; semantic rejection is terminal. You never call or return to the Fast Planner. "
             "Capabilities are plan leaves, not planner ownership boundaries. Do not execute, authorize, or claim completion. Return JSON only."
         )
 
     @staticmethod
     def _revision_system_prompt() -> str:
         return (
-            "You regenerate one fresh Deep Planner output using semantic reasoning, complete deterministic validator feedback, and the supplied exact flat DeepPlannerModelOutput JSON Schema. "
+            "You regenerate one fresh Deep Planner DTO only because the previous object was mechanically invalid under the supplied exact flat DeepPlannerModelOutput JSON Schema. "
             "Rebuild every required field from the authoritative user turn, goals, and capabilities; do not edit or splice the invalid JSON. "
             "Return only the corrected DeepPlannerModelOutput JSON object. Do not add commentary, markdown, annotations, local field mappings, or hidden reasoning."
         )
@@ -1392,33 +1424,6 @@ class DeepPlannerResolver:
             raw,
             planner_tier="deep",
             expected_goal_ids_for_turn=expected_goal_ids_for_turn,
-        )
-        validate_goal_responsibility_outcomes(
-            model_output,
-            authoritative_goals=canonical_goal_grounding(request.context),
-            context=request.context,
-        )
-        if capability_payload is not None:
-            validate_resource_responsibility_capability_grounding(
-                model_output,
-                authoritative_goals=canonical_goal_grounding(request.context),
-                capabilities=capability_payload,
-            )
-        validate_explicit_numeric_parameter_grounding(
-            model_output,
-            authoritative_goals=canonical_goal_grounding(request.context),
-        )
-        validate_goal_binding_argument_grounding(
-            model_output,
-            authoritative_goals=canonical_goal_grounding(request.context),
-        )
-        validate_user_supplied_parameter_provenance(
-            model_output,
-            authoritative_goals=canonical_goal_grounding(request.context),
-        )
-        validate_external_response_evidence_boundary(
-            model_output,
-            context=request.context,
         )
         out = model_output.model_dump(mode="python")
         out.pop("plan_relation", None)
@@ -1443,6 +1448,13 @@ class DeepPlannerResolver:
             if not step.get("step_id"):
                 step["step_id"] = f"{plan_id}:step:{index}"
             normalized.append(step)
+        # A singleton step has no inter-step concurrency relation. Canonicalize
+        # a model-authored ``parallel`` label to ``sequential`` mechanically
+        # instead of spending another semantic model call to repair a meaningless
+        # scheduling annotation. Multi-step concurrency remains model-owned and
+        # is validated against provider safety below.
+        if len(normalized) == 1 and normalized[0].get("timing") == "parallel":
+            normalized[0]["timing"] = "sequential"
         out["steps"] = normalized
         out.setdefault("coverage", "uncertain")
         out.setdefault("disposition", "clarify")
@@ -1600,7 +1612,7 @@ class DeepPlannerResolver:
                 "status": "clarify",
                 "authority": "advisory",
                 "attempt_count": attempts,
-                "max_replans": self.max_replans,
+                "max_contract_repairs": self.max_contract_repairs,
                 "reason": reason,
             }
         )

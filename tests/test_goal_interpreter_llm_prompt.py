@@ -656,54 +656,6 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("Terminal references do not reopen Goals", prompt)
 
 
-    def test_post_interrupt_review_prompt_confirms_or_corrects_after_safety_stop(self) -> None:
-        interpreter = OllamaGoalInterpreter(
-            ollama_url="http://example.invalid",
-            model="test-model",
-            review_model="review-model",
-            timeout_ms=800,
-            confidence_threshold=0.55,
-        )
-
-        payload = interpreter.build_post_interrupt_review_payload(
-            RouteRequest(
-                text="Stop by the table means what?",
-                language="en-US",
-                context={
-                    "common_ability_catalog": [
-                        {
-                            "capability_id": "soridormi.walk_forward",
-                            "interaction_executable": True,
-                        }
-                    ],
-                    "asr_alternatives": ["What does stop by the table mean?"],
-                },
-            ),
-            RouteDecision(
-                route="interrupt",
-                intent="stop_current_output",
-                confidence=0.99,
-                reason="deterministic stop phrase",
-                source="rules",
-            ),
-        )
-        system = payload["messages"][0]["content"]
-        user = payload["messages"][1]["content"]
-
-        self.assertEqual(payload["model"], "review-model")
-        self.assertIn("post-interrupt semantic reviewer", system)
-        self.assertIn("already applied the deterministic interrupt/cancel lane", system)
-        self.assertIn("confirm that interpretation or propose the correct non-interrupt route", system)
-        self.assertIn("do not create phrase rules", system)
-        self.assertIn("Already-applied emergency-filter decision JSON", system)
-        self.assertIn("speak_first may contain one brief apology/correction sentence", system)
-        self.assertIn("must not claim a physical action or tool side effect has executed", system)
-        self.assertIn("chain-of-thought", system)
-        self.assertIn("free-form progress narration", system)
-        self.assertIn("confidence >= 0.72", system)
-        self.assertIn("Stop by the table means what?", user)
-        self.assertIn("soridormi.walk_forward", user)
-
     def test_payload_disables_qwen_thinking_and_uses_compact_json_mode(self) -> None:
         interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
@@ -1190,7 +1142,6 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         interpreter = BudgetFailureInterpreter(
             ollama_url="http://example.invalid",
             model="quick-model",
-            review_model="",
             timeout_ms=800,
             confidence_threshold=0.55,
         )
@@ -1208,7 +1159,6 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                 super().__init__(
                     ollama_url="http://example.invalid",
                     model="quick-model",
-                    review_model="review-model",
                     timeout_ms=800,
                     confidence_threshold=0.55,
                 )
@@ -1375,7 +1325,6 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                 super().__init__(
                     ollama_url="http://example.invalid",
                     model="quick-model",
-                    review_model="review-model",
                     timeout_ms=800,
                     confidence_threshold=0.55,
                 )
@@ -1476,7 +1425,6 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         interpreter = AddressedRequestInterpreter(
             ollama_url="http://example.invalid",
             model="quick-model",
-            review_model="review-model",
             timeout_ms=800,
             confidence_threshold=0.55,
         )
@@ -1741,7 +1689,6 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                 super().__init__(
                     ollama_url="http://example.invalid",
                     model="quick-model",
-                    review_model="quality-model",
                     timeout_ms=800,
                     confidence_threshold=0.55,
                 )
