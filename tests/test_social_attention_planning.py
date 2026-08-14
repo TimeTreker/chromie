@@ -318,7 +318,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(plan.decision, "none")
         self.assertEqual(len(attention.prompts), 1)
 
-    async def test_contradictory_none_with_blink_gets_bounded_model_repair(self) -> None:
+    async def test_malformed_social_plan_fails_soft_without_second_model_call(self) -> None:
         target = {
             "target_ref": "none",
             "source": "none",
@@ -327,9 +327,9 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
         }
         behavior = {
             "capability_id": "soridormi.blink_eyes",
-            "args": {"count": 2},
+            "args": {"count": 1},
             "timing": "parallel",
-            "reason": "A small blink supports the warm work-start cue.",
+            "reason": "Optional acknowledgement.",
         }
         attention = _ScriptedAttentionOllama(
             [
@@ -338,15 +338,8 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
                     "target": target,
                     "behaviors": [behavior],
                     "confidence": 0.82,
-                    "reason": "A small blink would make the interaction warmer.",
-                },
-                {
-                    "decision": "express",
-                    "target": target,
-                    "behaviors": [behavior],
-                    "confidence": 0.82,
-                    "reason": "A small blink would make the interaction warmer.",
-                },
+                    "reason": "Contradictory malformed optional plan.",
+                }
             ]
         )
         planner = SocialAttentionPlanner(
@@ -364,34 +357,22 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
             language="zh-CN",
             intent="semantic_capability_planning",
             context={
-                "social_attention_candidates": [
-                    self._blink().model_dump(mode="json")
-                ],
+                "social_attention_candidates": [self._blink().model_dump(mode="json")],
                 "social_attention_interaction_state": {
-                    "primary_capability_ids": [
-                        "soridormi.acquire_and_deliver_resource"
-                    ]
-                },
-                "social_interaction_style": {
-                    "owner_approved": True,
-                    "warmth": "warm",
+                    "primary_capability_ids": ["soridormi.acquire_and_deliver_resource"]
                 },
             },
         )
 
         plan = await planner.plan(request)
 
-        self.assertIsNotNone(plan)
-        assert plan is not None
-        self.assertEqual(plan.decision, "express")
-        self.assertEqual(plan.behaviors[0].capability_id, "soridormi.blink_eyes")
-        self.assertTrue(plan.metadata["contract_repair"]["succeeded"])
-        self.assertEqual(len(attention.prompts), 2)
-        self.assertEqual(
-            attention.prompts[1][1]["prompt_family"],
-            "social_attention.contract_repair",
-        )
-        self.assertIn("decision=none with behaviors=[]", attention.prompts[1][0])
+        self.assertIsNone(plan)
+        self.assertEqual(len(attention.prompts), 1)
+        failure = request.context["social_attention_failure"]
+        self.assertEqual(failure["failure_class"], "structured_output_invalid")
+        self.assertEqual(failure["semantic_owner"], "social_attention")
+        self.assertEqual(failure["model_call_count"], 1)
+        self.assertFalse(failure["retryable"])
 
     async def test_valid_primary_none_remains_authoritative_for_courteous_style(self) -> None:
         target = {

@@ -679,19 +679,6 @@
       ]
     },
     {
-      "path": "agent/app/social_attention.py",
-      "symbol": "SocialAttentionPlanner.plan",
-      "ordinal": 2,
-      "classification": "typed_failure_mapping",
-      "owner": "agent",
-      "contract": "Retain a failed bounded Social Attention contract-repair result for the existing typed failure metadata and fail-soft auxiliary omission path.",
-      "review_status": "reviewed",
-      "body_sha256": "fb3ca836c46246b2306e3f1a7ca2f4279b180c42ecbdb7c46bd9325f3ecaad74",
-      "failure_signals": [
-        "state_update"
-      ]
-    },
-    {
       "path": "agent/app/soridormi_acceptance.py",
       "symbol": "run_soridormi_runtime_cancellation_acceptance",
       "ordinal": 1,
@@ -1585,17 +1572,6 @@
     },
     {
       "path": "orchestrator/runtime/cognitive_runtime.py",
-      "symbol": "CanonicalPlanRuntimeAdapter._build_response",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "20c868d0a10fafd0b76c8b7fb37919e0c44deca3daf1120a742c13fad069dd8f",
-      "failure_signals": []
-    },
-    {
-      "path": "orchestrator/runtime/cognitive_runtime.py",
       "symbol": "CanonicalPlanRuntimeAdapter._validation_errors",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
@@ -1619,17 +1595,6 @@
       "failure_signals": [
         "continue"
       ]
-    },
-    {
-      "path": "orchestrator/runtime/cognitive_runtime.py",
-      "symbol": "CanonicalPlanRuntimeAdapter.build_direct_response",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "20c868d0a10fafd0b76c8b7fb37919e0c44deca3daf1120a742c13fad069dd8f",
-      "failure_signals": []
     },
     {
       "path": "orchestrator/runtime/cognitive_runtime.py",

@@ -45,6 +45,8 @@ _SOCIAL_ATTENTION_PROVIDER_OWNED_FIELDS = frozenset(
         "installation_calibration",
         "mode",
         "backend",
+        "provider_backend",
+        "provider_mode",
     }
 )
 
@@ -324,20 +326,17 @@ class InteractionRuntime(_AgentPipeline):
         mode = self.services.effective_social_attention_mode()
         # Policy is host-owned runtime context, not a model preference. Clear any
         # caller-supplied/stale candidates before rebuilding the eligible view.
-        background_owned = (
-            request.context.get("social_attention_owned_by_background_loop") is True
-        )
         request.context["social_attention_policy"] = {
-            "mode": "off" if background_owned else mode,
-            "planning_enabled": mode != "off" and not background_owned,
-            "execution_enabled": mode == "on" and not background_owned,
+            "mode": mode,
+            "planning_enabled": mode != "off",
+            "execution_enabled": mode == "on",
             "embodiment_independent": True,
-            "owner": "background_loop" if background_owned else "local_request",
+            "semantic_owner": "social_attention",
         }
         request.context.pop("social_attention_candidates", None)
         request.context.pop("social_attention_candidate_source", None)
         request.context.pop("social_attention_target_evidence", None)
-        if mode == "off" or background_owned:
+        if mode == "off":
             return
         catalog = self.services.capability_catalog
         if catalog is None:
@@ -469,7 +468,7 @@ class InteractionRuntime(_AgentPipeline):
                 payload["metadata"] = {
                     key: value
                     for key, value in metadata.items()
-                    if str(key).strip().lower() not in {"mode", "backend"}
+                    if str(key).strip().lower() not in _SOCIAL_ATTENTION_PROVIDER_OWNED_FIELDS
                     and not _contains_provider_owned_field(value)
                 }
             candidates.append(payload)
@@ -504,14 +503,6 @@ class InteractionRuntime(_AgentPipeline):
             request.context["recent_auxiliary_behavior_evidence"] = []
 
         await self._ensure_social_attention_candidates(request)
-
-    async def prepare_response_composition_context(
-        self,
-        request: AgentRunRequest,
-    ) -> None:
-        """Attach bounded owner policy, evidence, and candidate context."""
-
-        await self.prepare_social_attention_context(request)
 
     def _social_attention_target_evidence(self, request: AgentRunRequest) -> dict[str, Any]:
         for key in ("social_attention_target", "active_user_target", "perceived_user_target"):

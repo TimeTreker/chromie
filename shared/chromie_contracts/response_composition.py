@@ -11,7 +11,6 @@ from .interaction import reject_forbidden_low_level_fields
 from .goal import GoalAssociationResolution
 from .plan import CanonicalPlan
 from .semantic_task import ResponsePlan, ResponseStage
-from .social_attention import SocialAttentionPlan
 
 ResponseCompositionStatus = Literal["resolved", "model_unavailable", "invalid_input"]
 ResponseCompositionPhase = Literal["pre_execution"]
@@ -38,7 +37,7 @@ def canonical_plan_fingerprint(plan: CanonicalPlan) -> str:
 
 
 class CoordinatedResponsePlan(BaseModel):
-    """Immutable task plan plus truthful speech and optional social presence."""
+    """Immutable task plan plus truthful user-facing response expression."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -49,7 +48,6 @@ class CoordinatedResponsePlan(BaseModel):
     canonical_plan_fingerprint: str = Field(min_length=16)
     canonical_plan: CanonicalPlan
     response_plan: ResponsePlan
-    social_attention_plan: SocialAttentionPlan | None = None
     lane_coordination: list[LaneCoordinationGroup] = Field(default_factory=list)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     rationale: str = ""
@@ -263,16 +261,6 @@ class CoordinatedResponsePlan(BaseModel):
                     "unavailable or refused plans cannot claim execution or completion"
                 )
 
-        if self.social_attention_plan is not None:
-            social = self.social_attention_plan
-            if social.behavior_domain != "social_attention":
-                raise ValueError("social attention plan must use social_attention behavior domain")
-            if social.interaction_role != "auxiliary_expression":
-                raise ValueError("social attention plan must remain auxiliary expression")
-            metadata = social.metadata
-            if metadata.get("auxiliary_social_attention") is not True:
-                raise ValueError("social attention plan must be explicitly auxiliary")
-
         return self
 
 
@@ -287,7 +275,6 @@ class DirectResponseComposition(BaseModel):
     goal_association_fingerprint: str = Field(min_length=16)
     goal_association: GoalAssociationResolution
     response_plan: ResponsePlan
-    social_attention_plan: SocialAttentionPlan | None = None
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     rationale: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)

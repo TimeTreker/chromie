@@ -34,9 +34,10 @@ Accepted decoration executes through Activity with explicit auxiliary metadata
 and no Goal-completion authority.
 
 Response Composer may author explicit best-effort lane coordination only between
-Vocal and Activity around parallel Canonical Plan work. Social Attention never
-appears in `LaneCoordinationGroup`, never authors response text, and never owns a
-user Responsibility. Provider metadata and the Trusted Capability Runtime remain
+Vocal and Activity around parallel Canonical Plan work. It does not author a
+`SocialAttentionPlan`. `SocialAttentionPlanner` is the single semantic owner of
+optional decoration; Social Attention never appears in `LaneCoordinationGroup`,
+never authors response text, and never owns a user Responsibility. Provider metadata and the Trusted Capability Runtime remain
 authoritative for physical overlap. Soridormi is a peer Capability Provider
 below Activity and owns subtle-expression/body concurrency and physical safety
 arbitration. See
@@ -662,9 +663,13 @@ planner tier.
 
 ### 4.7 Social attention plan
 
-An auxiliary interaction plan describing optional nonverbal attention.
+An auxiliary interaction plan describing optional nonverbal attention. It is
+authored only by the background `SocialAttentionPlanner`, never by Response
+Composer or Planner. Malformed output fails soft to no decoration and is not
+repaired because the opportunity is optional.
 
-It is not a user goal unless the user explicitly requested the behavior.
+It is not a user goal unless the user explicitly requested the behavior; in that
+case the requested behavior is ordinary primary Activity instead.
 
 ### 4.8 Execution evidence
 
@@ -1393,9 +1398,10 @@ planning and authorization.
 Goal Association is therefore a continuity and responsibility-relation boundary,
 not a global start barrier. Planner is an intention-forming mechanism used when
 the responsibility is not already complete or cannot safely advance from current
-understanding. Response Composer is a still-needed-delta coordinator, not the only place
-background Social Attention may reconsider optional decoration. Social Attention
-still never owns response wording. Provider observations are cognition events,
+understanding. Response Composer is a still-needed-delta expression coordinator and has no
+Social Attention authoring authority. Background `SocialAttentionPlanner` is the
+single place that may decide optional decoration for an anchored event. Social
+Attention still never owns response wording. Provider observations are cognition events,
 not merely terminal inputs to a speech formatter.
 
 The implemented General Progress substrate covers immediate native conversation,
@@ -2249,11 +2255,12 @@ reconstructs action meaning from capability-specific phrase templates.
 
 ### 12.1 Social Attention is a behavior domain
 
-A turn coordinates an immutable user task plan with response language and an
-optional Social Attention expression plan. Social Attention is not one skill and
-not a deterministic utterance-to-gesture mapping. It is a model-authored
-interaction objective that may be expressed through language, body behavior,
-both, or deliberate stillness.
+A turn may have an immutable user task plan, independent response language, and
+an optional background Social Attention expression plan. These are not authored
+as one compound object. `SocialAttentionPlanner` alone authors the decoration
+plan. Social Attention is not one skill and not a deterministic
+utterance-to-gesture mapping; it is optional body expression or deliberate
+stillness around an already-anchored interaction.
 
 The related shapes are:
 
@@ -2291,11 +2298,14 @@ catalog candidates tagged with the `social_attention` behavior domain. It owns:
 It does **not** own speech text, speech style, response semantics, Goal meaning,
 provider identity, or motor implementation. Response Composer / applicable
 cognitive owners retain language authority independently of Social Attention.
+No other model stage may author a competing Social Attention decision.
 
 The Host does not map purposes or user phrases to gestures. It validates catalog
 membership, schemas, target evidence, resource conflicts, confirmation and
 safety policy, low-level-field exclusion, auxiliary limits, and execution
-evidence.
+evidence. Provider/backend/calibration identity is stripped from the model-facing
+candidate projection. A malformed Social Attention DTO fails soft to no
+decoration with no repair or second model call.
 
 ### 12.4 Capability taxonomy is not planning
 
@@ -2634,13 +2644,14 @@ The response composer may combine updates naturally:
 The individual goals remain separately tracked even when speech is consolidated.
 
 The model-facing pre-execution composer contract contains only response stages,
-optional social attention, confidence, and rationale, with response coverage
-constrained to the immutable plan's Goal IDs. The post-execution contract
+Vocal/Activity lane coordination, confidence, and rationale, with response coverage
+constrained to the immutable plan's Goal IDs. Social Attention is absent and is
+authored independently by `SocialAttentionPlanner`. The post-execution contract
 contains only final text, exact goal/evidence claims, confidence, and rationale.
 The host owns both composition identities, the embedded canonical plan and
-fingerprint, and the execution-outcome fingerprint. Invalid model output may
-receive one bounded repair in the same composer stage using the exact schema
-and validation errors; it cannot trigger another semantic planner.
+fingerprint, and the execution-outcome fingerprint. A mechanically malformed
+Response DTO may be regenerated once with the same meaning; semantic/truth rejection
+is terminal and cannot trigger another semantic planner or response author.
 
 ## 16. Scenario-driven development
 

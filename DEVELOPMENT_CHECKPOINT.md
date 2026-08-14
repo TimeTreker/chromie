@@ -1,7 +1,7 @@
 # Chromie Development Checkpoint
 Status: current resume point
 Updated: 2026-08-14
-Base source: supplied `chromie_20260814_archive.zip` snapshot; Git revision is not embedded in the archive.
+Base main: `85fc0814665aafe2a768c5ff242b8032a5d54606` (`Make Response Composer a single expression owner`).
 This is the fast handoff for the next development session. It summarizes the
 current project shape and resume point; canonical owners linked below win if a
 conflict appears and this checkpoint should then be refreshed.
@@ -71,16 +71,11 @@ parallel manager objects.
   singing, humming, and nonverbal vocalization are modes of one voice.
   `chromie.voice` is exclusive. Compatible body Activity may overlap Vocal;
   simultaneous personal Vocal modes may not. Existing-media playback is Activity.
-- **Social Attention is decoration, not responsibility.** Small gaze/blink/nod/
-  wave/posture cues may accompany a socially anchored interaction through Activity,
-  fail-soft and with no Goal-completion authority. Explicitly requested versions of
-  the same physical actions are ordinary Activity. Social framing may justify a
-  different compatible auxiliary cue, but never duplication, mutation, or
-  completion of that explicit action. Idle liveliness is separate.
-- **A valid Social Attention `none` is terminal.** Courteous or lively preference
-  belongs in the primary decision context; no optional critic may override a
-  valid primary stillness decision. Only invalid primary DTO shape receives one
-  same-meaning regeneration.
+- **Social Attention is optional decoration with one semantic owner.**
+  `SocialAttentionPlanner` alone authors interaction-anchored body decoration through
+  Activity. Explicitly requested motion remains primary Activity. A valid `none` is
+  terminal; malformed/conflicting decoration disappears locally with no second call,
+  Goal completion authority, speech recomposition, or Goal/Plan mutation.
 - **Chromie is embodiment-independent.** Soridormi/MuJoCo is sufficient for the
   core embodied outcome; cognition must not know the backend, and physical-robot
   commissioning is optional provider work rather than a Chromie completion gate.
@@ -97,16 +92,14 @@ parallel manager objects.
   be cached; changing facts such as weather, news, prices, schedules, and law are
   acquired through trusted information paths.
 ## Recent architecture closure
-The supplied source already bounds Goal Association/reconsideration, keeps
-schema-valid benign chat on the Fast path, permits Fast-to-Deep escalation for
-meaningful consequential uncertainty, limits same-tier regeneration to malformed
-DTOs, and makes Deep/Host semantic rejection terminal. The owner has now frozen
-the broader human-like cognitive flow in the Charter and Goal-Driven Cognitive
-Architecture **before further implementation**. Response is expression, Deep is
-deeper source-based cognition rather than repair, optional presentation never
-reopens primary cognition, one material semantic fact has one writable owner, and
-Reflection learns forward. This documentation update does not claim that remaining
-Response/Social-Expression cleanup is already implemented or target-qualified.
+Current source bounds Goal/Planner reconsideration, keeps benign chat Fast, makes
+Deep/Host semantic rejection terminal, and implements the frozen human-like Core.
+Response Composer is the single wording owner. `SocialAttentionPlanner` is now the
+single optional-decoration writer; Response composition contains no Social-Attention
+DTO, malformed decoration fails soft without repair, and backend/calibration identity
+is stripped before model reasoning. Reflection learns forward. These are source
+claims only; no new target evidence is implied.
+
 ## Do not resurrect
 - independent Router semantic authority;
 - `social_attention` as a third execution lane or standalone Goal;

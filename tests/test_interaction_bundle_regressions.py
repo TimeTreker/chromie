@@ -15,7 +15,6 @@ from agent.app.response_composer import (
 )
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage
-from shared.chromie_contracts.social_attention import SocialAttentionPlan
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
 
@@ -71,7 +70,6 @@ class ResponseComposerCoordinationRepairTests(unittest.TestCase):
                     "covers_goal_ids": ["goal-song"],
                 }
             },
-            "social_attention_plan": {"decision": "none"},
             "lane_coordination": [
                 {
                     "coordination_id": "coord-performance",
@@ -115,7 +113,6 @@ class ResponseComposerCoordinationRepairTests(unittest.TestCase):
                     "coordination_id": "coord-malformed-optional",
                 }
             },
-            "social_attention_plan": {"decision": "none"},
             "lane_coordination": [
                 {
                     "coordination_id": "coord-malformed-optional",
@@ -157,7 +154,6 @@ class ResponseComposerCoordinationRepairTests(unittest.TestCase):
                     "covers_goal_ids": ["goal-move", "goal-song"],
                 }
             },
-            "social_attention_plan": {"decision": "none"},
             "lane_coordination": [
                 {
                     "coordination_id": "coord-social-only",
@@ -187,7 +183,6 @@ class ResponseComposerCoordinationRepairTests(unittest.TestCase):
                     "covers_goal_ids": ["goal-song"],
                 }
             },
-            "social_attention_plan": {"decision": "none"},
             "lane_coordination": [
                 {
                     "coordination_id": "coord-invalid-activity-reference",
@@ -207,7 +202,7 @@ class ResponseComposerCoordinationRepairTests(unittest.TestCase):
 
         self.assertEqual(output.lane_coordination, [])
 
-    def test_malformed_social_express_is_not_silently_downgraded(self) -> None:
+    def test_response_composer_rejects_social_attention_authoring(self) -> None:
         with self.assertRaises(ValidationError):
             ResponseComposerModelOutput.model_validate(
                 {
@@ -227,7 +222,7 @@ class ResponseComposerCoordinationRepairTests(unittest.TestCase):
                 }
             )
 
-    def test_social_attention_cannot_author_speech_adaptation(self) -> None:
+    def test_response_composer_rejects_social_attention_speech_adaptation(self) -> None:
         with self.assertRaises(ValidationError):
             ResponseComposerModelOutput.model_validate(
                 {

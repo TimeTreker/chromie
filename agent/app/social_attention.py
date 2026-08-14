@@ -134,66 +134,29 @@ class SocialAttentionPlanner:
                 failure["error"],
             )
             return None
-        repair_attempted = False
-        repair_succeeded = False
-        validation_error: Exception | None = None
         try:
             plan = SocialAttentionPlan.model_validate(raw)
-        except ValidationError as initial_exc:
-            repair_attempted = True
-            logger.warning(
-                "social_attention_contract_repair_start sid=%s validation_errors=%s",
-                session_id,
-                self._validation_error_json(initial_exc),
-            )
-            try:
-                repaired = await client.generate(
-                    self._repair_prompt(
-                        prompt=prompt,
-                        raw=raw,
-                        validation_error=initial_exc,
-                    ),
-                    system=system_prompt,
-                    options=generation_options,
-                    response_format=response_schema,
-                    prompt_family="social_attention.contract_repair",
-                    turn_id=session_id,
-                    attempt=2,
-                )
-                if not isinstance(repaired, dict):
-                    raise ValueError(
-                        "social attention contract repair did not return a JSON object"
-                    )
-                plan = SocialAttentionPlan.model_validate(repaired)
-                repair_succeeded = True
-                logger.info(
-                    "social_attention_contract_repair_done sid=%s status=success",
-                    session_id,
-                )
-            except Exception as repair_exc:
-                validation_error = repair_exc
-        if validation_error is not None:
+        except ValidationError as exc:
             planner_ms = (time.perf_counter() - started) * 1000.0
             failure = {
-                **llm_failure_metadata(validation_error),
+                **llm_failure_metadata(exc),
                 "stage": "social_attention",
-                "error_type": type(validation_error).__name__,
-                "error": str(validation_error)[:500],
+                "failure_class": "structured_output_invalid",
+                "failure_domain": "model_contract",
+                "architecture_attribution": "model_output",
+                "retryable": False,
+                "error_type": type(exc).__name__,
+                "error": str(exc)[:500],
                 "elapsed_ms": round(planner_ms, 1),
-                "contract_repair_attempted": repair_attempted,
-                "contract_repair_succeeded": False,
+                "semantic_owner": "social_attention",
+                "model_call_count": 1,
             }
             request.context["social_attention_failure"] = failure
             logger.warning(
-                "social_attention_plan_invalid sid=%s failure_class=%s failure_domain=%s "
-                "architecture_attribution=%s retryable=%s elapsed_ms=%.1f error=%s",
+                "social_attention_plan_invalid sid=%s elapsed_ms=%.1f error=%s",
                 session_id,
-                failure.get("failure_class"),
-                failure.get("failure_domain"),
-                failure.get("architecture_attribution"),
-                str(bool(failure.get("retryable"))).lower(),
                 planner_ms,
-                validation_error,
+                exc,
             )
             return None
         planner_ms = (time.perf_counter() - started) * 1000.0
@@ -202,11 +165,9 @@ class SocialAttentionPlanner:
             **plan.metadata,
             "planner_ms": round(planner_ms, 1),
             "architecture_attribution": "not_evaluated",
-            "contract_repair": {
-                "attempted": repair_attempted,
-                "succeeded": repair_succeeded,
-                "attempt_count": 2 if repair_attempted else 1,
-            },
+            "semantic_owner": "social_attention",
+            "model_call_count": 1,
+            "fail_soft": True,
         }
         logger.info(
             "social_attention_plan_done sid=%s decision=%s behaviors=%s confidence=%.2f "
@@ -276,43 +237,6 @@ class SocialAttentionPlanner:
             ]
         )
         return schema
-
-    @staticmethod
-    def _validation_error_json(exc: Exception) -> str:
-        payload: Any = (
-            exc.errors(include_url=False)
-            if isinstance(exc, ValidationError)
-            else [{"type": type(exc).__name__, "message": str(exc)[:1000]}]
-        )
-        return json.dumps(
-            payload,
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-            default=str,
-        )[:5000]
-
-    @classmethod
-    def _repair_prompt(
-        cls,
-        *,
-        prompt: str,
-        raw: dict[str, Any],
-        validation_error: Exception,
-    ) -> str:
-        return (
-            prompt
-            + "\n\nThe previous Social Attention JSON contradicted its own "
-            "decision/behavior contract. Reconsider the scene and return one complete "
-            "fresh plan. Keep a genuinely intended supported behavior with "
-            "decision=express, or return decision=none with behaviors=[]. Do not merely "
-            "flip a redundant field without rechecking social fit.\n\n"
-            "Previous invalid JSON:\n"
-            + json.dumps(raw, ensure_ascii=False, sort_keys=True)[:5000]
-            + "\n\nMechanical validation feedback JSON:\n"
-            + cls._validation_error_json(validation_error)
-        )
-
 
     def _prompt(
         self,

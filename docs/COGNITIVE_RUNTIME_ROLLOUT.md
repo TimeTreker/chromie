@@ -109,7 +109,7 @@ evidence.
 - propose exact, adjusted, alternative, clarification, unavailable, or refused
   outcomes;
 - compose goal-scoped speech;
-- propose optional social attention.
+- `SocialAttentionPlanner` alone may propose optional Social Attention decoration.
 
 ### Models may not
 
@@ -341,28 +341,26 @@ is retained separately.
 ## 10. Response composition and social attention
 
 The Response Composer receives an immutable fingerprinted terminal
-CanonicalPlan. It may organize goal-scoped speech and optional auxiliary social
-attention, but it cannot change user-task steps.
+CanonicalPlan and organizes only goal-scoped user-facing expression. It cannot
+change user-task steps and does not author Social Attention.
 
 Ollama receives the exact `ResponseComposerModelOutput` schema, containing only
-the model-owned `response_plan`, optional `social_attention_plan`, confidence,
-and rationale. Goal coverage IDs are constrained to the immutable plan's Goal
-IDs. The host creates the `CoordinatedResponsePlan` envelope, composition ID,
-canonical plan copy, and SHA-256 plan fingerprint after validation. A malformed
-model result receives its original JSON, exact validation errors, and the same
-schema for one bounded same-stage repair; a second invalid result fails closed.
+the model-owned `response_plan`, lane coordination, confidence, and rationale.
+Goal coverage IDs are constrained to the immutable plan's Goal IDs. The host
+creates the `CoordinatedResponsePlan` envelope, composition ID, canonical plan
+copy, and SHA-256 plan fingerprint after validation. A mechanically malformed
+model result may receive one same-meaning DTO regeneration; semantic/truth
+rejection is terminal for that response attempt.
 
 Trusted checks ensure:
 
 - all known Goals are covered by the appropriate terminal response;
-- pre-execution speech does not claim completion;
-- clarification enters `waiting_for_user` semantics;
-- optional attention uses exact available capabilities;
-- attention has valid target evidence;
-- attention does not conflict with the primary plan;
-- invalid optional attention is removed without changing the user task.
+- pre-execution speech does not claim completion; and
+- clarification enters `waiting_for_user` semantics.
 
-Social attention is not recorded as a new user Goal.
+Social Attention is a separate background cognition owned by
+`SocialAttentionPlanner`. Its valid `none`, malformed output, target/resource
+validation, and optional execution never cause Response Composer to run again.
 
 ## 11. Evidence records
 

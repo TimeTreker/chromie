@@ -12,7 +12,6 @@ from shared.chromie_contracts.response_composition import (
     canonical_plan_fingerprint,
 )
 from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage
-from shared.chromie_contracts.social_attention import SocialAttentionPlan
 
 
 class FakeOllama:
@@ -126,10 +125,6 @@ class ResponseCompositionContractTests(unittest.TestCase):
             canonical_plan_fingerprint=canonical_plan_fingerprint(canonical_plan),
             canonical_plan=canonical_plan,
             response_plan=response_plan,
-            social_attention_plan=SocialAttentionPlan(
-                decision="none",
-                metadata={"auxiliary_social_attention": True},
-            ),
         )
 
     def test_multi_goal_response_must_cover_every_goal(self):
@@ -226,54 +221,6 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertIn("Do not invent the user's plans, schedule", prompt)
         self.assertIn("ledger-composer-marker", prompt)
 
-    def test_empty_express_social_attention_downgrades_without_canceling_plan(self):
-        canonical = plan(goals=["goal-chat"] )
-        output = {
-            "response_plan": {
-                "final": {
-                    "text": "你好。",
-                    "speech_act": "inform",
-                    "commitment_state": "completed",
-                    "must_not_claim_completion": False,
-                    "covers_goal_ids": ["goal-chat"],
-                }
-            },
-            "social_attention_plan": {
-                "decision": "express",
-                "behaviors": [],
-                "confidence": 0.8,
-            },
-            "lane_coordination": [],
-            "confidence": 0.9,
-            "rationale": "Respond normally.",
-        }
-        result = asyncio.run(
-            ResponseComposerResolver(FakeOllama(output)).resolve(
-                request(
-                    canonical,
-                    context={
-                        "social_attention_candidates": [
-                            {
-                                "capability_id": "soridormi.blink_eyes",
-                                "available": True,
-                                "interaction_executable": True,
-                            }
-                        ]
-                    },
-                )
-            )
-        )
-
-        self.assertEqual(result.status, "resolved")
-        assert result.composition is not None
-        assert result.composition.social_attention_plan is not None
-        self.assertEqual(result.composition.social_attention_plan.decision, "none")
-        self.assertTrue(
-            result.composition.social_attention_plan.metadata.get(
-                "canonicalized_empty_expression"
-            )
-        )
-
     def test_live_bare_response_stage_list_regenerates_once_under_exact_schema(self):
         canonical = plan(
             disposition="execute",
@@ -308,7 +255,6 @@ class ResponseComposerResolverTests(unittest.TestCase):
         }
         invalid = {
             "response_plan": [live_malformed_stage],
-            "social_attention_plan": None,
             "confidence": 0.9,
             "rationale": "Pre-action acknowledgement.",
         }
@@ -334,7 +280,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertFalse(schema["additionalProperties"])
         self.assertIn("response_plan", schema["required"])
         self.assertEqual(schema["$defs"]["ResponsePlan"]["type"], "object")
-        self.assertIn("SocialAttentionPlan", schema["$defs"])
+        self.assertNotIn("SocialAttentionPlan", schema["$defs"])
         self.assertEqual(ollama.prompts[1][1]["response_format"], schema)
         self.assertEqual(
             schema["$defs"]["ResponseStage"]["properties"]["covers_goal_ids"]["items"]["enum"],
@@ -766,7 +712,6 @@ class ResponseComposerResolverTests(unittest.TestCase):
                     "covers_goal_ids": ["goal-walk"],
                 }
             },
-            "social_attention_plan": {"decision": "none"},
             "confidence": 1.0,
             "rationale": "The model incorrectly marked ordinary acknowledgement as waiting.",
         }
@@ -836,7 +781,6 @@ class ResponseComposerResolverTests(unittest.TestCase):
                     "covers_goal_ids": ["goal-nod"],
                 }
             },
-            "social_attention_plan": {"decision": "none"},
             "confidence": 1.0,
             "rationale": "The model emitted a punctuation-only placeholder.",
         }
@@ -922,7 +866,6 @@ class ResponseComposerResolverTests(unittest.TestCase):
                     "covers_goal_ids": ["goal-spoken"],
                 }
             },
-            "social_attention_plan": {"decision": "none"},
             "lane_coordination": [],
             "confidence": 1.0,
             "rationale": "The model covered only the requested spoken outcome.",
@@ -1250,7 +1193,6 @@ class ResponseComposerResolverTests(unittest.TestCase):
                     "covers_goal_ids": ["goal-show"],
                 }
             },
-            "social_attention_plan": None,
             "confidence": 1.0,
             "rationale": "Unsafe role-play used only to test truth rejection.",
         }
@@ -1499,7 +1441,6 @@ class ResponseComposerResolverTests(unittest.TestCase):
                     "covers_goal_ids": ["goal-weather"],
                 }
             },
-            "social_attention_plan": None,
             "confidence": 1.0,
             "rationale": "The model incorrectly inferred a result before execution.",
         }
@@ -1593,7 +1534,6 @@ class ResponseComposerResolverTests(unittest.TestCase):
                     "covers_goal_ids": ["goal-weather", "goal-response"],
                 }
             },
-            "social_attention_plan": None,
             "confidence": 1.0,
             "rationale": "Incorrectly reused an earlier result.",
         }
@@ -1900,7 +1840,6 @@ class ResponseComposerResolverTests(unittest.TestCase):
                     "covers_goal_ids": ["goal-nod", "goal-walk"],
                 }
             },
-            "social_attention_plan": {"decision": "none"},
             "confidence": 0.92,
         }
         result = asyncio.run(
@@ -1916,7 +1855,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             "waiting_for_user",
         )
 
-    def test_multi_goal_response_and_none_attention_resolve(self):
+    def test_multi_goal_response_resolves_without_social_attention_dependency(self):
         canonical = plan(goals=["goal-weather", "goal-calendar"])
         raw = {
             "response_plan": {
@@ -1927,7 +1866,6 @@ class ResponseComposerResolverTests(unittest.TestCase):
                     "covers_goal_ids": ["goal-weather", "goal-calendar"],
                 }
             },
-            "social_attention_plan": {"decision": "none"},
             "confidence": 0.91,
             "rationale": "One concise combined response covers both goals.",
         }
@@ -1937,9 +1875,9 @@ class ResponseComposerResolverTests(unittest.TestCase):
             result.composition.response_plan.final.covers_goal_ids,  # type: ignore[union-attr]
             ["goal-weather", "goal-calendar"],
         )
-        self.assertEqual(result.composition.social_attention_plan.decision, "none")  # type: ignore[union-attr]
-        self.assertTrue(
-            result.composition.social_attention_plan.metadata["auxiliary_social_attention"]  # type: ignore[union-attr]
+        self.assertNotIn(
+            "social_attention_plan",
+            result.composition.model_dump(mode="json", exclude_none=True),  # type: ignore[union-attr]
         )
 
     def test_response_text_can_be_empathetic_without_social_attention_owning_speech(self):
@@ -1952,14 +1890,6 @@ class ResponseComposerResolverTests(unittest.TestCase):
                     "commitment_state": "none",
                     "covers_goal_ids": ["goal-chat"],
                 }
-            },
-            "social_attention_plan": {
-                "behavior_domain": "social_attention",
-                "interaction_role": "auxiliary_expression",
-                "purpose": "empathy",
-                "decision": "none",
-                "behaviors": [],
-                "confidence": 0.91,
             },
             "confidence": 0.93,
         }
@@ -1975,160 +1905,12 @@ class ResponseComposerResolverTests(unittest.TestCase):
             composition.response_plan.final.text,
             "我理解这让你有些难受，我们慢慢来。",
         )
-        attention = composition.social_attention_plan
-        self.assertEqual(attention.decision, "none")
-        self.assertEqual(attention.behaviors, [])
-        self.assertEqual(attention.metadata["behavior_domain"], "social_attention")
-        self.assertEqual(attention.metadata["interaction_role"], "auxiliary_expression")
-
-    def test_resource_conflicting_attention_is_dropped_without_losing_speech(self):
-        canonical = plan(
-            disposition="execute",
-            goals=["goal-walk"],
-            steps=[
-                {
-                    "step_id": "walk",
-                    "skill_id": "soridormi.walk_forward",
-                    "args": {"duration_s": 15},
-                }
-            ],
-        )
-        raw = {
-            "response_plan": {
-                "pre_action": {
-                    "text": "我先确认这个动作。",
-                    "speech_act": "inform",
-                    "commitment_state": "evaluating",
-                    "must_not_claim_completion": True,
-                    "covers_goal_ids": ["goal-walk"],
-                }
-            },
-            "social_attention_plan": {
-                "decision": "express",
-                "target": {"source": "none", "target_ref": "none"},
-                "behaviors": [
-                    {
-                        "skill_id": "soridormi.express_attention",
-                        "args": {"style": "neutral"},
-                        "timing": "parallel",
-                    }
-                ],
-                "confidence": 0.8,
-            },
-            "confidence": 0.9,
-        }
-        context = {
-            "capability_candidates": [
-                {
-                    "capability_id": "soridormi.walk_forward",
-                    "available": True,
-                    "interaction_executable": True,
-                    "input_schema": {"type": "object"},
-                    "can_run_parallel": True,
-                    "parallel_metadata_declared": True,
-                    "exclusive_group": "body_motion",
-                    "resource_claims": ["body_motion"],
-                }
-            ],
-            "social_attention_candidates": [
-                {
-                    "capability_id": "soridormi.express_attention",
-                    "available": True,
-                    "interaction_executable": True,
-                    "input_schema": {
-                        "type": "object",
-                        "properties": {"style": {"type": "string"}},
-                    },
-                    "can_run_parallel": True,
-                    "parallel_metadata_declared": True,
-                    "exclusive_group": "body_motion",
-                    "resource_claims": ["body_motion"],
-                }
-            ],
-        }
-        result = asyncio.run(
-            ResponseComposerResolver(FakeOllama(raw)).resolve(request(canonical, context=context))
-        )
-        self.assertEqual(result.status, "resolved")
-        attention = result.composition.social_attention_plan  # type: ignore[union-attr]
-        self.assertEqual(attention.decision, "none")
-        self.assertIn(
-            "resource_conflict:soridormi.express_attention",
-            result.composition.metadata["social_attention_validation_reasons"],  # type: ignore[union-attr]
-        )
-
-    def test_invented_target_is_dropped(self):
-        canonical = plan(goals=["goal-chat"])
-        raw = {
-            "response_plan": {
-                "final": {
-                    "text": "你好。",
-                    "covers_goal_ids": ["goal-chat"],
-                }
-            },
-            "social_attention_plan": {
-                "decision": "express",
-                "target": {
-                    "target_ref": "invented-user",
-                    "source": "live_perception",
-                },
-                "behaviors": [
-                    {"skill_id": "soridormi.look_at_person", "args": {}}
-                ],
-            },
-            "confidence": 0.8,
-        }
-        result = asyncio.run(ResponseComposerResolver(FakeOllama(raw)).resolve(request(canonical)))
-        self.assertEqual(result.status, "resolved")
-        self.assertEqual(result.composition.social_attention_plan.decision, "none")  # type: ignore[union-attr]
-
-    def test_targeted_behavior_without_evidence_is_dropped(self):
-        canonical = plan(goals=["goal-chat"])
-        raw = {
-            "response_plan": {
-                "final": {"text": "你好。", "covers_goal_ids": ["goal-chat"]}
-            },
-            "social_attention_plan": {
-                "decision": "express",
-                "target": {"source": "none", "target_ref": "none"},
-                "behaviors": [
-                    {
-                        "skill_id": "soridormi.look_direction",
-                        "args": {"direction": "right"},
-                    }
-                ],
-            },
-        }
-        context = {
-            "social_attention_candidates": [
-                {
-                    "capability_id": "soridormi.look_direction",
-                    "available": True,
-                    "interaction_executable": True,
-                    "requires_confirmation": False,
-                    "input_schema": {
-                        "type": "object",
-                        "properties": {"direction": {"type": "string"}},
-                        "required": ["direction"],
-                    },
-                }
-            ]
-        }
-        result = asyncio.run(
-            ResponseComposerResolver(FakeOllama(raw)).resolve(
-                request(canonical, context=context)
-            )
-        )
-        self.assertEqual(result.status, "resolved")
-        self.assertEqual(
-            result.composition.social_attention_plan.decision, "none"  # type: ignore[union-attr]
-        )
+        self.assertNotIn("social_attention_plan", composition.model_dump(mode="json"))
 
     def test_prompt_keeps_task_plan_immutable_and_attention_auxiliary(self):
         canonical = plan(goals=["goal-chat"])
         raw = {
             "response_plan": {"final": {"text": "你好。", "covers_goal_ids": ["goal-chat"]}},
-            "social_attention_plan": {"decision": "none"},
         }
         ollama = FakeOllama(raw)
         context = {
@@ -2152,7 +1934,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
         )
         prompt = ollama.prompts[0][0]
         self.assertIn("CanonicalPlan is immutable", prompt)
-        self.assertIn("never a user Goal, task step, completion owner, or execution lane", prompt)
+        self.assertIn("Social Attention is owned by its independent background cognition", prompt)
         self.assertIn("Delivered evidence-bound dialogue JSON", prompt)
         self.assertIn("北京现在约28℃", prompt)
         self.assertIn("Preserve every measurement and condition", prompt)
@@ -2184,10 +1966,6 @@ class OrchestratorResponseComposerTests(unittest.TestCase):
                             text="你好。",
                             covers_goal_ids=["goal-chat"],
                         )
-                    ),
-                    social_attention_plan=SocialAttentionPlan(
-                        decision="none",
-                        metadata={"auxiliary_social_attention": True},
                     ),
                 )
                 return ResponseCompositionResolution(status="resolved", composition=composition)

@@ -340,11 +340,11 @@ certificate-repair fallback.
 | `AGENT_DEEP_PLANNER_MAX_CAPABILITIES` | `96`; maximum full catalog entries supplied. |
 | `ORCH_DEEP_PLANNER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Deep Planning remains terminal in the unified runtime. |
 | `ORCH_DEEP_PLANNER_TIMEOUT_MS` | `10000`; host timeout for report-only deep planning. |
-| `AGENT_RESPONSE_COMPOSER_ENABLED` | `1`; exposes advisory composition of an immutable terminal `CanonicalPlan` with a goal-scoped `ResponsePlan` and optional auxiliary `SocialAttentionPlan`. |
-| `AGENT_RESPONSE_COMPOSER_MODEL` | `gemma4:e2b`; model used for multi-goal speech and social-presence composition. |
+| `AGENT_RESPONSE_COMPOSER_ENABLED` | `1`; exposes advisory expression of an immutable terminal `CanonicalPlan` as a goal-scoped `ResponsePlan`. Social Attention is owned independently by `SocialAttentionPlanner` and is not part of the Response Composer DTO. |
+| `AGENT_RESPONSE_COMPOSER_MODEL` | `gemma4:e2b`; model used for multi-goal user-facing response expression. |
 | `AGENT_RESPONSE_COMPOSER_TIMEOUT_MS` | `4500`; response-composer model timeout. Failure does not alter the canonical task plan. |
 | `AGENT_RESPONSE_COMPOSER_NUM_CTX` | `8192`; bounded composition context sized for an immutable multi-goal plan plus the exact response schema. |
-| `AGENT_RESPONSE_COMPOSER_NUM_PREDICT` | `1024`; structured response/social-plan JSON budget. |
+| `AGENT_RESPONSE_COMPOSER_NUM_PREDICT` | `1024`; structured response-expression JSON budget. |
 | `ORCH_RESPONSE_COMPOSER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Unified `apply` requires a validated composition bound to the terminal plan. |
 | `ORCH_RESPONSE_COMPOSER_TIMEOUT_MS` | `5000`; host timeout for report-only composition. |
 | `AGENT_TOOL_RESULT_INTERPRETER_ENABLED` | `1`; enables generic evidence-bound interpretation after tool retrieval and for post-execution observations. |

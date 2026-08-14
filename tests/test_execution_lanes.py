@@ -32,10 +32,6 @@ from shared.chromie_contracts.response_composition import (
     canonical_plan_fingerprint,
 )
 from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage
-from shared.chromie_contracts.social_attention import (
-    SocialAttentionBehavior,
-    SocialAttentionPlan,
-)
 
 
 _OUTPUT_SCHEMA = {
@@ -155,18 +151,6 @@ class ExecutionLaneContractTests(unittest.TestCase):
                     delivery_role="activity_companion",
                 )
             ),
-            social_attention_plan=SocialAttentionPlan(
-                decision="express",
-                behaviors=[
-                    SocialAttentionBehavior(
-                        capability_id="soridormi.blink_eyes",
-                        args={},
-                        timing="parallel",
-                        social_function="engagement",
-                    )
-                ],
-                metadata={"auxiliary_social_attention": True},
-            ),
             lane_coordination=[
                 LaneCoordinationGroup(
                     coordination_id="together-1",
@@ -175,12 +159,6 @@ class ExecutionLaneContractTests(unittest.TestCase):
                     reason_summary="The user requested overlapping behavior.",
                 )
             ],
-            metadata={
-                "social_attention_policy": {
-                    "mode": "on",
-                    "execution_enabled": True,
-                }
-            },
         )
 
     def test_vocal_group_rejects_two_personal_voice_provider_steps(self) -> None:
@@ -230,10 +208,6 @@ class ExecutionLaneContractTests(unittest.TestCase):
                         delivery_role="activity_companion",
                     )
                 ),
-                social_attention_plan=SocialAttentionPlan(
-                    decision="none",
-                    metadata={"auxiliary_social_attention": True},
-                ),
                 lane_coordination=[
                     LaneCoordinationGroup(
                         coordination_id="together-1",
@@ -251,13 +225,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
             group="soridormi.base_motion",
             resources=["base_motion", "balance_control"],
         )
-        blink = _definition(
-            "soridormi.blink_eyes",
-            group="soridormi.eye_expression",
-            resources=["eye_expression"],
-            safety_class="low_risk_action",
-        )
-        view = _InteractionRuntimeView([walk, blink])
+        view = _InteractionRuntimeView([walk])
         adapter = CanonicalPlanRuntimeAdapter(view, social_attention_mode="on")
         contract = ExecutionLaneContractTests()
         plan = contract._plan()
@@ -271,11 +239,10 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 context={},
             ),
             walk,
-            blink,
         )
 
-    async def test_adapter_materializes_two_execution_lanes_plus_social_decoration(self) -> None:
-        response, _, _ = await self._response()
+    async def test_adapter_materializes_only_primary_execution_lanes(self) -> None:
+        response, _ = await self._response()
 
         self.assertEqual(response.speech[0].timing, "parallel")
         self.assertFalse(response.speech[0].metadata["wait_for_playback_start"])
@@ -283,6 +250,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.speech[0].metadata["coordination_id"], "together-1")
 
         by_id = {item.skill_id: item for item in response.skills}
+        self.assertEqual(set(by_id), {"soridormi.walk_forward"})
         self.assertEqual(
             by_id["soridormi.walk_forward"].metadata["execution_lane"],
             "activity",
@@ -291,15 +259,6 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
             by_id["soridormi.walk_forward"].metadata["coordination_id"],
             "together-1",
         )
-        self.assertEqual(
-            by_id["soridormi.blink_eyes"].metadata["execution_lane"],
-            "activity",
-        )
-        self.assertEqual(
-            by_id["soridormi.blink_eyes"].metadata["execution_role"],
-            "social_decoration",
-        )
-        self.assertNotIn("coordination_id", by_id["soridormi.blink_eyes"].metadata)
         self.assertEqual(len(response.metadata["lane_coordination_groups"]), 1)
 
     async def test_adapter_rejects_cross_lane_activity_without_provider_metadata(self) -> None:
@@ -309,14 +268,8 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
             resources=["base_motion"],
         )
         walk.metadata.pop("parallel_metadata_declared", None)
-        blink = _definition(
-            "soridormi.blink_eyes",
-            group="soridormi.eye_expression",
-            resources=["eye_expression"],
-            safety_class="low_risk_action",
-        )
         adapter = CanonicalPlanRuntimeAdapter(
-            _InteractionRuntimeView([walk, blink]),
+            _InteractionRuntimeView([walk]),
             social_attention_mode="on",
         )
         contract = ExecutionLaneContractTests()
@@ -458,12 +411,11 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertTrue(by_id["soridormi.walk_forward"].metadata["parallel_with_vocal"])
 
-    async def test_skill_runtime_overlaps_speech_walk_and_blink(self) -> None:
-        response, walk, blink = await self._response()
+    async def test_skill_runtime_overlaps_speech_and_walk(self) -> None:
+        response, walk = await self._response()
         registry = SkillRegistry()
         registry.register(local_speech_definition())
         registry.register(walk)
-        registry.register(blink)
         runtime = SkillRuntime(registry, max_concurrency=3)
         speech_provider = MockSkillProvider(
             local_speech_definition().provider_id,
@@ -483,16 +435,6 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status, "completed")
         self.assertLess(elapsed, 0.20)
         self.assertEqual(len(speech_provider.calls), 1)
-        self.assertEqual(body_provider.calls, [])
-        self.assertEqual(
-            body_provider.group_calls,
-            [
-                [
-                    response.skills[0].request_id,
-                    response.skills[1].request_id,
-                ]
-            ],
-        )
         self.assertEqual(
             speech_provider.calls[0].metadata["execution_lane"],
             "vocal",
@@ -501,6 +443,8 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
             speech_provider.calls[0].metadata["coordination_id"],
             "together-1",
         )
+        self.assertEqual(len(response.skills), 1)
+        self.assertEqual(response.skills[0].skill_id, "soridormi.walk_forward")
 
     async def test_parallel_runtime_rejects_two_personal_voice_owners(self) -> None:
         declaration = VocalProviderDeclaration(

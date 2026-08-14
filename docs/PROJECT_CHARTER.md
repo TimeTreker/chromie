@@ -604,6 +604,15 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    or other consequential uncertainty must stop before commitment. Spend cognitive
    cost where being wrong matters; do not turn perfectionism into architecture.
 
+37. **Social Attention has one semantic writer.** `SocialAttentionPlanner` alone
+   decides optional interaction-anchored decoration. Response Composer never authors
+   a `SocialAttentionPlan`; Goal/Planner stages do not decide it; the Host only
+   supplies bounded context and validates/materializes accepted decoration. A valid
+   `none` stands. Malformed, unavailable, conflicting, or unsafe decoration disappears
+   locally without a second model call, speech recomposition, Goal/Plan mutation, or
+   reopened cognition. Model-facing candidates exclude provider/backend/calibration
+   identity so the social decision remains embodiment-independent.
+
 37. **Reflection learns forward; it does not rewrite history.** Trusted observations,
    delivered speech, commitments, execution attempts, and outcomes remain historical
    evidence. Reflection may explain surprise, record an experience, calibrate future

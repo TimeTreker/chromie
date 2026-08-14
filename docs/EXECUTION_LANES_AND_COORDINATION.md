@@ -78,11 +78,10 @@ actively listening may be Social Attention; an autonomous idle blink with no
 social interaction belongs to baseline embodiment/liveliness if that separate
 behavior is ever implemented.
 
-Response Composer may include an advisory SocialAttentionPlan when a joint
-presentation decision is useful, but it is not the exclusive trigger. A
-separate background Social-Attention model path may use the same bounded
-contract. Neither path owns response text: wording, speech acts, and Vocal style
-remain with the applicable cognitive/response owner.
+Response Composer never authors Social Attention. The background
+`SocialAttentionPlanner` is the single semantic writer for optional decoration;
+wording, speech acts, and Vocal style remain with the applicable response owner.
+Accepted decoration is validated independently and materialized through Activity.
 
 When the runtime knows the reviewed live set of eligible Social Attention body
 Capabilities, the model-facing contract constrains `capability_id` to those

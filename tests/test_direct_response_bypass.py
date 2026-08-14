@@ -146,7 +146,6 @@ class DirectResponseComposerTests(unittest.TestCase):
                     },
                     "progress": [],
                 },
-                "social_attention_plan": {"decision": "none", "behaviors": []},
                 "confidence": 0.96,
                 "rationale": "A direct greeting completes the spoken goal.",
             }
@@ -185,7 +184,7 @@ class DirectResponseComposerTests(unittest.TestCase):
         self.assertIn("six-year-old", ollama.prompts[0])
         self.assertIn("Do not invent the user's plans, schedule", ollama.prompts[0])
 
-    def test_invalid_optional_social_expression_preserves_valid_direct_speech(self) -> None:
+    def test_social_attention_context_does_not_change_direct_response_authority(self) -> None:
         association = direct_association()
         ollama = ScriptedOllama(
             {
@@ -201,12 +200,7 @@ class DirectResponseComposerTests(unittest.TestCase):
                     },
                     "progress": [],
                 },
-                "social_attention_plan": {
-                    "decision": "express",
-                    "behaviors": [],
-                    "reason": "A warm response is appropriate.",
-                    "metadata": {"decorative_intent": "warm"},
-                },
+                "lane_coordination": [],
                 "confidence": 0.96,
                 "rationale": "The spoken answer completes the direct goal.",
             }
@@ -222,21 +216,11 @@ class DirectResponseComposerTests(unittest.TestCase):
                 source="llm",
             ),
             context={
-                "direct_goal_association_resolution": association.model_dump(
-                    mode="json"
-                ),
+                "direct_goal_association_resolution": association.model_dump(mode="json"),
                 "history": [],
-                "social_attention_policy": {
-                    "mode": "on",
-                    "planning_enabled": True,
-                    "execution_enabled": True,
-                    "embodiment_independent": True,
-                },
+                "social_attention_policy": {"mode": "on"},
                 "social_attention_candidates": [
-                    {
-                        "capability_id": "soridormi.nod_head",
-                        "description": "Nod once.",
-                    }
+                    {"capability_id": "soridormi.nod_head", "description": "Nod once."}
                 ],
             },
             history=[],
@@ -245,15 +229,14 @@ class DirectResponseComposerTests(unittest.TestCase):
         result = asyncio.run(ResponseComposerResolver(ollama).resolve(request))
 
         self.assertEqual(result.status, "resolved")
+        assert result.composition is not None
         self.assertEqual(
             result.composition.response_plan.final.text,
             "我会认真照顾好家里的每一个人！",
         )
-        self.assertEqual(result.composition.social_attention_plan.decision, "none")
-        self.assertTrue(
-            result.composition.social_attention_plan.metadata[
-                "canonicalized_empty_expression"
-            ]
+        self.assertNotIn(
+            "social_attention_plan",
+            result.composition.model_dump(mode="json", exclude_none=True),
         )
         self.assertEqual(ollama.calls, 1)
 

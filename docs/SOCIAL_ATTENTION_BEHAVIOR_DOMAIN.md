@@ -40,22 +40,26 @@ Social Attention obeys all of the following:
 2. **Not an execution lane.** Chromie's maintained execution lanes are Vocal
    and Activity. Accepted Social Attention body requests execute through
    Activity.
-3. **Not a speech owner.** It never authors, rewrites, paraphrases, or changes
+3. **Single semantic owner.** `SocialAttentionPlanner` alone authors the
+   optional `SocialAttentionPlan`. Response Composer, Goal/Planner stages, and the
+   Host may supply context or validate/materialize it but may not author a second
+   decoration decision.
+4. **Not a speech owner.** It never authors, rewrites, paraphrases, or changes
    the semantic content of ResponsePlan/Vocal output.
-4. **Anchored.** A decoration must accompany a meaningful social interaction
+5. **Anchored.** A decoration must accompany a meaningful social interaction
    state such as listening, speaking, ongoing Activity, turn-taking, waiting in
    an active interaction, or another evidence-backed social event. It does not
    manufacture standalone work merely so that Chromie can move.
-5. **Small and non-disruptive.** Typical candidates are gaze, blink, a small
+6. **Small and non-disruptive.** Typical candidates are gaze, blink, a small
    nod, a small wave, a smile when supported by embodiment, or slight posture /
    body orientation. The live capability catalog remains authoritative.
-6. **Optional and fail-soft.** Invalid, slow, unavailable, conflicting, or
+7. **Optional and fail-soft.** Invalid, slow, unavailable, conflicting, or
    unnecessary decoration is dropped. It must not delay, replace, cancel, or
    fail the primary behavior.
-7. **Interruptible and subordinate.** Emergency handling, explicit user
+8. **Interruptible and subordinate.** Emergency handling, explicit user
    actions, confirmation, Vocal delivery, and primary Activity always have
    priority.
-8. **No completion authority.** Decoration evidence can say that a decoration
+9. **No completion authority.** Decoration evidence can say that a decoration
    ran; it cannot satisfy or prove completion of the primary Goal.
 
 A socially important event that genuinely changes what Chromie should do next
@@ -66,12 +70,13 @@ Core / Goal reasoning rather than smuggled into `SocialAttentionPlan`.
 ### Optional presentation never reopens primary cognition
 
 Social Attention has no right to demand a second interpretation of an otherwise
-valid interaction. A valid `decision=none` stands. Missing courteous/lively style
-guidance belongs in the primary Social Attention context, not in a second-opinion
-critic that is biased toward producing a gesture. If the primary decoration DTO is
-mechanically invalid, it may be regenerated once; if decoration is still invalid,
-unavailable, conflicting, or semantically unsuitable, the decoration disappears
-locally.
+valid interaction. `SocialAttentionPlanner` is the single semantic writer for one
+optional decoration opportunity, and a valid `decision=none` stands. Missing
+courteous/lively style guidance belongs in that primary context, not in a
+second-opinion critic. If the primary decoration DTO is malformed, the opportunity
+fails soft to no decoration immediately; because decoration is optional, there is
+no same-stage repair call. Unavailable, conflicting, or semantically unsuitable
+decoration likewise disappears locally.
 
 In particular:
 
@@ -378,11 +383,11 @@ The maintained default is `on`. Contextual model selection may always produce
 
 A valid primary `decision=none` is authoritative for that optional decoration
 opportunity. Social Attention does not invoke a second semantic critic merely
-because an eligible cue existed, and it never repairs a critic of a valid primary
-decision. Owner-approved courteous, warm, playful, or other expression tendencies
-belong in the primary context and policy. Because decoration is fail-soft, an
-invalid primary DTO may receive one contract repair; continued invalidity resolves
-to no decoration without affecting primary work.
+because an eligible cue existed. Owner-approved courteous, warm, playful, or other
+expression tendencies belong in the single primary Social Attention context and
+policy. Because decoration is optional and fail-soft, malformed primary output
+resolves directly to no decoration; it is not repaired and cannot trigger another
+model call or reopen Response/Goal/Plan cognition.
 
 ## Testing and acceptance
 

@@ -392,11 +392,6 @@ class CognitiveEvidenceRecorder:
             "goal_association_fingerprint": (
                 direct.goal_association_fingerprint if direct else None
             ),
-            "social_attention": (
-                composition.social_attention_plan.decision
-                if composition and composition.social_attention_plan
-                else None
-            ),
             "lane_coordination": (
                 [
                     {
@@ -470,24 +465,6 @@ class CanonicalPlanRuntimeAdapter:
         self._recent_auxiliary_behavior_evidence: deque[dict[str, Any]] = deque(
             maxlen=max(1, int(recent_auxiliary_evidence_limit))
         )
-
-    def _effective_social_attention_mode(
-        self,
-        composition: CoordinatedResponsePlan,
-    ) -> str:
-        policy_payload = composition.metadata.get("social_attention_policy")
-        agent_mode = normalize_social_attention_mode(
-            policy_payload.get("mode") if isinstance(policy_payload, dict) else "off",
-            default="off",
-        )
-        # Both the Agent-side policy and the Host-side launch policy must allow
-        # the behavior. The more restrictive mode wins; a compromised/stale
-        # composition cannot widen the local runtime policy.
-        if "off" in {self.social_attention_mode, agent_mode}:
-            return "off"
-        if "report_only" in {self.social_attention_mode, agent_mode}:
-            return "report_only"
-        return "on"
 
     def recent_auxiliary_behavior_evidence(
         self,
@@ -1146,7 +1123,6 @@ class CanonicalPlanRuntimeAdapter:
                 "vocal": "response_delivery",
                 "activity": "idle",
             },
-            "social_attention_role": "background_decoration",
             "lane_coordination_groups": [],
             "planning_result": "direct_response",
             "capability_decision": "respond",
@@ -1218,103 +1194,7 @@ class CanonicalPlanRuntimeAdapter:
             )
         ]
 
-        attention = composition.social_attention_plan
-        policy_mode = self._effective_social_attention_mode(composition)
-        omitted_attention: list[str] = []
         skills: list[SkillRequest] = []
-        if attention is not None and attention.decision == "express":
-            if policy_mode == "off":
-                omitted_attention.append("policy_off")
-            elif policy_mode == "report_only":
-                omitted_attention.append("policy_report_only")
-            else:
-                target_error = self._attention_target_error(attention, runtime_context)
-                if target_error:
-                    omitted_attention.append(target_error)
-                else:
-                    seen: set[str] = set()
-                    for index, behavior in enumerate(attention.behaviors):
-                        try:
-                            await self.interaction_runtime.ensure_skill_definitions(
-                                [behavior.skill_id]
-                            )
-                            definition = self.interaction_runtime.skill_definition(
-                                behavior.skill_id
-                            )
-                            if behavior.skill_id in seen:
-                                omitted_attention.append(
-                                    f"duplicate_social_skill:{behavior.skill_id}"
-                                )
-                                continue
-                            if not definition.available:
-                                omitted_attention.append(f"unavailable:{behavior.skill_id}")
-                                continue
-                            if definition.requires_confirmation:
-                                omitted_attention.append(
-                                    f"confirmation_required:{behavior.skill_id}"
-                                )
-                                continue
-                            if behavior.timing != "parallel":
-                                omitted_attention.append(
-                                    f"auxiliary_must_be_parallel:{behavior.skill_id}"
-                                )
-                                continue
-                            schema_errors = validate_args_for_schema(
-                                behavior.args, definition.input_schema
-                            )
-                            if schema_errors:
-                                omitted_attention.append(f"invalid_args:{behavior.skill_id}")
-                                continue
-                            target_args_error = self._attention_target_args_error(
-                                behavior.args,
-                                definition.input_schema,
-                                runtime_context,
-                            )
-                            if target_args_error:
-                                omitted_attention.append(
-                                    f"target_error:{behavior.skill_id}:{target_args_error}"
-                                )
-                                continue
-                            digest = hashlib.sha256(
-                                (f"{fingerprint}|direct-social|{index}|{behavior.skill_id}").encode(
-                                    "utf-8"
-                                )
-                            ).hexdigest()[:20]
-                            request = SkillRequest(
-                                request_id=f"social_{digest}",
-                                skill_id=behavior.skill_id,
-                                skill_version=definition.version,
-                                args=behavior.args,
-                                timing="parallel",
-                                timeout_ms=definition.timeout_ms,
-                                cancellable=definition.interruptible,
-                                requires_confirmation=False,
-                                idempotency_key=(f"direct:{fingerprint[:16]}:social:{index}"),
-                                metadata={
-                                    "source": "social_attention_plan",
-                                    "auxiliary_social_attention": True,
-                                    "behavior_domain": attention.behavior_domain,
-                                    "interaction_role": attention.interaction_role,
-                                    "social_attention_purpose": attention.purpose,
-                                    "social_function": behavior.social_function,
-                                    "goal_association_fingerprint": fingerprint,
-                                    "target": attention.target.model_dump(
-                                        mode="json", exclude_none=True
-                                    ),
-                                    "reason": behavior.reason,
-                                    "social_attention_policy_mode": policy_mode,
-                                    "execution_lane": "activity",
-                                    "execution_role": "social_decoration",
-                                    "source_goal_ids": list(goal_ids),
-                                },
-                            )
-                            skills.append(request)
-                            self._record_auxiliary_behavior_request(request, session_id=session_id)
-                            seen.add(behavior.skill_id)
-                        except Exception as exc:
-                            omitted_attention.append(
-                                f"invalid:{behavior.skill_id}:{type(exc).__name__}"
-                            )
 
         metadata = {
             "source": "goal_driven_cognitive_runtime",
@@ -1326,18 +1206,13 @@ class CanonicalPlanRuntimeAdapter:
             "response_composition": composition.model_dump(mode="json", exclude_none=True),
             "execution_lanes": {
                 "vocal": "response_delivery",
-                "activity": (
-                    "auxiliary_social_decoration" if skills else "idle"
-                ),
+                "activity": "idle",
             },
-            "social_attention_role": "background_decoration",
             "lane_coordination_groups": [],
             "planning_result": "direct_response",
             "capability_decision": "respond",
             "goal_ids": goal_ids,
             "planner_tier": "none",
-            "omitted_social_attention": omitted_attention,
-            "social_attention_policy_mode": policy_mode,
             "operational_speech_authority": "llm_direct_response",
         }
         if isinstance(runtime_context.get("user_turn_envelope"), dict):
@@ -1368,17 +1243,6 @@ class CanonicalPlanRuntimeAdapter:
             canonical_plan_fingerprint=fingerprint,
             canonical_plan=plan,
             response_plan=ResponsePlan(),
-            social_attention_plan=SocialAttentionPlan(
-                decision="none",
-                reason=(
-                    "Safe read started independently; Social Attention remains optional "
-                    "background decoration rather than a presentation dependency."
-                ),
-                metadata={
-                    "auxiliary_social_attention": True,
-                    "execution_permitted": False,
-                },
-            ),
             lane_coordination=[],
             confidence=1.0,
             rationale="Pure safe-read execution does not require pre-evidence response composition.",
@@ -1387,11 +1251,6 @@ class CanonicalPlanRuntimeAdapter:
                 "resolver": "readiness_execution",
                 "task_plan_immutable": True,
                 "safe_read_speech_optional": True,
-                "social_attention_policy": {
-                    "mode": "off",
-                    "execution_enabled": False,
-                    "embodiment_independent": True,
-                },
             },
         )
         return await self.build_response(
@@ -2032,132 +1891,6 @@ class CanonicalPlanRuntimeAdapter:
                 )
             )
 
-        omitted_attention: list[str] = []
-        attention = composition.social_attention_plan
-        runtime_context = context if isinstance(context, dict) else {}
-        policy_mode = self._effective_social_attention_mode(composition)
-        if attention is not None and attention.decision == "express" and policy_mode == "off":
-            omitted_attention.append("policy_off")
-        elif (
-            attention is not None
-            and attention.decision == "express"
-            and policy_mode == "report_only"
-        ):
-            omitted_attention.append("policy_report_only")
-        elif attention is not None and attention.decision == "express":
-            target_error = self._attention_target_error(attention, runtime_context)
-            if target_error:
-                omitted_attention.append(target_error)
-            else:
-                primary_definitions = {
-                    step.skill_id: self.interaction_runtime.skill_definition(step.skill_id)
-                    for step in plan.steps
-                }
-                seen_social: set[str] = set()
-                for index, behavior in enumerate(attention.behaviors):
-                    try:
-                        await self.interaction_runtime.ensure_skill_definitions([behavior.skill_id])
-                        definition = self.interaction_runtime.skill_definition(behavior.skill_id)
-                        if (
-                            behavior.skill_id in primary_definitions
-                            or behavior.skill_id in seen_social
-                        ):
-                            omitted_attention.append(
-                                f"duplicate_or_primary_skill:{behavior.skill_id}"
-                            )
-                            continue
-                        if not definition.available:
-                            omitted_attention.append(f"unavailable:{behavior.skill_id}")
-                            continue
-                        if definition.requires_confirmation:
-                            omitted_attention.append(f"confirmation_required:{behavior.skill_id}")
-                            continue
-                        if behavior.timing != "parallel":
-                            omitted_attention.append(
-                                f"auxiliary_must_be_parallel:{behavior.skill_id}"
-                            )
-                            continue
-                        schema_errors = validate_args_for_schema(
-                            behavior.args, definition.input_schema
-                        )
-                        if schema_errors:
-                            omitted_attention.append(f"invalid_args:{behavior.skill_id}")
-                            continue
-                        target_args_error = self._attention_target_args_error(
-                            behavior.args,
-                            definition.input_schema,
-                            runtime_context,
-                        )
-                        if target_args_error:
-                            omitted_attention.append(
-                                f"target_error:{behavior.skill_id}:{target_args_error}"
-                            )
-                            continue
-                        if self._attention_conflicts_with_primary(
-                            definition,
-                            behavior.timing,
-                            primary_definitions,
-                        ):
-                            omitted_attention.append(f"resource_conflict:{behavior.skill_id}")
-                            continue
-                        digest = hashlib.sha256(
-                            f"{fingerprint}|social|{index}|{behavior.skill_id}".encode("utf-8")
-                        ).hexdigest()[:20]
-                        skills.append(
-                            SkillRequest(
-                                request_id=f"social_{digest}",
-                                skill_id=behavior.skill_id,
-                                skill_version=definition.version,
-                                args=behavior.args,
-                                timing=behavior.timing,
-                                timeout_ms=definition.timeout_ms,
-                                cancellable=definition.interruptible,
-                                requires_confirmation=False,
-                                idempotency_key=(
-                                    f"{plan.plan_id}:social:{index}:{fingerprint[:16]}"
-                                ),
-                                metadata={
-                                    "source": "social_attention_plan",
-                                    "auxiliary_social_attention": True,
-                                    "behavior_domain": attention.behavior_domain,
-                                    "interaction_role": attention.interaction_role,
-                                    "social_attention_purpose": attention.purpose,
-                                    "social_function": behavior.social_function,
-                                    "canonical_plan_id": plan.plan_id,
-                                    "canonical_plan_fingerprint": fingerprint,
-                                    "source_goal_ids": list(plan.goal_ids),
-                                    "target": attention.target.model_dump(
-                                        mode="json", exclude_none=True
-                                    ),
-                                    "reason": behavior.reason,
-                                    "social_attention_policy_mode": policy_mode,
-                                    "execution_lane": "activity",
-                                    "execution_role": "social_decoration",
-                                },
-                            )
-                        )
-                        seen_social.add(behavior.skill_id)
-                    except Exception as exc:
-                        omitted_attention.append(
-                            f"invalid:{behavior.skill_id}:{type(exc).__name__}"
-                        )
-
-        proposed_social_capability_ids = (
-            [behavior.skill_id for behavior in attention.behaviors]
-            if attention is not None and attention.decision == "express"
-            else []
-        )
-        materialized_social_capability_ids = [
-            request.skill_id
-            for request in skills
-            if request.metadata.get("auxiliary_social_attention") is True
-        ]
-        for request in skills:
-            self._record_auxiliary_behavior_request(
-                request,
-                session_id=session_id,
-            )
-
         status_map = {
             "respond": "ok",
             "execute": "ok",
@@ -2167,10 +1900,7 @@ class CanonicalPlanRuntimeAdapter:
             "refused": "refused",
         }
         primary_effectful_count = sum(
-            1
-            for request in skills
-            if request.metadata.get("auxiliary_social_attention") is not True
-            and request.metadata.get("effectful") is True
+            1 for request in skills if request.metadata.get("effectful") is True
         )
         metadata = {
             "source": "goal_driven_cognitive_runtime",
@@ -2192,17 +1922,11 @@ class CanonicalPlanRuntimeAdapter:
                     "provider_work"
                     if any(
                         request.metadata.get("execution_lane") == "activity"
-                        and request.metadata.get("auxiliary_social_attention") is not True
                         for request in skills
                     )
-                    else (
-                        "auxiliary_social_decoration"
-                        if materialized_social_capability_ids
-                        else "idle"
-                    )
+                    else "idle"
                 ),
             },
-            "social_attention_role": "background_decoration",
             "lane_coordination_groups": [
                 item.model_dump(mode="json", exclude_none=True)
                 for item in composition.lane_coordination
@@ -2217,17 +1941,6 @@ class CanonicalPlanRuntimeAdapter:
                 plan.goal_satisfaction.model_dump(mode="json")
                 if plan.goal_satisfaction is not None
                 else None
-            ),
-            "omitted_social_attention": omitted_attention,
-            "social_attention_policy_mode": policy_mode,
-            "social_attention_model_decision": (
-                attention.decision if attention is not None else "missing"
-            ),
-            "social_attention_proposed_capability_ids": proposed_social_capability_ids,
-            "social_attention_materialized_capability_ids": (materialized_social_capability_ids),
-            "social_attention_materialized_count": len(materialized_social_capability_ids),
-            "recent_auxiliary_behavior_evidence": (
-                self.recent_auxiliary_behavior_evidence(session_id)
             ),
             "omitted_pre_execution_speech_phases": (omitted_pre_execution_speech_phases),
             "operational_speech_authority": (
@@ -3016,7 +2729,6 @@ class GoalDrivenRuntimeCoordinator:
         if not callable(resolver) or self.adapter.social_attention_mode == "off":
             return {"status": "not_available", "event": event}
         social_context = dict(context)
-        social_context.pop("social_attention_owned_by_background_loop", None)
         social_context["social_attention_event"] = event
         primary_progress: list[dict[str, Any]] = []
         primary_capability_ids: list[str] = []
@@ -3974,7 +3686,6 @@ class GoalDrivenRuntimeCoordinator:
 
                     fast_planner_path = "direct_vocal_output"
                     composition_context = dict(planning_context)
-                    composition_context["social_attention_owned_by_background_loop"] = True
                     composition_context["direct_goal_association_resolution"] = (
                         association.prompt_projection()
                     )
@@ -4378,7 +4089,6 @@ class GoalDrivenRuntimeCoordinator:
                 )
 
             composition_context = dict(planning_context)
-            composition_context["social_attention_owned_by_background_loop"] = True
             composition_context["canonical_plan_resolution"] = terminal_plan.prompt_projection()
             composition_context["execution_capabilities"] = [
                 {

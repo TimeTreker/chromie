@@ -9,18 +9,9 @@ from pathlib import Path
 
 from agent.app.agents.base import AgentServices
 from agent.app.capabilities.catalog import CapabilityMatch
-from agent.app.response_composer import ResponseComposerResolver
 from agent.app.runtime import InteractionRuntime
 from agent.app.schema import AgentRunRequest, RouteDecision
-from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
-from orchestrator.runtime.skill_runtime import SkillDefinition
 from shared.chromie_contracts.mind import default_mind_profile
-from shared.chromie_contracts.plan import CanonicalPlan
-from shared.chromie_contracts.response_composition import (
-    CoordinatedResponsePlan,
-    canonical_plan_fingerprint,
-)
-from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage
 from shared.chromie_contracts.social_attention import SocialAttentionPlan
 
 
@@ -76,18 +67,6 @@ class _Ollama:
         return self.payload
 
 
-class _Runtime:
-    def __init__(self, definition: SkillDefinition) -> None:
-        self.definition = definition
-
-    async def ensure_skill_definitions(self, skill_ids):
-        if skill_ids != [self.definition.skill_id]:
-            raise ValueError(skill_ids)
-
-    def skill_definition(self, skill_id):
-        if skill_id != self.definition.skill_id:
-            raise ValueError(skill_id)
-        return self.definition
 
 
 def request() -> AgentRunRequest:
@@ -105,18 +84,6 @@ def request() -> AgentRunRequest:
         history=[],
     )
 
-
-def plan() -> CanonicalPlan:
-    return CanonicalPlan(
-        plan_id="plan-style",
-        planner_tier="fast",
-        disposition="respond",
-        coverage="complete",
-        confidence=0.95,
-        goal_ids=["goal-answer"],
-        goal_summary="answer the user",
-        response_text="Here is the result.",
-    )
 
 
 class SocialInteractionStyleTests(unittest.TestCase):
@@ -140,7 +107,7 @@ class SocialInteractionStyleTests(unittest.TestCase):
             )
         )
 
-        asyncio.run(runtime.prepare_response_composition_context(item))
+        asyncio.run(runtime.prepare_social_attention_context(item))
 
         style = item.context["social_interaction_style"]
         self.assertTrue(style["owner_approved"])
@@ -156,16 +123,10 @@ class SocialInteractionStyleTests(unittest.TestCase):
             "soridormi.attention",
         )
 
-    def test_response_composer_prompt_contains_style_and_recent_evidence(self):
+    def test_social_attention_prompt_contains_style_and_recent_evidence(self):
         item = request()
-        canonical = plan()
         item.context = {
-            "canonical_plan_resolution": canonical.model_dump(mode="json"),
-            "social_attention_policy": {"mode": "report_only"},
-            "social_interaction_style": (
-                default_mind_profile()
-                .social_interaction_style.model_dump(mode="json")
-            ),
+            "mind": default_mind_profile().prompt_context(),
             "recent_auxiliary_behavior_evidence": [
                 {
                     "evidence_kind": "host_accepted_auxiliary_request",
@@ -173,34 +134,34 @@ class SocialInteractionStyleTests(unittest.TestCase):
                     "skill_id": "soridormi.attention",
                 }
             ],
-            "social_attention_candidates": [
-                _Catalog().entries()[0].model_dump(mode="json")
-            ],
         }
         ollama = _Ollama(
             {
-                "response_plan": {
-                    "final": {
-                        "text": "Here is the result.",
-                        "covers_goal_ids": ["goal-answer"],
-                    }
-                },
-                "social_attention_plan": {
-                    "decision": "none",
-                    "purpose": "neutral_presence",
-                },
+                "decision": "none",
+                "purpose": "neutral_presence",
+                "behaviors": [],
                 "confidence": 0.9,
-                "rationale": "Recent evidence favors stillness.",
+                "reason": "Recent evidence favors stillness.",
             }
         )
+        runtime = InteractionRuntime(
+            AgentServices(
+                social_attention_mode="report_only",
+                capability_catalog=_Catalog(),
+                social_attention_ollama=ollama,
+            )
+        )
 
-        result = asyncio.run(ResponseComposerResolver(ollama).resolve(item))
+        asyncio.run(runtime.prepare_social_attention_context(item))
+        result = asyncio.run(runtime.social_attention_planner.plan(item))
 
-        self.assertEqual(result.status, "resolved")
-        self.assertIn("Owner-approved Social Interaction Style", ollama.prompt)
+        self.assertIsNotNone(result)
+        assert result is not None
+        self.assertEqual(result.decision, "none")
+        self.assertIn("owner-approved Social Interaction Style", ollama.prompt)
         self.assertIn("host_accepted_auxiliary_request", ollama.prompt)
         self.assertIn("timing=parallel", ollama.prompt)
-        self.assertIn("simulator or physical backend metadata", ollama.prompt)
+        self.assertNotIn("opaque-provider-value", ollama.prompt)
 
     def test_contract_rejects_sequential_auxiliary_request(self):
         with self.assertRaises(ValidationError):

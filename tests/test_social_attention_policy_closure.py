@@ -1,21 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 import unittest
 
 from agent.app.agents.base import AgentServices
 from agent.app.capabilities.catalog import CapabilityMatch
-from agent.app.response_composer import ResponseComposerResolver
 from agent.app.runtime import InteractionRuntime
 from agent.app.schema import AgentRunRequest, RouteDecision
 from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
 from orchestrator.runtime.skill_runtime import SkillDefinition, SkillRegistry
-from shared.chromie_contracts.plan import CanonicalPlan
-from shared.chromie_contracts.response_composition import (
-    CoordinatedResponsePlan,
-    canonical_plan_fingerprint,
-)
-from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage
 from shared.chromie_contracts.social_attention import (
     SocialAttentionPlan,
     normalize_social_attention_mode,
@@ -74,18 +68,10 @@ class _Catalog:
         )
 
 
-class _Ollama:
-    def __init__(self, payload):
-        self.payload = payload
-
-    async def generate(self, *args, **kwargs):
-        del args, kwargs
-        return self.payload
-
-
 class _Runtime:
     def __init__(self, definitions):
         self.definitions = {item.skill_id: item for item in definitions}
+        self.executed = []
 
     async def ensure_skill_definitions(self, skill_ids):
         for skill_id in skill_ids:
@@ -94,6 +80,10 @@ class _Runtime:
 
     def skill_definition(self, skill_id):
         return self.definitions[skill_id]
+
+    async def execute(self, response, *, session_id):
+        self.executed.append((response, session_id))
+        return SimpleNamespace(status="completed")
 
 
 def _request() -> AgentRunRequest:
@@ -112,44 +102,46 @@ def _request() -> AgentRunRequest:
     )
 
 
-def _plan() -> CanonicalPlan:
-    return CanonicalPlan(
-        plan_id="plan-social-policy",
-        planner_tier="fast",
-        disposition="respond",
-        coverage="complete",
-        confidence=0.95,
-        goal_ids=["goal-chat"],
-        goal_summary="greet the user",
-        response_text="Hello.",
+def _definition(skill_id: str, *, backend: str) -> SkillDefinition:
+    return SkillDefinition(
+        skill_id=skill_id,
+        provider_id="soridormi.mcp",
+        input_schema={"type": "object", "properties": {}, "additionalProperties": False},
+        output_schema={
+            "type": "object",
+            "properties": {"completed": {"type": "boolean"}},
+            "required": ["completed"],
+            "additionalProperties": False,
+        },
+        available=True,
+        requires_confirmation=False,
+        can_run_parallel=True,
+        exclusive_group=f"social:{skill_id}",
+        metadata={
+            "provider_backend": backend,
+            "behavior_domains": ["social_attention"],
+            "effects": ["social_expression"],
+            "parallel_metadata_declared": True,
+            "resource_claims": [f"social:{skill_id}"],
+        },
     )
 
 
-def _composition(mode: str, *, skill_id: str = "soridormi.sim_attention"):
-    plan = _plan()
-    return CoordinatedResponsePlan(
-        composition_id=f"composition-{mode}",
-        canonical_plan_id=plan.plan_id,
-        canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
-        canonical_plan=plan,
-        response_plan=ResponsePlan(
-            final=ResponseStage(
-                text="Hello.",
-                covers_goal_ids=plan.goal_ids,
-                must_not_claim_completion=True,
-            )
-        ),
-        social_attention_plan=SocialAttentionPlan(
-            decision="express",
-            behaviors=[{"skill_id": skill_id, "args": {}, "timing": "parallel"}],
-            metadata={"auxiliary_social_attention": True},
-        ),
-        metadata={
-            "social_attention_policy": {
-                "mode": mode,
-                "execution_enabled": mode == "on",
-            }
-        },
+def _social_plan(skill_id: str = "soridormi.sim_attention") -> SocialAttentionPlan:
+    return SocialAttentionPlan.model_validate(
+        {
+            "purpose": "engagement",
+            "decision": "express",
+            "behaviors": [
+                {
+                    "capability_id": skill_id,
+                    "args": {},
+                    "timing": "parallel",
+                }
+            ],
+            "confidence": 0.95,
+            "metadata": {"semantic_owner": "social_attention"},
+        }
     )
 
 
@@ -163,7 +155,7 @@ class SocialAttentionPolicyClosureTests(unittest.TestCase):
                     capability_catalog=_Catalog(),
                 )
             )
-            await runtime.prepare_response_composition_context(request)
+            await runtime.prepare_social_attention_context(request)
             return request.context
 
         off = asyncio.run(run("off"))
@@ -175,150 +167,54 @@ class SocialAttentionPolicyClosureTests(unittest.TestCase):
             {item["capability_id"] for item in report["social_attention_candidates"]},
             {"soridormi.sim_attention", "soridormi.hardware_attention"},
         )
+        self.assertEqual(report["social_attention_policy"]["semantic_owner"], "social_attention")
 
         enabled = asyncio.run(run("on"))
         self.assertEqual(len(enabled["social_attention_candidates"]), 2)
 
-    def test_response_composer_off_drops_model_attention(self):
-        plan = _plan()
-        request = _request()
-        request.context = {
-            "canonical_plan_resolution": plan.model_dump(mode="json"),
-            "social_attention_policy": {"mode": "off"},
-        }
-        result = asyncio.run(
-            ResponseComposerResolver(
-                _Ollama(
-                    {
-                        "response_plan": {
-                            "final": {
-                                "text": "Hello.",
-                                "covers_goal_ids": ["goal-chat"],
-                            }
-                        },
-                        "social_attention_plan": {
-                            "decision": "express",
-                            "behaviors": [
-                                {
-                                    "capability_id": "soridormi.blink_eyes",
-                                    "args": {"count": 1},
-                                    "timing": "parallel",
-                                }
-                            ],
-                        },
-                    }
-                )
-            ).resolve(request)
-        )
-        self.assertEqual(result.status, "resolved")
-        self.assertIsNone(result.composition.social_attention_plan)
-        self.assertIn(
-            "policy_off",
-            result.composition.metadata["social_attention_validation_reasons"],
-        )
-
-    def test_response_composer_report_only_retains_advisory_plan(self):
-        plan = _plan()
-        request = _request()
-        request.context = {
-            "canonical_plan_resolution": plan.model_dump(mode="json"),
-            "social_attention_policy": {"mode": "report_only"},
-            "social_attention_candidates": [
-                _Catalog().entries()[0].model_dump(mode="json")
-            ],
-        }
-        result = asyncio.run(
-            ResponseComposerResolver(
-                _Ollama(
-                    {
-                        "response_plan": {
-                            "final": {
-                                "text": "Hello.",
-                                "covers_goal_ids": ["goal-chat"],
-                            }
-                        },
-                        "social_attention_plan": {
-                            "decision": "express",
-                            "behaviors": [
-                                {
-                                    "skill_id": "soridormi.sim_attention",
-                                    "args": {},
-                                    "timing": "parallel",
-                                }
-                            ],
-                        },
-                    }
-                )
-            ).resolve(request)
-        )
-        attention = result.composition.social_attention_plan
-        self.assertEqual(attention.decision, "express")
-        self.assertEqual(attention.metadata["policy_mode"], "report_only")
-        self.assertFalse(attention.metadata["execution_permitted"])
-
-    def test_host_policy_is_more_restrictive_than_agent_plan(self):
-        definition = SkillDefinition(
-            skill_id="soridormi.sim_attention",
-            provider_id="soridormi.mcp",
-            input_schema={"type": "object", "properties": {}},
-            available=True,
-            requires_confirmation=False,
-            metadata={"mode": "sim"},
-        )
-        response = asyncio.run(
-            CanonicalPlanRuntimeAdapter(
-                _Runtime([definition]),
-                social_attention_mode="off",
-            ).build_response(
-                plan=_plan(),
-                composition=_composition("on"),
+    def test_host_policy_is_more_restrictive_than_social_attention_plan(self):
+        runtime = _Runtime([_definition("soridormi.sim_attention", backend="sim")])
+        outcome = asyncio.run(
+            CanonicalPlanRuntimeAdapter(runtime, social_attention_mode="off").execute_social_attention_event(
+                plan=_social_plan(),
                 session_id="social-policy",
-                language="en-US",
+                turn_id="turn-1",
+                event="understanding_ready",
                 context={},
             )
         )
-        self.assertEqual(response.skills, [])
-        self.assertEqual(response.metadata["social_attention_policy_mode"], "off")
-        self.assertIn("policy_off", response.metadata["omitted_social_attention"])
+        self.assertEqual(outcome["status"], "not_executed")
+        self.assertEqual(outcome["materialized_count"], 0)
+        self.assertEqual(runtime.executed, [])
 
     def test_legacy_simulator_scoped_configuration_migrates_to_on(self):
-        self.assertEqual(
-            normalize_social_attention_mode("sim" + "_only"),
-            "on",
-        )
+        self.assertEqual(normalize_social_attention_mode("sim" + "_only"), "on")
 
     def test_host_accepts_reviewed_skill_independent_of_backend_metadata(self):
-        hardware = SkillDefinition(
-            skill_id="soridormi.hardware_attention",
-            provider_id="soridormi.mcp",
-            input_schema={"type": "object", "properties": {}},
-            available=True,
-            requires_confirmation=False,
-            metadata={"provider_backend": "physical"},
+        runtime = _Runtime(
+            [_definition("soridormi.hardware_attention", backend="physical")]
         )
-        adapter = CanonicalPlanRuntimeAdapter(
-            _Runtime([hardware]),
-            social_attention_mode="on",
-        )
-        response = asyncio.run(
-            adapter.build_response(
-                plan=_plan(),
-                composition=_composition(
-                    "on", skill_id="soridormi.hardware_attention"
-                ),
+        adapter = CanonicalPlanRuntimeAdapter(runtime, social_attention_mode="on")
+        outcome = asyncio.run(
+            adapter.execute_social_attention_event(
+                plan=_social_plan("soridormi.hardware_attention"),
                 session_id="social-policy",
-                language="en-US",
+                turn_id="turn-2",
+                event="understanding_ready",
                 context={},
             )
         )
+        self.assertEqual(outcome["status"], "completed")
+        self.assertEqual(outcome["materialized_count"], 1)
+        response, session_id = runtime.executed[0]
+        self.assertEqual(session_id, "social-policy")
         self.assertEqual(
             [item.skill_id for item in response.skills],
             ["soridormi.hardware_attention"],
         )
-        evidence = adapter.recent_auxiliary_behavior_evidence()
+        evidence = adapter.recent_auxiliary_behavior_evidence("social-policy")
         self.assertEqual(evidence[-1]["capability_id"], "soridormi.hardware_attention")
         self.assertEqual(evidence[-1]["execution_claim"], "not_observed")
-        self.assertEqual(evidence[-1]["session_id"], "social-policy")
         self.assertEqual(adapter.recent_auxiliary_behavior_evidence("other-session"), [])
 
     def test_registry_preserves_semantic_taxonomy_not_backend_mode(self):
@@ -340,9 +236,7 @@ class SocialAttentionPolicyClosureTests(unittest.TestCase):
         )
         definition = registry.get("soridormi.opaque_attention")
         self.assertNotIn("mode", definition.metadata)
-        self.assertEqual(
-            definition.metadata["behavior_domains"], ["social_attention"]
-        )
+        self.assertEqual(definition.metadata["behavior_domains"], ["social_attention"])
 
     def test_model_facing_candidates_hide_backend_identity_and_calibration(self):
         catalog = _Catalog()
@@ -354,7 +248,7 @@ class SocialAttentionPolicyClosureTests(unittest.TestCase):
                 social_attention_mode="on",
             )
         )
-        asyncio.run(runtime.prepare_response_composition_context(request))
+        asyncio.run(runtime.prepare_social_attention_context(request))
         candidates = request.context["social_attention_candidates"]
         self.assertEqual(len(candidates), 2)
         self.assertNotIn("mode", candidates[0].get("metadata", {}))
@@ -386,7 +280,7 @@ class SocialAttentionPolicyClosureTests(unittest.TestCase):
                 social_attention_mode="on",
             )
         )
-        asyncio.run(runtime.prepare_response_composition_context(request))
+        asyncio.run(runtime.prepare_social_attention_context(request))
         ids = {item["capability_id"] for item in request.context["social_attention_candidates"]}
         self.assertNotIn("soridormi.calibrated_head_target", ids)
 

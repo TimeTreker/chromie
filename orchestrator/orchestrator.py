@@ -4890,14 +4890,12 @@ class VoiceAssistant:
             )
             if stage is not None
         )
-        attention = composition.social_attention_plan
         self.session_log(
             session_id,
-            "response_composer_report_done: ms=%.1f status=%s stages=%s attention=%s confidence=%.2f fingerprint=%s",
+            "response_composer_report_done: ms=%.1f status=%s stages=%s confidence=%.2f fingerprint=%s",
             now_ms() - started_ms,
             resolution.status,
             stage_count,
-            attention.decision if attention is not None else "absent",
             composition.confidence,
             composition.canonical_plan_fingerprint[:12],
         )

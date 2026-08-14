@@ -766,7 +766,6 @@ async def plan_social_attention(request: SocialAttentionRequest) -> SocialAttent
 async def compose_response_plan(request: AgentRunRequest):
     if response_composer_resolver is None:
         raise HTTPException(status_code=503, detail="Response composer is disabled")
-    await interaction_runtime.prepare_response_composition_context(request)
     prepared, disclosure = await agent_skill_progressive_disclosure.prepare_agent_request(
         request,
         "response_composer",
