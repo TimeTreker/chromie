@@ -584,6 +584,21 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    escalation authority. Do not build confidence-review machinery merely to make a
    numeric score look consistent.
 
+   **Fast-path commitment is not Deep-reviewed.** Once one Responsibility has complete
+   authoritative Goal grounding and a Fast Plan names exact available Capabilities with
+   schema-valid arguments, deterministic safety/authorization passes, and no confirmation
+   is required, the Trusted Capability Runtime may commit and dispatch that work without
+   waiting for Deep cognition. Deep is neither an execution prerequisite nor a reviewer of
+   a Fast-resolved Responsibility. A Fast contract or authoritative-grounding failure stops
+   that Fast path; it is not semantic evidence that Deep should repair the same Plan.
+
+   **Cognitive depth is Responsibility-local.** Independent Responsibilities in one turn
+   need not share a single depth or wall-clock barrier. Already-grounded confirmation-free
+   safe reads may use the existing readiness path while Goal binding continues, and a
+   terminal valid Fast Plan may execute while genuinely uncertain remaining Responsibility
+   enters Deep where supported by the canonical contracts. Do not run Deep in parallel merely
+   to re-check work already resolved by Fast cognition.
+
 35. **Response is expression, not a second semantic mind.** Once authoritative
    responsibility, plan/evidence state, and permitted conversational act are known,
    Response composition chooses natural wording for the still-needed user-facing
@@ -613,8 +628,10 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    supplies bounded context and validates/materializes accepted decoration. A valid
    `none` stands. Malformed, unavailable, conflicting, or unsafe decoration disappears
    locally without a second model call, speech recomposition, Goal/Plan mutation, or
-   reopened cognition. Model-facing candidates exclude provider/backend/calibration
-   identity so the social decision remains embodiment-independent.
+   reopened cognition. Once one auxiliary behavior has been accepted for a turn, later
+   milestones in that same turn are mechanically cooled down rather than spending another
+   model call on repetitive decoration. Model-facing candidates exclude
+   provider/backend/calibration identity so the social decision remains embodiment-independent.
 
 38. **Tool-result meaning has one writer and immutable truth proof.** Trusted tool/provider
    evidence is authoritative reality, while Tool Result Interpreter owns one natural

@@ -250,6 +250,7 @@ class SemanticAuthorityContractTests(unittest.TestCase):
                 "goal_association_five_call_budget": True,
                 "planner_one_mechanical_regeneration": True,
                 "host_semantic_replan_forbidden": True,
+                "fast_contract_failure_not_deep_repair": True,
                 "response_single_writer": True,
                 "response_goal_coverage_host_projection": True,
                 "social_attention_single_writer": True,

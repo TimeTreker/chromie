@@ -324,6 +324,20 @@ def audit() -> dict[str, Any]:
                 "Cognitive Host regained same-turn semantic replanning authority: "
                 + forbidden
             )
+    for required in (
+        'if fast_planner_path == "contract_failure":',
+        'raise CognitiveStageFailure("fast_planner", fast_failure)',
+        'deep_reason = "semantic_escalation"',
+        '"fast_plan_committed_without_deep"',
+    ):
+        if required not in cognitive_runtime_source:
+            errors.append(
+                "Fast/Deep commitment boundary guard missing: " + required
+            )
+    if 'deep_reason = "fast_contract_failure"' in cognitive_runtime_source:
+        errors.append(
+            "Deep Planner again treats a Fast contract failure as a semantic escalation"
+        )
 
     response_composer = _read("agent/app/response_composer.py")
     response_contract = _read("shared/chromie_contracts/response_composition.py")
@@ -409,6 +423,7 @@ def audit() -> dict[str, Any]:
         "goal_association_five_call_budget": True,
         "planner_one_mechanical_regeneration": True,
         "host_semantic_replan_forbidden": True,
+        "fast_contract_failure_not_deep_repair": True,
         "response_single_writer": True,
         "response_goal_coverage_host_projection": True,
         "social_attention_single_writer": True,

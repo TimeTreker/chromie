@@ -500,6 +500,7 @@ class CanonicalPlanRuntimeAdapter:
                 "capability_id": request.capability_id,
                 "semantic_args": dict(request.args),
                 "purpose": request.metadata.get("social_attention_purpose"),
+                "turn_id": request.metadata.get("turn_id"),
                 "canonical_plan_id": request.metadata.get("canonical_plan_id"),
                 "policy_mode": request.metadata.get("social_attention_policy_mode"),
             }
@@ -2728,6 +2729,28 @@ class GoalDrivenRuntimeCoordinator:
         resolver = getattr(self.agent_client, "resolve_social_attention", None)
         if not callable(resolver) or self.adapter.social_attention_mode == "off":
             return {"status": "not_available", "event": event}
+
+        # Social Attention is optional presentation. Once this turn has already
+        # materialized one accepted auxiliary behavior, later cognitive milestones
+        # must not spend another model call deciding another decoration for the same
+        # turn. This is a mechanical same-turn cooldown, not semantic judgment: if
+        # the earlier decision was `none`, no accepted-request evidence exists and a
+        # genuinely later social opportunity may still be considered.
+        recent = getattr(self.adapter, "recent_auxiliary_behavior_evidence", None)
+        recent_evidence = recent(sid) if callable(recent) else []
+        if any(
+            str(item.get("turn_id") or "").strip() == str(turn_id or "").strip()
+            for item in recent_evidence
+            if isinstance(item, dict)
+        ):
+            return {
+                "status": "suppressed",
+                "event": event,
+                "decision": "none",
+                "materialized_count": 0,
+                "reasons": ["same_turn_auxiliary_cooldown"],
+            }
+
         social_context = dict(context)
         social_context["social_attention_event"] = event
         primary_progress: list[dict[str, Any]] = []
@@ -2773,10 +2796,7 @@ class GoalDrivenRuntimeCoordinator:
             "primary_progress": primary_progress,
             "primary_work_known": bool(primary_progress),
         }
-        recent = getattr(self.adapter, "recent_auxiliary_behavior_evidence", None)
-        social_context["recent_auxiliary_behavior_evidence"] = (
-            recent(sid) if callable(recent) else []
-        )
+        social_context["recent_auxiliary_behavior_evidence"] = recent_evidence
         request = SocialAttentionRequest(
             session_id=sid,
             turn_id=turn_id,
@@ -2938,31 +2958,10 @@ class GoalDrivenRuntimeCoordinator:
         return "terminal"
 
     @staticmethod
-    def _fast_plan_context_for_deep(
-        plan: CanonicalPlan,
-        *,
-        path_classification: str,
-    ) -> dict[str, Any]:
-        payload = plan.prompt_projection()
-        if path_classification != "contract_failure":
-            return payload
-        metadata = dict(payload.get("metadata") or {})
-        payload["metadata"] = {
-            key: metadata[key]
-            for key in (
-                "resolver",
-                "status",
-                "authority",
-                "path_classification",
-                "failure_class",
-                "failure_domain",
-                "architecture_attribution",
-                "retryable",
-                "error_type",
-            )
-            if key in metadata
-        }
-        return payload
+    def _fast_plan_context_for_deep(plan: CanonicalPlan) -> dict[str, Any]:
+        """Project only a genuine semantic Fast escalation into Deep cognition."""
+
+        return plan.prompt_projection()
 
     async def resolve(
         self,
@@ -3187,6 +3186,20 @@ class GoalDrivenRuntimeCoordinator:
                         "direct_vocal_output",
                         "native_response_readiness_adoption",
                         "terminal_missing_ability",
+                        "readiness_adoption",
+                        "contract_failure",
+                    }
+                    and not deep_planner_invocation_reasons
+                ),
+                "fast_plan_committed_without_deep": bool(
+                    fast_plan is not None
+                    and fast_plan.planner_tier == "fast"
+                    and fast_plan.disposition != "escalate"
+                    and fast_planner_path
+                    in {
+                        "terminal",
+                        "direct_vocal_output",
+                        "native_response_readiness_adoption",
                         "readiness_adoption",
                     }
                     and not deep_planner_invocation_reasons
@@ -3859,16 +3872,30 @@ class GoalDrivenRuntimeCoordinator:
                     terminal_plan = fast_plan
                     fast_planner_path = self._fast_plan_path(fast_plan)
                 if fast_plan.disposition == "escalate":
-                    deep_reason = (
-                        "fast_contract_failure"
-                        if fast_planner_path == "contract_failure"
-                        else "semantic_escalation"
-                    )
+                    if fast_planner_path == "contract_failure":
+                        # A malformed or grounding-invalid Fast plan is not evidence
+                        # that the user's problem needs deeper cognition. Deep Planner
+                        # must not become an online repair service for a Fast output
+                        # that failed the authoritative contract. Preserve the failure
+                        # and stop before dispatch; a later user turn or Reflection may
+                        # reconsider from new meaning/evidence.
+                        fast_failure = self._optional_stage_failure_metadata(
+                            "fast_planner", fast_plan.metadata
+                        ) or self._stage_failure_metadata(
+                            "fast_planner",
+                            fast_plan.metadata,
+                            default_failure_class=(
+                                fast_plan.escalation_reason
+                                or "fast_planner_contract_failure"
+                            ),
+                        )
+                        raise CognitiveStageFailure("fast_planner", fast_failure)
+
+                    deep_reason = "semantic_escalation"
                     deep_planner_invocation_reasons.append(deep_reason)
                     deep_context = dict(planning_context)
                     deep_context["fast_plan_resolution"] = self._fast_plan_context_for_deep(
-                        fast_plan,
-                        path_classification=fast_planner_path,
+                        fast_plan
                     )
                     fast_validation_feedback = fast_plan.metadata.get(
                         "validation_feedback"

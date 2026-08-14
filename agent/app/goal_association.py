@@ -530,6 +530,11 @@ class GoalAssociationModelResourceResponsibility(BaseModel):
             and self.delivery_mode == "physical_handover"
         ):
             raise ValueError("information resource cannot use physical_handover")
+        if self.resource.kind == "information" and not self.resource.attributes:
+            raise ValueError(
+                "information resource requires at least one typed query-scope "
+                "attribute; resource.description is summary only"
+            )
         names = [
             binding.name
             for binding in [*self.resource.attributes, *self.source.bindings]
@@ -1966,6 +1971,41 @@ class GoalAssociationResolver:
                     },
                 }
             )
+            clauses.append(
+                {
+                    "if": {
+                        "properties": {
+                            "resource_responsibility": {
+                                "type": "object",
+                                "properties": {
+                                    "resource": {
+                                        "type": "object",
+                                        "properties": {
+                                            "kind": {"enum": ["information"]}
+                                        },
+                                        "required": ["kind"],
+                                    }
+                                },
+                                "required": ["resource"],
+                            }
+                        },
+                        "required": ["resource_responsibility"],
+                    },
+                    "then": {
+                        "properties": {
+                            "resource_responsibility": {
+                                "properties": {
+                                    "resource": {
+                                        "properties": {
+                                            "attributes": {"minItems": 1}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            )
 
         source_schema = definitions.get("GoalAssociationModelResourceSource")
         if isinstance(source_schema, dict):
@@ -2148,7 +2188,7 @@ class GoalAssociationResolver:
             + skill_section
             + "Bounded active goals JSON:\n"
             f"{self._bounded_json(candidate_goals, 6500)}\n\n"
-            "Current-turn progress candidates JSON (Core-authored bounded progress already understood before Goal Association. kind=capability is exact capability-shaped work; kind=native_response is a complete conversational answer already authored from current Mind/context. Candidate args are advisory and never establish material binding provenance. Copy candidate_id into only the canonical Goal(s) that exact grounded progress directly satisfies or supports. Do not create, modify, or infer capabilities or rewrite response text here; an empty list means no early progress exists):\n"
+            "Current-turn progress candidates JSON (Core-authored bounded progress already understood before Goal Association. kind=capability is exact capability-shaped work; kind=native_response is a complete conversational answer already authored from current Mind/context. Candidate args are advisory and never establish material binding provenance. When a capability candidate carries a material argument, independently verify that value against the FINAL AUTHORITATIVE USER TURN or supplied discourse; when the same value is explicitly grounded there, preserve that human meaning in the canonical typed Goal binding/resource attribute rather than only in descriptive prose. Copy candidate_id into only the canonical Goal(s) that exact grounded progress directly satisfies or supports. Do not create, modify, or infer capabilities or rewrite response text here; an empty list means no early progress exists):\n"
             f"{self._bounded_json(context.get('progress_candidates') or [], 3600)}\n\n"
             "Bounded active task/progress snapshots JSON:\n"
             f"{self._bounded_json(context.get('active_task_snapshots') or [], 5200)}\n\n"

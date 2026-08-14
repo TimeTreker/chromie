@@ -1786,6 +1786,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(result.terminal_plan.planner_tier, "fast")
         self.assertEqual(result.metadata["fast_planner_path"], "terminal")
         self.assertFalse(result.metadata["deep_planner_invoked"])
+        self.assertTrue(result.metadata["fast_plan_committed_without_deep"])
         self.assertEqual(result.metadata["fast_goal_outcome_count"], 2)
         self.assertEqual(result.metadata["fast_executable_step_count"], 1)
 
@@ -1828,7 +1829,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             "semantic_escalation",
         )
 
-    def test_fast_argument_validation_feedback_reaches_deep_planner(self):
+    def test_fast_contract_failure_does_not_invoke_deep_planner(self):
         validation_feedback = [
             {
                 "type": "invalid_args",
@@ -1847,6 +1848,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             metadata={
                 "path_classification": "contract_failure",
                 "validation_feedback": validation_feedback,
+                "failure_class": "structured_output_validation",
+                "failure_domain": "model_contract",
             },
         )
         client = ScriptedClient(
@@ -1866,13 +1869,14 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             coordinator, client, text="眨眼。", route="robot_action"
         )
 
-        self.assertEqual(result.status, "applied")
-        self.assertEqual(
-            client.deep_contexts[0]["runtime_validator_feedback"],
-            validation_feedback,
-        )
+        self.assertEqual(result.status, "error")
+        self.assertEqual(result.metadata["failure_stage"], "fast_planner")
+        self.assertEqual(result.metadata["fast_planner_path"], "contract_failure")
+        self.assertFalse(result.metadata["deep_planner_invoked"])
+        self.assertTrue(result.metadata["deep_planner_avoided"])
+        self.assertEqual(client.deep_contexts, [])
 
-    def test_fast_contract_failure_stays_visible_and_is_sanitized_for_deep(self):
+    def test_fast_contract_failure_stays_visible_without_deep_repair(self):
         fast = CanonicalPlan(
             plan_id="fast-contract-failure",
             planner_tier="fast",
@@ -1908,20 +1912,14 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             coordinator, client, text="眨眼。", route="robot_action"
         )
 
-        self.assertEqual(result.status, "applied")
-        self.assertEqual(
-            result.metadata["deep_planner_invocation_reason"],
-            "fast_contract_failure",
-        )
-        self.assertEqual(
-            result.metadata["stage_diagnostics"][0]["failure_class"],
-            "structured_output_validation",
-        )
-        deep_fast_metadata = client.deep_contexts[0]["fast_plan_resolution"][
-            "metadata"
-        ]
-        self.assertNotIn("initial_raw_output", deep_fast_metadata)
-        self.assertNotIn("repair_raw_output", deep_fast_metadata)
+        self.assertEqual(result.status, "error")
+        self.assertEqual(result.metadata["failure_stage"], "fast_planner")
+        self.assertEqual(result.metadata["failure_class"], "structured_output_validation")
+        self.assertEqual(result.metadata["fast_planner_path"], "contract_failure")
+        self.assertFalse(result.metadata["deep_planner_invoked"])
+        self.assertNotIn("initial_raw_output", result.metadata)
+        self.assertNotIn("repair_raw_output", result.metadata)
+        self.assertEqual(client.deep_contexts, [])
 
     def test_apply_robot_action_uses_runtime_confirmation_contract(self):
         client = ScriptedClient(

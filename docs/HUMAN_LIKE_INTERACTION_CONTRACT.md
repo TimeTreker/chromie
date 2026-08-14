@@ -237,7 +237,13 @@ needs no external read, tool, memory mutation, or embodied effect may move
 directly to response composition without invoking Fast or Deep Planner. This is
 a model-authored semantic decision validated against the typed Goal; it must
 never be selected by a greeting phrase table. Complete bounded capability work
-belongs on the Fast path. Deep Planner is exceptional and is justified by
+belongs on the Fast path. Once that Fast work is completely grounded, exactly
+capability-bound, deterministically safe/authorized, and needs no confirmation, it may
+be committed without waiting for Deep. Deep is not a reviewer of a successful Fast
+Plan; a Fast contract/provenance failure also does not justify asking Deep to repair the
+same work. Different independent Responsibilities may progress at different depths, so
+ready confirmation-free reads need not wait for unrelated deeper thinking. Deep Planner
+is exceptional and is justified by
 semantic uncertainty, incomplete or compound coverage, nontrivial dependencies,
 material alternatives, novelty or broader context, or safety/resource reasoning
 that requires the wider planning boundary. A structured semantic or plan

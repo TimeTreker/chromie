@@ -620,6 +620,74 @@ def test_independent_social_attention_uses_same_trusted_runtime_without_goal_aut
         evidence = adapter.recent_auxiliary_behavior_evidence("session-social")
         assert len(evidence) == 1
         assert evidence[0]["execution_claim"] == "not_observed"
+        assert evidence[0]["turn_id"] == "turn-social"
+
+    asyncio.run(scenario())
+
+
+def test_social_attention_same_turn_cooldown_skips_second_model_decision_after_behavior():
+    async def scenario():
+        runtime = InteractionRuntimeCoordinator(lambda payload: {"scheduled": True})
+        definition = blink_definition()
+        provider = SocialProvider()
+        runtime.registry.register(definition)
+        runtime.runtime.register_provider(provider)
+        adapter = CanonicalPlanRuntimeAdapter(runtime, social_attention_mode="on")
+        calls: list[str] = []
+
+        class Client:
+            async def resolve_social_attention(self, *args, **kwargs):
+                request = kwargs["request"]
+                calls.append(request.event)
+                return SocialAttentionPlan.model_validate(
+                    {
+                        "purpose": "acknowledge",
+                        "decision": "express",
+                        "target": {"target_ref": "none", "source": "none"},
+                        "behaviors": [
+                            {
+                                "capability_id": definition.skill_id,
+                                "args": {"count": 1},
+                                "timing": "parallel",
+                                "reason": "One subtle blink is enough.",
+                            }
+                        ],
+                        "confidence": 0.9,
+                    }
+                )
+
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=Client(),
+            adapter=adapter,
+            policy=CognitiveRuntimePolicy(mode="apply"),
+        )
+        common = dict(
+            session=object(),
+            text="Check the weather.",
+            sid="session-social-cooldown",
+            turn_id="turn-social-cooldown",
+            language="en-US",
+            intent="capability:chromie.reference.lookup",
+            context={},
+            history=[],
+        )
+        first = await coordinator._run_social_attention_event(
+            event="understanding_ready", **common
+        )
+        second = await coordinator._run_social_attention_event(
+            event="goal_associated", **common
+        )
+
+        assert first["materialized_count"] == 1
+        assert second == {
+            "status": "suppressed",
+            "event": "goal_associated",
+            "decision": "none",
+            "materialized_count": 0,
+            "reasons": ["same_turn_auxiliary_cooldown"],
+        }
+        assert calls == ["understanding_ready"]
+        assert provider.calls == 1
 
     asyncio.run(scenario())
 

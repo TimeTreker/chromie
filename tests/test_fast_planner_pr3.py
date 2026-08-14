@@ -2113,8 +2113,8 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.disposition, "escalate")
         self.assertEqual(plan.steps, [])
         self.assertEqual(len(ollama.prompts), 1)
-        self.assertEqual(plan.metadata["path_classification"], "semantic_escalation")
-        self.assertEqual(plan.escalation_reason, "fast_planner_semantic_validation_failed")
+        self.assertEqual(plan.metadata["path_classification"], "contract_failure")
+        self.assertEqual(plan.escalation_reason, "fast_planner_authoritative_grounding_failed")
         self.assertIn(
             "explicit numeric goal value has no matching user_supplied",
             plan.metadata["error"],

@@ -83,6 +83,15 @@ class _CapabilityArgumentValidationError(PlannerDTOContractError):
         )
 
 
+class _AuthoritativeGroundingValidationError(ValueError):
+    """Fast output contradicts or bypasses immutable Goal grounding.
+
+    This is not evidence that the user problem is semantically difficult. Deep
+    Planner must not be used as a repair service for a plan that tried to source
+    executable arguments outside the authoritative Goal representation.
+    """
+
+
 class FastPlannerResolver:
     """Low-latency semantic planner over the executable common catalog only."""
 
@@ -319,18 +328,23 @@ class FastPlannerResolver:
                     authoritative_goals=authoritative_goals,
                     capabilities=capability_payload,
                 )
-                validate_explicit_numeric_parameter_grounding(
-                    validated_model_output,
-                    authoritative_goals=authoritative_goals,
-                )
-                validate_goal_binding_argument_grounding(
-                    validated_model_output,
-                    authoritative_goals=authoritative_goals,
-                )
-                validate_user_supplied_parameter_provenance(
-                    validated_model_output,
-                    authoritative_goals=authoritative_goals,
-                )
+                try:
+                    validate_explicit_numeric_parameter_grounding(
+                        validated_model_output,
+                        authoritative_goals=authoritative_goals,
+                    )
+                    validate_goal_binding_argument_grounding(
+                        validated_model_output,
+                        authoritative_goals=authoritative_goals,
+                    )
+                    validate_user_supplied_parameter_provenance(
+                        validated_model_output,
+                        authoritative_goals=authoritative_goals,
+                    )
+                except PlannerDTOContractError:
+                    raise
+                except ValueError as exc:
+                    raise _AuthoritativeGroundingValidationError(str(exc)) from exc
                 validate_external_response_evidence_boundary(
                     validated_model_output,
                     context=request.context,
@@ -430,13 +444,22 @@ class FastPlannerResolver:
                 mechanical_contract_error = isinstance(
                     exc, (PlannerDTOContractError, json.JSONDecodeError)
                 )
-                semantic_validation_failure = isinstance(exc, ValueError) and not mechanical_contract_error
+                authoritative_grounding_failure = isinstance(
+                    exc, _AuthoritativeGroundingValidationError
+                )
+                semantic_validation_failure = (
+                    isinstance(exc, ValueError)
+                    and not mechanical_contract_error
+                    and not authoritative_grounding_failure
+                )
                 return self._escalation(
                     plan_id,
                     request,
                     (
                         "fast_planner_model_contract_failed"
                         if contract_repair_attempted or mechanical_contract_error
+                        else "fast_planner_authoritative_grounding_failed"
+                        if authoritative_grounding_failure
                         else "fast_planner_semantic_validation_failed"
                         if semantic_validation_failure
                         else "fast_planner_unavailable"

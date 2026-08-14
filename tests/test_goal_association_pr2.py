@@ -382,6 +382,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             kind="information",
             description="tonight's Chongqing weather",
             quantity="",
+            attributes=[binding("location", "location", "Chongqing")],
             source_status="provider_resolved",
         )
         with self.assertRaisesRegex(ValueError, "output_mode=capability_work"):
@@ -393,6 +394,18 @@ class GoalExecutionContractTests(unittest.TestCase):
             goal("Check tonight's weather.", "capability_work", resource=information)
         )
         self.assertEqual(parsed.output_mode, "capability_work")
+
+    def test_information_resource_requires_typed_query_scope_not_description_only(self):
+        information = resource_responsibility(
+            kind="information",
+            description="Chongqing current weather",
+            quantity="",
+            source_status="provider_resolved",
+        )
+        with self.assertRaisesRegex(ValueError, "typed query-scope attribute"):
+            GoalAssociationModelGoal.model_validate(
+                goal("Check Chongqing weather.", "capability_work", resource=information)
+            )
 
     def test_vocal_goal_cannot_claim_resource_authority(self):
         with self.assertRaisesRegex(ValueError, "output_mode=body_action"):
@@ -421,6 +434,7 @@ class GoalExecutionContractTests(unittest.TestCase):
                     kind="information",
                     description="tonight's Chongqing weather",
                     quantity="",
+                    attributes=[binding("location", "location", "Chongqing")],
                     source_status="provider_resolved",
                 ),
             )

@@ -373,10 +373,16 @@ availability, source-effect bounds, resources, confirmation requirements, and
 forbidden low-level controls. Validation cannot invent missing meaning or
 rewrite the plan into a nearby action.
 
-Fast Planner owns complete bounded capability work. Deep Planner is invoked
-only for unresolved ambiguity or coverage, nontrivial dependency, material
-alternative, novelty/broader context, or safety/resource reasoning that truly
-requires wider cognition. A purely mechanical Planner DTO/schema failure may be
+Fast Planner owns complete bounded capability work. A terminal Fast Plan whose
+Goal grounding, exact Capability, arguments, deterministic safety/authorization, and
+confirmation policy validate may commit directly to Trusted Capability Runtime; Deep
+is not an execution prerequisite or reviewer. A Fast contract/grounding failure stops
+that path instead of being repaired by Deep. Deep Planner is invoked only for genuine
+semantic ambiguity or coverage, nontrivial dependency, material alternative,
+novelty/broader context, or safety/resource reasoning that truly requires wider
+cognition. Independent Responsibilities may therefore progress at different cognitive
+depths; confirmation-free safe reads can use the existing readiness path while later
+Goal cognition continues. A purely mechanical Planner DTO/schema failure may be
 regenerated once under the same semantic meaning. Fast semantic/grounding/coverage
 rejection may escalate once to Deep when broader reasoning is warranted. Deep
 semantic/grounding/coverage rejection is terminal for that cognition attempt and

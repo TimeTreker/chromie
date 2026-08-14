@@ -1993,6 +1993,19 @@ complete | partial | uncertain
 Only complete, high-confidence, structurally valid coverage may proceed to
 validation.
 
+A complete Fast Plan is a commit candidate, not a draft waiting for Deep approval.
+When authoritative Goal grounding, exact Capability availability, parameter schema,
+safety/authorization, and confirmation policy all pass deterministic validation, the
+runtime may dispatch that Responsibility immediately. Deep Planner is not a second
+approval gate. Conversely, a Fast contract/provenance failure stops before execution;
+it does not gain semantic legitimacy by asking Deep to repair the same malformed Plan.
+
+For confirmation-free `safe_read` work, the existing readiness mechanism may start an
+exact grounded Capability candidate before Goal Association/planning completes and later
+bind that already-started request to the canonical Goal. This is Responsibility-local
+parallel progress, not speculative execution: effectful work still requires canonical
+Goal/Plan commitment and Host authorization.
+
 The planner model emits a flat semantic DTO, not the canonical transport
 envelope. Plan identity, schema version, planner tier, and authoritative
 top-level Goal IDs are host-owned. Model-authored steps must name the exact
@@ -2035,9 +2048,11 @@ The Deep Planner receives:
 Deep Planner is exceptional. It is invoked when semantic uncertainty,
 incomplete or compound coverage, nontrivial dependencies, material alternatives,
 novelty or broader context, or safety/resource reasoning requires the wider
-planning boundary. Fast-to-Deep is the one planning escalation, not repair of an
-already committed Goal or execution result. Deep Planner receives the original
-Goal truth, the Fast draft and failure evidence, and the full planning boundary.
+planning boundary. Fast-to-Deep is the one **semantic** planning escalation, not
+repair of a Fast contract/provenance failure, already committed Goal, or execution
+result. A Responsibility that is already completely and safely resolved by Fast does
+not enter Deep in parallel for reassurance. Deep Planner receives the original Goal
+truth, the Fast semantic escalation evidence, and the full planning boundary.
 It may regenerate once only when its structured DTO is mechanically malformed;
 semantic grounding, coverage, confidence/satisfaction, capability, or safety
 rejection is terminal and fails closed. Model confidence alone neither grants a direct/Fast
