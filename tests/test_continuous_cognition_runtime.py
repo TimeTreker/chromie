@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.cognitive_runtime import (
     CanonicalPlanRuntimeAdapter,
+    CognitiveRuntimeResolution,
     CognitiveRuntimePolicy,
     GoalDrivenRuntimeCoordinator,
 )
@@ -769,6 +770,59 @@ def test_social_attention_rejects_a_different_cue_that_conflicts_with_primary_ac
         assert provider.calls == 0
 
     asyncio.run(scenario())
+
+
+def test_social_attention_projects_compound_response_as_distinct_primary_activities():
+    resolution = CognitiveRuntimeResolution(
+        mode="apply",
+        status="applied",
+        lane="robot_action",
+        interaction_response=InteractionResponse(
+            interaction_id="interaction-compound-social",
+            speech=[
+                InteractionSpeech(
+                    id="speech-final",
+                    text="Here I go.",
+                    metadata={"source_goal_ids": ["goal-speak"]},
+                )
+            ],
+            skills=[
+                SkillRequest(
+                    request_id="request-walk",
+                    skill_id="soridormi.walk_forward",
+                    args={"duration_s": 2},
+                    metadata={"source_goal_ids": ["goal-walk"]},
+                ),
+                SkillRequest(
+                    request_id="request-media",
+                    skill_id="chromie.media.play",
+                    args={},
+                    metadata={"source_goal_ids": ["goal-media"]},
+                ),
+            ],
+        ),
+    )
+
+    activities = GoalDrivenRuntimeCoordinator._resolution_social_activities(
+        resolution, turn_id="turn-compound-social"
+    )
+
+    assert [activity.activity_id for activity in activities] == [
+        "speech-final",
+        "request-walk",
+        "request-media",
+    ]
+    assert [activity.kind for activity in activities] == [
+        "speech",
+        "body_action",
+        "media_playback",
+    ]
+    assert [activity.goal_ids for activity in activities] == [
+        ["goal-speak"],
+        ["goal-walk"],
+        ["goal-media"],
+    ]
+    assert all(activity.kind != "mixed" for activity in activities)
 
 
 def test_social_attention_uses_scheduled_primary_speech_as_activity_anchor(caplog):

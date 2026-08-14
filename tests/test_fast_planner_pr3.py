@@ -176,7 +176,7 @@ class CompleteResourceCatalog(FakeCatalog):
         return self.items
 
 
-def request(text: str, route="robot_action", *, goal_ids=None):
+def request(text: str, route="robot_action", *, goal_ids=None, goal_metadata=None):
     goal_ids = list(goal_ids or [])
     new_goals = [
         {
@@ -185,6 +185,7 @@ def request(text: str, route="robot_action", *, goal_ids=None):
             "source_text": text,
             "constraints": {},
             "success_criteria": [],
+            "metadata": dict(goal_metadata or {}),
         }
         for goal_id in goal_ids
     ]
@@ -1347,9 +1348,67 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.steps[0].capability_id, "soridormi.blink_eyes")
         self.assertEqual(plan.metadata["authority"], "advisory")
 
+    def test_compatibility_chat_route_cannot_suppress_canonical_body_goal(self):
+        raw = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 0.96,
+            "goal_summary": "blink twice",
+            "steps": [
+                {
+                    "step_id": "blink",
+                    "capability_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "timing": "sequential",
+                    "source_goal_ids": ["goal-blink"],
+                }
+            ],
+            "goal_satisfaction": {"score": 1.0, "status": "exact"},
+        }
+        coverage_review = {
+            "decision": "accept",
+            "confidence": 1.0,
+            "uncovered_requirements": [],
+            "reason": "The exact blink capability completely covers the canonical body Goal.",
+        }
+        ollama = ScriptedOllama([raw, coverage_review])
+        plan = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve(
+                request(
+                    "Blink twice.",
+                    route="chat",
+                    goal_ids=["goal-blink"],
+                    goal_metadata={
+                        "responsibility_kind": "executable_action",
+                        "execution_lane": "activity",
+                        "output_mode": "body_action",
+                        "provider_required": True,
+                    },
+                )
+            )
+        )
+
+        self.assertEqual(plan.disposition, "execute")
+        self.assertEqual([step.capability_id for step in plan.steps], ["soridormi.blink_eyes"])
+        schema = ollama.prompts[0][1]["response_format"]
+        self.assertNotEqual(schema["properties"]["steps"].get("maxItems"), 0)
+        self.assertIn("soridormi.blink_eyes", ollama.prompts[0][0])
+        self.assertNotIn("Goal Interpretation advisory JSON", ollama.prompts[0][0])
+        self.assertNotIn("authoritative source route", ollama.prompts[0][0].casefold())
+
     def test_simple_chat_produces_complete_response(self):
-        raw = {"disposition":"respond","coverage":"complete","confidence":0.93,"goal_summary":"greet","response_text":"你好。","steps":[],"goal_satisfaction":{"score":1.0,"status":"exact"}}
-        plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("你好。", route="chat", goal_ids=["goal-greet"])))
+        raw = multi_goal_plan(
+            disposition="respond",
+            coverage="complete",
+            goal_summary="greet",
+            response_text="你好。",
+            steps=[],
+            goal_outcomes={
+                "goal-greet": respond_outcome("goal-greet", "你好。", "Direct greeting.")
+            },
+            goal_satisfaction=exact_satisfaction(["goal-greet"]),
+        )
+        plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("你好。", route="chat", goal_ids=["goal-greet"], goal_metadata={"responsibility_kind": "vocal_output", "output_mode": "speech", "provider_required": False})))
         self.assertEqual(plan.disposition, "respond")
         self.assertEqual(plan.steps, [])
 
@@ -1505,19 +1564,21 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
 
     def test_chat_route_schema_is_response_only(self):
-        raw = {
-            "disposition": "respond",
-            "coverage": "complete",
-            "confidence": 0.93,
-            "goal_summary": "greet",
-            "response_text": "Hello!",
-            "steps": [],
-            "goal_satisfaction": {"score": 1.0, "status": "exact"},
-        }
+        raw = multi_goal_plan(
+            disposition="respond",
+            coverage="complete",
+            goal_summary="greet",
+            response_text="Hello!",
+            steps=[],
+            goal_outcomes={
+                "goal-greet": respond_outcome("goal-greet", "Hello!", "Direct greeting.")
+            },
+            goal_satisfaction=exact_satisfaction(["goal-greet"]),
+        )
         ollama = FakeOllama(raw)
         plan = asyncio.run(
             FastPlannerResolver(ollama, FakeCatalog()).resolve(
-                request("Hello.", route="chat", goal_ids=["goal-greet"])
+                request("Hello.", route="chat", goal_ids=["goal-greet"], goal_metadata={"responsibility_kind": "vocal_output", "output_mode": "speech", "provider_required": False})
             )
         )
         self.assertEqual(plan.disposition, "respond")
@@ -2698,8 +2759,20 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.escalation_reason, "step_not_in_executable_common_catalog")
 
     def test_prompt_defines_complete_coverage_not_skill_matching(self):
-        ollama = FakeOllama({"disposition":"respond","coverage":"complete","confidence":0.9,"response_text":"你好。","steps":[],"goal_satisfaction":{"score":1.0,"status":"exact"}})
-        planner_request = request("你好。", route="chat", goal_ids=["goal-greet"])
+        ollama = FakeOllama(
+            multi_goal_plan(
+                disposition="respond",
+                coverage="complete",
+                goal_summary="greet",
+                response_text="你好。",
+                steps=[],
+                goal_outcomes={
+                    "goal-greet": respond_outcome("goal-greet", "你好。", "Direct greeting.")
+                },
+                goal_satisfaction=exact_satisfaction(["goal-greet"]),
+            )
+        )
+        planner_request = request("你好。", route="chat", goal_ids=["goal-greet"], goal_metadata={"responsibility_kind": "vocal_output", "output_mode": "speech", "provider_required": False})
         context = dict(planner_request.context)
         context["history"] = [
             {
@@ -3012,23 +3085,24 @@ class FastPlannerResolverTests(unittest.TestCase):
             }],
             "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
-        repaired = {
-            "disposition": "respond",
-            "coverage": "complete",
-            "confidence": 0.95,
-            "response_text": "A short joke.",
-            "steps": [],
-            "goal_satisfaction": {
-                "score": 1.0,
-                "status": "exact",
-                "satisfied_goal_ids": ["goal-joke"],
+        repaired = multi_goal_plan(
+            disposition="respond",
+            coverage="complete",
+            goal_summary="Tell a short joke.",
+            response_text="A short joke.",
+            steps=[],
+            goal_outcomes={
+                "goal-joke": respond_outcome(
+                    "goal-joke", "A short joke.", "Direct conversational response."
+                )
             },
-        }
+            goal_satisfaction=exact_satisfaction(["goal-joke"]),
+        )
         ollama = ScriptedOllama([invalid, repaired])
 
         plan = asyncio.run(
             FastPlannerResolver(ollama, FakeCatalog()).resolve(
-                request("Tell me a short joke.", route="chat", goal_ids=["goal-joke"])
+                request("Tell me a short joke.", route="chat", goal_ids=["goal-joke"], goal_metadata={"responsibility_kind": "vocal_output", "output_mode": "speech", "provider_required": False})
             )
         )
 

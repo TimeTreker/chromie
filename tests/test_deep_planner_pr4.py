@@ -160,6 +160,82 @@ class CanonicalDeepPlanContractTests(unittest.TestCase):
 
 
 class DeepPlannerResolverTests(unittest.TestCase):
+    def test_compatibility_chat_route_cannot_suppress_canonical_body_goal(self):
+        raw = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 0.96,
+            "goal_summary": "Blink twice.",
+            "response_text": "",
+            "steps": [
+                {
+                    "step_id": "blink",
+                    "capability_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "timing": "sequential",
+                    "source_goal_ids": ["goal-blink"],
+                    "reason_summary": "Blink twice as requested.",
+                }
+            ],
+            "goal_outcomes": {
+                "goal-blink": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "response_text": "",
+                    "unresolved": [],
+                    "step_ids": ["blink"],
+                    "satisfaction": {
+                        "score": 1.0,
+                        "status": "exact",
+                        "satisfied_goal_ids": ["goal-blink"],
+                        "unmet_goal_ids": [],
+                        "unmet_requirements": [],
+                        "rationale": "Exact body action coverage.",
+                    },
+                    "rationale": "Exact body action coverage.",
+                }
+            },
+            "goal_satisfaction": {
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": ["goal-blink"],
+                "unmet_goal_ids": [],
+                "unmet_requirements": [],
+                "rationale": "Exact body action coverage.",
+            },
+            "escalation_reason": "",
+            "unresolved": [],
+            "parameter_resolutions": [],
+            "plan_relation": "exact",
+            "user_confirmation_required": False,
+        }
+        run_request = request("Blink twice.", goal_ids=["goal-blink"])
+        run_request.route_decision = run_request.route_decision.model_copy(
+            update={"route": "chat", "intent": "compatibility_only_wrong_lane"}
+        )
+        goal = run_request.context["goal_association_resolution"]["new_goals"][0]
+        goal["metadata"] = {
+            "responsibility_kind": "executable_action",
+            "execution_lane": "activity",
+            "output_mode": "body_action",
+            "provider_required": True,
+        }
+        coverage_review = {
+            "decision": "accept",
+            "confidence": 1.0,
+            "uncovered_requirements": [],
+            "reason": "The exact blink capability completely covers the canonical body Goal.",
+        }
+        ollama = SequencedOllama([raw, coverage_review])
+
+        plan = asyncio.run(DeepPlannerResolver(ollama, FullCatalog()).resolve(run_request))
+
+        self.assertEqual(plan.disposition, "execute")
+        self.assertEqual([step.capability_id for step in plan.steps], ["soridormi.blink_eyes"])
+        schema = ollama.prompts[0][1]["response_format"]
+        self.assertNotEqual(schema["properties"]["steps"].get("maxItems"), 0)
+        self.assertNotIn("authoritative source route", ollama.prompts[0][0].casefold())
+
     def test_effectful_zero_step_false_satisfaction_fails_closed_without_same_tier_repair(self):
         invalid = {
             "disposition": "respond",

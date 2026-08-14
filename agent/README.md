@@ -173,8 +173,11 @@ or prepared body/media/vocal-performance work. A scheduled Fast acknowledgement
 may therefore be decorated while Goal Association continues, because the speech
 itself is the anchor; provider readiness, Goal milestones, planning, waiting, and
 evidence arrival are not anchors. Each distinct primary Activity may independently
-choose eligible small body capabilities tagged `social_attention` or `none`. The
-model does not own Goal meaning, response wording, completion, or authorization.
+choose eligible small body capabilities tagged `social_attention` or `none`. A final
+`InteractionResponse` is not itself such an Activity: each speech item and each
+observable Capability request keeps its own Activity ID, so compound speech/body/media
+work is not collapsed into one `mixed` decoration opportunity. The model does not own
+Goal meaning, response wording, completion, or authorization.
 Accepted Social Attention body requests execute through Activity as fail-soft
 auxiliary decoration.
 

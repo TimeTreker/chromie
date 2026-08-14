@@ -44,6 +44,7 @@ from .planner_contract import (
     materialize_planner_metadata,
     normalize_schema_default_parameter_provenance,
     parallel_plan_contract_errors,
+    planner_goal_execution_requirements,
     planner_provider_media_goal_operations,
     planner_provider_vocal_goal_ids,
     planner_response_goal_ids,
@@ -130,6 +131,12 @@ class DeepPlannerResolver:
 
     async def _resolve(self, request: AgentRunRequest) -> CanonicalPlan:
         plan_id = self._plan_id(request)
+        context = request.context if isinstance(request.context, dict) else {}
+        expected_goal_ids_for_turn = expected_goal_ids(context)
+        authoritative_goals = canonical_goal_grounding(context)
+        response_only, requires_execution = planner_goal_execution_requirements(
+            authoritative_goals
+        )
         capabilities = await self.catalog.prompt_entries(scope="all", refresh=False)
         executable = [
             item
@@ -138,21 +145,9 @@ class DeepPlannerResolver:
             and item.interaction_executable
             and is_planner_step_skill(item.capability_id)
         ]
-        source_route = str(request.route_decision.route or "").strip()
-        response_only = source_route == "chat"
-        requires_execution = source_route == "tool"
         if response_only:
             executable = []
-        elif requires_execution:
-            # Cognitive Core already established the effect envelope. A tool
-            # lane may choose among tool capabilities, but it must never drift
-            # into a body gesture merely because that capability is common.
-            executable = [item for item in executable if str(item.route) == "tool"]
         payload = [self._capability_payload(item) for item in executable[: self.max_capabilities]]
-        expected_goal_ids_for_turn = expected_goal_ids(
-            request.context if isinstance(request.context, dict) else {}
-        )
-        authoritative_goals = canonical_goal_grounding(request.context)
         response_schema = self._response_schema(
             expected_goal_ids_for_turn,
             allowed_skill_ids=[item["capability_id"] for item in payload],
@@ -1176,26 +1171,17 @@ class DeepPlannerResolver:
         ]
         feedback_section = self._bounded(combined_feedback, 5000) if combined_feedback else "[]"
         previous_section = self._bounded(previous_raw, 5000) if previous_raw is not None else "null"
-        source_route = str(request.route_decision.route or "").strip()
-        route_effect_contract = (
-            "The authoritative source route is chat. This turn is response-only: "
-            "do not select or invent executable skills, physical effects, or plan "
-            "steps. Use respond, clarify, unavailable, or refused outcomes only. "
-            if source_route == "chat"
+        response_only, requires_execution = planner_goal_execution_requirements(grounding)
+        goal_execution_contract = (
+            "The canonical Goals are provider-free direct speech responsibilities. "
+            "This plan is response-only: do not select executable skills or plan steps. "
+            if response_only
             else (
-                "The authoritative source route is tool. This fresh external-information "
-                "turn must contain at least one executable supplied tool step, or return "
-                "clarify/unavailable/refused when no valid tool plan is possible. Do not "
-                "terminate the whole turn as respond from model memory or loosely related "
-                "evidence. response_text is optional prospective conversational intent: "
-                "use Interaction Context to omit an equivalent act already delivered or "
-                "pending, and author only a genuinely new acknowledgement, limitation, "
-                "correction, confirmation need, or other delta. Never predict the tool "
-                "result or use response_text to satisfy the tool Goal. Trusted "
-                "post-execution interpretation owns factual claims from returned evidence. "
-                "A completed-evidence follow-up that needs no execution belongs on a chat "
-                "route upstream. "
-                if source_route == "tool"
+                "At least one canonical Goal requires provider/effect evidence. The Plan "
+                "must execute exact supplied Capability work for every such Goal or return "
+                "clarify/unavailable/refused for the affected Goal. response_text may carry "
+                "only a still-needed conversational delta and never proves execution. "
+                if requires_execution
                 else ""
             )
         )
@@ -1223,7 +1209,7 @@ class DeepPlannerResolver:
             "When validation feedback is present but the previous output is null, regenerate one fresh complete object from the authoritative turn, goals, catalog, and all listed defects. Do not patch, quote, splice, annotate, or embed JSON fragments inside rationale or response strings. "
             "When validation feedback reports parallel_step_count=1, the parallel label has no peer and is a malformed scheduling annotation rather than a user-visible concurrency plan; regenerate that exact one-step plan with timing=sequential. When validation feedback says multi-step parallel execution is not affirmatively safe, never silently change those parallel steps to an exact sequential plan. Either author plan_relation=safe_adjustment or alternative with user_confirmation_required=true and response_text explaining the timing change, or return a zero-step clarification/unavailable result. "
             "Produce the final DeepPlannerModelOutput for the complete user goal. Deep planning is terminal: never return to the Fast Planner. The FINAL AUTHORITATIVE USER TURN owns the current communicative act. Retained Goals and delivered evidence may support a response, but must not replace the latest reaction, feeling, acknowledgement, evaluation, or practical decision. Answer that current act directly; replay or re-explain a prior task only when the latest turn asks for it. The verified tool-memory index contains no answer facts. If one exact fresh index entry matches the authoritative Goal bindings, execute chromie.memory.retrieve_verified_tool_result with its evidence_id, original tool_id, and the exact material arguments. If no such entry exists, execute the fresh read capability. Never answer directly from index metadata, never reinterpret an unresolved reference from old memory, and never use another task's result. When a scheduled, running, or recoverable safe read has no matching completed memory entry, resume or retry its bound capability with the exact arguments. "
-            f"{route_effect_contract}"
+            f"{goal_execution_contract}"
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
             f"{EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT}"
@@ -1487,14 +1473,17 @@ class DeepPlannerResolver:
                     "actual_goal_ids": list(plan.goal_ids),
                 }
             )
+        _, requires_execution = planner_goal_execution_requirements(
+            canonical_goal_grounding(request.context)
+        )
         if (
-            str(request.route_decision.route or "").strip() == "tool"
+            requires_execution
             and plan.disposition not in {"clarify", "unavailable", "refused"}
             and not plan.steps
         ):
             errors.append(
                 {
-                    "type": "tool_route_requires_executable_step",
+                    "type": "canonical_goal_requires_executable_step",
                     "disposition": plan.disposition,
                 }
             )

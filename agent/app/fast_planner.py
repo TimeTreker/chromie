@@ -37,6 +37,7 @@ from .planner_contract import (
     materialize_planner_metadata,
     normalize_schema_default_parameter_provenance,
     parallel_plan_contract_errors,
+    planner_goal_execution_requirements,
     planner_response_goal_ids,
     planner_contract_diagnostics,
     retained_evidence_response_review_required,
@@ -157,6 +158,13 @@ class FastPlannerResolver:
 
     async def _resolve(self, request: AgentRunRequest) -> CanonicalPlan:
         plan_id = self._plan_id(request)
+        context = request.context if isinstance(request.context, dict) else {}
+        expected_goal_ids_for_turn = expected_goal_ids(context)
+        authoritative_goals = canonical_goal_grounding(context)
+        response_goal_ids = sorted(planner_response_goal_ids(authoritative_goals))
+        response_only, requires_execution = planner_goal_execution_requirements(
+            authoritative_goals
+        )
         capabilities = await self.catalog.prompt_entries(scope="common", refresh=False)
         executable = [
             item
@@ -165,16 +173,8 @@ class FastPlannerResolver:
             and item.interaction_executable
             and is_planner_step_skill(item.capability_id)
         ]
-        source_route = str(request.route_decision.route or "").strip()
-        response_only = source_route == "chat"
-        requires_execution = source_route == "tool"
         if response_only:
             executable = []
-        elif requires_execution:
-            # Cognitive Core already established the effect envelope. A tool
-            # lane may choose among tool capabilities, but it must never drift
-            # into a body gesture merely because that capability is common.
-            executable = [item for item in executable if str(item.route) == "tool"]
         capability_payload = [
             {
                 "capability_id": item.capability_id,
@@ -191,10 +191,6 @@ class FastPlannerResolver:
             }
             for item in executable[: self.max_capabilities]
         ]
-        context = request.context if isinstance(request.context, dict) else {}
-        expected_goal_ids_for_turn = expected_goal_ids(context)
-        authoritative_goals = canonical_goal_grounding(context)
-        response_goal_ids = sorted(planner_response_goal_ids(authoritative_goals))
         multi_goal_contract = len(expected_goal_ids_for_turn) > 1
         contract_schema = (
             "FastPlannerMultiGoalPlanOutput" if multi_goal_contract else "FastPlannerModelOutput"
@@ -803,13 +799,8 @@ class FastPlannerResolver:
         identity_json = bounded_identity_json(context)
         personality_json = bounded_personality_json(context)
         association = goal_association_prompt_projection(context)
-        route = request.route_decision
-        advisory = {
-            "route": route.route,
-            "intent": route.intent,
-            "confidence": route.confidence,
-        }
         grounding = canonical_goal_grounding(context)
+        response_only, requires_execution = planner_goal_execution_requirements(grounding)
         argument_grounding_contract = (
             EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT
             + "For chromie.memory.retrieve_verified_tool_result, resolved Goal "
@@ -820,21 +811,16 @@ class FastPlannerResolver:
             "must be material_args and its value must equal the complete "
             "step.args.material_args object. "
         )
-        source_route = str(request.route_decision.route or "").strip()
-        route_effect_contract = (
-            "The authoritative source route is chat. This turn is response-only: "
-            "do not select or invent executable skills, physical effects, or plan "
-            "steps. Answer conversational goals with respond outcomes; escalate "
-            "only when semantic reasoning is genuinely insufficient. "
-            if source_route == "chat"
+        goal_execution_contract = (
+            "The canonical Goals are provider-free direct speech responsibilities. "
+            "This plan is response-only: do not select executable skills or plan steps. "
+            if response_only
             else (
-                "The authoritative source route is tool. This fresh external-information "
-                "turn must contain at least one executable supplied tool step, or use a "
-                "model-authored semantic escalation when no valid tool plan is possible. "
-                "Do not terminate the whole turn as respond from model memory or loosely "
-                "related evidence. A completed-evidence follow-up that needs no execution "
-                "belongs on a chat route upstream. "
-                if source_route == "tool"
+                "At least one canonical Goal requires provider/effect evidence. The Plan "
+                "must execute exact supplied Capability work for every such Goal or return "
+                "a truthful escalation/clarification/unavailable/refused outcome. Do not "
+                "close provider-required work with model memory or response text. "
+                if requires_execution
                 else ""
             )
         )
@@ -862,7 +848,6 @@ class FastPlannerResolver:
         if len(expected_goal_ids(context)) > 1:
             return (
                 f"Goal association advisory JSON:\n{self._bounded(association, 3000)}\n\n"
-                f"Goal Interpretation advisory JSON:\n{self._bounded(advisory, 900)}\n\n"
                 f"Owner-approved Chromie identity JSON:\n{identity_json}\n\n"
                 f"Owner-approved Personality Expression JSON:\n{personality_json}\n\n"
                 f"{skill_section}"
@@ -877,13 +862,13 @@ class FastPlannerResolver:
                 "Use Interaction Context to plan only the still-needed conversational and effectful delta. Preserve each typed event's owner and state: generated or scheduled speech is not proof the user heard it, committed work is not completion, and only execution_closure terminal events reference trusted Activity completion evidence. Do not treat missing or undelivered speech as fulfilled communication. Decide whether any new planner response_text materially helps the current human interaction, and prefer no extra speech when it would be filler or repetition. Do not repeat an already delivered or pending semantic act, or re-plan an already completed effect, unless the current meaning requires an explicit repeat, retry after failure, correction, changed state, new evidence, or clarification. It cannot override the authoritative current Goals or Canonical Plan contract. "
                 f"Previous Fast Planner output when doing a mechanical DTO regeneration:\n{self._bounded(previous_raw, 3500) if previous_raw is not None else 'null'}\n\n"
                 "When validation errors are present, regenerate one fresh complete model-authored plan object from the authoritative goals and catalog. Author the semantic plan directly. Do not classify text with lexical rules and do not expect the host to choose a capability, arguments, ordering, ownership, response, disposition, coverage, or satisfaction for you. "
-                "Every top-level field and every nested field in FastPlannerMultiGoalPlanOutput is required. Use exact catalog capability IDs and schema-valid args. The verified tool-memory index contains no answer facts. When an exact fresh index entry matches every authoritative Goal binding, execute chromie.memory.retrieve_verified_tool_result with that evidence_id, original tool_id, and the same material arguments; never use a respond outcome directly from the index. If no exact fresh entry exists, execute the supplied fresh read capability. For a scheduled, running, or recoverable safe-read goal, reuse the bound capability and exact arguments and execute or retry it; never answer from another task's result. On a tool or other executable route, response_text is optional prospective conversational intent, not execution evidence. Use Interaction Context to leave it empty when an equivalent acknowledgement or commitment is already delivered or pending and nothing new needs saying. When there is a genuinely new acknowledgement, limitation, correction, confirmation need, or other conversational delta, author it naturally without predicting an external result or claiming execution/completion. A response_text never satisfies the executable Goal; post-execution factual claims require matching evidence. "
+                "Every top-level field and every nested field in FastPlannerMultiGoalPlanOutput is required. Use exact catalog capability IDs and schema-valid args. The verified tool-memory index contains no answer facts. When an exact fresh index entry matches every authoritative Goal binding, execute chromie.memory.retrieve_verified_tool_result with that evidence_id, original tool_id, and the same material arguments; never use a respond outcome directly from the index. If no exact fresh entry exists, execute the supplied fresh read capability. For a scheduled, running, or recoverable safe-read goal, reuse the bound capability and exact arguments and execute or retry it; never answer from another task's result. For an executable Goal, response_text is optional prospective conversational intent, not execution evidence. Use Interaction Context to leave it empty when an equivalent acknowledgement or commitment is already delivered or pending and nothing new needs saying. When there is a genuinely new acknowledgement, limitation, correction, confirmation need, or other conversational delta, author it naturally without predicting an external result or claiming execution/completion. A response_text never satisfies the executable Goal; post-execution factual claims require matching evidence. "
                 f"{argument_grounding_contract}"
                 f"{semantic_scope_contract}"
                 f"{current_turn_communication_contract}"
                 f"{IDENTITY_SEMANTIC_CONTRACT}"
                 f"{PERSONALITY_SEMANTIC_CONTRACT}"
-                f"{route_effect_contract}"
+                f"{goal_execution_contract}"
                 f"{concise_output_contract}"
                 "Author stable non-empty step_id values, exact source_goal_ids, and matching outcome step_ids yourself. "
                 "This is prospective planning: no action has executed yet. A planned step or response counts as satisfying its goal if it would succeed. For each keyed goal outcome, judge only that one goal; never put sibling goals or pending execution in unmet_goal_ids or unmet_requirements. Complete terminal outcomes use exact satisfaction with both unmet lists empty. "
@@ -903,7 +888,6 @@ class FastPlannerResolver:
             )
         return (
             f"Goal association advisory JSON:\n{self._bounded(association, 3000)}\n\n"
-            f"Goal Interpretation advisory JSON:\n{self._bounded(advisory, 900)}\n\n"
             f"Owner-approved Chromie identity JSON:\n{identity_json}\n\n"
             f"Owner-approved Personality Expression JSON:\n{personality_json}\n\n"
             f"{skill_section}"
@@ -927,7 +911,7 @@ class FastPlannerResolver:
             f"{current_turn_communication_contract}"
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
-            f"{route_effect_contract}"
+            f"{goal_execution_contract}"
             f"{concise_output_contract}"
             "Generic speech transport is not a plan step. A canonical Goal with responsibility_kind=vocal_output, output_mode=speech, and provider_required=false is a direct conversational responsibility: use disposition=respond with the actual response_text now. Executable outcomes may also carry response_text when it is a still-needed prospective conversational delta; use Interaction Context to omit equivalent delivered or pending speech, and never treat that text as execution evidence. A vocal_output Goal with provider_required=true is a mode-specific vocal performance and cannot be completed by response_text, chromie.speak, ordinary TTS, media playback, or a body gesture. Execute that Goal only when the supplied catalog contains exact capability_id chromie.vocal.perform and its mode enum contains the authoritative Goal output_mode; copy that exact mode and authored content into one owned step. Otherwise escalate for an exact unavailable, refused, or clarification outcome; never invent a vocal capability ID or silently choose another mode. A canonical executable_action/activity/media_playback Goal uses exactly one `chromie.media.<media_operation>` capability copied from the qualified catalog. Playback of existing music, recordings, streams, or sound effects is never a Vocal Goal and never evidence for singing. Preserve persistent playback_id controls and do not replace play, pause, resume, seek, stop, volume, or status with another operation. Greeting wording and length are ordinary model-authored conversational choices governed by the supplied scene, relationship context, and owner-approved personality. "
             "Every executable step must use capability_id plus source_goal_ids copied from the canonical goals. Do not use catalog-only parameters, action, input_schema, route, or step_type fields. "
@@ -1127,15 +1111,18 @@ class FastPlannerResolver:
                     **counts,
                 },
             )
+        _, requires_execution = planner_goal_execution_requirements(
+            canonical_goal_grounding(request.context)
+        )
         if (
-            str(request.route_decision.route or "").strip() == "tool"
-            and plan.disposition != "escalate"
+            requires_execution
+            and plan.disposition not in {"escalate", "clarify", "unavailable", "refused"}
             and not plan.steps
         ):
             return self._escalation(
                 plan.plan_id,
                 request,
-                "tool_route_requires_executable_step",
+                "canonical_goal_requires_executable_step",
                 response_text=plan.response_text,
                 metadata={
                     "proposed_disposition": plan.disposition,

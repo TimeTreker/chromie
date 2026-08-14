@@ -2113,61 +2113,79 @@ class GoalDrivenRuntimeCoordinator:
         return None
 
     @staticmethod
-    def _resolution_social_activity(
+    def _resolution_social_activities(
         resolution: CognitiveRuntimeResolution,
         *,
         turn_id: str,
-    ) -> SocialAttentionActivityAnchor | None:
-        """Return the primary human-observable Activity prepared by this resolution."""
+    ) -> list[SocialAttentionActivityAnchor]:
+        """Return each concrete human-observable Activity prepared by a resolution.
 
+        InteractionResponse is a coordination envelope, not an Activity. Speech and
+        each observable Capability request keep their own stable execution identity so
+        Social Attention can independently decorate each one instead of collapsing a
+        compound response into one interaction-scoped ``mixed`` pseudo-activity.
+        """
+
+        del turn_id  # execution item IDs already provide stable Activity identity
         interaction = resolution.interaction_response
         if interaction is None:
-            return None
-        speech_texts = [
-            " ".join(str(item.text or "").strip().split())
-            for item in interaction.speech
-            if " ".join(str(item.text or "").strip().split())
-        ]
-        capability_ids = [
-            str(item.capability_id or "").strip()
-            for item in interaction.skills
-            if str(item.capability_id or "").strip()
-        ]
-        observable_capability_ids = [
-            capability_id
-            for capability_id in capability_ids
-            if capability_id.startswith("soridormi.")
-            or capability_id == VOCAL_PERFORMANCE_CAPABILITY_ID
-            or capability_id.startswith("chromie.media.")
-        ]
-        if not speech_texts and not observable_capability_ids:
-            return None
-        if speech_texts and observable_capability_ids:
-            kind = "mixed"
-        elif speech_texts:
-            kind = "speech"
-        elif all(
-            capability_id == VOCAL_PERFORMANCE_CAPABILITY_ID
-            for capability_id in observable_capability_ids
-        ):
-            kind = "vocal_performance"
-        elif all(
-            capability_id.startswith("chromie.media.")
-            for capability_id in observable_capability_ids
-        ):
-            kind = "media_playback"
-        else:
-            kind = "body_action"
-        summary = speech_texts[0] if speech_texts else ", ".join(observable_capability_ids)
-        goal_ids = list(resolution.terminal_plan.goal_ids) if resolution.terminal_plan else []
-        return SocialAttentionActivityAnchor(
-            activity_id=interaction.interaction_id,
-            kind=kind,
-            phase="ready",
-            summary=summary,
-            goal_ids=goal_ids,
-            capability_ids=observable_capability_ids,
+            return []
+        fallback_goal_ids = (
+            list(resolution.terminal_plan.goal_ids) if resolution.terminal_plan else []
         )
+
+        def item_goal_ids(metadata: dict[str, Any]) -> list[str]:
+            raw = metadata.get("source_goal_ids")
+            if not isinstance(raw, list):
+                return list(fallback_goal_ids)
+            normalized = [
+                text
+                for item in raw
+                if (text := " ".join(str(item or "").strip().split()))
+            ]
+            return list(dict.fromkeys(normalized)) or list(fallback_goal_ids)
+
+        activities: list[SocialAttentionActivityAnchor] = []
+        for speech in interaction.speech:
+            text = " ".join(str(speech.text or "").strip().split())
+            if not text:
+                continue
+            activities.append(
+                SocialAttentionActivityAnchor(
+                    activity_id=speech.id,
+                    kind="speech",
+                    phase="ready",
+                    summary=text,
+                    goal_ids=item_goal_ids(speech.metadata),
+                )
+            )
+
+        for request in interaction.skills:
+            capability_id = str(request.capability_id or "").strip()
+            if not (
+                capability_id.startswith("soridormi.")
+                or capability_id == VOCAL_PERFORMANCE_CAPABILITY_ID
+                or capability_id.startswith("chromie.media.")
+            ):
+                continue
+            kind = (
+                "vocal_performance"
+                if capability_id == VOCAL_PERFORMANCE_CAPABILITY_ID
+                else "media_playback"
+                if capability_id.startswith("chromie.media.")
+                else "body_action"
+            )
+            activities.append(
+                SocialAttentionActivityAnchor(
+                    activity_id=request.request_id,
+                    kind=kind,
+                    phase="ready",
+                    summary=capability_id,
+                    goal_ids=item_goal_ids(request.metadata),
+                    capability_ids=[capability_id],
+                )
+            )
+        return activities
 
     def _queue_social_attention_for_activity(
         self,
@@ -3035,7 +3053,7 @@ class GoalDrivenRuntimeCoordinator:
                 if turn_envelope is not None
                 else self._context_turn_id(context, sid)
             )
-            activity = self._resolution_social_activity(
+            activities = self._resolution_social_activities(
                 resolution, turn_id=resolved_turn_id
             )
             social_context = dict(context)
@@ -3047,17 +3065,18 @@ class GoalDrivenRuntimeCoordinator:
                 social_context["canonical_plan_resolution"] = (
                     resolution.terminal_plan.prompt_projection()
                 )
-            self._queue_social_attention_for_activity(
-                session,
-                activity=activity,
-                text=text,
-                sid=sid,
-                turn_id=resolved_turn_id,
-                language=language,
-                intent=intent or "unknown",
-                context=social_context,
-                history=history,
-            )
+            for activity in activities:
+                self._queue_social_attention_for_activity(
+                    session,
+                    activity=activity,
+                    text=text,
+                    sid=sid,
+                    turn_id=resolved_turn_id,
+                    language=language,
+                    intent=intent or "unknown",
+                    context=social_context,
+                    history=history,
+                )
 
         trace_scope = runtime_tracer.start_trace(
             correlations={
@@ -3901,32 +3920,13 @@ class GoalDrivenRuntimeCoordinator:
                     if deep_failure is not None:
                         raise CognitiveStageFailure("deep_planner", deep_failure)
 
+            # The Fast Goal Interpreter's legacy route is diagnostic compatibility
+            # evidence only.  It must not grant or suppress effects after Goal
+            # Association and Planner have established the canonical responsibility
+            # and Plan.  Runtime authority starts from that validated Plan and is
+            # bounded here by the registered capability, authorization, confirmation,
+            # resource, and provider-safety contracts below.
             lane = self.adapter.lane_for_plan(terminal_plan)
-            source_route = str(getattr(route_decision, "route", "") or "")
-            if lane == "robot_action" and source_route != "robot_action":
-                return self._finish(
-                    mode=self.policy.mode,
-                    status="error",
-                    lane=lane,
-                    association=association,
-                    fast_plan=fast_plan,
-                    terminal_plan=terminal_plan,
-                    composition=None,
-                    timings=timings,
-                    started=started,
-                    fallback_reason=("terminal_plan_exceeds_source_route_effect_envelope"),
-                    metadata={
-                        "failure_stage": "authority_boundary",
-                        "failure_class": "route_effect_escalation",
-                        "failure_domain": "cognitive_runtime",
-                        "architecture_attribution": "not_evaluated",
-                        "retryable": False,
-                        "source_route": source_route,
-                        "terminal_lane": lane,
-                        "stage_diagnostics": stage_diagnostics,
-                        **path_metadata(),
-                    },
-                )
             runtime_errors = await self._observe_workflow_stage(
                 sid=sid,
                 stage="canonical_plan_validation",

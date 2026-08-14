@@ -198,6 +198,28 @@ def new_goal_association(goal_id: str = "goal-1") -> GoalAssociationResolution:
     )
 
 
+def body_goal_association(goal_id: str = "goal-1") -> GoalAssociationResolution:
+    return GoalAssociationResolution(
+        turn_id="turn-body",
+        new_goals=[
+            SemanticGoal(
+                goal_id=goal_id,
+                description="Blink the eyes.",
+                source_text="blink",
+                metadata={
+                    "responsibility_kind": "executable_action",
+                    "execution_lane": "activity",
+                    "output_mode": "activity",
+                    "provider_required": True,
+                },
+            )
+        ],
+        confidence=0.95,
+        reason_summary="A new observable body-action responsibility.",
+        metadata={"status": "resolved"},
+    )
+
+
 def multi_goal_association(*goal_ids: str) -> GoalAssociationResolution:
     return GoalAssociationResolution(
         turn_id="turn-multi",
@@ -1012,8 +1034,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(goal_context["plan_status"], "failed")
         self.assertNotEqual(goal_context["status"], "done")
 
-    def test_chat_source_route_cannot_elevate_to_robot_action(self):
-        fast = execute_plan(plan_id="fast-route-escalation").model_copy(
+    def test_compatibility_chat_route_cannot_suppress_canonical_robot_action(self):
+        fast = execute_plan(plan_id="fast-canonical-body").model_copy(
             update={
                 "planner_tier": "fast",
                 "metadata": {"path_classification": "terminal"},
@@ -1021,7 +1043,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
         runtime = FakeRuntime([blink_definition()])
         client = ScriptedClient(
-            association=new_goal_association(),
+            association=body_goal_association(),
             fast_plans=[fast],
         )
         coordinator = GoalDrivenRuntimeCoordinator(
@@ -1036,23 +1058,19 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         result = self.run_resolution(
             coordinator,
             client,
-            text="What are you thinking?",
+            text="Blink your eyes.",
             route="chat",
         )
 
-        self.assertEqual(result.status, "error")
+        self.assertEqual(result.status, "applied")
         self.assertEqual(result.lane, "robot_action")
-        self.assertEqual(result.metadata["failure_stage"], "authority_boundary")
-        self.assertEqual(result.metadata["failure_class"], "route_effect_escalation")
-        self.assertEqual(result.metadata["source_route"], "chat")
+        self.assertEqual(client.calls, ["association", "fast", "compose"])
+        self.assertIsNotNone(result.interaction_response)
         self.assertEqual(
-            result.fallback_reason,
-            "terminal_plan_exceeds_source_route_effect_envelope",
+            [item.capability_id for item in result.interaction_response.skills],
+            ["soridormi.blink_eyes"],
         )
-        self.assertIsNone(result.response_composition)
-        self.assertIsNone(result.interaction_response)
-        self.assertEqual(client.calls, ["association", "fast"])
-        self.assertEqual(runtime.ensure_calls, [])
+        self.assertTrue(runtime.ensure_calls)
 
     def test_exact_execute_plan_preserves_prospective_response_text(self):
         top_level_payload = execute_plan().model_dump(mode="json")

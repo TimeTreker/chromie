@@ -27,11 +27,12 @@ repair/reviewer machinery. Implementation order:
    Consequential response truth checking is an immutable accept/reject certificate,
    never a replacement Response author, and semantic/evidence rejection is terminal
    to composition. Requalification remains separate from source closure.
-2. **Optional presentation locality — next.** Social Attention and response polish may
-   fail locally. A valid Social Attention `none` stands; invalid decoration is
-   dropped without recomposing speech or reopening Goal/Planner cognition. Resolve
-   any duplicate Social Attention semantic ownership so one maintained path owns
-   the decision.
+2. **Optional presentation locality — implemented in source.** Social Attention and
+   response polish fail locally. A valid Social Attention `none` stands; invalid
+   decoration is dropped without recomposing speech or reopening Goal/Planner
+   cognition. One maintained Social Attention planner owns decoration, and each
+   concrete primary Activity is projected independently rather than through a
+   cognition milestone or interaction-wide `mixed` anchor.
 3. **Fast/Deep boundary.** Keep obvious low-risk interaction Fast even when model
    confidence is imperfectly calibrated. Escalate when uncertainty/consequence
    actually warrants deeper cognition. Deep consumes authoritative source meaning,
@@ -134,9 +135,9 @@ adding a manager because a useful explanatory term exists.
    broader autonomy/competence calibration, or richer resumable cognition when a real
    scenario demonstrates missing lifecycle or authority.
 2. Preserve the merged source contracts from Issues
-   [#17](https://github.com/TimeTreker/chromie/issues/17) and
-   [#18](https://github.com/TimeTreker/chromie/issues/18) and merged Issue
-   [#20](https://github.com/TimeTreker/chromie/issues/20), then complete the
+   [#17](https://github.com/TimeTreker/chromie/issues/17),
+   [#18](https://github.com/TimeTreker/chromie/issues/18),
+   [#20](https://github.com/TimeTreker/chromie/issues/20), and the completed
    Goal-scoped cross-lane Interaction Context from
    [#22](https://github.com/TimeTreker/chromie/issues/22) before qualifying a
    replacement model profile. Same-model timing evidence must remain separate

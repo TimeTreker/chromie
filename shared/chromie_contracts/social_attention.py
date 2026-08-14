@@ -44,7 +44,6 @@ SocialAttentionActivityKind = Literal[
     "body_action",
     "vocal_performance",
     "media_playback",
-    "mixed",
 ]
 SocialAttentionActivityPhase = Literal["ready", "started"]
 

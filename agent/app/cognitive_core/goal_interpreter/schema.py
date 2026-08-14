@@ -207,7 +207,8 @@ class FastResponsibilityProposal(BaseModel):
     @classmethod
     def reject_low_level_bindings(cls, value: dict[str, Any]) -> dict[str, Any]:
         reject_forbidden_low_level_fields(value)
-        return _reject_planner_owned_bindings(value)
+        _reject_planner_owned_bindings(value)
+        return value
 
     @model_validator(mode="after")
     def validate_evidence_requirement(self) -> "FastResponsibilityProposal":

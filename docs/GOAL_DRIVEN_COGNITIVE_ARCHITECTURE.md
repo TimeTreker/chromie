@@ -70,10 +70,13 @@ composition. Those belong to the Goal-Driven Cognitive Core.
 
 The fast Goal Interpreter is an Agent-owned compatibility stage inside the
 Goal-Driven Cognitive Core. It receives only an admitted `UserTurnEnvelope`
-projection and may emit a bounded advisory route, intent, source-effect envelope,
-affordance set, or candidate proposal for dependent contracts. It does not own
-Gateway normalization, protective reflex, attention, or admission; it is not an
-independent service, a second semantic planner, or execution authority.
+projection and emits provider-neutral Responsibility evidence, material semantic
+bindings, bounded confidence/work requirements, and optional immediate
+conversational progress. Legacy `route`/`intent` fields may remain as compatibility
+or diagnostic projections, but they are not a source-effect envelope and may not
+grant, suppress, filter, or narrow Planner Capability access. It does not own
+Gateway normalization, protective reflex, attention, admission, Goal state,
+Capability selection, execution shape, or authorization.
 
 The executable state machine that carries one admitted turn through specialist
 delegation, trusted observations, per-goal reconciliation, and a final response
@@ -1565,9 +1568,12 @@ coverage proof may permit one fresh source-based interpretation, whose model may
 choose a genuine clarification when the user can resolve the gap. Invalid or
 repeatedly incomplete output fails closed with no Goal commit or effect.
 
-Fast Goal Interpreter route hints and Responsibility proposals are advisory
-projections. Exact Capability/retrieval selection is not part of this stage. Its
-maintained transaction is deliberately smaller than Goal Association's:
+Fast Goal Interpreter Responsibility proposals are semantic evidence for Goal
+Association. Legacy route/intent fields may remain as advisory compatibility or
+diagnostic projections, but they are not Planner inputs: they cannot grant, deny,
+filter, or narrow executable Capability access. Exact Capability/retrieval selection
+and the execution shape belong to Fast/Deep Planner after canonical Goal Association.
+Its maintained transaction is deliberately smaller than Goal Association's:
 
 ```text
 primary fast interpretation
@@ -2415,7 +2421,10 @@ performance, or media playback can provide that anchor. `understanding_ready`,
 Goal Association, planning, waiting, evidence arrival, and similar internal
 cognitive/runtime milestones cannot. Pure unanchored idle animation is a separate
 embodiment/liveliness concern. Each distinct primary Activity in one turn is an
-independent optional decoration opportunity.
+independent optional decoration opportunity. `InteractionResponse` is only a
+coordination envelope: its speech items and observable Capability requests retain
+their own Activity IDs and are never collapsed into one interaction-scoped `mixed`
+Social Attention anchor.
 
 Target priority is:
 
@@ -3076,7 +3085,8 @@ Evolution rules:
   semantic coordination, outcome synthesis, and response composition inside one
   Goal-Driven Cognitive Core authority;
 - treat `RouteDecision` route/intent/action/proposal fields as digest-bound
-  advisory inputs only, never as a service, canonical Plan, or execution grant;
+  compatibility evidence only, never as a service, canonical Plan, execution grant,
+  or Planner capability filter;
 - use `report_only` only for explicit observation or rollout diagnosis, not as
   the maintained authority mode;
 - compare complete Goal coverage and committed capabilities before widening an

@@ -372,11 +372,14 @@ catalog as affordance grounding, not phrase tables. Catalog presence does not
 justify weak substitution: a capability may be selected only when user meaning
 and required arguments are sufficiently supported.
 
-The fast Goal Interpreter is an internal stage of the Goal-Driven Cognitive
-Core. It receives admitted evidence and may emit advisory route/intent,
-affordance, and task proposals. Gateway reflex/admission evidence, Host
-validation, committed plans, runtime results, and provider postconditions remain
-separate authorities.
+The Fast Goal Interpreter is an internal stage of the Goal-Driven Cognitive
+Core. It receives admitted evidence and emits provider-neutral Responsibility
+proposals, material semantic bindings, and optional immediate conversational
+progress. Legacy route/intent fields are compatibility diagnostics only; they do
+not select affordances, create tasks, authorize effects, or filter Planner
+Capabilities. Gateway reflex/admission evidence, canonical Goals, Planner output,
+Host validation, runtime results, and provider postconditions remain separate
+authorities.
 
 If no matching capability exists, Chromie should say what is missing or ask a
 clarifying question. It should not substitute a vaguely related skill or tool.

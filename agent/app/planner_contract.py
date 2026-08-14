@@ -773,6 +773,43 @@ def planner_effectful_goal_ids(
     return result
 
 
+def planner_goal_execution_requirements(
+    authoritative_goals: list[dict[str, Any]],
+) -> tuple[bool, bool]:
+    """Derive Planner execution shape only from canonical Goal semantics.
+
+    Pre-association ``RouteDecision.route`` is a compatibility projection and must
+    never grant or suppress executable capability access. Goal Association owns the
+    typed completion contract; planners may tighten their decoder surface from that
+    canonical truth only.
+
+    Returns ``(response_only, requires_execution)``. ``requires_execution`` is the
+    decoder-tightening flag for canonical ``capability_dependent`` work (the semantic
+    successor to the old tool route). Other provider-backed Activity/Vocal Goals retain
+    the normal mixed-response schema and are still enforced by Goal outcome validation.
+    """
+
+    goal_ids = {
+        goal_id
+        for goal in authoritative_goals
+        if isinstance(goal, dict)
+        and (goal_id := " ".join(str(goal.get("goal_id") or "").strip().split()))
+    }
+    response_goal_ids = planner_response_goal_ids(authoritative_goals)
+    capability_work_goal_ids = {
+        goal_id
+        for goal in authoritative_goals
+        if isinstance(goal, dict)
+        and (goal_id := " ".join(str(goal.get("goal_id") or "").strip().split()))
+        and isinstance(goal.get("metadata"), dict)
+        and str(goal["metadata"].get("responsibility_kind") or "").strip()
+        == "capability_dependent"
+    }
+    response_only = bool(goal_ids) and goal_ids.issubset(response_goal_ids)
+    requires_execution = bool(capability_work_goal_ids)
+    return response_only, requires_execution
+
+
 def planner_provider_vocal_goal_ids(
     authoritative_goals: list[dict[str, Any]],
 ) -> set[str]:
@@ -3428,8 +3465,8 @@ def canonical_plan_response_schema(
         if isinstance(steps_schema, dict):
             steps_schema["maxItems"] = 0
             steps_schema["description"] = (
-                "The source route is conversational and authorizes no "
-                "executable effects; return no plan steps."
+                "The canonical Goals are provider-free direct speech responsibilities; "
+                "return no executable plan steps."
             )
 
     step_schema = schema.get("$defs", {}).get("PlannerModelStep")
@@ -3571,8 +3608,8 @@ def fast_multi_goal_response_schema(
         if isinstance(response_only_steps, dict):
             response_only_steps["maxItems"] = 0
             response_only_steps["description"] = (
-                "The source route is conversational and authorizes no "
-                "executable effects; return no plan steps."
+                "The canonical Goals are provider-free direct speech responsibilities; "
+                "return no executable plan steps."
             )
 
     goal_outcomes = properties.get("goal_outcomes")

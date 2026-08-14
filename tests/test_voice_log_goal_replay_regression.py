@@ -1,56 +1,13 @@
 from __future__ import annotations
 
-import asyncio
 import unittest
 
-from orchestrator.runtime.cognitive_runtime import (
-    CanonicalPlanRuntimeAdapter,
-    CognitiveRuntimePolicy,
-    GoalDrivenRuntimeCoordinator,
-)
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from shared.chromie_contracts.execution_outcome import ExecutionOutcomeBundle
 from shared.chromie_contracts.goal import GoalAssociationResolution
+from agent.app.goal_association import GoalAssociationResolver
+from agent.app.schema import AgentRunRequest, RouteDecision
 from shared.chromie_contracts.interaction import InteractionResponse
-from shared.chromie_contracts.plan import CanonicalPlan
-
-
-class _ReplayClient:
-    def __init__(
-        self,
-        association: GoalAssociationResolution,
-        plan: CanonicalPlan,
-    ) -> None:
-        self.association = association
-        self.plan = plan
-        self.calls: list[str] = []
-
-    async def resolve_goal_association(self, *args, **kwargs):  # type: ignore[no-untyped-def]
-        self.calls.append("association")
-        return self.association
-
-    async def resolve_fast_plan(self, *args, **kwargs):  # type: ignore[no-untyped-def]
-        self.calls.append("fast")
-        return self.plan
-
-    async def resolve_deep_plan(self, *args, **kwargs):  # type: ignore[no-untyped-def]
-        raise AssertionError("the replay plan must fail before deep planning")
-
-    async def compose_response_plan(self, *args, **kwargs):  # type: ignore[no-untyped-def]
-        self.calls.append("compose")
-        raise AssertionError("the replay plan must fail before response composition")
-
-
-class _NoExecutionRuntime:
-    def __init__(self) -> None:
-        self.ensure_calls: list[list[str]] = []
-
-    async def ensure_skill_definitions(self, skill_ids):  # type: ignore[no-untyped-def]
-        self.ensure_calls.append(list(skill_ids))
-        raise AssertionError("chat must fail before physical capability validation")
-
-    def skill_definition(self, skill_id):  # type: ignore[no-untyped-def]
-        raise AssertionError(f"chat must not resolve physical skill {skill_id}")
 
 
 class VoiceLogGoalReplayRegressionTests(unittest.TestCase):
@@ -235,92 +192,42 @@ class VoiceLogGoalReplayRegressionTests(unittest.TestCase):
                 "metadata": {"status": "resolved"},
             }
         )
-        replay_plan = CanonicalPlan.model_validate(
-            {
-                "plan_id": "plan-replay",
-                "planner_tier": "fast",
-                "disposition": "execute",
-                "coverage": "complete",
-                "confidence": 0.9,
-                "goal_ids": ["goal-walk", "goal-blink"],
-                "steps": [
-                    {
-                        "step_id": "walk",
-                        "skill_id": "soridormi.walk_forward",
-                        "args": {"duration_s": 15.0, "speed": "normal"},
-                        "source_goal_ids": ["goal-walk"],
-                    },
-                    {
-                        "step_id": "blink",
-                        "skill_id": "soridormi.blink_eyes",
-                        "args": {"count": 2},
-                        "source_goal_ids": ["goal-blink"],
-                    },
-                ],
-                "goal_outcomes": [
-                    {
-                        "goal_id": "goal-walk",
-                        "disposition": "execute",
-                        "coverage": "complete",
-                        "step_ids": ["walk"],
-                    },
-                    {
-                        "goal_id": "goal-blink",
-                        "disposition": "execute",
-                        "coverage": "complete",
-                        "step_ids": ["blink"],
-                    },
-                ],
-                "goal_satisfaction": {
-                    "score": 1.0,
-                    "status": "exact",
-                    "satisfied_goal_ids": ["goal-walk", "goal-blink"],
-                },
-            }
-        )
-        client = _ReplayClient(association, replay_plan)
-        runtime = _NoExecutionRuntime()
-        coordinator = GoalDrivenRuntimeCoordinator(
-            agent_client=client,
-            adapter=CanonicalPlanRuntimeAdapter(runtime),
-            policy=CognitiveRuntimePolicy(
-                mode="apply",
-                apply_lanes=frozenset({"chat", "robot_action"}),
-            ),
-        )
-
         social_context = {
             **state.snapshot(),
             "active_goal_snapshots": state.active_goal_snapshots(),
         }
         self.assertEqual(social_context["active_goal_snapshots"], [])
-        resolution = asyncio.run(
-            coordinator.resolve(
-                object(),
-                text="想啥呢？",
-                sid="sid-social",
-                route_decision=type(
-                    "Decision",
-                    (),
-                    {
-                        "route": "chat",
-                        "intent": "social_exchange",
-                        "language": "zh-CN",
-                    },
-                )(),
-                context=social_context,
-                history=state.get_history(),
+
+        # Goal Association is the semantic owner that may reconnect a new turn to
+        # retained Goals. Once the completed motion Goals leave the active candidate
+        # set, a model-shaped attempt to continue them must be rejected there; a
+        # downstream route label is not an effect-safety fallback.
+        request = AgentRunRequest(
+            sid="sid-social",
+            text="想啥呢？",
+            route_decision=RouteDecision(
+                route="chat",
+                intent="social_exchange",
                 language="zh-CN",
-            )
+            ),
+            language="zh-CN",
+            context=social_context,
+            history=state.get_history(),
+        )
+        validated = GoalAssociationResolver(object())._validate(
+            association,
+            candidate_goals=[],
+            request=request,
         )
 
-        self.assertEqual(resolution.status, "error")
-        self.assertEqual(resolution.metadata["failure_stage"], "authority_boundary")
-        self.assertEqual(resolution.metadata["failure_class"], "route_effect_escalation")
-        self.assertIsNone(resolution.interaction_response)
-        self.assertEqual(client.calls, ["association", "fast"])
-        self.assertEqual(runtime.ensure_calls, [])
-        self.assertEqual(state.active_goal_snapshots(), [])
+        self.assertEqual(validated.resolution_status, "needs_clarification")
+        self.assertEqual(validated.associations, [])
+        self.assertEqual(validated.new_goals, [])
+        self.assertEqual(
+            [item["reason"] for item in validated.metadata["rejected_associations"]],
+            ["unknown_target_goal", "unknown_target_goal"],
+        )
+
 
 
 if __name__ == "__main__":
