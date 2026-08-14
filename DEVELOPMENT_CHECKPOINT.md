@@ -117,7 +117,7 @@ only; no new target evidence is implied.
 - random idle animation disguised as Social Attention;
 - silent capability substitution, evidence promotion, or response text as proof;
 - compatibility machinery for an owner-replaced architecture;
-- online semantic repair chains, reviewer-of-reviewer flows, and repair-of-repair;
+- online semantic repair chains, reviewer-of-reviewer flows, and repair-of-repair (the semantic-authority audit must reject their return);
 - Host replanning after a terminal Deep plan has failed trusted validation;
 - model-authored duplicate copies of one semantic fact;
 - managers/layers/prompt mountains without a distinct required owner or invariant.

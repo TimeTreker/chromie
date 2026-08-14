@@ -16,6 +16,7 @@ from orchestrator.runtime.cognitive_runtime import (
     CognitiveRuntimePolicy,
     GoalDrivenRuntimeCoordinator,
 )
+from scripts.semantic_authority_audit import audit as semantic_authority_audit
 from shared.chromie_contracts.semantic_authority import (
     SemanticAuthorityClaim,
     context_with_semantic_authority,
@@ -236,6 +237,25 @@ class SemanticAuthorityContractTests(unittest.TestCase):
         )
         self.assertEqual(result.status, "error")
         self.assertNotEqual(result.status, "legacy_fallback")
+
+
+    def test_bounded_cognition_authority_guards_are_machine_audited(self) -> None:
+        report = semantic_authority_audit()
+        self.assertEqual(report["status"], "pass", report["errors"])
+        self.assertEqual(
+            report["bounded_cognition_guards"],
+            {
+                "goal_interpreter_two_call_budget": True,
+                "goal_association_five_call_budget": True,
+                "planner_one_mechanical_regeneration": True,
+                "host_semantic_replan_forbidden": True,
+                "response_single_writer": True,
+                "response_goal_coverage_host_projection": True,
+                "social_attention_single_writer": True,
+                "tool_result_single_writer_with_truth_proof": True,
+                "reflection_future_adaptation_only": True,
+            },
+        )
 
 
 class CapabilityAuthorityBoundaryTests(unittest.IsolatedAsyncioTestCase):

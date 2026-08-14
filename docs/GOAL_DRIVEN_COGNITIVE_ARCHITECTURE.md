@@ -299,6 +299,14 @@ history to make the old turn look correct.
 
 ### Reconstructability is an architecture test
 
+The maintained `semantic_authority_audit.py` also treats bounded cognition as a
+machine-checkable authority contract. It guards the Fast/Deep invocation budgets,
+forbids Host same-turn semantic replanning, keeps Response and Tool Result on one
+writer plus immutable truth proof, keeps Response Goal coverage Host-derived, and
+keeps Social Attention/Reflection on one authoring call. The audit intentionally does
+not freeze exact prompt text or incidental call sequence; it protects authority and
+budgets so deleted recovery workflows cannot silently grow back.
+
 A new engineer should be able to explain an ordinary interaction by answering a
 small set of questions:
 

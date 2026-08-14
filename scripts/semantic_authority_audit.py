@@ -273,6 +273,130 @@ def audit() -> dict[str, Any]:
             "Static ability registry still defines a Host-selected thinking gesture"
         )
 
+    # Bounded cognition guards protect semantic authority rather than historical
+    # implementation sequences.  Rich diagnostics are allowed, but a deleted
+    # second writer/reviewer/repair path must not silently regain model authority.
+    goal_interpreter = _read(
+        "agent/app/cognitive_core/goal_interpreter/model_interpreter.py"
+    )
+    if '"logical_invocation_budget": 2' not in goal_interpreter:
+        errors.append(
+            "Goal Interpreter no longer declares the two-call primary/DTO budget"
+        )
+    if '"semantic_repair_attempted": False' not in goal_interpreter:
+        errors.append(
+            "Goal Interpreter no longer proves semantic repair is disabled"
+        )
+
+    goal_association = _read("agent/app/goal_association.py")
+    if '"logical_invocation_budget": 5' not in goal_association:
+        errors.append(
+            "Goal Association no longer declares its bounded five-invocation transaction"
+        )
+
+    fast_planner = _read("agent/app/fast_planner.py")
+    deep_planner = _read("agent/app/deep_planner.py")
+    for name, source in (("Fast Planner", fast_planner), ("Deep Planner", deep_planner)):
+        if "self.max_contract_repairs = max(0, min(1, int(max_contract_repairs)))" not in source:
+            errors.append(f"{name} no longer caps mechanical DTO regeneration at one")
+    cognitive_runtime_source = _read("orchestrator/runtime/cognitive_runtime.py")
+    for forbidden in ("host_replan_budget", "host_replan", "semantic_repair"):
+        if forbidden in cognitive_runtime_source:
+            errors.append(
+                "Cognitive Host regained same-turn semantic replanning authority: "
+                + forbidden
+            )
+
+    response_composer = _read("agent/app/response_composer.py")
+    response_contract = _read("shared/chromie_contracts/response_composition.py")
+    for required in (
+        "ResponseTruthAudit",
+        'prompt_family="response_composer.truth_audit"',
+        '"response_composer.dto_regeneration"',
+        "_project_goal_coverage",
+        'covers_goal_ids["maxItems"] = 0',
+        "Do not author covers_goal_ids",
+    ):
+        if required not in response_composer:
+            errors.append(f"Response bounded-authority guard missing: {required}")
+    for forbidden in (
+        "response_composer.semantic_review",
+        "response_composer.effectful_semantic_review",
+        "_repair_mixed_execution_coverage",
+        "social_attention_plan",
+    ):
+        if forbidden in response_composer:
+            errors.append(
+                "Response Composer regained a deleted semantic-authority path: "
+                f"{forbidden}"
+            )
+    if "social_attention_plan" in response_contract:
+        errors.append(
+            "Response composition contract again grants Social Attention authoring authority"
+        )
+
+    if social_prompt.count("client.generate(") != 1:
+        errors.append(
+            "Social Attention must have exactly one model-authoring call site; "
+            f"found {social_prompt.count('client.generate(')}"
+        )
+    for forbidden in (
+        "social_attention.contract_repair",
+        "social_attention.none_semantic_review",
+        "social_attention.semantic_review",
+    ):
+        if forbidden in social_prompt:
+            errors.append(
+                "Social Attention regained an online repair/reviewer path: " + forbidden
+            )
+
+    tool_result = _read("agent/app/tool_result_interpreter.py")
+    for required in (
+        "ToolResultTruthAudit",
+        'prompt_family="tool_result_interpreter.truth_audit"',
+        '"tool_result_interpreter.dto_regeneration"',
+    ):
+        if required not in tool_result:
+            errors.append(f"Tool Result bounded-authority guard missing: {required}")
+    for forbidden in (
+        "tool_result_interpreter.contract_repair",
+        "tool_result_interpreter.effectful_semantic_review",
+        "tool_result_interpreter.semantic_repair",
+    ):
+        if forbidden in tool_result:
+            errors.append(
+                "Tool Result Interpreter regained a mutable reviewer/repair path: "
+                + forbidden
+            )
+
+    reflection = _read("agent/app/reflection.py")
+    if reflection.count("self.ollama.generate(") != 1:
+        errors.append(
+            "Reflection must have exactly one selective model-authoring call site; "
+            f"found {reflection.count('self.ollama.generate(')}"
+        )
+    for forbidden in (
+        "reflection.contract_repair",
+        "reflection.semantic_review",
+        "forward repair",
+    ):
+        if forbidden in reflection:
+            errors.append(
+                "Reflection regained current-turn repair/reviewer authority: " + forbidden
+            )
+
+    bounded_cognition_guards = {
+        "goal_interpreter_two_call_budget": True,
+        "goal_association_five_call_budget": True,
+        "planner_one_mechanical_regeneration": True,
+        "host_semantic_replan_forbidden": True,
+        "response_single_writer": True,
+        "response_goal_coverage_host_projection": True,
+        "social_attention_single_writer": True,
+        "tool_result_single_writer_with_truth_proof": True,
+        "reflection_future_adaptation_only": True,
+    }
+
     return {
         "schema_version": 1,
         "status": "pass" if not errors else "fail",
@@ -281,6 +405,7 @@ def audit() -> dict[str, Any]:
         "live_model_or_robot_evidence_included": False,
         "entrypoints": matrix,
         "maintained_defaults": maintained_defaults,
+        "bounded_cognition_guards": bounded_cognition_guards,
         "offline_equivalence_evidence": {
             "exact_goal_interpretation_actions": (
                 "deterministic adapter path; semantic LLM call forbidden"

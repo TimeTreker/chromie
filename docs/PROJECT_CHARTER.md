@@ -643,6 +643,13 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    architecture is too complicated. Project complexity should grow primarily with
    real capabilities and evidence boundaries, not with semantic recovery workflows.
 
+41. **Machine guards protect cognitive authority, not historical implementation sequence.**
+   Static architecture audits and outcome/call-budget tests must prevent deleted second
+   writers, online semantic repair, reviewer-of-reviewer flows, Host semantic replanning,
+   and duplicate model-writable truth from silently returning. These guards should assert
+   owner, bounded invocation budget, immutable-proof shape, and fail-closed behavior rather
+   than freeze exact prompts or incidental call ordering.
+
 ### One personal voice; resources constrain coexistence
 
 Chromie has one personal Vocal domain. Ordinary speech, expressive speech,
