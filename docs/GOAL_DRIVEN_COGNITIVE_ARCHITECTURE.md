@@ -86,58 +86,63 @@ contract is produced and consumed.
 
 ## Canonical human-like cognitive flow
 
-The Project Charter fixes the following flow as the primary mental model for
-Chromie. It is an ownership graph, not a requirement that every box run
-serially on every turn.
+The Project Charter fixes the following **expanded flow** as Chromie's primary
+architecture and mental model. It is an ownership graph, not a requirement that
+every box run serially on every turn.
 
 ```text
-                 WORLD / PERSON
-                       │
-                  Perception
-                       │
-                       ▼
-               Cognitive Gateway
-                       │
-               Is this worth attention?
-                       │
-                       ▼
-              Goal Interpretation
-                  /           \
-              obvious       uncertain /
-               cheap        consequential
-                │                │
-               Fast             Deep
-                \                /
-                 \              /
-                  ▼            ▼
-                 Responsibility
-                      │
-                     Goal
-                      │
-                      ▼
-                   Planner
-                      │
-            Available Capabilities
-                      │
-                      ▼
-                   Provider
-                      │
-                      ▼
-                    Action
-                      │
-                      ▼
-                   Evidence
-                      │
-              ┌───────┴────────┐
-              ▼                ▼
-          Response         Reflection
-              │                │
-              ▼                ▼
-           Person        Future cognition
-
-Social Attention
-= optional parallel expression around interaction
+                         WORLD / PERSON
+                               │
+                          Perception
+                               ↓
+                      Cognitive Gateway
+                               ↓
+                    Goal Interpretation
+                       Fast / Deep
+                               ↓
+                        Responsibility
+                               ↓
+                             Goal
+                               ↓
+                           Planner
+                               │
+                 ┌─────────────┴─────────────┐
+                 │       planned Work         │
+                 │                           │
+                 ▼                           ▼
+          Primary Activity A          Primary Activity B
+                 │                           │
+        ┌────────┴────────┐          ┌───────┴────────┐
+        │                 │          │                │
+ realization       optional SA   realization      optional SA
+        │                 │          │                │
+ Vocal / Activity     auxiliary   Vocal / Activity  auxiliary
+ lane / Capability    expression lane / Capability expression
+        │                            │
+        └──────────┬─────────────────┘
+                   ↓
+                Provider
+                   ↓
+                 Action
+                   ↓
+                Evidence
+                   ↓
+          Response / Reflection
 ```
+
+The middle expansion is deliberate but does not create another cognitive
+pipeline. Planner still owns Work selection from canonical Goals and current
+Capability/provider contracts. Semantic Primary Activity is the human-observable
+meaning of a concrete Work/Plan act; `realization` is only its execution form.
+Vocal/Activity lanes, Vocal Expression modes, Capability IDs, request IDs, and
+provider transports therefore live below Activity meaning.
+
+Social Attention is shown as an optional sibling of each Primary Activity's
+realization because it decorates that Activity rather than following Vocal,
+Activity-lane execution, Provider completion, or a cognition milestone. It is
+subordinate and fail-soft and has no Goal-completion authority. The compact
+`Responsibility → Goal → Planner → Provider → Action → Evidence` chain is only a
+compression of this same canonical graph.
 
 ### Human-like does not mean perfectionist
 

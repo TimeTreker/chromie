@@ -1,7 +1,7 @@
 # Chromie Development Checkpoint
 Status: current resume point
 Updated: 2026-08-15
-Base main: `5546511dd18feba67f6d7fd54de61874e375aecc` (`close goal authority and social activity milestone`).
+Base main: `757ff88d53a83a60f37d796349041371e476c3c0` (`correct semantic activity and vocal expression hierarchy`).
 This is the fast handoff for the next development session. Canonical owners linked below win if a conflict appears; refresh this checkpoint afterward.
 ## Project in one minute
 Chromie is a local-first realtime interaction control plane for a voice assistant
@@ -16,8 +16,10 @@ authorization, execution, resources, and evidence.** Capability unavailable,
 execution failed, empty result, and successful result are different truths.
 Read first: [Project Charter](docs/PROJECT_CHARTER.md),
 [Goal-Driven Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
-(the canonical WORLD/PERSON → Fast/Deep → Responsibility → Goal → Planner →
-Provider → Evidence → Response/Reflection design is frozen there),
+(the canonical expanded flow is frozen there: WORLD/PERSON → Fast/Deep →
+Responsibility → Goal → Planner → semantic Primary Activity/Work → realization →
+Provider → Evidence → Response/Reflection, with optional Social Attention branching
+from each Primary Activity rather than forming another stage),
 [Execution Lanes](docs/EXECUTION_LANES_AND_COORDINATION.md),
 [Current Status](docs/STATUS.md), and [Roadmap](ROADMAP.md).
 ## Current architecture

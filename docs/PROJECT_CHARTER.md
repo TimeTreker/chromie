@@ -80,64 +80,78 @@ genuinely different speech act; it does not paraphrase the same acknowledgement 
 Chromie is a local-first realtime interaction control plane for voice assistants
 that can invoke embodied capabilities safely.
 
-The intended user experience and canonical cognitive flow are:
+The following expanded flow is the canonical primary architecture and mental
+model for Chromie:
 
 ```text
-                 WORLD / PERSON
-                       │
-                  Perception
-                       │
-                       ▼
-               Cognitive Gateway
-                       │
-               Is this worth attention?
-                       │
-                       ▼
-              Goal Interpretation
-                  /           \
-              obvious       uncertain /
-               cheap        consequential
-                │                │
-               Fast             Deep
-                \                /
-                 \              /
-                  ▼            ▼
-                 Responsibility
-                      │
-                     Goal
-                      │
-                      ▼
-                   Planner
-                      │
-            Available Capabilities
-                      │
-                      ▼
-                   Provider
-                      │
-                      ▼
-                    Action
-                      │
-                      ▼
-                   Evidence
-                      │
-              ┌───────┴────────┐
-              ▼                ▼
-          Response         Reflection
-              │                │
-              ▼                ▼
-           Person        Future cognition
-
-Social Attention
-= optional parallel expression around interaction
+                         WORLD / PERSON
+                               │
+                          Perception
+                               ↓
+                      Cognitive Gateway
+                               ↓
+                    Goal Interpretation
+                       Fast / Deep
+                               ↓
+                        Responsibility
+                               ↓
+                             Goal
+                               ↓
+                           Planner
+                               │
+                 ┌─────────────┴─────────────┐
+                 │       planned Work         │
+                 │                           │
+                 ▼                           ▼
+          Primary Activity A          Primary Activity B
+                 │                           │
+        ┌────────┴────────┐          ┌───────┴────────┐
+        │                 │          │                │
+ realization       optional SA   realization      optional SA
+        │                 │          │                │
+ Vocal / Activity     auxiliary   Vocal / Activity  auxiliary
+ lane / Capability    expression lane / Capability expression
+        │                            │
+        └──────────┬─────────────────┘
+                   ↓
+                Provider
+                   ↓
+                 Action
+                   ↓
+                Evidence
+                   ↓
+          Response / Reflection
 ```
 
-This diagram is a stable architecture invariant. It describes ownership and
-information flow, not a mandatory synchronous wall-clock pipeline. Fast and Deep
-are two depths of one Mind; Responsibility/Goal owns what Chromie owes, Planner
-owns how to advance it with current capabilities, Providers own execution inside
-advertised contracts, Evidence owns reality, Response expresses established
-meaning/truth, Reflection improves future cognition, and Social Attention remains
-optional parallel expression rather than another responsibility or semantic mind.
+This expanded diagram is the stable architecture invariant. It describes
+ownership and information flow, not a mandatory synchronous wall-clock pipeline.
+It does **not** add new semantic authorities between Planner and Provider:
+`planned Work`, semantic Primary Activities, and their realization are the
+explicit internal expansion of how Planner advances Goals.
+
+Read the diagram with these boundaries:
+
+- Responsibility/Goal owns **what outcome Chromie still owes**.
+- Planner owns **what Work can advance those Goals now**, constrained by the
+  currently available Capability/provider contracts. Available Capabilities are
+  therefore Planner input and realization constraints even though they are not
+  drawn as a separate box in the expanded view.
+- A Primary Activity is a concrete semantic Work/Plan act describing **what
+  Chromie is doing**. One Goal may own several Activities, while a sufficiently
+  high-level provider Capability may keep one Activity atomic.
+- `realization` describes **how** that Activity is carried out. Vocal Expression
+  modes such as speaking, singing, humming, or recitation and Activity-lane
+  Capability work belong here; they are not sibling Primary-Activity kinds.
+- optional Social Attention is a subordinate, fail-soft sibling of primary
+  realization around the same semantic Activity. It is not a Goal, Planner,
+  execution lane, completion authority, or downstream stage after Vocal.
+- Providers own execution inside advertised contracts, Evidence owns reality,
+  Response expresses established meaning/truth, and Reflection improves future
+  cognition.
+
+The shorter ownership chain
+`Responsibility → Goal → Planner → Provider → Action → Evidence` remains a valid
+compression of this same diagram, not a competing architecture.
 
 Chromie should make this loop responsive, interruptible, understandable, and
 portable across qualified embodied providers without exposing low-level robot

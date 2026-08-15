@@ -2,6 +2,11 @@
 
 ## Decision
 
+The [Project Charter](PROJECT_CHARTER.md) expanded primary diagram is
+authoritative. This document elaborates only the optional Social Attention
+branch attached to each semantic Primary Activity; it does not define a second
+main workflow.
+
 Social Attention is Chromie's background social-decoration cognition.
 
 It does **not** decide the primary thing Chromie is trying to accomplish. It

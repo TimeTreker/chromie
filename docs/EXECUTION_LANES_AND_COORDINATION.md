@@ -2,6 +2,11 @@
 
 ## Status
 
+The [Project Charter](PROJECT_CHARTER.md) expanded primary diagram is the
+authoritative main workflow. This document elaborates only the `realization`
+branches beneath semantic Primary Activities; the lane topology below is not a
+second or alternative primary architecture.
+
 Chromie has one Goal-Driven Cognitive Core and two execution lanes:
 
 ```text
