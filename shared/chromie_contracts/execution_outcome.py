@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -35,6 +35,193 @@ ModelObservationStatus = Literal[
     "too_large",
     "sensitive",
 ]
+ClaimQualificationStatus = Literal[
+    "established",
+    "insufficient",
+    "stale",
+    "contradicted",
+    "unknown",
+]
+ClaimCoverageStatus = Literal[
+    "not_required",
+    "complete",
+    "partial",
+    "unknown",
+]
+EvidenceRequirementSource = Literal[
+    "execution_observation",
+    "provider_postcondition",
+]
+JsonScalar: TypeAlias = str | int | float | bool | None
+
+
+class EvidenceRequirement(BaseModel):
+    """One declarative observation requirement for a factual claim.
+
+    A requirement always requires one schema-valid, available observation of
+    the selected source. Optional exact scalar assertions can further constrain
+    that observation. It is not a rule engine and it cannot select work,
+    capabilities, or cognitive depth. ``field_assertions`` uses dotted paths
+    only to address already schema-validated observation data.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source: EvidenceRequirementSource
+    condition: str = ""
+    field_assertions: dict[str, JsonScalar] = Field(default_factory=dict)
+    trust_domain: str = ""
+    max_age_ms: int | None = Field(default=None, ge=0)
+
+    @field_validator("condition", "trust_domain", mode="before")
+    @classmethod
+    def normalize_requirement_text(cls, value: Any) -> str:
+        return " ".join(str(value or "").strip().split())
+
+    @field_validator("field_assertions", mode="before")
+    @classmethod
+    def normalize_assertions(cls, value: Any) -> dict[str, JsonScalar]:
+        if value is None:
+            return {}
+        if not isinstance(value, dict):
+            raise ValueError("field_assertions must be an object")
+        normalized: dict[str, JsonScalar] = {}
+        for raw_path, expected in value.items():
+            path = ".".join(
+                part.strip()
+                for part in str(raw_path or "").split(".")
+                if part.strip()
+            )
+            if not path:
+                raise ValueError("field_assertions paths must not be empty")
+            if isinstance(expected, (dict, list, tuple, set)):
+                raise ValueError(
+                    "field_assertions values must be exact JSON scalars"
+                )
+            normalized[path] = expected
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_requirement_shape(self) -> "EvidenceRequirement":
+        if self.source == "execution_observation" and self.condition:
+            raise ValueError(
+                "execution_observation requirements must not name a postcondition"
+            )
+        if self.source == "provider_postcondition" and not self.condition:
+            raise ValueError(
+                "provider_postcondition requirements require condition"
+            )
+        return self
+
+
+class EvidenceRequirementGroup(BaseModel):
+    """One sufficient conjunction; policy groups are alternatives."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    requirements: list[EvidenceRequirement] = Field(min_length=1, max_length=16)
+    minimum_independent_trust_domains: int = Field(default=1, ge=1, le=16)
+
+    @model_validator(mode="after")
+    def validate_trust_domain_bound(self) -> "EvidenceRequirementGroup":
+        if self.minimum_independent_trust_domains > len(self.requirements):
+            raise ValueError(
+                "minimum_independent_trust_domains cannot exceed requirement count"
+            )
+        return self
+
+
+class ClaimQualificationPolicy(BaseModel):
+    """Owner-reviewed evidence sufficiency policy for one factual claim.
+
+    Every requirement inside one group must hold. Multiple groups are accepted
+    alternatives. The policy is declarative and runtime-checkable; providers may
+    advertise observations, but changing provider output cannot silently change
+    this owner-reviewed sufficiency rule.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal[1] = 1
+    claim: str = Field(min_length=1, max_length=200)
+    requirement_groups: list[EvidenceRequirementGroup] = Field(
+        min_length=1,
+        max_length=8,
+    )
+    requires_complete_coverage: bool = False
+
+    @field_validator("claim", mode="before")
+    @classmethod
+    def normalize_claim(cls, value: Any) -> str:
+        return " ".join(str(value or "").strip().split())
+
+
+def claim_qualification_policy_sha256(
+    policy: ClaimQualificationPolicy | dict[str, Any],
+) -> str:
+    validated = (
+        policy
+        if isinstance(policy, ClaimQualificationPolicy)
+        else ClaimQualificationPolicy.model_validate(policy)
+    )
+    payload = json.dumps(
+        validated.model_dump(mode="json"),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+class ClaimQualification(BaseModel):
+    """Immutable result of mechanically checking evidence against a policy."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal[1] = 1
+    claim: str = Field(min_length=1, max_length=200)
+    status: ClaimQualificationStatus
+    policy_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    evidence_ids: list[str] = Field(default_factory=list, max_length=32)
+    reason_codes: list[str] = Field(default_factory=list, max_length=16)
+    trust_domains: list[str] = Field(default_factory=list, max_length=16)
+    coverage: ClaimCoverageStatus = "not_required"
+    satisfied_group_index: int | None = Field(default=None, ge=0)
+    evaluated_at: datetime
+
+    @field_validator("claim", mode="before")
+    @classmethod
+    def normalize_qualification_claim(cls, value: Any) -> str:
+        return " ".join(str(value or "").strip().split())
+
+    @field_validator(
+        "evidence_ids",
+        "reason_codes",
+        "trust_domains",
+        mode="before",
+    )
+    @classmethod
+    def normalize_qualification_lists(cls, value: Any) -> list[str]:
+        return _normalize_ids(value)
+
+    @field_validator("evaluated_at")
+    @classmethod
+    def require_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("evaluated_at must include a timezone")
+        return value
+
+    @model_validator(mode="after")
+    def validate_established_shape(self) -> "ClaimQualification":
+        if self.status == "established" and self.satisfied_group_index is None:
+            raise ValueError(
+                "established qualification requires satisfied_group_index"
+            )
+        if self.status != "established" and self.satisfied_group_index is not None:
+            raise ValueError(
+                "non-established qualification cannot name a satisfied group"
+            )
+        return self
 
 
 def _normalize_identifier(value: Any) -> Any:

@@ -11,6 +11,7 @@ from typing import Any, Literal, Protocol
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from shared.chromie_runtime import ResourceArbiter
+from shared.chromie_contracts.execution_outcome import ClaimQualificationPolicy
 from shared.chromie_contracts.interaction import (
     CapabilityIdentityModel,
     CapabilityRequest,
@@ -122,6 +123,7 @@ class SkillDefinition(CapabilityIdentityModel):
     description: str = ""
     input_schema: dict[str, Any] = Field(default_factory=dict)
     output_schema: dict[str, Any] = Field(default_factory=dict)
+    completion_evidence_policy: ClaimQualificationPolicy | None = None
     available: bool = True
     unavailable_reason: str | None = None
     requires_confirmation: bool = False

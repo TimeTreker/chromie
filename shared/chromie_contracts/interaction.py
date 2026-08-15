@@ -1005,6 +1005,10 @@ class CapabilityRequest(CapabilityIdentityModel):
         default=None,
         pattern=r"^[0-9a-f]{64}$",
     )
+    committed_completion_evidence_sha256: str | None = Field(
+        default=None,
+        pattern=r"^[0-9a-f]{64}$",
+    )
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("request_id")

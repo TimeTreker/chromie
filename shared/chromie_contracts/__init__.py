@@ -62,6 +62,13 @@ from .execution_lanes import (
     LaneCoordinationStartPolicy,
 )
 from .execution_outcome import (
+    ClaimCoverageStatus,
+    ClaimQualification,
+    ClaimQualificationPolicy,
+    ClaimQualificationStatus,
+    EvidenceRequirement,
+    EvidenceRequirementGroup,
+    EvidenceRequirementSource,
     ExecutionAggregateStatus,
     ExecutionEvidence,
     ExecutionEvidenceStatus,
@@ -72,6 +79,7 @@ from .execution_outcome import (
     ModelObservationStatus,
     ProviderPostconditionEvidence,
     aggregate_execution_status,
+    claim_qualification_policy_sha256,
     execution_outcome_fingerprint,
 )
 from .interaction_ledger import (
@@ -290,6 +298,13 @@ __all__ = [
     "LaneCoordinationGroup",
     "LaneCoordinationRelation",
     "LaneCoordinationStartPolicy",
+    "ClaimCoverageStatus",
+    "ClaimQualification",
+    "ClaimQualificationPolicy",
+    "ClaimQualificationStatus",
+    "EvidenceRequirement",
+    "EvidenceRequirementGroup",
+    "EvidenceRequirementSource",
     "ExecutionAggregateStatus",
     "ExecutionEvidence",
     "ExecutionEvidenceStatus",
@@ -300,6 +315,7 @@ __all__ = [
     "ModelObservationStatus",
     "ProviderPostconditionEvidence",
     "aggregate_execution_status",
+    "claim_qualification_policy_sha256",
     "execution_outcome_fingerprint",
     "InteractionContextProjection",
     "InteractionEventDomain",

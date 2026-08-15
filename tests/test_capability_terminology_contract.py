@@ -73,6 +73,7 @@ class CapabilityTerminologyContractTests(unittest.TestCase):
                 "requires_confirmation",
                 "idempotency_key",
                 "committed_output_schema_sha256",
+                "committed_completion_evidence_sha256",
                 "metadata",
             },
         )
