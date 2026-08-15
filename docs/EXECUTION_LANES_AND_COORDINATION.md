@@ -62,10 +62,15 @@ Goal meaning, Goal Association, planning, and response meaning remain owned by
 the one Cognitive Core. Social Attention cannot author response text, create a
 Goal, own completion, or enter lane coordination.
 
-The current implementation provides best-effort parallel start through the
-Trusted Capability Runtime. It does not yet claim a synchronized cross-provider
-start barrier, atomic multi-provider cancellation, or verified temporal-overlap
-evidence. Those require a later runtime contract and provider support.
+The current source can start eligible requests concurrently inside the Trusted
+Capability Runtime, but its maintained coordinator still aggregates terminal results
+behind the originating execution call. The approved `CapabilityRuntime` target removes
+that batch-completion barrier: each request has an independent asynchronous lifecycle and
+publishes correlated runtime events as progress or terminal results arrive. This does not
+create another execution lane or change semantic Activity ownership. A synchronized
+cross-provider start barrier, atomic multi-provider cancellation, and verified temporal-
+overlap evidence still require explicit provider/runtime contracts and are not implied by
+ordinary asynchronous dispatch.
 
 ## Ownership
 
@@ -74,7 +79,7 @@ evidence. Those require a later runtime contract and provider support.
 | Cognitive Core | user meaning, Goal Association, Goal lifecycle, planning, response meaning, temporal intent | motor control, provider internals |
 | Background Social Attention | whether an anchored interaction benefits from small optional embodied decoration; social purpose and eligible body candidate | user Goal creation, response wording, completion, execution-lane membership, motor authorization |
 | Vocal Execution Lane | realization of one personal `Vocal Expression`: speaking (`mode=speech`), expressive speech, recitation, singing, humming, nonverbal vocalization; playback/interruption/cancellation/output ordering | independent personality, semantic Primary-Activity meaning, or existing-media lifecycle ownership |
-| Activity Execution Lane | non-Vocal provider calls, primary execution work, optional Social Attention body decoration, monitoring, cancellation, recovery, and outcome collection | Goal or semantic Primary-Activity meaning, or raw motor control |
+| Activity Execution Lane | non-Vocal provider calls, primary execution work, optional Social Attention body decoration, asynchronous lifecycle monitoring, cancellation, recovery, and correlated outcome collection | Goal or semantic Primary-Activity meaning, or raw motor control |
 | Soridormi | embodied feasibility, body arbitration, safety supervision, controller execution, stop, recovery, and physical evidence | conversational meaning or provider selection |
 
 The Activity lane executes work; it does not own Goals. Optional Social

@@ -2301,9 +2301,9 @@ The Deep Planner does not send simple steps back to the Fast Planner.
 
 Executable capabilities are leaf nodes in either planner's canonical plan and
 use canonical `capability_id`. Agent Skills are reusable planning methods and do
-not belong to a planner tier. Legacy `skill_id` remains a bounded compatibility
-input until retained artifacts and callers migrate; conflicting dual fields fail
-closed.
+not belong to a planner tier. The target architecture has no executable `skill_id`
+identity. Any remaining `skill_id` reader in current source is temporary migration
+debt and must be removed rather than promoted into another compatibility contract.
 
 ### 8.4 Shared planner primitives
 
@@ -2659,7 +2659,7 @@ The validator checks:
 
 - goal and plan versions;
 - plan structure;
-- exact skill IDs;
+- exact Capability IDs;
 - argument schemas and bounds;
 - capability availability;
 - provider registration and state;
@@ -2694,7 +2694,7 @@ plan version, but only the cognitive layer proposes a semantic goal change.
 Every committed step records or binds:
 
 - request, plan ID, and immutable plan fingerprint;
-- exact step skill/version, arguments, and execution timing;
+- exact step Capability/version, arguments, and execution timing;
 - goal and plan versions;
 - provider;
 - the full committed output-schema SHA-256 identity;
@@ -2704,13 +2704,17 @@ Every committed step records or binds:
 - failure reason;
 - resource and safety events.
 
-The host joins those records into an immutable `ExecutionOutcomeBundle` by
-canonical plan fingerprint, exact step skill/arguments/timing, request ID,
-source goal ID, result, and trace. An absent result is `not_run`, never inferred
-success. `partial` requires completed and unresolved work; heterogeneous
-all-uncompleted states aggregate conservatively while exact per-goal and
-per-step statuses remain present. Pre-action speech and auxiliary social
-attention cannot satisfy an effectful goal.
+The host joins terminal records into an immutable `ExecutionOutcomeBundle` by
+canonical plan fingerprint, exact step Capability/arguments/timing, request ID,
+source goal ID, result, and trace. `ExecutionOutcomeBundle` is terminal execution
+truth, not a live scheduler snapshot: an absent result is `not_run` only when the
+relevant execution scope has actually closed without that request running. An
+accepted, queued, or running request remains live Runtime state and must never be
+converted into `not_run` merely because a sibling result arrived first. `partial`
+requires completed and unresolved terminal work; heterogeneous all-uncompleted
+states aggregate conservatively while exact per-goal and per-step statuses remain
+present. Pre-action speech and auxiliary social attention cannot satisfy an
+effectful goal.
 
 Provider output may enter model-facing final composition only through a bounded
 projection that passes the declared non-empty output schema and low-level-field
@@ -2718,6 +2722,77 @@ filter. Retained evidence keeps provenance and an output digest even when the
 model-facing projection is unavailable. Provider postcondition evidence such
 as Soridormi safe idle is recorded separately; it supports only the claims its
 contract proves.
+
+### 14.1 Asynchronous Capability Runtime lifecycle
+
+`CapabilityRuntime` is the canonical source/runtime name for the Trusted Capability
+Runtime. It is not a second planner and not a new Work authority. The architecture does
+not retain executable `SkillRuntime` / `SkillRequest` / `SkillResult` terminology as a
+permanent compatibility layer; those names are migration debt until the dedicated
+source-cleanup Issue removes them. Agent Skills remain a separate passive cognitive
+concept and therefore keep the word *Skill*.
+
+Capability execution uses a non-blocking lifecycle:
+
+```text
+Canonical Plan / immediate authorized Activity
+        ↓
+CapabilityRequest
+        ↓
+CapabilityRuntime.submit(...)
+        ↓
+CapabilityDispatchReceipt   # accepted/rejected/scheduled, never completion
+        ↓
+originating interaction may continue or finish
+
+        ...later / independently...
+
+Provider progress/result
+        ↓
+CapabilityRuntime validates + correlates against Host-owned request state
+        ↓
+CapabilityRuntimeEvent
+        ↓
+trusted Evidence / execution closure when terminal
+        ↓
+Cognitive opportunity / result interpretation / replanning / response as needed
+```
+
+One committed request has one canonical `request_id`. Canonical Goal identity, Plan
+identity, provider/backend identity, and request identity remain separate layers. A
+Provider result may echo `request_id`, `capability_id`, or provider metadata, but the Host
+registry created at dispatch is authoritative for correlation; a result cannot self-assign
+itself to another Goal, Plan, Capability, or interaction. Backend-local IDs are opaque
+implementation references only.
+
+`CapabilityRuntimeEvent` is a mechanical lifecycle envelope around existing trusted
+request/result/trace truth. It may represent accepted, running/progress, completed,
+failed, cancelled, refused, or timed-out state. It does not decide whether the user
+should be interrupted, whether a Goal is satisfied, or how to phrase a result. The
+Cognitive Core and the existing evidence-bound result/response owners retain those
+semantic authorities. Late results from cancelled or superseded work remain historical
+execution observations but cannot resurrect obsolete Goal authority or force speech.
+
+Plan ordering still matters in an asynchronous runtime. `parallel` work may start
+independently when resources/provider contracts permit it; sequential dependencies are
+accepted by the Runtime but become provider-runnable only when their trusted predecessor
+conditions are satisfied. The Runtime therefore separates **dispatch acceptance** from
+**provider start** and both from **terminal completion**.
+
+The Runtime is transport- and durability-backend independent. MCP, HTTP, gRPC, ROS 2
+Action, local Python, and future provider protocols sit behind provider adapters. The
+first maintained backend remains an in-process `asyncio` implementation; a DBOS backend
+may be qualified later for durable, read-only or idempotent work without changing the
+Chromie contract. Temporal is a useful durable-execution reference, not a required
+Chromie dependency. Durable retry never grants physical-effect authority: effectful or
+non-idempotent work must revalidate current Goal/Plan/provider state and trusted evidence
+before any redispatch.
+
+Interaction lifetime and Capability lifetime are intentionally different. One user turn
+may finish its immediate conversational work while several capability requests remain
+active; each terminal result can create a new cognitive opportunity without resuming the
+original Python call stack. This is the execution foundation for many simultaneous
+Capabilities without turning concurrency mechanics into semantic intelligence.
 
 ## 15. Response architecture
 
@@ -2794,7 +2869,7 @@ owners append only facts they are qualified to observe:
 |---|---|---|
 | Cognitive Runtime | Goal association and validated Plan resolution | That a planned effect started or completed |
 | Playback Delivery | speech scheduled, playback started, or not delivered | Activity execution or completion |
-| Trusted Capability Runtime | Activity, provider-backed Vocal, or Social Attention decoration request committed; decoration terminal result | Completion of an unrelated Goal |
+| Trusted Capability Runtime (`CapabilityRuntime`) | Capability dispatch/lifecycle facts and correlated terminal results for Activity, provider-backed Vocal, or Social Attention decoration | Completion of an unrelated Goal or semantic meaning of a result |
 | Execution closure | Goal-scoped Activity or provider-backed Vocal terminal outcome with `ExecutionOutcomeBundle` evidence references | A stronger result than the referenced bundle proves |
 
 The Ledger neither edits nor replaces playback evidence,

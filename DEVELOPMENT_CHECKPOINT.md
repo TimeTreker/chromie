@@ -136,7 +136,7 @@ Do not silently downgrade because authority is absent.
 This checkpoint does **not** grant blanket architecture authority to later
 sessions; use Charter governance when new authority is needed.
 ## Resume point
-Fast Planner first-advancement is the current source seam: keep GI provider-neutral, keep GA canonical, and qualify the new pre-Goal Activity/continuation contract without adding a manager or second planner. Historical target evidence remains revision-bound.
+The approved next execution seam is the asynchronous transport-independent `CapabilityRuntime`: first delete executable-Skill naming/aliases, then separate dispatch from completion and route correlated lifecycle events back through existing Evidence/cognitive owners. Do not add a Work/Result/Event manager or second planner. Historical target evidence remains revision-bound.
 ## Resume and verification commands
 `docs/STATUS.md` owns implementation/evidence claims. Do not claim live-model,
 audio, MuJoCo, GPU, or physical-provider qualification unless that exact gate ran

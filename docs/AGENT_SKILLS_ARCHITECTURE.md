@@ -49,9 +49,9 @@ Agent generates a typed Plan for this situation
         ↓
 Plan references registered Capabilities through `capability_id`
         ↓
-Trusted Capability Runtime validates and executes
+Trusted Capability Runtime (`CapabilityRuntime`) validates and dispatches
         ↓
-Provider evidence returns to the Agent
+Provider lifecycle/result evidence returns asynchronously to cognition
         ↓
 Agent closes or replans the Goal
 ```
@@ -70,7 +70,7 @@ The architecture preserves the project principle:
 | Plan | A per-turn or per-replan typed proposal generated for the current Goal and situation | No | It records the Agent's decisions | No |
 | Capability / Tool | An atomic executable contract with typed arguments and results | No | No | Only through Trusted Capability Runtime/provider authority |
 | Workflow | A predefined fixed or partly fixed execution sequence | No | Usually limited | Potentially, if separately authorized |
-| Trusted Capability Runtime | Deterministic validation, authorization, scheduling, cancellation, and evidence boundary | No | No ordinary semantic decisions | Yes, after validation |
+| Trusted Capability Runtime / `CapabilityRuntime` | Deterministic validation, authorization, non-blocking dispatch, scheduling, lifecycle/cancellation, correlation, and evidence boundary | No | No ordinary semantic decisions | Yes, after validation |
 | Provider | The implementation authority for a capability; Soridormi owns embodied planning and physical safety | No | Provider-local planning where declared | Yes |
 
 ### Agent
@@ -138,22 +138,10 @@ Capabilities remain registered through typed manifests or authoritative live
 provider schemas. An Agent Skill may declare that a capability is required
 or useful, but that declaration does not register or authorize the capability.
 
-## Canonical naming and bounded compatibility
+## Canonical naming and executable-Skill removal
 
-Earlier retained artifacts and Provider-native compatibility boundaries used
-`skill_id`, `SkillRequest`, `SkillResult`, “named skill”, and “Trusted Skill
-Runtime” for executable Capabilities. New model-facing and current evidence
-contracts use canonical Capability terminology. A historical payload may look
-like:
-
-```json
-{
-  "skill_id": "chromie.weather.lookup"
-}
-```
-
-That terminology becomes ambiguous as soon as Chromie introduces real Agent
-Skills. The accepted canonical vocabulary is therefore:
+Chromie uses the word **Skill** only for passive **Agent Skills**. Executable runtime
+operations are **Capabilities**. The canonical vocabulary is:
 
 ```json
 {
@@ -180,29 +168,21 @@ Canonical terms:
 
 - **Agent Skill / `agent_skill_id`**: passive LLM-usable task method;
 - **Capability / `capability_id`**: executable typed contract;
-- **CapabilityRequest / CapabilityResult**: execution request and result DTOs;
-- **Trusted Capability Runtime**: deterministic capability execution boundary;
-- **named capability**: provider-advertised executable operation.
+- **CapabilityRequest / CapabilityResult**: exact execution request and intermediate/terminal result DTOs;
+- **CapabilityRuntime**: source name for the Trusted Capability Runtime;
+- **Capability Provider**: implementation authority behind an exact registered Capability.
 
-Bounded compatibility must preserve existing readers without making legacy
-terms canonical or performing an unsafe repository-wide identifier replacement:
+Executable `skill_id`, `SkillRequest`, `SkillResult`, `SkillRuntime`, `SkillDefinition`,
+`SkillRegistry`, and similar names are not part of the target architecture. They are
+pre-Agent-Skill migration debt in current source and must be renamed or deleted by the
+dedicated cleanup Issue rather than retained as perpetual aliases. Historical retained
+artifacts that genuinely require old-field readability should be migrated/versioned at an
+explicit ingestion/archive boundary; ordinary live runtime contracts must not carry dual
+identity indefinitely.
 
-- new model-facing contracts, Plans, traces, and documentation emit
-  `capability_id`;
-- decoders may accept legacy `skill_id` at explicitly documented compatibility
-  boundaries;
-- if both fields are present, they must match exactly or validation fails;
-- retained episodes, traces, fixtures, and external callers using `skill_id`
-  remain readable through explicit compatibility readers;
-- legacy class names and log event names may remain as bounded aliases where
-  current consumers still require them, but they are not canonical vocabulary;
-- the rename changes readability only and must not change registry, policy,
-  confirmation, provider, or physical-safety authority.
-
-This terminology transition was completed before Agent Skill selection was
-enabled. Current Canonical Plans therefore distinguish content-free
-`selected_agent_skills` provenance from executable `capability_id` steps.
-Bounded compatibility readers do not make legacy names canonical again.
+The naming cleanup changes no semantic or physical authority. Capability registration,
+schema validation, confirmation, authorization, resource arbitration, provider ownership,
+physical safety, request/result correlation, and Evidence remain independently enforced.
 
 ## Architectural principles
 
@@ -261,9 +241,9 @@ model-authored Plan
 → exact registered Capability ID and arguments
 → deterministic schema and policy validation
 → confirmation where required
-→ Trusted Capability Runtime scheduling
+→ `CapabilityRuntime` validation and non-blocking dispatch
 → provider validation and execution
-→ correlated result evidence
+→ correlated lifecycle events and terminal result evidence
 ```
 
 If a Skill package contains code or scripts for interoperability, they are

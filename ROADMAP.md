@@ -142,6 +142,67 @@ Architecture review may remove or replace pre-release compatibility/workflow
 structures when they obstruct this model. `Use less to solve more` means ending
 with fewer truth owners and processes, not preserving an obsolete pipeline or
 adding a manager because a useful explanatory term exists.
+## Approved architecture line — asynchronous transport-independent Capability Runtime
+
+The Trusted Capability Runtime now has an approved target architecture. Current source
+already has request identity, validation, resource arbitration, cancellation, provider
+execution, and bounded internal concurrency, but terminal results are still aggregated
+behind long-running `SkillRuntime.execute(...)` call stacks. The target is one canonical
+`CapabilityRuntime`: non-blocking dispatch, independent request lifecycle events, terminal
+Evidence reconciliation, and cognitive re-entry without creating a second Work/Result
+manager or semantic agent. Provider transport and durable-execution backend remain below
+the Capability contract.
+
+Implement this line as separate focused Issues and separate patches:
+
+- **Issue — Canonicalize Capability Runtime vocabulary.** Rename executable
+  `SkillRuntime`/`SkillDefinition`/`SkillRegistry`/`SkillProvider` and related source, tests,
+  files, logs, and DTO aliases to Capability terminology; delete live `skill_id` and
+  executable-Skill compatibility instead of extending it. Agent Skills keep their own
+  deliberate Skill vocabulary.
+- **Issue — Split capability dispatch from terminal completion.** Add a small
+  `CapabilityDispatchReceipt` contract and `CapabilityRuntime.submit(...)` semantics so
+  acceptance/scheduling returns promptly while provider execution continues. Preserve
+  sequential dependencies and resource barriers without using call-stack blocking as the
+  lifecycle model.
+- **Issue — Publish correlated capability lifecycle events.** Add one mechanical
+  `CapabilityRuntimeEvent` stream for accepted/running/progress/terminal state using
+  Host-owned request correlation. Provider-returned IDs are observations, never identity
+  authority. Deliver independent request results as they arrive rather than after a whole
+  parallel batch completes.
+- **Issue — Reconcile terminal Evidence incrementally.** Feed terminal events into the
+  existing execution/evidence owners without treating still-accepted/running siblings as
+  `not_run`. Keep `ExecutionOutcomeBundle` immutable terminal truth; introduce no duplicate
+  completion store.
+- **Issue — Decouple interaction lifetime from capability lifetime.** Remove the
+  assumption that one interaction Python task remains alive until every provider finishes.
+  Terminal Capability events create bounded cognitive opportunities/result interpretation
+  against current Goal/Plan relevance instead of resuming the original call stack.
+- **Issue — Harden cancellation, supersession, and late-result semantics.** Ensure scoped
+  cancel/preempt, Goal replacement, stale Plan bindings, and late provider completion cannot
+  resurrect obsolete work or force obsolete speech while preserving historical execution
+  Evidence.
+- **Issue — Introduce a Capability Runtime backend boundary.** Keep an in-process
+  `asyncio` backend as the maintained default, with provider adapters for MCP/HTTP/gRPC/ROS
+  2/local implementations. Backend IDs remain opaque and cannot replace Chromie request
+  identity.
+- **Issue — Qualify a DBOS durable backend with read-only/idempotent work.** Use weather
+  or another safe information Capability to prove non-blocking submission, concurrent work,
+  process restart, result delivery, cancel, and recovery. DBOS remains an optional backend,
+  not a Cognitive Core dependency; no physical effect is automatically retried because a
+  durable engine can retry execution.
+- **Issue — Migrate long-running Soridormi work to asynchronous provider lifecycle.** Reuse
+  its submit/status/event/cancel boundary so embodiment can report progress/terminal events
+  without making Chromie wait. Physical feasibility, stop/recovery, and retry authority stay
+  provider/trusted-runtime owned.
+- **Issue — Delete aggregate-and-wait execution compatibility.** Once all maintained
+  callers consume dispatch receipts/events, remove the old synchronous aggregation API and
+  stale compatibility tests/docs rather than carrying two execution architectures.
+
+Each Issue must preserve the central authority invariant: Runtime owns execution lifecycle;
+LLM/Core owns meaning. Framework choice must not turn transport, queues, workflows, or
+callbacks into a second planner.
+
 ## Current priorities
 
 1. Preserve the completed authority spine and implement only the contract detail now

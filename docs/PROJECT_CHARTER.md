@@ -268,9 +268,11 @@ A successful Chromie release lets an operator:
 - native structured Agent output and strict model-facing contracts;
 - owner-approved Agent Skill discovery, bounded Agent projections, and
   selection provenance without granting Skill content execution authority;
-- Trusted Capability Runtime validation, authorization, scheduling, timeout,
-  and cancellation; legacy `SkillRuntime`, `SkillRequest`, `SkillResult`, and
-  `skill_id` names remain only at explicit compatibility boundaries;
+- the Trusted Capability Runtime, implemented canonically as `CapabilityRuntime`,
+  owns deterministic validation, authorization, non-blocking dispatch, resource
+  arbitration, lifecycle/cancellation, provider-result correlation, and runtime-event
+  delivery without interpreting what a result means; Capability execution remains
+  transport-independent behind exact provider contracts;
 - evidence capture, acceptance tooling, deployment configuration, and release
   packaging.
 
@@ -772,6 +774,21 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    and duplicate model-writable truth from silently returning. These guards should assert
    owner, bounded invocation budget, immutable-proof shape, and fail-closed behavior rather
    than freeze exact prompts or incidental call ordering.
+
+42. **Capability execution is asynchronous, event-driven, and transport-independent.**
+   A committed `CapabilityRequest` is accepted, scheduled, and correlated by the trusted
+   Host without forcing the originating interaction call stack to wait for provider
+   completion. Dispatch acceptance is not execution success. Progress, cancellation,
+   failure, timeout, and terminal completion arrive as correlated runtime events keyed by
+   Host-owned request identity; a Provider may echo correlation fields but cannot author
+   or redefine their ownership. The Runtime owns lifecycle and mechanical relevance
+   checks, while the Cognitive Core owns what a returned result means, whether another
+   Plan is needed, and whether any user-facing act is warranted. `ExecutionOutcomeBundle`
+   remains immutable terminal execution truth and must not mislabel accepted/running work
+   as `not_run`. MCP, HTTP, gRPC, ROS 2, local Python, durable-workflow libraries, and future
+   transports/backends may realize execution beneath the same Capability contract without
+   becoming cognitive architecture. Do not add a parallel Work Manager, Result Agent, or
+   Event Agent merely to implement this lifecycle.
 
 ### One personal voice; resources constrain coexistence
 
