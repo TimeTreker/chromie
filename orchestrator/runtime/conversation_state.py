@@ -4724,12 +4724,13 @@ class ConversationStateManager:
         *,
         sid: str | None,
     ) -> list[dict[str, Any]]:
-        """Apply bounded future-adaptation proposals without rewriting history.
+        """Apply bounded future adaptation without rewriting Goal history.
 
-        Reflection may request future replanning and may propose non-durable task/session
-        memory. Memory promotion is accepted only after matching reason evidence
-        has appeared in an earlier Reflection for the same Goal. Durable profile
-        memory remains exclusively behind the existing explicit-consent boundary.
+        Responsibility-control actions are valid only while the Responsibility
+        remains open. Evidence-bound ``experience``/``calibration`` proposals may
+        also learn from terminal history because learning forward does not reopen
+        or mutate that history. Online proposals remain non-durable advisory
+        Memory; shared/systemic adaptation stays outside this path.
         """
 
         if not self.enabled:
@@ -4742,17 +4743,12 @@ class ConversationStateManager:
         results: list[dict[str, Any]] = []
         memory_entries: list[MemoryEntry] = []
         now = _now_ms()
+        responsibility_actions = {"replan", "clarify", "correct_user"}
+
         for goal_id in reflected.goal_ids:
             context = self._task_context_by_goal_id(goal_id)
             if context is None:
                 raise ValueError(f"reflection references unknown Goal: {goal_id}")
-            if self._goal_responsibility_status(context) != "open":
-                results.append({
-                    "goal_id": goal_id,
-                    "applied": False,
-                    "reason": "reflection_target_not_open",
-                })
-                continue
 
             evidence_summary = context.get("evidence_summary")
             recorded = (
@@ -4782,14 +4778,9 @@ class ConversationStateManager:
                     "reflection references evidence outside the recorded outcome: "
                     + ",".join(sorted(unknown_refs))
                 )
-            if reflected.actions and str(recorded.get("status") or "").strip() == "completed":
-                results.append({
-                    "goal_id": goal_id,
-                    "applied": False,
-                    "reason": "reflection_completed_outcome_is_terminal",
-                })
-                continue
 
+            responsibility_status = self._goal_responsibility_status(context)
+            responsibility_open = responsibility_status == "open"
             metadata = context.get("metadata")
             if not isinstance(metadata, dict):
                 metadata = {}
@@ -4807,23 +4798,32 @@ class ConversationStateManager:
                 if isinstance(previous, dict)
             )
 
-            if "replan" in reflected.actions:
-                context["status"] = "planning"
-                context["commitment_state"] = "evaluating"
-                context["plan_status"] = "reflection_future_replan_requested"
-            if "clarify" in reflected.actions:
-                context["status"] = "waiting_for_user"
-                context["commitment_state"] = "waiting_for_user"
-                context["plan_status"] = "reflection_future_clarification_needed"
-            if "correct_user" in reflected.actions:
-                metadata["reflection_future_correction_candidate"] = {
-                    "text": reflected.correction_text,
-                    "opportunity_id": reflected.opportunity_id,
-                    "evidence_refs": list(reflected.evidence_refs),
-                }
+            applied_actions: list[str] = []
+            rejected_actions: list[str] = []
+            for action in reflected.actions:
+                if action in responsibility_actions and not responsibility_open:
+                    rejected_actions.append(action)
+                    continue
+                if action == "replan":
+                    context["status"] = "planning"
+                    context["commitment_state"] = "evaluating"
+                    context["plan_status"] = "reflection_future_replan_requested"
+                    applied_actions.append(action)
+                elif action == "clarify":
+                    context["status"] = "waiting_for_user"
+                    context["commitment_state"] = "waiting_for_user"
+                    context["plan_status"] = "reflection_future_clarification_needed"
+                    applied_actions.append(action)
+                elif action == "correct_user":
+                    metadata["reflection_future_correction_candidate"] = {
+                        "text": reflected.correction_text,
+                        "opportunity_id": reflected.opportunity_id,
+                        "evidence_refs": list(reflected.evidence_refs),
+                    }
+                    applied_actions.append(action)
 
             promoted = 0
-            if "propose_memory" in reflected.actions and repeated_pattern:
+            if "propose_memory" in reflected.actions:
                 for candidate in reflected.memory_candidates:
                     memory_entries.append(
                         MemoryEntry(
@@ -4839,30 +4839,48 @@ class ConversationStateManager:
                         )
                     )
                     promoted += 1
+                if promoted:
+                    applied_actions.append("propose_memory")
 
             history.append({
                 "opportunity_id": reflected.opportunity_id,
                 "actions": list(reflected.actions),
+                "applied_actions": applied_actions,
+                "rejected_actions": rejected_actions,
                 "reason_codes": list(reflected.reason_codes),
                 "evidence_refs": list(reflected.evidence_refs),
                 "memory_candidates": len(reflected.memory_candidates),
                 "memory_promoted": promoted,
+                "responsibility_status": responsibility_status,
+                "terminal_history_learning": bool(
+                    not responsibility_open and promoted
+                ),
                 "ts_ms": now,
             })
             context["metadata"] = {
                 **metadata,
                 "reflection_history": history[-12:],
             }
-            context["updated_ms"] = now
-            results.append({
+            if applied_actions or responsibility_open:
+                context["updated_ms"] = now
+
+            result: dict[str, Any] = {
                 "goal_id": goal_id,
-                "applied": True,
+                "applied": bool(applied_actions),
                 "actions": list(reflected.actions),
+                "applied_actions": applied_actions,
+                "rejected_actions": rejected_actions,
                 "memory_promoted": promoted,
                 "repeated_pattern": repeated_pattern,
-                "responsibility_status": self._goal_responsibility_status(context),
-                "future_adaptation": True,
-            })
+                "responsibility_status": responsibility_status,
+                "future_adaptation": bool(applied_actions),
+                "terminal_history_learning": bool(
+                    not responsibility_open and promoted
+                ),
+            }
+            if rejected_actions and not applied_actions:
+                result["reason"] = "reflection_terminal_responsibility_action_rejected"
+            results.append(result)
 
         if memory_entries:
             self._memory_store.add_many(memory_entries)

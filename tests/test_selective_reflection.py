@@ -13,9 +13,12 @@ class FakeOllama:
     def __init__(self, payload: dict) -> None:
         self.payload = payload
         self.calls = 0
+        self.prompts: list[str] = []
 
     async def generate(self, *args, **kwargs):
         self.calls += 1
+        if args:
+            self.prompts.append(str(args[0]))
         return self.payload
 
 
@@ -37,6 +40,7 @@ def request_for(opportunity: CognitiveOpportunity) -> AgentRunRequest:
                 "goal_outcomes": [],
             },
             "active_goal_snapshots": [{"goal_id": opportunity.goal_ids[0]}],
+            "recent_goal_snapshots": [],
         },
     )
 
@@ -90,7 +94,7 @@ def test_slow_reflection_model_cannot_choose_grounding_references() -> None:
     assert result.actions == ["replan", "propose_memory"]
 
 
-def test_reflection_replans_without_changing_responsibility_and_promotes_only_repeated_memory() -> None:
+def test_reflection_replans_without_changing_responsibility_and_promotes_bounded_memory() -> None:
     manager = ConversationStateManager(base_conversation_id="reflection")
     manager.apply_semantic_task_operations_atomically(
         [
@@ -139,10 +143,11 @@ def test_reflection_replans_without_changing_responsibility_and_promotes_only_re
     )
     first_result = manager.apply_reflection_resolution(first, sid="sid-1")
 
-    assert first_result[0]["memory_promoted"] == 0
+    assert first_result[0]["memory_promoted"] == 1
+    assert first_result[0]["repeated_pattern"] is False
     assert context["semantic_goal"]["responsibility_status"] == "open"
     assert context["plan_status"] == "reflection_future_replan_requested"
-    assert not any(
+    assert any(
         item["kind"] == "experience"
         for item in manager.snapshot()["extracted_memory"]
     )
@@ -201,7 +206,7 @@ def test_slow_reflection_without_trusted_evidence_does_not_invoke_model() -> Non
     assert "trusted evidence" in result.reason_summary
 
 
-def test_reflection_cannot_reopen_completed_outcome() -> None:
+def _terminal_reflection_context() -> tuple[ConversationStateManager, dict]:
     manager = ConversationStateManager(base_conversation_id="reflection-completed")
     manager.apply_semantic_task_operations_atomically(
         [
@@ -220,6 +225,15 @@ def test_reflection_cannot_reopen_completed_outcome() -> None:
     )
     context = manager._task_context_by_goal_id("goal-arm-complete")
     assert context is not None
+    manager._set_goal_responsibility_status(
+        context,
+        "satisfied",
+        source="test_completed_outcome",
+        evidence_refs=["outcome-complete", "evidence-complete"],
+    )
+    context["status"] = "done"
+    context["commitment_state"] = "completed"
+    context["plan_status"] = "completed"
     context["evidence_summary"] = {
         "execution_outcome": {
             "outcome_id": "outcome-complete",
@@ -228,6 +242,11 @@ def test_reflection_cannot_reopen_completed_outcome() -> None:
             "status": "completed",
         }
     }
+    return manager, context
+
+
+def test_reflection_cannot_reopen_completed_outcome() -> None:
+    manager, context = _terminal_reflection_context()
     before = context.copy()
     resolution = ReflectionResolution(
         opportunity_id="opportunity-complete",
@@ -240,15 +259,104 @@ def test_reflection_cannot_reopen_completed_outcome() -> None:
 
     result = manager.apply_reflection_resolution(resolution, sid="sid-complete")
 
-    assert result == [
-        {
-            "goal_id": "goal-arm-complete",
-            "applied": False,
-            "reason": "reflection_completed_outcome_is_terminal",
-        }
-    ]
+    assert result[0]["applied"] is False
+    assert result[0]["applied_actions"] == []
+    assert result[0]["rejected_actions"] == ["replan"]
+    assert result[0]["reason"] == "reflection_terminal_responsibility_action_rejected"
+    assert result[0]["responsibility_status"] == "satisfied"
     assert context.get("plan_status") == before.get("plan_status")
     assert context["semantic_goal"]["description"] == "Bring the cup."
+    assert context["semantic_goal"]["responsibility_status"] == "satisfied"
+
+
+def test_terminal_history_can_propose_local_memory_without_reopening_goal() -> None:
+    manager, context = _terminal_reflection_context()
+    resolution = ReflectionResolution(
+        opportunity_id="opportunity-terminal-memory",
+        goal_ids=["goal-arm-complete"],
+        evidence_refs=["outcome-complete", "evidence-complete"],
+        reason_codes=["late_reflection"],
+        actions=["propose_memory"],
+        memory_candidates=[
+            {
+                "scope": "task",
+                "kind": "experience",
+                "text": "The completed grasp outcome exposed a misleading local assumption.",
+                "confidence": 0.9,
+            }
+        ],
+        reason_summary="Remember the local lesson without changing history.",
+    )
+
+    result = manager.apply_reflection_resolution(resolution, sid="sid-terminal-memory")
+
+    assert result[0]["applied"] is True
+    assert result[0]["applied_actions"] == ["propose_memory"]
+    assert result[0]["rejected_actions"] == []
+    assert result[0]["memory_promoted"] == 1
+    assert result[0]["terminal_history_learning"] is True
+    assert context["semantic_goal"]["responsibility_status"] == "satisfied"
+    assert context["status"] == "done"
+    assert context["plan_status"] == "completed"
+    assert any(
+        item["kind"] == "experience"
+        for item in manager.snapshot()["extracted_memory"]
+    )
+    assert manager.snapshot()["durable_profile_memory"]["entries"] == []
+
+
+def test_terminal_history_rejects_replan_but_keeps_memory_learning() -> None:
+    manager, context = _terminal_reflection_context()
+    resolution = ReflectionResolution(
+        opportunity_id="opportunity-terminal-mixed",
+        goal_ids=["goal-arm-complete"],
+        evidence_refs=["outcome-complete", "evidence-complete"],
+        reason_codes=["late_reflection"],
+        actions=["replan", "propose_memory"],
+        memory_candidates=[
+            {
+                "scope": "session",
+                "kind": "calibration",
+                "text": "Treat a similar unresolved referent as less settled next time.",
+                "confidence": 0.85,
+            }
+        ],
+        reason_summary="Learn forward only.",
+    )
+
+    result = manager.apply_reflection_resolution(resolution, sid="sid-terminal-mixed")
+
+    assert result[0]["applied"] is True
+    assert result[0]["applied_actions"] == ["propose_memory"]
+    assert result[0]["rejected_actions"] == ["replan"]
+    assert result[0]["terminal_history_learning"] is True
+    assert context["semantic_goal"]["responsibility_status"] == "satisfied"
+    assert context["status"] == "done"
+    assert context["plan_status"] == "completed"
+
+
+def test_reflection_prompt_surfaces_terminal_history_and_forbids_global_shortcuts() -> None:
+    opportunity = CognitiveOpportunity.create(
+        trigger="execution_outcome",
+        goal_ids=["goal-arm"],
+        evidence_refs=["outcome-2", "evidence-2"],
+        reason_codes=["late_reflection"],
+        recommended_cognition="slow",
+    )
+    ollama = FakeOllama({"actions": []})
+    request = request_for(opportunity)
+    request.context["recent_goal_snapshots"] = [
+        {"goal_id": "goal-old", "responsibility_status": "satisfied"}
+    ]
+
+    asyncio.run(ReflectionResolver(ollama).resolve(request))
+
+    prompt = ollama.prompts[-1]
+    assert "Recent terminal Goal projections JSON" in prompt
+    assert "goal-old" in prompt
+    assert "never replan, clarify, correct, reopen" in prompt
+    assert "pattern-to-always/never-Deep" in prompt
+    assert "trusted runtime, not this model, bounds their lifetime" in prompt
 
 
 def test_reflection_actions_require_evidence_refs() -> None:
