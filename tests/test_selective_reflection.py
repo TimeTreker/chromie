@@ -335,6 +335,85 @@ def test_terminal_history_rejects_replan_but_keeps_memory_learning() -> None:
     assert context["plan_status"] == "completed"
 
 
+def test_reflection_memory_has_trusted_finite_lifetime_independent_of_goal_boundary() -> None:
+    manager = ConversationStateManager(
+        base_conversation_id="reflection-expiry",
+        hard_idle_timeout_sec=3600,
+        reflection_memory_max_ttl_sec=2,
+    )
+    manager.apply_semantic_task_operations_atomically(
+        [
+            {
+                "operation_id": "create-expiry-goal",
+                "operation": "create",
+                "goal": {
+                    "goal_id": "goal-expiry",
+                    "description": "Keep the task open.",
+                    "source_text": "Keep the task open.",
+                },
+            }
+        ],
+        sid="sid-expiry-create",
+        user_text="Keep the task open.",
+    )
+    context = manager._task_context_by_goal_id("goal-expiry")
+    assert context is not None
+    context["evidence_summary"] = {
+        "execution_outcome": {
+            "outcome_id": "outcome-expiry",
+            "turn_id": "turn-expiry",
+            "evidence_ids": ["evidence-expiry"],
+            "status": "failed",
+        }
+    }
+    resolution = ReflectionResolution(
+        opportunity_id="opportunity-expiry",
+        goal_ids=["goal-expiry"],
+        evidence_refs=["outcome-expiry", "evidence-expiry"],
+        reason_codes=["local_calibration"],
+        actions=["propose_memory"],
+        memory_candidates=[
+            {
+                "scope": "session",
+                "kind": "calibration",
+                "text": "Treat the local referent as unsettled in this bounded context.",
+                "confidence": 0.8,
+            }
+        ],
+    )
+
+    manager.apply_reflection_resolution(resolution, sid="sid-expiry")
+
+    entries = [
+        item for item in manager.snapshot()["extracted_memory"]
+        if item["kind"] == "calibration"
+    ]
+    assert len(entries) == 1
+    assert entries[0]["expires_ms"] is not None
+    assert manager._active_task_contexts()
+
+    manager._memory_store.prune_expired(now=float(entries[0]["expires_ms"]) + 1.0)
+
+    assert not any(
+        item["kind"] == "calibration"
+        for item in manager.snapshot()["extracted_memory"]
+    )
+    assert manager._active_task_contexts()
+
+
+def test_reflection_memory_default_max_ttl_never_exceeds_fifteen_minutes() -> None:
+    long_conversation = ConversationStateManager(hard_idle_timeout_sec=7200)
+    short_conversation = ConversationStateManager(hard_idle_timeout_sec=120)
+
+    assert long_conversation.reflection_memory_max_ttl_sec == 900
+    assert short_conversation.reflection_memory_max_ttl_sec == 120
+    assert (
+        long_conversation.session_memory()["forgetting_policy"]
+        ["reflection_memory_max_ttl_sec"]
+        == 900
+    )
+
+
 def test_reflection_prompt_surfaces_terminal_history_and_forbids_global_shortcuts() -> None:
     opportunity = CognitiveOpportunity.create(
         trigger="execution_outcome",

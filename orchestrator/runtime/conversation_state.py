@@ -86,6 +86,7 @@ _TASK_RELATIONS = {
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_TASK_STORE_PATH = ".chromie/conversation/task_contexts.json"
 _DEFAULT_DURABLE_MEMORY_PATH = ".chromie/memory/profile.json"
+_DEFAULT_REFLECTION_MEMORY_MAX_TTL_SEC = 900
 
 
 logger = logging.getLogger("chromie.orchestrator.conversation_state")
@@ -137,12 +138,25 @@ class ConversationStateManager:
         durable_memory_enabled: bool = False,
         durable_memory_path: str | os.PathLike[str] | None = None,
         durable_memory_max_entries: int = 64,
+        reflection_memory_max_ttl_sec: int | None = None,
     ) -> None:
         self.base_conversation_id = base_conversation_id or "local_default"
         self.enabled = enabled
         self.max_turns = max(0, int(max_turns))
         self.soft_idle_timeout_sec = max(1, int(soft_idle_timeout_sec))
         self.hard_idle_timeout_sec = max(1, int(hard_idle_timeout_sec))
+        default_reflection_ttl = min(
+            self.hard_idle_timeout_sec,
+            _DEFAULT_REFLECTION_MEMORY_MAX_TTL_SEC,
+        )
+        self.reflection_memory_max_ttl_sec = max(
+            1,
+            int(
+                default_reflection_ttl
+                if reflection_memory_max_ttl_sec is None
+                else reflection_memory_max_ttl_sec
+            ),
+        )
         self.turn_max_text_chars = max(20, int(turn_max_text_chars))
         self.max_context_chars = max(200, int(max_context_chars))
         self.max_pending_tasks = max(0, int(max_pending_tasks))
@@ -3568,6 +3582,7 @@ class ConversationStateManager:
                 "durable_profile_requires_explicit_forget_or_clear": True,
                 "hard_idle_timeout_sec": self.hard_idle_timeout_sec,
                 "completed_task_retention_sec": self.completed_task_retention_sec,
+                "reflection_memory_max_ttl_sec": self.reflection_memory_max_ttl_sec,
                 "last_split_reason": self.last_split_reason,
             },
         }
@@ -3617,6 +3632,7 @@ class ConversationStateManager:
                 "max_discourse_referents": self.max_discourse_referents,
                 "max_discourse_focus": self.max_discourse_focus,
                 "completed_task_retention_sec": self.completed_task_retention_sec,
+                "reflection_memory_max_ttl_sec": self.reflection_memory_max_ttl_sec,
             },
         }
 
@@ -4835,6 +4851,9 @@ class ConversationStateManager:
                             source_turn_ids=[str(recorded.get("turn_id") or "")]
                             if str(recorded.get("turn_id") or "").strip()
                             else [],
+                            expires_ms=(
+                                now + self.reflection_memory_max_ttl_sec * 1000.0
+                            ),
                             persistence_policy="ephemeral",
                         )
                     )

@@ -221,13 +221,18 @@ Memory is interpretive context, not authority.
    reset and hard-idle expiry, keyed correction updates, explicit memory-route
    updates, trusted outcome memory, Goal Interpreter prompt sanitization,
    conversation/capability prompt migration, and deepthinking memory visibility.
-8. Implemented first offline-review slice: episode evaluation can write compact
+8. Implemented: terminal Goal history may feed evidence-grounded local
+   `experience`/`calibration` proposals without reopening or rewriting the old Goal.
+   Responsibility-control actions remain open-Goal only. The Host materializes those
+   proposals as ephemeral Memory with an independent wall-clock maximum TTL: by
+   default `min(conversation hard-idle timeout, 900 seconds)`, so an active Goal cannot
+   keep local calibration alive indefinitely merely by suppressing the conversation
+   boundary. Reflection cannot choose that lifetime or durable persistence.
+9. Implemented first offline-review slice: episode evaluation can write compact
    reviewed experience notes in `offline_reviews.jsonl` without injecting raw
-   experience logs into prompts. Next design work should let terminal evidence feed
-   bounded `experience`/`calibration` proposals without reopening the old Goal, apply
-   trusted maximum scope/lifetime during Memory materialization, and keep all
-   shared/systemic adaptation on the owner-governed
-   [Experience-To-Ability Learning](EXPERIENCE_TO_ABILITY_LEARNING.md) path.
+   experience logs into prompts. Shared/systemic adaptation stays on the
+   owner-governed [Experience-To-Ability Learning](EXPERIENCE_TO_ABILITY_LEARNING.md)
+   path.
 
 ## Acceptance Criteria
 
@@ -240,4 +245,7 @@ The first implemented slice should prove:
 - runtime-confirmed outcomes can update task memory;
 - model speech alone cannot mark a physical action as completed;
 - typed conversation boundaries and hard-idle expiry remove or expire session memory;
+- Reflection-created local advisory Memory expires on a trusted wall-clock maximum
+  even while an active Goal keeps the conversation open;
+- terminal history can teach future local cognition without reopening the old Goal;
 - docs, unit tests, and scenario fixtures describe the same behavior.

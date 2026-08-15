@@ -33,7 +33,7 @@ Next design/implementation order:
    `native_response`/`fast_speech`, Tool Result Interpretation owns its evidence-bound
    result act, and Response Composer owns only the still-needed acts it composes.
    Goal Association/Runtime bind or exactly reuse; they do not rewrite.
-2. **Epistemic Qualification contract detail.** Do not add an `EpistemicManager`.
+2. **Epistemic Qualification contract detail — first source slice implemented.** Do not add an `EpistemicManager`.
    Extend existing capability/evidence contracts to represent claim-specific required
    observations, provenance/trust-domain independence, alternatives/corroboration,
    validity/freshness, closed-world coverage, and qualification state
@@ -41,7 +41,7 @@ Next design/implementation order:
    Gateway and semantic meaning in GI/GA. Principal recognition/authentication uses
    the ordinary Capability/Provider/Evidence path; authorization/consent remains Host
    policy.
-3. **Forward Adaptation contract detail.** Separate open-Responsibility actions from
+3. **Forward Adaptation contract detail — first source slice implemented.** Separate open-Responsibility actions from
    terminal-history learning proposals. Online Reflection may create only bounded
    advisory experience/calibration; trusted policy caps scope and lifetime and Memory
    materializes it with explicit expiry. It may not modify Stable Mind/shared prompts/models/global
