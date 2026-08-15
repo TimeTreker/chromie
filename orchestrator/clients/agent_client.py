@@ -9,7 +9,7 @@ import aiohttp
 from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
 from shared.chromie_contracts.interaction import InteractionResponse
 from shared.chromie_contracts.goal import GoalAssociationResolution
-from shared.chromie_contracts.plan import CanonicalPlan
+from shared.chromie_contracts.plan import CanonicalPlan, FastPlannerAdvance
 from shared.chromie_contracts.reflection import ReflectionResolution
 from shared.chromie_contracts.response_composition import ResponseCompositionResolution
 from shared.chromie_contracts.social_attention import SocialAttentionPlan, SocialAttentionRequest
@@ -168,6 +168,51 @@ class AgentClient:
                     f"Agent interaction endpoint returned HTTP {resp.status}: {body[:500]}"
                 )
             return InteractionResponse.model_validate_json(body)
+
+    async def resolve_fast_advance(
+        self,
+        session: aiohttp.ClientSession,
+        *,
+        text: str,
+        route_decision: RouteDecision,
+        sid: str | None = None,
+        context: dict[str, Any] | None = None,
+        history: list[dict[str, Any]] | None = None,
+        timeout_ms: int | None = None,
+    ) -> FastPlannerAdvance:
+        effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
+        async with runtime_tracer.span(
+            module=self.TRACE_MODULE,
+            operation="resolve_fast_advance",
+            kind="tool_call",
+            attributes={"endpoint": "/fast-advance", "timeout_ms": effective_timeout_ms},
+        ) as span:
+            req = AgentRequest(
+                sid=sid,
+                text=text,
+                route_decision=route_decision,
+                context=runtime_tracer.inject_carrier(context or {}),
+                history=history or [],
+            )
+            timeout = aiohttp.ClientTimeout(total=effective_timeout_ms / 1000.0)
+            async with session.post(
+                f"{self.base_url}/fast-advance",
+                json=req.model_dump(mode="json"),
+                timeout=timeout,
+            ) as resp:
+                body = await resp.text()
+                span.set_attribute("http_status", resp.status)
+                if resp.status != 200:
+                    raise RuntimeError(
+                        f"Agent fast-advance endpoint returned HTTP {resp.status}: {body[:500]}"
+                    )
+                result = FastPlannerAdvance.model_validate_json(body)
+            runtime_tracer.merge_fragment_from_metadata(result.metadata)
+            span.set_attribute("continuations", ",".join(result.continuations))
+            span.set_attribute(
+                "immediate_vocal", result.immediate_vocal_activity is not None
+            )
+            return result
 
     async def resolve_fast_plan(
         self,

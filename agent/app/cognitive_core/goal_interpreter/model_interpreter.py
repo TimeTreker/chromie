@@ -1078,7 +1078,8 @@ def _goal_interpretation_fast_context_section(mind: Any) -> str:
     return (
         "Fast Goal Interpretation Context:\n"
         f"{_bounded_json(profile, max_chars=1150)}\n"
-        "This voice governs fast_speech. "
+        "This bounded identity/personality context helps interpret self-reference and social meaning; "
+        "it does not authorize Goal Interpretation to write a response. "
         "The full owner-approved mind profile, worldview, lifeview, valueview, "
         "long-term goals, and core principles remain downstream. "
         "Pick context_profile: fast_minimal, session_compact, capability_safety, full_mind."
@@ -1255,19 +1256,19 @@ class OllamaGoalInterpreter:
             f"Active Task/Progress Snapshot JSON:{active_tasks_json}\n\n"
             f"{recent_goals_section}"
             "Current Job:\n"
-            "fast goal-interpretation and responsibility proposer. Understand each independently satisfiable human outcome and emit provider-neutral responsibilities[]. This is Responsibility evidence for Goal Association, not canonical Goal/Work/Activity/Plan. Fast and Deep share this authority: never author Work, Primary Activities, Plan steps, execution lanes, realization, Capability/provider/executable details, execution, or authorization. Terminal references do not reopen Goals. If trusted context fully answers an outcome, use native_response with fast_speech=null. Otherwise, when any Responsibility still requires Work or fresh evidence, normally emit one tiny prospective Goal Progress Communication act in fast_speech; null is exceptional when an equivalent current-turn notification is already delivered/pending or silence is genuinely more appropriate.\n\n"
+            "fast goal-interpretation and responsibility proposer. Understand each independently satisfiable human outcome and emit provider-neutral responsibilities[]. This is Responsibility evidence for downstream cognition: Fast Planner is the first HOW owner when meaning is sufficient, while Goal Association alone owns canonical Goal continuity. Fast and Deep share this interpretation authority: never author Work, Primary Activities, response wording, Plan steps, execution lanes, realization, Capability/provider/executable details, execution, or authorization. Terminal references do not reopen Goals. Always leave fast_speech=null and progress=[]; Planner owns conversational Activities and wording.\n\n"
             "Task Context Group:\n"
             f"Latest user input: {request.text}\n"
             f"Common ability IDs: {_bounded_json(common_ability_ids, max_chars=420)}\n"
             f"Common Ability Catalog JSON: {common_ability_catalog_json}\n"
             "Task Continuity Context, Not Authority:\n"
-            "Use open Goals/progress, active tasks, dialogue, discourse, and Interaction Context by meaning, not lexical shortcuts, as bounded context for the current responsibility delta. Do not author semantic_task_operations or mutate an open Goal/Task here; downstream Task Continuity and Goal Association own canonical lifecycle changes. Keep newer failed/goal-less dialogue salient. fast_speech is the first Goal Progress Communication milestone only when work remains: normally a tiny polite prospective acknowledgement/checking act, never a provider-dependent result or claim that checking already finished. native_response is the immediate answer and therefore requires fast_speech=null. For an external truth check, never state the result before evidence; missing results limit claims, not responsiveness. Omit duplicate fast_speech when an equivalent notification is delivered or pending. delivered speech/trusted terminal effects are done, scheduled/planned work is not.\n"
+            "Use open Goals/progress, active tasks, dialogue, discourse, and Interaction Context by meaning, not lexical shortcuts, as bounded context for the current responsibility delta. Do not author semantic_task_operations or mutate an open Goal/Task here; Goal Association owns canonical lifecycle changes. Keep newer failed/goal-less dialogue salient. Preserve what the user wants, material bindings, and whether fresh work/evidence remains. Do not decide how to acknowledge, clarify, or respond; Fast Planner owns those Activities after this handoff. For an external truth check, never state a result before evidence. delivered speech/trusted terminal effects are done, scheduled/planned work is not.\n"
             "Ability Awareness, Not Planning:\n"
-            "Treat the Common Ability Catalog only as awareness of supported outcome kinds, never a Fast Goal Interpreter selection or Activity-definition surface. Do not output routes[], Activity/Work/Plan contracts, lanes, realization, capability_id/skill_id, executable args/actions, or intent=capability:<id>; exact Work/Activity decomposition and Capability choice belong to Planner after Goal Association. Topical similarity is not support. Stable reasoning needing no fresh evidence stays conversational; current external facts require a provider-neutral information responsibility with completion_requires_work=true and completion_requires_fresh_evidence=true. Never use native_response before provider-dependent evidence. Missing ability is non-executable semantic metadata only.\n\n"
+            "Treat the Common Ability Catalog only as awareness of supported outcome kinds, never a Fast Goal Interpreter selection or Activity-definition surface. Do not output routes[], response wording, Activity/Work/Plan contracts, lanes, realization, capability_id/skill_id, executable args/actions, or intent=capability:<id>; exact HOW belongs to Planner. Topical similarity is not support. Stable reasoning needing no fresh evidence stays conversational; current external facts require a provider-neutral information responsibility with completion_requires_work=true and completion_requires_fresh_evidence=true. Missing ability is non-executable semantic metadata only.\n\n"
             "Compatibility Framing:\n"
             "route/intent are deprecated diagnostic framing only: chat=locally answerable; robot_action=likely embodied effect; tool=trusted external/changing evidence; deep_thought=wider interpretation; clarify=ambiguity. They do not define Work, Activity, lane, realization, Plan, or Capability. Never return interrupt or ignore.\n\n"
             "Output Contract:\n"
-            "Return compact JSON. Required keys: route, intent, confidence, responsibilities, fast_speech, progress. Each responsibilities[] item is provider-neutral: local_ref, outcome, bindings, completion_requires_work, completion_requires_fresh_evidence, confidence. completion_requires_work only says downstream Work remains. Do not put Activity/Work/Plan contracts, lanes, realization, Capability/provider/executable details in responsibilities. Immediate complete answer: route=chat, kind=native_response, fast_speech=null. Otherwise progress=[]; when any responsibility has completion_requires_work=true or completion_requires_fresh_evidence=true, fast_speech should normally be one short prospective Goal Progress Communication act, never result/completion. Use null only when an equivalent current-turn notification is already delivered/pending or silence is genuinely more appropriate; null is not the default for understood unfinished work. Do not output routes[]; compound outcomes belong in responsibilities[] and Goal Association canonicalizes them before Planner decomposes Work/Activities. memory write=memory; recall=chat; durable memory needs current-turn consent. Use child/family first-person speech; never customer-service or processing narration. Omit agents, metadata, candidate_capabilities, explanations, hidden reasoning, markdown, and text outside JSON."
+            "Return compact JSON. Required keys: route, intent, confidence, responsibilities, fast_speech, progress. Each responsibilities[] item is provider-neutral: local_ref, outcome, bindings, completion_requires_work, completion_requires_fresh_evidence, confidence. Ordinary conversation still has Responsibility meaning: for a greeting, emit the responsibility to socially reciprocate/acknowledge the greeting without writing Chromie\'s reply. Set completion_requires_work=true whenever Chromie still needs to perform a conversational or other Activity to satisfy the outcome. completion_requires_work only says further Work remains; it never describes that Work. Do not put response wording, Activity/Work/Plan contracts, lanes, realization, Capability/provider/executable details in responsibilities. The maintained contract requires fast_speech=null and progress=[] because Fast Planner owns the first HOW decision and any conversational Activity. Do not output routes[]; compound outcomes belong in responsibilities[] and later cognition preserves them without letting GI choose implementation. memory write=memory; recall=chat; durable memory needs current-turn consent. Omit agents, metadata, candidate_capabilities, explanations, hidden reasoning, markdown, and text outside JSON."
         )
 
     @staticmethod
@@ -1297,22 +1298,20 @@ class OllamaGoalInterpreter:
         # claim envelope after decoding.
         progress = properties.get("progress")
         if isinstance(progress, dict):
-            progress["description"] = (
-                "Required immediate-answer proposals. Use [] when no responsibility is "
-                "already completely answerable from current trusted cognition. Only "
-                "native_response is allowed; Capability work is Planner-owned."
-            )
+            progress.clear()
+            progress.update({
+                "type": "array",
+                "maxItems": 0,
+                "description": (
+                    "Maintained Goal Interpretation never authors response Activities; "
+                    "Fast Planner owns wording and advancement. Return []."
+                ),
+            })
         properties["fast_speech"] = {
-            "anyOf": [
-                {"type": "string", "minLength": 1, "maxLength": 120},
-                {"type": "null"},
-            ],
+            "type": "null",
             "description": (
-                "Required speech decision. When downstream work remains, use one brief "
-                "natural prospective acknowledgement/checking utterance. When the whole "
-                "responsibility is answered immediately by native_response, use null "
-                "because native_response itself is the immediate speech. Never put a "
-                "provider-dependent result or completed lookup claim here."
+                "Maintained Goal Interpretation does not author speech. Fast Planner is "
+                "the first HOW owner. Return null."
             ),
         }
         schema["required"] = list(
@@ -1407,14 +1406,10 @@ class OllamaGoalInterpreter:
                     "strip exact Capability IDs, executable args/actions, and capability-shaped "
                     "progress instead of repairing them into another executable form. Preserve "
                     "the human outcome and grounded material meaning in responsibilities[]. "
-                    "When provider work or fresh evidence remains, set the responsibility flags "
-                    "accordingly, keep progress=[], and make fast_speech only a prospective "
-                    "acknowledgement/checking utterance with no result facts. If current trusted "
-                    "Mind/context already answers the whole turn with nothing else to do, emit "
-                    "one native_response and set fast_speech=null; the native response itself "
-                    "is the immediate speech. Never repair provider-dependent output into "
-                    "kind=capability; exact Capability selection belongs to Planner after Goal "
-                    "Association. Session memory is "
+                    "Set the responsibility work/fresh-evidence flags from meaning only. "
+                    "Always repair progress to [] and fast_speech to null: Goal Interpretation "
+                    "does not author response wording or Activities. Never repair provider-dependent "
+                    "output into kind=capability; exact HOW belongs to Planner. Session memory is "
                     "ephemeral and must omit consent_basis and retention_days. Return JSON only."
                 ),
             },

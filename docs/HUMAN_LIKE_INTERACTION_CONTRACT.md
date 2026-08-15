@@ -236,14 +236,12 @@ composer nor an execution specialist may reinterpret the Goal, widen effects,
 authorize work, or become a second conversation authority. Physical TaskGraph
 execution remains sequential.
 
-A provider-free already-complete conversational answer may be authored as a Fast
-Goal-Interpretation `native_response`, begin through the existing Vocal runtime, and
-later be bound exactly by Goal Association; Runtime then reuses that act without
-Planner or Response Composer rewriting it. If no such ready act exists, a complete
-non-effectful `spoken_response` Goal that needs no external read, tool, memory
-mutation, or embodied effect may move directly to response composition without
-invoking Fast or Deep Planner. These are model-authored semantic decisions, never a
-greeting phrase table. Each conversational act has one semantic wording owner; exact
+A provider-free already-complete conversational answer is authored by Fast Planner from
+Goal Interpretation's Responsibility evidence. It may begin through the existing Vocal
+runtime immediately. A simple greeting may finish there without Goal Association; if
+persistent work also exists, Fast Planner may author only prospective progress while
+requesting Goal Association. These are model-authored planning decisions, never a Host
+greeting phrase table, and Goal Interpretation does not write the reply. Each conversational act has one semantic wording owner; exact
 reuse is not a second writer. Complete bounded capability work
 belongs on the Fast path. Once that Fast work is completely grounded, exactly
 capability-bound, deterministically safe/authorized, and needs no confirmation, it may
@@ -454,7 +452,7 @@ The Cognitive Gateway admits a turn but does not author semantic speech. Goal
 Interpretation owns the first possible **Goal Progress Communication** milestone.
 Once a nontrivial Goal is sufficiently understood and still requires downstream
 work before a substantive answer or effect, it should normally author one typed,
-non-terminal `fast_speech` notification so the person knows Chromie got the Goal
+non-terminal Fast-Planner progress Activity so the person knows Chromie got the Goal
 and is taking it forward. This is a polite progress notification, not Social
 Attention and not task clarification/confirmation. Missing result evidence limits
 what the wording may claim; it is not itself a reason for silence. A separate Fast
@@ -462,7 +460,7 @@ Response is omitted when the substantive answer is immediate, an equivalent
 notification is already delivered or pending, the user asked for silence, or
 another utterance would only repeat or add empty chatter. The source Goal
 Interpreter owns that semantic choice, and its model-facing output must state the
-choice explicitly: `fast_speech` is notification text or JSON `null`, never omitted.
+choice explicitly in its typed immediate-Activity/continuation output; Goal-Interpreter `fast_speech` is compatibility-only.
 Speech is optional; making the decision is not. The Host deterministically derives
 the typed claim envelope from the selected route instead of asking the model to
 copy system invariants. No second production LLM reviews, repairs, or re-decides

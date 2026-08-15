@@ -97,9 +97,12 @@ provenance，以及 grounded external information 与 weather 两个方法包。
 ## 开发主线
 
 - **当前架构基线**：主 authority seam 已固定为 `Goal Interpretation →
-  Responsibility evidence → Goal Association → Canonical Goal → Planner →
-  Work/Primary Activity → realization → Provider → Evidence`。GI 的 Fast/Deep 只有
-  深度差异，均不得创建 Work、Activity、lane、Capability 或 Plan。
+  Responsibility evidence → Fast Planner 快速推进 →（可立即执行的安全 Activity）
+  和/或 Goal Association / Deep Planner continuation → 需要持久连续性时建立
+  Canonical Goal → canonical planning → Work/Primary Activity → realization → Provider
+  → Evidence`。GI 的 Fast/Deep 只有认知深度/上下文/推理预算差异，authority 和输出
+  相同；均不得写回复文本、创建 Work/Activity、选择 lane/Capability/Plan。Fast
+  Planner 是第一个 HOW owner，但 GA 仍唯一拥有 canonical Goal continuity。
 - **下一阶段设计**：Epistemic Qualification 只负责“证据是否足以建立某个事实”，
   Forward Adaptation 只允许有界的未来认知上下文；二者都不是新的 owner。在线
   Reflection 不得修改共享 Fast/Deep 策略、Stable Mind、全局 prompt/model、授权或

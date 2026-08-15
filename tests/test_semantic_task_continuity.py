@@ -378,7 +378,8 @@ class InterpreterSemanticTaskPromptTests(unittest.TestCase):
         self.assertIn("responsibility delta", prompt)
         self.assertIn("by meaning, not lexical shortcuts", prompt)
         self.assertIn("Do not author semantic_task_operations", prompt)
-        self.assertIn("downstream Task Continuity and Goal Association", prompt)
+        self.assertIn("Goal Association owns canonical lifecycle changes", prompt)
+        self.assertIn("Fast Planner owns those Activities", prompt)
 
 
 class CapabilityInformationGapTests(unittest.TestCase):

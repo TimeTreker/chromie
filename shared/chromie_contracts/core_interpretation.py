@@ -74,10 +74,12 @@ class CoreInterpretationUnavailable(BaseModel):
 class CognitiveResponsibilityProposal(BaseModel):
     """Core-owned provider-neutral interpretation of one human responsibility.
 
-    Goal Association is still the only stage that can create or mutate canonical
-    Goals. This proposal preserves what Fast Goal Interpretation understood while
-    deliberately carrying no Work/Primary-Activity contract, Capability identity,
-    plan step, execution lane, realization, or execution method.
+    This is the authoritative WHAT handoff from Goal Interpretation to downstream
+    cognition. Fast Planner is the first HOW owner when meaning is sufficient, while
+    Goal Association remains the only stage that can create or mutate canonical Goals.
+    The proposal deliberately carries no response wording, Work/Primary-Activity
+    contract, Capability identity, plan step, execution lane, realization, or
+    execution method.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -112,12 +114,11 @@ class CognitiveResponsibilityProposal(BaseModel):
 
 
 class CognitiveProgressCandidate(BaseModel):
-    """Complete immediate conversational progress understood before Goal closure.
+    """Legacy compatibility shape for GI-authored pre-Goal speech.
 
-    The only maintained pre-Goal readiness form is ``native_response``: trusted
-    cognition already contains the complete answer and no new work is needed for
-    that responsibility. Capability selection and executable arguments belong to
-    Fast/Deep Planner after Goal Association.
+    Maintained Goal Interpretation now emits Responsibility evidence only. Fast Planner
+    owns the first HOW decision and any immediately-ready conversational Activity. This
+    type remains temporarily for older direct compatibility callers and retained traces.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)

@@ -187,42 +187,31 @@ questions:
 
 When the answers are sufficient, that part may advance while unrelated cognition
 continues **only inside the authority already established for that part**. This is
-the general runtime rule behind responsive conversation and later parallel work;
-it never allows Fast Goal Interpretation to skip Goal Association or Planner for
-provider work. It must not be implemented as a weather phrase rule, route shortcut,
-or second semantic authority.
+the general runtime rule behind responsive conversation and later parallel work. Goal
+Interpretation itself stops at Responsibility evidence; once that WHAT is sufficient,
+Fast Planner is the first HOW owner. It must not be implemented as a greeting/weather
+phrase rule, route shortcut, or second semantic authority.
 
-A complete native conversational response is another locally ready form of
-progress. When Fast Understanding can already answer from the current Mind and
-bounded conversation context without external acquisition, unresolved reference,
-provider evidence, effect, or deeper reasoning, it may author one substantive
-`native_response` and start it through the existing Vocal runtime while Goal
-Association continues. This is distinct from `fast_speech`: `fast_speech` only
-communicates prospective progress when work remains, whereas `native_response`
-may satisfy a conversational Goal. For one single-lane Responsibility the two
-are mutually exclusive: immediate complete answer means `native_response` with
-`fast_speech=null`; capability/evidence work means no provider-dependent result
-may appear in `fast_speech`. Host normalization cannot convert an explicit chat
-answer into capability acknowledgement merely because another field names an
-exact Capability; that DTO is contradictory and receives at most one mechanical
-retransmission. The early Vocal result remains turn-scoped until Goal Association
-explicitly binds that exact progress candidate to a canonical `spoken_response`
-Goal; canonical delivery may then reuse the exact speech/result instead of
-speaking it again. This is a **planless, already-complete conversational act**, not a
-Work/Primary-Activity proposal. Goal Interpretation is the sole semantic wording owner
-for that exact act; Goal Association only binds provenance and Runtime only adopts or
-reuses it. Response Composer is intentionally skipped for the same act rather than
-becoming a second writer. The Host may validate and bind that model-authored act but
-may not rewrite it or infer its Goal from text similarity.
+Fast Planner has a bounded pre-Goal advancement phase. It may author one immediately
+ready provider-free conversational Activity and decide whether canonical Goal continuity
+and/or deeper HOW planning is additionally required. For a simple greeting, the Fast
+Plan may consist only of a complete conversational Activity such as greeting back; no
+persistent Goal is required. For weather, resource, effectful, or other continuing work,
+Fast Planner may start a short prospective progress Activity while requesting Goal
+Association. If HOW exceeds its bounded planning budget, it may also request Deep
+Planner. These are typed continuation dispositions: Fast Planner does not itself create
+Goals or invoke another semantic owner.
 
-A fully specified non-effectful read still needs the correct semantic owners. Fast
-Goal Interpretation may already know the information Responsibility and material
-bindings such as location/date, but that does not make an exact provider request
-its output. Goal Association first binds or creates the canonical Goal; Fast or
-Deep Planner then selects the exact read Capability and executable arguments. Once
-that Plan is valid and the trusted runtime verifies read-only, schema, confirmation,
-and authorization constraints, the read may execute without waiting for unrelated
-later cognition. The resulting observation retains exact Goal/Plan, capability
+Goal Association remains the only canonical Goal-continuity authority. A fully specified
+non-effectful read still needs canonical Goal grounding when the Responsibility must
+persist for fresh evidence. Goal Interpretation may already know the information
+Responsibility and material bindings such as location/date; Fast Planner may author
+immediate conversational progress, but that does not make an exact provider request
+pre-Goal output. Goal Association binds or creates the canonical Goal; canonical Fast or
+Deep Planner then selects the exact read Capability and executable arguments. Once that
+Plan is valid and the trusted runtime verifies read-only, schema, confirmation, and
+authorization constraints, the read may execute without waiting for unrelated later
+cognition. The resulting observation retains exact Goal/Plan, capability
 version, arguments, schema identity, timestamps, and provenance.
 
 Effectful work is different. Physical motion, object manipulation, writes,
@@ -367,37 +356,37 @@ ordinary Core cognition.
 
 ## 5. Goal understanding and planning
 
-The Core associates the admitted turn with active goals and creates only
-genuinely independent new goals. A complete non-effectful `spoken_response`
-responsibility that needs no external read, memory retrieval/mutation, unresolved
-reference, or embodied effect may already have started as a Fast-Understanding
-`native_response`; Goal Association then explicitly binds that candidate to the
-canonical Goal and the Host may adopt/reuse the exact Vocal act. If no such
-ready candidate exists, a resolved `spoken_response` Goal may still move directly
-from `GOALS_RESOLVED` to `READY_TO_RESPOND`. Neither path invokes Fast or Deep
-Planner merely to transport speech. Both are model-authored semantic results,
+Goal Interpretation first emits provider-neutral Responsibility evidence. The maintained
+Core then asks Fast Planner for the smallest useful advancement **before** assuming a
+persistent Goal is needed. A simple clear greeting can therefore become one immediate
+Vocal Activity and finish without Goal Association. This is model-authored planning,
 never a Host greeting phrase table or `route == chat` shortcut.
 
-When capability work or broader planning is required, the planning path is:
+When continuity, fresh evidence, provider/effect work, retained-Goal modification, or
+broader planning is required, Fast Planner returns typed continuation dispositions. The
+Core mechanically follows them:
 
 ```text
-UserTurnEnvelope
-  -> GoalAssociationResolution
-  -> Fast Planner
+UserTurnEnvelope + Responsibility evidence
+  -> FastPlannerAdvance
+       |-> immediate safe conversational Activity (optional)
+       |-> Goal Association when persistent continuity is required
+       `-> Deep Planner requested when HOW exceeds fast budget
+  -> GoalAssociationResolution (when requested)
+  -> canonical Fast Planner, or direct Deep Planner when pre-Goal Fast Planner requested it
   -> terminal CanonicalPlan
-     or explicit escalation to Deep Planner
   -> deterministic validation
   -> confirmation and commitment
 ```
 
-Fast and Deep planning use the same `CanonicalPlan` contract. Fast Goal
-Interpretation contributes provider-neutral Responsibility evidence; it does not
-author Work or a Primary-Activity contract and does not choose Plan steps, execution
-lanes, realization, exact Capabilities, or executable arguments.
-`completion_requires_work` is only a need-for-work fact, never a Work description.
-Goal Association owns the canonical Goal transition between interpretation and
-planning. Planner model reasoning then chooses semantic Work/Primary Activities,
-Plan steps, parameters, ordering, and per-goal prospective outcomes. Deterministic
+Fast and Deep canonical planning use the same `CanonicalPlan` contract. Fast Goal
+Interpretation contributes provider-neutral Responsibility evidence; it does not author
+response wording, Work, a Primary-Activity contract, Plan steps, execution lanes,
+realization, exact Capabilities, or executable arguments. `completion_requires_work` is
+only a need-for-work fact, never a Work description. Fast Planner owns HOW; Goal
+Association owns only canonical Goal continuity when requested. Planner model reasoning
+then chooses semantic Work/Primary Activities, Plan steps, parameters, ordering, and
+per-goal prospective outcomes. Deterministic
 code checks schemas, capability
 availability, source-effect bounds, resources, confirmation requirements, and
 forbidden low-level controls. Validation cannot invent missing meaning or
@@ -636,16 +625,15 @@ Outcome reconciliation is a Core stage after execution. It:
    cancelled, or needs a bounded replan;
 5. exposes one immutable result bundle to the final response composer.
 
-Streaming changes scheduling, not authority. Raw model-token deltas, partial
-JSON, private reasoning, and incomplete sentences are not speech contracts and
-must never reach TTS. Goal Interpretation's model-facing Fast Response decision is
-required-but-nullable: `fast_speech` must be a short string or explicit JSON `null`.
-The Host derives deterministic typed claim-envelope fields after decoding; it does
-not infer silence from an omitted decision. The Host may schedule a complete,
-independently schema-valid `fast_speech` or `ResponseStage` only after Host validation
-authorizes it against the applicable correlation, commitment/evidence state,
-claim guards, and cancellation generation. It need not wait for unrelated later
-response fields.
+Streaming changes scheduling, not authority. Raw model-token deltas, partial JSON,
+private reasoning, and incomplete sentences are not speech contracts and must never
+reach TTS. In maintained cognitive apply, Goal Interpretation does not author speech.
+The first early speech contract is a complete typed Fast-Planner conversational Activity.
+The Host may schedule that Activity as soon as its provider-free claim/effect boundaries,
+turn correlation, cancellation generation, and Vocal transport contract validate; it
+need not wait for Goal Association or unrelated later response fields. Legacy Goal-
+Interpreter `fast_speech`/`native_response` fields remain compatibility-only and are not
+maintained wording authority.
 
 Current-turn conversational-act reuse is correlated by the exact speech-event
 ID together with its turn, structured stage, purpose, route, intent,
@@ -670,11 +658,11 @@ results, and `ExecutionOutcomeBundle` closure owns trusted Activity and
 provider-backed Vocal outcomes. No entry edits or upgrades another owner's
 evidence.
 
-Before Goal Association, two bounded continuity surfaces are available. First,
-Gateway-admitted user turns are published immediately as accepted dialogue
-history; this preserves references across overlapping turns without creating a
-Goal or Task. Second, recent session events form volatile Interaction Context for
-Goal Interpretation and Goal Association. Goal Interpretation receives that
+Before Goal Association, bounded continuity remains available to Goal Interpretation and
+Fast Planner. First, Gateway-admitted user turns are published immediately as accepted
+dialogue history; this preserves references across overlapping turns without creating a
+Goal or Task. Second, recent session events form volatile Interaction Context for Goal
+Interpretation, Fast Planner, and Goal Association. Goal Interpretation receives that
 dialogue together with compact active/recent Goal and Task/progress projections.
 Goal Association receives the richer bounded Goal/Task/discourse view. Within one
 conversation, Goal Association is serialized at its semantic-state boundary; a

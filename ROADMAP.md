@@ -19,20 +19,25 @@ organized by capability, risk, and retained evidence.
 ## Immediate architecture line — consolidate the reviewed authority baseline
 
 The broad architecture-discovery phase is closed. New work starts from the canonical
-`Goal Interpretation → Responsibility evidence → Goal Association → Canonical Goal →
-Planner → Work/Primary Activities → realization → Provider → Evidence` authority seam
+`Goal Interpretation → Responsibility evidence → Fast Planner advancement → immediate
+safe Activity and/or Goal Association/Deep continuation → Canonical Goal when persistent
+continuity is required → canonical planning → Work/Primary Activities → realization →
+Provider → Evidence` authority seam
 and must pass the Charter's architecture-irreducibility review before adding a new
 principle, owner, persistent state concept, manager, workflow, contract field, or
 mechanism.
 
 Next design/implementation order:
 
-1. **Conversational-act wording ownership — docs closure first.** Preserve the current
-   low-latency `native_response` path as a planless already-complete act. One semantic
-   writer owns each conversational act: Goal Interpretation may own eligible
-   `native_response`/`fast_speech`, Tool Result Interpretation owns its evidence-bound
-   result act, and Response Composer owns only the still-needed acts it composes.
-   Goal Association/Runtime bind or exactly reuse; they do not rewrite.
+1. **Fast Planner first-advancement seam — implemented in the maintained path.** Keep
+   Responsibility evidence as Goal Interpretation's provider-neutral WHAT handoff. The
+   same Fast Planner is the first HOW owner: before canonical Goal binding it may author
+   one immediate safe conversational Activity and typed continuation dispositions for
+   Goal Association and/or Deep Planner. Goal Association remains the only canonical
+   Goal-continuity authority; commitment-bearing Capability work still requires
+   applicable canonical Goal grounding and trusted validation. Goal-Interpreter
+   `native_response`/`fast_speech` survive only as compatibility vocabulary and are not
+   maintained wording owners.
 2. **Epistemic Qualification contract detail — first source slice implemented.** Do not add an `EpistemicManager`.
    Extend existing capability/evidence contracts to represent claim-specific required
    observations, provenance/trust-domain independence, alternatives/corroboration,

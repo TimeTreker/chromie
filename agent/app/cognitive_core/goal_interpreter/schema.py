@@ -196,10 +196,12 @@ class RouteItem(OptionalCapabilityIdentityModel):
 class FastResponsibilityProposal(BaseModel):
     """Provider-neutral human outcome understood by Fast Goal Interpretation.
 
-    This is semantic evidence for Goal Association, not a Goal, Work/Primary-Activity
-    contract, Plan, Capability selection, execution realization, or authorization. ``bindings`` preserve material meaning
-    already present in the user turn or trusted context without choosing how that
-    outcome will be achieved.
+    This Responsibility evidence is the authoritative semantic handoff to downstream
+    cognition. Fast Planner is the first HOW owner when meaning is sufficient; Goal
+    Association alone owns canonical Goal continuity. The proposal is not a Goal,
+    Work/Primary-Activity contract, response, Plan, Capability selection, execution
+    realization, or authorization. ``bindings`` preserve material meaning without
+    choosing how the outcome will be achieved.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -235,11 +237,11 @@ class FastResponsibilityProposal(BaseModel):
 
 
 class FastProgressProposal(BaseModel):
-    """Complete immediate conversational progress from Fast Goal Interpretation.
+    """Legacy compatibility shape for pre-Planner conversational progress.
 
-    Fast Goal Interpretation may expose only a ``native_response`` that is already
-    complete from trusted cognition. Capability-shaped work belongs to the Planner
-    after Goal Association and therefore cannot appear in this DTO.
+    Maintained Goal Interpretation no longer authors this field: its model-facing
+    contract requires ``progress=[]`` and Fast Planner owns conversational Activities
+    and wording. The type remains only while older direct RouteDecision adapters exist.
     """
 
     model_config = ConfigDict(extra="forbid")

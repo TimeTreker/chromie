@@ -324,12 +324,13 @@ def audit() -> dict[str, Any]:
         "agent/app/cognitive_core/goal_interpreter/prompts/goal_interpreter_system.txt"
     )
     for required in (
-        "Responsibility evidence for Goal Association, not canonical Goal/Work/Activity/Plan",
-        "Fast and Deep share this boundary",
-        "Never author Work, Primary Activities, Plan steps",
+        "Responsibility evidence for downstream cognition",
+        "Fast Planner is the first HOW owner when meaning is sufficient",
+        "Fast and Deep Goal Interpretation share this boundary",
+        "Never author Work, Primary Activities, response wording, Plan steps",
         "Do not output routes[]",
         "Activity/Work/Plan contracts",
-        "Exact Work/Activity decomposition and Capability selection are Planner-owned after Goal Association",
+        "Exact Work/Activity decomposition and Capability selection are Planner-owned",
     ):
         if required not in goal_interpreter_prompt:
             errors.append(
@@ -343,6 +344,15 @@ def audit() -> dict[str, Any]:
         )
 
     fast_planner = _read("agent/app/fast_planner.py")
+    for required in (
+        "async def resolve_advance",
+        "Fast Planner advance requires authoritative Responsibility evidence",
+        "Goal Association owns canonical Goal continuity",
+        "This phase never emits",
+        "executable capability steps and never authorizes effects",
+    ):
+        if required not in fast_planner:
+            errors.append("Fast Planner lost pre-Goal advancement boundary: " + required)
     deep_planner = _read("agent/app/deep_planner.py")
     for name, source in (("Fast Planner", fast_planner), ("Deep Planner", deep_planner)):
         if "self.max_contract_repairs = max(0, min(1, int(max_contract_repairs)))" not in source:

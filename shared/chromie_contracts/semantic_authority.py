@@ -96,14 +96,13 @@ def semantic_authority_route_matrix() -> list[dict[str, Any]]:
                 "apply preconditions pass"
             ),
             "planner_path": (
-                "Core readiness may start only complete provider-free native Vocal while "
-                "Goal Association continues; provider work cannot start before canonical "
-                "Goal Association. Goal Association binds provider-neutral responsibilities "
-                "and native progress to canonical Goals; completely bound native conversation "
-                "may adopt canonical speech without Planner or Response Composer, otherwise "
-                "Fast/Deep Planner selects exact Capability work before trusted execution; "
-                "background Social Attention is separately anchored to semantic primary "
-                "human-observable Activities"
+                "Goal Interpretation emits provider-neutral Responsibility evidence; Fast "
+                "Planner is the first HOW owner and may author one immediate safe conversational "
+                "Activity plus typed Goal-Association/Deep-Planner continuations. Simple terminal "
+                "conversation needs no persistent Goal. When continuity is requested, Goal "
+                "Association alone mutates canonical Goal state; canonical Fast/Deep Planner then "
+                "selects exact Capability work before trusted execution. Background Social "
+                "Attention is separately anchored to semantic primary human-observable Activities"
             ),
             "fallback": "fail_closed_after_authority_acquisition",
         },

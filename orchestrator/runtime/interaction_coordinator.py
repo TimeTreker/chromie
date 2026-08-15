@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import time
 from collections.abc import Awaitable, Callable, Iterable
@@ -16,6 +17,7 @@ from agent.app.tool_invocation import (
     ToolInvocationContext,
 )
 from shared.chromie_contracts.core_interpretation import CognitiveProgressCandidate
+from shared.chromie_contracts.plan import FastPlannerVocalActivity
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
@@ -95,6 +97,16 @@ def _int_env(name: str, default: int, *, minimum: int = 0) -> int:
     except ValueError:
         return default
     return max(minimum, value)
+
+
+@dataclass
+class ReadyPlannerVocalExecution:
+    """One Fast-Planner-authored conversational Activity entering the Vocal lane."""
+
+    activity: FastPlannerVocalActivity
+    interaction_id: str
+    speech: InteractionSpeech
+    task: asyncio.Task[SkillRuntimeResult]
 
 
 @dataclass
@@ -225,6 +237,81 @@ class InteractionRuntimeCoordinator:
 
     def skill_definition(self, skill_id: str):
         return self.registry.get(skill_id)
+
+    async def start_fast_planner_vocal_activity(
+        self,
+        activity: FastPlannerVocalActivity,
+        *,
+        session_id: str,
+        turn_id: str,
+        language: str,
+    ) -> ReadyPlannerVocalExecution:
+        """Start one planner-authored immediate conversational Activity.
+
+        This path carries no canonical Goal or completion authority.  It exists so
+        a safe progress/clarification act may begin while Goal Association or
+        deeper planning continues in parallel.
+        """
+
+        text = " ".join(activity.response_text.strip().split())
+        speech = InteractionSpeech(
+            id=f"fast_activity_speech_{activity.activity_id}",
+            text=text,
+            timing="immediate",
+            style="brief",
+            priority="normal",
+            interruptible=True,
+            metadata={
+                "source": "fast_planner_advance",
+                "phase": "fast_planner_immediate",
+                "speech_act": activity.speech_act,
+                "turn_id": turn_id,
+                "session_id": session_id,
+                "language": language,
+                "fast_activity_id": activity.activity_id,
+                "source_responsibility_refs": list(activity.source_responsibility_refs),
+                "canonical_goal_binding_pending": True,
+                "goal_completion_authority": False,
+                "execution_lane": "vocal",
+                "delivery_role": activity.role,
+                "wait_for_playback_start": True,
+                "playback_start_required_for_delivery": True,
+            },
+        )
+        interaction_id = f"fast_advance_{turn_id}_{activity.activity_id}"
+        response = InteractionResponse(
+            interaction_id=interaction_id,
+            status="ok",
+            speech=[speech],
+            metadata={
+                "source": "fast_planner_advance",
+                "turn_id": turn_id,
+                "session_id": session_id,
+                "language": language,
+                "fast_activity_id": activity.activity_id,
+                "source_responsibility_refs": list(activity.source_responsibility_refs),
+                "canonical_goal_binding_pending": True,
+                "goal_completion_authority": False,
+            },
+        )
+        task = asyncio.create_task(self.runtime.execute(response))
+
+        def observe_completion(completed: asyncio.Task[SkillRuntimeResult]) -> None:
+            if completed.cancelled():
+                return
+            exc = completed.exception()
+            if exc is not None:  # delivery failure is evidence, not semantic replanning
+                logger.warning(
+                    "fast_planner_vocal_activity_failed turn_id=%s activity_id=%s "
+                    "error_type=%s error=%s",
+                    turn_id,
+                    activity.activity_id,
+                    type(exc).__name__,
+                    exc,
+                )
+
+        task.add_done_callback(observe_completion)
+        return ReadyPlannerVocalExecution(activity, interaction_id, speech, task)
 
     async def start_ready_native_response(
         self,

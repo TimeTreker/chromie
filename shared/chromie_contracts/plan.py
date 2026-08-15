@@ -38,6 +38,120 @@ ParameterResolutionStrategy = Literal[
     "unresolvable",
 ]
 GoalSatisfactionStatus = Literal["exact", "substantial", "partial", "unsatisfied"]
+FastPlannerContinuation = Literal["goal_association", "deep_planner"]
+FastVocalActivityRole = Literal["complete_response", "progress", "clarification"]
+
+
+class FastPlannerVocalActivity(BaseModel):
+    """One immediately-ready conversational Activity authored by Fast Planner.
+
+    This is a planner-owned semantic Activity, not a Goal Interpretation field and
+    not execution evidence.  It may complete a simple conversational
+    responsibility, provide prospective progress while slower work continues, or
+    ask a clarification question.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    activity_id: str = Field(min_length=1, max_length=160)
+    role: FastVocalActivityRole
+    response_text: str = Field(min_length=1, max_length=600)
+    speech_act: str = Field(default="inform", min_length=1, max_length=120)
+    source_responsibility_refs: list[str] = Field(min_length=1)
+
+    @field_validator("activity_id", "response_text", "speech_act", mode="before")
+    @classmethod
+    def normalize_vocal_text(cls, value: Any) -> Any:
+        return " ".join(value.strip().split()) if isinstance(value, str) else value
+
+    @field_validator("source_responsibility_refs", mode="before")
+    @classmethod
+    def normalize_responsibility_refs(cls, value: Any) -> list[str]:
+        return _normalize_ids(value)
+
+
+class FastPlannerAdvance(BaseModel):
+    """Fast Planner's pre-Goal advancement decision over Responsibility evidence.
+
+    Fast Goal Interpretation owns WHAT the user appears to want.  This contract is
+    the first planner-owned decision about HOW to advance that meaning.  It may
+    author one immediately-ready conversational Activity and may request Goal
+    Association and/or Deep Planner continuation.  It cannot mutate canonical Goal
+    state or authorize effects.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: int = Field(default=1, ge=1)
+    turn_id: str = Field(min_length=1, max_length=160)
+    planner_tier: Literal["fast"] = "fast"
+    covered_responsibility_refs: list[str] = Field(default_factory=list)
+    immediate_vocal_activity: FastPlannerVocalActivity | None = None
+    continuations: list[FastPlannerContinuation] = Field(default_factory=list)
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    unresolved: list[str] = Field(default_factory=list)
+    reason_summary: str = ""
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("turn_id", "reason_summary", mode="before")
+    @classmethod
+    def normalize_advance_text(cls, value: Any) -> Any:
+        return " ".join(value.strip().split()) if isinstance(value, str) else value
+
+    @field_validator("covered_responsibility_refs", "continuations", "unresolved", mode="before")
+    @classmethod
+    def normalize_advance_lists(cls, value: Any) -> list[str]:
+        return _normalize_ids(value)
+
+    @field_validator("metadata")
+    @classmethod
+    def reject_advance_low_level_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
+        return reject_forbidden_low_level_fields(value)
+
+    @model_validator(mode="after")
+    def validate_advance_contract(self) -> "FastPlannerAdvance":
+        if "deep_planner" in self.continuations and "goal_association" not in self.continuations:
+            raise ValueError(
+                "Deep Planner continuation requires Goal Association so deeper planning "
+                "receives canonical Goal state"
+            )
+        if not self.continuations and self.immediate_vocal_activity is None:
+            raise ValueError(
+                "a terminal Fast Planner advance requires an immediate conversational Activity"
+            )
+        if self.immediate_vocal_activity is not None:
+            unknown = set(self.immediate_vocal_activity.source_responsibility_refs) - set(
+                self.covered_responsibility_refs
+            )
+            if unknown:
+                raise ValueError(
+                    "immediate vocal Activity references uncovered Responsibility refs: "
+                    + ",".join(sorted(unknown))
+                )
+        return self
+
+
+class FastPlannerAdvanceModelOutput(BaseModel):
+    """Schema-constrained model payload before host-owned turn identity is attached."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    covered_responsibility_refs: list[str] = Field(default_factory=list)
+    immediate_vocal_activity: FastPlannerVocalActivity | None = None
+    continuations: list[FastPlannerContinuation] = Field(default_factory=list)
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    unresolved: list[str] = Field(default_factory=list)
+    reason_summary: str = ""
+
+    @field_validator("covered_responsibility_refs", "continuations", "unresolved", mode="before")
+    @classmethod
+    def normalize_output_lists(cls, value: Any) -> list[str]:
+        return _normalize_ids(value)
+
+    @field_validator("reason_summary", mode="before")
+    @classmethod
+    def normalize_output_text(cls, value: Any) -> Any:
+        return " ".join(value.strip().split()) if isinstance(value, str) else value
 
 
 def _normalize_ids(value: Any) -> list[str]:

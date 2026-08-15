@@ -64,9 +64,19 @@ except ImportError:  # pragma: no cover
     from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 
 try:
-    from chromie_contracts.plan import CanonicalPlan
+    from chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    from chromie_contracts.plan import (
+        CanonicalPlan,
+        FastPlannerAdvance,
+        FastPlannerAdvanceModelOutput,
+    )
 except ImportError:  # pragma: no cover
-    from shared.chromie_contracts.plan import CanonicalPlan
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    from shared.chromie_contracts.plan import (
+        CanonicalPlan,
+        FastPlannerAdvance,
+        FastPlannerAdvanceModelOutput,
+    )
 
 logger = logging.getLogger("chromie.agent.fast_planner")
 
@@ -123,6 +133,118 @@ class FastPlannerResolver:
         self.num_predict = max(128, int(num_predict))
         self.max_capabilities = max(1, min(64, int(max_capabilities)))
         self.max_contract_repairs = max(0, min(1, int(max_contract_repairs)))
+
+    async def resolve_advance(self, request: AgentRunRequest) -> FastPlannerAdvance:
+        """Advance authoritative Responsibility evidence before canonical Goal binding.
+
+        This is the same Fast Planner at an earlier lifecycle point, not another
+        planner module.  It owns the first HOW decision after Goal Interpretation:
+        an immediately-ready conversational Activity, whether persistent Goal
+        continuity is needed, and whether HOW exceeds the fast planning budget.
+        """
+
+        context = request.context if isinstance(request.context, dict) else {}
+        raw_responsibilities = context.get("responsibility_proposals") or []
+        responsibilities: list[CognitiveResponsibilityProposal] = []
+        for raw in raw_responsibilities:
+            try:
+                responsibilities.append(CognitiveResponsibilityProposal.model_validate(raw))
+            except (ValidationError, ValueError, TypeError):
+                continue
+        if not responsibilities:
+            raise ValueError(
+                "Fast Planner advance requires authoritative Responsibility evidence"
+            )
+
+        responsibility_refs = [item.local_ref for item in responsibilities]
+        capabilities = await self.catalog.prompt_entries(scope="common", refresh=False)
+        capability_awareness = [
+            {
+                "capability_id": item.capability_id,
+                "description": item.description,
+                "effects": list(item.effects),
+                "safety_class": item.safety_class,
+                "available": bool(item.available and item.interaction_executable),
+            }
+            for item in capabilities[: self.max_capabilities]
+        ]
+        response_schema = FastPlannerAdvanceModelOutput.model_json_schema()
+        options = {
+            "temperature": 0,
+            "top_p": 0.9,
+            "num_ctx": min(self.num_ctx, 4096),
+            "num_predict": min(self.num_predict, 384),
+        }
+        raw = await self.ollama.generate(
+            self._advance_layered_prompt(
+                request,
+                responsibilities=responsibilities,
+                capability_awareness=capability_awareness,
+            ),
+            system=self._advance_system_prompt(),
+            options=options,
+            response_format=response_schema,
+            prompt_family="fast_planner.advance",
+            turn_id=request.sid,
+            attempt=1,
+        )
+        if not isinstance(raw, dict):
+            raise ValueError("Fast Planner advance response is not a JSON object")
+        output = FastPlannerAdvanceModelOutput.model_validate(raw)
+        continuation_set = set(output.continuations)
+        route = str(request.route_decision.route or "").strip()
+        if any(item.completion_requires_fresh_evidence for item in responsibilities):
+            if "goal_association" not in continuation_set:
+                raise ValueError(
+                    "fresh-evidence Responsibilities require Goal Association continuity"
+                )
+        if route not in {"chat", "clarify"} and "goal_association" not in continuation_set:
+            raise ValueError(
+                "non-conversational/effect-bearing compatibility framing requires Goal "
+                "Association before canonical execution planning"
+            )
+        if set(output.covered_responsibility_refs) != set(responsibility_refs):
+            raise ValueError(
+                "Fast Planner advance must cover exactly the authoritative Responsibility refs"
+            )
+        activity = output.immediate_vocal_activity
+        if activity is not None:
+            if not set(activity.source_responsibility_refs).issubset(responsibility_refs):
+                raise ValueError(
+                    "Fast Planner immediate Activity references unknown Responsibility refs"
+                )
+            by_ref = {item.local_ref: item for item in responsibilities}
+            if activity.role == "complete_response" and any(
+                by_ref[ref].completion_requires_fresh_evidence
+                for ref in activity.source_responsibility_refs
+            ):
+                raise ValueError(
+                    "Fast Planner cannot complete a fresh-evidence Responsibility before evidence"
+                )
+            if output.continuations and activity.role == "complete_response":
+                raise ValueError(
+                    "a continuing Fast Planner advance may only emit progress or clarification speech"
+                )
+            if not output.continuations and activity.role == "progress":
+                raise ValueError(
+                    "terminal Fast Planner advance cannot end on progress-only speech"
+                )
+        advance = FastPlannerAdvance(
+            turn_id=str(request.sid or "turn-fast-advance"),
+            covered_responsibility_refs=output.covered_responsibility_refs,
+            immediate_vocal_activity=activity,
+            continuations=output.continuations,
+            confidence=output.confidence,
+            unresolved=output.unresolved,
+            reason_summary=output.reason_summary,
+            metadata={
+                "semantic_authority": "fast_planner_model",
+                "phase": "pre_goal_advancement",
+                "execution_authority": "none",
+                "capability_selection_authority": "deferred_until_canonical_planning",
+            },
+        )
+        return advance
 
     async def resolve(self, request: AgentRunRequest) -> CanonicalPlan:
         trace_scope = runtime_tracer.continue_from_context(request.context)
@@ -928,6 +1050,78 @@ class FastPlannerResolver:
             "FINAL AUTHORITATIVE CONTRACT REPAIR ERRORS JSON:\n"
             f"{validation_errors or '[]'}\n"
             "When this list is non-empty, correct every listed defect in the fresh object. If an error reports an expected aggregate disposition, author exactly that disposition unless you also revise the underlying per-goal outcomes consistently."
+        )
+
+    def _advance_layered_prompt(
+        self,
+        request: AgentRunRequest,
+        *,
+        responsibilities: list[CognitiveResponsibilityProposal],
+        capability_awareness: list[dict[str, Any]],
+    ) -> LayeredPrompt:
+        context = request.context if isinstance(request.context, dict) else {}
+        identity_world = (
+            "Owner-approved Chromie identity JSON:\n"
+            f"{bounded_identity_json(context)}\n\n"
+            "Owner-approved Personality Expression JSON:\n"
+            f"{bounded_personality_json(context)}\n\n"
+        )
+        responsibilities_json = self._bounded(
+            [item.model_dump(mode="json", exclude_none=True) for item in responsibilities],
+            4800,
+        )
+        active_goals = self._bounded(context.get("active_goal_snapshots") or [], 2800)
+        interaction_context = self._bounded(context.get("interaction_context") or {}, 2600)
+        capability_json = self._bounded(capability_awareness, 4200)
+        rendered = (
+            identity_world
+            + IDENTITY_SEMANTIC_CONTRACT
+            + "\n\n"
+            + PERSONALITY_SEMANTIC_CONTRACT
+            + "\n\n"
+            + "Current user turn:\n"
+            f"{request.text}\n\n"
+            "Authoritative Responsibility evidence from Goal Interpretation:\n"
+            f"{responsibilities_json}\n\n"
+            "Current active Goal snapshots for continuity awareness only:\n"
+            f"{active_goals}\n\n"
+            "Interaction Context (delivered/pending acts; do not repeat them):\n"
+            f"{interaction_context}\n\n"
+            "Common capability awareness (planning awareness only; this pre-Goal phase "
+            "must not emit executable capability steps):\n"
+            f"{capability_json}\n\n"
+            "Decide the smallest useful advancement now. Cover every Responsibility ref exactly. "
+            "You may author one immediate conversational Activity. Use role=complete_response only "
+            "when that Activity itself fully satisfies its referenced Responsibility from current "
+            "trusted Mind/context. Use role=progress for a short prospective acknowledgement while "
+            "work/evidence/Goal continuity continues. Use role=clarification when user input is the "
+            "missing material information. Do not claim provider results, physical execution, memory "
+            "writes, or completion without evidence.\n\n"
+            "Continuations: add goal_association when the Responsibility must persist, modify/continue "
+            "retained Goal state, wait for evidence/provider/effects, or otherwise requires canonical "
+            "continuity. Add deep_planner only when HOW is too complex for the Fast planning budget; "
+            "deep_planner always also requires goal_association. If an ordinary conversational "
+            "Responsibility can be completed safely and immediately, use no continuations. Fast and "
+            "Deep Goal Interpretation own WHAT; do not reinterpret or rewrite Responsibility meaning. "
+            "Goal Association owns canonical Goal continuity. This Fast Planner owns HOW and wording "
+            "of any Activity it authors. Return JSON only."
+        )
+        return LayeredPrompt.promote(
+            rendered,
+            identity_world=(identity_world,),
+            operating_contract=(IDENTITY_SEMANTIC_CONTRACT, PERSONALITY_SEMANTIC_CONTRACT),
+        )
+
+    @staticmethod
+    def _advance_system_prompt() -> str:
+        return (
+            "You are Chromie's Fast Planner operating immediately after Goal Interpretation and "
+            "before canonical Goal binding. Responsibility evidence is authoritative WHAT; do not "
+            "reinterpret it. Decide the smallest HOW advancement: one safe immediate conversational "
+            "Activity if useful, plus whether Goal Association and/or Deep Planner continuation is "
+            "needed. Goal Association alone owns canonical Goal mutation. This phase never emits "
+            "executable capability steps and never authorizes effects. Keep the response childlike, "
+            "natural, and concise. Return only schema-constrained JSON."
         )
 
     def _layered_prompt(

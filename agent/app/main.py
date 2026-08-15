@@ -702,10 +702,10 @@ async def interpret_cognitive_turn(
         item.model_dump(mode="json", exclude_none=True)
         for item in decision.responsibilities
     ]
-    progress_proposals = [
-        item.model_dump(mode="json", exclude_none=True)
-        for item in decision.progress
-    ]
+    # Maintained Goal Interpretation owns WHAT only. Conversational Activity
+    # wording belongs to Fast Planner, so legacy GI progress is not promoted into
+    # the Core interpretation handoff.
+    progress_proposals: list[dict[str, object]] = []
     projection = SharedRouteDecision.model_validate(
         decision.model_dump(mode="json", exclude={"progress", "responsibilities"})
     )
@@ -715,6 +715,17 @@ async def interpret_cognitive_turn(
         responsibility_proposals=responsibility_proposals,
         progress_proposals=progress_proposals,
     )
+
+@app.post("/fast-advance")
+async def resolve_fast_advance(request: AgentRunRequest):
+    if fast_planner_resolver is None:
+        raise HTTPException(status_code=503, detail="Fast planner is disabled")
+    # This is the same Fast Planner before canonical Goal binding.  Agent Skill
+    # disclosure remains deferred until canonical planning because pre-Goal
+    # advancement may author only a conversational Activity and continuation
+    # dispositions, never executable Capability steps.
+    return await fast_planner_resolver.resolve_advance(request)
+
 
 @app.post("/fast-plan")
 async def resolve_fast_plan(request: AgentRunRequest):

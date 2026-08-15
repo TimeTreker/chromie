@@ -139,7 +139,7 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
             "sid",
         )
 
-    def test_core_authored_tool_acknowledgement_is_scheduled_before_slow_runtime(self):
+    def test_apply_bypasses_goal_interpreter_speech_and_defers_fast_response_to_planner(self):
         response = InteractionResponse(
             speech=[{"text": "北京今天没有雨。", "timing": "after_skills"}],
             metadata={"source": "goal_driven_cognitive_runtime"},
@@ -194,13 +194,8 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
 
         asyncio.run(run())
 
-        self.assertEqual(
-            events,
-            ["acknowledgement_scheduled", "runtime_started"],
-        )
-        self.assertFalse(
-            assistant._launch_interaction_calls[0][1]["reset_playback"]
-        )
+        self.assertEqual(events, ["runtime_started"])
+        self.assertTrue(assistant._launch_interaction_calls[0][1]["reset_playback"])
 
     def test_active_named_goal_cancel_fails_closed_before_state_mutation(self):
         assistant = VoiceAssistant.__new__(VoiceAssistant)

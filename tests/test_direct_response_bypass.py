@@ -15,6 +15,7 @@ from orchestrator.runtime.cognitive_runtime import (
     GoalDrivenRuntimeCoordinator,
 )
 from shared.chromie_contracts.goal import GoalAssociationResolution
+from shared.chromie_contracts.plan import FastPlannerAdvance, FastPlannerVocalActivity
 from shared.chromie_contracts.response_composition import (
     DirectResponseComposition,
     goal_association_fingerprint,
@@ -52,17 +53,25 @@ class DirectRuntimeClient:
         self,
         association: GoalAssociationResolution,
         composition: DirectResponseComposition,
+        advance: FastPlannerAdvance | None = None,
     ) -> None:
         self.association = association
         self.composition = composition
+        self.advance = advance
         self.calls: list[str] = []
+
+    async def resolve_fast_advance(self, *args, **kwargs):
+        self.calls.append("advance")
+        if self.advance is None:
+            raise AssertionError("unexpected pre-Goal Fast Planner advance")
+        return self.advance
 
     async def resolve_goal_association(self, *args, **kwargs):
         self.calls.append("association")
         return self.association
 
     async def resolve_fast_plan(self, *args, **kwargs):
-        raise AssertionError("Fast Planner must be bypassed for direct speech")
+        raise AssertionError("canonical Fast Planner must be bypassed for direct speech")
 
     async def resolve_deep_plan(self, *args, **kwargs):
         raise AssertionError("Deep Planner must be bypassed for direct speech")
@@ -242,10 +251,24 @@ class DirectResponseComposerTests(unittest.TestCase):
 
 
 class DirectResponseRuntimeTests(unittest.TestCase):
-    def test_runtime_skips_fast_and_deep_planners(self) -> None:
+    def test_runtime_lets_fast_planner_complete_greeting_before_goal_association(self) -> None:
         association = direct_association()
         composition = direct_composition(association)
-        client = DirectRuntimeClient(association, composition)
+        advance = FastPlannerAdvance(
+            turn_id="turn-direct",
+            covered_responsibility_refs=["greeting"],
+            immediate_vocal_activity=FastPlannerVocalActivity(
+                activity_id="activity-greeting",
+                role="complete_response",
+                response_text="你好呀！",
+                speech_act="greeting",
+                source_responsibility_refs=["greeting"],
+            ),
+            continuations=[],
+            confidence=0.98,
+            reason_summary="Clear greeting can be completed immediately.",
+        )
+        client = DirectRuntimeClient(association, composition, advance)
         coordinator = GoalDrivenRuntimeCoordinator(
             agent_client=client,
             adapter=CanonicalPlanRuntimeAdapter(NoopInteractionRuntime()),
@@ -270,22 +293,34 @@ class DirectResponseRuntimeTests(unittest.TestCase):
                 text="你好",
                 sid="sid-direct",
                 route_decision=route,
-                context={"history": [], "active_goal_snapshots": []},
+                context={
+                    "history": [],
+                    "active_goal_snapshots": [],
+                    "responsibility_proposals": [
+                        {
+                            "local_ref": "greeting",
+                            "outcome": "Socially reciprocate the user's greeting.",
+                            "bindings": {},
+                            "completion_requires_work": True,
+                            "completion_requires_fresh_evidence": False,
+                            "confidence": 0.98,
+                        }
+                    ],
+                },
                 history=[],
                 language="zh-CN",
             )
         )
 
         self.assertEqual(result.status, "applied")
-        self.assertEqual(client.calls, ["association", "compose"])
+        self.assertEqual(client.calls, ["advance"])
+        self.assertIsNotNone(result.fast_advance)
+        self.assertIsNone(result.goal_association)
         self.assertIsNone(result.fast_plan)
         self.assertIsNone(result.terminal_plan)
-        self.assertEqual(
-            result.interaction_response.speech[0].text,
-            "你好呀！",
-        )
-        self.assertTrue(result.metadata["planless_direct_response"])
-        self.assertTrue(result.metadata["deep_planner_avoided"])
+        self.assertIsNone(result.response_composition)
+        self.assertEqual(result.interaction_response.speech[0].text, "你好呀！")
+        self.assertTrue(result.metadata["fast_planner_terminal_without_goal"])
 
     def test_direct_response_evidence_uses_goal_association_fingerprint(self) -> None:
         association = direct_association()

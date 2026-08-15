@@ -4430,18 +4430,17 @@ class VoiceAssistant:
             self._launch_interaction(safe_response, session_id)
             return True, decision
 
-        core_fast_first_scheduled, fast_first_hedge = (
-            await _start_fast_first_delivery(
-                self,
-                decision,
-                user_text,
-                session_id,
-            )
-        )
-        runtime_context = _context_with_scheduled_fast_speech(
-            context,
-            decision,
-            scheduled=core_fast_first_scheduled,
+        # Maintained apply mode gives the first HOW/wording decision to Fast
+        # Planner. Goal Interpretation contributes Responsibility evidence only, so
+        # its legacy fast_speech/native_response compatibility fields must not race
+        # the planner and become a second semantic writer. The cognitive runtime
+        # starts any planner-authored immediate Vocal Activity itself, allowing it
+        # to overlap Goal Association/deeper planning when continuation is needed.
+        fast_first_hedge = None
+        runtime_context = dict(context)
+        self.session_log(
+            session_id,
+            "fast_response_owner=fast_planner_advance gi_fast_speech_bypassed=true",
         )
         resolution = await self._run_cognitive_runtime_pipeline(
             session,
@@ -4457,6 +4456,11 @@ class VoiceAssistant:
             resolution = resolution.model_copy(
                 update={"turn_envelope": turn_envelope}
             )
+        fast_planner_vocal_scheduled = bool(
+            resolution.fast_advance is not None
+            and resolution.fast_advance.immediate_vocal_activity is not None
+            and resolution.fast_advance.continuations
+        )
         summary = self._cognitive_resolution_summary(resolution)
         metadata = dict(decision.metadata or {})
         metadata["cognitive_runtime_resolution"] = summary
@@ -4471,7 +4475,7 @@ class VoiceAssistant:
                 session_id=session_id,
             )
             fast_first_scheduled = (
-                core_fast_first_scheduled or hedge_scheduled
+                fast_planner_vocal_scheduled or hedge_scheduled
             )
             safe_response = await self._compose_cognitive_failure_response(
                 resolution,
@@ -4719,7 +4723,7 @@ class VoiceAssistant:
                 session_id=session_id,
             )
             fast_first_scheduled = (
-                core_fast_first_scheduled or hedge_scheduled
+                fast_planner_vocal_scheduled or hedge_scheduled
             )
             resolution = resolution.model_copy(
                 deep=True,
@@ -4843,7 +4847,7 @@ class VoiceAssistant:
             decision=decision,
             session_id=session_id,
         )
-        fast_first_scheduled = core_fast_first_scheduled or hedge_scheduled
+        fast_first_scheduled = fast_planner_vocal_scheduled or hedge_scheduled
         if await self._stage_interaction_confirmation(
             response,
             session_id,

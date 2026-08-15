@@ -1371,7 +1371,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "b53054b7fa71bf1b07d302c2e5a707aa87894d11ad85462572403760c6d89e18",
+      "body_sha256": "be5fad8098ccb762dcb340b9dc2f0859f7e6cad5a01f32246ec159728c8be369",
       "failure_signals": [
         "diagnostic",
         "return",

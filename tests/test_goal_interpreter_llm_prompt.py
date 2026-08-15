@@ -106,30 +106,30 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("Generalization-first principle", prompt)
         self.assertIn("Responsibility Before Framing", prompt)
         self.assertIn("provider-neutral responsibilities", prompt)
-        self.assertIn("Responsibility evidence for Goal Association, not canonical Goal/Work/Activity/Plan", prompt)
+        self.assertIn("Responsibility evidence for downstream cognition", prompt)
+        self.assertIn("Fast Planner is the first HOW owner", prompt)
+        self.assertIn("Goal Association alone owns canonical Goal continuity", prompt)
         self.assertIn("completion_requires_fresh_evidence", prompt)
         self.assertIn("Ability Awareness, Not Planning", prompt)
         self.assertIn("not a Fast-GI selection or Activity-definition surface", prompt)
-        self.assertIn("Exact Work/Activity decomposition and Capability selection are Planner-owned after Goal Association", prompt)
-        self.assertIn("Never emit kind=capability progress", prompt)
-        self.assertIn("Goal Progress Communication", prompt)
-        self.assertIn("not an independent Goal or Planner step", prompt)
+        self.assertIn("Exact Work/Activity decomposition and Capability selection are Planner-owned", prompt)
+        self.assertIn("Always return fast_speech=null and progress=[]", prompt)
+        self.assertIn("Fast Planner receives the authoritative user input plus Responsibility evidence", prompt)
         self.assertIn("Current external facts", prompt)
         self.assertIn("provider-neutral information responsibility", prompt)
-        self.assertIn("Uncertainty And Confirmation Acting Rule", prompt)
+        self.assertIn("Uncertainty Boundary", prompt)
         self.assertIn("Capability Inquiry And Execution", prompt)
         self.assertIn("Availability questions stay chat", prompt)
         self.assertIn("Do not output routes[]", prompt)
         self.assertIn("Activity/Work/Plan contracts", prompt)
-        self.assertIn("Never author Work, Primary Activities, Plan steps", prompt)
+        self.assertIn("Never author Work, Primary Activities, response wording, Plan steps", prompt)
         self.assertIn("Missing abilities may appear only as non-executable metadata", prompt)
         self.assertIn(
             "return compact JSON with required route, intent, confidence, responsibilities, fast_speech, progress",
             prompt,
         )
-        self.assertIn("progress[] is native_response only", prompt)
-        self.assertIn("child/family first-person speech", prompt)
-        self.assertIn("processing narration", prompt)
+        self.assertIn("requires fast_speech=null and progress=[]", prompt)
+        self.assertIn("Do not output routes[]", prompt)
         self.assertIn("or intent=capability:<id>", prompt)
         self.assertIn("hidden reasoning", prompt)
         self.assertNotIn("Tool And Affordance Proposal", prompt)
@@ -197,7 +197,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("Capability Inquiry And Execution", system)
         self.assertIn("Availability questions stay chat", system)
         self.assertIn("robot_action/tool are compatibility framing only, never Activity/execution contracts", system)
-        self.assertIn("Exact Work/Activity decomposition and Capability selection are Planner-owned after Goal Association", system)
+        self.assertIn("Exact Work/Activity decomposition and Capability selection are Planner-owned", system)
         self.assertIn("Generalization-first principle", system)
         self.assertIn("technical discussion about another system", system)
         self.assertIn("Addressedness", system)
@@ -267,7 +267,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("Topical similarity is not support", prompt)
         self.assertIn("Stable reasoning needing no fresh evidence", prompt)
         self.assertIn("Activity/Work/Plan contracts", prompt)
-        self.assertIn("never author Work, Primary Activities, Plan steps", prompt)
+        self.assertIn("never author Work, Primary Activities, response wording, Plan steps", prompt)
 
     def test_semantic_ignore_requires_inactive_host_engagement_evidence(self) -> None:
         inactive = RouteRequest(
@@ -388,18 +388,19 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("capability_safety", prompt)
         self.assertIn("full_mind", prompt)
         self.assertIn("fast goal-interpretation and responsibility proposer", prompt)
-        self.assertIn("Responsibility evidence for Goal Association", prompt)
-        self.assertIn("never author Work, Primary Activities, Plan steps", prompt)
+        self.assertIn("Responsibility evidence for downstream cognition", prompt)
+        self.assertIn("Fast Planner is the first HOW owner", prompt)
+        self.assertIn("never author Work, Primary Activities, response wording, Plan steps", prompt)
         self.assertIn("Ability Awareness, Not Planning", prompt)
         self.assertIn("never a Fast Goal Interpreter selection or Activity-definition surface", prompt)
-        self.assertIn("exact Work/Activity decomposition and Capability choice belong to Planner after Goal Association", prompt)
-        self.assertIn("Do not output routes[], Activity/Work/Plan contracts", prompt)
-        self.assertIn("exact Work/Activity decomposition and Capability choice belong to Planner after Goal Association", prompt)
+        self.assertIn("exact HOW belongs to Planner", prompt)
+        self.assertIn("Do not output routes[], response wording, Activity/Work/Plan contracts", prompt)
+        self.assertIn("exact HOW belongs to Planner", prompt)
         self.assertIn("responsibilities[]", prompt)
         self.assertIn("completion_requires_fresh_evidence", prompt)
-        self.assertIn("Immediate complete answer: route=chat, kind=native_response", prompt)
-        self.assertIn("Goal Progress Communication", prompt)
-        self.assertIn("fast_speech should normally be one short prospective Goal Progress Communication act", prompt)
+        self.assertIn("for a greeting, emit the responsibility to socially reciprocate/acknowledge", prompt)
+        self.assertIn("fast_speech=null and progress=[]", prompt)
+        self.assertIn("Fast Planner owns the first HOW decision", prompt)
         self.assertIn("Common ability IDs", prompt)
         self.assertIn("Common Ability Catalog JSON", prompt)
         self.assertIn("soridormi.blink_eyes", prompt)
@@ -422,7 +423,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertNotIn("Protect humans first.", prompt)
         self.assertNotIn("Become a useful companion robot.", prompt)
         self.assertIn("hidden reasoning", contract_prompt)
-        self.assertIn("processing narration", contract_prompt)
+        self.assertIn("does not authorize Goal Interpretation to write a response", contract_prompt)
         self.assertLess(len(prompt), 5800)
 
     def test_fast_interpreter_prompt_uses_common_ability_catalog_not_full_catalog(self) -> None:
@@ -1534,7 +1535,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
 
 
 
-    def test_primary_prompt_treats_fast_speech_as_default_polite_progress_notification(self) -> None:
+    def test_primary_prompt_hands_conversational_activity_wording_to_fast_planner(self) -> None:
         interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
@@ -1551,33 +1552,24 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         user_prompt = interpreter.build_user_prompt(request)
 
         for rendered in (system_prompt, user_prompt):
-            self.assertIn("Goal Progress Communication", rendered)
-            self.assertIn("polite", rendered)
-            self.assertIn("normally", rendered)
-            self.assertIn("limit claims, not responsiveness", rendered)
-        self.assertIn("immediate answer", system_prompt)
-        self.assertIn("equivalent notification", user_prompt)
-        self.assertIn("customer-service", user_prompt)
-        self.assertIn("first-person speech", user_prompt)
-        self.assertIn("first-person", user_prompt)
-        self.assertIn("processing narration", user_prompt)
+            self.assertIn("Responsibility", rendered)
+            self.assertIn("Fast Planner", rendered)
+            self.assertIn("fast_speech=null", rendered)
+            self.assertIn("progress=[]", rendered)
+        self.assertIn("does not author conversational Activities", system_prompt)
+        self.assertIn("Do not decide how to acknowledge, clarify, or respond", user_prompt)
+        self.assertIn("Fast Planner owns those Activities", user_prompt)
         self.assertIn("external truth check", user_prompt)
         self.assertIn("before evidence", user_prompt)
 
-    def test_model_facing_schema_requires_explicit_fast_speech_decision(self) -> None:
+    def test_model_facing_schema_forbids_goal_interpreter_speech_authorship(self) -> None:
         schema = OllamaGoalInterpreter._route_response_schema()
         self.assertIn("fast_speech", schema["required"])
-        self.assertIn("route", schema["required"])
-        self.assertIn("intent", schema["required"])
-        self.assertIn("confidence", schema["required"])
-        fast_speech = schema["properties"]["fast_speech"]
-        self.assertEqual(
-            fast_speech["anyOf"],
-            [
-                {"type": "string", "minLength": 1, "maxLength": 120},
-                {"type": "null"},
-            ],
-        )
+        self.assertIn("progress", schema["required"])
+        self.assertEqual(schema["properties"]["fast_speech"]["type"], "null")
+        self.assertEqual(schema["properties"]["progress"]["type"], "array")
+        self.assertEqual(schema["properties"]["progress"]["maxItems"], 0)
+        self.assertIn("Fast Planner", schema["properties"]["fast_speech"]["description"])
 
     def test_model_facing_schema_exposes_responsibility_and_native_progress_boundary(self) -> None:
         schema = OllamaGoalInterpreter._route_response_schema()
@@ -1592,7 +1584,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(progress["properties"]["response_text"]["minLength"], 1)
         self.assertNotIn("capability_id", progress["properties"])
         self.assertNotIn("args", progress["properties"])
-        self.assertIn("Capability-shaped progress is forbidden", progress["description"])
+        self.assertEqual(schema["properties"]["progress"]["maxItems"], 0)
 
         self.assertIn("outcome", responsibility["properties"])
         self.assertIn("bindings", responsibility["properties"])

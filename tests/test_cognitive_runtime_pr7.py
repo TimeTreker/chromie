@@ -30,7 +30,7 @@ from shared.chromie_contracts.execution_outcome import (
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.interaction import output_schema_sha256
 from shared.chromie_contracts.mind import default_mind_profile
-from shared.chromie_contracts.plan import CanonicalPlan
+from shared.chromie_contracts.plan import CanonicalPlan, FastPlannerAdvance, FastPlannerVocalActivity
 from shared.chromie_contracts.response_composition import (
     CoordinatedResponsePlan,
     ResponseCompositionResolution,
@@ -66,6 +66,19 @@ class FakeRuntime:
         return self.definitions[skill_id]
 
 
+class FastAdvanceRuntime(FakeRuntime):
+    def __init__(self, definitions: list[SkillDefinition] | None = None):
+        super().__init__(definitions)
+        self.started_fast_activities: list[tuple[str, str]] = []
+
+    async def start_fast_planner_vocal_activity(
+        self, activity, *, session_id: str, turn_id: str, language: str
+    ):
+        del session_id, language
+        self.started_fast_activities.append((turn_id, activity.response_text))
+        return object()
+
+
 class ScriptedClient:
     def __init__(
         self,
@@ -73,15 +86,23 @@ class ScriptedClient:
         association: GoalAssociationResolution,
         fast_plans: list[CanonicalPlan],
         deep_plans: list[CanonicalPlan] | None = None,
+        fast_advances: list[FastPlannerAdvance] | None = None,
         composition_status: str = "resolved",
     ):
         self.association = association
         self.fast_plans = list(fast_plans)
         self.deep_plans = list(deep_plans or [])
+        self.fast_advances = list(fast_advances or [])
         self.composition_status = composition_status
         self.deep_contexts: list[dict] = []
         self.compose_contexts: list[dict] = []
         self.calls: list[str] = []
+
+    async def resolve_fast_advance(self, *args, **kwargs):
+        self.calls.append("advance")
+        if not self.fast_advances:
+            raise AssertionError("unexpected pre-Goal Fast Planner advance")
+        return self.fast_advances.pop(0)
 
     async def resolve_goal_association(self, *args, **kwargs):
         self.calls.append("association")
@@ -482,6 +503,156 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             )
         )
 
+
+    def test_fast_planner_progress_starts_before_goal_association(self):
+        events: list[str] = []
+
+        class Runtime(FastAdvanceRuntime):
+            async def start_fast_planner_vocal_activity(
+                self, activity, *, session_id: str, turn_id: str, language: str
+            ):
+                events.append("vocal_activity_started")
+                return await super().start_fast_planner_vocal_activity(
+                    activity,
+                    session_id=session_id,
+                    turn_id=turn_id,
+                    language=language,
+                )
+
+        class Client(ScriptedClient):
+            async def resolve_fast_advance(self, *args, **kwargs):
+                events.append("advance")
+                return await super().resolve_fast_advance(*args, **kwargs)
+
+            async def resolve_goal_association(self, *args, **kwargs):
+                events.append("association")
+                return await super().resolve_goal_association(*args, **kwargs)
+
+        advance = FastPlannerAdvance(
+            turn_id="turn-weather",
+            covered_responsibility_refs=["weather"],
+            immediate_vocal_activity=FastPlannerVocalActivity(
+                activity_id="weather-progress",
+                role="progress",
+                response_text="我看看今天下午重庆会不会下雨～",
+                speech_act="acknowledge",
+                source_responsibility_refs=["weather"],
+            ),
+            continuations=["goal_association"],
+            confidence=0.96,
+            reason_summary="Fresh weather needs continuity while progress can speak now.",
+        )
+        client = Client(
+            association=new_goal_association(),
+            fast_plans=[respond_plan()],
+            fast_advances=[advance],
+        )
+        runtime = Runtime()
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(runtime),
+            policy=CognitiveRuntimePolicy(mode="apply", apply_lanes=frozenset({"chat", "tool"})),
+        )
+        route = type(
+            "Decision",
+            (),
+            {"route": "tool", "intent": "weather_query", "language": "zh-CN"},
+        )()
+
+        result = asyncio.run(
+            coordinator.resolve(
+                object(),
+                text="今天下午重庆会下雨吗？",
+                sid="turn-weather",
+                route_decision=route,
+                context={
+                    "history": [],
+                    "active_goal_snapshots": [],
+                    "responsibility_proposals": [
+                        {
+                            "local_ref": "weather",
+                            "outcome": "Tell the user whether it will rain in Chongqing this afternoon.",
+                            "bindings": {"location": "重庆", "day_part": "afternoon"},
+                            "completion_requires_work": True,
+                            "completion_requires_fresh_evidence": True,
+                            "confidence": 0.96,
+                        }
+                    ],
+                },
+                history=[],
+                language="zh-CN",
+            )
+        )
+
+        self.assertEqual(result.status, "applied")
+        self.assertEqual(events[:3], ["advance", "vocal_activity_started", "association"])
+        self.assertEqual(runtime.started_fast_activities[0][1], "我看看今天下午重庆会不会下雨～")
+        self.assertEqual(client.calls[:3], ["advance", "association", "fast"])
+
+    def test_fast_planner_complexity_disposition_skips_second_fast_plan_after_goal_binding(self):
+        advance = FastPlannerAdvance(
+            turn_id="turn-complex",
+            covered_responsibility_refs=["fetch-water"],
+            immediate_vocal_activity=FastPlannerVocalActivity(
+                activity_id="fetch-progress",
+                role="progress",
+                response_text="好呀，我看看怎么过去帮你拿～",
+                speech_act="acknowledge",
+                source_responsibility_refs=["fetch-water"],
+            ),
+            continuations=["goal_association", "deep_planner"],
+            confidence=0.91,
+            reason_summary="Meaning is clear but HOW needs deeper planning.",
+        )
+        deep = respond_plan().model_copy(update={"planner_tier": "deep"})
+        client = ScriptedClient(
+            association=new_goal_association(),
+            fast_plans=[],
+            deep_plans=[deep],
+            fast_advances=[advance],
+        )
+        runtime = FastAdvanceRuntime()
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(runtime),
+            policy=CognitiveRuntimePolicy(mode="apply", apply_lanes=frozenset({"chat", "robot_action"})),
+        )
+        route = type(
+            "Decision",
+            (),
+            {"route": "robot_action", "intent": "fetch_water", "language": "zh-CN"},
+        )()
+
+        result = asyncio.run(
+            coordinator.resolve(
+                object(),
+                text="去那边把水拿回来给我。",
+                sid="turn-complex",
+                route_decision=route,
+                context={
+                    "history": [],
+                    "active_goal_snapshots": [],
+                    "responsibility_proposals": [
+                        {
+                            "local_ref": "fetch-water",
+                            "outcome": "Obtain the referenced water and bring it back to the requester.",
+                            "bindings": {},
+                            "completion_requires_work": True,
+                            "completion_requires_fresh_evidence": False,
+                            "confidence": 0.94,
+                        }
+                    ],
+                },
+                history=[],
+                language="zh-CN",
+            )
+        )
+
+        self.assertEqual(result.status, "applied")
+        self.assertEqual(client.calls, ["advance", "association", "deep", "compose"])
+        self.assertIsNone(result.fast_plan)
+        self.assertEqual(result.terminal_plan.planner_tier, "deep")
+        self.assertEqual(result.metadata["fast_planner_path"], "pre_goal_deep_escalation")
 
     def test_runtime_trace_profiles_actual_goal_driven_modules(self):
         client = ScriptedClient(

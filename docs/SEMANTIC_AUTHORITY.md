@@ -37,7 +37,7 @@ independently from immutable projections of that authoritative turn. Parallel
 output preparation does not create another semantic owner: a response composer
 cannot reinterpret Goals or authorize effects, and an execution specialist
 cannot become the conversation authority. Wording ownership is per conversational
-act: a Goal-Interpretation `native_response`/eligible progress act, a Tool Result
+act: a Fast-Planner immediate conversational Activity, a Tool Result
 act, and a Response-Composition act each retain exactly one writer, while later
 stages may only bind/reuse the exact act or author a genuinely different delta.
 
@@ -73,21 +73,20 @@ semantic plan after the Goal-driven Runtime acquires a turn.
 
 | Entrypoint | Semantic owner | Role | Planner path | Failure behavior |
 |---|---|---|---|---|
-| Orchestrator turn in `apply`; mapped route lane is allowlisted and apply preconditions pass | Goal-Driven Cognitive Core (current Goal-driven Runtime) | authoritative | Goal Association → Fast Planner → terminal Deep Planner when required → Response Composer → trusted adapter | Fail closed after ownership is acquired. |
+| Orchestrator turn in `apply`; mapped route lane is allowlisted and apply preconditions pass | Goal-Driven Cognitive Core (current Goal-driven Runtime) | authoritative | Goal Interpretation → Responsibility evidence → pre-Goal Fast Planner advancement → optional immediate Activity + optional Goal Association → canonical Fast/Deep Planner when required → Response Composer → trusted adapter | Fail closed after ownership is acquired. |
 | Orchestrator turn in `apply`; mapped route lane is excluded | Goal-Driven Cognitive Core policy boundary | authoritative fail-closed | No semantic planner is entered; deprecated externally supplied `actions[]` remain unexecuted compatibility input only | Return a typed no-action/error outcome without legacy semantic re-entry. |
 | Orchestrator turn in `report_only` | Goal-Driven Cognitive Core (current Goal-driven Runtime) | observer | Same stages, evidence only | The existing routed Agent path remains the only authority. |
 | Agent `/interaction` or `/run` with deprecated exact `actions[]` compatibility input | No new semantic planner; legacy action materializer | adapter | Schema validation and `SkillRequest` materialization only | Invalid actions are blocked or clarified; no LLM reinterpretation and no claim that Fast Goal Interpretation authored them. |
 | Explicit compatibility emergency | Legacy CapabilityAgent | authoritative | Legacy capability semantic planner | Requires both service gates and a per-turn emergency claim. |
 
-The maintained direct speech-only path has two bounded forms. If Goal
-Interpretation already owns an exact provider-free `native_response`, Goal
-Association binds that candidate to the canonical speech Goal and Runtime adopts/reuses
-it without invoking Planner or Response Composer for the same act. Otherwise a
-complete non-effectful speech Goal may move directly to Response Composition without
-Fast/Deep Planner. Both paths change latency, not Goal or effect authority: no
-Work/Activity/Capability contract is authored by Goal Interpretation, and trusted Host
-still owns delivery. Capability-dependent reads are not this branch; their factual
-speech follows trusted execution evidence.
+The maintained direct speech-only path is Fast-Planner-owned. Goal Interpretation emits
+Responsibility evidence only. Fast Planner may determine that a simple non-effectful
+conversational Responsibility is completeable immediately, author the conversational
+Activity, and return no Goal/Deep continuation; Runtime then delivers it through the
+trusted Vocal path without creating a persistent Goal or invoking Response Composer for
+the same act. This changes latency, not effect authority. Capability-dependent reads are
+not this terminal branch; Fast Planner requests Goal Association for their persistent
+fresh-evidence responsibility and factual speech follows trusted execution evidence.
 
 When Goal Association explicitly binds one Goal with `entity_type=action_list`,
 Fast and Deep Planning require a bounded model-authored semantic completeness

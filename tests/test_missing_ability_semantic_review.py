@@ -55,10 +55,11 @@ class MissingAbilityPrimaryInterpretationTests(unittest.IsolatedAsyncioTestCase)
 
         self.assertIn("fast Goal Interpretation model", system_text)
         self.assertIn("Missing abilities may appear only as non-executable metadata", system_text)
-        self.assertIn("Responsibility evidence for Goal Association", system_text)
+        self.assertIn("Responsibility evidence for downstream cognition", system_text)
         self.assertIn("chromie_default_mind", user_text)
         self.assertIn("owner-approved mind profile", user_text)
-        self.assertIn("child/family first-person speech", user_text)
+        self.assertIn("Fast Planner owns those Activities", user_text)
+        self.assertNotIn("child/family first-person speech", user_text)
         self.assertIn("chromie.weather.lookup", user_text)
 
     async def test_primary_missing_ability_is_terminal_after_one_model_call(self) -> None:
@@ -79,8 +80,7 @@ class MissingAbilityPrimaryInterpretationTests(unittest.IsolatedAsyncioTestCase)
                         "content": (
                             '{"route":"clarify",'
                             '"intent":"missing_or_unsupported_ability",'
-                            '"confidence":0.96,"fast_speech":'
-                            '"我知道你想找附近好吃的地方，不过这个我现在还不会查。",'
+                            '"confidence":0.96,"fast_speech":null,'
                             '"progress":[],"metadata":{"desired_abilities":[{'
                             '"ability_id":"local.restaurant_recommendation",'
                             '"intent":"推荐用户附近的餐厅",'
