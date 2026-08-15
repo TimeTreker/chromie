@@ -480,23 +480,32 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    alternatives, or broader value reasoning may escalate to Deep cognition, but
    escalation cannot weaken an already applicable safety or authorization
    boundary.
-29. **Social Attention is optional decoration of a primary observable Activity,
-   not a Goal or execution lane.** A concrete human-observable Activity such as
-   scheduled speech/Vocal, body motion, handover, vocal performance, or media
-   playback may independently carry small contextual embodied cues such as gaze,
-   blink, nod, a small wave, or slight posture/orientation. The anchor is the
-   primary Activity itself, not `understanding_ready`, Goal Association, planning,
-   waiting, evidence arrival, or another internal cognitive milestone. Decoration
-   is optional, interruptible, non-disruptive, subordinate, and fail-soft: it must
-   not author or alter response meaning, create or satisfy a Goal, delay or fail
-   primary work, weaken confirmation/safety, or appear as a third Vocal/Activity
-   lane. Accepted body decoration executes through Activity with an explicit
-   auxiliary role and no Goal-completion authority. Each distinct primary Activity
-   may independently choose `none` or expression; conflict or safety/resource
-   pressure simply removes that decoration. The same physical Capability is
-   ordinary Activity when explicitly requested by the user. A social event
-   important enough to change what Chromie should do must escalate through normal
-   Cognitive Core / Goal reasoning. Unanchored baseline embodiment remains a
+29. **Social Attention is optional decoration of a semantic primary observable
+   Activity, not a Goal, execution lane, or execution modality.** The anchor says
+   what Chromie is doing—for example greet someone, tell a joke, walk toward a
+   person, sing a song, hand over water, or show/play something. How that Activity
+   is realized is a lower layer: `Vocal`/`Activity` are execution lanes; speaking,
+   expressive speech, recitation, singing, humming, and nonverbal vocalization are
+   modes of one `Vocal Expression`; body/media Capability IDs are implementation
+   facts. Responsibility/Goal is above Activity: one Goal may own several semantic
+   Activities/Work items, while a qualified high-level provider may realize one
+   whole Activity atomically. Whether “greet Alice” remains one Activity or is
+   decomposed into “say hello” and “wave” follows canonical Work/Plan/provider
+   granularity—not Vocal/body modality. The anchor is the primary Activity meaning
+   itself, not an execution item and not
+   `understanding_ready`, Goal Association, planning, waiting, evidence arrival,
+   or another internal cognitive milestone. Decoration is optional, interruptible,
+   non-disruptive, subordinate, and fail-soft: it must not author or alter response
+   meaning, create or satisfy a Goal, delay or fail primary work, weaken
+   confirmation/safety, or appear as a third Vocal/Activity lane. Accepted body
+   decoration executes through the Activity Execution Lane with an explicit
+   auxiliary role and no Goal-completion authority. Each distinct semantic primary
+   Activity may independently choose `none` or expression; multiple execution items
+   realizing the same Activity do not create duplicate opportunities. Conflict or
+   safety/resource pressure simply removes the decoration. The same physical
+   Capability is primary execution when explicitly required by the user. A social
+   event important enough to change what Chromie should do must escalate through
+   normal Cognitive Core / Goal reasoning. Unanchored baseline embodiment remains a
    separate concern.
 30. **Semantic decomposition must prove responsibility coverage.** The model owns
    the semantic judgment about which user outcomes are independent Goals; Host
@@ -638,7 +647,7 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    cost where being wrong matters; do not turn perfectionism into architecture.
 
 37. **Social Attention has one semantic writer.** `SocialAttentionPlanner` alone
-   decides optional decoration for one concrete primary observable Activity. Response Composer never authors
+   decides optional decoration for one concrete semantic primary observable Activity. Response Composer never authors
    a `SocialAttentionPlan`; Goal/Planner stages do not decide it; the Host only
    supplies bounded context and validates/materializes accepted decoration. A valid
    `none` stands. Malformed, unavailable, conflicting, or unsafe decoration disappears
@@ -684,10 +693,12 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
 
 ### One personal voice; resources constrain coexistence
 
-Chromie has one personal Vocal domain. Ordinary speech, expressive speech,
-recitation, singing, humming, and nonverbal vocalization are modes of that same
-voice, not independent mouths. Compatible body Activity may overlap Vocal work,
-but two personal Vocal modes may not overlap.
+Chromie has one personal `Vocal Expression` domain realized through the Vocal
+Execution Lane. Ordinary speaking (`mode=speech`), expressive speech, recitation,
+singing, humming, and nonverbal vocalization are modes of that same voice, not
+independent mouths and not sibling Primary-Activity categories. Compatible body
+execution may overlap Vocal work, but two personal Vocal Expression modes may not
+overlap.
 
 Capabilities state what Chromie can do. Execution-time resources state which
 otherwise-valid work can coexist. Cognition should plan with that truth; the

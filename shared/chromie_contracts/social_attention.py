@@ -4,7 +4,11 @@ from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from .interaction import CapabilityIdentityModel, reject_forbidden_low_level_fields
+from .interaction import (
+    CapabilityIdentityModel,
+    VocalMode,
+    reject_forbidden_low_level_fields,
+)
 
 SocialAttentionMode = Literal["off", "report_only", "on"]
 _LEGACY_SIMULATOR_ONLY_MODE = "sim" + "_only"
@@ -39,38 +43,76 @@ SocialAttentionEvent = Literal[
     "primary_activity_ready",
     "primary_activity_started",
 ]
-SocialAttentionActivityKind = Literal[
-    "speech",
-    "body_action",
-    "vocal_performance",
-    "media_playback",
-]
 SocialAttentionActivityPhase = Literal["ready", "started"]
+SocialAttentionExecutionLane = Literal["vocal", "activity"]
+
+
+class SocialAttentionActivityRealization(BaseModel):
+    """Mechanical realization of one semantic primary Activity.
+
+    This is deliberately *not* the Activity ontology.  ``vocal`` and ``activity``
+    are execution lanes; speaking, singing, humming, recitation, expressive speech,
+    and nonverbal vocalization are Vocal Expression modes.  Capability/request IDs
+    describe the current implementation.  None of those fields rename the semantic
+    behavior being decorated.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    execution_lanes: list[SocialAttentionExecutionLane] = Field(
+        default_factory=list, max_length=2
+    )
+    vocal_modes: list[VocalMode] = Field(default_factory=list, max_length=6)
+    execution_item_ids: list[str] = Field(default_factory=list, max_length=24)
+    capability_ids: list[str] = Field(default_factory=list, max_length=24)
+
+    @field_validator("execution_lanes", "vocal_modes", "execution_item_ids", "capability_ids")
+    @classmethod
+    def normalize_realization_values(cls, value: list[Any]) -> list[Any]:
+        normalized: list[Any] = []
+        seen: set[str] = set()
+        for item in value:
+            text = " ".join(str(item or "").strip().split())
+            if text and text not in seen:
+                seen.add(text)
+                normalized.append(item if not isinstance(item, str) else text)
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_vocal_realization(self) -> "SocialAttentionActivityRealization":
+        if self.vocal_modes and "vocal" not in self.execution_lanes:
+            raise ValueError("Vocal Expression modes require the vocal execution lane")
+        return self
 
 
 class SocialAttentionActivityAnchor(BaseModel):
-    """A real human-observable primary Activity that Social Attention may decorate.
+    """One semantically meaningful human-observable primary Activity.
 
-    This anchor is deliberately downstream of cognition. Goal interpretation, Goal
-    Association, planning, evidence arrival, and other internal milestones are not
-    Activities and therefore cannot be used as Social Attention anchors.
+    ``summary`` answers *what Chromie is doing*: greet Alice, tell a joke, walk
+    forward, sing a song, hand over water, and so on. ``goal_ids`` are higher-level
+    Responsibility ownership/context; one Goal may own several Activities and therefore
+    does not itself define Activity identity. ``realization`` answers only *how that
+    Activity is currently being expressed/executed*. Internal
+    cognition milestones are not Activities, and execution modality must never be
+    promoted into Activity identity.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     activity_id: str = Field(min_length=1, max_length=200)
-    kind: SocialAttentionActivityKind
     phase: SocialAttentionActivityPhase
-    summary: str = Field(default="", max_length=500)
+    summary: str = Field(min_length=1, max_length=500)
     goal_ids: list[str] = Field(default_factory=list, max_length=24)
-    capability_ids: list[str] = Field(default_factory=list, max_length=24)
+    realization: SocialAttentionActivityRealization = Field(
+        default_factory=SocialAttentionActivityRealization
+    )
 
     @field_validator("activity_id", "summary", mode="before")
     @classmethod
     def normalize_activity_text(cls, value: Any) -> str:
         return " ".join(str(value or "").strip().split())
 
-    @field_validator("goal_ids", "capability_ids")
+    @field_validator("goal_ids")
     @classmethod
     def normalize_activity_ids(cls, value: list[str]) -> list[str]:
         normalized: list[str] = []
@@ -86,10 +128,10 @@ class SocialAttentionActivityAnchor(BaseModel):
 class SocialAttentionRequest(BaseModel):
     """One Activity-scoped projection for optional background Social Attention.
 
-    The request must carry a real primary human-observable Activity. Social Attention
-    may decorate that Activity but never creates a Goal, selects primary work, changes
-    completion semantics, or fires merely because an internal cognitive milestone
-    occurred.
+    The request must carry a semantically meaningful primary human-observable Activity.
+    Social Attention may decorate that Activity but never creates a Goal, selects primary
+    work, changes completion semantics, treats an execution lane/mode as Activity identity,
+    or fires merely because an internal cognitive milestone occurred.
     """
 
     model_config = ConfigDict(extra="forbid")

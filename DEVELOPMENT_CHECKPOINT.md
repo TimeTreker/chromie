@@ -1,7 +1,7 @@
 # Chromie Development Checkpoint
 Status: current resume point
 Updated: 2026-08-15
-Source baseline: user-provided `chromie_20260815.zip` (the newest owner-supplied archive for this change).
+Base main: `5546511dd18feba67f6d7fd54de61874e375aecc` (`close goal authority and social activity milestone`).
 This is the fast handoff for the next development session. Canonical owners linked below win if a conflict appears; refresh this checkpoint afterward.
 ## Project in one minute
 Chromie is a local-first realtime interaction control plane for a voice assistant
@@ -45,7 +45,7 @@ Goal-Driven Continuous Mind
                                   |
                    reconciliation -> result interpretation
 ```
-Social Attention is optional body decoration anchored to a concrete primary human-observable Activity; it is not a Goal, execution lane, or cognition-milestone reaction.
+Social Attention is optional body decoration anchored to a concrete semantic primary human-observable Activity—what Chromie is doing, not how a lane/mode/Capability realizes it; it is not a Goal, execution lane, or cognition-milestone reaction.
 Durable Mind stays small: Stable Mind, unfinished Goals, selective Memory.
 Situation is bounded, revisable, mostly reconstructable live soft state.
 Evidence/Ledger plus Progress/Plan/Request/Execution/Outcome are the grounding and
@@ -64,18 +64,23 @@ parallel manager objects.
 - **Unavailability never erases a requested responsibility.** Preserve the Goal
   and report the limitation; ordinary speech, media, or body motion cannot silently
   substitute for a provider-required vocal or effectful outcome.
-- **Chromie has one personal Vocal domain.** Speech, expressive speech, recitation,
-  singing, humming, and nonverbal vocalization are modes of one voice.
-  `chromie.voice` is exclusive. Compatible body Activity may overlap Vocal;
-  simultaneous personal Vocal modes may not. Existing-media playback is Activity.
-- **Social Attention is optional decoration with one semantic owner and one primary-Activity anchor.**
-  `SocialAttentionPlanner` alone authors decoration for a concrete primary
-  human-observable Activity through Activity. Speech/Vocal, body movement, handover,
-  vocal performance, or media playback may each be an anchor; cognition milestones,
-  planning state, evidence arrival, and waiting are not. Each primary Activity may
-  independently choose `none` or expression. Explicitly requested motion remains
-  primary Activity. Malformed/conflicting decoration disappears locally with no second
-  call, Goal completion authority, speech recomposition, or Goal/Plan mutation.
+- **Chromie has one personal Vocal Expression domain.** `speech` (speaking),
+  `expressive_speech`, `recitation`, `singing`, `humming`, and
+  `nonverbal_vocalization` are modes of one personal voice. `chromie.voice` is
+  exclusive. A compatible body/media realization may overlap Vocal; simultaneous
+  personal Vocal modes may not. Existing-media playback is realized through the
+  Activity Execution Lane, not through personal Vocal Expression.
+- **Social Attention is optional decoration with one semantic owner and one semantic primary-Activity anchor.**
+  `SocialAttentionPlanner` alone authors decoration for the concrete human-observable
+  behavior Chromie is doing: for example greet Alice, tell a joke, walk toward the
+  user, sing a song, hand over water, or show/play something. Execution lanes, Vocal
+  modes, Capability IDs, provider requests, and transport objects describe how that
+  Activity is realized; they are not Primary-Activity kinds. Multiple realization
+  items for one semantic Activity share one decoration opportunity, while independent
+  semantic Activities may independently choose `none` or expression. Cognition
+  milestones, planning state, evidence arrival, and waiting are not anchors.
+  Malformed/conflicting decoration disappears locally with no second call, Goal
+  completion authority, speech recomposition, or Goal/Plan mutation.
 - **Chromie is embodiment-independent.** Soridormi/MuJoCo is sufficient for the
   core embodied outcome; cognition must not know the backend, and physical-robot
   commissioning is optional provider work rather than a Chromie completion gate.
@@ -104,7 +109,7 @@ optional-decoration writer; malformed decoration fails soft and backend/calibrat
 identity is stripped before model reasoning. Reflection is evidence-bound future
 adaptation: actions require recorded outcome/evidence, apply only to open Responsibility,
 and cannot reopen completed outcomes or current-turn authority.
-The current daily-life source correction also closes the general boundaries exposed by the generated-voice suite: Capability choice requires declared semantic entailment rather than topical proximity; state mutations are not information resources; local/private sensor state stays unknown without a trusted Provider; unavailable persistent work cannot be phrased as a future promise; and Gateway Attention uses bounded recent dialogue for temporary user-authored addressedness policy with one fail-open judgment and no online repair/reviewer chain. The follow-up authority correction makes the weather case explicit: Fast Goal Interpretation preserves typed provider-neutral information scope as Responsibility evidence, but exact Capability identity, executable arguments, and actions belong only to planning after canonical Goal Association. Pre-Goal local progress is limited to already-complete native speech or prospective Goal Progress Communication; provider work does not start before the canonical Goal exists. Social Attention is now keyed to each concrete primary human-observable Activity rather than to cognitive milestones or a once-per-turn decoration budget; final InteractionResponse speech and observable Capability requests retain separate Activity anchors. Planner execution eligibility is derived from canonical Goal completion semantics, never from Fast Goal Interpreter compatibility route/intent fields.
+The current daily-life source correction also closes the general boundaries exposed by the generated-voice suite: Capability choice requires declared semantic entailment rather than topical proximity; state mutations are not information resources; local/private sensor state stays unknown without a trusted Provider; unavailable persistent work cannot be phrased as a future promise; and Gateway Attention uses bounded recent dialogue for temporary user-authored addressedness policy with one fail-open judgment and no online repair/reviewer chain. The follow-up authority correction makes the weather case explicit: Fast Goal Interpretation preserves typed provider-neutral information scope as Responsibility evidence, but exact Capability identity, executable arguments, and actions belong only to planning after canonical Goal Association. Pre-Goal local progress is limited to already-complete native speech or prospective Goal Progress Communication; provider work does not start before the canonical Goal exists. Social Attention is now keyed to semantic primary human-observable Activity meaning rather than to cognition milestones, execution modalities, or a once-per-turn budget. Responsibility/Goal sits above Activity; one Goal may own several semantic Activities/Work items, and a high-level provider Capability may realize one Activity atomically. Final `InteractionResponse` transport objects, Vocal modes, body/media requests, and Capability IDs are realization evidence only. Canonical conversational acts and Plan-step meaning provide Activity granularity; execution modality never does. Planner execution eligibility is derived from canonical Goal completion semantics, never from Fast Goal Interpreter compatibility route/intent fields.
 These are source claims only; no new target evidence is implied.
 ## Do not resurrect
 - independent Router semantic authority;
@@ -151,6 +156,5 @@ python scripts/semantic_authority_audit.py --check
 ```
 Canonical owners: [Charter](docs/PROJECT_CHARTER.md) ·
 [Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md) ·
-[Turn Loop](docs/COGNITIVE_TURN_LOOP.md) · [Roadmap](ROADMAP.md) ·
-[Status](docs/STATUS.md) · [Target Evidence](docs/TARGET_EVIDENCE_CLOSURE.md) ·
-[API](docs/API_REFERENCE.md) · [Runbook](CHROMIE_RUNBOOK.md).
+[Turn Loop](docs/COGNITIVE_TURN_LOOP.md) · [Roadmap](ROADMAP.md) · [Status](docs/STATUS.md) ·
+[Target Evidence](docs/TARGET_EVIDENCE_CLOSURE.md) · [API](docs/API_REFERENCE.md) · [Runbook](CHROMIE_RUNBOOK.md).

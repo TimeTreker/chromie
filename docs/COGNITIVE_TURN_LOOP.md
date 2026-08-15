@@ -230,9 +230,12 @@ but it is not execution authorization.
 
 The same principle applies to optional presentation work. Response composition
 or semantic polishing must not become a barrier to already-authorized work. Social
-Attention is considered only when a concrete primary human-observable Activity
-(such as scheduled speech/Vocal or body Activity) exists; internal cognition or
-evidence arrival cannot create a decoration opportunity by itself. Presentation
+Attention is considered only when a concrete semantic primary human-observable
+Activity exists: for example greeting, telling a joke, walking, singing, handover,
+or show/play behavior. Vocal/Activity execution lanes, Vocal Expression modes,
+Capability/provider requests, and transport objects describe realization only and
+cannot create a Primary-Activity identity. Internal cognition or evidence arrival
+cannot create a decoration opportunity by itself. Presentation
 failure remains local and must not reopen Goal Interpretation, planning, or another
 semantic reviewer. Runtime qualification should measure
 at least the time to the first meaningful reaction and the time to the first

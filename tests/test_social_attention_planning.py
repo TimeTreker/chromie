@@ -115,9 +115,13 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
     def _activity(activity_id: str = "activity-test") -> SocialAttentionActivityAnchor:
         return SocialAttentionActivityAnchor(
             activity_id=activity_id,
-            kind="speech",
             phase="ready",
-            summary="Primary outward activity",
+            summary="greet the user",
+            realization={
+                "execution_lanes": ["vocal"],
+                "vocal_modes": ["speech"],
+                "execution_item_ids": ["speech-greeting"],
+            },
         )
 
     def _request(self, *, route: str = "chat", intent: str = "general_conversation") -> AgentRunRequest:
@@ -234,7 +238,10 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('"recent_auxiliary_behavior_evidence"', prompt)
         self.assertIn('"count": 2', prompt)
         self.assertIn("explicit primary action remains mandatory", prompt)
-        self.assertIn("another outward Activity", prompt)
+        self.assertIn("WHAT Chromie is doing", prompt)
+        self.assertIn("Vocal Expression has modes", prompt)
+        self.assertIn("not peer Primary-Activity categories", prompt)
+        self.assertIn("another outward semantic Activity", prompt)
 
     def test_background_prompt_does_not_mistake_direct_work_for_exact_only(self) -> None:
         planner = SocialAttentionPlanner(

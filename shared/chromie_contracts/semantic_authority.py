@@ -102,7 +102,7 @@ def semantic_authority_route_matrix() -> list[dict[str, Any]]:
                 "and native progress to canonical Goals; completely bound native conversation "
                 "may adopt canonical speech without Planner or Response Composer, otherwise "
                 "Fast/Deep Planner selects exact Capability work before trusted execution; "
-                "background Social Attention is separately anchored to concrete primary "
+                "background Social Attention is separately anchored to semantic primary "
                 "human-observable Activities"
             ),
             "fallback": "fail_closed_after_authority_acquisition",

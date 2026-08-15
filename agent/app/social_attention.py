@@ -286,11 +286,12 @@ class SocialAttentionPlanner:
             "max_behaviors": int(self.services.social_attention_max_behaviors),
         }
         return (
-            "Plan optional Social Attention attached to the supplied primary human-observable Activity.\n"
-            "The primary_activity is the anchor. Goal interpretation, Goal Association, planning, waiting, evidence arrival, and other internal cognitive milestones are never Social Attention anchors.\n"
+            "Plan optional Social Attention attached to the supplied semantically meaningful primary human-observable Activity.\n"
+            "The primary_activity tells you WHAT Chromie is doing. goal_ids are higher-level Responsibility ownership/context, not the Activity identity: one Goal may own several Activities. Its realization tells you only HOW that Activity is currently expressed or executed. Never promote an execution lane, Capability, transport, or mode into the Activity identity. Goal interpretation, Goal Association, planning, waiting, evidence arrival, and other internal cognitive milestones are never Social Attention anchors.\n"
+            "Vocal Expression has modes speech, expressive_speech, recitation, singing, humming, and nonverbal_vocalization; these modes share one personal voice and are not peer Primary-Activity categories. For example, tell a joke may realize through Vocal Expression mode=speech, while sing a song may realize through mode=singing. Body/media Capability work is likewise realization, not Activity meaning.\n"
             "Social Attention is subordinate decoration, never the user Goal. Blinking, gaze, nodding, and other supplied Capabilities are only possible expressions.\n"
             "Every explicit primary action remains mandatory, exact, and completion-owning. Never replace it, duplicate its capability, change its count or args, or treat decoration as its completion. "
-            "Speech, a joke, walking, handover, vocal performance, media playback, or another outward Activity may each independently have no Social Attention or one small compatible expression. "
+            "A greeting, telling a joke, walking toward someone, singing a song, handing over water, showing or playing something, or another outward semantic Activity may each independently have no Social Attention or one small compatible expression. "
             "Ordinary cooperative engagement can support a subtle acknowledgement or presence cue when the owner-approved style, Activity semantics, candidate semantics, and concurrency metadata make that cue useful and non-disruptive. "
             "A clear task is not evidence that the user requires exact-only action or stillness. Treat exact-only action or stillness as a constraint only when it is supplied by the utterance or typed primary Activity state. "
             "Choose decision=none whenever no expression adds social value, when stillness is more natural, or when a gesture would be repetitive, distracting, unsafe, unsupported, or conflict with the primary Activity. "

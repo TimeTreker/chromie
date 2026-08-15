@@ -166,20 +166,32 @@ See [`../docs/CONFIGURATION.md`](../docs/CONFIGURATION.md) for all settings.
 ## Model-driven social attention
 
 Social Attention is background social-decoration cognition, not an execution
-lane, Goal, fixed gesture list, or speech-expression channel. The maintained
+lane, Goal, fixed gesture list, or Vocal-expression channel. The maintained
 Goal-driven Host creates an event-scoped `/social-attention/plan` opportunity only
-for a concrete primary human-observable Activity such as scheduled speech/Vocal
-or prepared body/media/vocal-performance work. A scheduled Fast acknowledgement
-may therefore be decorated while Goal Association continues, because the speech
-itself is the anchor; provider readiness, Goal milestones, planning, waiting, and
-evidence arrival are not anchors. Each distinct primary Activity may independently
-choose eligible small body capabilities tagged `social_attention` or `none`. A final
-`InteractionResponse` is not itself such an Activity: each speech item and each
-observable Capability request keeps its own Activity ID, so compound speech/body/media
-work is not collapsed into one `mixed` decoration opportunity. The model does not own
-Goal meaning, response wording, completion, or authorization.
-Accepted Social Attention body requests execute through Activity as fail-soft
-auxiliary decoration.
+for a concrete **semantic primary human-observable Activity**: what Chromie is doing,
+such as greeting somebody, telling a joke, walking toward a person, singing a song,
+handing something over, or showing/playing something. A scheduled pre-Goal Fast
+acknowledgement may itself be a concrete conversational Activity while Goal Association
+continues. After Goal Association, Responsibility/Goal meaning remains above Activity,
+while canonical conversational acts and Plan-step Work provide the concrete Activity
+granularity. One Goal may therefore own several Activities; conversely, a sufficiently
+high-level provider capability may realize one whole Activity atomically. Provider
+readiness, Goal milestones, planning, waiting, evidence arrival, execution-lane
+transitions, and Capability identities are not anchors.
+
+`Vocal` and `Activity` are execution lanes. `speech`, `expressive_speech`,
+`recitation`, `singing`, `humming`, and `nonverbal_vocalization` are modes of one
+personal **Vocal Expression**. Speech transport items, Vocal modes, body/media
+requests, Capability IDs, and request IDs therefore live under Activity
+`realization`: they say **how** the semantic Activity is being carried out, not
+**what** the Activity is. If a Goal is decomposed into “say hello” and “wave”, those
+are two semantic Activities even though they share Goal ownership; if a qualified
+high-level provider exposes one atomic greeting Activity, it remains one Activity.
+The boundary follows canonical Work/Plan/provider granularity, never modality.
+`InteractionResponse` is only a coordination envelope, never the Activity ontology. The model does not own Goal
+meaning, response wording, completion, or authorization. Accepted Social Attention
+body requests execute through the Activity Execution Lane as fail-soft auxiliary
+decoration.
 
 Candidate discovery uses catalog behavior-domain metadata supplemented by
 `capabilities/behavior_domains.json`; `AGENT_SOCIAL_ATTENTION_CAPABILITIES` is

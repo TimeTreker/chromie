@@ -27,6 +27,31 @@ third lane. It is background social cognition that may propose small auxiliary
 body decoration such as gaze, blink, nod, a small wave, or slight posture /
 orientation when the live catalog and interaction make that appropriate.
 
+### Terminology boundary: semantic Activity is not the Activity Execution Lane
+
+The word **Activity** appears at two layers and must not be collapsed:
+
+- **Responsibility/Goal** is above Activity and may own one or many semantic Work
+  Activities. The boundary may change with provider capability: one high-level
+  provider workflow can stay atomic while lower-level providers require several
+  Activities.
+- **Primary semantic Activity** answers **what Chromie is doing**: greet Alice,
+  tell a joke, walk forward, sing a song, hand over water, show/play something.
+  This concrete Work/Plan act is the Social Attention anchor.
+- **Activity Execution Lane** is the maintained runtime lane for non-Vocal
+  Capability execution. It is an implementation mechanism, not an Activity
+  ontology.
+- **Vocal Expression** is one personal-voice realization family. Speaking is
+  represented by `mode=speech`; expressive speech, recitation, singing, humming,
+  and nonverbal vocalization are other modes. The **Vocal Execution Lane** runs
+  those modes.
+
+Therefore `speech`, `singing`, `body`, and `media` are not peer Primary-Activity
+categories. A semantic greeting can be realized by Vocal Expression plus compatible
+body work and still remain one greeting Activity. Independent semantic `walk` and
+`sing` responsibilities remain distinct Activities even when their execution lanes
+overlap in time.
+
 This is not a second brain, a second planner, or a provider-selection shortcut.
 Goal meaning, Goal Association, planning, and response meaning remain owned by
 the one Cognitive Core. Social Attention cannot author response text, create a
@@ -43,8 +68,8 @@ evidence. Those require a later runtime contract and provider support.
 |---|---|---|
 | Cognitive Core | user meaning, Goal Association, Goal lifecycle, planning, response meaning, temporal intent | motor control, provider internals |
 | Background Social Attention | whether an anchored interaction benefits from small optional embodied decoration; social purpose and eligible body candidate | user Goal creation, response wording, completion, execution-lane membership, motor authorization |
-| Vocal Execution Lane | authored speech, TTS/vocal playback, vocal performance capabilities, interruption, cancellation, and output ordering | independent personality, semantic planning, or existing-media lifecycle ownership |
-| Activity Execution Lane | exact provider calls, primary task execution, optional Social Attention body decoration, monitoring, cancellation, recovery, and outcome collection | Goal meaning or raw motor control |
+| Vocal Execution Lane | realization of one personal `Vocal Expression`: speaking (`mode=speech`), expressive speech, recitation, singing, humming, nonverbal vocalization; playback/interruption/cancellation/output ordering | independent personality, semantic Primary-Activity meaning, or existing-media lifecycle ownership |
+| Activity Execution Lane | non-Vocal provider calls, primary execution work, optional Social Attention body decoration, monitoring, cancellation, recovery, and outcome collection | Goal or semantic Primary-Activity meaning, or raw motor control |
 | Soridormi | embodied feasibility, body arbitration, safety supervision, controller execution, stop, recovery, and physical evidence | conversational meaning or provider selection |
 
 The Activity lane executes work; it does not own Goals. Optional Social
@@ -57,21 +82,21 @@ personal voice output; it is not a separate conversational agent.
 
 Social Attention is continuous background social cognition, not an execution
 lane and not a standalone action generator. It may reconsider whether a small
-decoration is useful when meaningful interaction state changes, including:
+decoration is useful when a **semantic primary Activity** becomes ready/starts or
+when evidence materially changes how that already-anchored Activity should be
+socially expressed, for example:
 
-- a user starts or finishes addressing Chromie;
-- fast understanding becomes sufficient for the ongoing interaction;
-- Activity or information acquisition starts, waits, changes, completes, or
-  fails;
-- new scene/target evidence becomes available;
-- interruption or cancellation changes the interaction; and
-- Vocal output starts, continues, or completes.
+- a concrete greeting, joke, walk, song, handover, answer, or similar outward act
+  becomes ready or starts;
+- new scene/target evidence changes the social context of that Activity; or
+- interruption/cancellation changes whether that Activity is still active.
 
-These events provide an **interaction anchor**, not a reason to move by default.
-The Social-Attention model may choose `decision=none`. A decoration is useful
-only when it supports the live social situation and remains small,
-non-disruptive, interruptible, optional, and subordinate to the primary
-responsibility.
+Fast understanding, Goal Association, planning, provider readiness, evidence
+arrival, and Vocal/Activity lane transitions may cause the system to prepare or
+update an Activity, but those internal milestones are **not themselves anchors**.
+The Social-Attention model may choose `decision=none`. A decoration is useful only
+when it supports the anchored semantic Activity and remains small, non-disruptive,
+interruptible, optional, and subordinate to the primary responsibility.
 
 Social Attention must not become a generic idle-animation loop. A blink while
 actively listening may be Social Attention; an autonomous idle blink with no
@@ -223,7 +248,7 @@ not carry `coordination_id`:
 ```
 
 If accepted, the Host materializes that body decoration as auxiliary Activity.
-Actual overlap with primary body Activity is then decided mechanically from the
+Actual overlap with primary body realization through the Activity Execution Lane is then decided mechanically from the
 runtime batch and provider concurrency/safety declarations. Cross-lane
 coordination IDs are not reused as embodied-provider grouping semantics.
 
@@ -346,20 +371,23 @@ normal vocal Goal cannot carry `resource_responsibility`.
 
 ## One personal voice
 
-`Vocal` is Chromie's personal-voice execution domain:
+`Vocal Expression` is Chromie's one personal-voice expression domain, realized
+through the Vocal Execution Lane:
 
 ```text
-Vocal
-├── speech
-├── expressive_speech
-├── recitation
-├── singing
-├── humming
-└── nonverbal_vocalization
+Vocal Expression
+├── mode=speech
+├── mode=expressive_speech
+├── mode=recitation
+├── mode=singing
+├── mode=humming
+└── mode=nonverbal_vocalization
 ```
 
-These are different semantic outcomes but one embodied personal voice. They
-share one execution-time resource:
+These are expression **modes**, not sibling semantic Primary Activities. The semantic
+Activity remains what Chromie is doing—for example tell a joke, sing a song, recite
+a poem, or greet Alice. Different Activities may choose different Vocal modes as part
+of their realization, but all personal Vocal modes share one execution-time resource:
 
 ```text
 chromie.voice: exclusive
@@ -376,20 +404,21 @@ Runtime mechanically contains a bad parallel plan. This rule reuses the existing
 `ResourceArbiter`; it does not create a second Resource Manager.
 
 `chromie.voice` is not the Goal-level acquire/deliver `Resource` responsibility,
-and it is not identical to the physical speaker. Existing-media playback remains
-Activity. A qualified mixer may overlap Media and Vocal under
-`duck_media_during_vocal`.
+and it is not identical to the physical speaker. Existing-media playback is realized
+through the Activity Execution Lane, not through personal Vocal Expression. A qualified
+mixer may overlap Media realization and Vocal work under `duck_media_during_vocal`.
 
 Ordinary TTS historically released its runtime request at `playback_started`,
 while PCM continued playing. The maintained playback lifecycle therefore exposes
-a separate terminal voice-release fact. Body Activity may still begin at the
-playback-start barrier, but a following Vocal mode cannot acquire `chromie.voice`
-until prior TTS has actually stopped producing Chromie's voice.
+a separate terminal voice-release fact. Compatible body work through the Activity
+Execution Lane may still begin at the playback-start barrier, but a following Vocal
+mode cannot acquire `chromie.voice` until prior TTS has actually stopped producing
+Chromie's voice.
 
 ## Existing media playback
 
-Playing existing music, recordings, streams, or sound effects is Activity work,
-not authored vocal performance. A qualified peer provider exposes only the
+Playing existing music, recordings, streams, or sound effects is work realized through
+the Activity Execution Lane, not authored Vocal Expression. A qualified peer provider exposes only the
 stable `chromie.media.play|pause|resume|seek|stop|volume|status` family. The
 backend name stays behind the Trusted Capability Runtime, while
 `media_operation` binds each media Goal to exactly one public operation from

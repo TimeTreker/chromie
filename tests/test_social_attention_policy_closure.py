@@ -204,9 +204,13 @@ class SocialAttentionPolicyClosureTests(unittest.TestCase):
                 context={
                     "social_attention_primary_activity": {
                         "activity_id": "activity-turn-2",
-                        "kind": "speech",
                         "phase": "ready",
-                        "summary": "primary speech",
+                        "summary": "greet the user",
+                        "realization": {
+                            "execution_lanes": ["vocal"],
+                            "vocal_modes": ["speech"],
+                            "execution_item_ids": ["speech-turn-2"],
+                        },
                     }
                 },
             )

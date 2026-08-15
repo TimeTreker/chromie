@@ -665,11 +665,25 @@ format can block an otherwise correct plan.
 
 ## Social decoration during interaction
 
-Chromie may accompany a concrete primary human-observable Activity—such as
-speech/Vocal, body movement, handover, vocal performance, or media playback—with
-subtle nonverbal Social Attention decoration. The decoration is **not** the Goal.
-It is an optional way of making the already-intended Activity feel socially
-present rather than mechanically isolated.
+Chromie may accompany a concrete **semantic** primary human-observable Activity—
+such as greeting someone, telling a joke, walking toward a person, singing a song,
+handing over water, or showing/playing something—with subtle nonverbal Social
+Attention decoration. The decoration is **not** the Goal. It is an optional way of
+making the already-intended Activity feel socially present rather than mechanically
+isolated.
+
+Responsibility/Goal is above Activity. One Goal may own several semantic Activities
+or Work items, and the Activity boundary may move when provider capability changes: a
+high-level provider can keep a whole workflow atomic, while lower-level providers may
+require several planned Activities. Social Attention follows that canonical Work/Plan
+granularity; it does not use Goal count or execution modality as the Activity boundary.
+
+Do not confuse Activity meaning with realization. Speaking is `Vocal Expression`
+`mode=speech`; singing and humming are other modes of that same one personal voice.
+`Vocal` and `Activity` are runtime lanes, while body/media Capability requests are
+implementation items. A semantic Activity may use one or several of those realization
+mechanisms without becoming several Activities merely because its execution spans
+multiple items.
 
 For example, a greeting remains the same greeting text while Social Attention
 may add gaze toward the person, a natural blink, a small nod or wave, or another
@@ -685,9 +699,11 @@ resource metadata. It may produce a structured `SocialAttentionPlan` with
 body behavior; there is no Social-Attention speech-expression field or fallback.
 
 The same motion has different semantics depending on ownership. A user request
-such as "blink twice" is primary Activity responsibility. A blink selected while
-Chromie's greeting speech is the primary Activity is auxiliary decoration. The Capability may be the
-same, but only the first participates in Goal completion.
+such as "blink twice" makes **blink twice** the semantic primary Activity. A blink
+selected while Chromie performs the semantic Activity **greet the user** is auxiliary
+decoration, regardless of whether that greeting is realized through speaking, a
+compatible body cue, or both. The Capability may be the same, but only the first
+participates in Goal completion.
 
 An explicit action can also carry social framing. "Blink twice and be cute"
 still makes exactly two blinks mandatory primary Activity; it does not authorize
@@ -709,11 +725,13 @@ through Activity with `auxiliary_social_attention=true` and
 conflicting with Vocal, emergency handling, or primary Activity.
 
 Social Attention is not a generic idle-animation loop. Its decoration requires a
-concrete primary human-observable Activity anchor. `understanding_ready`, Goal
-Association, planning, waiting, evidence arrival, and other internal milestones
-are not anchors. Each distinct primary Activity is independently eligible; a
-previous decoration in the same turn is not a blanket suppression rule. Pure
-baseline embodiment/liveliness without a primary Activity is a separate concern.
+concrete semantic primary human-observable Activity anchor. `understanding_ready`,
+Goal Association, planning, waiting, evidence arrival, execution-lane transitions,
+and other internal milestones are not Activity meaning. Each distinct semantic
+primary Activity is independently eligible; multiple speech/body/provider items
+realizing the same Activity do not create extra opportunities. A previous
+decoration on another Activity in the same turn is not a blanket suppression rule.
+Pure baseline embodiment/liveliness without a primary Activity is a separate concern.
 
 Backend selection, calibration, motion limits, collision safety, stop, and
 recovery remain provider-owned. Do not implement normal attention through rules

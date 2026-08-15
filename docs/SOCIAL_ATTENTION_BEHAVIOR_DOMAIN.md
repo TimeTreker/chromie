@@ -15,7 +15,8 @@ A greeting illustrates the boundary:
 Primary responsibility
   greet Alice
     |
-    +-- Vocal: "Hello!"
+    +-- primary semantic Activity: greet Alice
+    |     `-- realization: Vocal Expression(mode=speech): "Hello!"
     |
     `-- optional Social Attention decoration
           +-- look toward Alice
@@ -32,13 +33,56 @@ In this document, **decoration** means semantic subordination, not meaningless
 random animation. A decoration is socially contextual, attached to one real
 primary Activity, and lower priority than the responsibility it accompanies.
 
-A **primary Activity anchor** is a concrete human-observable behavior such as
-scheduled/started speech or Vocal output, body movement, handover, vocal
-performance, or media playback. It is an umbrella interaction concept, not a new
-execution lane: the primary behavior may run in Vocal or Activity. Internal
-cognitive/runtime milestones such as `understanding_ready`, `goal_associated`,
-planning, waiting, `evidence_arrived`, or simple passage of time are **not**
-primary Activity anchors.
+A **primary Activity anchor** is the semantic human-observable behavior Chromie is
+doing: for example **greet Alice**, **tell a joke**, **walk toward the user**,
+**sing a song**, **hand over water**, or **show/play something**. It answers
+**what Chromie is doing**, not which transport, execution lane, provider, or
+Capability happens to realize it.
+
+That distinction is architectural:
+
+```text
+Primary semantic Activity: tell a joke
+  `-- realization: Vocal Expression(mode=speech)
+
+Primary semantic Activity: sing a song
+  `-- realization: Vocal Expression(mode=singing)
+
+Primary semantic Activity: greet Alice
+  +-- realization: Vocal Expression(mode=speech)
+  `-- realization: compatible body Capability work
+
+Primary semantic Activity: walk toward Alice
+  `-- realization: Activity Execution Lane / locomotion Capability
+```
+
+The ownership hierarchy is:
+
+```text
+Responsibility / Goal
+  `-- one or more semantic Primary Activities / Work items
+        `-- execution realization
+              +-- Vocal Expression mode(s) through Vocal Execution Lane
+              `-- non-Vocal Capability work through Activity Execution Lane
+```
+
+Activity granularity follows canonical Work/Plan/provider granularity. A `bring
+water` Goal may become several Activities when Chromie must plan walking, acquiring,
+returning, and handover separately; a future qualified provider that exposes the
+whole workflow atomically may make it one Activity. Likewise, one Goal can own both
+`say hello` and `wave` as separate Activities. Goal count, lane count, and Capability
+count therefore never define Activity count by themselves.
+
+`Vocal Expression` has one personal voice with modes `speech` (speaking),
+`expressive_speech`, `recitation`, `singing`, `humming`, and
+`nonverbal_vocalization`. Those modes are **not** sibling Primary-Activity kinds.
+Likewise, `Vocal` and `Activity` are runtime execution lanes, and media/body
+Capability identities are implementation facts. `SocialAttentionActivityAnchor`
+therefore keeps semantic Activity meaning/Goal ownership at the top level and puts
+lanes, Vocal modes, execution-item IDs, and Capability IDs only under
+`realization`. Internal cognitive/runtime milestones such as
+`understanding_ready`, `goal_associated`, planning, waiting, `evidence_arrived`,
+or simple passage of time are **not** primary Activity anchors.
 
 ## Core invariants
 
@@ -69,10 +113,11 @@ Social Attention obeys all of the following:
    priority.
 9. **No completion authority.** Decoration evidence can say that a decoration
    ran; it cannot satisfy or prove completion of the primary Goal.
-10. **Eligibility is per primary Activity, not per turn.** One acknowledgement
-    speech may choose a blink and a later walk or final answer in the same turn
-    may independently choose another compatible cue. Cooldown/repetition policy
-    applies to the anchored Activity/evidence, not as a blanket once-per-turn ban.
+10. **Eligibility is per semantic primary Activity, not per turn or execution item.**
+    One pre-Goal acknowledgement act may choose a blink and a later canonical
+    walk/final-answer Activity in the same turn may independently choose another
+    compatible cue. Multiple speech/body/provider execution items that realize the
+    same semantic Activity do not manufacture extra decoration opportunities.
 
 A socially important event that genuinely changes what Chromie should do next
 is no longer merely decoration. It must be elevated through normal Cognitive

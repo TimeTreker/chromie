@@ -30,9 +30,14 @@ repair/reviewer machinery. Implementation order:
 2. **Optional presentation locality — implemented in source.** Social Attention and
    response polish fail locally. A valid Social Attention `none` stands; invalid
    decoration is dropped without recomposing speech or reopening Goal/Planner
-   cognition. One maintained Social Attention planner owns decoration, and each
-   concrete primary Activity is projected independently rather than through a
-   cognition milestone or interaction-wide `mixed` anchor.
+   cognition. One maintained Social Attention planner owns decoration. The anchor
+   is the semantic Primary Activity—what Chromie is doing—not an execution lane,
+   Vocal Expression mode, Capability/request, transport item, cognition milestone,
+   or interaction-wide `mixed` envelope. Responsibility/Goal is above Activity:
+   one Goal may own several semantic Work/Plan Activities, while a high-level
+   provider capability may keep a whole behavior atomic. Multiple realization
+   items for the same canonical Activity share one anchor; independent semantic
+   Activities remain independently eligible.
 3. **Fast/Deep boundary.** Keep obvious low-risk interaction Fast even when model
    confidence is imperfectly calibrated. Escalate when uncertainty/consequence
    actually warrants deeper cognition. Deep consumes authoritative source meaning,

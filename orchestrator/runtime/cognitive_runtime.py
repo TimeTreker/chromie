@@ -29,6 +29,7 @@ from shared.chromie_contracts.interaction import (
     InteractionSpeech,
     MEDIA_CAPABILITY_IDS,
     SkillRequest,
+    VOCAL_MODES,
     VOCAL_PERFORMANCE_CAPABILITY_ID,
     output_schema_sha256,
     validate_output_schema_declaration,
@@ -50,6 +51,7 @@ from shared.chromie_contracts.response_composition import (
 from shared.chromie_contracts.semantic_task import ResponsePlan
 from shared.chromie_contracts.social_attention import (
     SocialAttentionActivityAnchor,
+    SocialAttentionActivityRealization,
     SocialAttentionPlan,
     SocialAttentionRequest,
     normalize_social_attention_mode,
@@ -503,7 +505,15 @@ class CanonicalPlanRuntimeAdapter:
                 "purpose": request.metadata.get("social_attention_purpose"),
                 "turn_id": request.metadata.get("turn_id"),
                 "primary_activity_id": request.metadata.get("primary_activity_id"),
-                "primary_activity_kind": request.metadata.get("primary_activity_kind"),
+                "primary_activity_goal_ids": list(
+                    request.metadata.get("primary_activity_goal_ids") or []
+                ),
+                "primary_activity_execution_lanes": list(
+                    request.metadata.get("primary_activity_execution_lanes") or []
+                ),
+                "primary_activity_vocal_modes": list(
+                    request.metadata.get("primary_activity_vocal_modes") or []
+                ),
                 "canonical_plan_id": request.metadata.get("canonical_plan_id"),
                 "policy_mode": request.metadata.get("social_attention_policy_mode"),
             }
@@ -853,6 +863,7 @@ class CanonicalPlanRuntimeAdapter:
             for item in raw_primary_ids
             if str(item).strip()
         } if isinstance(raw_primary_ids, list) else set()
+        primary_capability_ids.update(primary_activity.realization.capability_ids)
         primary_definitions: dict[str, Any] = {}
         unresolved_embodied_primary_ids: set[str] = set()
         for capability_id in sorted(primary_capability_ids):
@@ -977,7 +988,13 @@ class CanonicalPlanRuntimeAdapter:
                         "source_goal_ids": [],
                         "turn_id": turn_id,
                         "primary_activity_id": primary_activity.activity_id,
-                        "primary_activity_kind": primary_activity.kind,
+                        "primary_activity_goal_ids": list(primary_activity.goal_ids),
+                        "primary_activity_execution_lanes": list(
+                            primary_activity.realization.execution_lanes
+                        ),
+                        "primary_activity_vocal_modes": list(
+                            primary_activity.realization.vocal_modes
+                        ),
                     },
                 )
                 requests.append(request)
@@ -1005,7 +1022,13 @@ class CanonicalPlanRuntimeAdapter:
             "session_id": session_id,
             "social_attention_event": event,
             "primary_activity_id": primary_activity.activity_id,
-            "primary_activity_kind": primary_activity.kind,
+            "primary_activity_goal_ids": list(primary_activity.goal_ids),
+            "primary_activity_execution_lanes": list(
+                primary_activity.realization.execution_lanes
+            ),
+            "primary_activity_vocal_modes": list(
+                primary_activity.realization.vocal_modes
+            ),
         }
         envelope = runtime_context.get("user_turn_envelope")
         if isinstance(envelope, dict):
@@ -2087,7 +2110,11 @@ class GoalDrivenRuntimeCoordinator:
         *,
         turn_id: str,
     ) -> SocialAttentionActivityAnchor | None:
-        """Project an actually scheduled fast utterance into an Activity anchor."""
+        """Project one scheduled pre-Goal conversational act as a semantic Activity.
+
+        The act is not called a ``speech Activity``.  Speaking is only its Vocal
+        Expression realization; the text/purpose carries the outward semantic act.
+        """
 
         rows = context.get("scheduled_turn_speech")
         if not isinstance(rows, list):
@@ -2098,17 +2125,27 @@ class GoalDrivenRuntimeCoordinator:
             text = " ".join(str(row.get("text") or "").strip().split())
             if not text:
                 continue
-            raw_id = " ".join(str(row.get("speech_event_id") or "").strip().split())
-            if not raw_id:
-                digest = hashlib.sha256(
-                    f"{turn_id}|scheduled_speech|{text}".encode("utf-8")
-                ).hexdigest()[:20]
-                raw_id = f"speech_{digest}"
+            execution_item_id = " ".join(
+                str(row.get("speech_event_id") or "").strip().split()
+            )
+            purpose = " ".join(str(row.get("purpose") or "").strip().split())
+            commitment = " ".join(str(row.get("commitment") or "").strip().split())
+            identity_digest = hashlib.sha256(
+                "|".join(
+                    [turn_id, "scheduled_conversational_activity", purpose, commitment, text]
+                ).encode("utf-8")
+            ).hexdigest()[:20]
+            if not execution_item_id:
+                execution_item_id = f"speech_{identity_digest}"
             return SocialAttentionActivityAnchor(
-                activity_id=raw_id,
-                kind="speech",
+                activity_id=f"activity_{identity_digest}",
                 phase="ready",
-                summary=text,
+                summary=(f"{purpose}: {text}" if purpose else text),
+                realization=SocialAttentionActivityRealization(
+                    execution_lanes=["vocal"],
+                    vocal_modes=["speech"],
+                    execution_item_ids=[execution_item_id],
+                ),
             )
         return None
 
@@ -2117,48 +2154,165 @@ class GoalDrivenRuntimeCoordinator:
         resolution: CognitiveRuntimeResolution,
         *,
         turn_id: str,
+        context: dict[str, Any] | None = None,
     ) -> list[SocialAttentionActivityAnchor]:
-        """Return each concrete human-observable Activity prepared by a resolution.
+        """Project prepared work into semantic primary Activities.
 
-        InteractionResponse is a coordination envelope, not an Activity. Speech and
-        each observable Capability request keep their own stable execution identity so
-        Social Attention can independently decorate each one instead of collapsing a
-        compound response into one interaction-scoped ``mixed`` pseudo-activity.
+        The hierarchy is deliberately three-layered:
+
+        Responsibility/Goal -> semantic Activity/Work -> execution realization.
+
+        A Goal may own several Activities, while a sufficiently high-level provider
+        capability may realize one whole Activity atomically.  Interaction speech is
+        projected as a semantic conversational act; canonical Capability work is
+        projected at Plan-step granularity.  Vocal modes, execution lanes, request IDs,
+        and Capability IDs stay strictly below Activity identity as realization facts.
         """
 
-        del turn_id  # execution item IDs already provide stable Activity identity
         interaction = resolution.interaction_response
         if interaction is None:
             return []
-        fallback_goal_ids = (
-            list(resolution.terminal_plan.goal_ids) if resolution.terminal_plan else []
+        runtime_context = context if isinstance(context, dict) else {}
+
+        goal_summary_by_id: dict[str, str] = {}
+
+        def remember_goal(goal_id: Any, summary: Any) -> None:
+            normalized_id = " ".join(str(goal_id or "").strip().split())
+            normalized_summary = " ".join(str(summary or "").strip().split())
+            if normalized_id and normalized_summary and normalized_id not in goal_summary_by_id:
+                goal_summary_by_id[normalized_id] = normalized_summary
+
+        for key in ("active_goal_snapshots", "recent_goal_snapshots"):
+            rows = runtime_context.get(key)
+            if not isinstance(rows, list):
+                continue
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                goal = row.get("goal") if isinstance(row.get("goal"), dict) else {}
+                remember_goal(
+                    row.get("goal_id") or goal.get("goal_id"),
+                    goal.get("description") or row.get("last_user_update"),
+                )
+
+        if resolution.goal_association is not None:
+            for goal in resolution.goal_association.new_goals:
+                remember_goal(goal.goal_id, goal.description)
+
+        association_payload = runtime_context.get("goal_association_resolution")
+        if isinstance(association_payload, dict):
+            for row in association_payload.get("new_goals") or []:
+                if isinstance(row, dict):
+                    remember_goal(row.get("goal_id"), row.get("description"))
+
+        single_plan_goal_ids = (
+            list(resolution.terminal_plan.goal_ids)
+            if resolution.terminal_plan is not None
+            and len(resolution.terminal_plan.goal_ids) == 1
+            else []
+        )
+        fallback_goal_summary = (
+            " ".join(str(resolution.terminal_plan.goal_summary or "").strip().split())
+            if resolution.terminal_plan is not None
+            else ""
         )
 
         def item_goal_ids(metadata: dict[str, Any]) -> list[str]:
             raw = metadata.get("source_goal_ids")
             if not isinstance(raw, list):
-                return list(fallback_goal_ids)
+                raw = metadata.get("covers_goal_ids")
+            if not isinstance(raw, list):
+                return sorted(dict.fromkeys(single_plan_goal_ids))
             normalized = [
                 text
                 for item in raw
                 if (text := " ".join(str(item or "").strip().split()))
             ]
-            return list(dict.fromkeys(normalized)) or list(fallback_goal_ids)
+            return sorted(dict.fromkeys(normalized)) or sorted(
+                dict.fromkeys(single_plan_goal_ids)
+            )
 
-        activities: list[SocialAttentionActivityAnchor] = []
+        def goal_context(goal_ids: list[str]) -> str:
+            summaries = [
+                goal_summary_by_id[item]
+                for item in goal_ids
+                if item in goal_summary_by_id
+            ]
+            if summaries:
+                return "; ".join(dict.fromkeys(summaries))[:420]
+            return fallback_goal_summary[:420]
+
+        activities: dict[str, dict[str, Any]] = {}
+
+        def get_activity(
+            *,
+            activity_id: str,
+            summary: str,
+            goal_ids: list[str],
+        ) -> dict[str, Any] | None:
+            normalized_summary = " ".join(str(summary or "").strip().split())[:500]
+            if not normalized_summary:
+                return None
+            return activities.setdefault(
+                activity_id,
+                {
+                    "activity_id": activity_id,
+                    "summary": normalized_summary,
+                    "goal_ids": list(goal_ids),
+                    "execution_lanes": [],
+                    "vocal_modes": [],
+                    "execution_item_ids": [],
+                    "capability_ids": [],
+                },
+            )
+
+        def add_unique(row: dict[str, Any], field: str, value: str) -> None:
+            if value and value not in row[field]:
+                row[field].append(value)
+
         for speech in interaction.speech:
             text = " ".join(str(speech.text or "").strip().split())
             if not text:
                 continue
-            activities.append(
-                SocialAttentionActivityAnchor(
-                    activity_id=speech.id,
-                    kind="speech",
-                    phase="ready",
-                    summary=text,
-                    goal_ids=item_goal_ids(speech.metadata),
-                )
+            goal_ids = item_goal_ids(speech.metadata)
+            speech_act = " ".join(
+                str(speech.metadata.get("speech_act") or "conversational_act")
+                .strip()
+                .split()
             )
+            delivery_role = " ".join(
+                str(speech.metadata.get("delivery_role") or "response").strip().split()
+            )
+            phase = " ".join(str(speech.metadata.get("phase") or "").strip().split())
+            goal_meaning = goal_context(goal_ids)
+            summary = (
+                f"{speech_act}: {goal_meaning}"
+                if goal_meaning
+                else text
+            )
+            digest = hashlib.sha256(
+                "|".join(
+                    [
+                        turn_id,
+                        "conversational_activity",
+                        *goal_ids,
+                        speech_act,
+                        delivery_role,
+                        phase,
+                        text,
+                    ]
+                ).encode("utf-8")
+            ).hexdigest()[:20]
+            row = get_activity(
+                activity_id=f"activity_{digest}",
+                summary=summary,
+                goal_ids=goal_ids,
+            )
+            if row is None:
+                continue
+            add_unique(row, "execution_lanes", "vocal")
+            add_unique(row, "vocal_modes", "speech")
+            add_unique(row, "execution_item_ids", speech.id)
 
         for request in interaction.skills:
             capability_id = str(request.capability_id or "").strip()
@@ -2168,24 +2322,64 @@ class GoalDrivenRuntimeCoordinator:
                 or capability_id.startswith("chromie.media.")
             ):
                 continue
-            kind = (
-                "vocal_performance"
+            goal_ids = item_goal_ids(request.metadata)
+            reason_summary = " ".join(
+                str(request.metadata.get("reason_summary") or "").strip().split()
+            )
+            summary = reason_summary or goal_context(goal_ids)
+            if not summary:
+                # Activity meaning must come from semantic Goal/Plan evidence, never
+                # by decoding the Capability identifier in Host code.
+                continue
+            plan_id = " ".join(
+                str(request.metadata.get("canonical_plan_id") or "").strip().split()
+            )
+            step_id = " ".join(
+                str(request.metadata.get("step_id") or "").strip().split()
+            )
+            identity_material = (
+                f"plan_step|{plan_id}|{step_id}"
+                if plan_id and step_id
+                else "|".join(["semantic_work", *goal_ids, summary])
+            )
+            digest = hashlib.sha256(
+                f"{turn_id}|{identity_material}".encode("utf-8")
+            ).hexdigest()[:20]
+            row = get_activity(
+                activity_id=f"activity_{digest}",
+                summary=summary,
+                goal_ids=goal_ids,
+            )
+            if row is None:
+                continue
+            execution_lane = (
+                "vocal"
                 if capability_id == VOCAL_PERFORMANCE_CAPABILITY_ID
-                else "media_playback"
-                if capability_id.startswith("chromie.media.")
-                else "body_action"
+                else "activity"
             )
-            activities.append(
-                SocialAttentionActivityAnchor(
-                    activity_id=request.request_id,
-                    kind=kind,
-                    phase="ready",
-                    summary=capability_id,
-                    goal_ids=item_goal_ids(request.metadata),
-                    capability_ids=[capability_id],
-                )
+            add_unique(row, "execution_lanes", execution_lane)
+            add_unique(row, "execution_item_ids", request.request_id)
+            add_unique(row, "capability_ids", capability_id)
+            if capability_id == VOCAL_PERFORMANCE_CAPABILITY_ID:
+                vocal_mode = " ".join(str(request.args.get("mode") or "").strip().split())
+                if vocal_mode in VOCAL_MODES:
+                    add_unique(row, "vocal_modes", vocal_mode)
+
+        return [
+            SocialAttentionActivityAnchor(
+                activity_id=row["activity_id"],
+                phase="ready",
+                summary=row["summary"],
+                goal_ids=row["goal_ids"],
+                realization=SocialAttentionActivityRealization(
+                    execution_lanes=row["execution_lanes"],
+                    vocal_modes=row["vocal_modes"],
+                    execution_item_ids=row["execution_item_ids"],
+                    capability_ids=row["capability_ids"],
+                ),
             )
-        return activities
+            for row in activities.values()
+        ]
 
     def _queue_social_attention_for_activity(
         self,
@@ -2717,9 +2911,10 @@ class GoalDrivenRuntimeCoordinator:
                 "reasons": ["missing_or_invalid_primary_activity_anchor"],
             }
 
-        # Throttle per primary Activity, never per cognition turn. A fast acknowledgement
-        # and a later walk/final response are different observable Activities and may each
-        # independently receive optional Social Attention.
+        # Throttle per semantic primary Activity, never per cognition turn or execution
+        # modality/item. A pre-Goal acknowledgement may be its own conversational Activity;
+        # after planning, canonical conversational/Plan-step Work defines Activity identity.
+        # Goal ownership is context above that identity, not the cooldown key.
         recent = getattr(self.adapter, "recent_auxiliary_behavior_evidence", None)
         recent_evidence = recent(sid) if callable(recent) else []
         if any(
@@ -2738,14 +2933,29 @@ class GoalDrivenRuntimeCoordinator:
 
         social_context["social_attention_event"] = event
         primary_progress: list[dict[str, Any]] = []
-        primary_capability_ids: list[str] = list(primary_activity.capability_ids)
+        primary_capability_ids: list[str] = list(
+            primary_activity.realization.capability_ids
+        )
         seen_primary_ids: set[str] = set(primary_capability_ids)
+        activity_goal_ids = set(primary_activity.goal_ids)
 
         def retain_primary_progress(rows: Any) -> None:
             if not isinstance(rows, list):
                 return
             for row in rows[:12]:
                 if not isinstance(row, dict):
+                    continue
+                row_goal_ids = {
+                    text
+                    for item in (row.get("source_goal_ids") or row.get("covers_goal_ids") or [])
+                    if (text := " ".join(str(item or "").strip().split()))
+                }
+                if activity_goal_ids:
+                    if not row_goal_ids.intersection(activity_goal_ids):
+                        continue
+                elif row_goal_ids:
+                    # A pre-Goal conversational act must not inherit unrelated later
+                    # Goal/Plan implementation merely because it shares the turn.
                     continue
                 capability_id = str(
                     row.get("capability_id") or row.get("skill_id") or ""
@@ -2764,6 +2974,8 @@ class GoalDrivenRuntimeCoordinator:
                         "skill_id",
                         "intent",
                         "args",
+                        "source_goal_ids",
+                        "covers_goal_ids",
                     )
                     if key in row
                 }
@@ -2779,7 +2991,11 @@ class GoalDrivenRuntimeCoordinator:
             "primary_activity": primary_activity.model_dump(mode="json", exclude_none=True),
             "primary_capability_ids": primary_capability_ids,
             "primary_progress": primary_progress,
-            "primary_work_known": bool(primary_activity.summary or primary_capability_ids),
+            "primary_work_known": bool(
+                primary_activity.summary
+                or primary_activity.realization.execution_item_ids
+                or primary_capability_ids
+            ),
         }
         social_context["recent_auxiliary_behavior_evidence"] = recent_evidence
         request = SocialAttentionRequest(
@@ -3054,7 +3270,9 @@ class GoalDrivenRuntimeCoordinator:
                 else self._context_turn_id(context, sid)
             )
             activities = self._resolution_social_activities(
-                resolution, turn_id=resolved_turn_id
+                resolution,
+                turn_id=resolved_turn_id,
+                context=context,
             )
             social_context = dict(context)
             if resolution.goal_association is not None:

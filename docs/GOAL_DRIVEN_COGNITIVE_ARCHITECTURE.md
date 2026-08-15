@@ -295,11 +295,15 @@ This is the same one-writer/immutable-proof rule used by Response Composition.
 
 ### Social Attention is optional parallel expression
 
-Social Attention makes an already-anchored interaction feel socially alive. It is
-not another Goal, execution lane, speech owner, or semantic planner. A gaze, blink,
-small nod/wave, or slight posture/orientation may accompany listening, speaking,
-Activity, waiting, or turn-taking when context and current body capabilities make
-it natural.
+Social Attention makes an already-anchored **semantic primary Activity** feel
+socially alive. It is not another Goal, execution lane, speech owner, or semantic
+planner. The anchor is what Chromie is doing—greeting, telling a joke, walking,
+singing, handover, show/play behavior, and similar outward meaning. A gaze, blink,
+small nod/wave, or slight posture/orientation may decorate that Activity when context
+and current body capabilities make it natural. Listening/waiting state, speaking or
+singing modes, execution lanes, provider readiness, and transport events may supply
+context or realization evidence, but none of them becomes a Primary Activity merely
+by occurring.
 
 If optional decoration is unavailable, invalid, conflicting, slow, repetitive,
 or simply unnecessary, drop it locally. Do not recompose speech, reinterpret the
@@ -550,9 +554,10 @@ reasoning with action-specific rules.
 
 ### 3.10 Primary responsibility and social decoration are different semantics
 
-Vocal and Activity carry primary executable responsibility. Social Attention may
-decorate an interaction, but it is not a third responsibility or execution
-channel.
+The Core owns semantic Responsibility and Primary Activity meaning. The Vocal and
+Activity Execution Lanes realize authorized work; they do not define the Activity
+ontology. Social Attention may decorate a semantic primary Activity, but it is not a
+third responsibility or execution channel.
 
 Every admitted turn still has one Core-owned semantic and conversational
 authority. Speech composition and user-task execution may be prepared or
@@ -949,7 +954,7 @@ Direction:
 - permission/consent are explicit cross-cutting authority facts;
 - `Converse` is native cognition, while `chromie.speak` remains transport/evidence;
   and
-- Social Attention may decorate a concrete primary observable Activity but never
+- Social Attention may decorate a concrete semantic primary observable Activity but never
   reacts merely to cognition-state changes or becomes a second Goal/semantic planner.
 
 #### G. Outcome reconciliation, reflection, memory, and learning
@@ -1450,7 +1455,7 @@ Goal cognition:
   → deterministic validation/authorization
   → trusted execution → observation/evidence
 
-In parallel only when a concrete primary observable Activity exists:
+In parallel only when a concrete semantic primary observable Activity exists:
   background Social Attention decoration cognition
   existing already-authorized work and observations
 
@@ -2348,10 +2353,13 @@ reconstructs action meaning from capability-specific phrase templates.
 
 A turn may have an immutable user task plan, independent response language, and
 zero or more optional Social Attention opportunities, one for each concrete
-primary human-observable Activity. These are not authored as one compound object.
-`SocialAttentionPlanner` alone authors each decoration plan. Social Attention is
-not one skill and not a deterministic utterance-to-gesture mapping; it is optional
-body expression or deliberate stillness attached to a primary Activity.
+**semantic** primary human-observable Activity. Primary Activity answers what
+Chromie is doing; response speech, Vocal modes, execution lanes, provider requests,
+and Capability IDs are realization facts beneath that meaning. These are not
+authored as one compound object. `SocialAttentionPlanner` alone authors each
+decoration plan. Social Attention is not one skill and not a deterministic
+utterance-to-gesture mapping; it is optional body expression or deliberate
+stillness attached to a primary Activity.
 
 The related shapes are:
 
@@ -2415,16 +2423,39 @@ safety, stop, and recovery remain provider responsibilities.
 
 ### 12.5 Primary Activity anchor, target evidence, and conflict policy
 
-Social Attention requires a concrete primary human-observable Activity anchor.
-Scheduled/started speech or Vocal output, body Activity, handover, vocal
-performance, or media playback can provide that anchor. `understanding_ready`,
-Goal Association, planning, waiting, evidence arrival, and similar internal
-cognitive/runtime milestones cannot. Pure unanchored idle animation is a separate
-embodiment/liveliness concern. Each distinct primary Activity in one turn is an
-independent optional decoration opportunity. `InteractionResponse` is only a
-coordination envelope: its speech items and observable Capability requests retain
-their own Activity IDs and are never collapsed into one interaction-scoped `mixed`
-Social Attention anchor.
+Social Attention requires a concrete **semantic** primary human-observable
+Activity anchor: greet Alice, tell a joke, walk toward someone, sing a song, hand
+over water, show/play something, and similar outward behavior. The anchor answers
+**what Chromie is doing**. Its `realization` answers **how** that same Activity is
+currently expressed: `Vocal`/`Activity` execution lanes, execution-item IDs, exact
+Capability IDs, and any Vocal Expression modes. Speaking (`mode=speech`),
+expressive speech, recitation, singing, humming, and nonverbal vocalization are
+modes of one Vocal Expression; they are not peer Primary-Activity kinds.
+
+Responsibility/Goal meaning is **above** Activity identity. After Goal Association,
+concrete Primary Activities follow canonical Work/Plan granularity: a conversational
+act is one semantic Activity, and executable provider work is projected at canonical
+Plan-step granularity. One Goal may therefore own several Activities—for example a
+`bring water` Responsibility may require walking, acquiring, returning, and handover
+Activities when only low-level providers are available. If a qualified provider later
+exposes one atomic `bring water` capability/workflow, the Planner may instead keep
+that behavior as one Activity. This is the same dynamic capability boundary used by
+the rest of Chromie.
+
+Before Goal Association, a concrete scheduled conversational act such as an
+acknowledgement may temporarily anchor Social Attention from its own semantic text,
+while its realization records only `Vocal Expression(mode=speech)`. After planning,
+Plan-step `reason_summary`/ownership provide Activity meaning; request IDs and exact
+Capability IDs remain realization evidence. `InteractionResponse` is a coordination
+envelope, not an Activity ontology, and execution items must never be promoted into
+Primary Activity identity.
+
+`understanding_ready`, Goal Association, planning, waiting, evidence arrival, lane
+transitions, and similar internal cognitive/runtime milestones cannot provide
+Activity meaning. Pure unanchored idle animation is a separate embodiment/liveliness
+concern. Each distinct semantic primary Activity in one turn is an independent
+optional decoration opportunity; multiple execution items realizing that Activity
+do not multiply opportunities.
 
 Target priority is:
 

@@ -168,8 +168,9 @@ from .user_turn import (
 )
 from .social_attention import (
     SocialAttentionActivityAnchor,
-    SocialAttentionActivityKind,
     SocialAttentionActivityPhase,
+    SocialAttentionActivityRealization,
+    SocialAttentionExecutionLane,
     SocialAttentionBehavior,
     SocialAttentionMode,
     SocialAttentionPlan,
@@ -375,8 +376,9 @@ __all__ = [
     "UserTurnEnvelope",
     "normalize_turn_text",
     "SocialAttentionActivityAnchor",
-    "SocialAttentionActivityKind",
     "SocialAttentionActivityPhase",
+    "SocialAttentionActivityRealization",
+    "SocialAttentionExecutionLane",
     "SocialAttentionBehavior",
     "SocialAttentionMode",
     "SocialAttentionPlan",
