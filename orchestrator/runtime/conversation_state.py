@@ -36,6 +36,7 @@ try:
     from chromie_contracts.execution_outcome import (
         ExecutionOutcomeBundle,
         execution_outcome_fingerprint,
+        goal_completion_qualification_summary,
     )
     from chromie_contracts.situation import CognitiveOpportunity
     from chromie_contracts.reflex import CancellationDispatchReceipt
@@ -60,6 +61,7 @@ except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.execution_outcome import (
         ExecutionOutcomeBundle,
         execution_outcome_fingerprint,
+        goal_completion_qualification_summary,
     )
     from shared.chromie_contracts.situation import CognitiveOpportunity
     from shared.chromie_contracts.reflex import CancellationDispatchReceipt
@@ -4522,11 +4524,22 @@ class ConversationStateManager:
                     item.metadata.get("retryable_safe_read") is True
                     for item in referenced_evidence
                 )
+                qualification = self._completion_qualification_summary(
+                    validated, outcome
+                )
+                completion_unqualified = bool(
+                    outcome.status == "completed"
+                    and qualification["required"]
+                    and not qualification["established"]
+                )
                 lifecycle_status = (
                     "recoverable"
-                    if retryable_safe_read
-                    and outcome.status
-                    in {"failed", "timed_out", "cancelled", "not_run"}
+                    if completion_unqualified
+                    or (
+                        retryable_safe_read
+                        and outcome.status
+                        in {"failed", "timed_out", "cancelled", "not_run"}
+                    )
                     else status_projection[outcome.status]
                 )
                 evidence_summary = context.get("evidence_summary")
@@ -4548,6 +4561,9 @@ class ConversationStateManager:
                     "completed_step_ids": list(outcome.completed_step_ids),
                     "unresolved_step_ids": list(outcome.unresolved_step_ids),
                     "reason_codes": list(outcome.reason_codes),
+                    "completion_qualification_required": qualification["required"],
+                    "completion_qualification_established": qualification["established"],
+                    "completion_qualifications": qualification["qualifications"],
                 }
                 context["evidence_summary"] = evidence_summary
                 context["status"] = lifecycle_status
@@ -4566,6 +4582,8 @@ class ConversationStateManager:
                     "execution_outcome_status": outcome.status,
                     "execution_evidence_ids": list(outcome.evidence_ids),
                     "retryable_safe_read": retryable_safe_read,
+                    "completion_qualification_required": qualification["required"],
+                    "completion_qualification_established": qualification["established"],
                 }
 
                 matched_pending = 0
@@ -4584,6 +4602,8 @@ class ConversationStateManager:
                         "execution_outcome_status": outcome.status,
                         "execution_evidence_ids": list(outcome.evidence_ids),
                         "retryable_safe_read": retryable_safe_read,
+                        "completion_qualification_required": qualification["required"],
+                        "completion_qualification_established": qualification["established"],
                     }
                     matched_pending += 1
 
@@ -4594,6 +4614,8 @@ class ConversationStateManager:
                         "work_status": lifecycle_status,
                         "outcome_id": validated.outcome_id,
                         "applied": True,
+                        "completion_qualification_required": qualification["required"],
+                        "completion_qualification_established": qualification["established"],
                         "pending_records_updated": matched_pending,
                     }
                 )
@@ -4604,6 +4626,13 @@ class ConversationStateManager:
             raise
         self.last_activity_ms = timestamp_ms
         return results
+
+    @staticmethod
+    def _completion_qualification_summary(
+        bundle: ExecutionOutcomeBundle,
+        outcome: Any,
+    ) -> dict[str, Any]:
+        return goal_completion_qualification_summary(bundle, outcome)
 
     def reconcile_execution_outcome_responsibilities(
         self,
@@ -4653,7 +4682,17 @@ class ConversationStateManager:
                 })
                 continue
 
-            current = "satisfied" if outcome.status == "completed" else "open"
+            qualification = self._completion_qualification_summary(
+                validated, outcome
+            )
+            completion_established = bool(
+                outcome.status == "completed"
+                and (
+                    not qualification["required"]
+                    or qualification["established"]
+                )
+            )
+            current = "satisfied" if completion_established else "open"
             if current != previous:
                 self._set_goal_responsibility_status(
                     context,
@@ -4669,6 +4708,9 @@ class ConversationStateManager:
                 "responsibility_status": current,
                 "changed": current != previous,
                 "execution_status": outcome.status,
+                "completion_qualification_required": qualification["required"],
+                "completion_qualification_established": qualification["established"],
+                "completion_qualifications": qualification["qualifications"],
             })
 
         if changed:
@@ -4848,7 +4890,13 @@ class ConversationStateManager:
         validated = ExecutionOutcomeBundle.model_validate(bundle)
         opportunities: list[CognitiveOpportunity] = []
         for outcome in validated.goal_outcomes:
-            if outcome.status == "completed":
+            qualification = self._completion_qualification_summary(
+                validated, outcome
+            )
+            if outcome.status == "completed" and (
+                not qualification["required"]
+                or qualification["established"]
+            ):
                 continue
             context = self._task_context_by_goal_id(outcome.goal_id)
             if context is None:
@@ -4869,9 +4917,23 @@ class ConversationStateManager:
                 metadata = {}
             retryable_safe_read = metadata.get("retryable_safe_read") is True
             mode = "fast" if retryable_safe_read else "slow"
-            reason_codes = list(outcome.reason_codes) or [
-                f"execution_{outcome.status}"
+            qualification_reason_codes = [
+                str(reason)
+                for row in qualification["qualifications"]
+                for reason in row.get("reason_codes", [])
+                if str(reason).strip()
             ]
+            reason_codes = (
+                list(outcome.reason_codes)
+                or qualification_reason_codes
+                or [
+                    (
+                        "completion_evidence_insufficient"
+                        if outcome.status == "completed"
+                        else f"execution_{outcome.status}"
+                    )
+                ]
+            )
             opportunities.append(
                 CognitiveOpportunity.create(
                     trigger="execution_outcome",

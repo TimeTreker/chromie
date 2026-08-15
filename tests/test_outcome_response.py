@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import unittest
+from datetime import datetime, timezone
 from typing import Any
 
 from orchestrator.runtime.outcome_response import compose_outcome_response
 from shared.chromie_contracts.execution_outcome import (
+    ClaimQualification,
     ExecutionEvidence,
     ExecutionOutcomeBundle,
     GoalExecutionOutcome,
@@ -141,6 +143,28 @@ def _bundle(
     )
 
 
+def _require_unestablished_completion(
+    bundle: ExecutionOutcomeBundle,
+    *,
+    status: str = "insufficient",
+) -> ExecutionOutcomeBundle:
+    raw = bundle.model_dump(mode="python")
+    raw_evidence = raw["evidence"][0]
+    raw_evidence["metadata"] = {
+        **raw_evidence.get("metadata", {}),
+        "completion_qualification_required": True,
+    }
+    raw_evidence["completion_qualification"] = ClaimQualification(
+        claim="requested capability completion is established",
+        status=status,
+        policy_sha256="a" * 64,
+        evidence_ids=[raw_evidence["evidence_id"]],
+        reason_codes=["completion_evidence_insufficient"],
+        evaluated_at=datetime.now(timezone.utc),
+    ).model_dump(mode="python")
+    return ExecutionOutcomeBundle.model_validate(raw)
+
+
 class OutcomeResponseTests(unittest.TestCase):
     def test_covers_every_executable_goal_once_in_canonical_order(self) -> None:
         statuses = [
@@ -175,6 +199,28 @@ class OutcomeResponseTests(unittest.TestCase):
                 "The second one did not work.",
                 "I stopped the third one.",
             ],
+        )
+
+    def test_completed_execution_without_established_claim_never_says_done(self) -> None:
+        statuses = [("goal-check", ["completed"])]
+        plan = _plan(statuses)
+        bundle = _require_unestablished_completion(_bundle(plan, statuses))
+
+        response = compose_outcome_response(bundle, plan, "en-US")
+
+        self.assertEqual(bundle.goal_outcomes[0].status, "completed")
+        self.assertEqual(response.status, "error")
+        self.assertEqual(response.reason, "post_execution_completion_unverified")
+        self.assertEqual(
+            response.speech[0].text,
+            "I could not confirm that finished.",
+        )
+        self.assertNotIn("done", response.speech[0].text.casefold())
+        self.assertFalse(
+            response.speech[0].metadata["completion_claim_verified"]
+        )
+        self.assertTrue(
+            response.speech[0].metadata["completion_qualification"]["required"]
         )
 
     def test_preserves_all_terminal_status_distinctions_in_chinese(self) -> None:

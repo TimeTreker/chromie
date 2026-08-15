@@ -123,6 +123,9 @@ from shared.chromie_contracts.interaction import (
     SkillResult,
 )
 from shared.chromie_contracts.goal import GoalAssociationResolution
+from shared.chromie_contracts.execution_outcome import (
+    goal_completion_qualification_summary,
+)
 from shared.chromie_contracts.tool_result import (
     ToolExecutionRequest,
     ToolExecutionResponse,
@@ -7830,6 +7833,26 @@ class VoiceAssistant:
         before accepting one concise spoken answer.
         """
 
+        metadata = source_response.metadata if isinstance(source_response.metadata, dict) else {}
+        envelope = metadata.get("user_turn_envelope")
+        normalized_input = (
+            envelope.get("normalized_input")
+            if isinstance(envelope, dict)
+            else None
+        )
+        language = str(
+            metadata.get("language")
+            or (normalized_input.get("language") if isinstance(normalized_input, dict) else "")
+            or "en-US"
+        )
+        if any(
+            outcome.status == "completed"
+            and (summary := goal_completion_qualification_summary(bundle, outcome))["required"]
+            and not summary["established"]
+            for outcome in bundle.goal_outcomes
+        ):
+            return compose_outcome_response(bundle, plan, language)
+
         evidence: list[ToolResultEvidence] = []
         for item in bundle.evidence:
             observation = item.observation
@@ -7852,13 +7875,6 @@ class VoiceAssistant:
         if not evidence:
             return None
 
-        metadata = source_response.metadata if isinstance(source_response.metadata, dict) else {}
-        envelope = metadata.get("user_turn_envelope")
-        normalized_input = (
-            envelope.get("normalized_input")
-            if isinstance(envelope, dict)
-            else None
-        )
         user_request = (
             str(normalized_input.get("text") or "").strip()
             if isinstance(normalized_input, dict)
@@ -7866,11 +7882,6 @@ class VoiceAssistant:
         )
         if not user_request:
             return None
-        language = str(
-            metadata.get("language")
-            or (normalized_input.get("language") if isinstance(normalized_input, dict) else "")
-            or "en-US"
-        )
         mind_manager = getattr(self, "mind", None)
         mind_context = (
             mind_manager.context()
@@ -7911,7 +7922,13 @@ class VoiceAssistant:
                     == "robot_action"
                 ),
                 "goal_statuses": [
-                    {"goal_id": item.goal_id, "status": item.status}
+                    {
+                        "goal_id": item.goal_id,
+                        "status": item.status,
+                        "completion_qualification": (
+                            goal_completion_qualification_summary(bundle, item)
+                        ),
+                    }
                     for item in bundle.goal_outcomes
                 ],
                 "identity": mind_context.get("identity") or {},

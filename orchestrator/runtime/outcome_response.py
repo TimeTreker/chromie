@@ -7,6 +7,7 @@ from shared.chromie_contracts.execution_outcome import (
     ExecutionOutcomeBundle,
     GoalExecutionOutcome,
     execution_outcome_fingerprint,
+    goal_completion_qualification_summary,
 )
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
@@ -62,6 +63,25 @@ _INTERPRETATION_UNAVAILABLE_TEXT = {
 _MAX_OBSERVATION_TEXT = 240
 
 
+def _unverified_completion_text(
+    *,
+    index: int,
+    count: int,
+    chinese: bool,
+) -> str:
+    if chinese:
+        if count <= 1:
+            return "我还不能确认这件事真的完成了。"
+        return f"第{index}件我还不能确认真的完成了。"
+    if count <= 1:
+        return "I could not confirm that finished."
+    ordinal = (
+        _ENGLISH_ORDINALS[index - 1]
+        if 0 < index <= len(_ENGLISH_ORDINALS)
+        else f"number {index}"
+    )
+    return f"I could not confirm the {ordinal} one finished."
+
 
 def compose_outcome_response(
     bundle: ExecutionOutcomeBundle,
@@ -103,22 +123,35 @@ def compose_outcome_response(
             internal_ids=internal_ids,
             chinese=chinese,
         )
-        text = _status_text(
-            status=outcome.status,
-            index=index,
-            count=goal_count,
-            chinese=chinese,
-            part_of_larger_request=bool(bundle.non_execution_goal_ids),
+        qualification = goal_completion_qualification_summary(bundle, outcome)
+        completion_unverified = bool(
+            outcome.status == "completed"
+            and qualification["required"]
+            and not qualification["established"]
         )
-        if observation_text:
-            text = _append_observation(
-                text,
-                observation_text,
-                status=outcome.status,
+        if completion_unverified:
+            text = _unverified_completion_text(
+                index=index,
+                count=goal_count,
                 chinese=chinese,
             )
-        elif outcome.status == "completed" and had_available_observation:
-            text = _INTERPRETATION_UNAVAILABLE_TEXT["zh" if chinese else "en"]
+        else:
+            text = _status_text(
+                status=outcome.status,
+                index=index,
+                count=goal_count,
+                chinese=chinese,
+                part_of_larger_request=bool(bundle.non_execution_goal_ids),
+            )
+            if observation_text:
+                text = _append_observation(
+                    text,
+                    observation_text,
+                    status=outcome.status,
+                    chinese=chinese,
+                )
+            elif outcome.status == "completed" and had_available_observation:
+                text = _INTERPRETATION_UNAVAILABLE_TEXT["zh" if chinese else "en"]
 
         speech_id = f"speech_outcome_{bundle_fingerprint[:12]}_{index}"
         speech.append(
@@ -136,6 +169,11 @@ def compose_outcome_response(
                     "playback_start_required_for_delivery": True,
                     "covers_goal_ids": [goal_id],
                     "goal_status": outcome.status,
+                    "completion_claim_verified": (
+                        not qualification["required"]
+                        or qualification["established"]
+                    ),
+                    "completion_qualification": qualification,
                     "evidence_ids": list(outcome.evidence_ids),
                     "observed_evidence_ids": observed_evidence_ids,
                     "execution_outcome_fingerprint": bundle_fingerprint,
@@ -146,6 +184,7 @@ def compose_outcome_response(
             {
                 "goal_id": goal_id,
                 "status": outcome.status,
+                "completion_qualification": qualification,
                 "step_ids": list(outcome.step_ids),
                 "evidence_ids": list(outcome.evidence_ids),
                 "observed_evidence_ids": observed_evidence_ids,
@@ -153,9 +192,15 @@ def compose_outcome_response(
             }
         )
 
+    has_unverified_completion = any(
+        item.status == "completed"
+        and (summary := goal_completion_qualification_summary(bundle, item))["required"]
+        and not summary["established"]
+        for item in bundle.goal_outcomes
+    )
     response_status = (
         "ok"
-        if bundle.aggregate_status == "completed"
+        if bundle.aggregate_status == "completed" and not has_unverified_completion
         else "refused"
         if bundle.aggregate_status == "refused"
         else "error"
@@ -168,7 +213,9 @@ def compose_outcome_response(
         requires_confirmation=False,
         reason=(
             None
-            if bundle.aggregate_status == "completed"
+            if bundle.aggregate_status == "completed" and not has_unverified_completion
+            else "post_execution_completion_unverified"
+            if has_unverified_completion
             else f"post_execution_{bundle.aggregate_status}"
         ),
         metadata={

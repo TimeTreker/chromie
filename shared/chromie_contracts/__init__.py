@@ -81,6 +81,7 @@ from .execution_outcome import (
     aggregate_execution_status,
     claim_qualification_policy_sha256,
     execution_outcome_fingerprint,
+    goal_completion_qualification_summary,
 )
 from .interaction_ledger import (
     InteractionContextProjection,
@@ -317,6 +318,7 @@ __all__ = [
     "aggregate_execution_status",
     "claim_qualification_policy_sha256",
     "execution_outcome_fingerprint",
+    "goal_completion_qualification_summary",
     "InteractionContextProjection",
     "InteractionEventDomain",
     "InteractionEventOwner",

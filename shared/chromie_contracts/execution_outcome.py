@@ -705,6 +705,71 @@ class ExecutionOutcomeBundle(BaseModel):
         return self
 
 
+def goal_completion_qualification_summary(
+    bundle: ExecutionOutcomeBundle,
+    outcome: GoalExecutionOutcome,
+) -> dict[str, Any]:
+    """Project request-level completion qualification for one canonical Goal.
+
+    Execution status remains an immutable fact about what the provider/runtime
+    reported. This projection answers the separate question of whether every
+    maintained completion claim required for that Goal is established. It adds
+    no semantic judgment: the result is derived only from exact evidence IDs,
+    their committed qualification requirement, and immutable qualification
+    records.
+    """
+
+    evidence_by_id = {item.evidence_id: item for item in bundle.evidence}
+    referenced = [
+        evidence_by_id[evidence_id]
+        for evidence_id in outcome.evidence_ids
+        if evidence_id in evidence_by_id
+    ]
+    required = [
+        item
+        for item in referenced
+        if item.metadata.get("completion_qualification_required") is True
+    ]
+    rows: list[dict[str, Any]] = []
+    for item in required:
+        qualification = item.completion_qualification
+        rows.append(
+            {
+                "evidence_id": item.evidence_id,
+                "status": (
+                    qualification.status
+                    if qualification is not None
+                    else "unknown"
+                ),
+                "claim": (
+                    qualification.claim if qualification is not None else ""
+                ),
+                "reason_codes": (
+                    list(qualification.reason_codes)
+                    if qualification is not None
+                    else [
+                        str(
+                            item.metadata.get(
+                                "completion_evidence_gate_reason"
+                            )
+                            or "completion_qualification_missing"
+                        )
+                    ]
+                ),
+            }
+        )
+    return {
+        "required": bool(required),
+        "established": bool(required)
+        and all(
+            item.completion_qualification is not None
+            and item.completion_qualification.status == "established"
+            for item in required
+        ),
+        "qualifications": rows,
+    }
+
+
 def execution_outcome_fingerprint(bundle: ExecutionOutcomeBundle) -> str:
     payload = json.dumps(
         bundle.model_dump(mode="json", exclude_none=True),

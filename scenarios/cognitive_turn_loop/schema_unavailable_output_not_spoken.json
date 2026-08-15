@@ -72,7 +72,7 @@
     "goal_statuses": ["completed"],
     "observation_statuses": ["schema_unavailable"],
     "schema_gate_reasons": ["current_output_schema_invalid"],
-    "goal_state_statuses": ["done"],
+    "goal_state_statuses": ["recoverable"],
     "goal_state_outcome_statuses": ["completed"],
     "closure_status": "speech_runtime_completed",
     "delivery_status": "speech_runtime_completed",
@@ -83,6 +83,7 @@
     "final_goal_statuses": ["completed"],
     "final_skill_ids": [],
     "runtime_call_count": 2,
-    "final_speech_forbid": ["UNTRUSTED-SCHEMALESS-PAYLOAD"]
+    "final_speech_contains_all": ["could not confirm"],
+    "final_speech_forbid": ["UNTRUSTED-SCHEMALESS-PAYLOAD", "Done."]
   }
 }

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -11,7 +12,11 @@ from shared.chromie_contracts.discourse import (
     DiscourseReferentUpdate,
     ResolvedDiscourseReference,
 )
-from shared.chromie_contracts.execution_outcome import ExecutionOutcomeBundle
+from shared.chromie_contracts.execution_outcome import (
+    ClaimQualificationPolicy,
+    ExecutionOutcomeBundle,
+    claim_qualification_policy_sha256,
+)
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.interaction import InteractionResponse
 
@@ -1480,6 +1485,116 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             contexts["goal-walk"]["metadata"]["execution_outcome_status"],
             "completed",
         )
+
+    def test_completed_execution_with_insufficient_qualification_keeps_goal_open(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="qualification-open")
+        self._create_goals(manager, "goal-walk")
+        manager.record_agent_result(
+            "sid-qualified",
+            InteractionResponse(
+                interaction_id="interaction-qualified",
+                skills=[
+                    {
+                        "request_id": "request-walk",
+                        "skill_id": "soridormi.walk_forward",
+                        "metadata": {
+                            "source_goal_ids": ["goal-walk"],
+                            "canonical_plan_id": "plan-lifecycle",
+                            "canonical_plan_fingerprint": "q" * 64,
+                        },
+                    }
+                ],
+                metadata={
+                    "planning_result": "direct_skill",
+                    "turn_id": "turn-qualified",
+                    "canonical_plan_id": "plan-lifecycle",
+                    "canonical_plan_fingerprint": "q" * 64,
+                    "canonical_plan": self._canonical_plan(
+                        "execute",
+                        [
+                            {
+                                "goal_id": "goal-walk",
+                                "disposition": "execute",
+                                "coverage": "complete",
+                                "step_ids": ["step-walk"],
+                            }
+                        ],
+                    ),
+                },
+            ),
+        )
+        policy = ClaimQualificationPolicy(
+            claim="embodied completion",
+            requirement_groups=[
+                {
+                    "requirements": [
+                        {"source": "execution_observation"},
+                        {
+                            "source": "provider_postcondition",
+                            "condition": "post_execution_robot_status",
+                            "field_assertions": {"safe_idle": True},
+                        },
+                    ]
+                }
+            ],
+        )
+        bundle = ExecutionOutcomeBundle(
+            outcome_id="outcome-qualified",
+            turn_id="turn-qualified",
+            interaction_id="interaction-qualified",
+            canonical_plan_id="plan-lifecycle",
+            canonical_plan_fingerprint="q" * 64,
+            canonical_goal_ids=["goal-walk"],
+            aggregate_status="completed",
+            evidence=[
+                {
+                    "evidence_id": "evidence-walk",
+                    "request_id": "request-walk",
+                    "step_id": "step-walk",
+                    "skill_id": "soridormi.walk_forward",
+                    "source_goal_ids": ["goal-walk"],
+                    "status": "completed",
+                    "completion_qualification": {
+                        "claim": policy.claim,
+                        "status": "insufficient",
+                        "policy_sha256": claim_qualification_policy_sha256(policy),
+                        "evidence_ids": ["evidence-walk"],
+                        "reason_codes": ["provider_postcondition_missing"],
+                        "coverage": "not_required",
+                        "evaluated_at": datetime.now(timezone.utc),
+                    },
+                    "metadata": {
+                        "completion_qualification_required": True,
+                    },
+                }
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-walk",
+                    "status": "completed",
+                    "step_ids": ["step-walk"],
+                    "evidence_ids": ["evidence-walk"],
+                    "completed_step_ids": ["step-walk"],
+                }
+            ],
+        )
+
+        applied = manager.record_execution_outcome_bundle(bundle, sid="sid-qualified")
+        context = manager._task_context_by_goal_id("goal-walk")
+        assert context is not None
+        self.assertEqual(applied[0]["work_status"], "recoverable")
+        self.assertEqual(context["status"], "recoverable")
+        self.assertEqual(context["semantic_goal"]["responsibility_status"], "open")
+
+        reconciled = manager.reconcile_execution_outcome_responsibilities(
+            bundle, sid="sid-qualified"
+        )
+        self.assertEqual(reconciled[0]["responsibility_status"], "open")
+        self.assertFalse(reconciled[0]["completion_qualification_established"])
+
+        opportunities = manager.derive_execution_cognitive_opportunities(bundle)
+        self.assertEqual(len(opportunities), 1)
+        self.assertIn("provider_postcondition_missing", opportunities[0].reason_codes)
 
     def test_later_correction_reopens_satisfied_responsibility_without_rewriting_outcome(self) -> None:
         manager = ConversationStateManager(base_conversation_id="reopen-after-correction")
