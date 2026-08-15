@@ -399,7 +399,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("completion_requires_fresh_evidence", prompt)
         self.assertIn("Immediate complete answer: route=chat, kind=native_response", prompt)
         self.assertIn("Goal Progress Communication", prompt)
-        self.assertIn("fast_speech may be one prospective Goal Progress Communication act", prompt)
+        self.assertIn("fast_speech should normally be one short prospective Goal Progress Communication act", prompt)
         self.assertIn("Common ability IDs", prompt)
         self.assertIn("Common Ability Catalog JSON", prompt)
         self.assertIn("soridormi.blink_eyes", prompt)

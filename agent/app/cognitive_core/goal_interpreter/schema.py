@@ -40,6 +40,10 @@ DecisionSource = Literal["rules", "llm", "catalog", "fallback"]
 
 
 _SOURCE_FAST_SPEECH_ROUTE_CONTRACTS: dict[str, tuple[str, str]] = {
+    # ``route`` is only compatibility framing at Goal Interpretation. A work-bearing
+    # responsibility can therefore still carry prospective Goal Progress
+    # Communication even if the small model leaves that framing as ``chat``.
+    "chat": ("acknowledge", "prelude_only"),
     "tool": ("acknowledge_and_check", "checking_only"),
     "robot_action": ("acknowledge", "prelude_only"),
     "deep_thought": ("thinking", "prelude_only"),

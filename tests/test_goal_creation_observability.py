@@ -23,6 +23,13 @@ class _GoalState:
         return {
             "task_contexts": [{}, {}],
             "active_task_contexts": [{}],
+            "recent_goal_snapshots": [
+                {
+                    "goal_id": "goal-old",
+                    "responsibility_status": "satisfied",
+                    "work_status": "done",
+                }
+            ],
         }
 
     def active_goal_snapshots(self, *, limit):
@@ -48,13 +55,52 @@ class GoalCreationObservabilityTests(unittest.TestCase):
 
         self.assertEqual(results[0]["operation"], "create")
         joined = "\n".join(captured.output)
-        self.assertIn("goal_state_counts_after_create", joined)
+        self.assertIn("goal_list_after_association", joined)
+        self.assertIn("applied_operations=", joined)
         self.assertIn("created_goals=1", joined)
         self.assertIn("task_contexts=2", joined)
         self.assertIn("active_tasks=1", joined)
         self.assertIn("active_goals=1", joined)
         self.assertIn("thread=MainThread", joined)
         self.assertIn("is_main_thread=True", joined)
+        self.assertIn("active_goal_list=", joined)
+        self.assertIn("goal-weather", joined)
+        self.assertIn("recent_terminal_goal_list=", joined)
+        self.assertIn("goal-old", joined)
+
+
+    def test_non_create_goal_state_change_also_logs_full_goal_list(self):
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+
+        class ModifyState(_GoalState):
+            def apply_goal_association_resolution(self, *args, **kwargs):
+                del args, kwargs
+                return [
+                    {
+                        "applied": True,
+                        "operation": "modify",
+                        "goal_id": "goal-weather",
+                        "task_id": "task-weather",
+                    }
+                ]
+
+        assistant.conversation_state = ModifyState()
+        with self.assertLogs("chromie-orchestrator", level="INFO") as captured:
+            results = assistant._apply_cognitive_goal_association_stage(
+                object(),
+                sid="sid-weather-followup",
+                user_text="改成明天下午。",
+                route="tool",
+                intent="weather_query",
+                source="test",
+            )
+
+        self.assertEqual(results[0]["operation"], "modify")
+        joined = "\n".join(captured.output)
+        self.assertIn("goal_list_after_association", joined)
+        self.assertIn('"operation":"modify"', joined)
+        self.assertIn("active_goal_list=", joined)
+        self.assertIn("goal-weather", joined)
 
     def test_count_logging_failure_does_not_undo_goal_commit(self):
         assistant = VoiceAssistant.__new__(VoiceAssistant)
@@ -75,7 +121,7 @@ class GoalCreationObservabilityTests(unittest.TestCase):
             )
 
         self.assertEqual(results[0]["operation"], "create")
-        self.assertIn("goal_state_count_log_failed", "\n".join(captured.output))
+        self.assertIn("goal_list_after_association_log_failed", "\n".join(captured.output))
 
     def test_replayed_create_does_not_log_a_new_goal_count(self):
         assistant = VoiceAssistant.__new__(VoiceAssistant)

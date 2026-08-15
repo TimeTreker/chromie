@@ -27,6 +27,7 @@ from orchestrator.runtime.mind import MindManager
 from orchestrator.runtime.session import SessionTracker
 from orchestrator.runtime.skill_runtime import SkillRuntimeResult
 from orchestrator.schemas.route import RouteDecision
+from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision as AgentRouteDecision
 from shared.chromie_contracts.mind import default_mind_profile
 from shared.chromie_contracts.interaction import InteractionResponse, SkillResult
 
@@ -1357,6 +1358,44 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             )
         )
 
+    def test_chat_framed_bare_fast_speech_gets_generic_progress_contract(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.fast_first_response_enabled = True
+        assistant.core_generated_fast_speech_enabled = True
+        agent_decision = AgentRouteDecision.model_validate(
+            {
+                "route": "chat",
+                "intent": "native_response",
+                "confidence": 0.95,
+                "fast_speech": "嗯，我先看看能不能找到水瓶，然后帮你拿一杯水！",
+                "responsibilities": [
+                    {
+                        "local_ref": "water",
+                        "outcome": "拿一杯水",
+                        "bindings": {"resource": "水"},
+                        "completion_requires_work": True,
+                        "completion_requires_fresh_evidence": True,
+                        "confidence": 0.95,
+                    }
+                ],
+                "progress": [],
+            }
+        )
+        self.assertIsNotNone(agent_decision.fast_speech)
+        assert agent_decision.fast_speech is not None
+        self.assertEqual(agent_decision.fast_speech.purpose, "acknowledge")
+        self.assertEqual(agent_decision.fast_speech.commitment, "prelude_only")
+
+        # HTTP/compatibility serialization preserves the typed claim envelope, so
+        # the Host still receives a complete FastSpeech contract and can play it.
+        decision = RouteDecision.model_validate(
+            agent_decision.model_dump(mode="json", exclude_none=True)
+        )
+        self.assertEqual(
+            assistant._fast_first_response_text(decision, "帮我拿杯水。"),
+            "嗯，我先看看能不能找到水瓶，然后帮你拿一杯水！",
+        )
+
     def test_dynamic_fast_speech_uses_typed_claim_authority_not_wording_rules(self) -> None:
         # The Host applies transport checks only; semantic wording is reviewed
         # by the Cognitive Core and represented by typed claim provenance.
@@ -1563,6 +1602,17 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             assistant.sessions.state[session_id]["scheduled_tts"],
             0,
+        )
+        workflow_messages = [
+            str(item.get("message") or "")
+            for item in assistant.sessions.state[session_id]["workflow_events"]
+            if isinstance(item, dict)
+        ]
+        self.assertTrue(
+            any(
+                "reason=goal_interpreter_no_fast_speech" in message
+                for message in workflow_messages
+            )
         )
 
 

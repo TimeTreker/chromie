@@ -3358,9 +3358,11 @@ class VoiceAssistant:
         if claimed_capability_ids != [] or claimed_goal_ids != []:
             return None
         # Route-specific typed fields constrain authority but do not decide
-        # whether a polite notification is semantically useful. A memory prelude
-        # remains purely prospective and cannot claim that a commit already happened.
+        # whether a polite notification is semantically useful. ``chat`` is a
+        # deprecated compatibility framing that can still carry work-bearing
+        # provider-neutral Responsibilities, so it gets the generic prelude envelope.
         route_contracts = {
+            "chat": ("acknowledge", "prelude_only"),
             "tool": ("acknowledge_and_check", "checking_only"),
             "robot_action": ("acknowledge", "prelude_only"),
             "deep_thought": ("thinking", "prelude_only"),
@@ -3597,14 +3599,35 @@ class VoiceAssistant:
             task_snapshots=task_snapshots,
         )
         if not text:
+            diagnostics = self._goal_interpretation_fast_speech_diagnostics(decision)
+            if not self.fast_first_response_enabled:
+                skip_reason = "fast_first_response_disabled"
+            elif not decision.should_speak:
+                skip_reason = "speech_not_requested"
+            elif decision.route in {"interrupt", "ignore"}:
+                skip_reason = "operational_route"
+            elif (
+                diagnostics["top_fast_speech_present"]
+                and not diagnostics["top_fast_speech_safe"]
+            ) or (
+                diagnostics["route_item_fast_speech_count"]
+                > diagnostics["route_item_fast_speech_safe_count"]
+            ):
+                skip_reason = "fast_speech_contract_rejected"
+            elif not diagnostics["top_fast_speech_present"] and not diagnostics[
+                "route_item_fast_speech_count"
+            ]:
+                skip_reason = "goal_interpreter_no_fast_speech"
+            else:
+                skip_reason = "not_applicable"
             self.session_log(
                 session_id,
                 "fast_first_response_skipped: route=%s intent=%s reason=%s diagnostics=%s",
                 decision.route,
                 decision.intent,
-                "not_applicable",
+                skip_reason,
                 json.dumps(
-                    self._goal_interpretation_fast_speech_diagnostics(decision),
+                    diagnostics,
                     ensure_ascii=False,
                     sort_keys=True,
                 ),
@@ -4258,13 +4281,9 @@ class VoiceAssistant:
             source=source,
             atomic=True,
         )
-        created = [
-            item
-            for item in results
-            if item.get("applied") is True
-            and item.get("operation") == "create"
-        ]
-        if created:
+        applied = [item for item in results if item.get("applied") is True]
+        if applied:
+            created = [item for item in applied if item.get("operation") == "create"]
             try:
                 snapshot = self.conversation_state.snapshot()
                 task_contexts = snapshot.get("task_contexts")
@@ -4273,10 +4292,15 @@ class VoiceAssistant:
                     limit=self.conversation_state.max_pending_tasks
                 )
                 current_thread = threading.current_thread()
+                recent_goals = snapshot.get("recent_goal_snapshots")
+                if not isinstance(recent_goals, list):
+                    recent_goals = []
                 logger.info(
-                    "goal_state_counts_after_create: created_goals=%s "
+                    "goal_list_after_association: applied_operations=%s created_goals=%s "
                     "task_contexts=%s active_tasks=%s active_goals=%s "
-                    "thread=%s is_main_thread=%s",
+                    "thread=%s is_main_thread=%s active_goal_list=%s "
+                    "recent_terminal_goal_list=%s",
+                    self._compact_json_for_prompt(applied, max_chars=3000),
                     len(created),
                     len(task_contexts) if isinstance(task_contexts, list) else 0,
                     (
@@ -4287,14 +4311,16 @@ class VoiceAssistant:
                     len(active_goals),
                     current_thread.name,
                     current_thread is threading.main_thread(),
+                    self._compact_json_for_prompt(active_goals, max_chars=8000),
+                    self._compact_json_for_prompt(recent_goals, max_chars=4000),
                 )
             except (AttributeError, KeyError, RuntimeError, TypeError, ValueError) as exc:
-                # Observability must never turn a committed Goal creation into
-                # a failed user turn.
+                # Observability must never turn committed Goal state into a failed
+                # user turn.
                 logger.warning(
-                    "goal_state_count_log_failed: created_goals=%s "
+                    "goal_list_after_association_log_failed: applied=%s "
                     "error_type=%s error=%s",
-                    len(created),
+                    len(applied),
                     type(exc).__name__,
                     exc,
                 )
@@ -5412,6 +5438,21 @@ class VoiceAssistant:
                 ensure_ascii=False,
                 sort_keys=True,
                 separators=(",", ":"),
+            ),
+        )
+        self.session_log(
+            session_id,
+            "goal_list_before_turn: active_count=%s recent_terminal_count=%s "
+            "active_goals=%s recent_terminal_goals=%s",
+            len(context.get("active_goal_snapshots") or []),
+            len(context.get("recent_goal_snapshots") or []),
+            self._compact_json_for_prompt(
+                context.get("active_goal_snapshots") or [],
+                max_chars=8000,
+            ),
+            self._compact_json_for_prompt(
+                context.get("recent_goal_snapshots") or [],
+                max_chars=4000,
             ),
         )
         context_snapshot = gateway.assemble_context(turn_capture, context)
