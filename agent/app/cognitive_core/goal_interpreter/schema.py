@@ -206,7 +206,14 @@ class FastResponsibilityProposal(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    local_ref: str = Field(min_length=1, max_length=80)
+    local_ref: str = Field(
+        min_length=1,
+        max_length=80,
+        description=(
+            "Turn-local semantic proposal reference only; never a canonical "
+            "Goal, Task, or Plan identity."
+        ),
+    )
     outcome: str = Field(min_length=1, max_length=500)
     bindings: dict[str, Any] = Field(
         default_factory=dict,

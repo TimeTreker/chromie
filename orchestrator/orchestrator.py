@@ -6499,12 +6499,15 @@ class VoiceAssistant:
         validated Canonical Plan and Trusted Capability Runtime execution.
         """
 
+        # Cognition is unavailable at this boundary. Keep this emergency
+        # fail-closed utterance tiny and natural; authoritative safety facts stay
+        # in metadata rather than leaking workflow vocabulary into Chromie's voice.
         del context
         zh = self._looks_zh(user_text)
         text = (
-            "我这次没能处理好你的请求，所以没有执行任何操作。请再说一次。"
+            "对不起，我刚才卡住了，什么都还没做呢。你再说一遍好吗？"
             if zh
-            else "I couldn't complete that request, so no operation was executed. Please try again."
+            else "Sorry, I got stuck for a moment and haven't done anything yet. Can you say it again?"
         )
         response = self._host_speech_response(
             text,

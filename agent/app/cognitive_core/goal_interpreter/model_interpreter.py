@@ -150,9 +150,49 @@ _AGENT_GOAL_INTERPRETER_CONTEXT_OMIT_KEYS = {
     "task_contexts",
     "active_task_contexts",
     "active_task_snapshots",
+    "active_goal_snapshots",
+    "active_pending_tasks",
     "recent_goal_snapshots",
     "current_task_context",
+    "gateway_context_snapshot",
 }
+
+
+_GOAL_INTERPRETATION_AUTHORITY_KEYS = frozenset({
+    "goal_id",
+    "goal_ids",
+    "source_goal_ids",
+    "target_goal_ids",
+    "supersedes_goal_ids",
+    "covers_goal_ids",
+    "task_id",
+    "task_ids",
+    "plan_id",
+    "canonical_plan_id",
+    "canonical_plan_fingerprint",
+    "execution_binding",
+})
+
+
+def _without_goal_interpretation_authority(value: Any) -> Any:
+    """Remove lifecycle/execution identity before context reaches Fast GI.
+
+    Goal Interpretation needs semantic continuity, not the identifiers that let
+    downstream components name canonical Goals/Tasks/Plans or execution bindings.
+    Keep the filtering structural: no user-language or domain semantics live here.
+    """
+
+    if isinstance(value, dict):
+        return {
+            key: _without_goal_interpretation_authority(item)
+            for key, item in value.items()
+            if str(key).strip().casefold() not in _GOAL_INTERPRETATION_AUTHORITY_KEYS
+        }
+    if isinstance(value, list):
+        return [_without_goal_interpretation_authority(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_without_goal_interpretation_authority(item) for item in value)
+    return value
 
 
 def _extract_json_object(text: str) -> dict[str, Any]:
@@ -376,6 +416,69 @@ def _reject_planner_shaped_fast_output(
                     "Fast Goal Interpreter progress must be native_response only; "
                     "Capability work belongs to Planner after Goal Association"
                 )
+
+
+class _GoalInterpretationAuthorityViolation(ValueError):
+    """Fast GI attempted to reuse downstream canonical lifecycle identity."""
+
+
+def _canonical_goal_ids_from_context(value: Any) -> set[str]:
+    """Collect known canonical Goal identities for structural collision checks."""
+
+    found: set[str] = set()
+
+    def collect(node: Any) -> None:
+        if isinstance(node, dict):
+            for key, item in node.items():
+                normalized = str(key).strip().casefold()
+                if normalized == "goal_id":
+                    candidate = str(item or "").strip()
+                    if candidate:
+                        found.add(candidate)
+                elif normalized in {
+                    "goal_ids",
+                    "source_goal_ids",
+                    "target_goal_ids",
+                    "supersedes_goal_ids",
+                    "covers_goal_ids",
+                }:
+                    values = item if isinstance(item, (list, tuple, set)) else [item]
+                    for candidate in values:
+                        text = str(candidate or "").strip()
+                        if text:
+                            found.add(text)
+                collect(item)
+        elif isinstance(node, (list, tuple, set)):
+            for item in node:
+                collect(item)
+
+    collect(value)
+    return found
+
+
+def _reject_canonical_goal_identity_refs(
+    request: RouteRequest,
+    parsed: dict[str, Any],
+) -> None:
+    """Require Fast-GI responsibility references to remain turn-local."""
+
+    canonical_goal_ids = _canonical_goal_ids_from_context(request.context)
+    if not canonical_goal_ids:
+        return
+    responsibilities = parsed.get("responsibilities")
+    if not isinstance(responsibilities, list):
+        return
+    for index, item in enumerate(responsibilities):
+        if not isinstance(item, dict):
+            continue
+        local_ref = str(item.get("local_ref") or "").strip()
+        if local_ref and local_ref in canonical_goal_ids:
+            raise _GoalInterpretationAuthorityViolation(
+                "Fast Goal Interpreter responsibilities"
+                f"[{index}].local_ref reused canonical Goal identity {local_ref!r}; "
+                "local_ref must be turn-local and Goal Association alone owns "
+                "canonical Goal identity"
+            )
 
 
 
@@ -760,11 +863,13 @@ def _catalog_observability_profile(request: RouteRequest | None) -> dict[str, An
 
 
 def _context_without_prompt_globals(context: dict[str, Any]) -> dict[str, Any]:
-    return {
+    filtered = {
         key: value
         for key, value in (context or {}).items()
         if key not in _AGENT_GOAL_INTERPRETER_CONTEXT_OMIT_KEYS
     }
+    sanitized = _without_goal_interpretation_authority(filtered)
+    return sanitized if isinstance(sanitized, dict) else {}
 
 
 def _compact_active_task_snapshots(
@@ -1217,58 +1322,59 @@ class OllamaGoalInterpreter:
             max_chars=2200,
         )
         mind = request.context.get("mind", {})
-        session_context = _goal_interpretation_prompt_context(request.context)
+        session_context = _without_goal_interpretation_authority(
+            _goal_interpretation_prompt_context(request.context)
+        )
         context_json = _bounded_json(session_context, max_chars=520)
         interaction_context_json = _bounded_json(
-            request.context.get("interaction_context") or {},
+            _without_goal_interpretation_authority(
+                request.context.get("interaction_context") or {}
+            ),
             max_chars=3200,
         )
         recent_dialogue_json = _bounded_json_array(
-            _compact_recent_dialogue(request.context),
+            _without_goal_interpretation_authority(
+                _compact_recent_dialogue(request.context)
+            ),
             max_chars=1800,
         )
         active_tasks_json = _bounded_json_array(
-            _compact_active_task_snapshots(request.context),
+            _without_goal_interpretation_authority(
+                _compact_active_task_snapshots(request.context)
+            ),
             max_chars=1800,
         )
         active_goals_json = _bounded_json_array(
-            _compact_active_goal_snapshots(request.context),
+            _without_goal_interpretation_authority(
+                _compact_active_goal_snapshots(request.context)
+            ),
             max_chars=1500,
-        )
-        recent_goals_json = _bounded_json_array(
-            _compact_recent_goal_snapshots(request.context),
-            max_chars=1400,
-        )
-        recent_goals_section = (
-            f"Recent Terminal Goal Snapshot JSON:{recent_goals_json}\n\n"
-            if recent_goals_json != "[]"
-            else ""
         )
         return (
             "Global Context Group:\n"
             f"{_goal_interpretation_fast_context_section(mind)}\n\n"
+            "Current Turn Group:\n"
+            f"Latest user input: {request.text}\n"
+            f"language={request.language or 'auto'} sid={request.sid or ''}\n\n"
             "Session Context Group:\n"
-            f"language={request.language or 'auto'} sid={request.sid or ''}\n"
             f"Bounded session, memory, task, and robot/world context JSON:{context_json}\n"
             f"Recent Interaction Context JSON:{interaction_context_json}\n"
             f"Recent Accepted Dialogue JSON:{recent_dialogue_json}\n"
             f"Active Goal Snapshot JSON:{active_goals_json}\n"
             f"Active Task/Progress Snapshot JSON:{active_tasks_json}\n\n"
-            f"{recent_goals_section}"
             "Current Job:\n"
-            "fast goal-interpretation and responsibility proposer. Understand each independently satisfiable human outcome and emit provider-neutral responsibilities[]. This is Responsibility evidence for downstream cognition: Fast Planner is the first HOW owner when meaning is sufficient, while Goal Association alone owns canonical Goal continuity. Fast and Deep share this interpretation authority: never author Work, Primary Activities, response wording, Plan steps, execution lanes, realization, Capability/provider/executable details, execution, or authorization. Preserve every material qualifier that changes the owed outcome—including severity, intensity, magnitude, threshold, subtype, negation, comparison, quantity, and temporal scope—in outcome/bindings; never generalize it away. Terminal references do not reopen Goals. Always leave fast_speech=null and progress=[]; Planner owns conversational Activities and wording.\n\n"
+            "fast goal-interpretation and responsibility proposer. Emit provider-neutral responsibilities[] for each independently satisfiable human outcome. This is Responsibility evidence for downstream cognition: Fast Planner is the first HOW owner; Goal Association alone owns canonical Goal continuity and identity; never author Work, Primary Activities, response wording, Plan steps, execution lanes, realization, Capability/provider/executable details, execution, authorization, or canonical Goal/Task/Plan identity. Preserve every material qualifier that changes the owed outcome—including severity, intensity, magnitude, threshold, subtype, negation, comparison, quantity, and temporal scope—in outcome/bindings; never generalize it away. Always leave fast_speech=null and progress=[]; Planner owns conversational Activities and wording.\n\n"
             "Task Context Group:\n"
-            f"Latest user input: {request.text}\n"
             f"Common ability IDs: {_bounded_json(common_ability_ids, max_chars=420)}\n"
             f"Common Ability Catalog JSON: {common_ability_catalog_json}\n"
             "Task Continuity Context, Not Authority:\n"
-            "Use open Goals/progress, active tasks, dialogue, discourse, and Interaction Context by meaning, not lexical shortcuts, as bounded context for the current responsibility delta. Do not author semantic_task_operations or mutate an open Goal/Task here; Goal Association owns canonical lifecycle changes. Keep newer failed/goal-less dialogue salient. Preserve what the user wants, material bindings, and whether fresh work/evidence remains. Do not decide how to acknowledge, clarify, or respond; Fast Planner owns those Activities after this handoff. For an external truth check, never state a result before evidence. delivered speech/trusted terminal effects are done, scheduled/planned work is not.\n"
+            "Use active responsibility/progress semantics, accepted dialogue, discourse, and Interaction Context by meaning. Canonical Goal/Task/Plan identities and execution bindings are intentionally absent; downstream owners hold them. Do not author lifecycle mutations here. Keep newer failed/goal-less dialogue salient. Preserve what the user wants, material bindings, and whether fresh work/evidence remains. Do not decide how to acknowledge, clarify, or respond; Fast Planner owns those Activities. For an external truth check, never state a result before evidence; delivered speech/trusted terminal effects are done, scheduled/planned work is not.\n"
             "Ability Awareness, Not Planning:\n"
             "Treat the Common Ability Catalog only as awareness of supported outcome kinds, never a Fast Goal Interpreter selection or Activity-definition surface. Do not output routes[], response wording, Activity/Work/Plan contracts, lanes, realization, capability_id/skill_id, executable args/actions, or intent=capability:<id>; exact HOW belongs to Planner. Topical similarity is not support. Stable reasoning needing no fresh evidence stays conversational; current external facts require a provider-neutral information responsibility with completion_requires_work=true and completion_requires_fresh_evidence=true. Missing ability is non-executable semantic metadata only.\n\n"
             "Compatibility Framing:\n"
             "route/intent are deprecated diagnostic framing only: chat=locally answerable; robot_action=likely embodied effect; tool=trusted external/changing evidence; deep_thought=wider interpretation; clarify=ambiguity. They do not define Work, Activity, lane, realization, Plan, or Capability. Never return interrupt or ignore.\n\n"
             "Output Contract:\n"
-            "Return compact JSON. Required keys: route, intent, confidence, responsibilities, fast_speech, progress. Each responsibilities[] item is provider-neutral: local_ref, outcome, bindings, completion_requires_work, completion_requires_fresh_evidence, confidence. bindings must preserve material semantic qualifiers as well as entities/time: if severity, intensity, magnitude, threshold, subtype, negation, comparison, quantity, or another explicit modifier changes the answer, keep it rather than replacing the narrower request with a broader category. Ordinary conversation still has Responsibility meaning: for a greeting, emit the responsibility to socially reciprocate/acknowledge the greeting without writing Chromie\'s reply. Set completion_requires_work=true whenever Chromie still needs to perform a conversational or other Activity to satisfy the outcome. completion_requires_work only says further Work remains; it never describes that Work. Do not put response wording, Activity/Work/Plan contracts, lanes, realization, Capability/provider/executable details in responsibilities. The maintained contract requires fast_speech=null and progress=[] because Fast Planner owns the first HOW decision and any conversational Activity. Do not output routes[]; compound outcomes belong in responsibilities[] and later cognition preserves them without letting GI choose implementation. memory write=memory; recall=chat; durable memory needs current-turn consent. Omit agents, metadata, candidate_capabilities, explanations, hidden reasoning, markdown, and text outside JSON."
+            "Return compact JSON. Required keys: route, intent, confidence, responsibilities, fast_speech, progress. Each responsibilities[] item is provider-neutral: local_ref, outcome, bindings, completion_requires_work, completion_requires_fresh_evidence, confidence. local_ref is a turn-local proposal reference such as r1/r2; never copy or invent a canonical Goal/Task/Plan identity into it. bindings must preserve material semantic qualifiers as well as entities/time: if severity, intensity, magnitude, threshold, subtype, negation, comparison, quantity, or another explicit modifier changes the answer, keep it rather than replacing the narrower request with a broader category. Ordinary conversation still has Responsibility meaning: for a greeting, emit the responsibility to socially reciprocate/acknowledge the greeting without writing Chromie\'s reply. Set completion_requires_work=true whenever Chromie still needs to perform a conversational or other Activity to satisfy the outcome. completion_requires_work only says further Work remains; it never describes that Work. Do not put response wording, Activity/Work/Plan contracts, lanes, realization, Capability/provider/executable details in responsibilities. The maintained contract requires fast_speech=null and progress=[] because Fast Planner owns the first HOW decision and any conversational Activity. Do not output routes[]; compound outcomes belong in responsibilities[] and later cognition preserves them without letting GI choose implementation. memory write=memory; recall=chat; durable memory needs current-turn consent. Omit agents, metadata, candidate_capabilities, explanations, hidden reasoning, markdown, and text outside JSON."
         )
 
     @staticmethod
@@ -1864,6 +1970,7 @@ class OllamaGoalInterpreter:
                     stage,
                     discarded_progress_paths,
                 )
+        _reject_canonical_goal_identity_refs(request, parsed)
         _reject_planner_shaped_fast_output(request, parsed)
         route_items = _route_items_from_parsed(parsed)
         dominant_route = _dominant_route_from_items(route_items)
@@ -2144,6 +2251,19 @@ class OllamaGoalInterpreter:
                 request,
                 data,
                 stage="quick_intent",
+            )
+        except _GoalInterpretationAuthorityViolation as exc:
+            logger.warning(
+                "Goal Interpreter authority violation: %s; content=%r",
+                exc,
+                content[:500],
+            )
+            return fallback_decision(
+                request,
+                reason=(
+                    "goal_interpreter_authority_violation: "
+                    f"{type(exc).__name__}: {exc}"
+                ),
             )
         except (ValueError, ValidationError) as exc:
             contract_repair_attempted = True

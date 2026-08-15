@@ -1868,7 +1868,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assert response is not None
         self.assertEqual(
             response.speech[0].text,
-            "I couldn't complete that request, so no operation was executed. Please try again.",
+            "Sorry, I got stuck for a moment and haven't done anything yet. Can you say it again?",
         )
         self.assertEqual(
             response.metadata["source"],
@@ -1885,8 +1885,25 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             response.speech[0].text,
-            "I couldn't complete that request, so no operation was executed. Please try again.",
+            "Sorry, I got stuck for a moment and haven't done anything yet. Can you say it again?",
         )
+        self.assertEqual(response.metadata["effect_execution"], "not_authorized")
+        self.assertFalse(response.metadata["semantic_fallback"])
+
+    def test_cognitive_core_exception_chinese_fallback_is_natural_and_fail_closed(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+
+        response = assistant._cognitive_core_exception_safe_response(
+            "前面有一瓶水，你帮我拿过来好吗？",
+            context={},
+        )
+
+        self.assertEqual(
+            response.speech[0].text,
+            "对不起，我刚才卡住了，什么都还没做呢。你再说一遍好吗？",
+        )
+        self.assertNotIn("执行任何操作", response.speech[0].text)
+        self.assertNotIn("处理好你的请求", response.speech[0].text)
         self.assertEqual(response.metadata["effect_execution"], "not_authorized")
         self.assertFalse(response.metadata["semantic_fallback"])
 

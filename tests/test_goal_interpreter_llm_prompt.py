@@ -14,6 +14,7 @@ from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
     _payload_message_texts,
     _prompt_feature_flags,
     _raw_interpreter_output_summary,
+    _reject_canonical_goal_identity_refs,
     _reject_planner_shaped_fast_output,
     is_allowed_model_ignore,
 )
@@ -84,6 +85,39 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
                         },
                     )
 
+    def test_fast_responsibility_local_ref_cannot_reuse_canonical_goal_identity(self) -> None:
+        request = RouteRequest(
+            text="Bring me the bottle.",
+            context={
+                "recent_goal_snapshots": [
+                    {"goal_id": "goal-weather-complete"}
+                ]
+            },
+        )
+        parsed = {
+            "route": "robot_action",
+            "intent": "resource_delivery",
+            "confidence": 0.95,
+            "responsibilities": [
+                {
+                    "local_ref": "goal-weather-complete",
+                    "outcome": "bring the bottle to the user",
+                    "bindings": {"resource": "bottle"},
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.95,
+                }
+            ],
+            "fast_speech": None,
+            "progress": [],
+        }
+
+        with self.assertRaisesRegex(ValueError, "reused canonical Goal identity"):
+            _reject_canonical_goal_identity_refs(request, parsed)
+
+        parsed["responsibilities"][0]["local_ref"] = "r1"
+        _reject_canonical_goal_identity_refs(request, parsed)
+
     def test_system_prompt_names_goal_interpreter_role_and_context_boundaries(self) -> None:
         interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
@@ -97,6 +131,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("fast Goal Interpretation model", prompt)
         self.assertIn("Prompt Architecture", prompt)
         self.assertIn("Global Context Group", prompt)
+        self.assertIn("Current Turn Group", prompt)
         self.assertIn("Session Context Group", prompt)
         self.assertIn("Current Job", prompt)
         self.assertIn("Task Context", prompt)
@@ -111,6 +146,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("Responsibility evidence for downstream cognition", prompt)
         self.assertIn("Fast Planner is the first HOW owner", prompt)
         self.assertIn("Goal Association alone owns canonical Goal continuity", prompt)
+        self.assertIn("local_ref is only a turn-local semantic proposal reference", prompt)
         self.assertIn("completion_requires_fresh_evidence", prompt)
         self.assertIn("Ability Awareness, Not Planning", prompt)
         self.assertIn("not a Fast-GI selection or Activity-definition surface", prompt)
@@ -647,7 +683,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("重庆龙兴天街", prompt)
         self.assertIn("Keep newer failed/goal-less dialogue salient", prompt)
 
-    def test_user_and_repair_prompts_include_recent_terminal_goal_projection(self) -> None:
+    def test_user_and_repair_prompts_exclude_canonical_goal_identity(self) -> None:
         interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
@@ -659,6 +695,17 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
             text="So what was the answer?",
             language="en-US",
             context={
+                "history": [
+                    {
+                        "role": "user",
+                        "text": "Check today's weather in Beijing.",
+                    },
+                    {
+                        "role": "assistant",
+                        "text": "It will be clear today.",
+                        "metadata": {"source": "trusted_tool_result_response"},
+                    },
+                ],
                 "recent_goal_snapshots": [
                     {
                         "goal_id": "goal-weather-complete",
@@ -691,6 +738,24 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
                         "goal_ids": ["goal-weather-complete"],
                     }
                 ],
+                "active_task_snapshots": [
+                    {
+                        "task_id": "task-weather-complete",
+                        "status": "completed",
+                        "semantic_goal": {
+                            "description": "Check today's weather in Beijing."
+                        },
+                        "metadata": {
+                            "execution_binding": {
+                                "canonical_plan_id": "plan-weather-complete"
+                            }
+                        },
+                    }
+                ],
+                "gateway_context_snapshot": {
+                    "goal_id": "goal-weather-complete",
+                    "canonical_plan_id": "plan-weather-complete",
+                },
             },
         )
 
@@ -702,12 +767,148 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         )
         rendered_repair = json.dumps(repair, ensure_ascii=False)
 
-        self.assertIn("Recent Terminal Goal Snapshot JSON", prompt)
-        self.assertIn("goal-weather-complete", prompt)
-        self.assertIn("goal-weather-complete", rendered_repair)
-        self.assertIn("evidence-weather-complete", rendered_repair)
-        self.assertIn("verified_tool_memory_index", rendered_repair)
-        self.assertIn("Terminal references do not reopen Goals", prompt)
+        self.assertIn("Latest user input: So what was the answer?", prompt)
+        self.assertIn("Check today's weather in Beijing.", prompt)
+        self.assertIn("It will be clear today.", prompt)
+        self.assertNotIn("Recent Terminal Goal Snapshot JSON", prompt)
+        for leaked_identity in (
+            "goal-weather-complete",
+            "task-weather-complete",
+            "plan-weather-complete",
+            "gateway_context_snapshot",
+        ):
+            self.assertNotIn(leaked_identity, prompt)
+            self.assertNotIn(leaked_identity, rendered_repair)
+
+    def test_current_turn_precedes_identity_free_cross_topic_continuity(self) -> None:
+        interpreter = OllamaGoalInterpreter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            sid="s-water",
+            text="前面200米有一瓶水，你去帮我拿过来好吗？",
+            language="zh-CN",
+            context={
+                "history": [
+                    {"role": "user", "text": "今天晚上重庆有大雨吗？"},
+                    {"role": "assistant", "text": "我刚才查了重庆今晚的天气。"},
+                ],
+                "recent_goal_snapshots": [
+                    {
+                        "goal_id": "goal-weather-done",
+                        "status": "done",
+                        "goal": {"description": "Check heavy rain in Chongqing tonight."},
+                    }
+                ],
+                "active_goal_snapshots": [
+                    {
+                        "goal_id": "goal-other-active",
+                        "responsibility_status": "open",
+                        "goal": {"description": "Finish another responsibility."},
+                    }
+                ],
+                "active_task_snapshots": [
+                    {
+                        "task_id": "task-weather",
+                        "status": "completed",
+                        "semantic_goal": {"description": "Check weather."},
+                        "metadata": {
+                            "execution_binding": {
+                                "canonical_plan_id": "plan-weather"
+                            }
+                        },
+                    }
+                ],
+                "gateway_context_snapshot": {
+                    "goal_id": "goal-weather-done",
+                    "task_id": "task-weather",
+                    "canonical_plan_id": "plan-weather",
+                },
+            },
+        )
+
+        prompt = interpreter.build_user_prompt(request)
+
+        current_marker = "Latest user input: 前面200米有一瓶水，你去帮我拿过来好吗？"
+        self.assertIn(current_marker, prompt)
+        self.assertLess(
+            prompt.index(current_marker),
+            prompt.index("Recent Accepted Dialogue JSON"),
+        )
+        self.assertIn("今天晚上重庆有大雨吗？", prompt)
+        for leaked_identity in (
+            "goal-weather-done",
+            "goal-other-active",
+            "task-weather",
+            "plan-weather",
+            "gateway_context_snapshot",
+            "execution_binding",
+        ):
+            self.assertNotIn(leaked_identity, prompt)
+
+    def test_canonical_goal_identity_violation_skips_dto_repair(self) -> None:
+        class IdentityLeakInterpreter(OllamaGoalInterpreter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="test-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                )
+                self.stages: list[str] = []
+
+            async def _chat(
+                self,
+                payload: dict,
+                *,
+                stage: str = "unknown",
+            ) -> dict:
+                del payload
+                self.stages.append(stage)
+                return {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "route": "robot_action",
+                                "intent": "resource_delivery",
+                                "confidence": 0.95,
+                                "responsibilities": [
+                                    {
+                                        "local_ref": "goal-weather-complete",
+                                        "outcome": "bring the bottle to the user",
+                                        "bindings": {"resource": "bottle"},
+                                        "completion_requires_work": True,
+                                        "completion_requires_fresh_evidence": False,
+                                        "confidence": 0.95,
+                                    }
+                                ],
+                                "fast_speech": None,
+                                "progress": [],
+                            }
+                        )
+                    }
+                }
+
+        interpreter = IdentityLeakInterpreter()
+        with self.assertRaises(InterpretationUnavailableError):
+            asyncio.run(
+                interpreter.route(
+                    RouteRequest(
+                        text="Bring me the bottle.",
+                        context={
+                            "gateway_admission_complete": True,
+                            "recent_goal_snapshots": [
+                                {"goal_id": "goal-weather-complete"}
+                            ],
+                        },
+                    )
+                )
+            )
+
+        self.assertEqual(interpreter.stages, ["quick_intent"])
 
 
     def test_payload_disables_qwen_thinking_and_uses_compact_json_mode(self) -> None:
