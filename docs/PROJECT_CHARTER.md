@@ -93,11 +93,13 @@ model for Chromie:
                     Goal Interpretation
                        Fast / Deep
                                ↓
-                        Responsibility
+                    Responsibility evidence
                                ↓
-                             Goal
+                       Goal Association
                                ↓
-                           Planner
+                         Canonical Goal
+                               ↓
+                            Planner
                                │
                  ┌─────────────┴─────────────┐
                  │       planned Work         │
@@ -131,7 +133,19 @@ explicit internal expansion of how Planner advances Goals.
 
 Read the diagram with these boundaries:
 
-- Responsibility/Goal owns **what outcome Chromie still owes**.
+- Goal Interpretation owns only **provider-neutral Responsibility evidence**:
+  what human outcome appears to be wanted, material semantic bindings already
+  present in the turn/context, whether downstream work or fresh evidence is
+  required, and an optional immediate conversational act. Fast and Deep differ
+  only in cognitive depth; they have the same authority boundary. Neither may
+  author Work, a Primary-Activity contract, Plan steps, execution lanes,
+  realization, Capability selection, executable arguments, provider requests, or
+  authorization. `completion_requires_work` says only that work remains; it is
+  not a description of that Work.
+- Goal Association is the first canonical Responsibility/Goal-state authority.
+  It associates, creates, continues, corrects, or supersedes canonical Goals from
+  the provider-neutral evidence without choosing how those Goals will be done.
+- Canonical Goal owns **what outcome Chromie still owes**.
 - Planner owns **what Work can advance those Goals now**, constrained by the
   currently available Capability/provider contracts. Available Capabilities are
   therefore Planner input and realization constraints even though they are not
@@ -150,8 +164,7 @@ Read the diagram with these boundaries:
   cognition.
 
 The shorter ownership chain
-`Responsibility → Goal → Planner → Provider → Action → Evidence` remains a valid
-compression of this same diagram, not a competing architecture.
+`Responsibility evidence → Goal Association → Canonical Goal → Planner → Provider → Action → Evidence` remains a valid compression of this same diagram, not a competing architecture.
 
 Chromie should make this loop responsive, interruptible, understandable, and
 portable across qualified embodied providers without exposing low-level robot

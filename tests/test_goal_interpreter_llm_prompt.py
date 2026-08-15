@@ -14,6 +14,7 @@ from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
     _payload_message_texts,
     _prompt_feature_flags,
     _raw_interpreter_output_summary,
+    _reject_planner_shaped_fast_output,
     is_allowed_model_ignore,
 )
 from agent.app.cognitive_core.goal_interpreter.fallback import InterpretationUnavailableError
@@ -41,6 +42,48 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
                 confidence=0.95,
             )
 
+    def test_fast_responsibility_rejects_activity_contract_bindings(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Planner-owned field"):
+            FastResponsibilityProposal(
+                local_ref="r1",
+                outcome="greet Alice",
+                bindings={
+                    "person": "Alice",
+                    "primary_activity": {
+                        "activity_id": "activity-greet",
+                        "realization": {"vocal_mode": "speech"},
+                    },
+                },
+                completion_requires_work=True,
+                confidence=0.95,
+            )
+
+    def test_planner_shaped_guard_rejects_activity_work_plan_contracts(self) -> None:
+        request = RouteRequest(text="Greet Alice.")
+        for field, value in (
+            ("routes", []),
+            ("activities", [{"summary": "greet Alice"}]),
+            ("primary_activity", {"summary": "greet Alice"}),
+            ("work_items", [{"summary": "say hello"}]),
+            ("plan", {"steps": []}),
+            ("execution_lane", "vocal"),
+            ("realization", {"vocal_mode": "speech"}),
+        ):
+            with self.subTest(field=field):
+                with self.assertRaisesRegex(ValueError, "downstream-owned contract field"):
+                    _reject_planner_shaped_fast_output(
+                        request,
+                        {
+                            "route": "chat",
+                            "intent": "greet",
+                            "confidence": 0.9,
+                            "responsibilities": [],
+                            "fast_speech": None,
+                            "progress": [],
+                            field: value,
+                        },
+                    )
+
     def test_system_prompt_names_goal_interpreter_role_and_context_boundaries(self) -> None:
         interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
@@ -63,11 +106,11 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("Generalization-first principle", prompt)
         self.assertIn("Responsibility Before Framing", prompt)
         self.assertIn("provider-neutral responsibilities", prompt)
-        self.assertIn("not canonical Goal meaning and not a Plan", prompt)
+        self.assertIn("Responsibility evidence for Goal Association, not canonical Goal/Work/Activity/Plan", prompt)
         self.assertIn("completion_requires_fresh_evidence", prompt)
         self.assertIn("Ability Awareness, Not Planning", prompt)
-        self.assertIn("not a selection surface", prompt)
-        self.assertIn("exact Capability selection is Planner-owned after Goal Association", prompt)
+        self.assertIn("not a Fast-GI selection or Activity-definition surface", prompt)
+        self.assertIn("Exact Work/Activity decomposition and Capability selection are Planner-owned after Goal Association", prompt)
         self.assertIn("Never emit kind=capability progress", prompt)
         self.assertIn("Goal Progress Communication", prompt)
         self.assertIn("not an independent Goal or Planner step", prompt)
@@ -76,18 +119,19 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("Uncertainty And Confirmation Acting Rule", prompt)
         self.assertIn("Capability Inquiry And Execution", prompt)
         self.assertIn("Availability questions stay chat", prompt)
-        self.assertIn("routes[]", prompt)
-        self.assertIn("metadata.desired_abilities", prompt)
-        self.assertIn("status=missing_ability", prompt)
+        self.assertIn("Do not output routes[]", prompt)
+        self.assertIn("Activity/Work/Plan contracts", prompt)
+        self.assertIn("Never author Work, Primary Activities, Plan steps", prompt)
+        self.assertIn("Missing abilities may appear only as non-executable metadata", prompt)
         self.assertIn(
-            "Required: route, intent, confidence, responsibilities, fast_speech, progress",
+            "return compact JSON with required route, intent, confidence, responsibilities, fast_speech, progress",
             prompt,
         )
-        self.assertIn("progress[] contains native_response only", prompt)
+        self.assertIn("progress[] is native_response only", prompt)
         self.assertIn("child/family first-person speech", prompt)
         self.assertIn("processing narration", prompt)
-        self.assertIn("Never output placeholder intents", prompt)
-        self.assertIn("chain-of-thought", prompt)
+        self.assertIn("or intent=capability:<id>", prompt)
+        self.assertIn("hidden reasoning", prompt)
         self.assertNotIn("Tool And Affordance Proposal", prompt)
         self.assertNotIn("CapabilityAgent", prompt)
         self.assertNotIn("intent=weather_query", prompt)
@@ -152,10 +196,10 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         system = interpreter.load_system_prompt()
         self.assertIn("Capability Inquiry And Execution", system)
         self.assertIn("Availability questions stay chat", system)
-        self.assertIn("supported execution requests may use robot_action/tool as semantic route hints", system)
-        self.assertIn("exact Capability selection is Planner-owned after Goal Association", system)
-        self.assertIn("semantic distinction, not a phrase pattern", system)
-        self.assertIn("technical discussion about another person", system)
+        self.assertIn("robot_action/tool are compatibility framing only, never Activity/execution contracts", system)
+        self.assertIn("Exact Work/Activity decomposition and Capability selection are Planner-owned after Goal Association", system)
+        self.assertIn("Generalization-first principle", system)
+        self.assertIn("technical discussion about another system", system)
         self.assertIn("Addressedness", system)
 
     def test_common_capability_projection_exposes_semantic_scope_and_negative_boundary(self) -> None:
@@ -217,12 +261,13 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
             },
         )
         prompt = interpreter.build_user_prompt(req)
-        self.assertIn("capability_inquiry means a meta-question", prompt)
-        self.assertIn("not a Fast Goal Interpreter selection surface", prompt)
-        self.assertIn("Topical similarity is insufficient", prompt)
-        self.assertIn("prefer an honest missing ability over substitution", prompt)
-        self.assertIn("Stable everyday reasoning", prompt)
-        self.assertIn("never choose a Capability", prompt)
+        self.assertIn("awareness of supported outcome kinds", prompt)
+        self.assertIn("never a Fast Goal Interpreter selection or Activity-definition surface", prompt)
+        self.assertIn("Topical similarity is not support", prompt)
+        self.assertIn("Topical similarity is not support", prompt)
+        self.assertIn("Stable reasoning needing no fresh evidence", prompt)
+        self.assertIn("Activity/Work/Plan contracts", prompt)
+        self.assertIn("never author Work, Primary Activities, Plan steps", prompt)
 
     def test_semantic_ignore_requires_inactive_host_engagement_evidence(self) -> None:
         inactive = RouteRequest(
@@ -343,17 +388,18 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("capability_safety", prompt)
         self.assertIn("full_mind", prompt)
         self.assertIn("fast goal-interpretation and responsibility proposer", prompt)
-        self.assertIn("bounded cognitive evidence, not canonical Goal meaning", prompt)
-        self.assertIn("never choose a Capability", prompt)
+        self.assertIn("Responsibility evidence for Goal Association", prompt)
+        self.assertIn("never author Work, Primary Activities, Plan steps", prompt)
         self.assertIn("Ability Awareness, Not Planning", prompt)
-        self.assertIn("not a Fast Goal Interpreter selection surface", prompt)
-        self.assertIn("exact Capability choice belongs exclusively to Fast/Deep Planner after Goal Association", prompt)
-        self.assertIn("Do not output capability_id, skill_id, executable args, actions", prompt)
+        self.assertIn("never a Fast Goal Interpreter selection or Activity-definition surface", prompt)
+        self.assertIn("exact Work/Activity decomposition and Capability choice belong to Planner after Goal Association", prompt)
+        self.assertIn("Do not output routes[], Activity/Work/Plan contracts", prompt)
+        self.assertIn("exact Work/Activity decomposition and Capability choice belong to Planner after Goal Association", prompt)
         self.assertIn("responsibilities[]", prompt)
         self.assertIn("completion_requires_fresh_evidence", prompt)
-        self.assertIn("progress[] may contain native_response only", prompt)
+        self.assertIn("Immediate complete answer: route=chat, kind=native_response", prompt)
         self.assertIn("Goal Progress Communication", prompt)
-        self.assertIn("generic willingness only", contract_prompt)
+        self.assertIn("fast_speech may be one prospective Goal Progress Communication act", prompt)
         self.assertIn("Common ability IDs", prompt)
         self.assertIn("Common Ability Catalog JSON", prompt)
         self.assertIn("soridormi.blink_eyes", prompt)
@@ -375,7 +421,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertNotIn("CapabilityAgent", prompt)
         self.assertNotIn("Protect humans first.", prompt)
         self.assertNotIn("Become a useful companion robot.", prompt)
-        self.assertIn("chain-of-thought", contract_prompt)
+        self.assertIn("hidden reasoning", contract_prompt)
         self.assertIn("processing narration", contract_prompt)
         self.assertLess(len(prompt), 5800)
 
@@ -935,7 +981,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("speaker_agent", decision.agents)
         self.assertTrue(decision.needs_agent)
 
-    def test_goal_interpreter_accepts_mixed_route_items_and_builds_task_proposals(self) -> None:
+    def test_goal_interpreter_rejects_model_authored_route_item_decomposition(self) -> None:
         interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
@@ -944,62 +990,21 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         )
         request = RouteRequest(text="Hi, remember I like tea, and think through tomorrow.")
 
-        decision = interpreter._decision_from_response(
-            request,
-            {
-                "message": {
-                    "content": (
-                        '{"route":"chat","intent":"mixed_request","confidence":0.82,'
-                        '"routes":['
-                        '{"route":"chat","intent":"greeting","confidence":0.95,'
-                        '"lane":"immediate_speech","context_profile":"fast_minimal",'
-                        '"direct_to_tts":true,"text":"Hi, I am here."},'
-                        '{"route":"memory","intent":"remember_user_preference",'
-                        '"confidence":0.86,"lane":"post_turn",'
-                        '"context_profile":"session_compact"},'
-                        '{"route":"deep_thought","intent":"plan_tomorrow",'
-                        '"confidence":0.78,"lane":"deepthought",'
-                        '"context_profile":"full_mind","requires_mind":true}'
-                        ']}'
-                    )
-                }
-            },
-        )
-
-        self.assertEqual(decision.route, "deep_thought")
-        self.assertEqual(len(decision.routes), 3)
-        self.assertEqual(decision.metadata["route_item_count"], 3)
-        self.assertIn("dominant interpretation route", decision.reason or "")
-        from agent.app.cognitive_core.goal_interpreter.schema import annotate_pipeline_stage_outputs
-
-        annotated = annotate_pipeline_stage_outputs(decision)
-
-        self.assertEqual(
-            [item["task_type"] for item in annotated.metadata["task_list"]],
-            [
-                "speech.fast_reply",
-                "memory.remember_session_context",
-                "cognition.delegate_deep_thought",
-                "cognition.deep_think",
-            ],
-        )
-        proposals = annotated.metadata["task_proposals"]
-        self.assertTrue(
-            any(
-                item["task_type"] == "speech.fast_reply"
-                and item["metadata"]["direct_to_tts"] is True
-                and item["metadata"]["context_profile"] == "fast_minimal"
-                for item in proposals
+        with self.assertRaisesRegex(ValueError, "downstream-owned contract field routes"):
+            interpreter._decision_from_response(
+                request,
+                {
+                    "message": {
+                        "content": (
+                            '{"route":"chat","intent":"mixed_request","confidence":0.82,'
+                            '"responsibilities":[],"fast_speech":null,"progress":[],'
+                            '"routes":[{"route":"chat","intent":"greeting"},'
+                            '{"route":"memory","intent":"remember_user_preference"},'
+                            '{"route":"deep_thought","intent":"plan_tomorrow"}]}'
+                        )
+                    }
+                },
             )
-        )
-        self.assertTrue(
-            any(
-                item["task_type"] == "cognition.deep_think"
-                and item["metadata"]["requires_mind"] is True
-                and item["metadata"]["context_profile"] == "full_mind"
-                for item in proposals
-            )
-        )
 
 
 
@@ -1578,7 +1583,9 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         schema = OllamaGoalInterpreter._route_response_schema()
         progress = schema["$defs"]["FastProgressProposal"]
         responsibility = schema["$defs"]["FastResponsibilityProposal"]
-        route_item = schema["$defs"]["RouteItem"]
+        self.assertNotIn("RouteItem", schema.get("$defs", {}))
+        self.assertNotIn("routes", schema["properties"])
+        self.assertFalse(schema["additionalProperties"])
 
         self.assertEqual(progress["properties"]["kind"]["const"], "native_response")
         self.assertEqual(progress["required"], ["response_text"])
@@ -1591,9 +1598,6 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("bindings", responsibility["properties"])
         self.assertIn("completion_requires_work", responsibility["properties"])
         self.assertIn("completion_requires_fresh_evidence", responsibility["properties"])
-        self.assertNotIn("capability_id", route_item["properties"])
-        self.assertNotIn("args", route_item["properties"])
-        self.assertNotIn("actions", route_item["properties"])
         self.assertNotIn("actions", schema["properties"])
         self.assertNotIn("candidate_capabilities", schema["properties"])
         self.assertIn("responsibilities", schema["required"])

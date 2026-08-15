@@ -59,6 +59,15 @@ _PLANNER_OWNED_BINDING_FIELDS = frozenset({
     "executable_args",
     "args",
     "actions",
+    "primary_activity",
+    "activity_id",
+    "work_item_id",
+    "plan_step_id",
+    "execution_lane",
+    "realization",
+    "vocal_mode",
+    "coordination_id",
+    "execution_item_ids",
 })
 
 
@@ -154,11 +163,13 @@ class FastSpeech(BaseModel):
 
 
 class RouteItem(OptionalCapabilityIdentityModel):
-    """One semantic route item inside a multi-route decision.
+    """Legacy compatibility route item; not current Fast-GI model authority.
 
-    The top-level RouteDecision.route remains for compatibility. Route items
-    let the fast Goal Interpreter split one utterance into independently governed lanes:
-    immediate speech, memory, deep thought, tools, or embodied skills.
+    The maintained model-facing Goal Interpretation contract does not expose
+    ``routes[]``. Compound human outcomes belong in provider-neutral
+    ``responsibilities[]``; Goal Association canonicalizes them and Planner owns
+    any later Work/Activity decomposition. This type remains only for older direct
+    callers/adapters that still construct ``RouteDecision`` objects.
     """
 
     route: RouteName
@@ -181,8 +192,8 @@ class RouteItem(OptionalCapabilityIdentityModel):
 class FastResponsibilityProposal(BaseModel):
     """Provider-neutral human outcome understood by Fast Goal Interpretation.
 
-    This is semantic evidence for Goal Association, not a Goal, Plan, Capability
-    selection, or execution authorization. ``bindings`` preserve material meaning
+    This is semantic evidence for Goal Association, not a Goal, Work/Primary-Activity
+    contract, Plan, Capability selection, execution realization, or authorization. ``bindings`` preserve material meaning
     already present in the user turn or trusted context without choosing how that
     outcome will be achieved.
     """

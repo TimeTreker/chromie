@@ -12,7 +12,10 @@ from orchestrator.runtime.cognitive_gateway_modules import (
     ProtectiveReflex,
     TurnAdmission,
 )
-from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
+from shared.chromie_contracts.core_interpretation import (
+    CognitiveResponsibilityProposal,
+    CoreInterpretationResult,
+)
 from shared.chromie_contracts.route import RouteDecision
 from shared.chromie_contracts.user_turn import (
     AttentionReviewResult,
@@ -330,6 +333,22 @@ class CognitiveGatewayModuleTests(unittest.TestCase):
                 }
             )
 
+
+    def test_core_responsibility_rejects_activity_realization_contract(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Planner-owned field"):
+            CognitiveResponsibilityProposal(
+                local_ref="r1",
+                outcome="sing a song",
+                bindings={
+                    "song": "birthday song",
+                    "realization": {
+                        "execution_lane": "vocal",
+                        "vocal_mode": "singing",
+                    },
+                },
+                completion_requires_work=True,
+                confidence=0.9,
+            )
 
     def test_core_interpretation_keeps_responsibility_evidence_provider_neutral(self) -> None:
         gateway = CognitiveGateway(clock=self.clock)

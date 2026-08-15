@@ -100,11 +100,13 @@ every box run serially on every turn.
                     Goal Interpretation
                        Fast / Deep
                                ↓
-                        Responsibility
+                    Responsibility evidence
                                ↓
-                             Goal
+                       Goal Association
                                ↓
-                           Planner
+                         Canonical Goal
+                               ↓
+                            Planner
                                │
                  ┌─────────────┴─────────────┐
                  │       planned Work         │
@@ -130,19 +132,26 @@ every box run serially on every turn.
           Response / Reflection
 ```
 
-The middle expansion is deliberate but does not create another cognitive
-pipeline. Planner still owns Work selection from canonical Goals and current
-Capability/provider contracts. Semantic Primary Activity is the human-observable
-meaning of a concrete Work/Plan act; `realization` is only its execution form.
-Vocal/Activity lanes, Vocal Expression modes, Capability IDs, request IDs, and
-provider transports therefore live below Activity meaning.
+The upstream seam is equally deliberate. Fast and Deep Goal Interpretation
+produce only provider-neutral Responsibility evidence. They may preserve material
+semantic bindings and say that work/fresh evidence is required, but they may not
+describe that Work, author a Primary-Activity contract, choose Plan steps, execution
+lanes, realization, Capabilities, executable arguments, or provider requests. Goal
+Association is the first canonical Responsibility/Goal-state authority; Planner is
+the first Work/Activity authority.
+
+The middle expansion does not create another cognitive pipeline. Planner still
+owns Work selection from canonical Goals and current Capability/provider contracts.
+Semantic Primary Activity is the human-observable meaning of a concrete Work/Plan
+act; `realization` is only its execution form. Vocal/Activity lanes, Vocal Expression
+modes, Capability IDs, request IDs, and provider transports therefore live below
+Activity meaning.
 
 Social Attention is shown as an optional sibling of each Primary Activity's
 realization because it decorates that Activity rather than following Vocal,
 Activity-lane execution, Provider completion, or a cognition milestone. It is
 subordinate and fail-soft and has no Goal-completion authority. The compact
-`Responsibility → Goal → Planner → Provider → Action → Evidence` chain is only a
-compression of this same canonical graph.
+`Responsibility evidence → Goal Association → Canonical Goal → Planner → Provider → Action → Evidence` chain is only a compression of this same canonical graph.
 
 ### Human-like does not mean perfectionist
 
@@ -165,7 +174,14 @@ hard safety/authorization boundaries.
 
 ### Fast and Deep are depths of one Mind, not reviewer and repaired output
 
-Fast cognition handles obvious, inexpensive, locally understandable work. Deep
+Fast and Deep have the **same Goal-Interpretation authority**. Their boundary ends
+at provider-neutral Responsibility evidence plus optional immediate conversational
+progress. Neither depth may author Work, Primary Activities, Plan structure,
+execution lanes, realization, Capability selection, executable arguments, provider
+requests, or authorization. Deeper cognition may improve understanding; it may not
+widen the layer's authority.
+
+Fast cognition handles obvious, inexpensive, locally understandable meaning. Deep
 cognition receives authoritative source meaning and broader context when the task
 is genuinely uncertain, consequential, dependent, novel, or long-horizon. Deep
 is not an editor for Fast JSON and must not become `review(FastOutput)`.

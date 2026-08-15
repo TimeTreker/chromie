@@ -84,8 +84,10 @@ as Python code. Experience can change ordinary prompt tiers through an overlay
 loaded by `AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES`, but safety-locked entries
 cannot be promoted into the fast common catalog. The Fast Goal Interpreter sees
 this catalog only as bounded ability awareness. It emits provider-neutral
-`responsibilities[]`; exact Capability selection, executable arguments, and action
-decomposition belong to Fast/Deep Planner after canonical Goal Association.
+`responsibilities[]`; it does not author Work, Primary Activities, Plan steps,
+execution lanes, realization, exact Capability selection, executable arguments, or
+action decomposition. Goal Association owns canonical Goal state; Fast/Deep Planner
+owns the first Work/Activity contract afterward.
 `chromie.speak` therefore does not turn ordinary acknowledgement or requested speech
 into a Fast Goal Interpreter skill proposal. Deprecated compatibility requests that
 already contain exact `actions[]` may still be materialized by the legacy Agent adapter,

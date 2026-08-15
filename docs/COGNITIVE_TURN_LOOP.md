@@ -250,7 +250,7 @@ existing Goal: go out for dinner tonight
 user: "Will it rain heavily in Chongqing today?"
 
 Fast Goal Interpretation
-  |-- Responsibility: provide today's Chongqing weather
+  |-- Responsibility evidence: provide today's Chongqing weather
   |-- bindings: location=Chongqing, time=today
   `-- optional acknowledgement speech ------------------> Vocal
 
@@ -383,9 +383,13 @@ UserTurnEnvelope
 
 Fast and Deep planning use the same `CanonicalPlan` contract. Fast Goal
 Interpretation contributes provider-neutral Responsibility evidence; it does not
-choose plan steps or exact Capabilities. Planner model reasoning chooses semantic
-plan steps, parameters, ordering, and per-goal
-prospective outcomes. Deterministic code checks schemas, capability
+author Work or a Primary-Activity contract and does not choose Plan steps, execution
+lanes, realization, exact Capabilities, or executable arguments.
+`completion_requires_work` is only a need-for-work fact, never a Work description.
+Goal Association owns the canonical Goal transition between interpretation and
+planning. Planner model reasoning then chooses semantic Work/Primary Activities,
+Plan steps, parameters, ordering, and per-goal prospective outcomes. Deterministic
+code checks schemas, capability
 availability, source-effect bounds, resources, confirmation requirements, and
 forbidden low-level controls. Validation cannot invent missing meaning or
 rewrite the plan into a nearby action.

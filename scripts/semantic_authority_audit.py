@@ -308,6 +308,9 @@ def audit() -> dict[str, Any]:
     for required in (
         "_reject_planner_shaped_fast_output",
         "Capability selection belongs to Planner after Goal Association",
+        "downstream-owned contract field",
+        'properties.pop("routes", None)',
+        'schema["additionalProperties"] = False',
         "single-lane native_response is the immediate answer; ",
         "fast_speech must be null",
     ):
@@ -315,6 +318,22 @@ def audit() -> dict[str, Any]:
             errors.append(
                 "Goal Interpreter lost Fast answer/work authority separation: "
                 + required
+            )
+
+    goal_interpreter_prompt = _read(
+        "agent/app/cognitive_core/goal_interpreter/prompts/goal_interpreter_system.txt"
+    )
+    for required in (
+        "Responsibility evidence for Goal Association, not canonical Goal/Work/Activity/Plan",
+        "Fast and Deep share this boundary",
+        "Never author Work, Primary Activities, Plan steps",
+        "Do not output routes[]",
+        "Activity/Work/Plan contracts",
+        "Exact Work/Activity decomposition and Capability selection are Planner-owned after Goal Association",
+    ):
+        if required not in goal_interpreter_prompt:
+            errors.append(
+                "Goal Interpreter prompt regained Work/Activity/Plan authority: " + required
             )
 
     goal_association = _read("agent/app/goal_association.py")

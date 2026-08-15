@@ -344,10 +344,25 @@ def _reject_planner_shaped_fast_output(
             "Fast Goal Interpreter output selected an exact Capability; "
             "Capability selection belongs to Planner after Goal Association"
         )
-    for field in ("actions", "candidate_capabilities"):
-        if parsed.get(field):
+    forbidden_contract_fields = (
+        "routes",
+        "actions",
+        "candidate_capabilities",
+        "activities",
+        "primary_activity",
+        "work",
+        "work_items",
+        "plan",
+        "plan_steps",
+        "steps",
+        "execution_lane",
+        "realization",
+        "coordination",
+    )
+    for field in forbidden_contract_fields:
+        if field in parsed:
             raise ValueError(
-                f"Fast Goal Interpreter output contains Planner-owned {field}"
+                f"Fast Goal Interpreter output contains downstream-owned contract field {field}"
             )
     raw_progress = parsed.get("progress")
     if isinstance(raw_progress, list):
@@ -361,22 +376,6 @@ def _reject_planner_shaped_fast_output(
                     "Fast Goal Interpreter progress must be native_response only; "
                     "Capability work belongs to Planner after Goal Association"
                 )
-    raw_routes = parsed.get("routes")
-    if isinstance(raw_routes, list):
-        for item in raw_routes:
-            if not isinstance(item, dict):
-                continue
-            if any(item.get(key) for key in ("capability_id", "skill_id", "args", "actions")):
-                raise ValueError(
-                    "Fast Goal Interpreter route item contains Planner-owned Capability work"
-                )
-            if _known_capability_id(item.get("route"), capability_ids) or _known_capability_id(
-                item.get("intent"), capability_ids
-            ):
-                raise ValueError(
-                    "Fast Goal Interpreter route item selected an exact Capability"
-                )
-
 
 
 
@@ -645,10 +644,10 @@ def _prompt_feature_flags(text: str) -> dict[str, bool]:
     lowered = text.casefold()
     return {
         "has_fast_speech_contract": "fast_speech" in lowered,
-        "has_tool_route_contract": "valid routes:" in lowered and "tool" in lowered,
+        "has_tool_route_contract": ("route taxonomy:" in lowered or "compatibility framing:" in lowered) and "tool" in lowered,
         "has_external_lookup_guidance": "current external facts" in lowered
         and "provider-neutral information responsibility" in lowered,
-        "has_no_topic_mapping_guidance": "topical similarity is insufficient" in lowered,
+        "has_no_topic_mapping_guidance": ("topical similarity is insufficient" in lowered or "topical similarity is not support" in lowered),
     }
 
 
@@ -1256,7 +1255,7 @@ class OllamaGoalInterpreter:
             f"Active Task/Progress Snapshot JSON:{active_tasks_json}\n\n"
             f"{recent_goals_section}"
             "Current Job:\n"
-            "fast goal-interpretation and responsibility proposer. The deterministic emergency/noise filter ran. Decide from meaning and bounded context. Understand each independently satisfiable human outcome first and emit it in responsibilities[]. This is bounded cognitive evidence, not canonical Goal meaning; never choose a Capability, author executable arguments/actions, execute, or authorize side effects. Return calibrated confidence. Terminal references do not reopen Goals. If current trusted Mind/context fully answers the responsibility with nothing else to do, emit only kind=native_response and fast_speech=null. Otherwise do not invent the result: mark whether new work/fresh evidence is required and use fast_speech only as prospective acknowledgement/checking.\n\n"
+            "fast goal-interpretation and responsibility proposer. Understand each independently satisfiable human outcome and emit provider-neutral responsibilities[]. This is Responsibility evidence for Goal Association, not canonical Goal/Work/Activity/Plan. Fast and Deep share this authority: never author Work, Primary Activities, Plan steps, execution lanes, realization, Capability/provider/executable details, execution, or authorization. Terminal references do not reopen Goals. If trusted context fully answers an outcome, use native_response with fast_speech=null; otherwise mark whether work/fresh evidence remains and keep fast_speech prospective only.\n\n"
             "Task Context Group:\n"
             f"Latest user input: {request.text}\n"
             f"Common ability IDs: {_bounded_json(common_ability_ids, max_chars=420)}\n"
@@ -1264,11 +1263,11 @@ class OllamaGoalInterpreter:
             "Task Continuity Context, Not Authority:\n"
             "Use open Goals/progress, active tasks, dialogue, discourse, and Interaction Context by meaning, not lexical shortcuts, as bounded context for the current responsibility delta. Do not author semantic_task_operations or mutate an open Goal/Task here; downstream Task Continuity and Goal Association own canonical lifecycle changes. Keep newer failed/goal-less dialogue salient. fast_speech is the first Goal Progress Communication milestone only when work remains: normally a tiny polite prospective acknowledgement/checking act, never a provider-dependent result or claim that checking already finished. native_response is the immediate answer and therefore requires fast_speech=null. For an external truth check, never state the result before evidence; missing results limit claims, not responsiveness. Omit duplicate fast_speech when an equivalent notification is delivered or pending. delivered speech/trusted terminal effects are done, scheduled/planned work is not.\n"
             "Ability Awareness, Not Planning:\n"
-            "Treat the Common Ability Catalog only as bounded awareness of what kinds of outcomes Chromie may currently support. It is not a Fast Goal Interpreter selection surface. capability_inquiry means a meta-question about ability, not an ordinary task. Do not output capability_id, skill_id, executable args, actions, or intent=capability:<id>; exact Capability choice belongs exclusively to Fast/Deep Planner after Goal Association. Topical similarity is insufficient to claim support; prefer an honest missing ability over substitution. Stable everyday reasoning needing no fresh evidence stays conversational. Isolated letters and low-information ASR fragments clarify. Never use native_response for provider-dependent evidence. Current external facts should produce a provider-neutral information responsibility with completion_requires_work=true and completion_requires_fresh_evidence=true. Missing ability may remain non-executable semantic metadata, never an executable action.\n\n"
-            "Cost Function:\n"
-            "Speech-only conversation and capability availability=chat; catalog execution=robot_action; lookup=tool; planning=deep_thought; ambiguity=clarify. Never return interrupt or ignore; a separate focused addressedness stage owns ambient suppression.\n\n"
+            "Treat the Common Ability Catalog only as awareness of supported outcome kinds, never a Fast Goal Interpreter selection or Activity-definition surface. Do not output routes[], Activity/Work/Plan contracts, lanes, realization, capability_id/skill_id, executable args/actions, or intent=capability:<id>; exact Work/Activity decomposition and Capability choice belong to Planner after Goal Association. Topical similarity is not support. Stable reasoning needing no fresh evidence stays conversational; current external facts require a provider-neutral information responsibility with completion_requires_work=true and completion_requires_fresh_evidence=true. Never use native_response before provider-dependent evidence. Missing ability is non-executable semantic metadata only.\n\n"
+            "Compatibility Framing:\n"
+            "route/intent are deprecated diagnostic framing only: chat=locally answerable; robot_action=likely embodied effect; tool=trusted external/changing evidence; deep_thought=wider interpretation; clarify=ambiguity. They do not define Work, Activity, lane, realization, Plan, or Capability. Never return interrupt or ignore.\n\n"
             "Output Contract:\n"
-            "Return one compact JSON object. Required keys: route, intent, confidence, responsibilities, fast_speech, progress. responsibilities[] is provider-neutral and contains local_ref, outcome, bindings, completion_requires_work, completion_requires_fresh_evidence, confidence. One item per independently satisfiable human responsibility. Do not put Capability IDs or execution methods in outcomes/bindings. Immediate complete answer: route=chat, one matching kind=native_response, fast_speech=null. Work remains: no native_response for that responsibility; fast_speech is only prospective Goal Progress Communication. progress[] may contain native_response only; it never contains Capability work. Use owner-approved child/family voice in first-person speech, never customer-service or processing narration. For effectful work fast_speech is generic willingness only: omit material execution methods until planning. Never claim an unobserved result, execution, completion, or completed lookup. memory write=memory; recall=chat; durable memory needs current-turn consent. routes[] may split compatibility lanes but must not carry capability_id, args, or actions. Omit agents, metadata, candidate_capabilities, explanations unless needed. Never output placeholder intents, hidden reasoning, scratchpad, markdown, or text outside JSON."
+            "Return compact JSON. Required keys: route, intent, confidence, responsibilities, fast_speech, progress. Each responsibilities[] item is provider-neutral: local_ref, outcome, bindings, completion_requires_work, completion_requires_fresh_evidence, confidence. completion_requires_work only says downstream Work remains. Do not put Activity/Work/Plan contracts, lanes, realization, Capability/provider/executable details in responsibilities. Immediate complete answer: route=chat, kind=native_response, fast_speech=null. Otherwise progress=[] and fast_speech may be one prospective Goal Progress Communication act, never result/completion. Do not output routes[]; compound outcomes belong in responsibilities[] and Goal Association canonicalizes them before Planner decomposes Work/Activities. memory write=memory; recall=chat; durable memory needs current-turn consent. Use child/family first-person speech; never customer-service or processing narration. Omit agents, metadata, candidate_capabilities, explanations, hidden reasoning, markdown, and text outside JSON."
         )
 
     @staticmethod
@@ -1281,21 +1280,16 @@ class OllamaGoalInterpreter:
                 "Complete immediate conversational answer only. Capability-shaped "
                 "progress is forbidden here and belongs to Planner after Goal Association."
             )
-        route_item_definition = schema.get("$defs", {}).get("RouteItem")
-        if isinstance(route_item_definition, dict):
-            route_item_properties = route_item_definition.get("properties")
-            if isinstance(route_item_properties, dict):
-                for forbidden in ("capability_id", "args", "actions"):
-                    route_item_properties.pop(forbidden, None)
-            route_item_required = route_item_definition.get("required")
-            if isinstance(route_item_required, list):
-                route_item_definition["required"] = [
-                    item
-                    for item in route_item_required
-                    if item not in {"capability_id", "args", "actions"}
-                ]
+        # ``routes[]`` is a legacy adapter surface. Current Goal Interpretation
+        # may identify multiple human Responsibilities, but Work/Activity/lane
+        # decomposition begins only after Goal Association in Planner.
+        properties.pop("routes", None)
+        definitions = schema.get("$defs")
+        if isinstance(definitions, dict):
+            definitions.pop("RouteItem", None)
         for compatibility_only in ("actions", "candidate_capabilities"):
             properties.pop(compatibility_only, None)
+        schema["additionalProperties"] = False
         # The model must explicitly decide whether a first progress notification
         # exists. Speech itself remains optional; silence is represented by JSON
         # null rather than by omitting the responsibility. Keep the model-facing

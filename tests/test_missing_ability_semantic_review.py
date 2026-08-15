@@ -54,11 +54,11 @@ class MissingAbilityPrimaryInterpretationTests(unittest.IsolatedAsyncioTestCase)
         system_text, user_text, _ = _payload_message_texts(payload)
 
         self.assertIn("fast Goal Interpretation model", system_text)
-        self.assertIn("metadata.desired_abilities", system_text)
-        self.assertIn("status=missing_ability", system_text)
+        self.assertIn("Missing abilities may appear only as non-executable metadata", system_text)
+        self.assertIn("Responsibility evidence for Goal Association", system_text)
         self.assertIn("chromie_default_mind", user_text)
         self.assertIn("owner-approved mind profile", user_text)
-        self.assertIn("child/family voice", user_text)
+        self.assertIn("child/family first-person speech", user_text)
         self.assertIn("chromie.weather.lookup", user_text)
 
     async def test_primary_missing_ability_is_terminal_after_one_model_call(self) -> None:

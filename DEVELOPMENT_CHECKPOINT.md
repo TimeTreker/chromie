@@ -1,25 +1,17 @@
 # Chromie Development Checkpoint
 Status: current resume point
 Updated: 2026-08-15
-Base main: `757ff88d53a83a60f37d796349041371e476c3c0` (`correct semantic activity and vocal expression hierarchy`).
+Base main: `ec16e5e225bd2dc3de9b8f663ac87cdf4f7c339f` (`make expanded activity flow the canonical architecture diagram`).
 This is the fast handoff for the next development session. Canonical owners linked below win if a conflict appears; refresh this checkpoint afterward.
 ## Project in one minute
-Chromie is a local-first realtime interaction control plane for a voice assistant
-that can use embodied capabilities safely. Chromie owns user-facing cognition,
-Goal meaning and continuity, cross-provider planning, personal Vocal behavior,
-trusted authorization, coordination, and evidence reconciliation. Soridormi is a
-peer embodied Capability Provider beneath Activity. Its advertised capability
-granularity may change over time: a whole workflow can be one atomic capability,
-or Chromie can compose smaller advertised capabilities.
+Chromie is a local-first realtime interaction control plane for a voice assistant that can use embodied capabilities safely. Chromie owns user-facing cognition, Goal meaning and continuity, cross-provider planning, personal Vocal behavior, trusted authorization, coordination, and evidence reconciliation.
+Soridormi is a peer embodied Capability Provider beneath Activity; its advertised granularity may be one atomic workflow or smaller capabilities that Chromie composes.
 The core separation is: **models reason about meaning; trusted mechanisms own
 authorization, execution, resources, and evidence.** Capability unavailable,
 execution failed, empty result, and successful result are different truths.
 Read first: [Project Charter](docs/PROJECT_CHARTER.md),
 [Goal-Driven Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
-(the canonical expanded flow is frozen there: WORLD/PERSON → Fast/Deep →
-Responsibility → Goal → Planner → semantic Primary Activity/Work → realization →
-Provider → Evidence → Response/Reflection, with optional Social Attention branching
-from each Primary Activity rather than forming another stage),
+(the canonical expanded flow is frozen there: WORLD/PERSON → Fast/Deep → Responsibility evidence → Goal Association → Canonical Goal → Planner → semantic Primary Activity/Work → realization → Provider → Evidence → Response/Reflection, with optional Social Attention branching from each Primary Activity),
 [Execution Lanes](docs/EXECUTION_LANES_AND_COORDINATION.md),
 [Current Status](docs/STATUS.md), and [Roadmap](ROADMAP.md).
 ## Current architecture
@@ -29,7 +21,7 @@ admitted UserTurnEnvelope
 Cognitive Gateway ---- deterministic stop/cancel/emergency reflexes
         |
 Goal-Driven Continuous Mind
-  |-> Fast Understanding -------> provider-neutral Responsibility evidence
+  |-> Fast/Deep Understanding --> provider-neutral Responsibility evidence only
   |                               + optional locally-ready native conversation
   `-> Goal Association ---------> canonical Goals / Responsibilities
                                   |
@@ -54,6 +46,8 @@ Evidence/Ledger plus Progress/Plan/Request/Execution/Outcome are the grounding a
 work substrate. `Responsibility` and `Work` are architecture vocabulary, not new
 parallel manager objects.
 ## Settled boundaries
+- **Goal Interpretation stops at Responsibility evidence.** Fast/Deep may not author
+  Work, Primary Activities, Plan/execution/realization contracts, or Capabilities.
 - **Goal = canonical unfinished Responsibility.** Planning, waiting, confirmation,
   scheduling, running, retry/recovery, and provider state belong to Work/runtime.
 - **Responsibility completeness is contained.** Every newly proposed Goal set

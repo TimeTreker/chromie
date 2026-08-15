@@ -20,6 +20,15 @@ _PLANNER_OWNED_BINDING_FIELDS = frozenset({
     "executable_args",
     "args",
     "actions",
+    "primary_activity",
+    "activity_id",
+    "work_item_id",
+    "plan_step_id",
+    "execution_lane",
+    "realization",
+    "vocal_mode",
+    "coordination_id",
+    "execution_item_ids",
 })
 
 
@@ -67,7 +76,8 @@ class CognitiveResponsibilityProposal(BaseModel):
 
     Goal Association is still the only stage that can create or mutate canonical
     Goals. This proposal preserves what Fast Goal Interpretation understood while
-    deliberately carrying no Capability identity, plan step, or execution method.
+    deliberately carrying no Work/Primary-Activity contract, Capability identity,
+    plan step, execution lane, realization, or execution method.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
