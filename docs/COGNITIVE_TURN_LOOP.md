@@ -208,8 +208,12 @@ exact Capability; that DTO is contradictory and receives at most one mechanical
 retransmission. The early Vocal result remains turn-scoped until Goal Association
 explicitly binds that exact progress candidate to a canonical `spoken_response`
 Goal; canonical delivery may then reuse the exact speech/result instead of
-speaking it again. The Host may validate and bind that model-authored act but may
-not rewrite it or infer its Goal from text similarity.
+speaking it again. This is a **planless, already-complete conversational act**, not a
+Work/Primary-Activity proposal. Goal Interpretation is the sole semantic wording owner
+for that exact act; Goal Association only binds provenance and Runtime only adopts or
+reuses it. Response Composer is intentionally skipped for the same act rather than
+becoming a second writer. The Host may validate and bind that model-authored act but
+may not rewrite it or infer its Goal from text similarity.
 
 A fully specified non-effectful read still needs the correct semantic owners. Fast
 Goal Interpretation may already know the information Responsibility and material
@@ -326,6 +330,11 @@ authority that those owners cannot express without information loss.
 
 The Gateway emits a versioned `UserTurnEnvelope`. It is the only canonical
 input object for a new Core turn.
+
+Signal fidelity and semantic confidence are separate. ASR confidence/input usability
+is Gateway evidence about what signal was captured; it may inform later cognition but
+is not a confidence score for what the user meant. Goal Interpretation and Goal
+Association own semantic judgment independently from that input-quality evidence.
 
 Required fields:
 
@@ -554,6 +563,14 @@ Pre-action speech and auxiliary Social Attention decoration do not satisfy an ef
 user goal. Provider postcondition evidence such as `safe_idle=true` may support
 a safety claim, but does not by itself prove every requested goal completed.
 
+Exact correlation/schema validity proves evidence integrity, not every higher-level
+claim's sufficiency. Where a Goal depends on a factual postcondition, the registered
+capability/evidence contract may require claim-specific observation classes,
+provenance/trust domains, freshness/validity, or corroboration. Provider declarations
+say what can be observed; owner-reviewed policy says what is sufficient; trusted
+Runtime checks it mechanically. Qualified factual state feeds existing Fast/Deep,
+Goal/Planner, or Reflection paths and does not create a third routing/trigger system.
+
 Per-goal outcomes retain distinctions among:
 
 - `completed`;
@@ -731,6 +748,9 @@ The final response must:
 - avoid internal IDs and implementation narration;
 - make no completion, observation, memory, movement, or safety claim without
   matching evidence;
+- treat missing historical evidence as `unknown` unless the relevant collection and
+  retention policy establishes complete closed-world coverage; ordinary response
+  wording must be able to say that Chromie cannot confirm or rule something out;
 - be emitted once for the reconciled interaction.
 
 Only speech with a completed delivery result is added to model-visible

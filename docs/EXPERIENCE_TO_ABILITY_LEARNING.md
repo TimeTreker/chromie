@@ -40,9 +40,12 @@ daily interaction
   -> deployment only when evidence improves
 ```
 
-Experience should improve how Chromie understands, selects, plans, and requests
-abilities. It should not pretend that an unsupported physical ability already
-exists.
+Experience should improve future cognition and provider/capability engineering
+through governed offline artifacts. It must not become an online shortcut from a
+surface phrase or remembered case directly to a Capability, Plan, or Fast/Deep
+decision, and it must not pretend that an unsupported physical ability already exists.
+Online Reflection is limited to bounded local advisory context; shared prompt/model/
+contract/capability changes belong here only after evidence aggregation and review.
 
 ## Ability Meanings
 
@@ -50,7 +53,7 @@ The word "ability" has two different meanings in this system.
 
 | Kind | Example | What experience can do |
 |---|---|---|
-| Existing executable ability | `soridormi.blink_eyes` already exists | Learn when to select it, which arguments to use, and what not to say. |
+| Existing executable ability | `soridormi.blink_eyes` already exists | Improve reviewed training/scenarios/contracts so ordinary Planner reasoning selects and parameterizes it correctly; do not install a phrase→skill rule. |
 | Missing desired ability | Users often ask to control a light, but no light skill exists | Propose a missing ability, scenario coverage, catalog requirement, and future implementation task. |
 
 Experience can guide interpretation and propose new work. Runtime execution
@@ -89,13 +92,10 @@ Example:
 {
   "case_id": "exp_blink_not_roleplay",
   "status": "approved",
-  "trigger": "User asks Chromie to blink her eyes.",
-  "interpretation": "This is a physical robot skill request.",
-  "preferred_behavior": "Emit soridormi.blink_eyes with count if specified.",
-  "forbidden_behavior": "Do not say or roleplay that blinking happened without a blink skill.",
-  "skills": ["soridormi.blink_eyes"],
+  "lesson": "A requested physical effect must remain an effectful Responsibility and cannot be satisfied by speech roleplay.",
+  "failure_boundary": "planning_or_capability_grounding",
+  "relevant_capability_family": "embodied eye expression",
   "source": "reviewed_scenario",
-  "confidence": 0.95,
   "requires_owner_approval": true
 }
 ```
@@ -104,13 +104,16 @@ Prompt-facing form:
 
 ```text
 Relevant Reviewed Experience:
-- Blink requests should map to soridormi.blink_eyes when the skill is available.
-  Speech-only roleplay is wrong.
-- A compound request such as walking while telling a joke should keep speech as
-  a chromie.speak task alongside motion, not drop the speech task.
+- A requested physical effect cannot be satisfied by speech roleplay; preserve the
+  effectful Responsibility and ground current Work from the live Capability catalog.
+- Compound Responsibilities must preserve every independently observable human outcome;
+  current Goal Association and Planner still decide the present decomposition.
 ```
 
-These notes are advisory. They do not authorize execution.
+These notes are advisory. They do not authorize execution and must not become a
+hidden rule table that bypasses current Goal Association/Planner reasoning. A retrieved
+case may supply context; the current turn must still be interpreted and planned from
+its authoritative source meaning and live Capability state.
 
 ## Safety Boundaries
 
@@ -128,6 +131,9 @@ Experience may:
 Experience must not:
 
 - authorize physical execution;
+- auto-apply shared/global cognitive calibration from one online episode;
+- cache phrase→Capability, pattern→always/never-Deep, or other semantic decisions that
+  replace future cognition;
 - bypass confirmation, preflight, policy, schema validation, or provider checks;
 - turn raw logs into prompt payloads;
 - auto-apply safety policy or core principle changes;
@@ -148,8 +154,10 @@ python scripts/tune_capability_prompt_tiers.py \
   --audit-output .chromie/experience/capability_prompt_tier_audit.jsonl
 ```
 
-The generated overlay can be loaded by the Agent with
-`AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES`, after the initial owner preset in
+The generated overlay changes prompt-budget visibility only; it does not establish
+user meaning, choose a Capability, or install a semantic shortcut. The overlay can be
+loaded by the Agent with `AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES`, after the initial
+owner preset in
 `capabilities/prompt_tiers.json` has been loaded by
 `AGENT_CAPABILITY_PROMPT_TIER_PRESET`. It can promote frequently successful
 ordinary skills to `common` or demote unused common skills to `rare` after
@@ -159,6 +167,12 @@ commissioning, and explicitly `prompt_tier_locked` entries are forced to
 `rare` with `prompt_tier_source=safety_lock`.
 
 ## Future Implementation Plan
+
+Before any shared behavior change, the offline loop must distinguish a local case
+claim (for example, "Fast was wrong in this episode") from a cross-episode claim
+(for example, "Fast systematically under-escalates this class"). The latter requires
+comparable multi-episode evidence, provenance/sampling context, evaluation, and owner
+review; no single episode can establish a distribution-level failure.
 
 ### Stage 1: Artifact Export
 

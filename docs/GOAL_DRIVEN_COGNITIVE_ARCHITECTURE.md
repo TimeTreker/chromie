@@ -283,8 +283,13 @@ or contradict a trusted limitation, but it cannot reinterpret the Goal, invent a
 new responsibility, reopen Planner authority, or authorize an effect.
 
 If wording is mechanically malformed, the representation may be regenerated once
-without changing its meaning. The primary Response Composer is the only writer of
-response wording. Response stages do **not** author Goal coverage: `covers_goal_ids`
+without changing its meaning. Wording authority is per conversational act, not one
+universal speech author. A provider-free already-complete `native_response` and an
+eligible `fast_speech` progress act retain Goal Interpretation as their semantic wording
+owner; an evidence-bound Tool Result act retains Tool Result Interpretation as its
+writer; Response Composer is the sole writer only for the still-needed acts it owns.
+Goal Association and Runtime may bind or exactly reuse those acts but may not rewrite
+them. Response stages do **not** author Goal coverage: `covers_goal_ids`
 is a read-only Host projection from the immutable CanonicalPlan, per-Goal outcomes,
 and exact reused-speech provenance. The model-facing schema permits no writable Goal
 IDs in response stages, and any supplied duplicate copy is discarded before typed
@@ -339,6 +344,21 @@ happened. Chromie must stop before unsafe, unauthorized, irreversible, materiall
 mis-grounded, or reality-falsifying commitments. Those boundaries deserve strong
 validation.
 
+Evidence integrity does not by itself establish evidence sufficiency. Exact
+request/result correlation, schema validity, and provenance can prove that an
+observation is authentic without proving that it is enough to establish a broader
+claim such as `object_securely_held_now` or `authenticated_principal=Alice`. Providers
+advertise observable facts and their provenance; owner-reviewed capability/evidence
+policy defines claim-specific sufficiency; Runtime checks that policy mechanically.
+The result is factual state such as `established`, `insufficient`, `stale`,
+`contradicted`, or `unknown`, which existing cognition consumes as Situation/Evidence
+input. This is not a new intent interpreter, planner, or trigger engine.
+
+Keep three uncertainty domains separate: signal fidelity (for example ASR confidence)
+belongs to Perception/Gateway input-quality evidence; user meaning belongs to Goal
+Interpretation/Goal Association; non-semantic world/runtime claims are qualified from
+trusted observations. Do not collapse them into a universal confidence score.
+
 Not every imperfection deserves another cognitive call. Slightly awkward wording,
 a missed optional social cue, or another harmless variation may end locally. The
 architecture should spend complexity where being wrong matters rather than trying
@@ -347,12 +367,21 @@ to make every low-risk interaction perfect through review chains.
 ### Reflection learns forward
 
 Reflection consumes trusted experience after meaningful surprise, contradiction,
-failure, importance, or repetition. A model-authored Reflection action is valid only
-when runtime binds it to recorded outcome/evidence references and the affected
-Responsibility is still open. It may create evidence-backed proposals for future
-calibration, Memory, Goal/Plan reconsideration, clarification, or a future user
-correction through the normal owning boundaries. It is selective slow cognition, not
-a synchronous reviewer after every turn.
+failure, importance, or repetition. Every proposal is bound by Runtime to recorded
+outcome/evidence references. Responsibility-changing actions such as replan,
+clarification, or corrective progress can apply only while that Responsibility is
+open. A terminal outcome remains immutable history but may still support a future
+`experience` or `calibration` proposal; learning from a finished case is not the same
+as reopening it.
+
+Online Reflection is bounded advisory cognition, not online self-modification. It may
+supply future Situation/Memory context through the normal owners, but may not directly
+change Stable Mind, shared prompts or model weights, global Fast/Deep policy,
+authorization/safety policy, Capability semantics, or cache a semantic decision such
+as phrase→Capability or pattern→always/never-Deep. Trusted policy caps both **scope**
+(what future cognition may consume the proposal) and **lifetime** (how long it may
+remain influential); one does not imply the other. Shared/systemic learning is an
+offline evidence-aggregation and owner-review process.
 
 Reflection never rewrites delivered speech, provider evidence, execution history,
 past commitments, or a completed outcome. It cannot reopen current-turn semantic or
@@ -1254,7 +1283,10 @@ Core artifacts have different truth semantics:
 
 - **Historical fact** — Evidence, trusted execution/outcome records, and delivered
   speech record what occurred. Later cognition may append new evidence or a
-  correction but must not silently rewrite them.
+  correction but must not silently rewrite them. Immutability governs mutation while
+  retained; privacy/retention policy separately governs lifetime. Authorized deletion
+  does not rewrite the content of a retained record, but it can make later historical
+  queries epistemically incomplete.
 - **Current canonical meaning** — Goal, current Plan/Work choice, and durable
   Memory each have one current semantic owner and may be revised with retained
   provenance when better evidence or intent requires it.
@@ -1312,6 +1344,33 @@ evidence; Situation owns only Chromie's current interpretation. Avoid a universa
 confidence score or giant conflict resolver unless concrete requirements prove it
 necessary.
 
+Epistemic qualification is therefore **claim-specific**. A capability/provider may
+advertise the observation classes it can produce, but an owner-reviewed registration
+contract decides which observations are mandatory, which alternatives may substitute,
+which are merely corroborating, what provenance/trust domains must be independent,
+and what validity/freshness semantics apply. Runtime evaluates that declared contract;
+it does not semantically improvise sufficiency. Historical events, snapshot state, and
+continuously maintained state have different validity semantics and must not share one
+TTL/decay rule.
+
+Principal identity uses the same Capability/Provider/Evidence path when needed: a
+recognition claim and an authentication claim are different factual claims with
+different evidence requirements. Gateway still owns addressedness, while Host policy
+owns authorization and consent for a specific effect. Identity evidence does not gain
+those authorities merely by being strong.
+
+Negative historical claims require closed-world coverage. `no retained record` means
+only that no retained record is available unless collection, capture, and retention are
+known complete for the relevant claim. Sampling, capture failure, expiry, redaction, or
+privacy deletion therefore normally produce `unknown`, not `false`; no universal
+privacy tombstone is required. Response must be able to express that ordinary unknown
+state without rounding it into a confident denial.
+
+Qualified current claims are revisable Situation derived from immutable observations,
+not a new permanent belief database. New evidence may move a current claim from
+`established` to `stale`, `contradicted`, or `unknown` without rewriting the original
+observation.
+
 When uncertainty can be resolved cheaply by reality, prefer acquiring evidence
 through perception, a provider/tool read, or clarification over spending longer
 LLM inference guessing. Deeper commitment requires stronger evidence,
@@ -1356,18 +1415,30 @@ Situation answers what matters now; Memory answers what may matter again later.
 The default should be not to promote ordinary transient facts into durable
 Memory.
 
-`Experience` does not currently require a separate first-class store. Repeated or
-important outcomes may produce an experience candidate; selective Reflection may
-turn a supported reusable interpretation into Memory. Provider-internal
+`Experience` does not currently require a separate first-class store. Important or
+repeated outcomes may produce an experience candidate; selective Reflection may
+turn a supported reusable interpretation into bounded Memory. A completed Goal may
+be evidence for learning even though it may not be reopened. Provider-internal
 procedural learning remains provider-owned, and ordinary cognition cannot promote
 experience directly into Stable Mind identity/values or invent a new provider
 capability.
 
+Online adaptation is deliberately weaker than shared learning. Reflection proposes the
+semantic lesson; trusted policy limits the maximum scope and lifetime; the existing
+Memory owner materializes an ephemeral entry and role-appropriate projections expose
+it to future cognition. `scope` answers what may consume the lesson; `lifetime`
+answers how long it remains valid. A conversation/Goal that never naturally closes
+must not make a local calibration de facto permanent. Existing expiry/retention
+mechanics should be reused before inventing a new adaptation lifecycle subsystem.
+
 Learning is therefore a promotion process with explicit authority boundaries,
 not a `LearningState`. Forgetting/decay is retention policy, not another cognitive
-subsystem. Reflection is selective slow cognition that may propose revisions to
-Situation, Goal, Plan/Work, or Memory; it cannot rewrite historical Evidence,
-trusted outcome records, prior speech, provider authority, or Stable Mind.
+subsystem. Online Reflection cannot replace future reasoning with cached semantic
+decisions, directly tune global escalation propensity, or mutate shared cognitive
+policy. Cross-episode claims such as "Fast systematically under-escalates" require
+offline aggregation/evaluation and owner-governed promotion. Reflection cannot rewrite
+historical Evidence, trusted outcome records, prior speech, provider authority, or
+Stable Mind.
 
 Across restart, durable unfinished Goals, Memory, Stable Mind, and the minimum
 trusted Work/Evidence required for continuity may survive according to their
@@ -1395,8 +1466,12 @@ owner they may establish or revise:
 - external text enters as data/Evidence and cannot acquire authority over Stable
   Mind, safety, privacy, or capability contracts through prompt content.
 
-Implementation should encode these ownership boundaries using existing contracts
-where possible rather than creating a universal `AuthorityManager`.
+Cross-cutting information does not gain an `owns` relationship merely because several
+stages consume it. Evidence qualification, retention/privacy policy, and bounded
+adaptation refine inputs to existing owners and cannot inherit those owners' downstream
+authority. Implementation should encode these boundaries using existing contracts
+where possible rather than creating a universal `AuthorityManager`, `BeliefManager`, or
+`AdaptationManager`.
 
 #### 4.14.11 Continuous Mind constitution
 
@@ -1422,6 +1497,10 @@ The synthesis above reduces to a small set of invariants:
     ordinary cognition.**
 12. **When reality can cheaply resolve material uncertainty, acquire evidence
     instead of thinking harder.**
+13. **Evidence integrity is not evidence sufficiency; factual claims are established
+    only by claim-specific qualified evidence.**
+14. **Online learning may refine bounded future context, but it cannot replace future
+    reasoning or mutate shared cognitive policy.**
 
 The architectural shape is therefore not a new `ContinuousMind` manager. It is
 the continuous evidence-driven evolution of a few truth owners:

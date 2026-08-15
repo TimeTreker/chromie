@@ -36,7 +36,15 @@ Speech composition and user-task execution may be prepared or scheduled
 independently from immutable projections of that authoritative turn. Parallel
 output preparation does not create another semantic owner: a response composer
 cannot reinterpret Goals or authorize effects, and an execution specialist
-cannot become the conversation authority.
+cannot become the conversation authority. Wording ownership is per conversational
+act: a Goal-Interpretation `native_response`/eligible progress act, a Tool Result
+act, and a Response-Composition act each retain exactly one writer, while later
+stages may only bind/reuse the exact act or author a genuinely different delta.
+
+Cross-cutting evidence qualification, retention/privacy policy, and bounded
+adaptation are not additional semantic owners. They refine factual/context input to
+existing owners and cannot inherit downstream Goal, Plan, authorization, or effect
+authority.
 
 Single semantic authority does not freeze capability granularity. A provider may
 change which bounded capabilities it advertises as its implementation improves.
@@ -71,12 +79,15 @@ semantic plan after the Goal-driven Runtime acquires a turn.
 | Agent `/interaction` or `/run` with deprecated exact `actions[]` compatibility input | No new semantic planner; legacy action materializer | adapter | Schema validation and `SkillRequest` materialization only | Invalid actions are blocked or clarified; no LLM reinterpretation and no claim that Fast Goal Interpretation authored them. |
 | Explicit compatibility emergency | Legacy CapabilityAgent | authoritative | Legacy capability semantic planner | Requires both service gates and a per-turn emergency claim. |
 
-The implemented direct speech-only branch runs after Goal Association for a
-complete non-effectful spoken-response Goal. Response Composer authors the
-answer without invoking Fast or Deep Planner. This changes latency, not
-authority: the same Core owns Goal meaning and response composition, and the
-trusted Host still owns delivery. Capability-dependent safe reads are not this
-branch; their factual speech follows trusted execution evidence.
+The maintained direct speech-only path has two bounded forms. If Goal
+Interpretation already owns an exact provider-free `native_response`, Goal
+Association binds that candidate to the canonical speech Goal and Runtime adopts/reuses
+it without invoking Planner or Response Composer for the same act. Otherwise a
+complete non-effectful speech Goal may move directly to Response Composition without
+Fast/Deep Planner. Both paths change latency, not Goal or effect authority: no
+Work/Activity/Capability contract is authored by Goal Interpretation, and trusted Host
+still owns delivery. Capability-dependent reads are not this branch; their factual
+speech follows trusted execution evidence.
 
 When Goal Association explicitly binds one Goal with `entity_type=action_list`,
 Fast and Deep Planning require a bounded model-authored semantic completeness

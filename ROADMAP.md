@@ -16,54 +16,58 @@ Soridormi/provider work and is not a Chromie milestone or release prerequisite.
 Sequential milestone codes are not part of the current project model. Work is
 organized by capability, risk, and retained evidence.
 
-## Immediate architecture line — human-like cognitive flow cleanup
+## Immediate architecture line — consolidate the reviewed authority baseline
 
-The owner-approved canonical flow is now documented before implementation. The
-next source work must make the runtime match it rather than extending historical
-repair/reviewer machinery. Implementation order:
+The broad architecture-discovery phase is closed. New work starts from the canonical
+`Goal Interpretation → Responsibility evidence → Goal Association → Canonical Goal →
+Planner → Work/Primary Activities → realization → Provider → Evidence` authority seam
+and must pass the Charter's architecture-irreducibility review before adding a new
+principle, owner, persistent state concept, manager, workflow, contract field, or
+mechanism.
 
-1. **Response authority cleanup — implemented in source.** Response Composer has one
-   wording owner; mechanical DTO regeneration is bounded to one same-meaning retry.
-   Consequential response truth checking is an immutable accept/reject certificate,
-   never a replacement Response author, and semantic/evidence rejection is terminal
-   to composition. Requalification remains separate from source closure.
-2. **Optional presentation locality — implemented in source.** Social Attention and
-   response polish fail locally. A valid Social Attention `none` stands; invalid
-   decoration is dropped without recomposing speech or reopening Goal/Planner
-   cognition. One maintained Social Attention planner owns decoration. The anchor
-   is the semantic Primary Activity—what Chromie is doing—not an execution lane,
-   Vocal Expression mode, Capability/request, transport item, cognition milestone,
-   or interaction-wide `mixed` envelope. Responsibility/Goal is above Activity:
-   one Goal may own several semantic Work/Plan Activities, while a high-level
-   provider capability may keep a whole behavior atomic. Multiple realization
-   items for the same canonical Activity share one anchor; independent semantic
-   Activities remain independently eligible.
-3. **Fast/Deep boundary.** Keep obvious low-risk interaction Fast even when model
-   confidence is imperfectly calibrated. Escalate when uncertainty/consequence
-   actually warrants deeper cognition. Deep consumes authoritative source meaning,
-   not Fast output as a repair target.
-4. **Semantic single-source audit.** For each material fact, keep one writable
-   semantic owner and derive downstream projections mechanically. Delete alignment
-   machinery whose only purpose is reconciling duplicate writable truth.
-5. **Reflection vocabulary and lifecycle.** Preserve evidence-driven future
-   reconsideration/replanning, but remove terminology that makes it look like
-   online repair of the current model output. Reflection learns forward and never
-   rewrites trusted history.
-6. **Outcome and call-budget regression matrix.** Tests protect user-visible
-   semantic outcomes, fail-closed behavior, single ownership, and bounded logical
-   model calls—not historical prompt/reviewer sequences.
+Next design/implementation order:
 
-Exit criteria:
+1. **Conversational-act wording ownership — docs closure first.** Preserve the current
+   low-latency `native_response` path as a planless already-complete act. One semantic
+   writer owns each conversational act: Goal Interpretation may own eligible
+   `native_response`/`fast_speech`, Tool Result Interpretation owns its evidence-bound
+   result act, and Response Composer owns only the still-needed acts it composes.
+   Goal Association/Runtime bind or exactly reuse; they do not rewrite.
+2. **Epistemic Qualification contract detail.** Do not add an `EpistemicManager`.
+   Extend existing capability/evidence contracts to represent claim-specific required
+   observations, provenance/trust-domain independence, alternatives/corroboration,
+   validity/freshness, closed-world coverage, and qualification state
+   (`established|insufficient|stale|contradicted|unknown`). Keep ASR/input fidelity in
+   Gateway and semantic meaning in GI/GA. Principal recognition/authentication uses
+   the ordinary Capability/Provider/Evidence path; authorization/consent remains Host
+   policy.
+3. **Forward Adaptation contract detail.** Separate open-Responsibility actions from
+   terminal-history learning proposals. Online Reflection may create only bounded
+   advisory experience/calibration; trusted policy caps scope and lifetime and Memory
+   materializes it with explicit expiry. It may not modify Stable Mind/shared prompts/models/global
+   Fast/Deep policy, authorization/safety, Capability semantics, or cache semantic
+   decisions. Shared/systemic changes remain offline and owner-governed.
+4. **Retention/negative-evidence consistency.** Make `immutable while retained !=
+   permanent` explicit across Evidence/Memory/Data Loop. No universal tombstone is
+   required; absence supports a negative claim only under complete collection and
+   retention coverage, otherwise Response must preserve `unknown`.
+5. **Machine guards and scenarios.** Only after contract text is stable, add the
+   smallest schema/runtime/audit changes needed to protect these boundaries. Tests
+   should guard authority and observable semantics, not one incidental call sequence.
+6. **Qualification after implementation.** Source/test success, target qualification,
+   and release readiness stay separate; relevant revision/model/provider/config changes
+   invalidate the corresponding qualification claim before age-based review does.
 
-- the Charter's canonical WORLD/PERSON → Gateway → Fast/Deep → Responsibility →
-  Goal → Planner → Provider → Action → Evidence → Response/Reflection flow is
-  reconstructable in source without a second semantic authority;
-- optional presentation cannot reopen primary cognition;
-- semantic rejection does not create a same-layer repair workflow;
-- mechanical DTO regeneration is distinguished and bounded to at most one retry;
-- retained behavior/general-ability/benchmark scenarios remain green; and
-- current Status records implementation/evidence honestly, without promoting this
-  design-only update into target validation.
+Exit criteria for this line:
+
+- no reviewed case requires a new top-level semantic authority;
+- native response, later response composition, and result interpretation obey one
+  semantic wording owner per conversational act;
+- evidence integrity and evidence sufficiency are explicitly distinct;
+- terminal history can teach bounded future cognition without reopening history;
+- local adaptation has separately bounded scope and lifetime and cannot self-promote to
+  shared policy; and
+- Status records design/source/test/target evidence separately.
 
 ## Immediate architecture line — Continuous Mind implementation from the compressed baseline
 
@@ -135,10 +139,12 @@ with fewer truth owners and processes, not preserving an obsolete pipeline or
 adding a manager because a useful explanatory term exists.
 ## Current priorities
 
-1. Preserve the completed Continuous Mind core invariants and widen only from concrete
-   needs. The next architecture work is scoped durable consent/privacy, multi-user identity,
-   broader autonomy/competence calibration, or richer resumable cognition when a real
-   scenario demonstrates missing lifecycle or authority.
+1. Preserve the completed authority spine and implement only the contract detail now
+   proven necessary: conversational-act wording ownership, claim-specific Epistemic
+   Qualification, and bounded Forward Adaptation. Multi-user identity is not a new owner:
+   recognition/authentication is a factual Capability/Evidence claim and effect-specific
+   authorization/consent stays in Host policy. New top-level architecture requires the
+   Charter irreducibility review.
 2. Preserve the merged source contracts from Issues
    [#17](https://github.com/TimeTreker/chromie/issues/17),
    [#18](https://github.com/TimeTreker/chromie/issues/18),

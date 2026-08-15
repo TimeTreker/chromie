@@ -57,15 +57,21 @@ interpret a request, but it must never authorize physical side effects.
 
 ## Memory Scopes
 
-Memory entries should carry an explicit scope:
+Memory entries carry an explicit **scope**, but scope is not lifetime:
 
-| Scope | Lifetime | Examples |
-|---|---:|---|
-| `turn` | Current request only | ASR text, route decision, fast-interpreter proposal |
-| `session` | Current conversation | Current topic, recent correction, active question |
-| `task` | Until task closes or expires | Goal, constraints, accepted/revised proposals |
-| `preference` | Durable only with policy/consent | Language preference, interaction style |
-| `experience` | Durable evidence, reviewed use | Mistakes, successful fixes, scenario mining |
+| Scope | What may consume it | Typical lifetime policy | Examples |
+|---|---|---|---|
+| `turn` | Current request only | Current turn | Input/interpretation context |
+| `session` | Current conversation cognition | Conversation boundary **and** a bounded maximum TTL | Current topic, recent correction, local calibration |
+| `task` | The bound unfinished task/Goal | Goal/task boundary or explicit expiry | Goal constraints, accepted/revised proposals |
+| `preference` | Owner-approved profile consumers | Durable only with policy/consent | Language preference, interaction style |
+| `experience` | Reviewed learning/evaluation paths | Policy-defined; never automatic global cognition | Mistakes, successful fixes, scenario mining |
+
+A local adaptation must have both an applicability scope and an independently bounded
+lifetime. A long-running Continuous Mind or active Goal must not make `session` or task
+calibration de facto permanent merely because its natural boundary never arrives.
+`expires_ms`/retention policy should be reused for this purpose before adding a new
+adaptation lifecycle manager.
 
 The first implementation focuses on `session` and `task` memory. Durable
 preference and experience-fed memory still need consent, deletion, retention,
@@ -185,6 +191,13 @@ Memory is interpretive context, not authority.
   stale facts.
 - Sensitive or durable memory must remain opt-in until retention, deletion,
   encryption, and review behavior are defined.
+- Reflection may propose experience/calibration from trusted terminal evidence, but
+  online Memory remains advisory context: it cannot mutate Stable Mind, shared
+  Fast/Deep policy, authorization/safety, Capability semantics, or encode a semantic
+  shortcut such as phrase→Capability or pattern→always/never-Deep.
+- Reflection proposes semantic content; trusted policy caps maximum scope/lifetime;
+  Memory owns materialization and expiry. The model does not choose indefinite or
+  global persistence.
 
 ## Implementation Plan
 
@@ -210,8 +223,10 @@ Memory is interpretive context, not authority.
    conversation/capability prompt migration, and deepthinking memory visibility.
 8. Implemented first offline-review slice: episode evaluation can write compact
    reviewed experience notes in `offline_reviews.jsonl` without injecting raw
-   experience logs into prompts. Later, connect owner-approved experience notes
-   to durable memory selection through the future
+   experience logs into prompts. Next design work should let terminal evidence feed
+   bounded `experience`/`calibration` proposals without reopening the old Goal, apply
+   trusted maximum scope/lifetime during Memory materialization, and keep all
+   shared/systemic adaptation on the owner-governed
    [Experience-To-Ability Learning](EXPERIENCE_TO_ABILITY_LEARNING.md) path.
 
 ## Acceptance Criteria

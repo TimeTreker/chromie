@@ -67,7 +67,9 @@ fails the gate.
 ## Addition and consolidation rule
 
 A new maintained document is justified only when an existing authority or
-component owner cannot hold the fact clearly. The same change must link it from
-an entry point and remove or merge duplicated current prose, or record why no
-subtraction is possible. Documentation checks prove paths and ownership; human
-review still owns semantic consistency and plain-language quality.
+component owner cannot hold the fact clearly. Apply the same irreducibility review
+used for architecture: first prove the fact cannot be expressed correctly as a
+refinement of an existing owner. The same change must link the new document from an
+entry point and remove or merge duplicated current prose, or record why no subtraction
+is possible. Documentation checks prove paths and ownership; human review still owns
+semantic consistency and plain-language quality.

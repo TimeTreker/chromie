@@ -27,6 +27,20 @@ it does not grant an implementer unilateral authority to rewrite that principle.
 The escalation is explicit, while the implementation remains governed by the
 last owner-approved canonical rule.
 
+#### Architecture irreducibility review
+
+Before adding a new principle, authority, persistent state concept, module,
+manager, workflow, model-facing contract field, or runtime mechanism, reviewers
+must first ask whether the required responsibility can be expressed correctly by
+refining an existing owner or invariant. A new architectural construct is
+justified only when that reduction would create an incorrect owner, lifecycle,
+truth source, or safety boundary. In particular, review should ask whether the
+proposal is stable and cross-cutting, establishes genuinely new authority or
+truth, fails in a distinct way, is governable by tests/mechanical checks or
+disciplined architecture review, and belongs at this layer rather than in an
+existing component contract. This is the operating discipline behind **Use less
+to solve more**; it is not an additional numbered principle.
+
 ### One resource responsibility, dynamically bounded capabilities
 
 `AcquireAndDeliverResource` is one provider-neutral human responsibility.
@@ -65,6 +79,23 @@ Capability has a declared output schema, completion evidence must pass that sche
 its trust boundary before the reconciler may mark the bound Goal complete. A schema-invalid
 observation is failed evidence, not degraded success. Provider and consumer schemas must
 therefore evolve together.
+
+Evidence integrity and evidence sufficiency are distinct. A Provider may declare which
+observations it can produce, but it does not unilaterally decide that those observations
+establish a Chromie-level factual claim. Owner-reviewed capability/evidence policy defines
+claim-specific required observations, provenance/trust domains, validity/freshness, and
+corroboration where needed; trusted Runtime checks those requirements mechanically.
+Qualified factual state is consumed by existing owners and does not become a new semantic
+authority, intent interpreter, planner, or cognitive trigger system. Signal fidelity such
+as ASR confidence remains Gateway input-quality evidence; user meaning remains Goal
+Interpretation/Goal Association authority.
+
+Historical Evidence is immutable while retained, not necessarily permanent. Retention,
+privacy, and authorized deletion govern lifetime without rewriting the content of a
+retained record. Conversely, absence from retained evidence is not proof that an event did
+not occur unless the relevant collection and retention coverage is known to be complete.
+A privacy policy may delete data without leaving a universal tombstone; downstream
+cognition must then preserve `unknown` rather than silently infer `false`.
 
 Accepted dialogue also survives semantic-path failure. A user turn that fails before canonical
 Goal commit remains bounded conversation evidence for a later follow-up, but it never becomes a
@@ -165,6 +196,12 @@ Read the diagram with these boundaries:
 
 The shorter ownership chain
 `Responsibility evidence → Goal Association → Canonical Goal → Planner → Provider → Action → Evidence` remains a valid compression of this same diagram, not a competing architecture.
+
+Cross-cutting contracts do not add rows to the semantic ownership table merely because
+they influence several stages. Epistemic qualification refines factual evidence;
+retention/privacy governs lifetime; Reflection/Memory may provide bounded future context.
+They are inputs to existing owners, not new owners, and cannot inherit or bypass the
+downstream authority of the stage that consumes them.
 
 Chromie should make this loop responsive, interruptible, understandable, and
 portable across qualified embodied providers without exposing low-level robot
@@ -655,8 +692,14 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    Response composition chooses natural wording for the still-needed user-facing
    delta. It may be mechanically validated and must be rejected if it claims
    unsupported reality, but it may not reinterpret Goals, reopen planning, or gain
-   effect authority. The primary Response Composer is the only writer of response
-   wording. Response-stage Goal coverage is not model-authored semantic truth:
+   effect authority. **Each conversational act has exactly one semantic wording
+   owner.** Goal Interpretation may own an explicitly bounded `fast_speech` progress
+   act or a provider-free already-complete `native_response`; Tool Result
+   Interpretation owns its evidence-bound result act; Response Composer is the sole
+   writer only for still-needed Response-Composition-owned acts. Later stages may
+   bind/reuse an already-authored act exactly or author a genuinely different act;
+   they may not paraphrase the same milestone into a second semantic writer.
+   Response-stage Goal coverage is not model-authored semantic truth:
    `covers_goal_ids` is mechanically projected from the immutable Plan/outcomes and
    exact reused-speech provenance after wording is accepted. A consequential response
    may be checked by one immutable accept/reject
@@ -694,13 +737,18 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
 
 39. **Reflection learns forward; it does not rewrite history.** Trusted observations,
    delivered speech, commitments, execution attempts, and outcomes remain historical
-   evidence. Any Reflection action must be bound to trusted outcome/evidence references
-   supplied by runtime, may affect only still-open Responsibility, and cannot reopen a
-   completed outcome. Reflection may explain surprise, record an experience, calibrate
-   future cognition, or propose future Goal/Plan/Memory changes through their normal
-   owners. It must not retroactively make a failed interpretation 'what Chromie meant
-   all along', mutate completed evidence, or repair/reopen the current turn after the
-   fact.
+   evidence. Every Reflection proposal is bound to trusted outcome/evidence references
+   supplied by Runtime. Responsibility-changing actions such as replan, clarify, or
+   corrective progress may affect only still-open Responsibility and cannot reopen a
+   completed outcome. **Learning proposals are different:** a terminal outcome may still
+   support an `experience` or `calibration` proposal for future cognition, provided the
+   past record remains unchanged. Online Reflection may create only bounded advisory
+   context; it may not directly mutate Stable Mind, shared prompts/models, global Fast/Deep
+   policy, authorization/safety policy, Capability semantics, or cache a semantic shortcut
+   such as phrase→Capability or pattern→always/never-Deep. Scope and lifetime are separate
+   trusted policy bounds, so local adaptation cannot become durable merely because a
+   conversation or Goal never naturally ends. Shared/systemic adaptation remains an
+   offline, evidence-aggregated, owner-governed process.
 
 40. **The architecture must be reconstructable from a small set of responsibilities.**
    A normal interaction should be explainable without knowing historical regression

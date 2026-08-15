@@ -97,7 +97,10 @@ personal or deployment-sensitive data. Operators must review the policy's
 `usage_purpose` and `retention_profile_id`, filesystem access, trigger target,
 upload destination, and deletion process before enabling it. A local trigger
 file proves only local handoff; it is not proof of cloud upload, retention
-enforcement, consent, anonymization, or deletion.
+enforcement, consent, anonymization, or deletion. Evidence immutability applies while
+an artifact is retained; authorized retention/privacy deletion is allowed and need not
+leave a universal tombstone. After deletion, downstream evaluation must treat missing
+coverage as unknown rather than infer that the deleted event never occurred.
 
 ## Derivation chain
 

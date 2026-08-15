@@ -1,7 +1,7 @@
 # Chromie Development Checkpoint
 Status: current resume point
 Updated: 2026-08-15
-Base main: `ec16e5e225bd2dc3de9b8f663ac87cdf4f7c339f` (`make expanded activity flow the canonical architecture diagram`).
+Base main: `bcc25c92652b9e333179f2bb18c1117ce3e3ba24` (`bound goal interpretation to responsibility evidence`).
 This is the fast handoff for the next development session. Canonical owners linked below win if a conflict appears; refresh this checkpoint afterward.
 ## Project in one minute
 Chromie is a local-first realtime interaction control plane for a voice assistant that can use embodied capabilities safely. Chromie owns user-facing cognition, Goal meaning and continuity, cross-provider planning, personal Vocal behavior, trusted authorization, coordination, and evidence reconciliation.
@@ -81,12 +81,12 @@ parallel manager objects.
   core embodied outcome; cognition must not know the backend, and physical-robot
   commissioning is optional provider work rather than a Chromie completion gate.
 - **Reality enters through evidence.** Provider evidence and reconciliation own
-  runtime truth; cognition may explain that truth but may not promote it.
-- **Proof is not a second semantic author.** Goal Association may retain immutable
-  coverage evidence. Response Composer has one wording owner; a consequential truth
-  check is one immutable accept/reject certificate and cannot rewrite Response, Goal,
-  Plan, or Social Attention. Tool Result Interpreter follows the same one-writer rule:
-  one evidence-bound answer, immutable truth proof, no semantic rewrite/reviewer chain.
+  runtime truth; evidence integrity is not automatically claim sufficiency.
+- **One conversational act, one wording owner.** GI may own bounded `fast_speech` or
+  provider-free `native_response`; Tool Result Interpretation owns its result act;
+  Response Composer owns only the acts it composes. Later stages bind/reuse exactly.
+- **Cross-cutting contracts are inputs, not authorities.** Claim qualification,
+  retention/privacy, and bounded adaptation cannot inherit Goal/Plan/effect authority.
 - **Readiness is local, not pipeline-global.** A branch advances when its own
   meaning, inputs, evidence, dependencies, and authority are sufficient.
 - **Stable Mind is not dynamic world knowledge.** Identity/personality/values may
@@ -100,11 +100,12 @@ Composer model owns wording but cannot author `covers_goal_ids`; canonical Goal
 ownership and exact reused-speech provenance project that delivery bookkeeping
 mechanically. This removes another duplicate writable semantic truth without
 changing playback/evidence correlation.
-Response Composer is the single wording owner. `SocialAttentionPlanner` is the sole
-optional-decoration writer; malformed decoration fails soft and backend/calibration
-identity is stripped before model reasoning. Reflection is evidence-bound future
-adaptation: actions require recorded outcome/evidence, apply only to open Responsibility,
-and cannot reopen completed outcomes or current-turn authority.
+The one-writer rule is act-scoped: `native_response` remains GI-authored and exactly
+bound/reused; Response Composer owns later still-needed acts. `SocialAttentionPlanner`
+is the sole optional-decoration writer. Accepted design now separates open-Goal
+Reflection actions from terminal-history learning proposals: future online adaptation is
+bounded advisory Memory with independent scope/lifetime and can never self-modify shared
+cognitive policy or cache semantic decisions.
 The current daily-life source correction also closes the general boundaries exposed by the generated-voice suite: Capability choice requires declared semantic entailment rather than topical proximity; state mutations are not information resources; local/private sensor state stays unknown without a trusted Provider; unavailable persistent work cannot be phrased as a future promise; and Gateway Attention uses bounded recent dialogue for temporary user-authored addressedness policy with one fail-open judgment and no online repair/reviewer chain. The follow-up authority correction makes the weather case explicit: Fast Goal Interpretation preserves typed provider-neutral information scope as Responsibility evidence, but exact Capability identity, executable arguments, and actions belong only to planning after canonical Goal Association. Pre-Goal local progress is limited to already-complete native speech or prospective Goal Progress Communication; provider work does not start before the canonical Goal exists. Social Attention is now keyed to semantic primary human-observable Activity meaning rather than to cognition milestones, execution modalities, or a once-per-turn budget. Responsibility/Goal sits above Activity; one Goal may own several semantic Activities/Work items, and a high-level provider Capability may realize one Activity atomically. Final `InteractionResponse` transport objects, Vocal modes, body/media requests, and Capability IDs are realization evidence only. Canonical conversational acts and Plan-step meaning provide Activity granularity; execution modality never does. Planner execution eligibility is derived from canonical Goal completion semantics, never from Fast Goal Interpreter compatibility route/intent fields.
 These are source claims only; no new target evidence is implied.
 ## Do not resurrect
@@ -132,7 +133,7 @@ Do not silently downgrade because authority is absent.
 This checkpoint does **not** grant blanket architecture authority to later
 sessions; use Charter governance when new authority is needed.
 ## Resume point
-Docs-first core design and this authority cleanup are implemented. Next rerun the daily-life generated-voice suite and compare capability grounding, Goal correction/reasoning, future-commitment truth, and temporary addressedness. Do not add a new top-level layer or phrase-specific case rules; historical target evidence remains revision-bound.
+Architecture discovery is closed enough to implement detail contracts. First keep this docs-only consolidation separate from runtime claims; then design/implement the smallest existing-contract extensions for claim-specific Epistemic Qualification and terminal-history Forward Adaptation, including trusted scope/lifetime bounds. Apply the Charter irreducibility test before adding any manager/authority. Re-run source and target qualification only after implementation; historical evidence remains revision-bound.
 ## Resume and verification commands
 `docs/STATUS.md` owns implementation/evidence claims. Do not claim live-model,
 audio, MuJoCo, GPU, or physical-provider qualification unless that exact gate ran

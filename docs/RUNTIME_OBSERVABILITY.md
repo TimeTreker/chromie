@@ -84,8 +84,11 @@ The shared tracer owns:
 ### Evidence before interpretation
 
 A trace stores observed lifecycle facts and producer-declared classifications.
-Later evaluation may derive latency reports or scenario candidates, but the
-original evidence remains available and correlated.
+Later evaluation may derive latency reports or scenario candidates, but while a
+record is retained its content remains immutable and correlated. Immutability is not
+a requirement for indefinite retention: privacy/retention policy may expire or delete
+records. Consumers must therefore distinguish `no retained evidence` from a qualified
+negative historical fact unless collection and retention coverage is known complete.
 
 ### Operational independence
 

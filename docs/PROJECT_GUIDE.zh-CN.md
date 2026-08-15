@@ -96,6 +96,15 @@ provenance，以及 grounded external information 与 weather 两个方法包。
 
 ## 开发主线
 
+- **当前架构基线**：主 authority seam 已固定为 `Goal Interpretation →
+  Responsibility evidence → Goal Association → Canonical Goal → Planner →
+  Work/Primary Activity → realization → Provider → Evidence`。GI 的 Fast/Deep 只有
+  深度差异，均不得创建 Work、Activity、lane、Capability 或 Plan。
+- **下一阶段设计**：Epistemic Qualification 只负责“证据是否足以建立某个事实”，
+  Forward Adaptation 只允许有界的未来认知上下文；二者都不是新的 owner。在线
+  Reflection 不得修改共享 Fast/Deep 策略、Stable Mind、全局 prompt/model、授权或
+  Capability 语义，也不得学习 phrase→Capability / pattern→always-or-never-Deep
+  这种 shortcut。
 - **当前 Issue**：完成默认 `source_bound_development` 证据闭环；保留与当前
   revision 绑定的 Gateway/Core、Agent Skill 与 weather、Social Attention、
   配对 MuJoCo 以及第二台机器 LAN 证据。

@@ -209,8 +209,12 @@ must remain local:
 > **Optional presentation must never reopen primary cognition.**
 
 Reflection closes the learning loop later. It can use immutable failure/outcome
-evidence to improve future behavior, but it must not rewrite past speech, Goal
-meaning, commitments, or provider reality to make the current turn look correct.
+evidence—including terminal outcomes—to propose bounded experience/calibration for
+future cognition, but Responsibility-changing actions apply only while that
+Responsibility is open. It must not rewrite past speech, Goal meaning, commitments, or
+provider reality to make the current turn look correct, and online calibration may not
+mutate shared cognitive policy or replace future Fast/Deep reasoning with a cached
+semantic decision.
 
 ## Responsive speech and planning depth
 
@@ -232,11 +236,15 @@ composer nor an execution specialist may reinterpret the Goal, widen effects,
 authorize work, or become a second conversation authority. Physical TaskGraph
 execution remains sequential.
 
-After Goal Association, a complete non-effectful `spoken_response` Goal that
-needs no external read, tool, memory mutation, or embodied effect may move
-directly to response composition without invoking Fast or Deep Planner. This is
-a model-authored semantic decision validated against the typed Goal; it must
-never be selected by a greeting phrase table. Complete bounded capability work
+A provider-free already-complete conversational answer may be authored as a Fast
+Goal-Interpretation `native_response`, begin through the existing Vocal runtime, and
+later be bound exactly by Goal Association; Runtime then reuses that act without
+Planner or Response Composer rewriting it. If no such ready act exists, a complete
+non-effectful `spoken_response` Goal that needs no external read, tool, memory
+mutation, or embodied effect may move directly to response composition without
+invoking Fast or Deep Planner. These are model-authored semantic decisions, never a
+greeting phrase table. Each conversational act has one semantic wording owner; exact
+reuse is not a second writer. Complete bounded capability work
 belongs on the Fast path. Once that Fast work is completely grounded, exactly
 capability-bound, deterministically safe/authorized, and needs no confirmation, it may
 be committed without waiting for Deep. Deep is not a reviewer of a successful Fast
@@ -496,7 +504,9 @@ a fake promise.
 
 Likewise, a local household/device/sensor status that Chromie cannot observe remains
 unknown. A helpful response may say what the user can check, but must not substitute a
-generic web/weather lookup or imply that Chromie inspected the environment.
+generic web/weather lookup or imply that Chromie inspected the environment. Historical
+absence is also normally `unknown`: unless collection and retention coverage is known
+complete, "no retained record" cannot be rounded into "it did not happen."
 
 ### Truthful limitation and result-state separation
 
