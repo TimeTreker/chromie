@@ -616,12 +616,18 @@ def chromie_manifests(
                         },
                         "period": {
                             "type": "string",
-                            "enum": ["day", "tonight"],
+                            "enum": [
+                                "day",
+                                "morning",
+                                "afternoon",
+                                "evening",
+                                "tonight",
+                            ],
                             "default": "day",
                             "description": (
-                                "Local-day evidence scope. Use tonight only when the "
-                                "canonical Goal asks about the evening/night period; "
-                                "a whole-day date is not equivalent evidence."
+                                "Local-day evidence scope. Use the exact canonical day-part "
+                                "binding when the Goal asks for morning, afternoon, evening, "
+                                "or tonight; a whole-day date is not equivalent evidence."
                             ),
                         },
                         "units": {
@@ -655,7 +661,12 @@ def chromie_manifests(
                             "properties": {
                                         "scope": {
                                             "type": "string",
-                                            "enum": ["tonight"],
+                                            "enum": [
+                                                "morning",
+                                                "afternoon",
+                                                "evening",
+                                                "tonight",
+                                            ],
                                         },
                                         "start_local": {"type": "string", "minLength": 1},
                                         "end_local": {"type": "string", "minLength": 1},
@@ -728,8 +739,9 @@ def chromie_manifests(
                         "tool requests and should be visible in the common capability context."
                     ),
                     "when_to_use": (
-                        "Use when the user asks about current, today's, tonight's, tomorrow's, "
-                        "or upcoming weather or forecast for a city/location."
+                        "Use when the user asks about current, today's, morning, afternoon, "
+                        "evening, tonight, tomorrow, or upcoming weather or forecast for a "
+                        "city/location."
                     ),
                     "tool_name": "weather",
                     "semantic_type": "weather_lookup",
@@ -749,6 +761,9 @@ def chromie_manifests(
                         "supported_temporal_scopes": [
                             "current",
                             "today",
+                            "morning",
+                            "afternoon",
+                            "evening",
                             "tonight",
                             "tomorrow",
                             "near_term_forecast",

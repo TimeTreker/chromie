@@ -14,7 +14,7 @@ logger = logging.getLogger("chromie.agent.weather")
 
 WeatherDate = Literal["today", "tomorrow"]
 WeatherUnits = Literal["metric", "imperial", "auto"]
-WeatherPeriod = Literal["day", "tonight"]
+WeatherPeriod = Literal["day", "morning", "afternoon", "evening", "tonight"]
 
 
 @dataclass(slots=True)
@@ -589,7 +589,7 @@ class OpenMeteoWeatherClient:
                 "timezone": "auto",
                 "forecast_days": 2,
             }
-            if query.period == "tonight":
+            if query.period != "day":
                 forecast_params["hourly"] = ",".join(
                     [
                         "temperature_2m",
@@ -816,9 +816,9 @@ class OpenMeteoWeatherClient:
             day_index=day_index,
             period=period,
         )
-        if period == "tonight" and period_forecast is None:
+        if period != "day" and period_forecast is None:
             raise WeatherLookupError(
-                "weather provider did not return the requested tonight forecast",
+                f"weather provider did not return the requested {period} forecast",
                 reason_code="forecast_period_unavailable",
             )
 
@@ -850,8 +850,16 @@ class OpenMeteoWeatherClient:
         day_index: int,
         period: WeatherPeriod,
     ) -> WeatherPeriodForecast | None:
-        if period != "tonight":
+        period_windows: dict[WeatherPeriod, tuple[str, str]] = {
+            "morning": ("06:00", "12:00"),
+            "afternoon": ("12:00", "18:00"),
+            "evening": ("18:00", "22:00"),
+            "tonight": ("18:00", "24:00"),
+        }
+        window = period_windows.get(period)
+        if window is None:
             return None
+        start_clock, end_clock = window
         hourly = forecast.get("hourly") if isinstance(forecast, dict) else None
         if not isinstance(hourly, dict):
             return None
@@ -870,7 +878,7 @@ class OpenMeteoWeatherClient:
             if not local_time.startswith(target_date + "T"):
                 continue
             clock = local_time.split("T", 1)[1]
-            if clock < "18:00" or clock >= "24:00":
+            if clock < start_clock or clock >= end_clock:
                 continue
             if current_time.startswith(target_date + "T") and local_time < current_time:
                 continue
@@ -913,7 +921,7 @@ class OpenMeteoWeatherClient:
                     break
 
         return WeatherPeriodForecast(
-            scope="tonight",
+            scope=period,
             start_local=str(times[selected_indices[0]]),
             end_local=str(times[selected_indices[-1]]),
             temperature_min_c=min(temperatures) if temperatures else None,

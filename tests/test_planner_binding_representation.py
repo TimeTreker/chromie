@@ -472,6 +472,19 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
             authoritative_goals=[_information_weather_goal()],
         )
 
+    def test_information_step_preserves_exact_afternoon_argument(self):
+        goal = _information_weather_goal()
+        goal["object"]["bindings"]["time_frame"] = {
+            "entity_type": "day_part",
+            "value": "afternoon",
+        }
+        validate_goal_binding_argument_grounding(
+            _weather_output(
+                extra_args={"date": "today", "period": "afternoon"}
+            ),
+            authoritative_goals=[goal],
+        )
+
     def test_typed_list_binding_accepts_chinese_list_separators(self):
         goal = _weather_goal()
         goal["object"]["bindings"]["aspects"]["value"] = (
