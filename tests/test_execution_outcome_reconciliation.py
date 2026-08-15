@@ -11,6 +11,7 @@ from orchestrator.runtime.outcome_reconciliation import (
 )
 from orchestrator.runtime.outcome_response import compose_outcome_response
 from shared.chromie_contracts.execution_outcome import (
+    ClaimQualificationPolicy,
     ExecutionOutcomeBundle,
     GoalExecutionOutcome,
     ProviderPostconditionEvidence,
@@ -673,6 +674,233 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
             "non_terminal_skill_result",
         )
         self.assertEqual(bundle.evidence[0].reported_status, "running")
+
+    def test_schema_valid_execution_observation_establishes_owner_policy(self) -> None:
+        plan = single_plan()
+        request = request_for_step(plan, "lookup")
+        policy = ClaimQualificationPolicy(
+            claim="weather lookup request completed",
+            requirement_groups=[
+                {
+                    "requirements": [
+                        {
+                            "source": "execution_observation",
+                            "field_assertions": {"summary": "sunny"},
+                        }
+                    ]
+                }
+            ],
+        )
+        result = SkillResult(
+            request_id=request.request_id,
+            skill_id=request.skill_id,
+            status="completed",
+            provider_id="weather.provider",
+            output={"summary": "sunny"},
+        )
+
+        bundle = ExecutionOutcomeReconciler().build(
+            turn_id="turn-qualified",
+            plan=plan,
+            interaction_id="interaction-qualified",
+            requests=[request],
+            results=[result],
+            output_schemas={request.request_id: output_schema("summary")},
+            completion_evidence_policies={request.request_id: policy},
+        )
+
+        qualification = bundle.evidence[0].completion_qualification
+        self.assertIsNotNone(qualification)
+        assert qualification is not None
+        self.assertEqual(qualification.status, "established")
+        self.assertEqual(qualification.evidence_ids, [bundle.evidence[0].evidence_id])
+        self.assertEqual(qualification.trust_domains, ["weather.provider"])
+
+    def test_embodied_policy_requires_postcondition_and_preserves_contradiction(self) -> None:
+        plan = single_plan()
+        request = request_for_step(plan, "lookup")
+        result_schema = {
+            "type": "object",
+            "properties": {"completed": {"type": "boolean"}},
+            "required": ["completed"],
+            "additionalProperties": False,
+        }
+        status_schema = {
+            "type": "object",
+            "properties": {
+                "safe_idle": {"type": "boolean"},
+                "active_task_present": {"type": "boolean"},
+            },
+            "required": ["safe_idle", "active_task_present"],
+            "additionalProperties": False,
+        }
+        policy = ClaimQualificationPolicy(
+            claim="embodied request completed with safe closure",
+            requirement_groups=[
+                {
+                    "requirements": [
+                        {
+                            "source": "execution_observation",
+                            "field_assertions": {"completed": True},
+                        },
+                        {
+                            "source": "provider_postcondition",
+                            "condition": "post_execution_robot_status",
+                            "field_assertions": {
+                                "safe_idle": True,
+                                "active_task_present": False,
+                            },
+                        },
+                    ]
+                }
+            ],
+        )
+        result = SkillResult(
+            request_id=request.request_id,
+            skill_id=request.skill_id,
+            status="completed",
+            provider_id="soridormi.mcp",
+            output={"completed": True},
+        )
+        reconciler = ExecutionOutcomeReconciler()
+
+        missing = reconciler.build(
+            turn_id="turn-postcondition-missing",
+            plan=plan,
+            interaction_id="interaction-postcondition-missing",
+            requests=[request],
+            results=[result],
+            output_schemas={request.request_id: result_schema},
+            completion_evidence_policies={request.request_id: policy},
+        )
+        missing_qualification = missing.evidence[0].completion_qualification
+        self.assertIsNotNone(missing_qualification)
+        assert missing_qualification is not None
+        self.assertEqual(missing_qualification.status, "insufficient")
+
+        contradicted_postcondition = ProviderPostconditionEvidence(
+            evidence_id="postcondition-contradicted",
+            provider_id="soridormi.mcp",
+            condition="post_execution_robot_status",
+            observation=reconciler.build_model_observation(
+                {"safe_idle": False, "active_task_present": False},
+                output_schema=status_schema,
+            ),
+            source_goal_ids=["goal-weather"],
+            observed_at=datetime.now(timezone.utc),
+        )
+        contradicted = reconciler.build(
+            turn_id="turn-postcondition-contradicted",
+            plan=plan,
+            interaction_id="interaction-postcondition-contradicted",
+            requests=[request],
+            results=[result],
+            output_schemas={request.request_id: result_schema},
+            completion_evidence_policies={request.request_id: policy},
+            provider_postconditions=[contradicted_postcondition],
+        )
+        contradicted_qualification = contradicted.evidence[0].completion_qualification
+        self.assertIsNotNone(contradicted_qualification)
+        assert contradicted_qualification is not None
+        self.assertEqual(contradicted_qualification.status, "contradicted")
+
+        good_postcondition = contradicted_postcondition.model_copy(
+            update={
+                "evidence_id": "postcondition-good",
+                "observation": reconciler.build_model_observation(
+                    {"safe_idle": True, "active_task_present": False},
+                    output_schema=status_schema,
+                ),
+            }
+        )
+        established = reconciler.build(
+            turn_id="turn-postcondition-good",
+            plan=plan,
+            interaction_id="interaction-postcondition-good",
+            requests=[request],
+            results=[result],
+            output_schemas={request.request_id: result_schema},
+            completion_evidence_policies={request.request_id: policy},
+            provider_postconditions=[good_postcondition],
+        )
+        established_qualification = established.evidence[0].completion_qualification
+        self.assertIsNotNone(established_qualification)
+        assert established_qualification is not None
+        self.assertEqual(established_qualification.status, "established")
+        self.assertEqual(
+            established_qualification.evidence_ids,
+            [established.evidence[0].evidence_id, "postcondition-good"],
+        )
+
+    def test_independent_trust_domain_requirement_is_mechanical(self) -> None:
+        plan = single_plan()
+        request = request_for_step(plan, "lookup")
+        result_schema = {
+            "type": "object",
+            "properties": {"completed": {"type": "boolean"}},
+            "required": ["completed"],
+            "additionalProperties": False,
+        }
+        status_schema = {
+            "type": "object",
+            "properties": {"safe_idle": {"type": "boolean"}},
+            "required": ["safe_idle"],
+            "additionalProperties": False,
+        }
+        policy = ClaimQualificationPolicy(
+            claim="two-domain completion",
+            requirement_groups=[
+                {
+                    "requirements": [
+                        {"source": "execution_observation"},
+                        {
+                            "source": "provider_postcondition",
+                            "condition": "robot_status",
+                            "field_assertions": {"safe_idle": True},
+                        },
+                    ],
+                    "minimum_independent_trust_domains": 2,
+                }
+            ],
+        )
+        result = SkillResult(
+            request_id=request.request_id,
+            skill_id=request.skill_id,
+            status="completed",
+            provider_id="same.provider",
+            output={"completed": True},
+        )
+        reconciler = ExecutionOutcomeReconciler()
+        postcondition = ProviderPostconditionEvidence(
+            evidence_id="same-domain-status",
+            provider_id="same.provider",
+            condition="robot_status",
+            observation=reconciler.build_model_observation(
+                {"safe_idle": True}, output_schema=status_schema
+            ),
+            source_goal_ids=["goal-weather"],
+            observed_at=datetime.now(timezone.utc),
+        )
+
+        bundle = reconciler.build(
+            turn_id="turn-domain",
+            plan=plan,
+            interaction_id="interaction-domain",
+            requests=[request],
+            results=[result],
+            output_schemas={request.request_id: result_schema},
+            completion_evidence_policies={request.request_id: policy},
+            provider_postconditions=[postcondition],
+        )
+
+        qualification = bundle.evidence[0].completion_qualification
+        self.assertIsNotNone(qualification)
+        assert qualification is not None
+        self.assertEqual(qualification.status, "insufficient")
+        self.assertIn(
+            "independent_trust_domains_insufficient",
+            qualification.reason_codes,
+        )
 
     def test_provider_postcondition_does_not_turn_missing_work_into_success(self) -> None:
         plan = single_plan()

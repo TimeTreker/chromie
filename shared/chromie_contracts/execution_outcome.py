@@ -331,7 +331,9 @@ class ExecutionEvidence(CapabilityIdentityModel):
     status: ExecutionEvidenceStatus
     reported_status: str = ""
     provider_id: str | None = None
+    trust_domain: str = ""
     observation: ModelObservation | None = None
+    completion_qualification: ClaimQualification | None = None
     reason_code: str | None = None
     message: str = ""
     trace_id: str | None = None
@@ -346,6 +348,7 @@ class ExecutionEvidence(CapabilityIdentityModel):
         "step_id",
         "reported_status",
         "provider_id",
+        "trust_domain",
         "reason_code",
         "message",
         "trace_id",
@@ -470,6 +473,7 @@ class ProviderPostconditionEvidence(BaseModel):
     schema_version: int = Field(default=1, ge=1)
     evidence_id: str = Field(min_length=1)
     provider_id: str = Field(min_length=1)
+    trust_domain: str = ""
     condition: str = Field(min_length=1)
     observation: ModelObservation
     source_goal_ids: list[str] = Field(default_factory=list)
@@ -480,6 +484,7 @@ class ProviderPostconditionEvidence(BaseModel):
     @field_validator(
         "evidence_id",
         "provider_id",
+        "trust_domain",
         "condition",
         "trace_id",
         mode="before",

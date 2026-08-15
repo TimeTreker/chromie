@@ -6,8 +6,10 @@ from datetime import datetime, timezone
 from typing import Any
 
 from shared.chromie_contracts.execution_outcome import (
+    ClaimQualificationPolicy,
     ExecutionOutcomeBundle,
     ProviderPostconditionEvidence,
+    claim_qualification_policy_sha256,
 )
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
@@ -92,6 +94,10 @@ class CognitiveTurnClosure:
             )
         turn_id = self._turn_id(response, session_id=session_id)
         output_schemas, schema_gate_reasons = self._output_schemas(response)
+        (
+            completion_policies,
+            completion_policy_gate_reasons,
+        ) = self._completion_evidence_policies(response)
         speech_result_bindings = self._speech_result_bindings(response)
         postconditions = self._provider_postconditions(
             plan,
@@ -104,6 +110,8 @@ class CognitiveTurnClosure:
             requests=response.skills,
             results=execution.results,
             output_schemas=output_schemas,
+            completion_evidence_policies=completion_policies,
+            completion_evidence_gate_reasons=completion_policy_gate_reasons,
             committed_auxiliary_result_skills=speech_result_bindings,
             traces=execution.traces,
             provider_postconditions=postconditions,
@@ -196,6 +204,51 @@ class CognitiveTurnClosure:
             schemas[request.request_id] = dict(schema)
         return schemas, reasons
 
+    def _completion_evidence_policies(
+        self,
+        response: InteractionResponse,
+    ) -> tuple[dict[str, ClaimQualificationPolicy], dict[str, str]]:
+        policies: dict[str, ClaimQualificationPolicy] = {}
+        reasons: dict[str, str] = {}
+        for request in response.skills:
+            if request.metadata.get("source") != "goal_driven_canonical_plan":
+                continue
+            committed_digest = request.committed_completion_evidence_sha256
+            if committed_digest is None:
+                reasons[request.request_id] = (
+                    "committed_completion_evidence_digest_missing"
+                )
+                continue
+            try:
+                definition = self.interaction_runtime.skill_definition(
+                    request.skill_id
+                )
+            except ValueError:
+                reasons[request.request_id] = (
+                    "current_skill_definition_unavailable"
+                )
+                continue
+            policy = getattr(definition, "completion_evidence_policy", None)
+            if policy is None:
+                reasons[request.request_id] = (
+                    "current_completion_evidence_policy_unavailable"
+                )
+                continue
+            try:
+                current_digest = claim_qualification_policy_sha256(policy)
+            except (TypeError, ValueError):
+                reasons[request.request_id] = (
+                    "current_completion_evidence_policy_invalid"
+                )
+                continue
+            if current_digest != committed_digest:
+                reasons[request.request_id] = (
+                    "committed_completion_evidence_digest_mismatch"
+                )
+                continue
+            policies[request.request_id] = policy
+        return policies, reasons
+
     @staticmethod
     def _record_schema_gate_reasons(
         bundle: ExecutionOutcomeBundle,
@@ -283,6 +336,7 @@ class CognitiveTurnClosure:
             ProviderPostconditionEvidence(
                 evidence_id=evidence_id,
                 provider_id="soridormi.mcp",
+                trust_domain="soridormi.mcp",
                 condition="post_execution_robot_status",
                 observation=observation,
                 source_goal_ids=body_goal_ids,

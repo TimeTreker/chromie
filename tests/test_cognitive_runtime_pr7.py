@@ -24,6 +24,9 @@ from orchestrator.runtime.skill_runtime import (
     local_speech_definition,
 )
 from orchestrator.runtime.task_proposals import annotate_task_proposal_ledger
+from shared.chromie_contracts.execution_outcome import (
+    claim_qualification_policy_sha256,
+)
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.interaction import output_schema_sha256
 from shared.chromie_contracts.mind import default_mind_profile
@@ -1975,6 +1978,15 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(
             request.committed_output_schema_sha256,
             output_schema_sha256(TEST_SKILL_OUTPUT_SCHEMA),
+        )
+        expected_definition = blink_definition(confirmation=True)
+        self.assertIsNotNone(expected_definition.completion_evidence_policy)
+        assert expected_definition.completion_evidence_policy is not None
+        self.assertEqual(
+            request.committed_completion_evidence_sha256,
+            claim_qualification_policy_sha256(
+                expected_definition.completion_evidence_policy
+            ),
         )
         self.assertEqual(
             result.interaction_response.speech[0].text,

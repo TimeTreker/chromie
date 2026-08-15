@@ -4,11 +4,16 @@ import hashlib
 import json
 import re
 from collections.abc import Iterable, Mapping
+from datetime import datetime, timezone
 from typing import Any
 
 from agent.app.capabilities.validator import validate_value_for_schema
 
 from shared.chromie_contracts.execution_outcome import (
+    ClaimCoverageStatus,
+    ClaimQualification,
+    ClaimQualificationPolicy,
+    EvidenceRequirement,
     ExecutionEvidence,
     ExecutionEvidenceStatus,
     ExecutionOutcomeBundle,
@@ -16,6 +21,7 @@ from shared.chromie_contracts.execution_outcome import (
     ModelObservation,
     ProviderPostconditionEvidence,
     aggregate_execution_status,
+    claim_qualification_policy_sha256,
 )
 from shared.chromie_contracts.interaction import (
     SkillRequest,
@@ -147,6 +153,10 @@ class ExecutionOutcomeReconciler:
         requests: Iterable[SkillRequest],
         results: Iterable[SkillResult],
         output_schemas: Mapping[str, dict[str, Any]] | None = None,
+        completion_evidence_policies: Mapping[
+            str, ClaimQualificationPolicy
+        ] | None = None,
+        completion_evidence_gate_reasons: Mapping[str, str] | None = None,
         committed_auxiliary_result_skills: Mapping[str, str] | None = None,
         traces: Iterable[SkillTrace] = (),
         provider_postconditions: Iterable[
@@ -194,9 +204,15 @@ class ExecutionOutcomeReconciler:
             list(traces),
             planned_request_ids=planned_request_ids,
         )
-        # Closure binds schemas to committed request IDs. The skill-ID fallback
-        # preserves the lower-level builder API used by direct contract tests.
+        # Closure binds schemas and claim-sufficiency policy to committed request
+        # IDs. The skill-ID schema fallback preserves the lower-level builder API
+        # used by direct contract tests; qualification policy never falls back by
+        # capability ID because the exact committed request owns that boundary.
         schemas = output_schemas or {}
+        qualification_policies = completion_evidence_policies or {}
+        qualification_gate_reasons = completion_evidence_gate_reasons or {}
+        postconditions = list(provider_postconditions)
+        evaluated_at = datetime.now(timezone.utc)
 
         evidence: list[ExecutionEvidence] = []
         observation_bytes_used = 0
@@ -211,6 +227,25 @@ class ExecutionOutcomeReconciler:
                 request.request_id,
             )
             if result is None:
+                policy = qualification_policies.get(request.request_id)
+                qualification = (
+                    self.qualify_completion_claim(
+                        policy=policy,
+                        evidence_id=evidence_id,
+                        execution_status="not_run",
+                        execution_observation=None,
+                        execution_output=None,
+                        execution_trust_domain="",
+                        execution_finished_at=None,
+                        source_goal_ids=step.source_goal_ids,
+                        provider_postconditions=postconditions,
+                        evaluated_at=evaluated_at,
+                        missing_result=True,
+                    )
+                    if policy is not None
+                    else None
+                )
+                gate_reason = qualification_gate_reasons.get(request.request_id, "")
                 evidence.append(
                     ExecutionEvidence(
                         evidence_id=evidence_id,
@@ -219,6 +254,7 @@ class ExecutionOutcomeReconciler:
                         skill_id=step.skill_id,
                         source_goal_ids=step.source_goal_ids,
                         status="not_run",
+                        completion_qualification=qualification,
                         reason_code="missing_skill_result",
                         message=(
                             "No terminal SkillResult was returned for the "
@@ -238,6 +274,10 @@ class ExecutionOutcomeReconciler:
                             "retryable_safe_read": (
                                 request.metadata.get("retryable_safe_read") is True
                             ),
+                            "completion_qualification_required": bool(
+                                policy is not None or gate_reason
+                            ),
+                            "completion_evidence_gate_reason": gate_reason,
                         },
                     )
                 )
@@ -313,6 +353,33 @@ class ExecutionOutcomeReconciler:
                 started_at = started_at or trace.started_at
                 finished_at = finished_at or trace.finished_at
 
+            trust_domain = " ".join(
+                str(
+                    result.metadata.get("evidence_trust_domain")
+                    or provider_id
+                    or ""
+                ).strip().split()
+            )
+            policy = qualification_policies.get(request.request_id)
+            qualification = (
+                self.qualify_completion_claim(
+                    policy=policy,
+                    evidence_id=evidence_id,
+                    execution_status=status,
+                    execution_observation=observation,
+                    execution_output=result.output,
+                    execution_trust_domain=trust_domain,
+                    execution_finished_at=finished_at,
+                    source_goal_ids=step.source_goal_ids,
+                    provider_postconditions=postconditions,
+                    evaluated_at=evaluated_at,
+                    missing_result=False,
+                )
+                if policy is not None
+                else None
+            )
+            gate_reason = qualification_gate_reasons.get(request.request_id, "")
+
             evidence.append(
                 ExecutionEvidence(
                     evidence_id=evidence_id,
@@ -323,7 +390,9 @@ class ExecutionOutcomeReconciler:
                     status=status,
                     reported_status=result.status,
                     provider_id=provider_id,
+                    trust_domain=trust_domain,
                     observation=observation,
+                    completion_qualification=qualification,
                     reason_code=reason_code,
                     message=result.message,
                     trace_id=trace_id,
@@ -348,6 +417,10 @@ class ExecutionOutcomeReconciler:
                         "retryable_safe_read": (
                             request.metadata.get("retryable_safe_read") is True
                         ),
+                        "completion_qualification_required": bool(
+                            policy is not None or gate_reason
+                        ),
+                        "completion_evidence_gate_reason": gate_reason,
                     },
                 )
             )
@@ -430,7 +503,7 @@ class ExecutionOutcomeReconciler:
             aggregate_status=aggregate_status,
             evidence=evidence,
             goal_outcomes=goal_outcomes,
-            provider_postconditions=list(provider_postconditions),
+            provider_postconditions=postconditions,
             metadata={
                 "builder": "ExecutionOutcomeReconciler",
                 "observation_max_bytes": self.max_observation_bytes,
@@ -441,6 +514,297 @@ class ExecutionOutcomeReconciler:
                 "ignored_non_plan_request_count": ignored_request_count,
                 "ignored_non_plan_result_count": ignored_result_count,
             },
+        )
+
+    @staticmethod
+    def _observation_value(data: dict[str, Any], path: str) -> tuple[bool, Any]:
+        current: Any = data
+        for part in path.split("."):
+            if not isinstance(current, dict) or part not in current:
+                return False, None
+            current = current[part]
+        return True, current
+
+    @classmethod
+    def _assertion_status(
+        cls,
+        data: dict[str, Any],
+        requirement: EvidenceRequirement,
+    ) -> tuple[str, list[str]]:
+        reasons: list[str] = []
+        for path, expected in requirement.field_assertions.items():
+            found, actual = cls._observation_value(data, path)
+            if not found:
+                reasons.append(f"required_field_missing:{path}")
+                continue
+            if actual != expected:
+                return "contradicted", [f"field_assertion_mismatch:{path}"]
+        return ("insufficient", reasons) if reasons else ("established", [])
+
+    @staticmethod
+    def _freshness_status(
+        *,
+        observed_at: datetime | None,
+        max_age_ms: int | None,
+        evaluated_at: datetime,
+    ) -> tuple[str, list[str]]:
+        if max_age_ms is None:
+            return "established", []
+        if observed_at is None:
+            return "unknown", ["observation_time_unknown"]
+        if observed_at.tzinfo is None or observed_at.utcoffset() is None:
+            return "unknown", ["observation_time_unqualified"]
+        age_ms = max(0.0, (evaluated_at - observed_at).total_seconds() * 1000.0)
+        if age_ms > max_age_ms:
+            return "stale", ["observation_stale"]
+        return "established", []
+
+    @classmethod
+    def _evaluate_requirement(
+        cls,
+        requirement: EvidenceRequirement,
+        *,
+        evidence_id: str,
+        execution_observation: ModelObservation | None,
+        execution_output: dict[str, Any] | None,
+        execution_trust_domain: str,
+        execution_finished_at: datetime | None,
+        source_goal_ids: list[str],
+        provider_postconditions: list[ProviderPostconditionEvidence],
+        evaluated_at: datetime,
+    ) -> tuple[str, str | None, str, list[str]]:
+        if requirement.source == "execution_observation":
+            observation = execution_observation
+            if observation is None:
+                return "unknown", None, "", ["execution_observation_missing"]
+            if not observation.schema_validated:
+                return (
+                    "insufficient",
+                    evidence_id,
+                    execution_trust_domain,
+                    [f"execution_observation_{observation.status}"],
+                )
+            if (
+                requirement.trust_domain
+                and execution_trust_domain != requirement.trust_domain
+            ):
+                return (
+                    "insufficient",
+                    evidence_id,
+                    execution_trust_domain,
+                    ["execution_trust_domain_mismatch"],
+                )
+            freshness, freshness_reasons = cls._freshness_status(
+                observed_at=execution_finished_at,
+                max_age_ms=requirement.max_age_ms,
+                evaluated_at=evaluated_at,
+            )
+            if freshness != "established":
+                return (
+                    freshness,
+                    evidence_id,
+                    execution_trust_domain,
+                    freshness_reasons,
+                )
+            assertion_status, assertion_reasons = cls._assertion_status(
+                execution_output or {},
+                requirement,
+            )
+            return (
+                assertion_status,
+                evidence_id,
+                execution_trust_domain,
+                assertion_reasons,
+            )
+
+        goal_set = set(source_goal_ids)
+        candidates = [
+            item
+            for item in provider_postconditions
+            if item.condition == requirement.condition
+            and (
+                not item.source_goal_ids
+                or bool(goal_set.intersection(item.source_goal_ids))
+            )
+        ]
+        if not candidates:
+            return (
+                "insufficient",
+                None,
+                "",
+                [f"provider_postcondition_missing:{requirement.condition}"],
+            )
+
+        candidate_statuses: list[str] = []
+        candidate_reasons: list[str] = []
+        for item in candidates:
+            trust_domain = item.trust_domain or item.provider_id
+            if requirement.trust_domain and trust_domain != requirement.trust_domain:
+                candidate_statuses.append("insufficient")
+                candidate_reasons.append("postcondition_trust_domain_mismatch")
+                continue
+            if not item.observation.schema_validated:
+                candidate_statuses.append("insufficient")
+                candidate_reasons.append(
+                    f"postcondition_observation_{item.observation.status}"
+                )
+                continue
+            freshness, freshness_reasons = cls._freshness_status(
+                observed_at=item.observed_at,
+                max_age_ms=requirement.max_age_ms,
+                evaluated_at=evaluated_at,
+            )
+            if freshness != "established":
+                candidate_statuses.append(freshness)
+                candidate_reasons.extend(freshness_reasons)
+                continue
+            assertion_status, assertion_reasons = cls._assertion_status(
+                item.observation.data,
+                requirement,
+            )
+            if assertion_status == "established":
+                return "established", item.evidence_id, trust_domain, []
+            candidate_statuses.append(assertion_status)
+            candidate_reasons.extend(assertion_reasons)
+
+        if candidate_statuses and all(
+            status == "contradicted" for status in candidate_statuses
+        ):
+            return "contradicted", None, "", list(dict.fromkeys(candidate_reasons))
+        if "stale" in candidate_statuses:
+            return "stale", None, "", list(dict.fromkeys(candidate_reasons))
+        if "insufficient" in candidate_statuses:
+            return "insufficient", None, "", list(dict.fromkeys(candidate_reasons))
+        return "unknown", None, "", list(dict.fromkeys(candidate_reasons))
+
+    @classmethod
+    def qualify_completion_claim(
+        cls,
+        *,
+        policy: ClaimQualificationPolicy,
+        evidence_id: str,
+        execution_status: ExecutionEvidenceStatus,
+        execution_observation: ModelObservation | None,
+        execution_output: dict[str, Any] | None,
+        execution_trust_domain: str,
+        execution_finished_at: datetime | None,
+        source_goal_ids: list[str],
+        provider_postconditions: list[ProviderPostconditionEvidence],
+        evaluated_at: datetime,
+        missing_result: bool,
+        coverage: ClaimCoverageStatus = "not_required",
+    ) -> ClaimQualification:
+        digest = claim_qualification_policy_sha256(policy)
+        if policy.requires_complete_coverage and coverage != "complete":
+            return ClaimQualification(
+                claim=policy.claim,
+                status=("unknown" if coverage == "unknown" else "insufficient"),
+                policy_sha256=digest,
+                reason_codes=["closed_world_coverage_not_complete"],
+                coverage=coverage,
+                evaluated_at=evaluated_at,
+            )
+        if missing_result:
+            return ClaimQualification(
+                claim=policy.claim,
+                status="unknown",
+                policy_sha256=digest,
+                reason_codes=["execution_result_missing"],
+                coverage=coverage,
+                evaluated_at=evaluated_at,
+            )
+        if execution_status != "completed":
+            return ClaimQualification(
+                claim=policy.claim,
+                status="contradicted",
+                policy_sha256=digest,
+                evidence_ids=[evidence_id],
+                reason_codes=[f"execution_status_{execution_status}"],
+                trust_domains=(
+                    [execution_trust_domain] if execution_trust_domain else []
+                ),
+                coverage=coverage,
+                evaluated_at=evaluated_at,
+            )
+
+        group_statuses: list[str] = []
+        group_reasons: list[str] = []
+        for group_index, group in enumerate(policy.requirement_groups):
+            evidence_ids: list[str] = []
+            trust_domains: list[str] = []
+            requirement_statuses: list[str] = []
+            reasons: list[str] = []
+            for requirement in group.requirements:
+                status, matched_id, trust_domain, requirement_reasons = (
+                    cls._evaluate_requirement(
+                        requirement,
+                        evidence_id=evidence_id,
+                        execution_observation=execution_observation,
+                        execution_output=execution_output,
+                        execution_trust_domain=execution_trust_domain,
+                        execution_finished_at=execution_finished_at,
+                        source_goal_ids=source_goal_ids,
+                        provider_postconditions=provider_postconditions,
+                        evaluated_at=evaluated_at,
+                    )
+                )
+                requirement_statuses.append(status)
+                reasons.extend(requirement_reasons)
+                if matched_id:
+                    evidence_ids.append(matched_id)
+                if trust_domain:
+                    trust_domains.append(trust_domain)
+            unique_domains = list(dict.fromkeys(trust_domains))
+            if all(status == "established" for status in requirement_statuses):
+                if len(unique_domains) < group.minimum_independent_trust_domains:
+                    group_statuses.append("insufficient")
+                    group_reasons.append("independent_trust_domains_insufficient")
+                    continue
+                return ClaimQualification(
+                    claim=policy.claim,
+                    status="established",
+                    policy_sha256=digest,
+                    evidence_ids=list(dict.fromkeys(evidence_ids)),
+                    trust_domains=unique_domains,
+                    coverage=coverage,
+                    satisfied_group_index=group_index,
+                    evaluated_at=evaluated_at,
+                )
+            if (
+                "contradicted" in requirement_statuses
+                and all(
+                    status in {"established", "contradicted"}
+                    for status in requirement_statuses
+                )
+            ):
+                group_statuses.append("contradicted")
+            elif "stale" in requirement_statuses:
+                group_statuses.append("stale")
+            elif "insufficient" in requirement_statuses:
+                group_statuses.append("insufficient")
+            else:
+                group_statuses.append("unknown")
+            group_reasons.extend(reasons)
+
+        if group_statuses and all(status == "contradicted" for status in group_statuses):
+            status = "contradicted"
+        elif "stale" in group_statuses:
+            status = "stale"
+        elif "insufficient" in group_statuses:
+            status = "insufficient"
+        else:
+            status = "unknown"
+        return ClaimQualification(
+            claim=policy.claim,
+            status=status,
+            policy_sha256=digest,
+            evidence_ids=[evidence_id],
+            reason_codes=list(dict.fromkeys(group_reasons))[:16],
+            trust_domains=(
+                [execution_trust_domain] if execution_trust_domain else []
+            ),
+            coverage=coverage,
+            evaluated_at=evaluated_at,
         )
 
     def build_model_observation(
@@ -786,6 +1150,10 @@ def build_execution_outcome_bundle(
     requests: Iterable[SkillRequest],
     results: Iterable[SkillResult],
     output_schemas: Mapping[str, dict[str, Any]] | None = None,
+    completion_evidence_policies: Mapping[
+        str, ClaimQualificationPolicy
+    ] | None = None,
+    completion_evidence_gate_reasons: Mapping[str, str] | None = None,
     committed_auxiliary_result_skills: Mapping[str, str] | None = None,
     traces: Iterable[SkillTrace] = (),
     provider_postconditions: Iterable[
@@ -804,6 +1172,8 @@ def build_execution_outcome_bundle(
         requests=requests,
         results=results,
         output_schemas=output_schemas,
+        completion_evidence_policies=completion_evidence_policies,
+        completion_evidence_gate_reasons=completion_evidence_gate_reasons,
         committed_auxiliary_result_skills=(
             committed_auxiliary_result_skills
         ),

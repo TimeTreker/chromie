@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from shared.chromie_runtime import ResourceArbiter
 from shared.chromie_contracts.execution_outcome import ClaimQualificationPolicy
@@ -48,6 +48,64 @@ SkillRequest = CapabilityRequest
 SkillResult = CapabilityResult
 SkillTrace = CapabilityTrace
 SkillTraceEvent = CapabilityTraceEvent
+
+
+def schema_valid_completion_evidence_policy(
+    *,
+    claim: str = "capability request completed",
+) -> ClaimQualificationPolicy:
+    """Host default for ordinary capabilities with a closed output schema.
+
+    This is deliberately a Host policy, not a provider-authored declaration.
+    It establishes only that the committed capability request returned one
+    schema-valid correlated observation. More consequential providers may
+    replace it with a stronger owner-reviewed policy.
+    """
+
+    return ClaimQualificationPolicy(
+        claim=claim,
+        requirement_groups=[
+            {
+                "requirements": [
+                    {"source": "execution_observation"},
+                ]
+            }
+        ],
+    )
+
+
+def embodied_completion_evidence_policy() -> ClaimQualificationPolicy:
+    """Host-owned minimum evidence for Soridormi embodied completion.
+
+    The execution result and post-execution provider status are separate
+    observations, but this policy intentionally does not claim they are
+    independent trust domains. A future provider may qualify stronger
+    corroboration without changing Goal semantics.
+    """
+
+    return ClaimQualificationPolicy(
+        claim="embodied capability request completed with safe closure",
+        requirement_groups=[
+            {
+                "requirements": [
+                    {
+                        "source": "execution_observation",
+                        "field_assertions": {"completed": True},
+                    },
+                    {
+                        "source": "provider_postcondition",
+                        "condition": "post_execution_robot_status",
+                        "field_assertions": {
+                            "safe_idle": True,
+                            "active_task_present": False,
+                        },
+                    },
+                ],
+                "minimum_independent_trust_domains": 1,
+            }
+        ],
+    )
+
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +198,12 @@ class SkillDefinition(CapabilityIdentityModel):
     @classmethod
     def reject_low_level_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
         return reject_forbidden_low_level_fields(value)
+
+    @model_validator(mode="after")
+    def default_owner_reviewed_completion_policy(self) -> "SkillDefinition":
+        if self.completion_evidence_policy is None and self.output_schema:
+            self.completion_evidence_policy = schema_valid_completion_evidence_policy()
+        return self
 
 
 class SkillRegistry:
@@ -238,6 +302,7 @@ class SkillRegistry:
                 description=str(item.get("description") or ""),
                 input_schema=dict(input_schema),
                 output_schema=SORIDORMI_NAMED_SKILL_OUTPUT_SCHEMA,
+                completion_evidence_policy=embodied_completion_evidence_policy(),
                 available=bool(
                     item.get(
                         "available",

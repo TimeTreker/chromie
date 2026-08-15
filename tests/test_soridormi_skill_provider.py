@@ -90,6 +90,40 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
         runtime.register_provider(SoridormiMcpSkillProvider(invoker))
         return runtime
 
+    def test_imported_embodied_skill_has_host_owned_completion_evidence_policy(self) -> None:
+        registry = SkillRegistry()
+        registry.import_soridormi_catalog(
+            [
+                {
+                    "skill_id": "nod_yes",
+                    "description": "Nod the robot head.",
+                    "available": True,
+                    "parameters_schema": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": False,
+                    },
+                }
+            ]
+        )
+
+        policy = registry.get("soridormi.nod_yes").completion_evidence_policy
+        self.assertIsNotNone(policy)
+        assert policy is not None
+        requirements = policy.requirement_groups[0].requirements
+        self.assertEqual(
+            [item.source for item in requirements],
+            ["execution_observation", "provider_postcondition"],
+        )
+        self.assertEqual(
+            requirements[1].condition,
+            "post_execution_robot_status",
+        )
+        self.assertEqual(
+            requirements[1].field_assertions,
+            {"safe_idle": True, "active_task_present": False},
+        )
+
     async def test_named_skill_uses_opaque_plan_execute_contract(self) -> None:
         invoker = _RecordingInvoker()
         execution = await self._runtime(invoker).execute(

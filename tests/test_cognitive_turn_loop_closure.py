@@ -12,6 +12,11 @@ from orchestrator.runtime.session import SessionTracker
 from orchestrator.runtime.skill_runtime import (
     SkillDefinition,
     SkillRuntimeResult,
+    schema_valid_completion_evidence_policy,
+)
+from shared.chromie_contracts.execution_outcome import (
+    ClaimQualificationPolicy,
+    claim_qualification_policy_sha256,
 )
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
@@ -77,6 +82,9 @@ def _plan() -> CanonicalPlan:
 
 def _response(plan: CanonicalPlan) -> InteractionResponse:
     fingerprint = canonical_plan_fingerprint(plan)
+    completion_digest = claim_qualification_policy_sha256(
+        schema_valid_completion_evidence_policy()
+    )
     return InteractionResponse(
         interaction_id="interaction-turn-closure",
         skills=[
@@ -87,6 +95,7 @@ def _response(plan: CanonicalPlan) -> InteractionResponse:
                 "committed_output_schema_sha256": output_schema_sha256(
                     _TEST_OUTPUT_SCHEMA
                 ),
+                "committed_completion_evidence_sha256": completion_digest,
                 "metadata": {
                     "source": "goal_driven_canonical_plan",
                     "canonical_plan_id": plan.plan_id,
@@ -102,6 +111,7 @@ def _response(plan: CanonicalPlan) -> InteractionResponse:
                 "committed_output_schema_sha256": output_schema_sha256(
                     _TEST_OUTPUT_SCHEMA
                 ),
+                "committed_completion_evidence_sha256": completion_digest,
                 "metadata": {
                     "source": "goal_driven_canonical_plan",
                     "canonical_plan_id": plan.plan_id,
@@ -352,6 +362,62 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
                 execution=execution,
                 session_id="session-turn-closure",
             )
+
+    def test_completion_evidence_policy_digest_mismatch_fails_qualification_closed(self) -> None:
+        plan = _plan()
+        response = _response(plan)
+        execution = SkillRuntimeResult(
+            interaction_id=response.interaction_id,
+            status="completed",
+            results=[
+                SkillResult(
+                    request_id="request-first",
+                    skill_id="chromie.test.first",
+                    provider_id="test.provider",
+                    status="completed",
+                    output={"user_summary": "first"},
+                ),
+                SkillResult(
+                    request_id="request-second",
+                    skill_id="chromie.test.second",
+                    provider_id="test.provider",
+                    status="completed",
+                    output={"user_summary": "second"},
+                ),
+            ],
+        )
+        runtime = _Runtime(execution)
+        runtime._definitions["chromie.test.first"] = SkillDefinition(
+            skill_id="chromie.test.first",
+            provider_id="test.provider",
+            output_schema=_TEST_OUTPUT_SCHEMA,
+            completion_evidence_policy=ClaimQualificationPolicy(
+                claim="changed completion claim",
+                requirement_groups=[
+                    {"requirements": [{"source": "execution_observation"}]}
+                ],
+            ),
+        )
+
+        bundle = CognitiveTurnClosure(runtime).build(
+            response=response,
+            execution=execution,
+            session_id="turn-closure",
+        )
+
+        self.assertIsNotNone(bundle)
+        assert bundle is not None
+        first = bundle.evidence[0]
+        second = bundle.evidence[1]
+        self.assertTrue(first.metadata["completion_qualification_required"])
+        self.assertEqual(
+            first.metadata["completion_evidence_gate_reason"],
+            "committed_completion_evidence_digest_mismatch",
+        )
+        self.assertIsNone(first.completion_qualification)
+        self.assertIsNotNone(second.completion_qualification)
+        assert second.completion_qualification is not None
+        self.assertEqual(second.completion_qualification.status, "established")
 
     def test_committed_pre_action_speech_result_is_auxiliary_evidence(
         self,

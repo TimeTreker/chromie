@@ -21,6 +21,7 @@ from shared.chromie_contracts.core_interpretation import (
 )
 from shared.chromie_contracts.execution_outcome import (
     ExecutionOutcomeBundle,
+    claim_qualification_policy_sha256,
     execution_outcome_fingerprint,
 )
 from shared.chromie_contracts.goal import GoalAssociationResolution
@@ -972,6 +973,13 @@ class CanonicalPlanRuntimeAdapter:
                         f"{turn_id}:social:{primary_activity.activity_id}:{event}:{index}"
                     ),
                     committed_output_schema_sha256=schema_digest,
+                    committed_completion_evidence_sha256=(
+                        claim_qualification_policy_sha256(
+                            definition.completion_evidence_policy
+                        )
+                        if definition.completion_evidence_policy is not None
+                        else None
+                    ),
                     metadata={
                         "source": "social_attention_plan",
                         "auxiliary_social_attention": True,
@@ -1906,6 +1914,13 @@ class CanonicalPlanRuntimeAdapter:
                     requires_confirmation=(bool(definition.requires_confirmation) or alternative),
                     idempotency_key=f"{plan.plan_id}:{step.step_id}:{fingerprint[:16]}",
                     committed_output_schema_sha256=output_schema_sha256(definition.output_schema),
+                    committed_completion_evidence_sha256=(
+                        claim_qualification_policy_sha256(
+                            definition.completion_evidence_policy
+                        )
+                        if definition.completion_evidence_policy is not None
+                        else None
+                    ),
                     metadata={
                         **step.metadata,
                         "source": "goal_driven_canonical_plan",
