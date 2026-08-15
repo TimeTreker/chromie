@@ -18,6 +18,8 @@ from .cognitive_identity import (
     PERSONALITY_SEMANTIC_CONTRACT,
     bounded_identity_json,
     bounded_personality_json,
+    owner_approved_identity_context,
+    owner_approved_personality_context,
 )
 from .planner_contract import (
     EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
@@ -157,29 +159,21 @@ class FastPlannerResolver:
             )
 
         responsibility_refs = [item.local_ref for item in responsibilities]
-        capabilities = await self.catalog.prompt_entries(scope="common", refresh=False)
-        capability_awareness = [
-            {
-                "capability_id": item.capability_id,
-                "description": item.description,
-                "effects": list(item.effects),
-                "safety_class": item.safety_class,
-                "available": bool(item.available and item.interaction_executable),
-            }
-            for item in capabilities[: self.max_capabilities]
-        ]
+        # Pre-Goal advancement cannot select or emit Capability steps.  Pulling the
+        # common Capability catalog into this prompt therefore adds latency and
+        # context pressure without granting any useful authority.  Exact capability
+        # availability belongs to canonical planning after applicable Goal binding.
         response_schema = FastPlannerAdvanceModelOutput.model_json_schema()
         options = {
             "temperature": 0,
             "top_p": 0.9,
-            "num_ctx": min(self.num_ctx, 4096),
+            "num_ctx": min(self.num_ctx, 8192),
             "num_predict": min(self.num_predict, 384),
         }
         raw = await self.ollama.generate(
             self._advance_layered_prompt(
                 request,
                 responsibilities=responsibilities,
-                capability_awareness=capability_awareness,
             ),
             system=self._advance_system_prompt(),
             options=options,
@@ -1052,76 +1046,105 @@ class FastPlannerResolver:
             "When this list is non-empty, correct every listed defect in the fresh object. If an error reports an expected aggregate disposition, author exactly that disposition unless you also revise the underlying per-goal outcomes consistently."
         )
 
+    @staticmethod
+    def _advance_identity_voice_projection(context: dict[str, Any]) -> dict[str, Any]:
+        identity_context = owner_approved_identity_context(context)
+        identity = identity_context.get("identity")
+        if not isinstance(identity, dict):
+            identity = {}
+        personality = owner_approved_personality_context(context)
+        if not isinstance(personality, dict):
+            personality = {}
+        return {
+            "identity": {
+                key: identity[key]
+                for key in (
+                    "name",
+                    "kind",
+                    "age_description",
+                    "family_role",
+                    "short_self_description",
+                )
+                if identity.get(key) not in (None, "", [], {})
+            },
+            "voice": {
+                key: personality[key]
+                for key in (
+                    "core_traits",
+                    "spoken_style",
+                    "tool_use_style",
+                )
+                if personality.get(key) not in (None, "", [], {})
+            },
+        }
+
     def _advance_layered_prompt(
         self,
         request: AgentRunRequest,
         *,
         responsibilities: list[CognitiveResponsibilityProposal],
-        capability_awareness: list[dict[str, Any]],
     ) -> LayeredPrompt:
         context = request.context if isinstance(request.context, dict) else {}
+        identity_voice = self._bounded(
+            self._advance_identity_voice_projection(context),
+            900,
+        )
         identity_world = (
-            "Owner-approved Chromie identity JSON:\n"
-            f"{bounded_identity_json(context)}\n\n"
-            "Owner-approved Personality Expression JSON:\n"
-            f"{bounded_personality_json(context)}\n\n"
+            "Identity/voice facts for immediate conversational wording only:\n"
+            f"{identity_voice}\n\n"
+        )
+        advance_contract = (
+            "Responsibility evidence is authoritative WHAT. Fast Planner owns only the "
+            "smallest HOW advancement: optional immediate conversational Activity and typed "
+            "continuations. It does not select Capability steps or authorize effects. Goal "
+            "Association alone owns canonical Goal continuity; Deep Planner owns deeper HOW. "
+            "Never claim provider results or completion without trusted evidence."
         )
         responsibilities_json = self._bounded(
             [item.model_dump(mode="json", exclude_none=True) for item in responsibilities],
-            4800,
+            2200,
         )
-        active_goals = self._bounded(context.get("active_goal_snapshots") or [], 2800)
-        interaction_context = self._bounded(context.get("interaction_context") or {}, 2600)
-        capability_json = self._bounded(capability_awareness, 4200)
+        active_goals = self._bounded(context.get("active_goal_snapshots") or [], 600)
+        interaction_context = self._bounded(
+            context.get("interaction_context") or {},
+            500,
+        )
+        user_text = " ".join(str(request.text or "").split())[:700]
         rendered = (
             identity_world
-            + IDENTITY_SEMANTIC_CONTRACT
-            + "\n\n"
-            + PERSONALITY_SEMANTIC_CONTRACT
-            + "\n\n"
-            + "Current user turn:\n"
-            f"{request.text}\n\n"
-            "Authoritative Responsibility evidence from Goal Interpretation:\n"
-            f"{responsibilities_json}\n\n"
-            "Current active Goal snapshots for continuity awareness only:\n"
-            f"{active_goals}\n\n"
-            "Interaction Context (delivered/pending acts; do not repeat them):\n"
-            f"{interaction_context}\n\n"
-            "Common capability awareness (planning awareness only; this pre-Goal phase "
-            "must not emit executable capability steps):\n"
-            f"{capability_json}\n\n"
-            "Decide the smallest useful advancement now. Cover every Responsibility ref exactly. "
-            "You may author one immediate conversational Activity. Use role=complete_response only "
-            "when that Activity itself fully satisfies its referenced Responsibility from current "
-            "trusted Mind/context. Use role=progress for a short prospective acknowledgement while "
-            "work/evidence/Goal continuity continues. Use role=clarification when user input is the "
-            "missing material information. Do not claim provider results, physical execution, memory "
-            "writes, or completion without evidence.\n\n"
-            "Continuations: add goal_association when the Responsibility must persist, modify/continue "
-            "retained Goal state, wait for evidence/provider/effects, or otherwise requires canonical "
-            "continuity. Add deep_planner only when HOW is too complex for the Fast planning budget; "
-            "deep_planner always also requires goal_association. If an ordinary conversational "
-            "Responsibility can be completed safely and immediately, use no continuations. Fast and "
-            "Deep Goal Interpretation own WHAT; do not reinterpret or rewrite Responsibility meaning. "
-            "Goal Association owns canonical Goal continuity. This Fast Planner owns HOW and wording "
-            "of any Activity it authors. Return JSON only."
+            + advance_contract
+            + "\n\nCurrent user turn:\n"
+            + user_text
+            + "\n\nAuthoritative Responsibility evidence from Goal Interpretation:\n"
+            + responsibilities_json
+            + "\n\nActive Goal continuity summary only:\n"
+            + active_goals
+            + "\n\nAlready-spoken/pending interaction summary only:\n"
+            + interaction_context
+            + "\n\nCover every Responsibility ref exactly. Author at most one immediate vocal "
+            "Activity: complete_response only when it fully satisfies a conversational "
+            "Responsibility now; progress while work/evidence/Goal continuity remains; "
+            "clarification when user input is materially missing. Add goal_association "
+            "when persistence, retained-Goal continuity, evidence, provider work, or effects "
+            "remain. Add deep_planner only when HOW exceeds the Fast planning budget; it also "
+            "requires goal_association. Return schema-constrained JSON only."
         )
         return LayeredPrompt.promote(
             rendered,
             identity_world=(identity_world,),
-            operating_contract=(IDENTITY_SEMANTIC_CONTRACT, PERSONALITY_SEMANTIC_CONTRACT),
+            operating_contract=(advance_contract,),
         )
 
     @staticmethod
     def _advance_system_prompt() -> str:
         return (
-            "You are Chromie's Fast Planner operating immediately after Goal Interpretation and "
-            "before canonical Goal binding. Responsibility evidence is authoritative WHAT; do not "
-            "reinterpret it. Decide the smallest HOW advancement: one safe immediate conversational "
-            "Activity if useful, plus whether Goal Association and/or Deep Planner continuation is "
-            "needed. Goal Association alone owns canonical Goal mutation. This phase never emits "
-            "executable capability steps and never authorizes effects. Keep the response childlike, "
-            "natural, and concise. Return only schema-constrained JSON."
+            "You are Chromie's low-latency Fast Planner. Accept Goal Interpretation's "
+            "Responsibility evidence as authoritative WHAT. Decide only the smallest HOW "
+            "advancement: optional immediate conversational Activity plus Goal Association "
+            "and/or Deep Planner continuation. Goal Association owns canonical Goal continuity. "
+            "This phase never emits executable capability steps and never authorizes effects. "
+            "Keep wording natural, childlike, brief, and evidence-honest. Return only "
+            "schema-constrained JSON."
         )
 
     def _layered_prompt(

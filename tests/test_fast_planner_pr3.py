@@ -13,7 +13,9 @@ from agent.app.planner_contract import (
 )
 from agent.app.schema import AgentRunRequest, RouteDecision
 from agent.app.capabilities.catalog import CatalogCapability
+from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
 from shared.chromie_contracts.plan import CanonicalPlan, FastPlannerAdvance
+from shared.chromie_runtime.llm_diagnostics import ollama_prompt_preflight_diagnostics
 
 
 class FakeOllama:
@@ -72,6 +74,14 @@ class FakeCatalog:
 
     async def prompt_entries(self, **kwargs):
         return self.items
+
+
+class AdvanceCatalogMustNotBeRead(FakeCatalog):
+    async def prompt_entries(self, **kwargs):
+        del kwargs
+        raise AssertionError(
+            "pre-Goal Fast Planner advancement must not read the Capability catalog"
+        )
 
 
 class GranularResourceCatalog(FakeCatalog):
@@ -1002,6 +1012,147 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(advance.immediate_vocal_activity.response_text, "嗨～")
         self.assertEqual(advance.immediate_vocal_activity.role, "complete_response")
         self.assertIn("Responsibility evidence", ollama.prompts[0][0])
+
+    def test_pre_goal_advance_does_not_depend_on_capability_catalog(self):
+        ollama = FakeOllama(
+            {
+                "covered_responsibility_refs": ["greeting"],
+                "immediate_vocal_activity": {
+                    "activity_id": "activity-greeting",
+                    "role": "complete_response",
+                    "response_text": "嗨～",
+                    "speech_act": "greeting",
+                    "source_responsibility_refs": ["greeting"],
+                },
+                "continuations": [],
+                "confidence": 0.98,
+                "unresolved": [],
+                "reason_summary": "Clear harmless greeting can be completed now.",
+            }
+        )
+        run_request = AgentRunRequest(
+            sid="turn-greeting-no-catalog",
+            text="你好",
+            language="zh-CN",
+            route_decision=RouteDecision(
+                route="chat", intent="greeting", confidence=0.98, source="llm"
+            ),
+            context={
+                "responsibility_proposals": [
+                    {
+                        "local_ref": "greeting",
+                        "outcome": "Socially reciprocate the user's greeting.",
+                        "bindings": {},
+                        "completion_requires_work": True,
+                        "completion_requires_fresh_evidence": False,
+                        "confidence": 0.98,
+                    }
+                ]
+            },
+            history=[],
+        )
+
+        advance = asyncio.run(
+            FastPlannerResolver(ollama, AdvanceCatalogMustNotBeRead()).resolve_advance(
+                run_request
+            )
+        )
+
+        self.assertEqual(advance.continuations, [])
+        rendered = str(ollama.prompts[0][0])
+        self.assertNotIn("Common capability awareness", rendered)
+        self.assertNotIn("soridormi.walk_forward", rendered)
+
+    def test_pre_goal_weather_prompt_fits_declared_four_k_context_budget(self):
+        resolver = FastPlannerResolver(FakeOllama({}), AdvanceCatalogMustNotBeRead())
+        responsibility = {
+            "local_ref": "weather",
+            "outcome": "Tell the user whether it will rain in Chongqing tonight.",
+            "bindings": {
+                "location": "Chongqing",
+                "date": "2026-08-15",
+                "time": "night",
+            },
+            "completion_requires_work": True,
+            "completion_requires_fresh_evidence": True,
+            "confidence": 0.95,
+        }
+        run_request = AgentRunRequest(
+            sid="turn-weather-budget",
+            text="你好，今天重庆晚上有没有雨啊？",
+            language="zh-CN",
+            route_decision=RouteDecision(
+                route="tool", intent="weather_lookup", confidence=0.95, source="llm"
+            ),
+            context={
+                "responsibility_proposals": [responsibility],
+                "active_goal_snapshots": [],
+                "interaction_context": {},
+                "mind": {
+                    "owner_approved": True,
+                    "profile_id": "chromie_default_mind",
+                    "version": "0.6.1",
+                    "identity": {
+                        "name": "Chromie",
+                        "kind": "human child",
+                        "age_description": "6 years old",
+                        "family_role": "the family's secretary",
+                        "short_self_description": (
+                            "I'm Chromie. I'm six years old, I'm a human girl, and "
+                            "I'm our family's little secretary."
+                        ),
+                        # Deliberately huge unrelated policy fields must not inflate
+                        # this latency-critical prompt.
+                        "identity_answer_guidance": "x" * 4000,
+                        "model_identity_boundary": "y" * 4000,
+                    },
+                    "personality_expression": {
+                        "owner_approved": True,
+                        "core_traits": [
+                            "smart",
+                            "curious",
+                            "warm",
+                            "cute",
+                            "direct",
+                            "simple",
+                            "playful",
+                            "innocent",
+                        ],
+                        "spoken_style": (
+                            "Speak in short, natural, age-appropriate sentences. "
+                            "Sound bright and emotionally alive."
+                        ),
+                        "tool_use_style": (
+                            "When checking or doing something, speak as a child "
+                            "responding to a person, not as a status monitor."
+                        ),
+                        "maturity_boundary": "z" * 4000,
+                    },
+                },
+            },
+            history=[],
+        )
+        responsibilities = [CognitiveResponsibilityProposal.model_validate(responsibility)]
+        prompt = resolver._advance_layered_prompt(
+            run_request,
+            responsibilities=responsibilities,
+        )
+        system = resolver._advance_system_prompt()
+        diagnostics = ollama_prompt_preflight_diagnostics(
+            prompt_chars=len(str(prompt)),
+            system_chars=len(system),
+            options={"num_ctx": 4096, "num_predict": 384},
+            chars_per_token=2.0,
+            safety_margin_tokens=2048,
+        )
+
+        self.assertLess(len(str(prompt)), 2600)
+        self.assertFalse(
+            any(item.event == "llm_prompt_budget_exceeded" for item in diagnostics),
+            diagnostics,
+        )
+        self.assertNotIn("identity_answer_guidance", str(prompt))
+        self.assertNotIn("Common capability awareness", str(prompt))
 
     def test_pre_goal_advance_requires_goal_association_for_fresh_evidence(self):
         ollama = FakeOllama(
