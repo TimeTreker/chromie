@@ -11,7 +11,12 @@ from pydantic import ValidationError
 
 from .capabilities.catalog import CapabilityCatalog
 from .capabilities.validator import validate_args_for_schema
-from .clients.ollama_client import LayeredPrompt, OllamaClient, llm_failure_metadata
+from .clients.ollama_client import (
+    LayeredPrompt,
+    OllamaClient,
+    OllamaGenerationError,
+    llm_failure_metadata,
+)
 from .agent_skills import agent_skill_prompt_section
 from .cognitive_identity import (
     IDENTITY_SEMANTIC_CONTRACT,
@@ -167,44 +172,87 @@ class FastPlannerResolver:
         options = {
             "temperature": 0,
             "top_p": 0.9,
-            "num_ctx": min(self.num_ctx, 8192),
+            "num_ctx": self.num_ctx,
             "num_predict": min(self.num_predict, 384),
         }
-        raw = await self.ollama.generate(
-            self._advance_layered_prompt(
+        raw: Any = None
+        try:
+            raw = await self.ollama.generate(
+                self._advance_layered_prompt(
+                    request,
+                    responsibilities=responsibilities,
+                ),
+                system=self._advance_system_prompt(),
+                options=options,
+                response_format=response_schema,
+                prompt_family="fast_planner.advance",
+                turn_id=request.sid,
+                attempt=1,
+            )
+        except (OllamaGenerationError, json.JSONDecodeError) as exc:
+            return self._advance_fail_safe(
                 request,
-                responsibilities=responsibilities,
-            ),
-            system=self._advance_system_prompt(),
-            options=options,
-            response_format=response_schema,
-            prompt_family="fast_planner.advance",
-            turn_id=request.sid,
-            attempt=1,
-        )
+                responsibility_refs=responsibility_refs,
+                error=exc,
+                raw_output=raw,
+            )
         if not isinstance(raw, dict):
-            raise ValueError("Fast Planner advance response is not a JSON object")
-        output = FastPlannerAdvanceModelOutput.model_validate(raw)
+            return self._advance_fail_safe(
+                request,
+                responsibility_refs=responsibility_refs,
+                error=ValueError(
+                    "Fast Planner advance response is not a JSON object"
+                ),
+                raw_output=raw,
+            )
+        try:
+            output = FastPlannerAdvanceModelOutput.model_validate(raw)
+        except ValidationError as exc:
+            return self._advance_fail_safe(
+                request,
+                responsibility_refs=responsibility_refs,
+                error=exc,
+                raw_output=raw,
+            )
+        def contract_fail(reason: str) -> FastPlannerAdvance:
+            return self._advance_fail_safe(
+                request,
+                responsibility_refs=responsibility_refs,
+                error=ValueError(reason),
+                raw_output=raw,
+            )
+
         continuation_set = set(output.continuations)
         route = str(request.route_decision.route or "").strip()
         if any(item.completion_requires_fresh_evidence for item in responsibilities):
             if "goal_association" not in continuation_set:
-                raise ValueError(
+                return contract_fail(
                     "fresh-evidence Responsibilities require Goal Association continuity"
                 )
         if route not in {"chat", "clarify"} and "goal_association" not in continuation_set:
-            raise ValueError(
-                "non-conversational/effect-bearing compatibility framing requires Goal "
-                "Association before canonical execution planning"
+            return contract_fail(
+                "non-conversational/effect-bearing compatibility framing requires "
+                "Goal Association before canonical execution planning"
+            )
+        if "deep_planner" in continuation_set and "goal_association" not in continuation_set:
+            return contract_fail(
+                "Deep Planner continuation requires Goal Association so deeper planning "
+                "receives canonical Goal state"
             )
         if set(output.covered_responsibility_refs) != set(responsibility_refs):
-            raise ValueError(
-                "Fast Planner advance must cover exactly the authoritative Responsibility refs"
+            return contract_fail(
+                "Fast Planner advance must cover exactly the authoritative "
+                "Responsibility refs"
             )
         activity = output.immediate_vocal_activity
+        if activity is None and not output.continuations:
+            return contract_fail(
+                "a terminal Fast Planner advance requires an immediate "
+                "conversational Activity"
+            )
         if activity is not None:
             if not set(activity.source_responsibility_refs).issubset(responsibility_refs):
-                raise ValueError(
+                return contract_fail(
                     "Fast Planner immediate Activity references unknown Responsibility refs"
                 )
             by_ref = {item.local_ref: item for item in responsibilities}
@@ -212,18 +260,20 @@ class FastPlannerResolver:
                 by_ref[ref].completion_requires_fresh_evidence
                 for ref in activity.source_responsibility_refs
             ):
-                raise ValueError(
-                    "Fast Planner cannot complete a fresh-evidence Responsibility before evidence"
+                return contract_fail(
+                    "Fast Planner cannot complete a fresh-evidence Responsibility "
+                    "before evidence"
                 )
             if output.continuations and activity.role == "complete_response":
-                raise ValueError(
-                    "a continuing Fast Planner advance may only emit progress or clarification speech"
+                return contract_fail(
+                    "a continuing Fast Planner advance may only emit progress or "
+                    "clarification speech"
                 )
             if not output.continuations and activity.role == "progress":
-                raise ValueError(
+                return contract_fail(
                     "terminal Fast Planner advance cannot end on progress-only speech"
                 )
-        advance = FastPlannerAdvance(
+        return FastPlannerAdvance(
             turn_id=str(request.sid or "turn-fast-advance"),
             covered_responsibility_refs=output.covered_responsibility_refs,
             immediate_vocal_activity=activity,
@@ -238,7 +288,61 @@ class FastPlannerResolver:
                 "capability_selection_authority": "deferred_until_canonical_planning",
             },
         )
-        return advance
+
+    @staticmethod
+    def _advance_fail_safe(
+        request: AgentRunRequest,
+        *,
+        responsibility_refs: list[str],
+        error: Exception,
+        raw_output: Any,
+    ) -> FastPlannerAdvance:
+        inference_failure = isinstance(error, OllamaGenerationError)
+        failure = (
+            llm_failure_metadata(error)
+            if inference_failure
+            else {
+                "failure_class": "fast_advance_contract_invalid",
+                "failure_domain": "model_contract",
+                "architecture_attribution": "not_evaluated",
+                "retryable": True,
+            }
+        )
+        logger.warning(
+            "fast_planner_advance_fail_safe sid=%s error_type=%s error=%s "
+            "failure_class=%s raw_output_ref=%s",
+            request.sid,
+            type(error).__name__,
+            error,
+            failure["failure_class"],
+            cognition_text_reference(raw_output),
+        )
+        return FastPlannerAdvance(
+            turn_id=str(request.sid or "turn-fast-advance"),
+            covered_responsibility_refs=responsibility_refs,
+            immediate_vocal_activity=None,
+            continuations=["goal_association"],
+            confidence=0.0,
+            unresolved=[
+                "Fast Planner advance unavailable; Responsibility preserved for "
+                "Goal Association."
+            ],
+            reason_summary=(
+                "Discard the invalid pre-Goal Activity and continue through canonical "
+                "Goal continuity."
+            ),
+            metadata={
+                "semantic_authority": "deterministic_fail_safe",
+                "phase": "pre_goal_advancement",
+                "execution_authority": "none",
+                "capability_selection_authority": "deferred_until_canonical_planning",
+                "advance_status": "fallback_to_goal_association",
+                "raw_output_ref": cognition_text_reference(raw_output),
+                "error_type": type(error).__name__,
+                "error": str(error)[:300],
+                **failure,
+            },
+        )
 
     async def resolve(self, request: AgentRunRequest) -> CanonicalPlan:
         trace_scope = runtime_tracer.continue_from_context(request.context)
@@ -1115,6 +1219,8 @@ class FastPlannerResolver:
             + advance_contract
             + "\n\nCurrent user turn:\n"
             + user_text
+            + "\nLanguage hint: "
+            + str(request.language or "auto")[:32]
             + "\n\nAuthoritative Responsibility evidence from Goal Interpretation:\n"
             + responsibilities_json
             + "\n\nActive Goal continuity summary only:\n"
@@ -1124,10 +1230,15 @@ class FastPlannerResolver:
             + "\n\nCover every Responsibility ref exactly. Author at most one immediate vocal "
             "Activity: complete_response only when it fully satisfies a conversational "
             "Responsibility now; progress while work/evidence/Goal continuity remains; "
-            "clarification when user input is materially missing. Add goal_association "
-            "when persistence, retained-Goal continuity, evidence, provider work, or effects "
-            "remain. Add deep_planner only when HOW exceeds the Fast planning budget; it also "
-            "requires goal_association. Return schema-constrained JSON only."
+            "clarification when user input is materially missing. If any covered "
+            "Responsibility has completion_requires_fresh_evidence=true, continuations "
+            "MUST include goal_association and any immediate vocal Activity MUST use "
+            "role=progress, never complete_response. Write immediate vocal wording in the "
+            "user's language unless the user explicitly asks for another language. Add "
+            "goal_association when persistence, "
+            "retained-Goal continuity, evidence, provider work, or effects remain. Add "
+            "deep_planner only when HOW exceeds the Fast planning budget; it also requires "
+            "goal_association. Return schema-constrained JSON only."
         )
         return LayeredPrompt.promote(
             rendered,

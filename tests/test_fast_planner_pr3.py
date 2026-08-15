@@ -14,7 +14,11 @@ from agent.app.planner_contract import (
 from agent.app.schema import AgentRunRequest, RouteDecision
 from agent.app.capabilities.catalog import CatalogCapability
 from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
-from shared.chromie_contracts.plan import CanonicalPlan, FastPlannerAdvance
+from shared.chromie_contracts.plan import (
+    CanonicalPlan,
+    FastPlannerAdvance,
+    FastPlannerAdvanceModelOutput,
+)
 from shared.chromie_runtime.llm_diagnostics import ollama_prompt_preflight_diagnostics
 
 
@@ -1013,6 +1017,54 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(advance.immediate_vocal_activity.role, "complete_response")
         self.assertIn("Responsibility evidence", ollama.prompts[0][0])
 
+    def test_pre_goal_advance_preserves_profile_context_topology(self):
+        ollama = FakeOllama(
+            {
+                "covered_responsibility_refs": ["greeting"],
+                "immediate_vocal_activity": {
+                    "activity_id": "activity-greeting",
+                    "role": "complete_response",
+                    "response_text": "嗨～",
+                    "speech_act": "greeting",
+                    "source_responsibility_refs": ["greeting"],
+                },
+                "continuations": [],
+                "confidence": 0.98,
+                "unresolved": [],
+                "reason_summary": "Clear harmless greeting can be completed now.",
+            }
+        )
+        run_request = AgentRunRequest(
+            sid="turn-greeting-profile-context",
+            text="你好",
+            language="zh-CN",
+            route_decision=RouteDecision(
+                route="chat", intent="greeting", confidence=0.98, source="llm"
+            ),
+            context={
+                "responsibility_proposals": [
+                    {
+                        "local_ref": "greeting",
+                        "outcome": "Socially reciprocate the user's greeting.",
+                        "completion_requires_work": True,
+                        "completion_requires_fresh_evidence": False,
+                        "confidence": 0.98,
+                    }
+                ]
+            },
+            history=[],
+        )
+
+        asyncio.run(
+            FastPlannerResolver(
+                ollama,
+                AdvanceCatalogMustNotBeRead(),
+                num_ctx=32768,
+            ).resolve_advance(run_request)
+        )
+
+        self.assertEqual(ollama.prompts[0][1]["options"]["num_ctx"], 32768)
+
     def test_pre_goal_advance_does_not_depend_on_capability_catalog(self):
         ollama = FakeOllama(
             {
@@ -1154,36 +1206,49 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertNotIn("identity_answer_guidance", str(prompt))
         self.assertNotIn("Common capability awareness", str(prompt))
 
-    def test_pre_goal_advance_requires_goal_association_for_fresh_evidence(self):
+    def test_pre_goal_advance_model_schema_requires_explicit_decision_fields(self):
+        schema = FastPlannerAdvanceModelOutput.model_json_schema()
+
+        self.assertEqual(
+            set(schema["required"]),
+            {
+                "covered_responsibility_refs",
+                "immediate_vocal_activity",
+                "continuations",
+                "confidence",
+                "unresolved",
+                "reason_summary",
+            },
+        )
+
+    def test_pre_goal_advance_invalid_weather_output_fails_soft_into_goal_association(self):
+        # Retained live regression: qwen3:4b once emitted only this Activity,
+        # omitted the continuation/coverage decision, and mislabeled progress as
+        # a complete response. Fast advancement must not kill the weather work.
         ollama = FakeOllama(
             {
-                "covered_responsibility_refs": ["weather"],
                 "immediate_vocal_activity": {
-                    "activity_id": "activity-weather-progress",
-                    "role": "progress",
-                    "response_text": "我看看今天下午会不会下雨～",
-                    "speech_act": "acknowledge",
+                    "activity_id": "vocal_response",
+                    "role": "complete_response",
+                    "response_text": "I'm checking the weather for Chongqing tonight!",
+                    "speech_act": "completing_response",
                     "source_responsibility_refs": ["weather"],
-                },
-                "continuations": [],
-                "confidence": 0.95,
-                "unresolved": [],
-                "reason_summary": "Check fresh weather.",
+                }
             }
         )
         run_request = AgentRunRequest(
-            sid="turn-weather",
-            text="今天下午重庆会下雨吗？",
+            sid="turn-weather-invalid-advance",
+            text="今天重庆晚上会不会下大雨？",
             language="zh-CN",
             route_decision=RouteDecision(
-                route="tool", intent="weather_query", confidence=0.96, source="llm"
+                route="chat", intent="weather_query", confidence=0.96, source="llm"
             ),
             context={
                 "responsibility_proposals": [
                     {
                         "local_ref": "weather",
-                        "outcome": "Tell the user whether it will rain in Chongqing this afternoon.",
-                        "bindings": {"location": "重庆", "day_part": "afternoon"},
+                        "outcome": "Tell the user whether it will rain in Chongqing tonight.",
+                        "bindings": {"location": "重庆", "time": "今晚"},
                         "completion_requires_work": True,
                         "completion_requires_fresh_evidence": True,
                         "confidence": 0.96,
@@ -1193,8 +1258,68 @@ class FastPlannerResolverTests(unittest.TestCase):
             history=[],
         )
 
-        with self.assertRaisesRegex(ValueError, "fresh-evidence Responsibilities require Goal Association"):
-            asyncio.run(FastPlannerResolver(ollama, FakeCatalog()).resolve_advance(run_request))
+        advance = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve_advance(run_request)
+        )
+
+        self.assertEqual(advance.continuations, ["goal_association"])
+        self.assertIsNone(advance.immediate_vocal_activity)
+        self.assertEqual(
+            advance.metadata["advance_status"],
+            "fallback_to_goal_association",
+        )
+        self.assertEqual(
+            advance.metadata["failure_class"],
+            "fast_advance_contract_invalid",
+        )
+
+    def test_pre_goal_advance_accepts_weather_progress_with_goal_association(self):
+        ollama = FakeOllama(
+            {
+                "covered_responsibility_refs": ["weather"],
+                "immediate_vocal_activity": {
+                    "activity_id": "activity-weather-progress",
+                    "role": "progress",
+                    "response_text": "我看看今晚会不会下大雨～",
+                    "speech_act": "acknowledge",
+                    "source_responsibility_refs": ["weather"],
+                },
+                "continuations": ["goal_association"],
+                "confidence": 0.95,
+                "unresolved": [],
+                "reason_summary": "Fresh weather evidence is still required.",
+            }
+        )
+        run_request = AgentRunRequest(
+            sid="turn-weather-progress",
+            text="今天重庆晚上会不会下大雨？",
+            language="zh-CN",
+            route_decision=RouteDecision(
+                route="chat", intent="weather_query", confidence=0.96, source="llm"
+            ),
+            context={
+                "responsibility_proposals": [
+                    {
+                        "local_ref": "weather",
+                        "outcome": "Tell the user whether it will rain in Chongqing tonight.",
+                        "bindings": {"location": "重庆", "time": "今晚"},
+                        "completion_requires_work": True,
+                        "completion_requires_fresh_evidence": True,
+                        "confidence": 0.96,
+                    }
+                ]
+            },
+            history=[],
+        )
+
+        advance = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve_advance(run_request)
+        )
+
+        self.assertEqual(advance.continuations, ["goal_association"])
+        self.assertIsNotNone(advance.immediate_vocal_activity)
+        self.assertEqual(advance.immediate_vocal_activity.role, "progress")
+        self.assertIn("Language hint: zh-CN", str(ollama.prompts[0][0]))
 
     def test_pre_goal_advance_deep_planner_also_requires_goal_association(self):
         with self.assertRaisesRegex(ValueError, "Deep Planner continuation requires Goal Association"):

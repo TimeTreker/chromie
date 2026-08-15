@@ -132,16 +132,22 @@ class FastPlannerAdvance(BaseModel):
 
 
 class FastPlannerAdvanceModelOutput(BaseModel):
-    """Schema-constrained model payload before host-owned turn identity is attached."""
+    """Schema-constrained model payload before host-owned turn identity is attached.
+
+    Every decision field is required even when its value is empty or null.  The
+    model must explicitly state coverage and continuation rather than relying on
+    host-side defaults that can turn an omitted decision into a false terminal
+    advance.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
-    covered_responsibility_refs: list[str] = Field(default_factory=list)
-    immediate_vocal_activity: FastPlannerVocalActivity | None = None
-    continuations: list[FastPlannerContinuation] = Field(default_factory=list)
-    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
-    unresolved: list[str] = Field(default_factory=list)
-    reason_summary: str = ""
+    covered_responsibility_refs: list[str]
+    immediate_vocal_activity: FastPlannerVocalActivity | None
+    continuations: list[FastPlannerContinuation]
+    confidence: float = Field(ge=0.0, le=1.0)
+    unresolved: list[str]
+    reason_summary: str
 
     @field_validator("covered_responsibility_refs", "continuations", "unresolved", mode="before")
     @classmethod
