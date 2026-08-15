@@ -917,6 +917,15 @@ class GoalResponsibilityCoverageItem(BaseModel):
                 raise ValueError(
                     "one responsibility must map to exactly one Goal candidate"
                 )
+        elif self.coverage == "representation_mismatch":
+            if not self.candidate_goal_indices:
+                raise ValueError(
+                    "representation_mismatch requires the mismatched Goal candidate"
+                )
+            if self.role == "responsibility" and len(self.candidate_goal_indices) != 1:
+                raise ValueError(
+                    "one mismatched responsibility must identify exactly one Goal candidate"
+                )
         elif self.candidate_goal_indices:
             raise ValueError(
                 "missing or clarification-required meaning cannot claim Goal ownership"
@@ -2486,6 +2495,36 @@ class GoalAssociationResolver:
                     {
                         "if": {
                             "properties": {
+                                "coverage": {"enum": ["representation_mismatch"]}
+                            },
+                            "required": ["coverage"],
+                        },
+                        "then": {
+                            "properties": {
+                                "candidate_goal_indices": {"minItems": 1}
+                            }
+                        },
+                    },
+                    {
+                        "if": {
+                            "properties": {
+                                "role": {"enum": ["responsibility"]},
+                                "coverage": {"enum": ["representation_mismatch"]},
+                            },
+                            "required": ["role", "coverage"],
+                        },
+                        "then": {
+                            "properties": {
+                                "candidate_goal_indices": {
+                                    "minItems": 1,
+                                    "maxItems": 1,
+                                }
+                            }
+                        },
+                    },
+                    {
+                        "if": {
+                            "properties": {
                                 "coverage": {
                                     "enum": [
                                         "missing",
@@ -2604,10 +2643,14 @@ class GoalAssociationResolver:
                 output_type=output_type,
             )
             + "\n\nAn independent source-grounded coverage proof rejected the "
-            "first candidate set. Discard that candidate set completely and perform "
+            "first candidate set. Discard that candidate DTO as authority and perform "
             "one final fresh interpretation from the FINAL AUTHORITATIVE USER TURN. "
-            "The following compact defects are proof feedback, not Goal labels and "
-            "not permission to copy a previous DTO:\n"
+            "Do not discard independently supported current-turn Responsibility evidence: "
+            "the Fast responsibility proposals rendered above remain provider-neutral "
+            "semantic evidence and must be re-checked against the authoritative turn. "
+            "Removing an unjustified sibling Goal never permits dropping a still-supported "
+            "human Responsibility. The following compact defects are proof feedback, not "
+            "Goal labels and not permission to copy a previous DTO:\n"
             + self._bounded_json(problems, 3000)
             + "\n"
             + terminal_instruction

@@ -295,10 +295,15 @@ A weather Skill may expose:
 | Response Composer | What may be said before evidence, how memory reuse differs from a fresh lookup, and user-facing failure semantics |
 | Tool Result Interpreter | Weather-field interpretation and relevance guidance |
 
-The Host selects the requested projection only after the Agent has selected the
-Skill or after an earlier authoritative Agent has supplied the relevant Skill
-selection for the same Goal. The Host does not infer the domain from user
-phrases.
+The Host selects the requested projection only after the responsible Agent has
+selected the Skill or after an earlier authoritative Agent has supplied the relevant
+Skill selection for the same canonical Goal. Goal Association has no canonical Goal
+identity yet, so its pre-association Agent-Skill path receives no historical
+active/recent Goal IDs and deterministically returns `no_skill` without a model call.
+This prevents an unrelated unfinished Goal from injecting a stale domain method into
+new user meaning. Domain-method selection begins only after Goal Association has
+established the relevant canonical Goal identity. The Host never infers the domain
+from phrases.
 
 ### Progressive disclosure
 

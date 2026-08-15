@@ -674,6 +674,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             certificate(
                 coverage_item(
                     "Set a reminder for tomorrow morning",
+                    0,
                     role="responsibility",
                     coverage="representation_mismatch",
                     independently_satisfiable=True,
@@ -688,6 +689,52 @@ class GoalExecutionContractTests(unittest.TestCase):
             "representation_mismatch:responsibility:Set a reminder for tomorrow morning",
             problems,
         )
+
+    def test_representation_mismatch_must_identify_the_mismatched_candidate(self):
+        with self.assertRaises(ValidationError):
+            GoalResponsibilityCoverageCertificate.model_validate(
+                certificate(
+                    coverage_item(
+                        "帮我拿杯水",
+                        role="responsibility",
+                        coverage="representation_mismatch",
+                        independently_satisfiable=True,
+                    )
+                )
+            )
+
+    def test_fresh_reinterpretation_keeps_fast_responsibility_evidence(self):
+        req = request("你能往前走个100米，那边有个水瓶，帮我拿杯水可以吗？")
+        req = req.model_copy(
+            update={
+                "context": {
+                    **req.context,
+                    "responsibility_proposals": [
+                        {
+                            "local_ref": "responsibility-1",
+                            "outcome": "拿一杯水",
+                            "bindings": {
+                                "resource": "水",
+                                "source": "水瓶",
+                                "recipient": "我",
+                            },
+                            "completion_requires_work": True,
+                            "completion_requires_fresh_evidence": True,
+                            "confidence": 0.95,
+                        }
+                    ],
+                }
+            }
+        )
+        prompt = GoalAssociationResolver(FakeOllama({}))._build_fresh_interpretation_prompt(
+            request=req,
+            candidate_goals=[],
+            output_type=GoalSegmentationModelOutput,
+            problems=["unjustified_goal_indices:1"],
+        )
+        self.assertIn('"outcome":"拿一杯水"', prompt)
+        self.assertIn("Do not discard independently supported current-turn Responsibility evidence", prompt)
+        self.assertIn("Removing an unjustified sibling Goal never permits dropping", prompt)
 
     def test_coverage_prompt_distinguishes_preferences_state_changes_and_information(self):
         resolver = GoalAssociationResolver(FakeOllama({}))
