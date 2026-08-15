@@ -105,6 +105,8 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertLess(prompt.index("Current Job"), prompt.index("Task Context"))
         self.assertIn("Generalization-first principle", prompt)
         self.assertIn("Responsibility Before Framing", prompt)
+        self.assertIn("Semantic Fidelity", prompt)
+        self.assertIn("Severity, intensity, magnitude, threshold", prompt)
         self.assertIn("provider-neutral responsibilities", prompt)
         self.assertIn("Responsibility evidence for downstream cognition", prompt)
         self.assertIn("Fast Planner is the first HOW owner", prompt)
@@ -1561,6 +1563,8 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Fast Planner owns those Activities", user_prompt)
         self.assertIn("external truth check", user_prompt)
         self.assertIn("before evidence", user_prompt)
+        self.assertIn("Preserve every material qualifier", user_prompt)
+        self.assertIn("never generalize it away", user_prompt)
 
     def test_model_facing_schema_forbids_goal_interpreter_speech_authorship(self) -> None:
         schema = OllamaGoalInterpreter._route_response_schema()
@@ -1588,6 +1592,10 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIn("outcome", responsibility["properties"])
         self.assertIn("bindings", responsibility["properties"])
+        self.assertIn(
+            "severity/intensity/magnitude/threshold",
+            responsibility["properties"]["bindings"]["description"],
+        )
         self.assertIn("completion_requires_work", responsibility["properties"])
         self.assertIn("completion_requires_fresh_evidence", responsibility["properties"])
         self.assertNotIn("actions", schema["properties"])

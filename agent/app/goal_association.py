@@ -2117,6 +2117,49 @@ class GoalAssociationResolver:
         text = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
         return text if len(text) <= max_chars else text[:max_chars].rstrip() + "..."
 
+    @staticmethod
+    def _fast_planner_advance_goal_projection(context: dict[str, Any]) -> dict[str, Any]:
+        """Project only continuity markers from pre-Goal Planner HOW.
+
+        Goal Association never needs Planner-authored response wording. Keeping that
+        text out of the segmentation prompt prevents a model from mistaking an
+        already-authored progress Activity for a second human Responsibility/Goal.
+        """
+
+        raw = context.get("fast_planner_advance")
+        if not isinstance(raw, dict):
+            return {}
+        activity = raw.get("immediate_vocal_activity")
+        activity_projection: dict[str, Any] | None = None
+        if isinstance(activity, dict):
+            refs = activity.get("source_responsibility_refs")
+            activity_projection = {
+                "activity_id": str(activity.get("activity_id") or ""),
+                "role": str(activity.get("role") or ""),
+                "source_responsibility_refs": (
+                    list(refs) if isinstance(refs, list) else []
+                ),
+            }
+        metadata = raw.get("metadata")
+        return {
+            "covered_responsibility_refs": list(
+                raw.get("covered_responsibility_refs")
+                if isinstance(raw.get("covered_responsibility_refs"), list)
+                else []
+            ),
+            "continuations": list(
+                raw.get("continuations")
+                if isinstance(raw.get("continuations"), list)
+                else []
+            ),
+            "immediate_vocal_activity": activity_projection,
+            "advance_status": (
+                str(metadata.get("advance_status") or "")
+                if isinstance(metadata, dict)
+                else ""
+            ),
+        }
+
     def _build_prompt(
         self,
         request: AgentRunRequest,
@@ -2166,7 +2209,7 @@ class GoalAssociationResolver:
             + "The model-facing contract is deliberately small. "
             "The host owns all IDs, versions, source text, constraints, metadata, persistence fields, and canonical object construction. "
             "Never emit id, goal_id, association_id, turn_id, schema_version, source_text, constraints, object, metadata, success_criteria, skills, or plans. Referent IDs may only be copied from the supplied discourse context; new referent IDs are Host-generated.\n\n"
-            "Create one new goal for each independently satisfiable user responsibility. Emit exactly one new_goals item containing description, typed bindings, and an optional provider-neutral resource_responsibility for each responsibility. "
+            "Create one new goal for each independently satisfiable user responsibility. The authoritative user turn plus Responsibility evidence are the only sources of human Responsibility here; a pre-Goal Fast Planner Activity is HOW already authored downstream and must never become, justify, or be copied into a sibling Goal. Emit exactly one new_goals item containing description, typed bindings, and an optional provider-neutral resource_responsibility for each responsibility. "
             "Every new Goal must declare one exact output_mode that describes the semantic work completing the human outcome. output_mode is the only model-authored execution discriminator. Responsibility kind, execution lane, and provider requirement are Host-derived projections and are not fields in the model schema. Media playback may also declare its exact media_operation; non-media Goals may omit media_operation and the Host supplies none. "
             f"{_EXECUTION_CONTRACT_PROMPT} "
             "The eventual spoken delivery of a capability result is part of that same capability_dependent Goal, never an additional vocal_output Goal. Persona, tone, wording, and answer delivery are not independent Goals. "
@@ -2180,7 +2223,7 @@ class GoalAssociationResolver:
             "Resolve references, pronouns, demonstratives, ellipsis, and task mentions before planning. Authority order is: explicit current user meaning; foreground scoped discourse referents; candidate Goal bindings; recent dialogue. First identify every material indirect referring expression, then require a unique value from that authority order and preserve it in a typed binding or supplied referent. Imperative grammar and a plausible generic noun such as device, object, person, task, or setting are never reference evidence. If two or more contextual candidates remain plausible, or none is supplied, ask a narrow clarification. Phrases such as ‘the last task I told you’ may semantically associate with an active, recoverable, or retained recent terminal Goal, but the model must decide that relationship from the supplied Goal state and dialogue—not from a Host phrase table. Tool-result memory is not reference-resolution authority and must never decide what an unresolved expression refers to. "
             "When the user introduces or explicitly corrects a salient entity, emit referent_updates only when the required discourse-index provenance is available. Use operation=correct with non-empty target_referent_ids copied from supplied discourse context when a new value supersedes an earlier referent; never emit an unscoped correction when no target referent ID was supplied. The canonical Goal association and typed bindings still preserve a correction even when no discourse-index update can be authored. The old referent remains available in its own task scope but becomes background. Use operation=introduce for a new salient entity, and focus/background/retire only for supplied referent IDs. "
             "Use resolved_references only for indirect references whose denotation must be selected from a supplied discourse referent or active Goal binding, such as pronouns, demonstratives, ellipsis, aliases, corrections, or task mentions. Do not emit resolved_references for an ordinary explicit entity mention such as a directly named place; represent that meaning in the new Goal bindings and, when it is salient for future dialogue, in referent_updates. Every resolved_references item must copy a supplied referent_id and include explicit confidence. If resolution is materially ambiguous, return decision=clarify rather than selecting a value from stale evidence or recency alone. "
-            "Each non-resource Goal must include top-level typed bindings for material entities and parameters already resolved here, including explicit counts, durations, speeds, directions, and targets. A resource Goal instead keeps top-level bindings empty and owns every material resource fact only in its canonical nested object. For an information resource such as weather, put a resolved place in resource.attributes as a binding named location, and preserve requested time and result aspects there as their own typed attributes. Downstream planners receive a deterministic read-only projection of those canonical fields rather than a second model-authored copy. "
+            "Each non-resource Goal must include top-level typed bindings for material entities and parameters already resolved here, including explicit counts, durations, speeds, directions, and targets. A resource Goal instead keeps top-level bindings empty and owns every material resource fact only in its canonical nested object. For an information resource, put resolved query scope in resource.attributes; for weather, put a resolved place in resource.attributes as a binding named location. Preserve requested time and result aspects there as their own typed attributes; each result aspect must also retain any explicit severity, intensity, magnitude, threshold, subtype, negation, or comparison qualifier when it changes what answer would satisfy the user. Never generalize a narrower requested aspect into a broader category. Downstream planners receive a deterministic read-only projection of those canonical fields rather than a second model-authored copy. "
             "For a location named directly in the final authoritative user turn, copy the complete location value verbatim as one contiguous span in the user's language. Never translate, transliterate, shorten, or expand a directly named location. A directly supplied location is a resolved semantic binding, not a claim that provider canonicalization has already succeeded. Do not ask the user for administrative granularity merely because multiple real-world places might share that value; create the fully bound Goal and let the downstream Capability resolve the exact value or report provider ambiguity. Clarify only when the user's intended location is genuinely underdetermined in the dialogue. Only an indirect reference resolved from a supplied referent may use the referent's canonical value instead. For an indirect location, copy the supplied referent_id into both the location binding and resolved_references, and copy the indirect user surface into resolved_references.surface_form. "
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
@@ -2199,8 +2242,8 @@ class GoalAssociationResolver:
             f"{self._bounded_json(candidate_goals, 6500)}\n\n"
             "Responsibility evidence JSON (Core-authored provider-neutral semantic handoff from Goal Interpretation. These are not canonical Goals. Preserve the WHAT and material bindings; use the authoritative user turn, discourse, retained Goal state, and Situation only to associate continuity or identify a real representation mismatch, never to silently rewrite the Responsibility. Goal Association alone decides create/continue/modify/supersede canonical Goal state. Never infer a Capability, provider, execution method, executable argument, or response wording here):\n"
             f"{self._bounded_json(context.get('responsibility_proposals') or [], 4200)}\n\n"
-            "Pre-Goal Fast Planner advance JSON (same Fast Planner, earlier lifecycle phase. It may already have authored one immediate conversational Activity and requested this Goal Association for persistence/continuity. The Activity is not a Goal and does not prove completion. Do not create a sibling speech Goal for it, rewrite its wording, or inherit Planner HOW authority. Associate only the underlying Responsibility evidence to canonical Goal state):\n"
-            f"{self._bounded_json(context.get('fast_planner_advance') or {}, 3600)}\n\n"
+            "Pre-Goal Fast Planner continuity markers JSON (same Fast Planner, earlier lifecycle phase. Response wording is intentionally absent because Planner HOW is not Goal Association input. An immediate Activity is not a Goal, not human Responsibility evidence, and must never become or justify a sibling Goal. Associate only the underlying Responsibility evidence to canonical Goal state):\n"
+            f"{self._bounded_json(self._fast_planner_advance_goal_projection(context), 1800)}\n\n"
             "Legacy current-turn progress candidates JSON (compatibility-only; maintained Goal Interpretation leaves this empty because Fast Planner owns conversational Activities):\n"
             f"{self._bounded_json(context.get('progress_candidates') or [], 1800)}\n\n"
             "Bounded active task/progress snapshots JSON:\n"
@@ -2564,7 +2607,49 @@ class GoalAssociationResolver:
                 architecture_attribution="not_evaluated",
                 retryable=True,
             )
-        certificate = GoalResponsibilityCoverageCertificate.model_validate(raw)
+        normalized_raw = copy.deepcopy(raw)
+        normalized_items = normalized_raw.get("items")
+        recoveries: list[dict[str, Any]] = []
+        if isinstance(normalized_items, list):
+            for item_index, item in enumerate(normalized_items):
+                if not isinstance(item, dict):
+                    continue
+                coverage = str(item.get("coverage") or "")
+                indices = item.get("candidate_goal_indices")
+                if not isinstance(indices, list) or not indices:
+                    continue
+                if coverage == "missing":
+                    # "missing" plus a named attempted owner is structurally
+                    # contradictory. Preserve the attempted owner but keep the
+                    # certificate rejecting by normalizing to representation mismatch.
+                    item["coverage"] = "representation_mismatch"
+                    recoveries.append(
+                        {
+                            "item_index": item_index,
+                            "from": "missing",
+                            "to": "representation_mismatch",
+                            "candidate_goal_indices": list(indices),
+                        }
+                    )
+                elif coverage == "clarification_required":
+                    # Unresolved human meaning cannot have a Goal owner yet. Dropping
+                    # the indices preserves the rejecting/clarification verdict.
+                    item["candidate_goal_indices"] = []
+                    recoveries.append(
+                        {
+                            "item_index": item_index,
+                            "from": "clarification_required_with_owner",
+                            "to": "clarification_required",
+                            "candidate_goal_indices": [],
+                        }
+                    )
+        if recoveries:
+            logger.warning(
+                "goal_association_coverage_shape_normalized sid=%s recoveries=%s",
+                request.sid,
+                cls._bounded_json(recoveries, 1800),
+            )
+        certificate = GoalResponsibilityCoverageCertificate.model_validate(normalized_raw)
         authoritative_turn = " ".join(request.text.strip().split()).casefold()
         for index, item in enumerate(certificate.items):
             excerpt = " ".join(item.source_excerpt.strip().split()).casefold()
@@ -2650,6 +2735,12 @@ class GoalAssociationResolver:
             "Do not discard independently supported current-turn Responsibility evidence: "
             "the Fast responsibility proposals rendered above remain provider-neutral "
             "semantic evidence and must be re-checked against the authoritative turn. "
+            "The FINAL AUTHORITATIVE USER TURN remains the source for explicit material "
+            "qualifiers: if a proposal or rejected candidate generalized away severity, "
+            "intensity, magnitude, threshold, subtype, negation, comparison, quantity, or "
+            "scope, restore that source-grounded WHAT in the final Goal representation. "
+            "Planner Activity metadata is never a Responsibility source and must not be "
+            "preserved as a Goal. "
             "Removing an unjustified sibling Goal never permits dropping a still-supported "
             "human Responsibility. The following compact defects are proof feedback, not "
             "Goal labels and not permission to copy a previous DTO:\n"
@@ -2674,8 +2765,12 @@ class GoalAssociationResolver:
             "words or data are involved. Conversely, an immediate judgment, choice, "
             "prioritization, or advice that needs no fresh external/private/runtime "
             "evidence is conversational reasoning rather than information acquisition. "
-            "Use coverage=representation_mismatch when the candidate owns the words but "
-            "its completion semantics are the wrong kind. A positive observable "
+            "Use coverage=representation_mismatch when a candidate clearly attempts to "
+            "own the fragment but represents it incorrectly, including wrong completion "
+            "semantics or a dropped/generalized material qualifier, binding, result aspect, "
+            "severity, threshold, or scope. In that case identify the mismatched candidate "
+            "index. Use coverage=missing only when no candidate attempts to own the fragment, "
+            "with no candidate indices. A positive observable "
             "outcome the user can independently judge is a responsibility, not a "
             "constraint or decoration. Do not invent a vocal outcome from a broad "
             "social impression when no words, information, or vocal performance were "
@@ -2749,9 +2844,12 @@ class GoalAssociationResolver:
             "delivery, or a negative speech boundary into a separate Goal.\n\n"
             "For coverage=covered, map a responsibility to exactly one candidate Goal "
             "index; a constraint may map to one or more affected Goal indices. Use "
-            "coverage=missing when a responsibility or constraint has no Goal "
-            "owner, and "
-            "clarification_required only when the human-level responsibility itself "
+            "coverage=missing only when a responsibility or constraint has no Goal "
+            "candidate attempting to own it, and then candidate_goal_indices must be empty. "
+            "If a candidate attempts to own the fragment but drops or generalizes a material "
+            "qualifier, binding, result aspect, severity/intensity, threshold, subtype, "
+            "comparison, or scope, use coverage=representation_mismatch and include that "
+            "candidate index instead. clarification_required only when the human-level responsibility itself "
             "cannot be determined without asking the user. Context and framing "
             "acknowledge non-owed meaning rather than requiring ownership: they must "
             "always use coverage=covered, independently_satisfiable=false, and an "

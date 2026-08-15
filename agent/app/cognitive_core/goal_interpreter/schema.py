@@ -208,7 +208,15 @@ class FastResponsibilityProposal(BaseModel):
 
     local_ref: str = Field(min_length=1, max_length=80)
     outcome: str = Field(min_length=1, max_length=500)
-    bindings: dict[str, Any] = Field(default_factory=dict)
+    bindings: dict[str, Any] = Field(
+        default_factory=dict,
+        description=(
+            "Provider-neutral material semantic bindings. Preserve entities, time, "
+            "quantities, and any severity/intensity/magnitude/threshold/subtype/"
+            "comparison/negation qualifier that changes what counts as satisfying "
+            "the human outcome; never generalize it away."
+        ),
+    )
     completion_requires_work: bool = False
     completion_requires_fresh_evidence: bool = False
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)

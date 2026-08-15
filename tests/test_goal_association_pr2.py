@@ -703,6 +703,92 @@ class GoalExecutionContractTests(unittest.TestCase):
                 )
             )
 
+    def test_coverage_normalizes_missing_with_named_candidate_to_representation_mismatch(self):
+        req = request("今天晚上有大雨吗？")
+        parsed = GoalAssociationResolver._validate_coverage_certificate(
+            certificate(
+                coverage_item(
+                    "今天晚上有大雨吗？",
+                    0,
+                    coverage="missing",
+                    independently_satisfiable=True,
+                )
+            ),
+            request=req,
+            goal_count=1,
+        )
+
+        self.assertEqual(parsed.items[0].coverage, "representation_mismatch")
+        self.assertEqual(parsed.items[0].candidate_goal_indices, [0])
+        verdict, problems = GoalAssociationResolver._coverage_verdict(
+            parsed, goal_count=1
+        )
+        self.assertEqual(verdict, "reject")
+        self.assertIn(
+            "representation_mismatch:responsibility:今天晚上有大雨吗？",
+            problems,
+        )
+
+    def test_coverage_normalizes_clarification_with_named_candidate_by_dropping_owner(self):
+        req = request("把那个拿过来")
+        parsed = GoalAssociationResolver._validate_coverage_certificate(
+            certificate(
+                coverage_item(
+                    "那个",
+                    0,
+                    coverage="clarification_required",
+                    independently_satisfiable=True,
+                )
+            ),
+            request=req,
+            goal_count=1,
+        )
+
+        self.assertEqual(parsed.items[0].coverage, "clarification_required")
+        self.assertEqual(parsed.items[0].candidate_goal_indices, [])
+
+    def test_goal_association_projection_omits_fast_planner_response_wording(self):
+        req = request("今天晚上有大雨吗？")
+        req = req.model_copy(
+            update={
+                "context": {
+                    **req.context,
+                    "responsibility_proposals": [
+                        {
+                            "local_ref": "weather_1",
+                            "outcome": "确认今晚是否有大雨",
+                            "bindings": {"precipitation_severity": "heavy"},
+                            "completion_requires_work": True,
+                            "completion_requires_fresh_evidence": True,
+                            "confidence": 0.95,
+                        }
+                    ],
+                    "fast_planner_advance": {
+                        "covered_responsibility_refs": ["weather_1"],
+                        "continuations": ["goal_association"],
+                        "immediate_vocal_activity": {
+                            "activity_id": "vocal_1",
+                            "role": "progress",
+                            "response_text": "这句 Planner 文案绝不能进入 GA。",
+                            "source_responsibility_refs": ["weather_1"],
+                        },
+                        "reason_summary": "Planner HOW, not Goal meaning.",
+                        "unresolved": ["not_goal_meaning"],
+                    },
+                }
+            }
+        )
+        prompt = GoalAssociationResolver(FakeOllama({}))._build_prompt(
+            req, [], output_type=GoalSegmentationModelOutput
+        )
+
+        self.assertNotIn("这句 Planner 文案绝不能进入 GA。", prompt)
+        self.assertNotIn("Planner HOW, not Goal meaning.", prompt)
+        self.assertIn('"activity_id":"vocal_1"', prompt)
+        self.assertIn('"role":"progress"', prompt)
+        self.assertIn("Response wording is intentionally absent", prompt)
+        self.assertIn("must never become or justify a sibling Goal", prompt)
+
     def test_fresh_reinterpretation_keeps_fast_responsibility_evidence(self):
         req = request("你能往前走个100米，那边有个水瓶，帮我拿杯水可以吗？")
         req = req.model_copy(
@@ -745,6 +831,8 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertIn("Stated preferences", prompt)
         self.assertIn("state mutation or deferred effect", prompt)
         self.assertIn("representation_mismatch", prompt)
+        self.assertIn("drops or generalizes a material qualifier", prompt)
+        self.assertIn("candidate_goal_indices must be empty", prompt)
 
 
 
@@ -770,6 +858,127 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
             families,
         )
+
+    def test_weather_material_modifier_and_planner_progress_recover_to_one_goal(self):
+        req = request("你好，我在重庆，今天晚上有大雨吗？", intent="weather_lookup")
+        req = req.model_copy(
+            update={
+                "context": {
+                    **req.context,
+                    "responsibility_proposals": [
+                        {
+                            "local_ref": "weather_1",
+                            # Simulate the retained live GI defect: the fast proposal
+                            # generalized 大雨 to rain. GA coverage must not commit it.
+                            "outcome": "确认重庆今晚是否下雨",
+                            "bindings": {"location": "重庆", "time": "tonight"},
+                            "completion_requires_work": True,
+                            "completion_requires_fresh_evidence": True,
+                            "confidence": 0.95,
+                        }
+                    ],
+                    "fast_planner_advance": {
+                        "covered_responsibility_refs": ["weather_1"],
+                        "continuations": ["goal_association"],
+                        "immediate_vocal_activity": {
+                            "activity_id": "vocal_1",
+                            "role": "progress",
+                            "response_text": "我看看今晚会不会有大雨～",
+                            "source_responsibility_refs": ["weather_1"],
+                        },
+                        "confidence": 0.95,
+                    },
+                }
+            }
+        )
+        initial = create_goals(
+            goal(
+                "Confirm whether it rains in Chongqing tonight.",
+                "capability_work",
+                resource=resource_responsibility(
+                    kind="information",
+                    description="Chongqing rain tonight",
+                    attributes=[
+                        binding("location", "place", "重庆"),
+                        binding("time", "day_part", "tonight"),
+                    ],
+                    source_status="provider_resolved",
+                ),
+            ),
+            goal("我看看今晚会不会有大雨～", "capability_work"),
+        )
+        rejected_coverage = certificate(
+            coverage_item(
+                "你好", role="framing", independently_satisfiable=False
+            ),
+            coverage_item(
+                "我在重庆", role="context", independently_satisfiable=False
+            ),
+            # Retained live malformed shape: missing plus candidate index.
+            coverage_item(
+                "今天晚上有大雨吗？",
+                0,
+                coverage="missing",
+                independently_satisfiable=True,
+            ),
+        )
+        corrected = create_goals(
+            goal(
+                "确认重庆今天晚上是否有大雨。",
+                "capability_work",
+                resource=resource_responsibility(
+                    kind="information",
+                    description="重庆今晚大雨情况",
+                    attributes=[
+                        binding("location", "place", "重庆"),
+                        binding("time", "day_part", "tonight"),
+                        binding(
+                            "precipitation_severity",
+                            "severity",
+                            "heavy",
+                        ),
+                    ],
+                    source_status="provider_resolved",
+                ),
+            )
+        )
+        final_coverage = certificate(
+            coverage_item(
+                "你好", role="framing", independently_satisfiable=False
+            ),
+            coverage_item(
+                "我在重庆", role="context", independently_satisfiable=False
+            ),
+            coverage_item("今天晚上有大雨吗？", 0),
+        )
+        ollama = ScriptedOllama(
+            [initial, rejected_coverage, corrected, final_coverage]
+        )
+
+        result = self._resolve(ollama, req)
+
+        self.assertEqual(result.resolution_status, "resolved")
+        self.assertEqual(len(result.new_goals), 1)
+        resource = result.new_goals[0].resource_responsibility.resource
+        self.assertEqual(
+            resource.attributes["precipitation_severity"]["value"],
+            "heavy",
+        )
+        families = [kwargs["prompt_family"] for _, kwargs in ollama.prompts]
+        self.assertEqual(
+            families,
+            [
+                "goal_association.primary",
+                "goal_association.responsibility_coverage",
+                "goal_association.fresh_interpretation",
+                "goal_association.responsibility_coverage_final",
+            ],
+        )
+        primary_prompt = str(ollama.prompts[0][0])
+        self.assertNotIn("我看看今晚会不会有大雨～", primary_prompt)
+        fresh_prompt = str(ollama.prompts[2][0])
+        self.assertIn("restore that source-grounded WHAT", fresh_prompt)
+        self.assertIn("Planner Activity metadata is never a Responsibility source", fresh_prompt)
 
     def test_ordinary_conversation_commits_after_required_coverage(self):
         ollama = ScriptedOllama(

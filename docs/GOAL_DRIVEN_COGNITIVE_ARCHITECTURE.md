@@ -843,9 +843,13 @@ Interpretation evidence for what human outcome appears to be owed. It carries a 
 reference, outcome, material semantic bindings, whether work remains, and whether fresh
 evidence is required. It is not a Goal, Plan, Capability selection, or execution
 authorization. Capability IDs, executable arguments, actions, providers, realization,
-and execution methods are forbidden in its bindings. Responsibility evidence may
-preserve bounded unresolved material meaning; uncertainty belongs to interpretation,
-while the decision to clarify, continue, or deepen HOW belongs downstream.
+and execution methods are forbidden in its bindings. Responsibility evidence must
+preserve every explicit material qualifier that changes what would satisfy the human
+outcome—such as severity, intensity, magnitude, threshold, subtype, negation,
+comparison, quantity, or temporal scope—rather than generalizing a narrower request
+into a broader category. It may preserve bounded unresolved material meaning;
+uncertainty belongs to interpretation, while the decision to clarify, continue, or
+deepen HOW belongs downstream.
 
 The maintained first downstream HOW owner is Fast Planner. Before canonical Goal binding
 it may return a typed `FastPlannerAdvance`: exact Responsibility refs covered, at most one
@@ -861,9 +865,13 @@ continuity before commitment-bearing Deep Work.
 `fast_speech` are compatibility vocabulary only; maintained cognitive apply does not
 accept Goal Interpretation as a conversational wording owner. Goal Association consumes
 the same authoritative Responsibility evidence only when Fast Planner requests canonical
-continuity. It creates/associates the Goal without rewriting the Planner-authored
-immediate Activity or inheriting HOW authority. Canonical Fast/Deep planning after Goal
-Association then selects exact Capabilities and executable arguments when needed.
+continuity. Its model-facing projection receives only Fast Planner continuity markers
+(covered Responsibility refs, continuation disposition, and optional Activity identity/
+role/source refs); Planner-authored response wording and rationale are deliberately
+absent so HOW cannot be mistaken for another human Responsibility. Goal Association
+creates/associates the Goal without rewriting the Planner-authored immediate Activity or
+inheriting HOW authority. Canonical Fast/Deep planning after Goal Association then
+selects exact Capabilities and executable arguments when needed.
 
 ### 4.11 Continuous Mind candidate vocabulary — retained problem-space inventory
 
@@ -2036,6 +2044,11 @@ structure and provenance:
   responsibility;
 - missing or clarification-required material meaning cannot pass an `accept`
   review;
+- when an audit says `missing` while also naming a candidate Goal, the Host may
+  mechanically normalize that contradictory shape to `representation_mismatch` with
+  the same candidate index; when `clarification_required` names a candidate, the Host
+  drops the impossible ownership index. Both normalizations preserve a rejecting
+  verdict and never repair semantic meaning or turn a reject into accept;
 - two independently satisfiable positive outcomes cannot be assigned to the
   same Goal candidate;
 - every current-turn excerpt is source-grounded rather than translated or
