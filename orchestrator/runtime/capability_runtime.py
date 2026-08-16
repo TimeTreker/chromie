@@ -7,6 +7,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Literal, Protocol
+from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -266,6 +267,14 @@ class RuntimeAuthorization(BaseModel):
     safety_monitor_active: bool = False
 
 
+class CapabilityDispatchReceipt(BaseModel):
+    dispatch_id: str
+    interaction_id: str
+    status: Literal["accepted"] = "accepted"
+    request_ids: list[str] = Field(default_factory=list)
+    accepted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class CapabilityRuntimeResult(BaseModel):
     interaction_id: str
     status: str
@@ -327,6 +336,8 @@ class CapabilityRuntime:
         self._active_lock = asyncio.Lock()
         self._open_interactions: set[str] = set()
         self._executing_interactions: set[str] = set()
+        self._submissions: dict[str, asyncio.Task[CapabilityRuntimeResult]] = {}
+        self._dispatch_interactions: dict[str, str] = {}
         self._scheduled: dict[
             str,
             dict[str, tuple[CapabilityRequest, CapabilityDefinition]],
@@ -395,12 +406,20 @@ class CapabilityRuntime:
         self._scheduled.pop(interaction_id, None)
         self._cancellation_rules.pop(interaction_id, None)
 
-    async def execute(
+    async def submit(
         self,
         response: InteractionResponse,
         *,
         authorization: RuntimeAuthorization | None = None,
-    ) -> CapabilityRuntimeResult:
+    ) -> CapabilityDispatchReceipt:
+        """Validate, register, and dispatch one capability scope without joining it.
+
+        The returned receipt means Host validation and Runtime ownership
+        registration succeeded and a Runtime-owned submission task exists. It
+        does *not* mean any provider request has completed. Terminal completion
+        is an explicit join through :meth:`wait_terminal`.
+        """
+
         auto_managed = self.begin_interaction(response.interaction_id)
         try:
             authorization = authorization or RuntimeAuthorization()
@@ -410,15 +429,14 @@ class CapabilityRuntime:
             if auto_managed:
                 self.end_interaction(response.interaction_id)
             raise
-        results: list[CapabilityResult] = []
-        traces: list[CapabilityTrace] = []
-        execution_registered = False
 
+        dispatch_id = uuid4().hex
+        execution_registered = False
         try:
             async with self._active_lock:
                 if response.interaction_id in self._executing_interactions:
                     raise ValueError(
-                        "concurrent CapabilityRuntime.execute calls cannot reuse "
+                        "concurrent CapabilityRuntime.submit calls cannot reuse "
                         f"interaction_id={response.interaction_id!r}"
                     )
                 self._executing_interactions.add(response.interaction_id)
@@ -430,6 +448,68 @@ class CapabilityRuntime:
                 interaction_scheduled.update(
                     {request.request_id: (request, definition) for request, definition in validated}
                 )
+                task = asyncio.create_task(
+                    self._run_submission(
+                        response.interaction_id,
+                        validated,
+                        authorization,
+                        auto_managed=auto_managed,
+                    ),
+                    name=f"capability-dispatch:{response.interaction_id}:{dispatch_id}",
+                )
+                self._submissions[dispatch_id] = task
+                self._dispatch_interactions[dispatch_id] = response.interaction_id
+        except BaseException:
+            if execution_registered:
+                async with self._active_lock:
+                    self._scheduled.pop(response.interaction_id, None)
+                    self._executing_interactions.discard(response.interaction_id)
+            if auto_managed:
+                self.end_interaction(response.interaction_id)
+            raise
+
+        return CapabilityDispatchReceipt(
+            dispatch_id=dispatch_id,
+            interaction_id=response.interaction_id,
+            request_ids=[request.request_id for request, _ in validated],
+        )
+
+    async def wait_terminal(
+        self,
+        receipt: CapabilityDispatchReceipt,
+    ) -> CapabilityRuntimeResult:
+        """Explicitly join one previously accepted Runtime submission."""
+
+        async with self._active_lock:
+            interaction_id = self._dispatch_interactions.get(receipt.dispatch_id)
+            task = self._submissions.get(receipt.dispatch_id)
+        if interaction_id is None or task is None:
+            raise ValueError(f"unknown or already-consumed dispatch_id={receipt.dispatch_id!r}")
+        if interaction_id != receipt.interaction_id:
+            raise ValueError(
+                "dispatch receipt interaction mismatch: "
+                f"registered={interaction_id!r} receipt={receipt.interaction_id!r}"
+            )
+        try:
+            return await task
+        finally:
+            if task.done():
+                async with self._active_lock:
+                    if self._submissions.get(receipt.dispatch_id) is task:
+                        self._submissions.pop(receipt.dispatch_id, None)
+                        self._dispatch_interactions.pop(receipt.dispatch_id, None)
+
+    async def _run_submission(
+        self,
+        interaction_id: str,
+        validated: list[tuple[CapabilityRequest, CapabilityDefinition]],
+        authorization: RuntimeAuthorization,
+        *,
+        auto_managed: bool,
+    ) -> CapabilityRuntimeResult:
+        results: list[CapabilityResult] = []
+        traces: list[CapabilityTrace] = []
+        try:
             try:
                 pending_parallel: list[tuple[CapabilityRequest, CapabilityDefinition]] = []
                 for request, definition in validated:
@@ -439,7 +519,7 @@ class CapabilityRuntime:
                     if pending_parallel:
                         parallel_items = list(pending_parallel)
                         batch_results, batch_traces = await self._run_parallel(
-                            response.interaction_id,
+                            interaction_id,
                             parallel_items,
                             authorization,
                         )
@@ -448,25 +528,25 @@ class CapabilityRuntime:
                         pending_parallel = []
                         if any(self._is_runtime_cancellation(result) for result in batch_results):
                             return CapabilityRuntimeResult(
-                                interaction_id=response.interaction_id,
+                                interaction_id=interaction_id,
                                 status="cancelled",
                                 results=results,
                                 traces=traces,
                             )
                         if any(
                             self._failure_blocks_following_requests(
-                                response.interaction_id,
+                                interaction_id,
                                 item,
-                                definition,
+                                item_definition,
                                 result,
                             )
-                            for (item, definition), result in zip(
+                            for (item, item_definition), result in zip(
                                 parallel_items, batch_results, strict=True
                             )
                         ):
                             break
                     result, trace = await self._run_one(
-                        response.interaction_id,
+                        interaction_id,
                         request,
                         definition,
                         authorization,
@@ -475,13 +555,13 @@ class CapabilityRuntime:
                     traces.append(trace)
                     if self._is_runtime_cancellation(result):
                         return CapabilityRuntimeResult(
-                            interaction_id=response.interaction_id,
+                            interaction_id=interaction_id,
                             status="cancelled",
                             results=results,
                             traces=traces,
                         )
                     if self._failure_blocks_following_requests(
-                        response.interaction_id,
+                        interaction_id,
                         request,
                         definition,
                         result,
@@ -489,7 +569,7 @@ class CapabilityRuntime:
                         break
                 if pending_parallel:
                     batch_results, batch_traces = await self._run_parallel(
-                        response.interaction_id,
+                        interaction_id,
                         pending_parallel,
                         authorization,
                     )
@@ -497,15 +577,15 @@ class CapabilityRuntime:
                     traces.extend(batch_traces)
                     if any(self._is_runtime_cancellation(result) for result in batch_results):
                         return CapabilityRuntimeResult(
-                            interaction_id=response.interaction_id,
+                            interaction_id=interaction_id,
                             status="cancelled",
                             results=results,
                             traces=traces,
                         )
             except asyncio.CancelledError:
-                await asyncio.shield(self.cancel_interaction(response.interaction_id))
+                await asyncio.shield(self.cancel_interaction(interaction_id))
                 return CapabilityRuntimeResult(
-                    interaction_id=response.interaction_id,
+                    interaction_id=interaction_id,
                     status="cancelled",
                     results=results,
                     traces=traces,
@@ -525,18 +605,17 @@ class CapabilityRuntime:
                 else "failed"
             )
             return CapabilityRuntimeResult(
-                interaction_id=response.interaction_id,
+                interaction_id=interaction_id,
                 status=status,
                 results=results,
                 traces=traces,
             )
         finally:
-            if execution_registered:
-                async with self._active_lock:
-                    self._scheduled.pop(response.interaction_id, None)
-                    self._executing_interactions.discard(response.interaction_id)
+            async with self._active_lock:
+                self._scheduled.pop(interaction_id, None)
+                self._executing_interactions.discard(interaction_id)
             if auto_managed:
-                self.end_interaction(response.interaction_id)
+                self.end_interaction(interaction_id)
 
     def _failure_blocks_following_requests(
         self,
@@ -1278,22 +1357,22 @@ class CapabilityRuntime:
         definition = self.registry.get(request.capability_id)
         if definition.provider_id not in self._providers:
             raise ValueError(
-                f"skill {request.capability_id!r} has no registered provider {definition.provider_id!r}"
+                f"capability {request.capability_id!r} has no registered provider {definition.provider_id!r}"
             )
         if request.capability_version and request.capability_version != definition.version:
             raise ValueError(
-                f"skill {request.capability_id!r} version {request.capability_version!r} "
+                f"capability {request.capability_id!r} version {request.capability_version!r} "
                 f"does not match registered version {definition.version!r}"
             )
         if not definition.available:
             reason = definition.unavailable_reason or "unavailable"
-            raise ValueError(f"skill {request.capability_id!r} is unavailable: {reason}")
+            raise ValueError(f"capability {request.capability_id!r} is unavailable: {reason}")
         _validate_json_schema(request.args, definition.input_schema, path="args")
         confirmed = request.request_id in authorization.confirmed_request_ids
         if (request.requires_confirmation or definition.requires_confirmation) and not confirmed:
-            raise ValueError(f"skill {request.capability_id!r} requires confirmation")
+            raise ValueError(f"capability {request.capability_id!r} requires confirmation")
         if definition.requires_safety_monitor and not authorization.safety_monitor_active:
-            raise ValueError(f"skill {request.capability_id!r} requires an active safety monitor")
+            raise ValueError(f"capability {request.capability_id!r} requires an active safety monitor")
         return request, definition
 
     @staticmethod
@@ -1392,7 +1471,7 @@ class CapabilityRuntime:
                         items[index][0],
                         items[index][1],
                         reason_code="cancelled",
-                        message="skill execution was cancelled",
+                        message="capability execution was cancelled",
                     )
                     for index in indices
                 ]
@@ -1836,7 +1915,7 @@ class CapabilityRuntime:
                     provider_id=definition.provider_id,
                     reason_code="cancelled_before_start",
                     message=(
-                        "skill execution was cancelled before provider start "
+                        "capability execution was cancelled before provider start "
                         f"by scope={cancellation_rule.effective_scope}"
                     ),
                     trace_id=trace.trace_id,
@@ -1916,7 +1995,7 @@ class CapabilityRuntime:
                 provider_id=definition.provider_id,
                 reason_code="timeout",
                 message=(
-                    f"skill exceeded {timeout_s:.3f}s timeout"
+                    f"capability exceeded {timeout_s:.3f}s timeout"
                     + (f"; provider cancellation failed: {cancel_error}" if cancel_error else "")
                 ),
             )
@@ -1953,9 +2032,9 @@ class CapabilityRuntime:
                         "local execution was interrupted, but provider "
                         "cancellation was not confirmed"
                         if scoped_cancel_failed
-                        else "skill execution was cancelled before provider start"
+                        else "capability execution was cancelled before provider start"
                         if cancelled_before_provider
-                        else "skill execution was cancelled"
+                        else "capability execution was cancelled"
                     )
                     + (
                         f" by scope={context.cancellation_scope}"

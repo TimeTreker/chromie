@@ -514,10 +514,8 @@ class _CognitiveTurnScenarioRuntime:
         if self.mode == "active_cancel":
             if self.runtime is None:  # pragma: no cover - construction guard
                 raise AssertionError("active-cancel runtime was not initialized")
-            return await self.runtime.execute(
-                response,
-                authorization=None,
-            )
+            receipt = await self.runtime.submit(response, authorization=None)
+            return await self.runtime.wait_terminal(receipt)
 
         requests_by_step = {
             str(request.metadata.get("step_id") or ""): request

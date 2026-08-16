@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.capability_runtime_test_support import submit_and_wait_terminal
+
 import asyncio
 import json
 import unittest
@@ -338,7 +340,7 @@ class MediaTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
         operation: str,
         args: dict[str, object],
     ):
-        return await self.runtime.execute(
+        return await submit_and_wait_terminal(self.runtime,
             InteractionResponse(
                 interaction_id=f"interaction-{operation}",
                 capabilities=[
@@ -539,7 +541,7 @@ class MediaTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
         runtime = CapabilityRuntime(self.registry)
         runtime.register_provider(MediaPlaybackCapabilityProvider(self.declaration, wrong))
-        execution = await runtime.execute(
+        execution = await submit_and_wait_terminal(runtime,
             InteractionResponse(
                 interaction_id="wrong-operation",
                 capabilities=[
@@ -601,7 +603,7 @@ class MediaTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
             runtime.register_provider(provider)
             interaction_id = f"cancel-{scope}"
             task = asyncio.create_task(
-                runtime.execute(
+                submit_and_wait_terminal(runtime,
                     InteractionResponse(
                         interaction_id=interaction_id,
                         capabilities=[

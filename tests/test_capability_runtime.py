@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.capability_runtime_test_support import submit_and_wait_terminal
+
 import asyncio
 import time
 import unittest
@@ -87,6 +89,126 @@ def _tool_definition(
 
 
 class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_submit_returns_after_runtime_acceptance_before_provider_completion(self) -> None:
+        started = asyncio.Event()
+        release = asyncio.Event()
+
+        class SlowProvider(MockCapabilityProvider):
+            async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
+                self.calls.append(request)
+                started.set()
+                await release.wait()
+                return await MockCapabilityProvider.execute(
+                    self, request, definition, context
+                )
+
+        registry = CapabilityRegistry()
+        registry.register(_body_definition(exclusive_group=None))
+        provider = SlowProvider("mock.body")
+        runtime = CapabilityRuntime(registry)
+        runtime.register_provider(provider)
+        response = InteractionResponse(
+            interaction_id="async-dispatch",
+            capabilities=[
+                {
+                    "request_id": "slow-request",
+                    "capability_id": "soridormi.nod_yes",
+                }
+            ],
+        )
+
+        receipt = await runtime.submit(response)
+
+        self.assertEqual(receipt.status, "accepted")
+        self.assertEqual(receipt.interaction_id, "async-dispatch")
+        self.assertEqual(receipt.request_ids, ["slow-request"])
+        observation = await runtime.execution_observation()
+        self.assertIn("async-dispatch", observation.open_interaction_ids)
+        self.assertIn("async-dispatch", observation.executing_interaction_ids)
+        self.assertEqual(
+            [
+                (item.request_id, item.capability_id, item.provider_started)
+                for item in observation.requests
+            ],
+            [("slow-request", "soridormi.nod_yes", False)],
+        )
+
+        await started.wait()
+        self.assertFalse(release.is_set())
+        release.set()
+        terminal = await runtime.wait_terminal(receipt)
+
+        self.assertEqual(terminal.status, "completed")
+        self.assertEqual([item.status for item in terminal.results], ["completed"])
+        final_observation = await runtime.execution_observation()
+        self.assertNotIn("async-dispatch", final_observation.open_interaction_ids)
+        self.assertNotIn("async-dispatch", final_observation.executing_interaction_ids)
+        self.assertEqual(final_observation.requests, [])
+
+    async def test_duplicate_submit_fails_without_corrupting_first_submission(self) -> None:
+        started = asyncio.Event()
+        release = asyncio.Event()
+
+        class SlowProvider(MockCapabilityProvider):
+            async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
+                self.calls.append(request)
+                started.set()
+                await release.wait()
+                return await MockCapabilityProvider.execute(
+                    self, request, definition, context
+                )
+
+        registry = CapabilityRegistry()
+        registry.register(_body_definition(exclusive_group=None))
+        provider = SlowProvider("mock.body")
+        runtime = CapabilityRuntime(registry)
+        runtime.register_provider(provider)
+        response = InteractionResponse(
+            interaction_id="duplicate-dispatch",
+            capabilities=[
+                {
+                    "request_id": "first-request",
+                    "capability_id": "soridormi.nod_yes",
+                }
+            ],
+        )
+        first = await runtime.submit(response)
+        await started.wait()
+
+        with self.assertRaisesRegex(ValueError, "cannot reuse interaction_id"):
+            await runtime.submit(response)
+
+        observation = await runtime.execution_observation()
+        self.assertIn("duplicate-dispatch", observation.executing_interaction_ids)
+        self.assertEqual([item.request_id for item in observation.requests], ["first-request"])
+        release.set()
+        terminal = await runtime.wait_terminal(first)
+        self.assertEqual(terminal.status, "completed")
+
+    async def test_submit_validation_failure_does_not_leave_runtime_ownership(self) -> None:
+        runtime = CapabilityRuntime(CapabilityRegistry())
+        response = InteractionResponse(
+            interaction_id="invalid-dispatch",
+            capabilities=[
+                {
+                    "request_id": "unknown-request",
+                    "capability_id": "chromie.unknown",
+                }
+            ],
+        )
+
+        with self.assertRaisesRegex(ValueError, "unknown capability"):
+            await runtime.submit(response)
+
+        observation = await runtime.execution_observation()
+        self.assertNotIn("invalid-dispatch", observation.open_interaction_ids)
+        self.assertNotIn("invalid-dispatch", observation.executing_interaction_ids)
+        self.assertEqual(observation.requests, [])
+
+    def test_runtime_has_no_aggregate_execute_api(self) -> None:
+        runtime = CapabilityRuntime(CapabilityRegistry())
+        self.assertFalse(hasattr(runtime, "execute"))
+
     def test_soridormi_resource_outcome_schema_accepts_simulation_marker(self) -> None:
         resource = SORIDORMI_NAMED_CAPABILITY_OUTPUT_SCHEMA["properties"]["resource_outcome"]
         self.assertIn("mocked_simulation", resource["properties"])
@@ -120,7 +242,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime = CapabilityRuntime(CapabilityRegistry())
 
         with self.assertRaisesRegex(ValueError, "must be unique"):
-            await runtime.execute(unsafe)
+            await submit_and_wait_terminal(runtime, unsafe)
 
     async def test_soridormi_import_preserves_provider_confirmation_requirement(self) -> None:
         registry = CapabilityRegistry()
@@ -317,7 +439,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
             )
         )
 
-        execution = await runtime.execute(
+        execution = await submit_and_wait_terminal(runtime,
             InteractionResponse(
                 speech=[
                     {
@@ -359,7 +481,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
         runtime.register_provider(body)
 
-        execution = await runtime.execute(
+        execution = await submit_and_wait_terminal(runtime,
             InteractionResponse(
                 speech=[
                     {
@@ -402,7 +524,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime.register_provider(LocalSpeechCapabilityProvider(speak))
         runtime.register_provider(body)
 
-        execution = await runtime.execute(
+        execution = await submit_and_wait_terminal(runtime,
             InteractionResponse(
                 speech=[
                     {
@@ -431,7 +553,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
 
-        execution = await runtime.execute(
+        execution = await submit_and_wait_terminal(runtime,
             InteractionResponse(
                 capabilities=[
                     {
@@ -470,7 +592,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime.register_provider(LocalSpeechCapabilityProvider(speak))
         runtime.register_provider(TimedProvider("mock.body", delay_s=0.05))
 
-        await runtime.execute(
+        await submit_and_wait_terminal(runtime,
             InteractionResponse(
                 speech=[{"text": "Hello.", "timing": "parallel"}],
                 capabilities=[
@@ -519,7 +641,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime = CapabilityRuntime(registry, max_concurrency=2)
 
         runtime.register_provider(provider)
-        execution = await runtime.execute(
+        execution = await submit_and_wait_terminal(runtime,
             InteractionResponse(
                 capabilities=[
                     {
@@ -559,7 +681,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime.register_provider(provider)
 
         await asyncio.gather(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id="interaction-a",
                     capabilities=[
@@ -570,7 +692,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     ],
                 )
             ),
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id="interaction-b",
                     capabilities=[
@@ -607,7 +729,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
         executions = [
             asyncio.create_task(
-                runtime.execute(
+                submit_and_wait_terminal(runtime,
                     InteractionResponse(
                         interaction_id=interaction_id,
                         capabilities=[
@@ -693,7 +815,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime.register_provider(provider)
 
         cancel_task = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id="cancel",
                     capabilities=[
@@ -706,7 +828,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
             )
         )
         keep_task = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id="keep",
                     capabilities=[
@@ -777,7 +899,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime.register_provider(body_provider)
         interaction_id = "scoped-output"
         execution_task = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id=interaction_id,
                     speech=[
@@ -869,7 +991,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime.register_provider(motion_provider)
         runtime.register_provider(tool_provider)
         execution_task = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id="scoped-motion",
                     capabilities=[
@@ -952,7 +1074,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
             "canonical_plan_fingerprint": "fingerprint-scoped",
         }
         execution_task = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id="specific-queued",
                     capabilities=[
@@ -1043,7 +1165,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     expected_plan_fingerprint="fingerprint-future",
                 )
             )
-            execution = await runtime.execute(
+            execution = await submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id=interaction_id,
                     capabilities=[
@@ -1116,7 +1238,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
         try:
             unrelated_execution_task = asyncio.create_task(
-                runtime.execute(
+                submit_and_wait_terminal(runtime,
                     InteractionResponse(
                         interaction_id=interaction_id,
                         capabilities=[
@@ -1146,7 +1268,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
             )
             release_unrelated.set()
             unrelated_execution = await unrelated_execution_task
-            target_execution = await runtime.execute(
+            target_execution = await submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id=interaction_id,
                     capabilities=[
@@ -1213,7 +1335,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     foreground_interaction_id=interaction_id,
                 )
             )
-            execution = await runtime.execute(
+            execution = await submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id=interaction_id,
                     speech=[
@@ -1289,7 +1411,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
             "canonical_plan_fingerprint": "fingerprint-active",
         }
         execution_task = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id="specific-active",
                     capabilities=[
@@ -1373,7 +1495,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
         execution_task = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id="specific-shared",
                     capabilities=[
@@ -1442,7 +1564,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
         execution_task = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id="specific-stale",
                     capabilities=[
@@ -1526,7 +1648,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
             "canonical_plan_fingerprint": "fingerprint-physical",
         }
         execution_task = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id="specific-physical",
                     capabilities=[
@@ -1611,7 +1733,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
             "canonical_plan_fingerprint": "fingerprint-speech",
         }
         first = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id="speech-a",
                     capabilities=[
@@ -1628,7 +1750,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
             )
         )
         second = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id="speech-b",
                     capabilities=[
@@ -1710,7 +1832,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime = CapabilityRuntime(registry, max_concurrency=2)
         runtime.register_provider(provider)
         cancel_task = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id="cancel",
                     capabilities=[
@@ -1723,7 +1845,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
             )
         )
         keep_task = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id="keep",
                     capabilities=[
@@ -1785,7 +1907,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
         first = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id="reused-interaction",
                     capabilities=[
@@ -1803,7 +1925,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
             ValueError,
             "cannot reuse interaction_id",
         ):
-            await runtime.execute(
+            await submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id="reused-interaction",
                     capabilities=[
@@ -1843,7 +1965,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
         execution_task = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id="non-interruptible",
                     capabilities=[
@@ -1930,7 +2052,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
         runtime.register_provider(provider)
         execution_task = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id="current-sequential",
                     speech=[
@@ -2023,7 +2145,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime.register_provider(speech_provider)
         runtime.register_provider(body_provider)
         execution_task = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id="output-barrier",
                     speech=[
@@ -2098,7 +2220,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
         execution_task = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id="cancel-failure",
                     capabilities=[
@@ -2163,7 +2285,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
         execution_task = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id="concurrent-cancel-failure",
                     capabilities=[
@@ -2244,7 +2366,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
         execution_task = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id="distinct-turn-shared-cancel",
                     capabilities=[
@@ -2343,7 +2465,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime.register_provider(provider)
         active_key = ("completed-success-reuse", "motion-success-reuse")
         execution_task = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id=active_key[0],
                     capabilities=[
@@ -2453,7 +2575,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime = CapabilityRuntime(registry, max_concurrency=2)
         runtime.register_provider(provider)
         first_execution = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id="global-epoch-first",
                     capabilities=[
@@ -2477,7 +2599,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         await first_cancel_started.wait()
 
         second_execution = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id="global-epoch-second",
                     capabilities=[
@@ -2565,7 +2687,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
         execution_task = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id="current-cancel-failure",
                     capabilities=[
@@ -2634,7 +2756,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
 
-        await runtime.execute(
+        await submit_and_wait_terminal(runtime,
             InteractionResponse(
                 capabilities=[
                     {
@@ -2677,7 +2799,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime.register_provider(LocalSpeechCapabilityProvider(speak))
         runtime.register_provider(OrderedBodyProvider("mock.body"))
 
-        await runtime.execute(
+        await submit_and_wait_terminal(runtime,
             InteractionResponse(
                 speech=[{"text": "Done.", "timing": "after_capabilities"}],
                 capabilities=[
@@ -2700,11 +2822,11 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime.register_provider(provider)
 
         with self.assertRaisesRegex(ValueError, "unknown capability"):
-            await runtime.execute(
+            await submit_and_wait_terminal(runtime,
                 InteractionResponse(capabilities=[{"capability_id": "missing.skill"}])
             )
         with self.assertRaisesRegex(ValueError, "unknown fields"):
-            await runtime.execute(
+            await submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     capabilities=[
                         {
@@ -2715,7 +2837,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 )
             )
         with self.assertRaisesRegex(ValueError, "requires confirmation"):
-            await runtime.execute(
+            await submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     capabilities=[{"request_id": "nod-1", "capability_id": "soridormi.nod_yes"}]
                 )
@@ -2729,7 +2851,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
 
-        execution = await runtime.execute(
+        execution = await submit_and_wait_terminal(runtime,
             InteractionResponse(
                 capabilities=[{"request_id": "nod-1", "capability_id": "soridormi.nod_yes"}]
             ),
@@ -2745,7 +2867,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
 
-        execution = await runtime.execute(
+        execution = await submit_and_wait_terminal(runtime,
             InteractionResponse(
                 capabilities=[{"request_id": "nod-1", "capability_id": "soridormi.nod_yes"}]
             )
@@ -2765,7 +2887,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
 
-        execution = await runtime.execute(
+        execution = await submit_and_wait_terminal(runtime,
             InteractionResponse(
                 capabilities=[{"request_id": "nod-1", "capability_id": "soridormi.nod_yes"}]
             )
@@ -2793,7 +2915,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
         task = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     capabilities=[
                         {
@@ -2842,7 +2964,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime.register_provider(body_provider)
 
         task = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     speech=[{"id": "speech-1", "text": "Hello."}],
                     capabilities=[
@@ -2903,7 +3025,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime.register_provider(provider)
 
         task = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     capabilities=[
                         {

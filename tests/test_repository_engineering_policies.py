@@ -273,6 +273,26 @@ class RepositoryEngineeringPolicyTests(unittest.TestCase):
             {item.rule_id for item in findings},
         )
 
+    def test_retired_capability_runtime_execute_api_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            path = root / "orchestrator" / "runtime" / "capability_runtime.py"
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                "class CapabilityRuntime:\n"
+                "    async def submit(self): pass\n"
+                "    async def wait_terminal(self): pass\n"
+                "    async def execute(self): pass\n",
+                encoding="utf-8",
+            )
+
+            findings = policies.audit_canonical_capability_identity(root)
+
+        self.assertTrue(
+            any(item.symbol == "CapabilityRuntime.execute" for item in findings),
+            findings,
+        )
+
     def test_reviewed_exception_is_exact_and_stale_exception_fails(self) -> None:
         finding = policies.PolicyFinding(
             rule_id=policies.RULE_PRODUCTION_ASSERT,

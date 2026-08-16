@@ -1168,6 +1168,52 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
                         )
                     )
 
+    runtime_path = root / "orchestrator/runtime/capability_runtime.py"
+    if runtime_path.is_file():
+        runtime_tree, parse_findings = _parse_python(runtime_path, root)
+        findings.extend(parse_findings)
+        if runtime_tree is not None:
+            runtime_class = next(
+                (
+                    node
+                    for node in ast.walk(runtime_tree)
+                    if isinstance(node, ast.ClassDef) and node.name == "CapabilityRuntime"
+                ),
+                None,
+            )
+            if runtime_class is not None:
+                method_names = {
+                    node.name
+                    for node in runtime_class.body
+                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                }
+                if "execute" in method_names:
+                    findings.append(
+                        _source_policy_finding(
+                            root=root,
+                            path="orchestrator/runtime/capability_runtime.py",
+                            rule_id=RULE_CANONICAL_CAPABILITY_ID,
+                            symbol="CapabilityRuntime.execute",
+                            message=(
+                                "retired aggregate CapabilityRuntime.execute API must not be "
+                                "reintroduced; use submit() and lifecycle/terminal consumers"
+                            ),
+                        )
+                    )
+                for required_method in ("submit", "wait_terminal"):
+                    if required_method not in method_names:
+                        findings.append(
+                            _source_policy_finding(
+                                root=root,
+                                path="orchestrator/runtime/capability_runtime.py",
+                                rule_id=RULE_CANONICAL_CAPABILITY_ID,
+                                symbol=f"CapabilityRuntime.{required_method}",
+                                message=(
+                                    "canonical CapabilityRuntime dispatch/completion boundary is missing"
+                                ),
+                            )
+                        )
+
     retired_runtime_paths = (
         "orchestrator/runtime/skill_runtime.py",
         "orchestrator/runtime/skill_adapters.py",

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.capability_runtime_test_support import submit_and_wait_terminal
+
 import unittest
 from typing import Any
 
@@ -238,7 +240,7 @@ class SoridormiActivityCompilationTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
 
-        result = await runtime.execute(
+        result = await submit_and_wait_terminal(runtime,
             response,
             authorization=RuntimeAuthorization(safety_monitor_active=True),
         )

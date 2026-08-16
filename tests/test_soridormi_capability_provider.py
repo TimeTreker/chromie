@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.capability_runtime_test_support import submit_and_wait_terminal
+
 import unittest
 from typing import Any
 
@@ -129,7 +131,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_named_skill_uses_opaque_plan_execute_contract(self) -> None:
         invoker = _RecordingInvoker()
-        execution = await self._runtime(invoker).execute(
+        execution = await submit_and_wait_terminal(self._runtime(invoker),
             InteractionResponse(
                 capabilities=[
                     {
@@ -259,7 +261,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(SoridormiCapabilityProvider(invoker))
 
-        execution = await runtime.execute(
+        execution = await submit_and_wait_terminal(runtime,
             InteractionResponse(
                 interaction_id="social-interaction",
                 capabilities=[
@@ -315,7 +317,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(SoridormiCapabilityProvider(invoker))
 
-        await runtime.execute(
+        await submit_and_wait_terminal(runtime,
             InteractionResponse(
                 interaction_id="provider-confirmation",
                 capabilities=[
@@ -378,7 +380,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(SoridormiCapabilityProvider(invoker))
 
-        await runtime.execute(
+        await submit_and_wait_terminal(runtime,
             InteractionResponse(
                 interaction_id="ordinary-interaction",
                 capabilities=[
@@ -455,7 +457,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(SoridormiCapabilityProvider(invoker))
 
-        execution = await runtime.execute(
+        execution = await submit_and_wait_terminal(runtime,
             InteractionResponse(
                 interaction_id="goal-grounded-motion",
                 capabilities=[
@@ -512,7 +514,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(SoridormiCapabilityProvider(invoker))
 
-        await runtime.execute(
+        await submit_and_wait_terminal(runtime,
             InteractionResponse(
                 interaction_id="provider-confirmed-motion",
                 capabilities=[
@@ -547,7 +549,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_named_skill_propagates_route_trace_metadata_to_plan(self) -> None:
         invoker = _RecordingInvoker()
-        execution = await self._runtime(invoker).execute(
+        execution = await submit_and_wait_terminal(self._runtime(invoker),
             InteractionResponse(
                 interaction_id="interaction-route-trace",
                 capabilities=[
@@ -587,7 +589,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_named_skill_propagates_live_perception_contract(self) -> None:
         invoker = _RecordingInvoker()
-        execution = await self._runtime(invoker).execute(
+        execution = await submit_and_wait_terminal(self._runtime(invoker),
             InteractionResponse(
                 interaction_id="interaction-live-perception",
                 capabilities=[
@@ -635,7 +637,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
         runtime.register_provider(SoridormiCapabilityProvider(_RecordingInvoker()))
 
         with self.assertRaisesRegex(ValueError, "not executable"):
-            await runtime.execute(
+            await submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     capabilities=[{"capability_id": "soridormi.wave_hand"}]
                 ),
@@ -653,7 +655,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
             }
         )
 
-        execution = await self._runtime(invoker).execute(
+        execution = await submit_and_wait_terminal(self._runtime(invoker),
             InteractionResponse(
                 capabilities=[
                     {
@@ -683,7 +685,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
             }
         )
 
-        execution = await self._runtime(invoker).execute(
+        execution = await submit_and_wait_terminal(self._runtime(invoker),
             InteractionResponse(
                 capabilities=[
                     {
@@ -925,7 +927,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
         )
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(SoridormiCapabilityProvider(invoker))
-        execution = await runtime.execute(
+        execution = await submit_and_wait_terminal(runtime,
             InteractionResponse(
                 interaction_id="fetch-resource",
                 capabilities=[

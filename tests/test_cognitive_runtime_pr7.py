@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.capability_runtime_test_support import submit_and_wait_terminal
+
 import asyncio
 import json
 import os
@@ -1217,7 +1219,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         runtime.register_provider(
             LocalSpeechCapabilityProvider(lambda _args: {"scheduled": False})
         )
-        execution = asyncio.run(runtime.execute(response))
+        execution = asyncio.run(submit_and_wait_terminal(runtime, response))
 
         self.assertEqual(execution.status, "failed")
         self.assertEqual(execution.results[0].reason_code, "playback_not_started")

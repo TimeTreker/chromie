@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.capability_runtime_test_support import submit_and_wait_terminal
+
 import asyncio
 import time
 import unittest
@@ -429,7 +431,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime.register_provider(body_provider)
 
         started = time.perf_counter()
-        result = await runtime.execute(
+        result = await submit_and_wait_terminal(runtime,
             response,
             authorization=RuntimeAuthorization(),
         )
@@ -510,7 +512,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with self.assertRaisesRegex(ValueError, "multiple chromie.voice owners"):
-            await runtime.execute(response)
+            await submit_and_wait_terminal(runtime, response)
 
     def test_soridormi_import_preserves_provider_body_lanes(self) -> None:
         registry = CapabilityRegistry()

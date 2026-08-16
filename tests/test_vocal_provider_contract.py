@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.capability_runtime_test_support import submit_and_wait_terminal
+
 import asyncio
 import json
 import unittest
@@ -416,7 +418,7 @@ class VocalTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
 
-        result = await runtime.execute(response)
+        result = await submit_and_wait_terminal(runtime, response)
 
         self.assertEqual(result.status, "failed")
         self.assertEqual(len(result.results), 1)
@@ -500,7 +502,7 @@ class VocalTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.capabilities[0].capability_id, VOCAL_PERFORMANCE_CAPABILITY_ID)
         self.assertEqual(response.capabilities[0].metadata["execution_lane"], "vocal")
-        execution = await self.runtime.execute(response)
+        execution = await submit_and_wait_terminal(self.runtime, response)
         self.assertEqual(execution.status, "completed")
         vocal_result = next(
             item
@@ -527,7 +529,7 @@ class VocalTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_unsupported_mode_returns_correlated_unavailable_result(self) -> None:
-        execution = await self.runtime.execute(
+        execution = await submit_and_wait_terminal(self.runtime,
             InteractionResponse(
                 interaction_id="unsupported-vocal-mode",
                 capabilities=[
@@ -568,7 +570,7 @@ class VocalTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
         provider = VocalPerformanceCapabilityProvider(self.declaration, downgrade)
         runtime = CapabilityRuntime(self.registry)
         runtime.register_provider(provider)
-        execution = await runtime.execute(
+        execution = await submit_and_wait_terminal(runtime,
             InteractionResponse(
                 interaction_id="vocal-no-downgrade",
                 capabilities=[
@@ -609,7 +611,7 @@ class VocalTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime.register_provider(provider)
         interaction_id = "vocal-cancel"
         execution_task = asyncio.create_task(
-            runtime.execute(
+            submit_and_wait_terminal(runtime,
                 InteractionResponse(
                     interaction_id=interaction_id,
                     capabilities=[

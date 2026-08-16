@@ -145,13 +145,15 @@ adding a manager because a useful explanatory term exists.
 ## Approved architecture line — asynchronous transport-independent Capability Runtime
 
 The Trusted Capability Runtime now has an approved target architecture. Current source
-already has request identity, validation, resource arbitration, cancellation, provider
-execution, and bounded internal concurrency, but terminal results are still aggregated
-behind long-running `CapabilityRuntime.execute(...)` call stacks. The target is one canonical
-`CapabilityRuntime`: non-blocking dispatch, independent request lifecycle events, terminal
-Evidence reconciliation, and cognitive re-entry without creating a second Work/Result
-manager or semantic agent. Provider transport and durable-execution backend remain below
-the Capability contract.
+has request identity, validation, resource arbitration, cancellation, provider execution,
+bounded internal concurrency, and a non-blocking `CapabilityRuntime.submit(...)` dispatch
+boundary. `submit()` returns a `CapabilityDispatchReceipt` after Host validation, Runtime
+ownership registration, and submission-task creation; provider terminal completion is an
+explicit `wait_terminal(receipt)` join rather than the dispatch API. No
+`CapabilityRuntime.execute(...)` aggregate compatibility API remains. The remaining target
+is independent request lifecycle events, terminal Evidence reconciliation, and cognitive
+re-entry without creating a second Work/Result manager or semantic agent. Provider transport
+and durable-execution backend remain below the Capability contract.
 
 Implement this line as separate focused Issues and separate patches:
 
@@ -162,11 +164,13 @@ Implement this line as separate focused Issues and separate patches:
   live `skill_id` compatibility are removed; Agent Skills retain `agent_skill_id`, while
   Soridormi wire `skill_id` is translated only at its adapter boundary. This naming/authority
   cleanup does **not** claim the asynchronous dispatch behavior of the later Issues.
-- **Issue — Split capability dispatch from terminal completion.** Add a small
-  `CapabilityDispatchReceipt` contract and `CapabilityRuntime.submit(...)` semantics so
-  acceptance/scheduling returns promptly while provider execution continues. Preserve
-  sequential dependencies and resource barriers without using call-stack blocking as the
-  lifecycle model.
+- **Issue — Split capability dispatch from terminal completion — source implementation complete.**
+  `CapabilityRuntime.submit(...)` now returns a `CapabilityDispatchReceipt` after validation,
+  canonical request registration, and Runtime-owned task creation while provider execution
+  continues independently. Terminal joining is explicit through `wait_terminal(receipt)`;
+  the old `CapabilityRuntime.execute(...)` API was deleted rather than retained as a
+  compatibility wrapper. Existing sequential dependencies, provider grouping, cancellation,
+  and resource barriers remain Runtime-owned.
 - **Issue — Publish correlated capability lifecycle events.** Add one mechanical
   `CapabilityRuntimeEvent` stream for accepted/running/progress/terminal state using
   Host-owned request correlation. Provider-returned IDs are observations, never identity
@@ -197,9 +201,11 @@ Implement this line as separate focused Issues and separate patches:
   its submit/status/event/cancel boundary so embodiment can report progress/terminal events
   without making Chromie wait. Physical feasibility, stop/recovery, and retry authority stay
   provider/trusted-runtime owned.
-- **Issue — Delete aggregate-and-wait execution compatibility.** Once all maintained
-  callers consume dispatch receipts/events, remove the old synchronous aggregation API and
-  stale compatibility tests/docs rather than carrying two execution architectures.
+- **Issue — Delete remaining foreground aggregate-wait behavior.** The old
+  `CapabilityRuntime.execute(...)` compatibility API is already deleted. Once lifecycle
+  events, incremental Evidence, and cognitive re-entry are maintained, remove foreground
+  coordinator joins that still wait for a whole response scope before interaction closure,
+  plus any stale aggregate-only tests/docs. Do not reintroduce a second execution API.
 
 Each Issue must preserve the central authority invariant: Runtime owns execution lifecycle;
 LLM/Core owns meaning. Framework choice must not turn transport, queues, workflows, or

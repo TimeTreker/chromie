@@ -290,7 +290,7 @@ class InteractionRuntimeCoordinator:
                 "goal_completion_authority": False,
             },
         )
-        task = asyncio.create_task(self.runtime.execute(response))
+        task = asyncio.create_task(self._dispatch_to_terminal(response))
 
         def observe_completion(completed: asyncio.Task[CapabilityRuntimeResult]) -> None:
             if completed.cancelled():
@@ -352,6 +352,15 @@ class InteractionRuntimeCoordinator:
             consumed_results,
             consumed_traces,
         )
+
+    async def _dispatch_to_terminal(
+        self,
+        response: InteractionResponse,
+        *,
+        authorization: RuntimeAuthorization | None = None,
+    ) -> CapabilityRuntimeResult:
+        receipt = await self.runtime.submit(response, authorization=authorization)
+        return await self.runtime.wait_terminal(receipt)
 
     async def execute(
         self,
@@ -502,7 +511,7 @@ class InteractionRuntimeCoordinator:
             primary
         )
         if primary.capabilities or primary.speech:
-            execution = await self.runtime.execute(
+            execution = await self._dispatch_to_terminal(
                 primary,
                 authorization=RuntimeAuthorization(
                     confirmed_request_ids=authorized_request_ids,
@@ -577,7 +586,7 @@ class InteractionRuntimeCoordinator:
                 ],
                 metadata={"source": "host_body_failure_fallback"},
             )
-            fallback_execution = await self.runtime.execute(fallback)
+            fallback_execution = await self._dispatch_to_terminal(fallback)
             return self._merge_executions(
                 execution,
                 fallback_execution,
@@ -590,7 +599,7 @@ class InteractionRuntimeCoordinator:
                 speech=after_capabilities_speech,
                 metadata=prepared.metadata,
             )
-            followup_execution = await self.runtime.execute(followup)
+            followup_execution = await self._dispatch_to_terminal(followup)
             return self._merge_executions(
                 execution,
                 followup_execution,
@@ -728,7 +737,7 @@ class InteractionRuntimeCoordinator:
             ],
             metadata={"source": "host_body_setup_failure_fallback"},
         )
-        fallback_execution = await self.runtime.execute(fallback)
+        fallback_execution = await self._dispatch_to_terminal(fallback)
         return self._merge_executions(
             failed,
             fallback_execution,

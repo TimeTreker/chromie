@@ -1622,13 +1622,26 @@
     },
     {
       "path": "orchestrator/runtime/capability_runtime.py",
-      "symbol": "CapabilityRuntime.execute",
+      "symbol": "CapabilityRuntime.submit",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "contract": "Reject an invalid dispatch before Runtime ownership is exposed, and roll back any auto-opened interaction state.",
       "review_status": "reviewed",
       "body_sha256": "9dfd73f419e08e94596198f4154747eb2d91872f9aea5ea920686eab870d60c3",
+      "failure_signals": [
+        "bare_reraise"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/capability_runtime.py",
+      "symbol": "CapabilityRuntime.submit",
+      "ordinal": 2,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Roll back canonical scheduling/execution ownership if Runtime dispatch task creation or registration fails before a receipt is returned.",
+      "review_status": "reviewed",
+      "body_sha256": "35122638105b8192aa479b30832043ceb5576675dc9e24d9d7ca76f63b74330f",
       "failure_signals": [
         "bare_reraise"
       ]
