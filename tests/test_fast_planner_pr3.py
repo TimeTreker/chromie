@@ -1299,7 +1299,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "immediate_vocal_activity": {
                     "activity_id": "activity-weather-progress",
                     "role": "progress",
-                    "response_text": "我看看今晚会不会下大雨～",
+                    "progress_kind": "check_information",
                     "speech_act": "acknowledge",
                     "source_responsibility_refs": ["weather"],
                 },
@@ -1335,7 +1335,57 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(advance.continuations, ["goal_association"])
         self.assertIsNotNone(advance.immediate_vocal_activity)
         self.assertEqual(advance.immediate_vocal_activity.role, "progress")
+        self.assertEqual(advance.immediate_vocal_activity.progress_kind, "check_information")
+        self.assertFalse(hasattr(advance.immediate_vocal_activity, "response_text"))
         self.assertIn("Language hint: zh-CN", str(ollama.prompts[0][0]))
+
+    def test_pre_goal_progress_cannot_smuggle_unsupported_weather_result_text(self):
+        ollama = FakeOllama(
+            {
+                "covered_responsibility_refs": ["weather"],
+                "immediate_vocal_activity": {
+                    "activity_id": "activity-weather-fake-result",
+                    "role": "progress",
+                    "progress_kind": "check_information",
+                    "response_text": "重庆今天温度是28摄氏度哦！",
+                    "speech_act": "inform",
+                    "source_responsibility_refs": ["weather"],
+                },
+                "continuations": ["goal_association"],
+                "confidence": 0.95,
+                "unresolved": [],
+                "reason_summary": "Fresh weather evidence is still required.",
+            }
+        )
+        run_request = _work_request(
+            sid="turn-weather-fake-result",
+            text="今天重庆温度多高？",
+            language="zh-CN",
+            context={
+                "responsibility_proposals": [
+                    {
+                        "local_ref": "weather",
+                        "outcome": "Tell the user today's Chongqing temperature.",
+                        "bindings": {"location": "重庆", "time": "today"},
+                        "completion_requires_work": True,
+                        "completion_requires_fresh_evidence": True,
+                        "confidence": 0.96,
+                    }
+                ]
+            },
+            history=[],
+        )
+
+        advance = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve_advance(run_request)
+        )
+
+        self.assertEqual(advance.continuations, ["goal_association"])
+        self.assertIsNone(advance.immediate_vocal_activity)
+        self.assertEqual(
+            advance.metadata["failure_class"],
+            "fast_advance_contract_invalid",
+        )
 
     def test_pre_goal_advance_deep_planner_also_requires_goal_association(self):
         with self.assertRaisesRegex(ValueError, "Deep Planner continuation requires Goal Association"):

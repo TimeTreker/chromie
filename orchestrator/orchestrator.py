@@ -3558,7 +3558,7 @@ class VoiceAssistant:
             return None
         if decision.route in {"interrupt", "ignore"}:
             return None
-        # Goal Interpretation owns whether a separate Fast Response is useful.
+        # Fast Planner owns whether a separate immediate progress Activity is useful.
         # The Host does not add route-specific suppression for tool work; it only
         # validates and schedules a source-authored notification.
         interpretation_text = self._goal_interpretation_fast_speech_text(

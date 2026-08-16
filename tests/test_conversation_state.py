@@ -929,7 +929,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
         )
         self.assertEqual(manager.active_goal_snapshots(), [])
 
-    def test_planless_native_response_goal_waits_for_scoped_speaking_evidence(self) -> None:
+    def test_planless_direct_response_goal_waits_for_scoped_speaking_evidence(self) -> None:
         manager = ConversationStateManager(base_conversation_id="native-respond-lifecycle")
         self._create_goals(manager, "goal-native-answer")
         response = InteractionResponse(
@@ -940,14 +940,12 @@ class GoalScopedLifecycleTests(unittest.TestCase):
                     "metadata": {
                         "covers_goal_ids": ["goal-native-answer"],
                         "source_goal_ids": ["goal-native-answer"],
-                        "progress_candidate_id": "progress-native-answer",
                     },
                 }
             ],
             metadata={
                 "planning_result": "direct_response",
                 "planless_direct_response": True,
-                "native_response_readiness_adoption": True,
                 "goal_ids": ["goal-native-answer"],
             },
         )

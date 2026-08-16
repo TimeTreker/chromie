@@ -33,7 +33,12 @@ from shared.chromie_contracts.core_interpretation import CoreInterpretationResul
 from shared.chromie_contracts.user_turn import AttentionReviewResult
 from shared.chromie_contracts.interaction import output_schema_sha256
 from shared.chromie_contracts.mind import default_mind_profile
-from shared.chromie_contracts.plan import CanonicalPlan, FastPlannerAdvance, FastPlannerVocalActivity
+from shared.chromie_contracts.plan import (
+    CanonicalPlan,
+    FastPlannerAdvance,
+    FastPlannerProgressActivity,
+    render_fast_planner_vocal_activity,
+)
 from shared.chromie_contracts.response_composition import (
     CoordinatedResponsePlan,
     DirectResponseComposition,
@@ -129,8 +134,10 @@ class FastAdvanceRuntime(FakeRuntime):
     async def start_fast_planner_vocal_activity(
         self, activity, *, session_id: str, turn_id: str, language: str
     ):
-        del session_id, language
-        self.started_fast_activities.append((turn_id, activity.response_text))
+        del session_id
+        self.started_fast_activities.append(
+            (turn_id, render_fast_planner_vocal_activity(activity, language=language))
+        )
         return object()
 
 
@@ -623,10 +630,9 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         advance = FastPlannerAdvance(
             turn_id="turn-weather",
             covered_responsibility_refs=["weather"],
-            immediate_vocal_activity=FastPlannerVocalActivity(
+            immediate_vocal_activity=FastPlannerProgressActivity(
                 activity_id="weather-progress",
-                role="progress",
-                response_text="我看看今天下午重庆会不会下雨～",
+                progress_kind="check_information",
                 speech_act="acknowledge",
                 source_responsibility_refs=["weather"],
             ),
@@ -675,17 +681,16 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         self.assertEqual(result.status, "applied")
         self.assertEqual(events[:3], ["advance", "vocal_activity_started", "association"])
-        self.assertEqual(runtime.started_fast_activities[0][1], "我看看今天下午重庆会不会下雨～")
+        self.assertEqual(runtime.started_fast_activities[0][1], "好，我查一下。")
         self.assertEqual(client.calls[:3], ["advance", "association", "compose"])
 
     def test_fast_planner_complexity_disposition_skips_second_fast_plan_after_goal_binding(self):
         advance = FastPlannerAdvance(
             turn_id="turn-complex",
             covered_responsibility_refs=["fetch-water"],
-            immediate_vocal_activity=FastPlannerVocalActivity(
+            immediate_vocal_activity=FastPlannerProgressActivity(
                 activity_id="fetch-progress",
-                role="progress",
-                response_text="好呀，我看看怎么过去帮你拿～",
+                progress_kind="perform_action",
                 speech_act="acknowledge",
                 source_responsibility_refs=["fetch-water"],
             ),

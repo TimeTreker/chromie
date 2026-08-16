@@ -5,7 +5,6 @@ import asyncio
 import pytest
 from types import SimpleNamespace
 
-from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.cognitive_runtime import (
     CanonicalPlanRuntimeAdapter,
     CognitiveRuntimeResolution,
@@ -14,20 +13,12 @@ from orchestrator.runtime.cognitive_runtime import (
 )
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
 from orchestrator.runtime.skill_runtime import SkillDefinition
-from shared.chromie_contracts.core_interpretation import CognitiveProgressCandidate
-from shared.chromie_contracts.goal import GoalAssociationResolution, GoalProgressBinding
+from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
     SkillRequest,
     SkillResult,
-    output_schema_sha256,
-)
-from shared.chromie_contracts.resource import (
-    AcquireAndDeliverResource,
-    ResourceDescriptor,
-    ResourceRecipient,
-    ResourceSource,
 )
 from shared.chromie_contracts.semantic_task import SemanticGoal
 from shared.chromie_contracts.social_attention import SocialAttentionPlan
@@ -39,13 +30,6 @@ OUTPUT_SCHEMA = {
     "required": ["summary"],
     "additionalProperties": False,
 }
-INPUT_SCHEMA = {
-    "type": "object",
-    "properties": {"query": {"type": "string", "minLength": 1}},
-    "required": ["query"],
-    "additionalProperties": False,
-}
-
 
 def social_activity_context(
     activity_id: str,
@@ -64,370 +48,14 @@ def social_activity_context(
             "goal_ids": list(goal_ids or []),
             "realization": {
                 "execution_lanes": [execution_lane],
-                "vocal_modes": list(vocal_modes or (["speech"] if execution_lane == "vocal" else [])),
+                "vocal_modes": list(
+                    vocal_modes
+                    or (["speech"] if execution_lane == "vocal" else [])
+                ),
                 "capability_ids": list(capability_ids or []),
             },
         }
     }
-
-
-def safe_read_definition(*, provider_id: str = "test.reference") -> SkillDefinition:
-    return SkillDefinition(
-        skill_id="chromie.reference.lookup",
-        version="1.0",
-        provider_id=provider_id,
-        description="test provider-neutral information read",
-        input_schema=INPUT_SCHEMA,
-        output_schema=OUTPUT_SCHEMA,
-        available=True,
-        requires_confirmation=False,
-        interruptible=True,
-        can_run_parallel=True,
-        timeout_ms=1000,
-        idempotent=True,
-        requires_safety_monitor=False,
-        metadata={
-            "effects": ["read_only"],
-            "safety_class": "safe_read",
-            "side_effect_free": True,
-            "execution_lane": "activity",
-            "semantic_scope": {
-                "responsibility_type": "acquire_and_deliver_resource",
-                "resource_kinds": ["information"],
-            },
-            "resource_contract": {
-                "plan_provides": ["resource_acquired"],
-                "final_delivery_owner": "chromie_response_layer",
-            },
-        },
-    )
-
-
-def information_goal(goal_id: str, candidate_id: str) -> GoalAssociationResolution:
-    resource = AcquireAndDeliverResource(
-        resource=ResourceDescriptor(kind="information", description="current reference information"),
-        source=ResourceSource(status="provider_resolved"),
-        recipient=ResourceRecipient(description="requester"),
-        delivery_mode="spoken_explanation",
-    )
-    return GoalAssociationResolution(
-        turn_id="turn-1",
-        new_goals=[
-            SemanticGoal(
-                goal_id=goal_id,
-                description="Look up the current reference status.",
-                source_text="Check the current reference status.",
-                resource_responsibility=resource,
-                metadata={
-                    "responsibility_kind": "capability_dependent",
-                    "execution_lane": "activity",
-                    "output_mode": "capability_work",
-                    "provider_required": True,
-                    "media_operation": "none",
-                },
-            )
-        ],
-        progress_bindings=[
-            GoalProgressBinding(
-                candidate_id=candidate_id,
-                goal_ids=[goal_id],
-                confidence=0.98,
-                reason_summary="The exact information read satisfies this Goal.",
-            )
-        ],
-        confidence=0.98,
-        reason_summary="New information Goal.",
-        metadata={"status": "resolved"},
-    )
-
-
-class ReadyFakeRuntime:
-    def __init__(self) -> None:
-        self.definition = safe_read_definition()
-        self.started = asyncio.Event()
-        self.start_calls = 0
-        self.bind_calls = 0
-        self.cancel_calls = 0
-
-    async def ensure_skill_definitions(self, skill_ids):
-        for item in skill_ids:
-            if item != self.definition.skill_id:
-                raise ValueError(item)
-
-    def skill_definition(self, skill_id):
-        if skill_id != self.definition.skill_id:
-            raise ValueError(skill_id)
-        return self.definition
-
-    async def start_ready_capability_read(self, candidate, **kwargs):
-        assert candidate.capability_id == self.definition.skill_id
-        self.start_calls += 1
-        request = SkillRequest(
-            request_id=f"ready_{candidate.candidate_id}",
-            skill_id=candidate.capability_id,
-            skill_version=self.definition.version,
-            args=candidate.args,
-            committed_output_schema_sha256=output_schema_sha256(self.definition.output_schema),
-        )
-        self.started.set()
-        return SimpleNamespace(candidate=candidate, request=request)
-
-    async def cancel_ready_capability_read(self, handle):
-        self.cancel_calls += 1
-
-    async def bind_ready_capability_read(self, handle, **kwargs):
-        canonical_request = kwargs["canonical_request"]
-        assert canonical_request.skill_id == handle.request.skill_id
-        assert canonical_request.args == handle.request.args
-        self.bind_calls += 1
-        return True
-
-
-class ContinuousClient:
-    def __init__(self, runtime: ReadyFakeRuntime, association: GoalAssociationResolution):
-        self.runtime = runtime
-        self.association = association
-        self.calls: list[str] = []
-
-    async def resolve_goal_association(self, *args, **kwargs):
-        self.calls.append("association")
-        # Proves the trusted read branch is allowed to start while Goal Association
-        # is still in flight rather than after it returns.
-        await asyncio.wait_for(self.runtime.started.wait(), timeout=1.0)
-        return self.association
-
-    async def resolve_fast_plan(self, *args, **kwargs):
-        self.calls.append("fast")
-        raise AssertionError("Fast Planner must not run for fully bound safe-read progress")
-
-    async def resolve_deep_plan(self, *args, **kwargs):
-        self.calls.append("deep")
-        raise AssertionError("Deep Planner must not run")
-
-    async def compose_response_plan(self, *args, **kwargs):
-        self.calls.append("compose")
-        raise AssertionError("pre-evidence Response Composer must not block a pure safe read")
-
-
-class ReadyConversationRuntime:
-    def __init__(self) -> None:
-        self.started = asyncio.Event()
-        self.start_calls = 0
-        self.bind_calls = 0
-        self.cancel_calls = 0
-
-    async def start_ready_capability_read(self, candidate, **kwargs):
-        return None
-
-    async def start_ready_native_response(self, candidate, **kwargs):
-        assert candidate.kind == "native_response"
-        self.start_calls += 1
-        self.started.set()
-        return SimpleNamespace(candidate=candidate)
-
-    async def cancel_ready_capability_read(self, handle):
-        self.cancel_calls += 1
-
-    async def cancel_ready_native_response(self, handle):
-        self.cancel_calls += 1
-
-    async def bind_ready_native_response(self, handle, **kwargs):
-        speech = kwargs["canonical_speech"]
-        assert speech.text == handle.candidate.response_text
-        self.bind_calls += 1
-        return True
-
-
-def spoken_goal(goal_id: str, candidate_id: str) -> GoalAssociationResolution:
-    return GoalAssociationResolution(
-        turn_id="turn-native",
-        new_goals=[
-            SemanticGoal(
-                goal_id=goal_id,
-                description="Answer the user's identity question.",
-                source_text="What is your name?",
-                metadata={
-                    "responsibility_kind": "vocal_output",
-                    "execution_lane": "vocal",
-                    "output_mode": "speech",
-                    "provider_required": False,
-                    "media_operation": "none",
-                },
-            )
-        ],
-        progress_bindings=[
-            GoalProgressBinding(
-                candidate_id=candidate_id,
-                goal_ids=[goal_id],
-                confidence=0.99,
-                reason_summary="The native response directly satisfies this Goal.",
-            )
-        ],
-        confidence=0.99,
-        reason_summary="One direct conversational Goal.",
-        metadata={"status": "resolved"},
-    )
-
-
-def test_native_converse_runs_with_goal_association_and_skips_planner_composer():
-    async def scenario():
-        candidate = CognitiveProgressCandidate(
-            candidate_id="progress-native",
-            kind="native_response",
-            response_text="I'm Chromie!",
-            speech_act="answer",
-            intent="identity_question",
-            confidence=0.99,
-        )
-        runtime = ReadyConversationRuntime()
-        association = spoken_goal("goal-native", candidate.candidate_id)
-
-        class Client:
-            def __init__(self) -> None:
-                self.calls: list[str] = []
-
-            async def resolve_goal_association(self, *args, **kwargs):
-                self.calls.append("association")
-                await asyncio.wait_for(runtime.started.wait(), timeout=1.0)
-                return association
-
-            async def resolve_fast_plan(self, *args, **kwargs):
-                raise AssertionError("Fast Planner must not run for bound native conversation")
-
-            async def resolve_deep_plan(self, *args, **kwargs):
-                raise AssertionError("Deep Planner must not run for bound native conversation")
-
-            async def compose_response_plan(self, *args, **kwargs):
-                raise AssertionError("Response Composer must not rewrite bound native conversation")
-
-        client = Client()
-        conversation = ConversationStateManager(base_conversation_id="transient-native")
-        coordinator = GoalDrivenRuntimeCoordinator(
-            agent_client=client,
-            adapter=CanonicalPlanRuntimeAdapter(runtime),
-            policy=CognitiveRuntimePolicy(
-                mode="apply",
-                apply_lanes=frozenset({"chat"}),
-            ),
-            goal_state_apply=conversation.apply_goal_association_resolution,
-        )
-        result = await coordinator._resolve(
-            object(),
-            text="What is your name?",
-            sid="session-native",
-            route_decision=SimpleNamespace(route="chat", intent="identity_question"),
-            context={
-                "turn_id": "turn-native",
-                "progress_candidates": [candidate.model_dump(mode="json")],
-            },
-            history=[],
-            language="en-US",
-        )
-
-        assert result.status == "applied"
-        assert result.fast_plan is None
-        assert result.terminal_plan is None
-        assert result.response_composition is None
-        assert result.metadata["fast_planner_path"] == "native_response_readiness_adoption"
-        assert result.metadata["native_response_readiness_adoption"] is True
-        assert result.metadata["ready_result_bound_count"] == 1
-        assert result.metadata["goal_state_commit_stage"] == "transient_native_responsibility"
-        assert result.metadata["authoritative_goal_count"] == 0
-        assert result.metadata["transient_responsibility_ids"] == ["goal-native"]
-        assert conversation.active_goal_snapshots() == []
-        assert result.interaction_response is not None
-        assert result.interaction_response.metadata["transient_responsibility"] is True
-        conversation.record_agent_result("session-native", result.interaction_response)
-        assert conversation.active_goal_snapshots() == []
-        assert not [
-            item
-            for item in conversation.snapshot()["pending_tasks"]
-            if item.get("type") == "goal_execution"
-        ]
-        assert [item.text for item in result.interaction_response.speech] == ["I'm Chromie!"]
-        assert result.interaction_response.speech[0].metadata["covers_goal_ids"] == [
-            "goal-native"
-        ]
-        assert client.calls == ["association"]
-        assert runtime.start_calls == 1
-        assert runtime.bind_calls == 1
-        assert runtime.cancel_calls == 0
-
-    asyncio.run(scenario())
-
-
-def test_ready_native_speech_is_rebound_to_canonical_speech_without_second_tts_call():
-    async def scenario():
-        scheduled: list[dict] = []
-
-        def scheduler(payload):
-            scheduled.append(dict(payload))
-            return {"scheduled": True, "playback_started": True}
-
-        coordinator = InteractionRuntimeCoordinator(scheduler)
-        candidate = CognitiveProgressCandidate(
-            candidate_id="progress-native-runtime",
-            kind="native_response",
-            response_text="I'm Chromie!",
-            speech_act="answer",
-            intent="identity_question",
-            confidence=0.99,
-        )
-        handle = await coordinator.start_ready_native_response(
-            candidate,
-            session_id="session-native-runtime",
-            turn_id="turn-native-runtime",
-            language="en-US",
-        )
-        assert handle is not None
-        canonical_speech = InteractionSpeech(
-            id="speech-canonical-native",
-            text="I'm Chromie!",
-            metadata={"source_goal_ids": ["goal-native-runtime"]},
-        )
-        assert await coordinator.bind_ready_native_response(
-            handle,
-            canonical_interaction_id="interaction-native-runtime",
-            canonical_speech=canonical_speech,
-        )
-        execution = await coordinator.execute(
-            InteractionResponse(
-                interaction_id="interaction-native-runtime",
-                speech=[canonical_speech],
-            ),
-            session_id="session-native-runtime",
-        )
-
-        assert len(scheduled) == 1
-        assert execution.status == "completed"
-        assert any(
-            result.request_id == "speech-canonical-native"
-            and result.skill_id == "chromie.speak"
-            for result in execution.results
-        )
-
-    asyncio.run(scenario())
-
-
-class CountingProvider:
-    provider_id = "test.reference"
-
-    def __init__(self) -> None:
-        self.calls = 0
-
-    async def execute(self, request, definition, context):
-        self.calls += 1
-        return SkillResult(
-            request_id=request.request_id,
-            skill_id=request.skill_id,
-            skill_version=definition.version,
-            status="completed",
-            provider_id=self.provider_id,
-            output={"summary": "The current reference status is available."},
-        )
-
-    async def cancel(self, request, definition, context):
-        return None
 
 
 def blink_definition() -> SkillDefinition:

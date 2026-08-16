@@ -20,7 +20,7 @@ from shared.chromie_contracts.resource import (
     ResourceDescriptor,
     ResourceRecipient,
     ResourceSource,
-    project_resource_grounding,
+    resource_semantic_bindings,
 )
 
 
@@ -85,21 +85,30 @@ def resource_responsibility(
     recipient_payload = {"description": recipient}
     if recipient_referent_id:
         recipient_payload["referent_id"] = recipient_referent_id
-    return {
-        "resource": {
-            "kind": kind,
+    if kind == "information":
+        source_payload: dict = {"status": source_status}
+        if source_status == "known":
+            source_payload["source_name"] = source_description or "named source"
+        return {
+            "kind": "information",
             "description": description,
             "quantity": quantity,
-            "attributes": list(attributes or []),
-        },
+            "query_scope": list(attributes or []),
+            "source": source_payload,
+            "recipient": recipient_payload,
+            "delivery_mode": delivery_mode or "spoken_explanation",
+        }
+    return {
+        "kind": "physical_object",
+        "description": description,
+        "quantity": quantity,
         "source": {
             "status": source_status,
             "description": source_description,
-            "bindings": list(source_bindings or []),
+            "acquisition_bindings": list(source_bindings or []),
         },
         "recipient": recipient_payload,
-        "delivery_mode": delivery_mode
-        or ("physical_handover" if kind == "physical_object" else "spoken_explanation"),
+        "delivery_mode": delivery_mode or "physical_handover",
     }
 
 
@@ -168,7 +177,6 @@ def request(
     route: str = "chat",
     intent: str = "conversation",
     discourse_referents=None,
-    progress_candidates=None,
 ) -> CognitiveWorkRequest:
     del route, intent
     return CognitiveWorkRequest(
@@ -193,7 +201,6 @@ def request(
             "discourse_referents": discourse_referents or [],
             "discourse_focus": [],
             "recent_tool_evidence": [],
-            "progress_candidates": progress_candidates or [],
         },
     )
 
@@ -241,7 +248,7 @@ class GoalExecutionContractTests(unittest.TestCase):
                 }
             )
 
-    def test_resource_contract_is_nested_and_top_level_bindings_are_read_only(self):
+    def test_physical_resource_has_one_acquisition_binding_surface(self):
         nested = resource_responsibility(
             source_status="known",
             source_description="前方100米处",
@@ -253,9 +260,11 @@ class GoalExecutionContractTests(unittest.TestCase):
         parsed = GoalAssociationModelGoal.model_validate(
             goal("从前方100米处拿一杯水并交给用户。", "body_action", resource=nested)
         )
-        self.assertEqual(parsed.resource_responsibility.resource.quantity, "1")
+        resource = parsed.resource_responsibility
+        self.assertEqual(resource.quantity, "1")
+        self.assertEqual(resource.kind, "physical_object")
         self.assertEqual(
-            [item.name for item in parsed.resource_responsibility.source.bindings],
+            [item.name for item in resource.source.acquisition_bindings],
             ["distance", "direction"],
         )
 
@@ -279,112 +288,91 @@ class GoalExecutionContractTests(unittest.TestCase):
                 )
             )
 
-    def test_resource_attributes_cannot_duplicate_canonical_quantity(self):
-        with self.assertRaisesRegex(ValueError, "duplicate canonical resource"):
+    def test_physical_resource_rejects_information_query_scope_surface(self):
+        payload = resource_responsibility(
+            source_status="known",
+            source_bindings=[binding("source_location", "place", "table")],
+        )
+        payload["query_scope"] = [binding("distance", "distance", "100")]
+        with self.assertRaises(ValidationError):
             GoalAssociationModelGoal.model_validate(
-                goal(
-                    "Bring one bottle.",
-                    "body_action",
-                    resource=resource_responsibility(
-                        attributes=[binding("quantity", "quantity", "1")]
-                    ),
-                )
+                goal("Bring the bottle.", "body_action", resource=payload)
             )
 
-    def test_known_resource_source_requires_typed_source_bindings(self):
-        with self.assertRaisesRegex(ValueError, "source.bindings"):
+    def test_known_physical_source_requires_acquisition_bindings(self):
+        with self.assertRaisesRegex(ValueError, "acquisition_bindings"):
             GoalAssociationModelGoal.model_validate(
                 goal(
                     "Bring the water from 100 meters ahead.",
                     "body_action",
                     resource=resource_responsibility(
-                        attributes=[binding("distance", "distance", "100")],
                         source_status="known",
                         source_description="100 meters ahead",
                     ),
                 )
             )
 
-    def test_source_summary_cannot_supply_an_unbound_numeric_fact(self):
-        with self.assertRaisesRegex(ValueError, "numeric facts.*source.bindings"):
+    def test_physical_source_summary_cannot_supply_unbound_numeric_fact(self):
+        with self.assertRaisesRegex(ValueError, "numeric facts.*acquisition_bindings"):
             GoalAssociationModelGoal.model_validate(
                 goal(
                     "Bring the water from 100 meters ahead.",
                     "body_action",
                     resource=resource_responsibility(
-                        attributes=[binding("distance", "distance", "100m")],
                         source_status="known",
                         source_description="100 meters ahead",
-                        source_bindings=[
-                            binding("location_direction", "direction", "ahead")
-                        ],
+                        source_bindings=[binding("direction", "direction", "ahead")],
                     ),
                 )
             )
 
-    def test_typed_resource_fact_cannot_have_two_writable_owners(self):
-        with self.assertRaisesRegex(ValueError, "both resource attributes and source"):
-            GoalAssociationModelGoal.model_validate(
-                goal(
-                    "Bring the water from 100 meters ahead.",
-                    "body_action",
-                    resource=resource_responsibility(
-                        attributes=[
-                            binding("distance_to_source", "distance", "100m")
-                        ],
-                        source_status="known",
-                        source_description="100 meters ahead",
-                        source_bindings=[
-                            binding("location_offset", "distance", "100m")
-                        ],
-                    ),
-                )
-            )
+    def test_information_resource_has_one_query_scope_surface(self):
+        information = resource_responsibility(
+            kind="information",
+            description="Chongqing weather tonight",
+            quantity="",
+            attributes=[
+                binding("location", "location", "Chongqing"),
+                binding("time", "time", "tonight"),
+            ],
+            source_status="provider_resolved",
+        )
+        parsed = GoalAssociationModelGoal.model_validate(
+            goal("Check Chongqing weather tonight.", "capability_work", resource=information)
+        )
+        resource = parsed.resource_responsibility
+        self.assertEqual(resource.kind, "information")
+        self.assertEqual([item.name for item in resource.query_scope], ["location", "time"])
+        self.assertFalse(hasattr(resource.source, "bindings"))
 
-    def test_equivalent_measurement_cannot_escape_cross_owner_check(self):
-        with self.assertRaisesRegex(
-            ValueError,
-            "equivalent typed measurement.*resource attributes and source",
-        ):
+    def test_information_query_scope_cannot_recreate_source_authority(self):
+        with self.assertRaisesRegex(ValueError, "query_scope cannot duplicate"):
             GoalAssociationModelGoal.model_validate(
                 goal(
-                    "Retrieve the measurement from the supplied source.",
+                    "Check the named source.",
                     "capability_work",
                     resource=resource_responsibility(
                         kind="information",
-                        description="the requested measurement",
+                        description="named-source result",
                         quantity="",
-                        attributes=[binding("distance", "measurement", "100m")],
-                        source_status="known",
-                        source_bindings=[
-                            binding(
-                                "location_description",
-                                "location_instruction",
-                                "100 meters ahead",
-                            )
-                        ],
+                        attributes=[binding("source", "information_source", "BBC")],
+                        source_status="provider_resolved",
                     ),
                 )
             )
 
-    def test_physical_resource_attributes_are_structurally_unwritable(self):
-        with self.assertRaisesRegex(
-            ValueError,
-            "physical resource.attributes must be empty",
-        ):
+    def test_information_source_has_no_arbitrary_binding_surface(self):
+        payload = resource_responsibility(
+            kind="information",
+            description="weather",
+            quantity="",
+            attributes=[binding("location", "location", "重庆")],
+            source_status="provider_resolved",
+        )
+        payload["source"]["bindings"] = [binding("location", "location", "重庆")]
+        with self.assertRaises(ValidationError):
             GoalAssociationModelGoal.model_validate(
-                goal(
-                    "Bring the red bottle from the table.",
-                    "body_action",
-                    resource=resource_responsibility(
-                        description="the red bottle",
-                        attributes=[binding("color", "color", "red")],
-                        source_status="known",
-                        source_bindings=[
-                            binding("source_location", "place", "the table")
-                        ],
-                    ),
-                )
+                goal("Check 重庆 weather.", "capability_work", resource=payload)
             )
 
     def test_resource_kind_requires_its_semantic_completion_mode(self):
@@ -412,7 +400,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             quantity="",
             source_status="provider_resolved",
         )
-        with self.assertRaisesRegex(ValueError, "typed query-scope attribute"):
+        with self.assertRaisesRegex(ValueError, "query_scope"):
             GoalAssociationModelGoal.model_validate(
                 goal("Check Chongqing weather.", "capability_work", resource=information)
             )
@@ -476,18 +464,19 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
         self.assertTrue(list(goal_validator.iter_errors(untyped_known_source)))
 
+        typed_physical_attribute_resource = resource_responsibility(
+            description="the red bottle",
+            source_status="known",
+            source_bindings=[binding("source_location", "place", "the table")],
+        )
+        typed_physical_attribute_resource["query_scope"] = [
+            binding("color", "color", "red")
+        ]
         typed_physical_attribute = create_goals(
             goal(
                 "Bring the red bottle from the table.",
                 "body_action",
-                resource=resource_responsibility(
-                    description="the red bottle",
-                    attributes=[binding("color", "color", "red")],
-                    source_status="known",
-                    source_bindings=[
-                        binding("source_location", "place", "the table")
-                    ],
-                ),
+                resource=typed_physical_attribute_resource,
             )
         )
         typed_physical_attribute.update(
@@ -537,11 +526,11 @@ class GoalExecutionContractTests(unittest.TestCase):
             output_type=GoalSegmentationModelOutput,
         )
         self.assertIn(
-            "put a resolved place in resource.attributes as a binding named location",
+            "a resolved place is a query_scope binding named location",
             interpretation_prompt,
         )
         self.assertIn(
-            "requested time and result aspects there as their own typed attributes",
+            "time and requested result aspects as separate bindings",
             interpretation_prompt,
         )
         self.assertNotIn(
@@ -576,7 +565,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
         self.assertIn(
             "requested location, time, and result aspects are covered only by "
-            "resource.attributes",
+            "resource_responsibility.query_scope",
             coverage_prompt,
         )
         self.assertIn("Reference grounding is part of responsibility coverage", coverage_prompt)
@@ -597,7 +586,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertIn("saying the reminder now does not complete", execution_contract)
         self.assertIn("ordinary typed Goal bindings", execution_contract)
         self.assertIn("persistent state mutations", execution_contract)
-        self.assertIn("local, private, household, device, sensor, or runtime state", execution_contract)
+        self.assertIn("local/private/runtime source", execution_contract)
         self.assertIn("source.status=unknown", execution_contract)
 
     def test_unscoped_optional_referent_correction_is_dropped(self):
@@ -619,34 +608,30 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertEqual(normalized["referent_updates"], [])
         self.assertEqual(dropped[0]["reason"], "missing_target_referent_ids")
 
-    def test_deterministic_resource_projection_is_frozen(self):
+    def test_resource_semantic_binding_view_is_transient(self):
         canonical = AcquireAndDeliverResource(
             resource=ResourceDescriptor(
-                kind="physical_object",
-                description="一杯水",
+                kind="information",
+                description="temperature reading",
                 quantity="1",
-                attributes={"temperature": binding("temperature", "temperature", "cold")},
+                attributes={"location": binding("location", "location", "重庆")},
             ),
             source=ResourceSource(
-                status="known",
-                description="前方100米处",
-                bindings={"distance": binding("distance", "distance", "100")},
+                status="provider_resolved",
+                description="",
+                bindings={},
             ),
             recipient=ResourceRecipient(description="用户"),
-            delivery_mode="physical_handover",
+            delivery_mode="spoken_explanation",
         )
-        projection = project_resource_grounding(canonical)
+        bindings = resource_semantic_bindings(canonical)
 
+        self.assertEqual(set(bindings), {"location", "quantity"})
+        bindings["location"]["value"] = "changed"
         self.assertEqual(
-            set(projection.bindings),
-            {"temperature", "distance", "quantity"},
+            canonical.resource.attributes["location"]["value"],
+            "重庆",
         )
-        self.assertEqual(
-            projection.provenance["distance"],
-            "resource_responsibility.source.bindings.distance",
-        )
-        with self.assertRaises(ValidationError):
-            projection.bindings = {}
 
     def test_certificate_has_no_model_authored_verdict(self):
         parsed = GoalResponsibilityCoverageCertificate.model_validate(
@@ -1366,14 +1351,12 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
         semantic = result.new_goals[0]
         self.assertEqual(semantic.metadata["output_mode"], "body_action")
         self.assertEqual(semantic.resource_responsibility.resource.quantity, "1")
+        self.assertEqual(semantic.object, {})
         self.assertEqual(
-            set(semantic.object["bindings"]),
+            set(resource_semantic_bindings(semantic.resource_responsibility)),
             {"distance", "direction", "quantity"},
         )
-        self.assertEqual(
-            semantic.metadata["resource_grounding_projection"]["authority"],
-            "derived_read_only",
-        )
+        self.assertNotIn("resource_grounding_projection", semantic.metadata)
 
     def test_user_water_probe_preserves_one_resource_goal_and_source_constraint(self):
         resource = resource_responsibility(

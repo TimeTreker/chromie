@@ -145,11 +145,9 @@ Information example:
 ```
 
 `responsibility_type=acquire_and_deliver_resource` plus `resource.kind` is the
-canonical semantic discriminator. The old `responsibility_variant` field is accepted
-only as an input-compatibility alias for persisted/older payloads; it is validated
-against `resource.kind` and omitted from canonical serialization. Planner matching
-therefore never depends on names such as `fetch_and_deliver_object` or
-`fetch_and_deliver_information`.
+canonical semantic discriminator. The removed `responsibility_variant` field is not
+accepted as an input alias; old names such as `fetch_and_deliver_object` and
+`fetch_and_deliver_information` are rejected instead of translated.
 
 The semantic contract forbids provider IDs, capability IDs, coordinates, grasp
 poses, websites, search engines, execution mode, and implementation plans.
@@ -160,9 +158,17 @@ Those belong downstream.
 Goal Association decides whether the current turn creates, continues, modifies,
 or supplies missing information for a resource responsibility.
 
-`SemanticGoal.resource_responsibility` is the resource domain's sole writable
+`SemanticGoal.resource_responsibility` is the resource domain's sole persisted
 semantic authority. Resource identity, kind, quantity, source, recipient, and
-delivery mode are authored exactly once there. A Goal description is a
+delivery mode are authored exactly once there. The Goal-Association model-facing
+schema also has one writable owner per fact: information requests put location,
+time, requested aspect, and similar query facts only in `query_scope`; the narrow
+information `source` carries source status/identity only. Physical requests put
+spatial/acquisition facts only in `source.acquisition_bindings`. The Host then
+materializes one canonical `resource_responsibility`; it does not persist a second
+flat `SemanticGoal.object.bindings` copy. Generic Planner checks may derive a
+transient flat view from the canonical object, but that view is never written back.
+A Goal description is a
 human-readable summary: it may be checked for material contradiction but never
 supplies, overrides, or repairs a typed resource fact. Generic Goal bindings and
 Planner argument views must not be separately model-authored copies of resource

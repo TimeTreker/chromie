@@ -55,6 +55,17 @@ except ImportError:  # pragma: no cover
         PlanTiming,
     )
 
+try:
+    from chromie_contracts.resource import (
+        AcquireAndDeliverResource,
+        resource_semantic_bindings,
+    )
+except ImportError:  # pragma: no cover
+    from shared.chromie_contracts.resource import (
+        AcquireAndDeliverResource,
+        resource_semantic_bindings,
+    )
+
 PlannerTier = Literal["fast", "deep"]
 PlannerPlanRelation = Literal["exact", "safe_adjustment", "alternative"]
 
@@ -2186,12 +2197,24 @@ def _material_values_equal(
 
 
 def _goal_binding_map(goal: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    goal_object = goal.get("object")
-    if not isinstance(goal_object, dict):
-        return {}
-    raw_bindings = goal_object.get("bindings")
-    if not isinstance(raw_bindings, dict):
-        return {}
+    """Return one transient typed binding view from the canonical Goal authority.
+
+    Non-resource Goals own ``object.bindings``. Resource Goals own only
+    ``resource_responsibility``; their flat view is computed on demand and is never
+    persisted back into the Goal.
+    """
+
+    raw_resource = goal.get("resource_responsibility")
+    if isinstance(raw_resource, dict):
+        responsibility = AcquireAndDeliverResource.model_validate(raw_resource)
+        raw_bindings = resource_semantic_bindings(responsibility)
+    else:
+        goal_object = goal.get("object")
+        if not isinstance(goal_object, dict):
+            return {}
+        raw_bindings = goal_object.get("bindings")
+        if not isinstance(raw_bindings, dict):
+            return {}
     bindings: dict[str, dict[str, Any]] = {}
     for raw_name, raw_binding in raw_bindings.items():
         name = " ".join(str(raw_name or "").strip().split())
@@ -2650,16 +2673,13 @@ def validate_explicit_numeric_parameter_grounding(
         source_text = str(goal.get("source_text") or "").strip()
         if not parts and source_text:
             parts.append(source_text)
-        goal_object = goal.get("object")
-        bindings = goal_object.get("bindings") if isinstance(goal_object, dict) else None
-        if isinstance(bindings, dict):
-            parts.extend(
-                str(binding.get("value")).strip()
-                for binding in bindings.values()
-                if isinstance(binding, dict)
-                and binding.get("value") is not None
-                and str(binding.get("value")).strip()
-            )
+        bindings = _goal_binding_map(goal)
+        parts.extend(
+            str(binding.get("value")).strip()
+            for binding in bindings.values()
+            if binding.get("value") is not None
+            and str(binding.get("value")).strip()
+        )
         responsibility = goal.get("resource_responsibility")
         if isinstance(responsibility, dict):
             resource_arguments_by_goal[goal_id] = {
@@ -2846,17 +2866,10 @@ def normalize_schema_default_parameter_provenance(
                 parsed = numeric(match.group(0))
                 if parsed is not None:
                     values.add(parsed)
-        goal_object = goal.get("object")
-        bindings = (
-            goal_object.get("bindings") if isinstance(goal_object, dict) else None
-        )
-        if isinstance(bindings, dict):
-            for binding in bindings.values():
-                if not isinstance(binding, dict):
-                    continue
-                parsed = numeric(binding.get("value"))
-                if parsed is not None:
-                    values.add(parsed)
+        for binding in _goal_binding_map(goal).values():
+            parsed = numeric(binding.get("value"))
+            if parsed is not None:
+                values.add(parsed)
         goal_numbers[goal_id] = values
 
     schemas = {

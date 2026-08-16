@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import hashlib
-import json
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -103,52 +101,6 @@ class CognitiveResponsibilityProposal(BaseModel):
                 "fresh evidence requirement implies completion_requires_work"
             )
         return self
-
-
-class CognitiveProgressCandidate(BaseModel):
-    """Runtime-only prospective vocal candidate.
-
-    This type is not part of Goal Interpretation output and carries no route or
-    Capability authority. New maintained turns use FastPlannerAdvance directly;
-    the type remains for runtime-owned prospective vocal scheduling artifacts.
-    """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    schema_version: Literal[2] = 2
-    candidate_id: str = Field(min_length=1, max_length=160)
-    kind: Literal["native_response"] = "native_response"
-    response_text: str = Field(min_length=1, max_length=600)
-    speech_act: str = Field(default="inform", min_length=1, max_length=120)
-    intent: str = Field(default="unknown", min_length=1, max_length=200)
-    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
-
-    @field_validator(
-        "candidate_id", "response_text", "speech_act", "intent", mode="before"
-    )
-    @classmethod
-    def normalize_candidate_text(cls, value: str) -> str:
-        return normalize_turn_text(str(value or ""))
-
-    @staticmethod
-    def stable_id(
-        *,
-        turn_id: str,
-        response_text: str = "",
-        speech_act: str = "inform",
-    ) -> str:
-        payload = json.dumps(
-            {
-                "turn_id": normalize_turn_text(turn_id),
-                "kind": "native_response",
-                "response_text": normalize_turn_text(response_text),
-                "speech_act": normalize_turn_text(speech_act),
-            },
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
-        return f"progress_{hashlib.sha256(payload).hexdigest()[:20]}"
 
 
 class CoreInterpretationResult(BaseModel):

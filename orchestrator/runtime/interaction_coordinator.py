@@ -16,8 +16,10 @@ from agent.app.tool_invocation import (
     McpStreamableHttpInvoker,
     ToolInvocationContext,
 )
-from shared.chromie_contracts.core_interpretation import CognitiveProgressCandidate
-from shared.chromie_contracts.plan import FastPlannerVocalActivity
+from shared.chromie_contracts.plan import (
+    FastPlannerVocalActivity,
+    render_fast_planner_vocal_activity,
+)
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
@@ -110,15 +112,6 @@ class ReadyPlannerVocalExecution:
 
 
 @dataclass
-class ReadyNativeResponseExecution:
-    """One Core-authored native response already entering the Vocal lane."""
-
-    candidate: CognitiveProgressCandidate
-    interaction_id: str
-    speech: InteractionSpeech
-    task: asyncio.Task[SkillRuntimeResult]
-
-
 class InteractionRuntimeCoordinator:
     """Host integration boundary for InteractionResponse execution."""
 
@@ -253,7 +246,7 @@ class InteractionRuntimeCoordinator:
         deeper planning continues in parallel.
         """
 
-        text = " ".join(activity.response_text.strip().split())
+        text = render_fast_planner_vocal_activity(activity, language=language)
         speech = InteractionSpeech(
             id=f"fast_activity_speech_{activity.activity_id}",
             text=text,
@@ -312,145 +305,6 @@ class InteractionRuntimeCoordinator:
 
         task.add_done_callback(observe_completion)
         return ReadyPlannerVocalExecution(activity, interaction_id, speech, task)
-
-    async def start_ready_native_response(
-        self,
-        candidate: CognitiveProgressCandidate,
-        *,
-        session_id: str,
-        turn_id: str,
-        language: str,
-    ) -> ReadyNativeResponseExecution | None:
-        """Start one complete native conversational answer through chromie.speak.
-
-        The Core owns the semantic judgment that current Mind/context is already
-        sufficient.  Trusted runtime still owns delivery mechanics and evidence.
-        The response is deliberately Goal-unbound until Goal Association later
-        binds the candidate to canonical conversational Goals.
-        """
-
-        if candidate.kind != "native_response":
-            return None
-        text = " ".join(candidate.response_text.strip().split())
-        if not text:
-            return None
-        speech = InteractionSpeech(
-            id=f"ready_speech_{candidate.candidate_id}",
-            text=text,
-            timing="immediate",
-            style="brief",
-            priority="normal",
-            interruptible=True,
-            metadata={
-                "source": "core_native_response_readiness",
-                "phase": "native_response",
-                "speech_act": candidate.speech_act,
-                "turn_id": turn_id,
-                "session_id": session_id,
-                "language": language,
-                "progress_candidate_id": candidate.candidate_id,
-                "canonical_goal_binding_pending": True,
-                "goal_completion_authority": False,
-                "execution_lane": "vocal",
-                "delivery_role": "response",
-                "wait_for_playback_start": True,
-                "playback_start_required_for_delivery": True,
-            },
-        )
-        interaction_id = f"ready_native_{turn_id}_{candidate.candidate_id}"
-        response = InteractionResponse(
-            interaction_id=interaction_id,
-            status="ok",
-            speech=[speech],
-            metadata={
-                "source": "core_native_response_readiness",
-                "turn_id": turn_id,
-                "session_id": session_id,
-                "language": language,
-                "progress_candidate_id": candidate.candidate_id,
-                "canonical_goal_binding_pending": True,
-                "goal_completion_authority": False,
-            },
-        )
-        task = asyncio.create_task(self.runtime.execute(response))
-        return ReadyNativeResponseExecution(candidate, interaction_id, speech, task)
-
-    async def cancel_ready_native_response(
-        self, handle: ReadyNativeResponseExecution
-    ) -> None:
-        if handle.task.done():
-            return
-        handle.task.cancel()
-        await asyncio.gather(handle.task, return_exceptions=True)
-
-    async def bind_ready_native_response(
-        self,
-        handle: ReadyNativeResponseExecution,
-        *,
-        canonical_interaction_id: str,
-        canonical_speech: InteractionSpeech,
-    ) -> bool:
-        """Rebind one delivered/pending native response to canonical speech once."""
-
-        if (
-            handle.candidate.kind != "native_response"
-            or canonical_speech.text != handle.speech.text
-        ):
-            await self.cancel_ready_native_response(handle)
-            return False
-        execution_outcome = (
-            await asyncio.gather(handle.task, return_exceptions=True)
-        )[0]
-        if isinstance(execution_outcome, BaseException):
-            return False
-        result = next(
-            (
-                item
-                for item in execution_outcome.results
-                if item.request_id == handle.speech.id
-                and item.skill_id == "chromie.speak"
-            ),
-            None,
-        )
-        if result is None:
-            return False
-        trace = next(
-            (
-                item
-                for item in execution_outcome.traces
-                if item.request_id == handle.speech.id
-            ),
-            None,
-        )
-        rebound_result = result.model_copy(
-            deep=True,
-            update={
-                "request_id": canonical_speech.id,
-                "capability_id": "chromie.speak",
-                "metadata": {
-                    **dict(result.metadata or {}),
-                    "readiness_candidate_reused": True,
-                    "progress_candidate_id": handle.candidate.candidate_id,
-                },
-            },
-        )
-        rebound_trace = (
-            trace.model_copy(
-                deep=True,
-                update={
-                    "interaction_id": canonical_interaction_id,
-                    "request_id": canonical_speech.id,
-                    "capability_id": "chromie.speak",
-                },
-            )
-            if trace is not None
-            else None
-        )
-        self._preexecuted[(canonical_interaction_id, canonical_speech.id)] = (
-            rebound_result,
-            rebound_trace,
-        )
-        return True
 
     def _consume_preexecuted(
         self, response: InteractionResponse

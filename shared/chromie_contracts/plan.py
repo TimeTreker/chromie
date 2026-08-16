@@ -40,26 +40,24 @@ ParameterResolutionStrategy = Literal[
 GoalSatisfactionStatus = Literal["exact", "substantial", "partial", "unsatisfied"]
 FastPlannerContinuation = Literal["goal_association", "deep_planner"]
 FastVocalActivityRole = Literal["complete_response", "progress", "clarification"]
+FastProgressKind = Literal[
+    "acknowledge_work",
+    "check_information",
+    "perform_action",
+    "think",
+]
 
 
-class FastPlannerVocalActivity(BaseModel):
-    """One immediately-ready conversational Activity authored by Fast Planner.
-
-    This is a planner-owned semantic Activity, not a Goal Interpretation field and
-    not execution evidence.  It may complete a simple conversational
-    responsibility, provide prospective progress while slower work continues, or
-    ask a clarification question.
-    """
+class _FastPlannerVocalActivityBase(BaseModel):
+    """Common identity/provenance for one Fast-Planner-authored vocal Activity."""
 
     model_config = ConfigDict(extra="forbid")
 
     activity_id: str = Field(min_length=1, max_length=160)
-    role: FastVocalActivityRole
-    response_text: str = Field(min_length=1, max_length=600)
     speech_act: str = Field(default="inform", min_length=1, max_length=120)
     source_responsibility_refs: list[str] = Field(min_length=1)
 
-    @field_validator("activity_id", "response_text", "speech_act", mode="before")
+    @field_validator("activity_id", "speech_act", mode="before")
     @classmethod
     def normalize_vocal_text(cls, value: Any) -> Any:
         return " ".join(value.strip().split()) if isinstance(value, str) else value
@@ -68,6 +66,79 @@ class FastPlannerVocalActivity(BaseModel):
     @classmethod
     def normalize_responsibility_refs(cls, value: Any) -> list[str]:
         return _normalize_ids(value)
+
+
+class FastPlannerCompleteResponseActivity(_FastPlannerVocalActivityBase):
+    """A conversational answer that can fully complete its Responsibility now."""
+
+    role: Literal["complete_response"] = "complete_response"
+    response_text: str = Field(min_length=1, max_length=600)
+
+    @field_validator("response_text", mode="before")
+    @classmethod
+    def normalize_response_text(cls, value: Any) -> Any:
+        return " ".join(value.strip().split()) if isinstance(value, str) else value
+
+
+class FastPlannerClarificationActivity(_FastPlannerVocalActivityBase):
+    """A user-facing question when WHAT lacks a material binding."""
+
+    role: Literal["clarification"] = "clarification"
+    response_text: str = Field(min_length=1, max_length=600)
+
+    @field_validator("response_text", mode="before")
+    @classmethod
+    def normalize_response_text(cls, value: Any) -> Any:
+        return " ".join(value.strip().split()) if isinstance(value, str) else value
+
+
+class FastPlannerProgressActivity(_FastPlannerVocalActivityBase):
+    """Pre-evidence progress semantics with no model-authored factual wording.
+
+    A progress Activity is deliberately not free text.  Before trusted Evidence
+    exists, allowing arbitrary response text lets a model hide an unsupported
+    result claim behind ``role=progress``.  The Planner therefore selects only a
+    bounded progress act; trusted runtime renders that act without inventing a
+    result.
+    """
+
+    role: Literal["progress"] = "progress"
+    progress_kind: FastProgressKind
+
+
+FastPlannerVocalActivity = Annotated[
+    Union[
+        FastPlannerCompleteResponseActivity,
+        FastPlannerProgressActivity,
+        FastPlannerClarificationActivity,
+    ],
+    Field(discriminator="role"),
+]
+
+
+def render_fast_planner_vocal_activity(
+    activity: FastPlannerVocalActivity,
+    *,
+    language: str,
+) -> str:
+    """Render only the bounded speech semantics already authorized by Fast Planner."""
+
+    if activity.role != "progress":
+        return activity.response_text
+    zh = str(language or "").strip().casefold().startswith("zh")
+    if zh:
+        return {
+            "acknowledge_work": "好，我来处理。",
+            "check_information": "好，我查一下。",
+            "perform_action": "好，我来做。",
+            "think": "好，我想一想。",
+        }[activity.progress_kind]
+    return {
+        "acknowledge_work": "Okay, I'll handle it.",
+        "check_information": "Okay, I'll check.",
+        "perform_action": "Okay, I'll do it.",
+        "think": "Okay, I'll think about it.",
+    }[activity.progress_kind]
 
 
 class FastPlannerAdvance(BaseModel):

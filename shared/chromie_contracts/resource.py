@@ -285,36 +285,6 @@ class AcquireAndDeliverResource(BaseModel):
     def reject_low_level_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
         return _reject_resource_implementation_fields(value, path="resource.metadata")
 
-    @model_validator(mode="before")
-    @classmethod
-    def normalize_legacy_responsibility_variant(cls, value: Any) -> Any:
-        """Accept the retired variant only as an input-compatibility alias.
-
-        Canonical semantics are responsibility_type + resource.kind.  Keeping a
-        second serialized discriminator creates two names for one decision and
-        invites planners/providers to route by labels instead of semantic scope.
-        """
-
-        if not isinstance(value, dict):
-            return value
-        payload = dict(value)
-        legacy_variant = payload.pop("responsibility_variant", None)
-        if legacy_variant is None:
-            return payload
-        resource = payload.get("resource")
-        kind = resource.get("kind") if isinstance(resource, dict) else None
-        if kind in {"physical_object", "information"}:
-            expected_variant = (
-                "fetch_and_deliver_object"
-                if kind == "physical_object"
-                else "fetch_and_deliver_information"
-            )
-            if legacy_variant != expected_variant:
-                raise ValueError(
-                    "resource kind and legacy responsibility_variant disagree: "
-                    f"kind={kind} variant={legacy_variant}"
-                )
-        return payload
 
     @model_validator(mode="after")
     def validate_delivery_mode(self) -> "AcquireAndDeliverResource":
@@ -373,54 +343,36 @@ class AcquireAndDeliverResource(BaseModel):
         return self
 
 
-class ResourceGroundingProjection(BaseModel):
-    """Frozen output-only flat view derived from one canonical resource Goal.
+def resource_semantic_bindings(
+    responsibility: AcquireAndDeliverResource,
+) -> dict[str, dict[str, Any]]:
+    """Return a transient flat view of canonical resource facts for validation.
 
-    This object is never model-authored and never accepted as semantic input.  It
-    exists only for older Planner/consumer surfaces that still read flat Goal
-    bindings while the canonical resource contract remains authoritative.
+    The returned mapping is computed on demand and is never stored back into a
+    Goal.  ``resource_responsibility`` remains the sole semantic authority; this
+    helper only lets generic Planner validators compare typed argument names
+    without creating a second persisted representation.
     """
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    bindings: dict[str, dict[str, Any]] = Field(default_factory=dict)
-    provenance: dict[str, str] = Field(default_factory=dict)
-
-
-def project_resource_grounding(
-    responsibility: AcquireAndDeliverResource,
-) -> ResourceGroundingProjection:
-    """Pure deterministic projection from canonical resource semantics."""
-
     bindings: dict[str, dict[str, Any]] = {}
-    provenance: dict[str, str] = {}
 
-    def add_binding(name: str, value: Any, *, path: str) -> None:
+    def add_binding(name: str, value: Any) -> None:
         if not isinstance(value, dict):
             return
         normalized_name = " ".join(str(name or "").strip().split())
         if not normalized_name or normalized_name in bindings:
             raise ValueError(
-                "resource grounding projection contains duplicate binding name="
+                "canonical resource contains duplicate semantic binding name="
                 f"{normalized_name!r}"
             )
         payload = dict(value)
         payload["name"] = normalized_name
         bindings[normalized_name] = payload
-        provenance[normalized_name] = path
 
     for name, value in responsibility.resource.attributes.items():
-        add_binding(
-            name,
-            value,
-            path=f"resource_responsibility.resource.attributes.{name}",
-        )
+        add_binding(name, value)
     for name, value in responsibility.source.bindings.items():
-        add_binding(
-            name,
-            value,
-            path=f"resource_responsibility.source.bindings.{name}",
-        )
+        add_binding(name, value)
     if responsibility.resource.quantity:
         add_binding(
             "quantity",
@@ -430,9 +382,5 @@ def project_resource_grounding(
                 "value": responsibility.resource.quantity,
                 "confidence": 1.0,
             },
-            path="resource_responsibility.resource.quantity",
         )
-    return ResourceGroundingProjection(
-        bindings=bindings,
-        provenance=provenance,
-    )
+    return bindings

@@ -264,25 +264,18 @@ effect.
 
 Streaming changes delivery timing, not semantic authority. Raw model-token
 deltas, partial JSON, private reasoning, and incomplete sentences are not speech
-contracts and must never reach TTS. The Host may schedule a complete, schema-valid source-authored `fast_speech` or
-`ResponseStage` only after mechanical validation authorizes it against the
-applicable turn/Goal correlation, commitment or evidence state, claim guards,
-and cancellation generation. It need not wait for unrelated later response
-fields. The stages have distinct truth requirements. Goal Interpretation owns
-the exact dynamic Fast Response wording and whether that first progress
-notification is useful. There is no second production LLM that re-decides or
-repairs this ordinary communication choice. The typed `claim_state`,
-`claimed_capability_ids`, and `claimed_goal_ids` remain necessary mechanical
-claim controls; before Goals and Plans exist they must be `none`, empty, and
-empty. Tool speech may therefore use only the typed
-`acknowledge_and_check`/`checking_only` prospective act before evidence exists;
-a memory acknowledgement may be prospective too, but cannot claim that a memory
-commit already happened. The later result, failure, limitation, or committed
-memory outcome is a distinct act. The Host validates typed fields, turn
-correlation, internal-token safety, and lifecycle state without inferring
-meaning from a phrase blacklist. The pre-generated generic cache is a
-transport-safe fallback when dynamic speech is not admissible or cannot be
-scheduled; it never claims evidence or an effect.
+contracts and must never reach TTS. Goal Interpretation never authors maintained
+speech. Fast Planner is the first HOW owner and may select one complete typed
+immediate conversational Activity after Responsibility meaning is sufficient.
+A terminal/clarification Activity may carry model-authored response text under
+its own truth contract; a pre-evidence `progress` Activity carries only a bounded
+`progress_kind` and Runtime renders the wording deterministically. Therefore a
+model cannot hide an unverified result inside a field merely labelled progress.
+Later `ResponseStage` speech is scheduled only after the applicable Goal/Plan,
+evidence, claim, cancellation, and delivery contracts authorize it. The Host
+validates typed fields and lifecycle authority without phrase blacklists or a
+second semantic repair owner. A transport-safe fallback never claims evidence or
+an effect.
 
 Current-turn de-duplication uses the typed speech-event identity and its turn,
 structured purpose, stage, route, commitment, source Goal IDs, Plan provenance,
@@ -454,21 +447,17 @@ Once a nontrivial Goal is sufficiently understood and still requires downstream
 work before a substantive answer or effect, it should normally author one typed,
 non-terminal Fast-Planner progress Activity so the person knows Chromie got the Goal
 and is taking it forward. This is a polite progress notification, not Social
-Attention and not task clarification/confirmation. Missing result evidence limits
-what the wording may claim; it is not itself a reason for silence. A separate Fast
-Response is omitted when the substantive answer is immediate, an equivalent
-notification is already delivered or pending, the user asked for silence, or
-another utterance would only repeat or add empty chatter. The source Goal
-Interpreter owns that semantic choice, and its model-facing output must state the
-choice explicitly in its typed immediate-Activity/continuation output; Goal-Interpreter `fast_speech` is compatibility-only.
-Speech is optional; making the decision is not. The Host deterministically derives
-the typed claim envelope from the selected route instead of asking the model to
-copy system invariants. No second production LLM reviews, repairs, or re-decides
-it. Host/runtime code validates only the mechanical FastSpeech,
-correlation, evidence, cancellation, and transport boundaries. If the source model
-makes a poor semantic choice, the remedy is to fix and qualify that source
-prompt/model, not to hide the defect behind another LLM. Interaction Context remains
-the sole authority for whether any speech was actually heard or is still pending.
+Attention and not task clarification/confirmation. Missing result Evidence limits
+what the wording may claim; it is not itself a reason for silence. A separate progress
+Activity is omitted when the substantive answer is immediate, an equivalent act is
+already delivered or pending, the user asked for silence, or another utterance would
+only repeat or add empty chatter. Fast Planner owns this HOW decision. Pre-evidence
+progress is represented only by a bounded `progress_kind`; Runtime renders the actual
+prospective wording and the schema provides no free-form result field. The removed
+Goal-Interpreter `fast_speech`/`native_response` path is not accepted as compatibility.
+No second production LLM reviews, repairs, or re-decides ordinary progress wording.
+Interaction Context remains the authority for whether any speech was actually heard or
+is still pending.
 
 Fast Response wording uses a bounded owner-approved **fast voice projection**:
 Chromie's name, child age/role identity where relevant to expression, and the

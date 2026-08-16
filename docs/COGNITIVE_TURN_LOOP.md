@@ -629,9 +629,8 @@ reach TTS. In maintained cognitive apply, Goal Interpretation does not author sp
 The first early speech contract is a complete typed Fast-Planner conversational Activity.
 The Host may schedule that Activity as soon as its provider-free claim/effect boundaries,
 turn correlation, cancellation generation, and Vocal transport contract validate; it
-need not wait for Goal Association or unrelated later response fields. Legacy Goal-
-Interpreter `fast_speech`/`native_response` fields remain compatibility-only and are not
-maintained wording authority.
+need not wait for Goal Association or unrelated later response fields. The old Goal-Interpreter `fast_speech`/`native_response` contracts are removed;
+there is no parallel legacy early-speech path beside Fast Planner Activity.
 
 Current-turn conversational-act reuse is correlated by the exact speech-event
 ID together with its turn, structured stage, purpose, route, intent,

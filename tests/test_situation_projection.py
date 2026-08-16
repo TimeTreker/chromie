@@ -35,23 +35,16 @@ def test_situation_projection_is_bounded_reference_only_and_reconstructable() ->
     first = build_situation_projection(
         context=context,
         turn_id="turn-1",
-        lane="robot_action",
-        intent="bring cup",
-        progress_candidate_ids=["progress-1"],
     )
     rebuilt = build_situation_projection(
         context=context,
         turn_id="turn-1",
-        lane="robot_action",
-        intent="bring cup",
-        progress_candidate_ids=["progress-1"],
     )
 
     assert first == rebuilt
     assert first.focus_goal_ids == ["goal-water"]
     assert first.discourse_focus_ids == ["ref-user", "ref-blue-cup"]
     assert first.unresolved_conditions[0].condition_id == "target-container"
-    assert first.progress_candidate_ids == ["progress-1"]
     assert first.evidence_refs[0].reference_id == "evidence-camera-1"
     projection = first.prompt_projection()
     assert "payload" not in str(projection)
@@ -67,15 +60,11 @@ def test_situation_revision_can_change_focus_without_mutating_source_context() -
     before = build_situation_projection(
         context=context,
         turn_id="turn-2",
-        lane="chat",
-        intent="correct target",
         revision=1,
     )
     after = build_situation_projection(
         context=context,
         turn_id="turn-2",
-        lane="chat",
-        intent="correct target",
         focus_goal_ids=["goal-new"],
         revision=2,
     )

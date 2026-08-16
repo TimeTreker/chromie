@@ -860,17 +860,13 @@ may start a short prospective progress Activity while requesting Goal Associatio
 `deep_planner` is a HOW-complexity continuation and always requires canonical Goal
 continuity before commitment-bearing Deep Work.
 
-`CognitiveProgressCandidate`, Goal-Interpreter `native_response`, and Goal-Interpreter
-`fast_speech` are compatibility vocabulary only; maintained cognitive apply does not
-accept Goal Interpretation as a conversational wording owner. Goal Association consumes
-the same authoritative Responsibility evidence only when Fast Planner requests canonical
-continuity. Its model-facing projection receives only Fast Planner continuity markers
-(covered Responsibility refs, continuation disposition, and optional Activity identity/
-role/source refs); Planner-authored response wording and rationale are deliberately
-absent so HOW cannot be mistaken for another human Responsibility. Goal Association
-creates/associates the Goal without rewriting the Planner-authored immediate Activity or
-inheriting HOW authority. Canonical Fast/Deep planning after Goal Association then
-selects exact Capabilities and executable arguments when needed.
+The old Goal-Interpreter `CognitiveProgressCandidate` / `native_response` /
+`fast_speech` path has been removed rather than retained as compatibility. Goal
+Association consumes the authoritative Responsibility evidence only when Fast Planner
+requests canonical continuity. Its model-facing projection receives only Fast Planner
+continuation markers and Activity identity/role/source refs; Planner-authored wording is
+not a second human Responsibility. Canonical Fast/Deep planning after Goal Association
+then selects exact Capabilities and executable arguments when needed.
 
 ### 4.11 Continuous Mind candidate vocabulary — retained problem-space inventory
 
@@ -2826,8 +2822,8 @@ wording. Fast Planner owns the exact wording and semantic role of any pre-Goal
 conversational Activity it authors. The Host derives transport/claim-envelope facts and
 may reject malformed or authority-violating output, but it does not become a second
 semantic writer. Dynamic pre-Goal speech carries no Capability/Goal completion claim.
-Legacy Goal-Interpreter `fast_speech`/`native_response` fields remain compatibility-only
-and cannot become maintained semantic authority. Tool speech uses the typed
+The old Goal-Interpreter `fast_speech`/`native_response` fields are removed rather than
+retained as compatibility. Tool speech uses the typed
 `acknowledge_and_check`/
 `checking_only` contract before result evidence; a memory acknowledgement is
 likewise purely prospective and cannot claim that the commit already happened.
@@ -2911,55 +2907,35 @@ promoting the Ledger into long-term memory.
 
 ### 15.1.2 Goal Progress Communication
 
-Goal Progress Communication is the shared user-facing communication responsibility
-that spans the lifetime of one Goal. The familiar Fast Response is its earliest
-common milestone: after Goal Interpretation has sufficiently understood a
-nontrivial Goal that still requires downstream work before a substantive answer or
-effect, Chromie should normally give one tiny polite prospective notification so
-the person knows the Goal was understood and is being taken forward. Missing
-result evidence limits what that notification may claim; it is not itself a
-reason for silence. A separate Fast Response is omitted when a substantive answer
-is immediate, an equivalent notification is already delivered or pending, the
-user requested silence, or another line would only repeat or add empty chatter.
-That act is not Social Attention and is not clarification or confirmation of an
-unclear Goal. At this boundary optional speech does not mean an optional decision:
-the source model must return either notification text or explicit `null`. A missing
-field is a contract defect, not evidence that silence was intended.
+Goal Progress Communication is a user-facing responsibility across the lifetime
+of Work, but its first maintained owner is **Fast Planner**, not Goal
+Interpretation. Goal Interpretation ends at provider-neutral Responsibility:
+WHAT the user wants, material bindings, uncertainty, and whether fresh work or
+Evidence remains. It has no speech/progress Activity contract.
 
-The same responsibility continues after the initial acknowledgement. A planner,
-trusted result interpreter, response composer, or later cognitive stage may propose
-concise speech when it owns a genuinely new and trustworthy user-relevant delta,
-such as a material plan limitation, a meaningful wait state, an important achieved
-milestone, a failure or retry state, a correction, or completion. Stages without a
-user-facing speech field preserve the milestone in authoritative Goal/runtime state
-so a later speech-capable stage can communicate it. The architecture does not add a
-parallel speech pipeline for every module merely to expose implementation progress.
+After Responsibility meaning is sufficient, Fast Planner may select one tiny
+immediately-ready conversational Activity while downstream work continues. A
+pre-evidence progress Activity is structurally bounded: the model chooses only a
+`progress_kind` such as `check_information`, `perform_action`, `think`, or
+`acknowledge_work`; Runtime renders the actual prospective wording. The progress
+schema contains no free-form result text, so an unverified result cannot become
+admissible merely by labelling it `role=progress`. A substantive immediate answer
+or clarification uses its own typed Activity and truth requirements instead.
 
-After the initial Fast Response, later progress speech remains selective. The
-cognitive stage that owns a new milestone reasons about whether it is worth telling
-the person; it should not narrate internal modules, schemas, provider plumbing,
-planning mechanics, or every execution step. The objective is responsive, polite,
-low-noise interaction rather than minimum word count or maximum status reporting.
-Each milestone has one cognitive communication owner. The runtime does not call a
-second LLM to re-decide or repair an ordinary speech-versus-silence judgment.
-Mechanical schema, authority, evidence, cancellation, and delivery checks remain
-deterministic; semantic mistakes are fixed at the source prompt/model boundary and
-measured in regression and benchmark scenarios. If a structurally valid Fast Plan
-is escalated for an unrelated planning/coverage defect, its source-authored progress
-`response_text` may be retained only as an **undelivered advisory** for Deep
-Planning. Retention makes no truth or playback claim and does not satisfy the
-communication act; Deep Planning still reasons from Interaction Context and
-current evidence before using any such candidate.
+Later planning, trusted result interpretation, response composition, or runtime
+may communicate a genuinely new trustworthy user-relevant delta: a material
+limitation, meaningful wait state, achieved milestone, failure/retry, correction,
+or completion. Interaction Context and playback Evidence prevent duplicate
+communication. Generated, scheduled, or planned speech is not delivery Evidence;
+only the maintained delivery lifecycle proves that the user was actually told.
+Internal modules, schemas, provider plumbing, planning mechanics, and ordinary
+low-level steps are not milestones merely because they occurred.
 
-Every stage uses Goal-scoped Interaction Context before proposing speech. Only
-audible playback counts as already told to the user; scheduled speech is merely
-pending. Planned or committed work is not an achieved milestone, and a completion
-claim still requires trusted terminal evidence. Equivalent delivered or pending
-progress acts are reused or omitted rather than paraphrased at successive stages. For current-turn
-speech, the runtime can enforce this mechanically from the typed speech act and Interaction Ledger
-event identity: a later stage that wants the same act must reference the existing event instead of
-requesting new audio. A genuinely new supplement carries a different semantic act. A new
-notification is justified by a new semantic progress delta, not by a module boundary.
+Each communication act has one semantic owner and deterministic authority,
+evidence, cancellation, and delivery validation. The architecture does not add a
+second LLM to repair ordinary progress wording, and it does not retain a legacy
+Goal-Interpreter `fast_speech`/`native_response` compatibility path for maintained
+turns.
 
 ### 15.2 Post-execution response
 

@@ -233,63 +233,15 @@ checks Python 3.11+ support, installs changed requirements, warms Ollama, avoids
 duplicate processes, and starts the module from the repository root.
 
 The Orchestrator has a fast-first presentation path for Goal Progress
-Communication. Once Goal Interpretation has sufficiently understood a nontrivial
-Goal that still requires downstream work before a substantive answer or effect,
-the source Goal Interpreter should normally propose one typed, non-terminal
-`fast_speech` notification so the person knows Chromie got the Goal and is taking
-it forward. Missing result evidence limits what that notification may claim; it
-is not itself a reason for silence. A separate Fast Response is omitted when the
-substantive answer is immediate, an equivalent notification is already delivered
-or pending, the user requested silence, or another utterance would only repeat or
-add empty chatter. Goal Interpretation is the sole semantic owner of that first
-notification: there is no second production LLM that re-decides or repairs the
-speech-versus-silence choice. The Host validates the structured FastSpeech,
-correlation, evidence, cancellation, and transport boundaries only; it does not
-infer semantic equivalence from route names or wording. Tool routes use the typed
-`acknowledge_and_check`/`checking_only` prospective contract before result evidence;
-memory routes may likewise carry only a prospective acknowledgement and never a
-commit claim. Results and failures remain separate evidence-bound acts.
-
-At startup the Orchestrator may also prime a small speaker-specific
-English/Chinese acknowledgement cache through the configured TTS service and
-load the PCM into host memory. Cached cues are generic, low-commitment
-presentation fallbacks such as “One moment” or “我先确认一下”. They are used only
-when dynamic speech is not admissible, missing, invalid, or cannot be scheduled;
-an adaptive hedge timer then waits `ORCH_FAST_FIRST_AUDIO_HEDGE_MS` (750 ms by
-default) so a final response may still win the race. Cache entries never claim
-a tool result, memory commit, physical execution, or completion.
-
-The Host never authors the semantic sentence. Bare strings and partial
-FastSpeech objects remain parseable but not playable: immediate dynamic audio requires
-an allowed `purpose`, a non-terminal `commitment`,
-`must_not_claim_completion=true`, and text that passes the completion-claim
-guard. Physical work is limited to a safety prelude or confirmation, never an
-execution claim. At the fast-speech review boundary the body action has not
-started, so the ordinary wording must remain prospective; typed
-`claim_state=none` cannot excuse a sentence that says Chromie is already inside
-an ongoing movement. The queued dynamic utterance is projected into Response
-Composer context as a non-evidentiary current-turn commitment. If it already
-serves the required acknowledgement, the Composer references the exact speech
-event with `reuse_current_turn_speech=true` and `reused_speech_event_id`;
-Runtime reuses an audible event, waits for a pending one, or fulfills the act
-once if that event becomes `not_delivered`. Playback start, not generation or
-scheduling, satisfies the audible act. Text is checked only for event payload
-integrity and is not the de-duplication key. Final result or failure speech
-remains a distinct, evidence-bounded act.
-
-Pure safe-read and other executable Plans use the same still-needed-delta rule as
-all cognitive stages. If the exact Fast acknowledgement is already audible or
-pending, later stages reference/reuse that event instead of repeating its meaning.
-If no equivalent act exists, a Planner or Response Composer may author one new
-prospective acknowledgement or correction, but it still cannot claim a result
-before provider evidence. Tool Result Interpretation then contributes only the
-new grounded post-execution result, failure, or correction that remains necessary.
-
-Complete non-effectful Vocal-output Goals already use the direct Core branch
-after Goal Association, without Fast or Deep Planner. Runtime records that path
-separately from terminal Fast planning and reasoned Deep escalation. True
-incremental PCM playback remains separate playback-lifecycle work; a
-`tts_stream_start` transport event is not currently audible playback evidence.
+Communication, but Goal Interpretation does not author that speech. Goal
+Interpretation emits provider-neutral Responsibility only. Fast Planner is the
+first HOW owner and may select one immediate conversational Activity while
+canonical Goal/Plan work continues. Pre-evidence progress is not free-form text:
+Fast Planner selects a bounded `progress_kind` and Runtime renders prospective
+wording, so progress cannot smuggle an unverified result. Interaction Context,
+claim/evidence checks, cancellation, and playback lifecycle remain the
+deterministic delivery boundaries. Maintained turns do not fall back to the old
+Goal-Interpreter `fast_speech`, route, or intent compatibility contract.
 
 Manual development start:
 

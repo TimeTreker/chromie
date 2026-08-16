@@ -16,7 +16,7 @@ from agent.app.planner_contract import (
     resource_grounding_repair_response_schema,
     validate_resource_responsibility_capability_grounding,
 )
-from agent.app.schema import AgentRunRequest, RouteDecision
+from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 from shared.chromie_contracts.resource import (
     AcquireAndDeliverResource,
     ResourceDescriptor,
@@ -870,7 +870,7 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
         )
 
 
-    def test_legacy_responsibility_variant_is_input_only_compatibility(self) -> None:
+    def test_removed_responsibility_variant_is_rejected(self) -> None:
         information = AcquireAndDeliverResource(
             resource=ResourceDescriptor(
                 kind="information",
@@ -882,30 +882,22 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
             ),
             delivery_mode="spoken_explanation",
         )
-        self.assertEqual(
-            information.responsibility_type,
-            "acquire_and_deliver_resource",
-        )
         canonical_payload = information.model_dump(mode="json")
         self.assertNotIn("responsibility_variant", canonical_payload)
-        restored = AcquireAndDeliverResource.model_validate(
-            {
-                **canonical_payload,
-                "responsibility_variant": "fetch_and_deliver_information",
-            }
-        )
-        self.assertEqual(restored.resource.kind, "information")
-        self.assertNotIn("responsibility_variant", restored.model_dump(mode="json"))
+        for removed_variant in (
+            "fetch_and_deliver_information",
+            "fetch_and_deliver_object",
+        ):
+            with self.subTest(removed_variant=removed_variant):
+                with self.assertRaises(ValidationError):
+                    AcquireAndDeliverResource.model_validate(
+                        {
+                            **canonical_payload,
+                            "responsibility_variant": removed_variant,
+                        }
+                    )
 
-        with self.assertRaises(ValidationError):
-            AcquireAndDeliverResource.model_validate(
-                {
-                    **canonical_payload,
-                    "responsibility_variant": "fetch_and_deliver_object",
-                }
-            )
-
-    def test_absent_resource_contract_does_not_change_legacy_goal_serialization(self) -> None:
+    def test_absent_resource_contract_keeps_ordinary_goal_serialization_clean(self) -> None:
         goal = SemanticGoal(
             description="Tell the user a joke.",
             source_text="Tell me a joke.",
@@ -922,16 +914,13 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                         "output_mode": "body_action",
                         "bindings": [],
                         "resource_responsibility": {
-                            "resource": {
-                                "kind": "physical_object",
-                                "description": "a bottle of water",
-                                "quantity": "1",
-                                "attributes": [],
-                            },
+                            "kind": "physical_object",
+                            "description": "a bottle of water",
+                            "quantity": "1",
                             "source": {
                                 "status": "known",
                                 "description": "100 meters ahead",
-                                "bindings": [
+                                "acquisition_bindings": [
                                     {
                                         "name": "source_location",
                                         "entity_type": "place",
@@ -952,16 +941,24 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                 "reason_summary": "One complete resource responsibility.",
             }
         )
-        request = AgentRunRequest(
+        request = CognitiveWorkRequest(
             sid="resource-contract",
             text="The water is 100 meters ahead. Bring me a bottle.",
             language="en-US",
-            route_decision=RouteDecision(
-                route="robot_action",
-                intent="fetch_water",
-                confidence=0.9,
-                source="llm",
-            ),
+            responsibilities=[
+                {
+                    "local_ref": "resource",
+                    "outcome": "Fetch a bottle of water and deliver it to the requester.",
+                    "bindings": {
+                        "resource": "a bottle of water",
+                        "source": "100 meters ahead",
+                    },
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.9,
+                }
+            ],
+            interpretation_confidence=0.9,
             context={},
         )
 
@@ -982,10 +979,7 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
             responsibility.source.bindings["source_location"]["value"],
             "100 meters ahead",
         )
-        self.assertEqual(
-            set(resolution.new_goals[0].object["bindings"]),
-            {"source_location", "quantity"},
-        )
+        self.assertEqual(resolution.new_goals[0].object, {})
         serialized = responsibility.model_dump(mode="json")
         self.assertNotIn("provider_id", serialized)
         self.assertNotIn("capability_id", serialized)

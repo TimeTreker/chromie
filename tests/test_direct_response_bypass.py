@@ -8,14 +8,17 @@ from pathlib import Path
 
 from agent.app.response_composer import ResponseComposerResolver
 from agent.app.schema import AgentRunRequest, RouteDecision
+from orchestrator.runtime.cognitive_gateway import CognitiveGateway
 from orchestrator.runtime.cognitive_runtime import (
     CanonicalPlanRuntimeAdapter,
     CognitiveEvidenceRecorder,
     CognitiveRuntimePolicy,
     GoalDrivenRuntimeCoordinator,
 )
+from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
 from shared.chromie_contracts.goal import GoalAssociationResolution
-from shared.chromie_contracts.plan import FastPlannerAdvance, FastPlannerVocalActivity
+from shared.chromie_contracts.user_turn import AttentionReviewResult
+from shared.chromie_contracts.plan import FastPlannerAdvance, FastPlannerCompleteResponseActivity
 from shared.chromie_contracts.response_composition import (
     DirectResponseComposition,
     goal_association_fingerprint,
@@ -48,6 +51,46 @@ class NoopInteractionRuntime:
         raise AssertionError(f"unexpected skill lookup: {skill_id}")
 
 
+def admitted_core(
+    text: str,
+    *,
+    sid: str,
+    language: str,
+    responsibilities: list[dict],
+):
+    gateway = CognitiveGateway()
+    capture = gateway.capture(
+        text,
+        session_id=sid,
+        conversation_id=f"conversation-{sid}",
+        channel="text",
+        language=language,
+    )
+    snapshot = gateway.assemble_context(capture, {})
+    envelope = gateway.admit_attention(
+        capture,
+        snapshot,
+        AttentionReviewResult(
+            turn_id=capture.turn_id,
+            session_id=capture.session_id,
+            context_digest=snapshot.digest,
+            disposition="admit",
+            speech_act="greeting",
+            confidence=1.0,
+            source="test",
+            reason="direct-response test input",
+        ),
+    )
+    core = CoreInterpretationResult(
+        turn_id=envelope.turn_id,
+        session_id=envelope.session_id,
+        confidence=min(float(item.get("confidence", 0.95)) for item in responsibilities),
+        language=language,
+        responsibilities=responsibilities,
+    )
+    return core, envelope
+
+
 class DirectRuntimeClient:
     def __init__(
         self,
@@ -78,7 +121,8 @@ class DirectRuntimeClient:
 
     async def compose_response_plan(self, *args, **kwargs):
         self.calls.append("compose")
-        self.assert_direct_context(kwargs.get("context") or {})
+        request = kwargs.get("request")
+        self.assert_direct_context(dict(getattr(request, "context", {}) or {}))
         from shared.chromie_contracts.response_composition import (
             ResponseCompositionResolution,
         )
@@ -257,9 +301,8 @@ class DirectResponseRuntimeTests(unittest.TestCase):
         advance = FastPlannerAdvance(
             turn_id="turn-direct",
             covered_responsibility_refs=["greeting"],
-            immediate_vocal_activity=FastPlannerVocalActivity(
+            immediate_vocal_activity=FastPlannerCompleteResponseActivity(
                 activity_id="activity-greeting",
-                role="complete_response",
                 response_text="你好呀！",
                 speech_act="greeting",
                 source_responsibility_refs=["greeting"],
@@ -277,36 +320,31 @@ class DirectResponseRuntimeTests(unittest.TestCase):
                 apply_lanes=frozenset({"chat"}),
             ),
         )
-        route = type(
-            "Decision",
-            (),
+        responsibilities = [
             {
-                "route": "chat",
-                "intent": "greeting",
-                "language": "zh-CN",
-            },
-        )()
+                "local_ref": "greeting",
+                "outcome": "Socially reciprocate the user's greeting.",
+                "bindings": {},
+                "completion_requires_work": True,
+                "completion_requires_fresh_evidence": False,
+                "confidence": 0.98,
+            }
+        ]
+        core, envelope = admitted_core(
+            "你好",
+            sid="sid-direct",
+            language="zh-CN",
+            responsibilities=responsibilities,
+        )
 
         result = asyncio.run(
             coordinator.resolve(
                 object(),
                 text="你好",
                 sid="sid-direct",
-                route_decision=route,
-                context={
-                    "history": [],
-                    "active_goal_snapshots": [],
-                    "responsibility_proposals": [
-                        {
-                            "local_ref": "greeting",
-                            "outcome": "Socially reciprocate the user's greeting.",
-                            "bindings": {},
-                            "completion_requires_work": True,
-                            "completion_requires_fresh_evidence": False,
-                            "confidence": 0.98,
-                        }
-                    ],
-                },
+                core_interpretation=core,
+                turn_envelope=envelope,
+                context={"history": [], "active_goal_snapshots": []},
                 history=[],
                 language="zh-CN",
             )
@@ -325,29 +363,45 @@ class DirectResponseRuntimeTests(unittest.TestCase):
     def test_direct_response_evidence_uses_goal_association_fingerprint(self) -> None:
         association = direct_association()
         composition = direct_composition(association)
+        advance = FastPlannerAdvance(
+            turn_id="turn-direct-evidence",
+            covered_responsibility_refs=["greeting"],
+            immediate_vocal_activity=None,
+            continuations=["goal_association"],
+            confidence=0.95,
+            reason_summary="Bind the conversational responsibility before composition.",
+        )
         coordinator = GoalDrivenRuntimeCoordinator(
-            agent_client=DirectRuntimeClient(association, composition),
+            agent_client=DirectRuntimeClient(association, composition, advance),
             adapter=CanonicalPlanRuntimeAdapter(NoopInteractionRuntime()),
             policy=CognitiveRuntimePolicy(
                 mode="apply",
                 apply_lanes=frozenset({"chat"}),
             ),
         )
-        route = type(
-            "Decision",
-            (),
+        responsibilities = [
             {
-                "route": "chat",
-                "intent": "greeting",
-                "language": "zh-CN",
-            },
-        )()
+                "local_ref": "greeting",
+                "outcome": "Socially reciprocate the user's greeting.",
+                "bindings": {},
+                "completion_requires_work": True,
+                "completion_requires_fresh_evidence": False,
+                "confidence": 0.98,
+            }
+        ]
+        core, envelope = admitted_core(
+            "你好",
+            sid="sid-direct-evidence",
+            language="zh-CN",
+            responsibilities=responsibilities,
+        )
         result = asyncio.run(
             coordinator.resolve(
                 object(),
                 text="你好",
                 sid="sid-direct-evidence",
-                route_decision=route,
+                core_interpretation=core,
+                turn_envelope=envelope,
                 context={"history": [], "active_goal_snapshots": []},
                 history=[],
                 language="zh-CN",
