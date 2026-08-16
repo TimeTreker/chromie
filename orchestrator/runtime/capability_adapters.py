@@ -11,11 +11,11 @@ from shared.chromie_contracts.agent import AgentResult
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
-    SkillRequest,
-    SkillResult,
+    CapabilityRequest,
+    CapabilityResult,
 )
 
-from .skill_runtime import SkillDefinition, SkillExecutionContext
+from .capability_runtime import CapabilityDefinition, CapabilityExecutionContext
 
 
 class AgentResultInteractionAdapter:
@@ -36,7 +36,7 @@ class AgentResultInteractionAdapter:
         speech.extend(
             InteractionSpeech(
                 text=item.text,
-                timing="after_skills",
+                timing="after_capabilities",
                 style=item.style,
                 priority=item.priority,
                 interruptible=item.interruptible,
@@ -44,10 +44,10 @@ class AgentResultInteractionAdapter:
             )
             for item in result.speak_after
         )
-        skills = [self._action_request(action) for action in result.actions]
-        skills.extend(
-            SkillRequest(
-                skill_id="chromie.task_graph.execute",
+        capabilities = [self._action_request(action) for action in result.actions]
+        capabilities.extend(
+            CapabilityRequest(
+                capability_id="chromie.task_graph.execute",
                 args={"graph": graph},
                 timing="sequential",
                 requires_confirmation=result.requires_confirmation
@@ -58,7 +58,7 @@ class AgentResultInteractionAdapter:
         return InteractionResponse(
             status=self._status(result.status),
             speech=speech,
-            skills=skills,
+            capabilities=capabilities,
             requires_confirmation=result.requires_confirmation,
             reason=result.reason,
             metadata={
@@ -75,16 +75,16 @@ class AgentResultInteractionAdapter:
             "blocked": "refused",
         }.get(status, status)
 
-    def _action_request(self, action: Any) -> SkillRequest:
-        skill_id, args = self._named_skill(action)
-        translated_named_skill = skill_id != action.type
-        return SkillRequest(
+    def _action_request(self, action: Any) -> CapabilityRequest:
+        capability_id, args = self._named_capability(action)
+        translated_named_capability = capability_id != action.type
+        return CapabilityRequest(
             request_id=action.id,
-            skill_id=skill_id,
-            skill_version=action.metadata.get("skill_version"),
+            capability_id=capability_id,
+            capability_version=action.metadata.get("capability_version"),
             args=args,
             timing="sequential" if action.blocking else "parallel",
-            timeout_ms=None if translated_named_skill else action.timeout_ms,
+            timeout_ms=None if translated_named_capability else action.timeout_ms,
             requires_confirmation=action.requires_confirmation,
             metadata={
                 **action.metadata,
@@ -94,7 +94,7 @@ class AgentResultInteractionAdapter:
             },
         )
 
-    def _named_skill(self, action: Any) -> tuple[str, dict[str, Any]]:
+    def _named_capability(self, action: Any) -> tuple[str, dict[str, Any]]:
         if action.type == "head.nod":
             return "soridormi.nod_yes", {
                 "count": max(2, int(action.params.get("times", 1))),
@@ -109,7 +109,7 @@ class AgentResultInteractionAdapter:
             if isinstance(duration_ms, (int, float)) and duration_ms > 0:
                 args["duration_s"] = duration_ms / 1000.0
             return "soridormi.look_at_person", args
-        return str(action.metadata.get("skill_id") or action.type), dict(action.params)
+        return str(action.metadata.get("capability_id") or action.type), dict(action.params)
 
 
 TaskGraphHandler = Callable[[dict[str, Any]], dict[str, Any] | Awaitable[dict[str, Any]]]
@@ -187,7 +187,7 @@ TASK_GRAPH_RESULT_OUTPUT_SCHEMA: dict[str, Any] = {
 }
 
 
-class TaskGraphSkillProvider:
+class TaskGraphCapabilityProvider:
     """Compatibility provider around the existing guarded TaskGraph executor."""
 
     provider_id = "chromie.task_graph"
@@ -203,20 +203,20 @@ class TaskGraphSkillProvider:
 
     async def execute(
         self,
-        request: SkillRequest,
-        definition: SkillDefinition,
-        context: SkillExecutionContext,
-    ) -> SkillResult:
+        request: CapabilityRequest,
+        definition: CapabilityDefinition,
+        context: CapabilityExecutionContext,
+    ) -> CapabilityResult:
         raw = self._handler(request.args["graph"])
         output = await raw if inspect.isawaitable(raw) else raw
         output = _with_residual_replan(request.args.get("graph"), output)
         status = _task_graph_skill_status(output)
         message = _task_graph_skill_message(output, status)
         model_safe_output = _task_graph_result_output(output)
-        return SkillResult(
+        return CapabilityResult(
             request_id=request.request_id,
-            skill_id=request.skill_id,
-            skill_version=definition.version,
+            capability_id=request.capability_id,
+            capability_version=definition.version,
             status=status,
             provider_id=self.provider_id,
             output=model_safe_output,
@@ -226,9 +226,9 @@ class TaskGraphSkillProvider:
 
     async def cancel(
         self,
-        request: SkillRequest,
-        definition: SkillDefinition,
-        context: SkillExecutionContext,
+        request: CapabilityRequest,
+        definition: CapabilityDefinition,
+        context: CapabilityExecutionContext,
     ) -> None:
         if self._cancel_handler is None:
             raise RuntimeError(
@@ -359,7 +359,7 @@ def _task_graph_result_output(output: dict[str, Any]) -> dict[str, Any]:
 
 
 def _task_graph_skill_status(output: dict[str, Any]) -> str:
-    """Map only explicit terminal TaskGraph evidence to SkillResult status."""
+    """Map only explicit terminal TaskGraph evidence to CapabilityResult status."""
 
     graph_status = str(output.get("status") or "").strip().lower()
     if graph_status == "success":
@@ -402,11 +402,11 @@ def _task_graph_reason_code(
     return "task_graph_failed"
 
 
-def task_graph_skill_definition() -> SkillDefinition:
-    return SkillDefinition(
-        skill_id="chromie.task_graph.execute",
+def task_graph_capability_definition() -> CapabilityDefinition:
+    return CapabilityDefinition(
+        capability_id="chromie.task_graph.execute",
         version="1.0.0",
-        provider_id=TaskGraphSkillProvider.provider_id,
+        provider_id=TaskGraphCapabilityProvider.provider_id,
         description="Execute a validated legacy Chromie TaskGraph.",
         input_schema={
             "type": "object",

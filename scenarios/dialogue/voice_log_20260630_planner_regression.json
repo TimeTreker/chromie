@@ -35,7 +35,7 @@
       "expect": {
         "speech_any": ["Hello", "help"],
         "no_skills": true,
-        "forbidden_skills": ["soridormi.express_attention"],
+        "forbidden_capabilities": ["soridormi.express_attention"],
         "post_history_contains": ["Hello."]
       }
     },
@@ -105,9 +105,9 @@
         "ollama_reply": {
           "decision": "execute",
           "speech": "I will nod my head to acknowledge you.",
-          "skills": [
+          "capabilities": [
             {
-              "skill_id": "soridormi.nod_yes",
+              "capability_id": "soridormi.nod_yes",
               "args": {"count": 2}
             }
           ]
@@ -116,13 +116,13 @@
           "decision": "clarify",
           "reason": "The proposed nod is a social acknowledgement and does not satisfy the ambiguous ahead request.",
           "speech": "Please clarify whether you want a safe bounded walking plan before I move.",
-          "skills": []
+          "capabilities": []
         }
       },
       "expect": {
         "speech_any": ["clarify", "safe bounded walking"],
         "no_skills": true,
-        "forbidden_skills": [
+        "forbidden_capabilities": [
           "soridormi.nod_yes",
           "soridormi.look_at_person",
           "soridormi.express_attention"
@@ -197,9 +197,9 @@
         "ollama_reply": {
           "decision": "execute",
           "speech": "I will turn my head to look at you.",
-          "skills": [
+          "capabilities": [
             {
-              "skill_id": "soridormi.look_at_person",
+              "capability_id": "soridormi.look_at_person",
               "args": {"duration_s": 3.0}
             }
           ]
@@ -208,13 +208,13 @@
           "decision": "clarify",
           "reason": "The proposed gaze skill is unrelated to the requested forward walk.",
           "speech": "Please confirm a safe bounded walking plan before I move.",
-          "skills": []
+          "capabilities": []
         }
       },
       "expect": {
         "speech_any": ["safe bounded walking plan"],
         "no_skills": true,
-        "forbidden_skills": [
+        "forbidden_capabilities": [
           "soridormi.look_at_person",
           "soridormi.nod_yes",
           "soridormi.express_attention"
@@ -289,9 +289,9 @@
         "ollama_reply": {
           "decision": "execute",
           "speech": "I will nod my head to acknowledge you.",
-          "skills": [
+          "capabilities": [
             {
-              "skill_id": "soridormi.nod_yes",
+              "capability_id": "soridormi.nod_yes",
               "args": {"count": 2}
             }
           ]
@@ -300,13 +300,13 @@
           "decision": "clarify",
           "reason": "The proposed nod is a social acknowledgement and does not satisfy walking.",
           "speech": "Please confirm a safe bounded walking plan before I move.",
-          "skills": []
+          "capabilities": []
         }
       },
       "expect": {
         "speech_any": ["safe bounded walking plan"],
         "no_skills": true,
-        "forbidden_skills": [
+        "forbidden_capabilities": [
           "soridormi.nod_yes",
           "soridormi.look_at_person",
           "soridormi.express_attention"

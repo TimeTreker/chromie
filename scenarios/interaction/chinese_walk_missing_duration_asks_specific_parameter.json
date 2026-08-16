@@ -40,7 +40,7 @@
     "ollama_reply": {
       "decision": "clarify",
       "speech": "你希望我往前走多久？请告诉我秒数。",
-      "skills": [],
+      "capabilities": [],
       "information_gaps": [
         {
           "gap_id": "soridormi.walk_velocity:duration_s",
@@ -51,7 +51,7 @@
           "candidate_values": [],
           "metadata": {
             "schema_field": "duration_s",
-            "skill_id": "soridormi.walk_velocity",
+            "capability_id": "soridormi.walk_velocity",
             "reason": "duration materially changes the physical action scope"
           }
         }
@@ -64,7 +64,7 @@
   "expect": {
     "speech_all": ["多久", "秒"],
     "forbidden_speech_any": ["缺少必要参数", "不能移动"],
-    "skills": [],
+    "capabilities": [],
     "requires_confirmation": false,
     "metadata_json_contains": ["needs_clarification", "duration_s", "ask_user"]
   }

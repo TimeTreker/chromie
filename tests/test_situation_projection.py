@@ -80,7 +80,7 @@ def test_cognitive_opportunity_is_stable_bounded_and_ephemeral_by_contract():
         trigger="execution_outcome",
         goal_ids=["goal-weather"],
         evidence_refs=["outcome-1", "evidence-1"],
-        reason_codes=["missing_skill_result"],
+        reason_codes=["missing_capability_result"],
         recommended_cognition="fast",
         situation_digest="a" * 64,
     )
@@ -88,7 +88,7 @@ def test_cognitive_opportunity_is_stable_bounded_and_ephemeral_by_contract():
         trigger="execution_outcome",
         goal_ids=["goal-weather"],
         evidence_refs=["outcome-1", "evidence-1"],
-        reason_codes=["missing_skill_result"],
+        reason_codes=["missing_capability_result"],
         recommended_cognition="fast",
         situation_digest="a" * 64,
     )

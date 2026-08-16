@@ -81,7 +81,7 @@ def _configure_environment(args: argparse.Namespace, output_dir: Path) -> None:
     os.environ["AGENT_URL"] = args.agent_url
     os.environ["ORCH_ENABLE_AGENT"] = "1"
     os.environ["ORCH_ENABLE_INTERACTION_RESPONSE"] = "1"
-    os.environ["ORCH_ENABLE_SORIDORMI_SKILLS"] = "0"
+    os.environ["ORCH_ENABLE_SORIDORMI_CAPABILITIES"] = "0"
     os.environ["ORCH_AUDIO_INPUT_MODE"] = "stdin"
     os.environ["ORCH_AUDIO_OUTPUT_MODE"] = "device" if args.speaker else "discard"
     if not args.speaker:

@@ -178,7 +178,7 @@ ORCH_COGNITIVE_RUNTIME_MODE=apply
 
 ```env
 ORCH_ENABLE_INTERACTION_RESPONSE=1
-ORCH_ENABLE_SORIDORMI_SKILLS=0
+ORCH_ENABLE_SORIDORMI_CAPABILITIES=0
 ORCH_COGNITIVE_RUNTIME_MODE=apply
 ORCH_COGNITIVE_APPLY_LANES=chat,memory,tool
 ```
@@ -187,7 +187,7 @@ ORCH_COGNITIVE_APPLY_LANES=chat,memory,tool
 
 ```env
 ORCH_ENABLE_INTERACTION_RESPONSE=1
-ORCH_ENABLE_SORIDORMI_SKILLS=1
+ORCH_ENABLE_SORIDORMI_CAPABILITIES=1
 ORCH_COGNITIVE_RUNTIME_MODE=apply
 ORCH_COGNITIVE_APPLY_LANES=chat,memory,robot_action,tool
 ORCH_SORIDORMI_MANIFEST=capabilities/soridormi.json
@@ -256,9 +256,9 @@ python scripts/interaction_text_mujoco_check.py \
   --cognitive-runtime \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi \
-  --expect-skill soridormi.walk_velocity \
-  --expect-skill soridormi.nod_yes \
-  --expect-skill soridormi.turn_in_place \
+  --expect-capability soridormi.walk_velocity \
+  --expect-capability soridormi.nod_yes \
+  --expect-capability soridormi.turn_in_place \
   --expect-arg 0:vx_mps=0.2 \
   --expect-arg 0:duration_s=10 \
   --expect-arg 1:count=2 \
@@ -266,7 +266,7 @@ python scripts/interaction_text_mujoco_check.py \
 ```
 
 Use `--no-speaker` for headless automation. The runner sets a 120s per-skill
-diagnostic timeout for live simulator checks; pass `--skill-timeout-s 0` to use
+diagnostic timeout for live simulator checks; pass `--capability-timeout-s 0` to use
 catalog/default timeouts unchanged. Evidence is written under
 `.chromie/acceptance/text-mujoco/<id>/`. The summary records exact source,
 manifest, and semantic-runtime provenance. This is the current cognitive
@@ -675,7 +675,7 @@ The normal startup script uses `/tmp/chromie-orchestrator.lock`.
 
 ### Named skill fails before execution
 
-- Confirm `ORCH_ENABLE_SORIDORMI_SKILLS=1`.
+- Confirm `ORCH_ENABLE_SORIDORMI_CAPABILITIES=1`.
 - Confirm `SORIDORMI_MCP_URL` is exported where the manifest is loaded.
 - Run the capability probe.
 - Compare live tool schemas to the pinned manifest revision.

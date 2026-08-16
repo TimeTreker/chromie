@@ -275,22 +275,22 @@ class BaseAgent(ABC):
         return False
 
     @staticmethod
-    def _is_speech_skill_id(value: Any) -> bool:
+    def _is_speech_capability_id(value: Any) -> bool:
         return str(value or "").strip() == "chromie.speak"
 
     def _is_effectful_action(self, item: Any) -> bool:
         if not isinstance(item, dict):
             return False
-        skill_id = item.get("skill_id") or item.get("capability_id")
-        if self._is_speech_skill_id(skill_id):
+        capability_id = item.get("capability_id")
+        if self._is_speech_capability_id(capability_id):
             return False
-        return bool(skill_id or item.get("type") or item.get("target"))
+        return bool(capability_id or item.get("type") or item.get("target"))
 
     def _is_effectful_capability(self, item: Any) -> bool:
         if not isinstance(item, dict):
             return False
-        capability_id = item.get("capability_id") or item.get("skill_id")
-        if self._is_speech_skill_id(capability_id):
+        capability_id = item.get("capability_id")
+        if self._is_speech_capability_id(capability_id):
             return False
         effects = item.get("effects")
         if isinstance(effects, list) and any(
@@ -308,14 +308,14 @@ class BaseAgent(ABC):
     def _is_effectful_task_item(self, item: Any) -> bool:
         if not isinstance(item, dict):
             return False
-        skill_id = item.get("skill_id") or item.get("capability_id")
-        if self._is_speech_skill_id(skill_id):
+        capability_id = item.get("capability_id")
+        if self._is_speech_capability_id(capability_id):
             return False
         task_type = str(item.get("task_type") or item.get("type") or "").strip()
         if task_type in {"", "speech.answer", "chromie.speak"}:
             return False
         if task_type in {
-            "task.execute_skill",
+            "task.execute_capability",
             "task.execute_robot_action",
             "robot_action",
         }:

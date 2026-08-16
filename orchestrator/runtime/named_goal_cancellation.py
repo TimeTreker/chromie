@@ -13,7 +13,7 @@ from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
-    SkillRequest,
+    CapabilityRequest,
 )
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.reflex import (
@@ -85,7 +85,7 @@ def replacement_target_goal_ids(
         for goal_id in goal.supersedes_goal_ids
     }
 
-def _request_source_goal_ids(request: SkillRequest) -> set[str]:
+def _request_source_goal_ids(request: CapabilityRequest) -> set[str]:
     metadata = request.metadata if isinstance(request.metadata, dict) else {}
     values = metadata.get("source_goal_ids") or metadata.get("covers_goal_ids")
     if isinstance(values, str):
@@ -120,15 +120,15 @@ def _build_confirmation_remainder(
     response = pending.response.model_copy(deep=True)
     all_goal_ids = {
         goal_id
-        for request in response.skills
+        for request in response.capabilities
         for goal_id in _request_source_goal_ids(request)
     }
     if not target_goal_ids.intersection(all_goal_ids):
         return None, None
 
     cancelled_request_ids: set[str] = set()
-    preserved_requests: list[SkillRequest] = []
-    for request in response.skills:
+    preserved_requests: list[CapabilityRequest] = []
+    for request in response.capabilities:
         owners = _request_source_goal_ids(request)
         overlap = owners.intersection(target_goal_ids)
         if overlap and owners - target_goal_ids:
@@ -223,7 +223,7 @@ def _build_confirmation_remainder(
             child_plan.model_dump(mode="python")
         )
         child_fingerprint = canonical_plan_fingerprint(child_plan)
-        remapped: list[SkillRequest] = []
+        remapped: list[CapabilityRequest] = []
         for request in preserved_requests:
             step_id = str(request.metadata.get("step_id") or "").strip()
             digest = hashlib.sha256(
@@ -333,7 +333,7 @@ def _build_confirmation_remainder(
             update={
                 "interaction_id": f"interaction_confirmation_remainder_{interaction_seed}",
                 "speech": preserved_speech,
-                "skills": preserved_requests,
+                "capabilities": preserved_requests,
                 "requires_confirmation": True,
                 "metadata": {
                     **response.metadata,
@@ -361,7 +361,7 @@ def _build_confirmation_remainder(
                 dialogue.remaining_ttl_s(pending),
             ),
         )
-        for request in replacement_response.skills:
+        for request in replacement_response.capabilities:
             for goal_id in _request_source_goal_ids(request):
                 request_ids_by_goal.setdefault(goal_id, []).append(
                     request.request_id

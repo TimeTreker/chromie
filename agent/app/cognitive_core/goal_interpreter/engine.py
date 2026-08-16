@@ -93,7 +93,7 @@ def interpretation_profile() -> dict[str, Any]:
             "conversation",
             "post_turn",
             "deepthought",
-            "skill_runtime",
+            "capability_runtime",
             "tool",
             "deterministic_control",
             "none",
@@ -695,7 +695,6 @@ def _validate_llm_capability_decision(
                     continue
                 capability_id = str(
                     action.get("capability_id")
-                    or action.get("skill_id")
                     or action.get("capability")
                     or ""
                 ).strip()

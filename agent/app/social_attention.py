@@ -13,10 +13,10 @@ from .clients.ollama_client import llm_failure_metadata
 from .schema import AgentRunRequest
 
 try:
-    from chromie_contracts.interaction import SkillRequest
+    from chromie_contracts.interaction import CapabilityRequest
     from chromie_contracts.social_attention import SocialAttentionPlan, SocialAttentionRequest
 except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.interaction import SkillRequest
+    from shared.chromie_contracts.interaction import CapabilityRequest
     from shared.chromie_contracts.social_attention import SocialAttentionPlan, SocialAttentionRequest
 
 logger = logging.getLogger("chromie.agent.social_attention")
@@ -29,7 +29,7 @@ class SocialAttentionPlanner:
     human-observable Activity. The model decides whether a small body decoration
     would make that Activity more socially natural without changing its Goal, response
     text, or completion, and selects exact
-    catalog skills for the scene. Response wording remains owned by the normal
+    catalog capabilities for the scene. Response wording remains owned by the normal
     cognitive/Response Composer path; this planner is body-only. Deterministic code validates
     schemas, evidence, safety, and resource conflicts without choosing actions.
     """
@@ -308,8 +308,8 @@ class SocialAttentionPlanner:
         request: AgentRunRequest,
         result: Any,
         plan: SocialAttentionPlan,
-    ) -> tuple[list[SkillRequest], list[str]]:
-        """Validate an advisory plan and return safe auxiliary SkillRequests."""
+    ) -> tuple[list[CapabilityRequest], list[str]]:
+        """Validate an advisory plan and return safe auxiliary CapabilityRequests."""
 
         reasons: list[str] = []
         if plan.decision != "express":
@@ -333,28 +333,28 @@ class SocialAttentionPlanner:
             for item in candidates
             if isinstance(item, dict) and item.get("capability_id")
         }
-        existing_skills = list(getattr(result, "_skills", []))
+        existing_capabilities = list(getattr(result, "_capabilities", []))
         existing_candidates = self._all_candidate_map(request)
-        materialized: list[SkillRequest] = []
-        seen: set[str] = {item.skill_id for item in existing_skills}
+        materialized: list[CapabilityRequest] = []
+        seen: set[str] = {item.capability_id for item in existing_capabilities}
 
         for behavior in plan.behaviors[: int(self.services.social_attention_max_behaviors)]:
-            candidate = candidate_by_id.get(behavior.skill_id)
+            candidate = candidate_by_id.get(behavior.capability_id)
             if candidate is None:
-                reasons.append(f"unknown_skill:{behavior.skill_id}")
+                reasons.append(f"unknown_skill:{behavior.capability_id}")
                 continue
-            if behavior.skill_id in seen:
-                reasons.append(f"duplicate_skill:{behavior.skill_id}")
+            if behavior.capability_id in seen:
+                reasons.append(f"duplicate_skill:{behavior.capability_id}")
                 continue
             if candidate.get("available") is False or candidate.get("interaction_executable") is not True:
-                reasons.append(f"unavailable_skill:{behavior.skill_id}")
+                reasons.append(f"unavailable_skill:{behavior.capability_id}")
                 continue
             if behavior.timing != "parallel":
-                reasons.append(f"auxiliary_must_be_parallel:{behavior.skill_id}")
+                reasons.append(f"auxiliary_must_be_parallel:{behavior.capability_id}")
                 continue
             mode = self.services.effective_social_attention_mode()
             if mode == "on" and bool(candidate.get("requires_confirmation")):
-                reasons.append(f"confirmation_required:{behavior.skill_id}")
+                reasons.append(f"confirmation_required:{behavior.capability_id}")
                 continue
 
             schema = dict(candidate.get("input_schema") or {})
@@ -364,7 +364,7 @@ class SocialAttentionPlanner:
                 target_evidence,
             )
             if target_error is not None:
-                reasons.append(f"target_error:{behavior.skill_id}:{target_error}")
+                reasons.append(f"target_error:{behavior.capability_id}:{target_error}")
                 continue
             args, normalized = normalize_args_for_schema(
                 behavior.args,
@@ -372,16 +372,16 @@ class SocialAttentionPlanner:
             )
             errors = validate_args_for_schema(args, schema)
             if errors:
-                reasons.append(f"invalid_args:{behavior.skill_id}:{'; '.join(errors)}")
+                reasons.append(f"invalid_args:{behavior.capability_id}:{'; '.join(errors)}")
                 continue
             if self._conflicts_with_primary_task(
                 request,
                 candidate,
-                existing_skills,
+                existing_capabilities,
                 existing_candidates,
                 behavior.timing,
             ):
-                reasons.append(f"resource_conflict:{behavior.skill_id}")
+                reasons.append(f"resource_conflict:{behavior.capability_id}")
                 continue
 
             metadata = {
@@ -401,15 +401,15 @@ class SocialAttentionPlanner:
             if normalized:
                 metadata["schema_normalized_args"] = True
             materialized.append(
-                SkillRequest(
-                    skill_id=behavior.skill_id,
+                CapabilityRequest(
+                    capability_id=behavior.capability_id,
                     args=args,
                     timing=behavior.timing,
                     requires_confirmation=bool(candidate.get("requires_confirmation")),
                     metadata=metadata,
                 )
             )
-            seen.add(behavior.skill_id)
+            seen.add(behavior.capability_id)
         return materialized, reasons
 
     def _validate_target_claim(
@@ -486,11 +486,11 @@ class SocialAttentionPlanner:
         self,
         request: AgentRunRequest,
         social_candidate: dict[str, Any],
-        existing_skills: list[SkillRequest],
+        existing_capabilities: list[CapabilityRequest],
         candidate_by_id: dict[str, dict[str, Any]],
         timing: str,
     ) -> bool:
-        if not existing_skills:
+        if not existing_capabilities:
             return False
         if timing != "parallel":
             return True
@@ -506,10 +506,10 @@ class SocialAttentionPlanner:
         if social_parallel is False:
             return True
 
-        for skill in existing_skills:
-            if skill.skill_id == "chromie.speak":
+        for skill in existing_capabilities:
+            if skill.capability_id == "chromie.speak":
                 continue
-            other = candidate_by_id.get(skill.skill_id)
+            other = candidate_by_id.get(skill.capability_id)
             if other is None:
                 if request.route_decision.route == "robot_action":
                     return True

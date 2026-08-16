@@ -28,7 +28,8 @@ _FIXED_EXPECTATION_TOKENS = (
     "required_gesture",
     "expected_action",
     "exact_gesture",
-    "skill_id",
+    "capability_id",
+    "skill_id",  # retained-artifact leak must also stay forbidden
 )
 _FORBIDDEN_CONTEXT_KEYS = {
     "provider_backend",

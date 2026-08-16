@@ -116,9 +116,9 @@
     "ollama_reply": {
       "decision": "execute",
       "speech": "Okay, I'll blink my eyes 15 times in three batches.",
-      "skills": [
+      "capabilities": [
         {
-          "skill_id": "soridormi.blink_eyes",
+          "capability_id": "soridormi.blink_eyes",
           "args": {
             "count": 6
           },
@@ -126,7 +126,7 @@
           "step_id": "blink-batch-1"
         },
         {
-          "skill_id": "soridormi.blink_eyes",
+          "capability_id": "soridormi.blink_eyes",
           "args": {
             "count": 6
           },
@@ -134,7 +134,7 @@
           "step_id": "blink-batch-2"
         },
         {
-          "skill_id": "soridormi.blink_eyes",
+          "capability_id": "soridormi.blink_eyes",
           "args": {
             "count": 3
           },
@@ -160,12 +160,12 @@
       "forward",
       "movement request"
     ],
-    "skills": [
+    "capabilities": [
       "soridormi.blink_eyes",
       "soridormi.blink_eyes",
       "soridormi.blink_eyes"
     ],
-    "forbidden_skills": [
+    "forbidden_capabilities": [
       "soridormi.walk_forward",
       "soridormi.walk_velocity"
     ],

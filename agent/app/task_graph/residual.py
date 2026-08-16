@@ -136,7 +136,7 @@ def build_residual_replan_state(
         },
         "safety_note": (
             "Residual context is advisory. Any follow-up plan must be newly "
-            "validated and must re-enter confirmation, SkillRuntime, and "
+            "validated and must re-enter confirmation, CapabilityRuntime, and "
             "Soridormi safety gates."
         ),
     }

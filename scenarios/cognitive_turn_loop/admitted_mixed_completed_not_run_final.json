@@ -14,7 +14,7 @@
     "runtime_status": "failed",
     "capabilities": [
       {
-        "skill_id": "chromie.scenario.first_check",
+        "capability_id": "chromie.scenario.first_check",
         "provider_id": "scenario.checks",
         "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
         "output_schema": {
@@ -24,7 +24,7 @@
         }
       },
       {
-        "skill_id": "chromie.scenario.second_check",
+        "capability_id": "chromie.scenario.second_check",
         "provider_id": "scenario.checks",
         "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
         "output_schema": {
@@ -45,14 +45,14 @@
       "steps": [
         {
           "step_id": "step-first",
-          "skill_id": "chromie.scenario.first_check",
+          "capability_id": "chromie.scenario.first_check",
           "args": {},
           "timing": "sequential",
           "source_goal_ids": ["goal-first"]
         },
         {
           "step_id": "step-second",
-          "skill_id": "chromie.scenario.second_check",
+          "capability_id": "chromie.scenario.second_check",
           "args": {},
           "timing": "sequential",
           "source_goal_ids": ["goal-second"]
@@ -104,7 +104,7 @@
     "final_speech_only": true,
     "final_speech_count": 2,
     "final_goal_statuses": ["completed", "not_run"],
-    "final_skill_ids": [],
+    "final_capability_ids": [],
     "runtime_call_count": 2,
     "final_speech_contains_all": ["The first check passed"]
   }

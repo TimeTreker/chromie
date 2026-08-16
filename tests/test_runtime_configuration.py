@@ -190,7 +190,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
             "1",
         )
         self.assertEqual(values["ORCH_ENABLE_INTERACTION_RESPONSE"], "1")
-        self.assertEqual(values["ORCH_ENABLE_SORIDORMI_SKILLS"], "0")
+        self.assertEqual(values["ORCH_ENABLE_SORIDORMI_CAPABILITIES"], "0")
         self.assertEqual(values["TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC"], "3")
         self.assertEqual(
             values["TTS_CANDIDATE_COLD_FIRST_AUDIO_TIMEOUT_SEC"], "180"
@@ -631,9 +631,9 @@ class RuntimeConfigurationTests(unittest.TestCase):
             'SKILL_TIMEOUT_S="${CHROMIE_VOICE_MUJOCO_SKILL_TIMEOUT_S:-120}"',
             source,
         )
-        self.assertIn("--skill-timeout-s SECONDS", source)
-        self.assertIn('--skill-timeout-s "$SKILL_TIMEOUT_S"', source)
-        self.assertNotIn("--skill-timeout-s 15", source)
+        self.assertIn("--capability-timeout-s SECONDS", source)
+        self.assertIn('--capability-timeout-s "$SKILL_TIMEOUT_S"', source)
+        self.assertNotIn("--capability-timeout-s 15", source)
 
     def test_deprecated_voice_launcher_is_not_advertised(self) -> None:
         self.assertFalse((ROOT / "scripts" / "start_chromie_voice.sh").exists())

@@ -37,7 +37,7 @@ def _plan(
             steps.append(
                 {
                     "step_id": step_id,
-                    "skill_id": f"test.skill.{goal_index}.{step_index}",
+                    "capability_id": f"test.skill.{goal_index}.{step_index}",
                     "source_goal_ids": [goal_id],
                     "reason_summary": "Execute one bounded test step.",
                 }
@@ -107,7 +107,7 @@ def _bundle(
                     evidence_id=evidence_id,
                     request_id=f"request-{goal_index}-{step_index}",
                     step_id=step_id,
-                    skill_id=step.skill_id,
+                    capability_id=step.capability_id,
                     source_goal_ids=[goal_id],
                     status=status,
                     reported_status=status,
@@ -183,7 +183,7 @@ class OutcomeResponseTests(unittest.TestCase):
         response = compose_outcome_response(bundle, plan, "en-US")
 
         self.assertEqual(response.interaction_id, bundle.interaction_id)
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
         self.assertFalse(response.requires_confirmation)
         self.assertEqual(
             [
@@ -456,7 +456,7 @@ class OutcomeResponseTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "step-walk",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "source_goal_ids": ["goal-walk"],
                 }
             ],
@@ -486,7 +486,7 @@ class OutcomeResponseTests(unittest.TestCase):
             evidence_id="evidence-walk",
             request_id="request-walk",
             step_id="step-walk",
-            skill_id="soridormi.walk_forward",
+            capability_id="soridormi.walk_forward",
             source_goal_ids=["goal-walk"],
             status="completed",
             reported_status="completed",

@@ -56,7 +56,7 @@ logger = logging.getLogger("chromie.agent.goal_interpreter.schema")
 
 _PLANNER_OWNED_BINDING_FIELDS = frozenset({
     "capability_id",
-    "skill_id",
+    "capability_id",
     "tool_name",
     "provider_id",
     "execution_method",
@@ -415,7 +415,7 @@ def _is_effectful_task_type(task_type: str) -> bool:
             "body.stop_motion",
             "task.cancel_current_action",
             "task.execute_robot_action",
-            "task.execute_skill",
+            "task.execute_capability",
             "task.execute_task_graph",
             "task.use_tool",
         }
@@ -506,9 +506,7 @@ def _desired_ability_proposals(
         }
         matched_capability_id = str(
             item.get("matched_capability_id")
-            or item.get("matched_skill_id")
             or item.get("capability_id")
-            or item.get("skill_id")
             or ""
         ).strip()
         if matched_capability_id:
@@ -590,7 +588,7 @@ def _default_route_item(decision: RouteDecision) -> RouteItem:
         context_profile = "full_mind"
         requires_mind = True
     elif decision.route == "robot_action":
-        lane = "skill_runtime"
+        lane = "capability_runtime"
         context_profile = "capability_safety"
     elif decision.route == "memory":
         lane = "post_turn"
@@ -824,7 +822,7 @@ def _task_items_for_route_item(
             kind = "action"
             requires_validation = True
             if capability_id:
-                task_type = "speech.speak" if capability_id == "chromie.speak" else "task.execute_skill"
+                task_type = "speech.speak" if capability_id == "chromie.speak" else "task.execute_capability"
                 kind = "speech" if capability_id == "chromie.speak" else "action"
                 requires_validation = capability_id != "chromie.speak"
             elif action_type:
@@ -851,7 +849,7 @@ def _task_items_for_route_item(
             _task_item(
                 source_stage=source_stage,
                 kind="action",
-                task_type="task.execute_skill",
+                task_type="task.execute_capability",
                 route=route,
                 intent=intent,
                 priority=priority,

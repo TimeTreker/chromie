@@ -95,10 +95,10 @@ PLACEHOLDER_CAPABILITY_INTENTS = {
     "capability_id",
     "<capability_id>",
     "<exact capability_id>",
-    "<exact skill_id>",
+    "<exact capability_id>",
     "capability:<capability_id>",
     "capability:<exact capability_id>",
-    "capability:<exact skill_id>",
+    "capability:<exact capability_id>",
 }
 
 
@@ -280,7 +280,7 @@ def _review_capabilities_from_request(request: RouteRequest) -> list[dict[str, A
             if not isinstance(item, dict):
                 continue
             capability_id = str(
-                item.get("capability_id") or item.get("skill_id") or ""
+                item.get("capability_id") or ""
             ).strip()
             if capability_id and capability_id in capability_indexes:
                 index = capability_indexes[capability_id]
@@ -313,7 +313,7 @@ def _capability_ids_from_request(request: RouteRequest) -> set[str]:
         for item in _review_capabilities_from_request(request)
         if (
             capability_id := str(
-                item.get("capability_id") or item.get("skill_id") or ""
+                item.get("capability_id") or ""
             ).strip()
         )
     }
@@ -416,7 +416,7 @@ def _reject_planner_shaped_fast_output(
             if not isinstance(item, dict):
                 continue
             if item.get("kind") == "capability" or any(
-                key in item for key in ("capability_id", "skill_id", "args", "actions")
+                key in item for key in ("capability_id", "capability_id", "args", "actions")
             ):
                 raise ValueError(
                     "Fast Goal Interpreter progress must be native_response only; "
@@ -538,7 +538,7 @@ def _compact_prompt_capabilities(
             continue
         if item.get("prompt_tier_locked") is True:
             continue
-        capability_id = str(item.get("capability_id") or item.get("skill_id") or "").strip()
+        capability_id = str(item.get("capability_id") or "").strip()
         if not capability_id:
             continue
         description = " ".join(str(item.get("description") or "").split())
@@ -828,7 +828,7 @@ def _catalog_observability_profile(request: RouteRequest | None) -> dict[str, An
         for item in items:
             if not isinstance(item, dict):
                 continue
-            capability_id = str(item.get("capability_id") or item.get("skill_id") or "").strip()
+            capability_id = str(item.get("capability_id") or "").strip()
             if capability_id:
                 ids.append(capability_id)
         return ids
@@ -842,7 +842,7 @@ def _catalog_observability_profile(request: RouteRequest | None) -> dict[str, An
                 str(item.get(key) or "")
                 for key in (
                     "capability_id",
-                    "skill_id",
+                    "capability_id",
                     "route",
                     "contract",
                     "description",
@@ -851,7 +851,7 @@ def _catalog_observability_profile(request: RouteRequest | None) -> dict[str, An
                 )
             ).casefold()
             if needle in haystack:
-                capability_id = str(item.get("capability_id") or item.get("skill_id") or "").strip()
+                capability_id = str(item.get("capability_id") or "").strip()
                 if capability_id:
                     found.append(capability_id)
         return found
@@ -1549,7 +1549,7 @@ class OllamaGoalInterpreter:
             "Task Continuity Context, Not Authority:\n"
             "Use active responsibility/progress semantics, accepted dialogue, discourse, and Interaction Context by meaning. Canonical Goal/Task/Plan identities and execution bindings are intentionally absent; downstream owners hold them. Do not author lifecycle mutations here. Keep newer failed/goal-less dialogue salient. Preserve what the user wants, material bindings, and whether fresh work/evidence remains. Do not decide how to acknowledge, clarify, or respond; Fast Planner owns those Activities. For an external truth check, never state a result before evidence; delivered speech/trusted terminal effects are done, scheduled/planned work is not.\n"
             "Ability Awareness, Not Planning:\n"
-            "Treat the Common Ability Catalog only as awareness of supported outcome kinds, never a Fast Goal Interpreter selection or Activity-definition surface. Do not output routes[], response wording, Activity/Work/Plan contracts, lanes, realization, capability_id/skill_id, executable args/actions, or intent=capability:<id>; exact HOW belongs to Planner. Topical similarity is not support. Stable reasoning needing no fresh evidence stays conversational; current external facts require a provider-neutral information responsibility with completion_requires_work=true and completion_requires_fresh_evidence=true. Missing ability is non-executable semantic metadata only.\n\n"
+            "Treat the Common Ability Catalog only as awareness of supported outcome kinds, never a Fast Goal Interpreter selection or Activity-definition surface. Do not output routes[], response wording, Activity/Work/Plan contracts, lanes, realization, capability_id, executable args/actions, or intent=capability:<id>; exact HOW belongs to Planner. Topical similarity is not support. Stable reasoning needing no fresh evidence stays conversational; current external facts require a provider-neutral information responsibility with completion_requires_work=true and completion_requires_fresh_evidence=true. Missing ability is non-executable semantic metadata only.\n\n"
             "Compatibility Framing:\n"
             "route/intent are deprecated diagnostic framing only: chat=locally answerable; robot_action=likely embodied effect; tool=trusted external/changing evidence; deep_thought=wider interpretation; clarify=ambiguity. They do not define Work, Activity, lane, realization, Plan, or Capability. Never return interrupt or ignore.\n\n"
             "Output Contract:\n"

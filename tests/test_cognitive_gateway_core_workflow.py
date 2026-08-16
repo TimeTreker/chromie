@@ -46,12 +46,12 @@ class CognitiveGatewayCoreWorkflowTests(unittest.TestCase):
             manifest = {
                 "qualification_id": "qualification-one",
                 "simulator_expectations": {
-                    "required_terminal_skills": ["soridormi.walk_velocity"]
+                    "required_terminal_capabilities": ["soridormi.walk_velocity"]
                 },
                 "cancellation_expectations": {
                     "command_text": "Manifest-owned walking request.",
                     "interrupt_text": "Manifest-owned stop.",
-                    "required_skill": "soridormi.walk_velocity",
+                    "required_capability": "soridormi.walk_velocity",
                 },
             }
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
@@ -83,11 +83,11 @@ class CognitiveGatewayCoreWorkflowTests(unittest.TestCase):
             manifest_path = root / "manifest.json"
             manifest = {
                 "qualification_id": "qualification-one",
-                "simulator_expectations": {"required_terminal_skills": []},
+                "simulator_expectations": {"required_terminal_capabilities": []},
                 "cancellation_expectations": {
                     "command_text": "Walk.",
                     "interrupt_text": "Stop.",
-                    "required_skill": "soridormi.walk_velocity",
+                    "required_capability": "soridormi.walk_velocity",
                 },
             }
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")

@@ -162,9 +162,9 @@ class _JokeWalkIdentityOllama:
             return {
                 "decision": "execute",
                 "speech": "Walking forward for 15 seconds.",
-                "skills": [
+                "capabilities": [
                     {
-                        "skill_id": "soridormi.walk_velocity",
+                        "capability_id": "soridormi.walk_velocity",
                         "args": {"vx_mps": 0.2, "duration_s": 15.0},
                     }
                 ],
@@ -182,7 +182,7 @@ class _UnsupportedStatusThenChatOllama:
     async def generate(self, prompt: str, **kwargs: Any) -> Any:
         self.calls.append({"prompt": prompt, **kwargs})
         if kwargs.get("response_format") == "json":
-            return {"decision": "unsupported", "speech": "unsupported", "skills": []}
+            return {"decision": "unsupported", "speech": "unsupported", "capabilities": []}
         return "Yes, that joke was pretty silly."
 
 
@@ -586,17 +586,17 @@ class _CompoundMotionOllama:
         return {
             "decision": "execute",
             "speech": "I will walk, look right, and blink.",
-            "skills": [
+            "capabilities": [
                 {
-                    "skill_id": "soridormi.walk_velocity",
+                    "capability_id": "soridormi.walk_velocity",
                     "args": {"vx_mps": 0.2, "duration_s": 10.0},
                 },
                 {
-                    "skill_id": "soridormi.look_at_person",
+                    "capability_id": "soridormi.look_at_person",
                     "args": {"target_yaw_rad": -0.35},
                 },
                 {
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                 },
             ],
@@ -676,9 +676,9 @@ class _HeadDirectionOllama:
         return {
             "decision": "execute",
             "speech": "I will turn my head right.",
-            "skills": [
+            "capabilities": [
                 {
-                    "skill_id": "soridormi.look_direction",
+                    "capability_id": "soridormi.look_direction",
                     "args": {"head_yaw_rad": 0.3, "duration_s": 1.0},
                 }
             ],
@@ -753,8 +753,8 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         ).run(request)
 
         self.assertEqual(response.metadata["interaction_output_mode"], "native")
-        self.assertEqual(response.skills[0].skill_id, "soridormi.nod_yes")
-        self.assertEqual(response.skills[0].args, {"count": 2})
+        self.assertEqual(response.capabilities[0].capability_id, "soridormi.nod_yes")
+        self.assertEqual(response.capabilities[0].args, {"count": 2})
         self.assertEqual(response.speech, [])
         self.assertIn("capability_agent", response.metadata["handled_by"])
         proposals = [
@@ -762,8 +762,8 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             for item in response.metadata["agent_task_proposals"]
         ]
         self.assertEqual([item.proposal_kind for item in proposals], ["skill"])
-        self.assertEqual(proposals[0].skill_id, "soridormi.nod_yes")
-        self.assertEqual(proposals[0].request_id, response.skills[0].request_id)
+        self.assertEqual(proposals[0].capability_id, "soridormi.nod_yes")
+        self.assertEqual(proposals[0].request_id, response.capabilities[0].request_id)
         self.assertTrue(proposals[0].effectful)
 
     async def test_native_runtime_preserves_model_selected_skill_and_args(self) -> None:
@@ -783,9 +783,9 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             )
         ).run(request)
 
-        self.assertEqual(response.skills[0].skill_id, "soridormi.look_direction")
+        self.assertEqual(response.capabilities[0].capability_id, "soridormi.look_direction")
         self.assertEqual(
-            response.skills[0].args,
+            response.capabilities[0].args,
             {"head_yaw_rad": 0.3, "duration_s": 1.0},
         )
 
@@ -824,7 +824,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.speech[0].timing, "immediate")
         self.assertNotIn("alignment", response.speech[0].metadata)
         self.assertNotIn("wait_for_playback_start", response.speech[0].metadata)
-        self.assertEqual(response.skills[0].skill_id, "soridormi.walk_velocity")
+        self.assertEqual(response.capabilities[0].capability_id, "soridormi.walk_velocity")
 
     async def test_goal_interpreter_compound_actions_keep_speech_as_skill(self) -> None:
         request = _legacy_request(
@@ -872,27 +872,27 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.speech, [])
         self.assertEqual(
-            [skill.skill_id for skill in response.skills],
+            [skill.capability_id for skill in response.capabilities],
             ["soridormi.walk_velocity", "chromie.speak"],
         )
-        self.assertEqual(response.skills[1].args["text"], "Why did the robot bring a map? Because every good walk needs direction.")
-        self.assertEqual(response.skills[1].timing, "parallel")
-        self.assertEqual(response.skills[0].metadata["execution_mode"], "proposed")
-        self.assertEqual(response.skills[0].metadata["execution_semantics"], "proposal_from_route2")
-        self.assertTrue(response.skills[0].metadata["requires_runtime_validation"])
-        self.assertEqual(response.skills[0].metadata["source_component"], "agent.capability")
-        self.assertEqual(response.skills[0].metadata["route_stage"], "quick_intent")
-        self.assertTrue(response.skills[0].metadata["goal_interpretation_compound_action_plan"])
-        self.assertEqual(response.skills[0].metadata["goal_interpretation_action_confidence"], 0.9)
-        self.assertEqual(response.skills[1].metadata["goal_interpretation_action_confidence"], 0.87)
-        self.assertEqual(response.skills[1].metadata["execution_mode"], "proposed")
-        self.assertFalse(response.skills[1].metadata["capability_requires_confirmation"])
+        self.assertEqual(response.capabilities[1].args["text"], "Why did the robot bring a map? Because every good walk needs direction.")
+        self.assertEqual(response.capabilities[1].timing, "parallel")
+        self.assertEqual(response.capabilities[0].metadata["execution_mode"], "proposed")
+        self.assertEqual(response.capabilities[0].metadata["execution_semantics"], "proposal_from_route2")
+        self.assertTrue(response.capabilities[0].metadata["requires_runtime_validation"])
+        self.assertEqual(response.capabilities[0].metadata["source_component"], "agent.capability")
+        self.assertEqual(response.capabilities[0].metadata["route_stage"], "quick_intent")
+        self.assertTrue(response.capabilities[0].metadata["goal_interpretation_compound_action_plan"])
+        self.assertEqual(response.capabilities[0].metadata["goal_interpretation_action_confidence"], 0.9)
+        self.assertEqual(response.capabilities[1].metadata["goal_interpretation_action_confidence"], 0.87)
+        self.assertEqual(response.capabilities[1].metadata["execution_mode"], "proposed")
+        self.assertFalse(response.capabilities[1].metadata["capability_requires_confirmation"])
         proposals = [
             TaskProposal.model_validate(item)
             for item in response.metadata["agent_task_proposals"]
         ]
         self.assertEqual(
-            [item.skill_id for item in proposals],
+            [item.capability_id for item in proposals],
             ["soridormi.walk_velocity", "chromie.speak"],
         )
         self.assertFalse(proposals[1].effectful)
@@ -920,16 +920,16 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(request.route_decision.route, "chat")
         self.assertEqual(response.speech[0].text, "Yes, you are correct.")
-        self.assertEqual(len(response.skills), 1)
-        self.assertEqual(response.skills[0].skill_id, "soridormi.express_attention")
+        self.assertEqual(len(response.capabilities), 1)
+        self.assertEqual(response.capabilities[0].capability_id, "soridormi.express_attention")
         self.assertEqual(
-            response.skills[0].args,
+            response.capabilities[0].args,
             {"style": "neutral", "duration_s": 2.4, "hold_fraction": 0.35},
         )
-        self.assertEqual(response.skills[0].timing, "parallel")
-        self.assertFalse(response.skills[0].requires_confirmation)
+        self.assertEqual(response.capabilities[0].timing, "parallel")
+        self.assertFalse(response.capabilities[0].requires_confirmation)
         self.assertEqual(
-            response.skills[0].metadata["source"],
+            response.capabilities[0].metadata["source"],
             "social_attention_plan",
         )
         self.assertEqual(response.metadata["social_attention_capability_ids"][0], "soridormi.express_attention")
@@ -956,15 +956,15 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         ).run(request)
 
         self.assertEqual(response.speech[0].text, "I am listening.")
-        self.assertEqual(len(response.skills), 1)
-        self.assertEqual(response.skills[0].skill_id, "soridormi.express_attention")
+        self.assertEqual(len(response.capabilities), 1)
+        self.assertEqual(response.capabilities[0].capability_id, "soridormi.express_attention")
         self.assertEqual(
-            response.skills[0].args,
+            response.capabilities[0].args,
             {"style": "neutral", "duration_s": 2.4, "hold_fraction": 0.35},
         )
-        self.assertEqual(response.skills[0].timing, "parallel")
+        self.assertEqual(response.capabilities[0].timing, "parallel")
         self.assertEqual(
-            response.skills[0].metadata["behavior_reason"],
+            response.capabilities[0].metadata["behavior_reason"],
             "A subtle attention cue supports the spoken reply.",
         )
         self.assertEqual(
@@ -1003,7 +1003,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             response.speech[0].text,
             "Why did the robot bring a ladder? To reach the cloud.",
         )
-        self.assertEqual(response.skills[0].skill_id, "soridormi.express_attention")
+        self.assertEqual(response.capabilities[0].capability_id, "soridormi.express_attention")
 
     async def test_capability_unsupported_status_label_is_not_spoken(self) -> None:
         ollama = _UnsupportedStatusThenChatOllama()
@@ -1053,7 +1053,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.metadata["capability_decision"], "unsupported")
         self.assertEqual(response.speech[0].text, "unsupported")
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
 
     async def test_deep_thought_route_survives_capability_preflight(self) -> None:
         request = _request(
@@ -1075,7 +1075,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(request.route_decision.route, "deep_thought")
         self.assertEqual(request.route_decision.agents, ["deepthinking_agent", "speaker_agent"])
         self.assertEqual(response.speech[0].text, "I am listening.")
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
 
     async def test_confident_llm_chat_is_not_overwritten_by_motion_catalog(self) -> None:
         request = _request(
@@ -1100,7 +1100,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(request.route_decision.route, "chat")
         self.assertEqual(response.speech[0].text, "La la, here is a small song just for you.")
         self.assertNotIn("capability_decision", response.metadata)
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
 
     async def test_fallback_chat_is_not_promoted_by_strong_motion_catalog_match(self) -> None:
         request = _request(
@@ -1126,7 +1126,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(request.route_decision.agents, ["conversation_agent", "speaker_agent"])
         self.assertEqual(request.route_decision.source, "fallback")
         self.assertEqual(response.speech[0].text, "I am listening.")
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
         self.assertNotIn("capability_decision", response.metadata)
 
     async def test_broad_llm_robot_action_is_not_narrowed_to_top_catalog_match(self) -> None:
@@ -1153,15 +1153,15 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(request.route_decision.intent, "robot_action")
         self.assertEqual(request.route_decision.source, "llm")
         self.assertEqual(
-            [skill.skill_id for skill in response.skills],
+            [skill.capability_id for skill in response.capabilities],
             [
                 "soridormi.walk_velocity",
                 "soridormi.look_at_person",
                 "soridormi.blink_eyes",
             ],
         )
-        self.assertEqual(response.skills[0].args, {"vx_mps": 0.2, "duration_s": 10.0})
-        self.assertEqual(response.skills[2].args, {"count": 2})
+        self.assertEqual(response.capabilities[0].args, {"vx_mps": 0.2, "duration_s": 10.0})
+        self.assertEqual(response.capabilities[2].args, {"count": 2})
 
     async def test_social_attention_model_can_choose_none(self) -> None:
         request = _request(
@@ -1183,7 +1183,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         ).run(request)
 
         self.assertEqual(response.speech[0].text, "I am listening.")
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
         self.assertEqual(response.metadata["social_attention_status"], "not_selected")
 
     async def test_expressive_body_cues_off_keeps_chat_speech_only(self) -> None:
@@ -1204,7 +1204,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         ).run(request)
 
         self.assertEqual(response.speech[0].text, "I am listening.")
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
 
     async def test_weak_catalog_motion_match_is_not_phrase_corrected_in_runtime(self) -> None:
         request = _request(
@@ -1223,7 +1223,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         ).run(request)
 
         self.assertEqual(request.route_decision.route, "robot_action")
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
         self.assertEqual(
             response.speech[0].text,
             "I got stuck forming that answer. Please say it again.",
@@ -1249,7 +1249,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(request.route_decision.route, "chat")
         self.assertEqual(request.route_decision.agents, ["conversation_agent", "speaker_agent"])
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
         self.assertEqual(response.speech[0].text, "I am listening.")
         self.assertNotIn("capability_promotion_blocked", request.context)
 
@@ -1275,7 +1275,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         first_response = await runtime.run(first)
 
         self.assertEqual(first.route_decision.route, "chat")
-        self.assertEqual(first_response.skills, [])
+        self.assertEqual(first_response.capabilities, [])
         self.assertIn("robot", first_response.speech[0].text.lower())
         self.assertIn("joke", first_response.speech[0].text.lower())
 
@@ -1294,8 +1294,8 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         second_response = await runtime.run(second)
 
         self.assertEqual(second.route_decision.route, "robot_action")
-        self.assertEqual([item.skill_id for item in second_response.skills], ["soridormi.walk_velocity"])
-        self.assertEqual(second_response.skills[0].args, {"vx_mps": 0.2, "duration_s": 15.0})
+        self.assertEqual([item.capability_id for item in second_response.capabilities], ["soridormi.walk_velocity"])
+        self.assertEqual(second_response.capabilities[0].args, {"vx_mps": 0.2, "duration_s": 15.0})
         self.assertEqual(second_response.speech[0].text, "Walking forward for 15 seconds.")
 
         third = _request(
@@ -1324,7 +1324,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(third.route_decision.route, "chat")
         self.assertEqual(third.route_decision.agents, ["conversation_agent", "speaker_agent"])
-        self.assertEqual(third_response.skills, [])
+        self.assertEqual(third_response.capabilities, [])
         self.assertIn("chromie", third_response.speech[0].text.lower())
         self.assertIn("6-year-old", third_response.speech[0].text.lower())
         self.assertNotIn("walking", third_response.speech[0].text.lower())
@@ -1347,7 +1347,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         ).run(request)
 
         self.assertEqual(request.route_decision.route, "robot_action")
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
         self.assertEqual(
             response.speech[0].text,
             "I got stuck forming that answer. Please say it again.",
@@ -1382,10 +1382,10 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             )
         )
 
-        self.assertEqual(len(response.skills), 1)
-        self.assertEqual(response.skills[0].skill_id, "chromie.task_graph.execute")
+        self.assertEqual(len(response.capabilities), 1)
+        self.assertEqual(response.capabilities[0].capability_id, "chromie.task_graph.execute")
         self.assertEqual(
-            response.skills[0].args["graph"]["graph_id"],
+            response.capabilities[0].args["graph"]["graph_id"],
             "graph_native",
         )
 
@@ -1407,15 +1407,15 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertTrue(response.requires_confirmation)
-        self.assertTrue(response.skills[0].requires_confirmation)
+        self.assertTrue(response.capabilities[0].requires_confirmation)
 
     async def test_native_validation_failure_is_fail_closed_by_default(self) -> None:
         native = _NativeRuntimeStub(
             {
                 "status": "ok",
-                "skills": [
+                "capabilities": [
                     {
-                        "skill_id": "unsafe.test",
+                        "capability_id": "unsafe.test",
                         "args": {"joint_targets": [0.1, 0.2]},
                     }
                 ],
@@ -1434,9 +1434,9 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         native = _NativeRuntimeStub(
             {
                 "status": "ok",
-                "skills": [
+                "capabilities": [
                     {
-                        "skill_id": "unsafe.test",
+                        "capability_id": "unsafe.test",
                         "args": {"joint_targets": [0.1, 0.2]},
                     }
                 ],
@@ -1461,7 +1461,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.metadata["interaction_output_mode"], "legacy-fallback")
         self.assertIn("native_validation_error", response.metadata)
         self.assertNotIn("[0.1,0.2]", response.model_dump_json())
-        self.assertEqual(response.skills[0].skill_id, "soridormi.nod_yes")
+        self.assertEqual(response.capabilities[0].capability_id, "soridormi.nod_yes")
         self.assertEqual(legacy.calls, 1)
 
     async def test_legacy_adapter_mode_skips_native_runtime(self) -> None:

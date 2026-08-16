@@ -604,7 +604,7 @@ def _check_feature_gate_alignment(root: Path, manifest_path: Path) -> list[Diagn
     diagnostics: list[Diagnostic] = []
     snapshot = load_env(root)
     configured = snapshot.get("ORCH_SORIDORMI_MANIFEST")
-    soridormi_enabled = parse_bool(snapshot.get("ORCH_ENABLE_SORIDORMI_SKILLS")) is True
+    soridormi_enabled = parse_bool(snapshot.get("ORCH_ENABLE_SORIDORMI_CAPABILITIES")) is True
     if soridormi_enabled and configured:
         configured_path = root / configured
         try:

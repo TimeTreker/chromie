@@ -166,7 +166,7 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
 
     def test_apply_uses_responsibility_only_core_and_defers_first_wording_to_planner(self):
         response = InteractionResponse(
-            speech=[{"text": "北京今天没有雨。", "timing": "after_skills"}],
+            speech=[{"text": "北京今天没有雨。", "timing": "after_capabilities"}],
             metadata={"source": "goal_driven_cognitive_runtime"},
         )
         resolution = CognitiveRuntimeResolution(

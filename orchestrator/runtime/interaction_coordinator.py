@@ -23,9 +23,9 @@ from shared.chromie_contracts.plan import (
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
-    SkillRequest,
-    SkillResult,
-    SkillTrace,
+    CapabilityRequest,
+    CapabilityResult,
+    CapabilityTrace,
     output_schema_sha256,
 )
 from shared.chromie_contracts.reflex import (
@@ -33,35 +33,38 @@ from shared.chromie_contracts.reflex import (
     CancellationDispatchReceipt,
 )
 
-from .skill_runtime import (
-    LocalSpeechSkillProvider,
-    MediaPlaybackSkillProvider,
+from .capability_runtime import (
+    LocalSpeechCapabilityProvider,
+    MediaPlaybackCapabilityProvider,
     RuntimeAuthorization,
-    SessionControlSkillProvider,
-    SkillRegistry,
-    SkillRuntime,
-    SkillRuntimeResult,
-    VocalPerformanceSkillProvider,
+    SessionControlCapabilityProvider,
+    CapabilityRegistry,
+    CapabilityRuntime,
+    CapabilityRuntimeResult,
+    VocalPerformanceCapabilityProvider,
     local_speech_definition,
     media_playback_definitions,
     session_interrupt_definition,
     vocal_performance_definition,
 )
-from .skill_adapters import (
+from .capability_adapters import (
     TaskGraphCancelHandler,
     TaskGraphHandler,
-    TaskGraphSkillProvider,
-    task_graph_skill_definition,
+    TaskGraphCapabilityProvider,
+    task_graph_capability_definition,
 )
-from .soridormi_skill_provider import SoridormiNamedSkillAdapter
+from .soridormi_capability_provider import (
+    SoridormiCapabilityProvider,
+    import_soridormi_capability_catalog,
+)
 from .agent_tool_provider import (
     AgentToolHandler,
-    AgentToolSkillProvider,
+    AgentToolCapabilityProvider,
     local_agent_tool_definitions,
 )
 from .conversation_memory_provider import (
     ConversationMemoryHandler,
-    ConversationMemorySkillProvider,
+    ConversationMemoryCapabilityProvider,
     host_runtime_memory_definitions,
 )
 from .body_recovery import (
@@ -73,7 +76,7 @@ from .task_proposals import annotate_task_proposal_ledger
 
 SpeechScheduler = Callable[[dict[str, Any]], dict[str, Any] | Awaitable[dict[str, Any]]]
 SpeechCancelScheduler = Callable[
-    [SkillRequest, dict[str, Any]],
+    [CapabilityRequest, dict[str, Any]],
     None | Awaitable[None],
 ]
 _TASK_GRAPH_SKILL_ID = "chromie.task_graph.execute"
@@ -108,7 +111,7 @@ class ReadyPlannerVocalExecution:
     activity: FastPlannerVocalActivity
     interaction_id: str
     speech: InteractionSpeech
-    task: asyncio.Task[SkillRuntimeResult]
+    task: asyncio.Task[CapabilityRuntimeResult]
 
 
 @dataclass
@@ -125,8 +128,8 @@ class InteractionRuntimeCoordinator:
         task_graph_cancel_handler: TaskGraphCancelHandler | None = None,
         agent_tool_handler: AgentToolHandler | None = None,
         conversation_memory_handler: ConversationMemoryHandler | None = None,
-        vocal_provider: VocalPerformanceSkillProvider | None = None,
-        media_provider: MediaPlaybackSkillProvider | None = None,
+        vocal_provider: VocalPerformanceCapabilityProvider | None = None,
+        media_provider: MediaPlaybackCapabilityProvider | None = None,
         capability_manifest_paths: str | None = None,
         max_concurrency: int | None = None,
         catalog_refresh_ttl_s: float | None = None,
@@ -134,11 +137,11 @@ class InteractionRuntimeCoordinator:
         body_recovery_confirmation_ttl_s: float | None = None,
         interaction_ledger: Any | None = None,
     ) -> None:
-        self.registry = SkillRegistry()
+        self.registry = CapabilityRegistry()
         self.registry.register(local_speech_definition())
         self.registry.register(session_interrupt_definition())
-        self.registry.register(task_graph_skill_definition())
-        self.runtime = SkillRuntime(
+        self.registry.register(task_graph_capability_definition())
+        self.runtime = CapabilityRuntime(
             self.registry,
             max_concurrency=max(
                 1,
@@ -150,7 +153,7 @@ class InteractionRuntimeCoordinator:
             ),
         )
         self.runtime.register_provider(
-            LocalSpeechSkillProvider(
+            LocalSpeechCapabilityProvider(
                 speech_scheduler,
                 speech_cancel_scheduler,
             )
@@ -162,25 +165,25 @@ class InteractionRuntimeCoordinator:
             for definition in media_playback_definitions(media_provider.declaration):
                 self.registry.register(definition)
             self.runtime.register_provider(media_provider)
-        self.runtime.register_provider(SessionControlSkillProvider())
+        self.runtime.register_provider(SessionControlCapabilityProvider())
         if agent_tool_handler is not None:
             definitions = local_agent_tool_definitions(capability_manifest_paths)
             for definition in definitions:
                 self.registry.register(definition)
             if definitions:
-                self.runtime.register_provider(AgentToolSkillProvider(agent_tool_handler))
+                self.runtime.register_provider(AgentToolCapabilityProvider(agent_tool_handler))
         if conversation_memory_handler is not None:
             memory_definitions = host_runtime_memory_definitions(capability_manifest_paths)
             for definition in memory_definitions:
                 self.registry.register(definition)
             if memory_definitions:
                 self.runtime.register_provider(
-                    ConversationMemorySkillProvider(conversation_memory_handler)
+                    ConversationMemoryCapabilityProvider(conversation_memory_handler)
                 )
         self._task_graph_enabled = task_graph_handler is not None
         if task_graph_handler is not None:
             self.runtime.register_provider(
-                TaskGraphSkillProvider(
+                TaskGraphCapabilityProvider(
                     task_graph_handler,
                     task_graph_cancel_handler,
                 )
@@ -212,24 +215,24 @@ class InteractionRuntimeCoordinator:
         )
         self._catalog_lock = asyncio.Lock()
         self.interaction_ledger = interaction_ledger
-        self._preexecuted: dict[tuple[str, str], tuple[SkillResult, SkillTrace | None]] = {}
+        self._preexecuted: dict[tuple[str, str], tuple[CapabilityResult, CapabilityTrace | None]] = {}
 
-    async def ensure_skill_definitions(self, skill_ids: Iterable[str]) -> None:
+    async def ensure_capability_definitions(self, capability_ids: Iterable[str]) -> None:
         """Refresh provider-backed definitions needed for a canonical plan.
 
         This is a deterministic catalog operation. It does not authorize or
         execute any requested skill.
         """
 
-        normalized = [str(item).strip() for item in skill_ids if str(item).strip()]
+        normalized = [str(item).strip() for item in capability_ids if str(item).strip()]
         body_ids = [item for item in normalized if item.startswith("soridormi.")]
         if body_ids:
-            await self._ensure_soridormi_catalog(required_skill_ids=body_ids)
-        for skill_id in normalized:
-            self.registry.get(skill_id)
+            await self._ensure_soridormi_catalog(required_capability_ids=body_ids)
+        for capability_id in normalized:
+            self.registry.get(capability_id)
 
-    def skill_definition(self, skill_id: str):
-        return self.registry.get(skill_id)
+    def capability_definition(self, capability_id: str):
+        return self.registry.get(capability_id)
 
     async def start_fast_planner_vocal_activity(
         self,
@@ -289,7 +292,7 @@ class InteractionRuntimeCoordinator:
         )
         task = asyncio.create_task(self.runtime.execute(response))
 
-        def observe_completion(completed: asyncio.Task[SkillRuntimeResult]) -> None:
+        def observe_completion(completed: asyncio.Task[CapabilityRuntimeResult]) -> None:
             if completed.cancelled():
                 return
             exc = completed.exception()
@@ -308,10 +311,10 @@ class InteractionRuntimeCoordinator:
 
     def _consume_preexecuted(
         self, response: InteractionResponse
-    ) -> tuple[InteractionResponse, list[SkillResult], list[SkillTrace]]:
-        consumed_results: list[SkillResult] = []
-        consumed_traces: list[SkillTrace] = []
-        remaining_skills: list[SkillRequest] = []
+    ) -> tuple[InteractionResponse, list[CapabilityResult], list[CapabilityTrace]]:
+        consumed_results: list[CapabilityResult] = []
+        consumed_traces: list[CapabilityTrace] = []
+        remaining_skills: list[CapabilityRequest] = []
         remaining_speech: list[InteractionSpeech] = []
 
         def consume(request_id: str) -> bool:
@@ -327,14 +330,14 @@ class InteractionRuntimeCoordinator:
                 consumed_traces.append(trace)
             return True
 
-        for request in response.skills:
+        for request in response.capabilities:
             if not consume(request.request_id):
                 remaining_skills.append(request)
         for speech in response.speech:
             if not consume(speech.id):
                 remaining_speech.append(speech)
         if (
-            len(remaining_skills) == len(response.skills)
+            len(remaining_skills) == len(response.capabilities)
             and len(remaining_speech) == len(response.speech)
         ):
             return response, consumed_results, consumed_traces
@@ -342,7 +345,7 @@ class InteractionRuntimeCoordinator:
             response.model_copy(
                 deep=True,
                 update={
-                    "skills": remaining_skills,
+                    "capabilities": remaining_skills,
                     "speech": remaining_speech,
                 },
             ),
@@ -356,7 +359,7 @@ class InteractionRuntimeCoordinator:
         *,
         session_id: str | None,
         confirmed_request_ids: set[str] | None = None,
-    ) -> SkillRuntimeResult:
+    ) -> CapabilityRuntimeResult:
         opened = self.runtime.begin_interaction(response.interaction_id)
         try:
             return await self._execute_open_interaction(
@@ -383,16 +386,16 @@ class InteractionRuntimeCoordinator:
         *,
         session_id: str | None,
         confirmed_request_ids: set[str] | None = None,
-    ) -> SkillRuntimeResult:
+    ) -> CapabilityRuntimeResult:
         raw_body_requests = [
-            request for request in response.skills if request.skill_id.startswith("soridormi.")
+            request for request in response.capabilities if request.capability_id.startswith("soridormi.")
         ]
         suppress_body_failure_speech = self._suppress_body_failure_speech(response)
         if raw_body_requests:
             if self.soridormi_invoker is None:
                 try:
                     await self._ensure_soridormi_catalog(
-                        required_skill_ids=(request.skill_id for request in raw_body_requests),
+                        required_capability_ids=(request.capability_id for request in raw_body_requests),
                     )
                 except RuntimeError as exc:
                     if suppress_body_failure_speech:
@@ -407,7 +410,7 @@ class InteractionRuntimeCoordinator:
                     raise
             try:
                 await self._ensure_soridormi_catalog(
-                    required_skill_ids=(request.skill_id for request in raw_body_requests),
+                    required_capability_ids=(request.capability_id for request in raw_body_requests),
                 )
             except RuntimeError as exc:
                 return await self._body_setup_failure(
@@ -435,19 +438,19 @@ class InteractionRuntimeCoordinator:
                 session_id=str(session_id or turn_id),
                 turn_id=turn_id,
                 interaction_id=prepared.interaction_id,
-                requests=prepared.skills,
+                requests=prepared.capabilities,
             )
-        if prepared.status == "error" and not prepared.skills and not prepared.speech:
-            return SkillRuntimeResult(
+        if prepared.status == "error" and not prepared.capabilities and not prepared.speech:
+            return CapabilityRuntimeResult(
                 interaction_id=prepared.interaction_id,
                 status="failed",
             )
         suppress_body_failure_speech = self._suppress_body_failure_speech(prepared)
         body_requests = [
-            request for request in prepared.skills if request.skill_id.startswith("soridormi.")
+            request for request in prepared.capabilities if request.capability_id.startswith("soridormi.")
         ]
         task_graph_requests = [
-            request for request in prepared.skills if request.skill_id == _TASK_GRAPH_SKILL_ID
+            request for request in prepared.capabilities if request.capability_id == _TASK_GRAPH_SKILL_ID
         ]
         gated_requests = [*body_requests, *task_graph_requests]
         if task_graph_requests and not self._task_graph_enabled:
@@ -466,10 +469,10 @@ class InteractionRuntimeCoordinator:
             unavailable = [
                 request
                 for request in body_requests
-                if not self.registry.get(request.skill_id).available
+                if not self.registry.get(request.capability_id).available
             ]
             if unavailable:
-                definition = self.registry.get(unavailable[0].skill_id)
+                definition = self.registry.get(unavailable[0].capability_id)
                 return await self._body_setup_failure(
                     prepared,
                     body_requests,
@@ -480,25 +483,25 @@ class InteractionRuntimeCoordinator:
                 )
 
         authorized_request_ids = set(confirmed_request_ids or ())
-        after_skills_speech = [
-            speech for speech in prepared.speech if speech.timing == "after_skills"
+        after_capabilities_speech = [
+            speech for speech in prepared.speech if speech.timing == "after_capabilities"
         ]
         primary = (
             prepared.model_copy(
                 deep=True,
                 update={
                     "speech": [
-                        speech for speech in prepared.speech if speech.timing != "after_skills"
+                        speech for speech in prepared.speech if speech.timing != "after_capabilities"
                     ]
                 },
             )
-            if gated_requests and after_skills_speech
+            if gated_requests and after_capabilities_speech
             else prepared
         )
         primary, preexecuted_results, preexecuted_traces = self._consume_preexecuted(
             primary
         )
-        if primary.skills or primary.speech:
+        if primary.capabilities or primary.speech:
             execution = await self.runtime.execute(
                 primary,
                 authorization=RuntimeAuthorization(
@@ -506,7 +509,7 @@ class InteractionRuntimeCoordinator:
                 ),
             )
         else:
-            execution = SkillRuntimeResult(
+            execution = CapabilityRuntimeResult(
                 interaction_id=prepared.interaction_id,
                 status="completed",
             )
@@ -581,10 +584,10 @@ class InteractionRuntimeCoordinator:
                 status="failed",
             )
 
-        if after_skills_speech:
+        if after_capabilities_speech:
             followup = InteractionResponse(
                 interaction_id=prepared.interaction_id,
-                speech=after_skills_speech,
+                speech=after_capabilities_speech,
                 metadata=prepared.metadata,
             )
             followup_execution = await self.runtime.execute(followup)
@@ -611,7 +614,7 @@ class InteractionRuntimeCoordinator:
         return bool(
             metadata.get("cognitive_runtime_apply") is True
             and isinstance(metadata.get("canonical_plan"), dict)
-            and response.skills
+            and response.capabilities
         )
 
     def prepare_response(
@@ -657,20 +660,20 @@ class InteractionRuntimeCoordinator:
         } or capability_decision in {"clarify", "unsupported", "blocked"}
         if not blocked:
             return response
-        effectful = [request for request in response.skills if request.skill_id != "chromie.speak"]
+        effectful = [request for request in response.capabilities if request.capability_id != "chromie.speak"]
         if not effectful:
             return response
         return response.model_copy(
             deep=True,
             update={
-                "skills": [
-                    request for request in response.skills if request.skill_id == "chromie.speak"
+                "capabilities": [
+                    request for request in response.capabilities if request.capability_id == "chromie.speak"
                 ],
                 "requires_confirmation": False,
                 "metadata": {
                     **metadata,
                     "structured_planning_execution_suppressed": True,
-                    "suppressed_capability_ids": [request.skill_id for request in effectful],
+                    "suppressed_capability_ids": [request.capability_id for request in effectful],
                 },
             },
         )
@@ -678,18 +681,18 @@ class InteractionRuntimeCoordinator:
     async def _body_setup_failure(
         self,
         response: InteractionResponse,
-        body_requests: list[SkillRequest],
+        body_requests: list[CapabilityRequest],
         *,
         session_id: str | None,
         reason_code: str,
         message: str,
         suppress_speech: bool = False,
-    ) -> SkillRuntimeResult:
+    ) -> CapabilityRuntimeResult:
         body_results = [
-            SkillResult(
+            CapabilityResult(
                 request_id=request.request_id,
-                skill_id=request.skill_id,
-                skill_version=request.skill_version,
+                capability_id=request.capability_id,
+                capability_version=request.capability_version,
                 status="failed",
                 provider_id="soridormi.mcp",
                 reason_code=reason_code,
@@ -697,7 +700,7 @@ class InteractionRuntimeCoordinator:
             )
             for request in body_requests
         ]
-        failed = SkillRuntimeResult(
+        failed = CapabilityRuntimeResult(
             interaction_id=response.interaction_id,
             status="failed",
             results=body_results,
@@ -734,12 +737,12 @@ class InteractionRuntimeCoordinator:
 
     def _body_failure_message(
         self,
-        results: list[SkillResult],
+        results: list[CapabilityResult],
         *,
         language: str,
     ) -> str:
         zh = language.lower().startswith("zh")
-        if any(result.skill_id == _TASK_GRAPH_SKILL_ID for result in results):
+        if any(result.capability_id == _TASK_GRAPH_SKILL_ID for result in results):
             if any(result.status == "cancelled" for result in results):
                 return (
                     "任务已取消，我没有继续执行。"
@@ -772,12 +775,12 @@ class InteractionRuntimeCoordinator:
 
     def _merge_executions(
         self,
-        first: SkillRuntimeResult,
-        second: SkillRuntimeResult,
+        first: CapabilityRuntimeResult,
+        second: CapabilityRuntimeResult,
         *,
         status: str,
-    ) -> SkillRuntimeResult:
-        return SkillRuntimeResult(
+    ) -> CapabilityRuntimeResult:
+        return CapabilityRuntimeResult(
             interaction_id=first.interaction_id,
             status=status,
             results=[*first.results, *second.results],
@@ -789,21 +792,21 @@ class InteractionRuntimeCoordinator:
         response: InteractionResponse,
     ) -> set[str]:
         body_requests = [
-            request for request in response.skills if request.skill_id.startswith("soridormi.")
+            request for request in response.capabilities if request.capability_id.startswith("soridormi.")
         ]
         if body_requests:
             await self._ensure_soridormi_catalog(
-                required_skill_ids=(request.skill_id for request in body_requests),
+                required_capability_ids=(request.capability_id for request in body_requests),
             )
 
         required = {
             request.request_id
-            for request in response.skills
+            for request in response.capabilities
             if request.requires_confirmation
-            or self.registry.get(request.skill_id).requires_confirmation
+            or self.registry.get(request.capability_id).requires_confirmation
         }
         if response.requires_confirmation and not required:
-            required.update(request.request_id for request in response.skills)
+            required.update(request.request_id for request in response.capabilities)
         return required
 
     async def cancel_all(self) -> None:
@@ -866,23 +869,23 @@ class InteractionRuntimeCoordinator:
         self,
         *,
         force: bool = False,
-        required_skill_ids: Iterable[str] | None = None,
+        required_capability_ids: Iterable[str] | None = None,
     ) -> None:
-        required = set(required_skill_ids or ())
+        required = set(required_capability_ids or ())
         if self.soridormi_invoker is None:
             raise RuntimeError(
-                "InteractionResponse requested a Soridormi skill, but "
-                "ORCH_ENABLE_SORIDORMI_SKILLS is disabled"
+                "InteractionResponse requested a Soridormi capability, but "
+                "ORCH_ENABLE_SORIDORMI_CAPABILITIES is disabled"
             )
         if not self._should_refresh_soridormi_catalog(
             force=force,
-            required_skill_ids=required,
+            required_capability_ids=required,
         ):
             return
         async with self._catalog_lock:
             if not self._should_refresh_soridormi_catalog(
                 force=force,
-                required_skill_ids=required,
+                required_capability_ids=required,
             ):
                 return
             outcome = await self.soridormi_invoker.invoke(
@@ -890,32 +893,32 @@ class InteractionRuntimeCoordinator:
                 {},
             )
             if outcome.status != "success":
-                raise RuntimeError(outcome.error or "Soridormi named-skill catalog lookup failed")
-            skills = outcome.output.get("skills")
-            if not isinstance(skills, list):
-                raise RuntimeError("Soridormi named-skill catalog response has no skills list")
-            self.registry.import_soridormi_catalog(skills)
+                raise RuntimeError(outcome.error or "Soridormi named-capability catalog lookup failed")
+            provider_skills = outcome.output.get("skills")
+            if not isinstance(provider_skills, list):
+                raise RuntimeError("Soridormi named-capability catalog response has no skills list")
+            import_soridormi_capability_catalog(self.registry, provider_skills)
             if "soridormi.mcp" not in self.runtime.provider_ids():
-                self.runtime.register_provider(SoridormiNamedSkillAdapter(self.soridormi_invoker))
+                self.runtime.register_provider(SoridormiCapabilityProvider(self.soridormi_invoker))
             self._catalog_loaded = True
             self._catalog_last_loaded_at = time.monotonic()
 
-            missing = self._missing_soridormi_skill_ids(required)
+            missing = self._missing_soridormi_capability_ids(required)
             if missing:
                 raise RuntimeError(
-                    "Soridormi named-skill catalog did not include requested "
-                    f"skills: {', '.join(sorted(missing))}"
+                    "Soridormi named-capability catalog did not include requested "
+                    f"capabilities: {', '.join(sorted(missing))}"
                 )
 
     def _should_refresh_soridormi_catalog(
         self,
         *,
         force: bool,
-        required_skill_ids: set[str],
+        required_capability_ids: set[str],
     ) -> bool:
         if force or not self._catalog_loaded:
             return True
-        if self._required_soridormi_skills_need_refresh(required_skill_ids):
+        if self._required_soridormi_capabilities_need_refresh(required_capability_ids):
             return True
         if self._catalog_refresh_ttl_s <= 0:
             return True
@@ -923,30 +926,30 @@ class InteractionRuntimeCoordinator:
             return True
         return (time.monotonic() - self._catalog_last_loaded_at) >= self._catalog_refresh_ttl_s
 
-    def _required_soridormi_skills_need_refresh(
+    def _required_soridormi_capabilities_need_refresh(
         self,
-        skill_ids: Iterable[str],
+        capability_ids: Iterable[str],
     ) -> bool:
-        for skill_id in skill_ids:
-            if not skill_id.startswith("soridormi."):
+        for capability_id in capability_ids:
+            if not capability_id.startswith("soridormi."):
                 continue
             try:
-                definition = self.registry.get(skill_id)
+                definition = self.registry.get(capability_id)
             except ValueError:
                 return True
             if definition.metadata.get("catalog_absent") is True:
                 return True
         return False
 
-    def _missing_soridormi_skill_ids(self, skill_ids: Iterable[str]) -> set[str]:
+    def _missing_soridormi_capability_ids(self, capability_ids: Iterable[str]) -> set[str]:
         missing: set[str] = set()
-        for skill_id in skill_ids:
-            if not skill_id.startswith("soridormi."):
+        for capability_id in capability_ids:
+            if not capability_id.startswith("soridormi."):
                 continue
             try:
-                self.registry.get(skill_id)
+                self.registry.get(capability_id)
             except ValueError:
-                missing.add(skill_id)
+                missing.add(capability_id)
         return missing
 
     def _with_session_metadata(
@@ -1014,7 +1017,7 @@ class InteractionRuntimeCoordinator:
             deep=True,
             update={
                 "speech": [],
-                "skills": [],
+                "capabilities": [],
                 "status": "error",
                 "reason": "truth_reconciliation_requires_model_repair",
                 "metadata": metadata,
@@ -1061,8 +1064,8 @@ class InteractionRuntimeCoordinator:
 
     @staticmethod
     def _has_effectful_runtime_skill(response: InteractionResponse) -> bool:
-        for request in response.skills:
-            if request.skill_id == "chromie.speak":
+        for request in response.capabilities:
+            if request.capability_id == "chromie.speak":
                 continue
             metadata = request.metadata if isinstance(request.metadata, dict) else {}
             if "effectful" in metadata:
@@ -1084,9 +1087,9 @@ class InteractionRuntimeCoordinator:
             # old body/task safety surface, but never classify arbitrary
             # chromie.* read-only tools as physical effects by name alone.
             if not metadata and (
-                request.skill_id.startswith("soridormi.")
-                or request.skill_id == _TASK_GRAPH_SKILL_ID
-                or request.skill_id == "session.interrupt"
+                request.capability_id.startswith("soridormi.")
+                or request.capability_id == _TASK_GRAPH_SKILL_ID
+                or request.capability_id == "session.interrupt"
             ):
                 return True
         return False

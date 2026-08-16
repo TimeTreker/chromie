@@ -23,7 +23,7 @@
       "expect": {
         "speech_any": ["stay still", "hot drink"],
         "forbidden_speech_any": ["Moving now", "Executing", "I will turn"],
-        "forbidden_skills": ["soridormi.walk_velocity", "soridormi.turn_in_place"],
+        "forbidden_capabilities": ["soridormi.walk_velocity", "soridormi.turn_in_place"],
         "no_skills": true
       }
     },

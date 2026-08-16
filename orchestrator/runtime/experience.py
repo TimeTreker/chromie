@@ -12,7 +12,7 @@ from shared.chromie_contracts.mind import (
     MindUpdateProposal,
 )
 
-from .skill_runtime import SkillRuntimeResult
+from .capability_runtime import CapabilityRuntimeResult
 
 if TYPE_CHECKING:
     from .host_settings import ExperienceSettings
@@ -72,7 +72,7 @@ class ExperienceManager:
         self,
         *,
         response: InteractionResponse,
-        execution: SkillRuntimeResult | None,
+        execution: CapabilityRuntimeResult | None,
         session_id: str | None,
         mind_profile: MindProfile,
         errors: list[str] | None = None,
@@ -82,12 +82,12 @@ class ExperienceManager:
         context = response.metadata.get("experience_context")
         if not isinstance(context, dict):
             context = {}
-        selected_skills = [request.skill_id for request in response.skills]
-        skill_results = []
+        selected_capabilities = [request.capability_id for request in response.capabilities]
+        capability_results = []
         execution_status = "not_executed"
         if execution is not None:
             execution_status = execution.status
-            skill_results = [
+            capability_results = [
                 {
                     "request_id": result.request_id,
                     "capability_id": result.capability_id,
@@ -107,8 +107,8 @@ class ExperienceManager:
             route_confidence=self._float_or_none(context.get("route_confidence")),
             response_status=response.status,
             execution_status=execution_status,
-            selected_skills=selected_skills,
-            skill_results=skill_results,
+            selected_capabilities=selected_capabilities,
+            capability_results=capability_results,
             speech_count=len(response.speech),
             errors=list(errors or ()),
             mind_profile_id=mind_profile.profile_id,
@@ -132,7 +132,7 @@ class ExperienceManager:
         failure_statuses = {"failed", "error", "timed_out", "cancelled", "refused"}
         failed_skill = any(
             str(result.get("status") or "").lower() in failure_statuses
-            for result in record.skill_results
+            for result in record.capability_results
         )
         learning_signal = self._learning_signal_from_metadata(record.metadata)
         if (

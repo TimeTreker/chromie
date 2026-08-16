@@ -9,7 +9,7 @@ from orchestrator.runtime.body_recovery import (
 from orchestrator.runtime.outcome_reconciliation import (
     ExecutionOutcomeReconciler,
 )
-from shared.chromie_contracts.interaction import InteractionResponse, SkillResult
+from shared.chromie_contracts.interaction import InteractionResponse, CapabilityResult
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.response_composition import (
     canonical_plan_fingerprint,
@@ -22,21 +22,21 @@ class BodyRecoveryTests(unittest.TestCase):
             interaction_id="interaction-grasp",
             speech=[
                 {"text": "Trying now.", "timing": "immediate"},
-                {"text": "Done.", "timing": "after_skills"},
+                {"text": "Done.", "timing": "after_capabilities"},
             ],
-            skills=[
+            capabilities=[
                 {
                     "request_id": "grasp-1",
-                    "skill_id": "soridormi.grasp_object",
+                    "capability_id": "soridormi.grasp_object",
                     "args": {"object": "cup"},
                     "metadata": {"route_stage": "quick_intent"},
                 }
             ],
             metadata={"language": "en-US"},
         )
-        result = SkillResult(
+        result = CapabilityResult(
             request_id="grasp-1",
-            skill_id="soridormi.grasp_object",
+            capability_id="soridormi.grasp_object",
             status="failed",
             reason_code="execution_incomplete",
             output={
@@ -63,11 +63,11 @@ class BodyRecoveryTests(unittest.TestCase):
         )
         self.assertIn("recoverable movement issue", recovery.prompt)
         self.assertIn("The object slipped", recovery.prompt)
-        self.assertEqual(len(recovery.response.skills), 1)
-        retry = recovery.response.skills[0]
+        self.assertEqual(len(recovery.response.capabilities), 1)
+        retry = recovery.response.capabilities[0]
         self.assertEqual(retry.request_id, "grasp-1_recovery1")
         self.assertTrue(retry.requires_confirmation)
-        self.assertEqual(retry.skill_id, "soridormi.grasp_object")
+        self.assertEqual(retry.capability_id, "soridormi.grasp_object")
         self.assertEqual(retry.args, {"object": "cup"})
         self.assertEqual(retry.metadata["body_recovery_attempt"], 1)
         self.assertEqual(retry.metadata["body_recovery_parent_request_id"], "grasp-1")
@@ -79,16 +79,16 @@ class BodyRecoveryTests(unittest.TestCase):
 
     def test_terminal_body_results_do_not_trigger_recovery(self) -> None:
         cases = (
-            SkillResult(
+            CapabilityResult(
                 request_id="move-1",
-                skill_id="soridormi.move_base",
+                capability_id="soridormi.move_base",
                 status="refused",
                 reason_code="safety_monitor_refused",
                 output={"recoverable": True},
             ),
-            SkillResult(
+            CapabilityResult(
                 request_id="move-1",
-                skill_id="soridormi.move_base",
+                capability_id="soridormi.move_base",
                 status="failed",
                 reason_code="execute_failed_retryable",
                 output={},
@@ -102,17 +102,17 @@ class BodyRecoveryTests(unittest.TestCase):
     def test_retry_budget_exhaustion_returns_no_recovery(self) -> None:
         response = InteractionResponse(
             interaction_id="interaction-grasp",
-            skills=[
+            capabilities=[
                 {
                     "request_id": "grasp-1_recovery1",
-                    "skill_id": "soridormi.grasp_object",
+                    "capability_id": "soridormi.grasp_object",
                     "metadata": {"body_recovery_attempt": 1},
                 }
             ],
         )
-        result = SkillResult(
+        result = CapabilityResult(
             request_id="grasp-1_recovery1",
-            skill_id="soridormi.grasp_object",
+            capability_id="soridormi.grasp_object",
             status="failed",
             reason_code="execute_failed_retryable",
             output={"recoverable": True},
@@ -139,14 +139,14 @@ class BodyRecoveryTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "step-walk",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"distance_m": 1.0},
                     "timing": "sequential",
                     "source_goal_ids": ["goal-walk"],
                 },
                 {
                     "step_id": "step-look",
-                    "skill_id": "soridormi.look_left",
+                    "capability_id": "soridormi.look_left",
                     "args": {},
                     "timing": "sequential",
                     "source_goal_ids": ["goal-look"],
@@ -170,10 +170,10 @@ class BodyRecoveryTests(unittest.TestCase):
         parent_fingerprint = canonical_plan_fingerprint(plan)
         response = InteractionResponse(
             interaction_id="interaction-two-step",
-            skills=[
+            capabilities=[
                 {
                     "request_id": "request-walk",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"distance_m": 1.0},
                     "timing": "sequential",
                     "metadata": {
@@ -186,7 +186,7 @@ class BodyRecoveryTests(unittest.TestCase):
                 },
                 {
                     "request_id": "request-look",
-                    "skill_id": "soridormi.look_left",
+                    "capability_id": "soridormi.look_left",
                     "timing": "sequential",
                     "metadata": {
                         "source": "goal_driven_canonical_plan",
@@ -206,16 +206,16 @@ class BodyRecoveryTests(unittest.TestCase):
             },
         )
         results = [
-            SkillResult(
+            CapabilityResult(
                 request_id="request-walk",
-                skill_id="soridormi.walk_forward",
+                capability_id="soridormi.walk_forward",
                 status="failed",
                 reason_code="path_temporarily_blocked",
                 output={"recoverable": True},
             ),
-            SkillResult(
+            CapabilityResult(
                 request_id="request-look",
-                skill_id="soridormi.look_left",
+                capability_id="soridormi.look_left",
                 status="completed",
             ),
         ]
@@ -237,7 +237,7 @@ class BodyRecoveryTests(unittest.TestCase):
             [step.step_id for step in retry_plan.steps],
             ["step-walk"],
         )
-        retry_request = recovery.response.skills[0]
+        retry_request = recovery.response.capabilities[0]
         self.assertEqual(
             retry_request.metadata["canonical_plan_id"],
             retry_plan.plan_id,
@@ -250,11 +250,11 @@ class BodyRecoveryTests(unittest.TestCase):
             turn_id="turn-two-step",
             plan=retry_plan,
             interaction_id=recovery.response.interaction_id,
-            requests=recovery.response.skills,
+            requests=recovery.response.capabilities,
             results=[
-                SkillResult(
+                CapabilityResult(
                     request_id=retry_request.request_id,
-                    skill_id=retry_request.skill_id,
+                    capability_id=retry_request.capability_id,
                     status="completed",
                 )
             ],
@@ -271,20 +271,20 @@ class BodyRecoveryTests(unittest.TestCase):
     ) -> None:
         response = InteractionResponse(
             interaction_id="interaction-missing-sibling",
-            skills=[
+            capabilities=[
                 {
                     "request_id": "request-a",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                 },
                 {
                     "request_id": "request-b",
-                    "skill_id": "soridormi.look_left",
+                    "capability_id": "soridormi.look_left",
                 },
             ],
         )
-        returned_failure = SkillResult(
+        returned_failure = CapabilityResult(
             request_id="request-a",
-            skill_id="soridormi.walk_forward",
+            capability_id="soridormi.walk_forward",
             status="failed",
             reason_code="path_temporarily_blocked",
             output={"recoverable": True},
@@ -313,12 +313,12 @@ class BodyRecoveryTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "step-move",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "source_goal_ids": ["goal-combined"],
                 },
                 {
                     "step_id": "step-weather",
-                    "skill_id": "chromie.weather.lookup",
+                    "capability_id": "chromie.weather.lookup",
                     "source_goal_ids": ["goal-combined"],
                 },
             ],
@@ -334,10 +334,10 @@ class BodyRecoveryTests(unittest.TestCase):
         fingerprint = canonical_plan_fingerprint(plan)
         response = InteractionResponse(
             interaction_id="interaction-mixed-shared-goal",
-            skills=[
+            capabilities=[
                 {
                     "request_id": "request-move",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "metadata": {
                         "source": "goal_driven_canonical_plan",
                         "canonical_plan_id": plan.plan_id,
@@ -348,7 +348,7 @@ class BodyRecoveryTests(unittest.TestCase):
                 },
                 {
                     "request_id": "request-weather",
-                    "skill_id": "chromie.weather.lookup",
+                    "capability_id": "chromie.weather.lookup",
                     "metadata": {
                         "source": "goal_driven_canonical_plan",
                         "canonical_plan_id": plan.plan_id,
@@ -365,9 +365,9 @@ class BodyRecoveryTests(unittest.TestCase):
                 "canonical_plan_fingerprint": fingerprint,
             },
         )
-        returned_failure = SkillResult(
+        returned_failure = CapabilityResult(
             request_id="request-move",
-            skill_id="soridormi.walk_forward",
+            capability_id="soridormi.walk_forward",
             status="failed",
             reason_code="path_temporarily_blocked",
             output={"recoverable": True},

@@ -101,7 +101,7 @@
     ],
     "actions": [],
     "task_types_forbid": [
-      "task.execute_skill"
+      "task.execute_capability"
     ]
   }
 }

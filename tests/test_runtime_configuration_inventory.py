@@ -78,7 +78,7 @@ class RuntimeConfigurationInventoryTests(unittest.TestCase):
         }
         self.assertIn("CHROMIE_OPERATOR_MODE", public)
         self.assertIn("ORCH_INPUT_DEVICE", public)
-        self.assertNotIn("ORCH_ENABLE_SORIDORMI_SKILLS", public)
+        self.assertNotIn("ORCH_ENABLE_SORIDORMI_CAPABILITIES", public)
 
     def test_maintained_gate_checks_configuration_inventory(self) -> None:
         script = (ROOT / "scripts" / "run_tests.sh").read_text(encoding="utf-8")

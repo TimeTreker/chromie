@@ -36,7 +36,7 @@ class RuntimeReliabilityStage4Tests(unittest.TestCase):
 
         self.assertIsNotNone(response)
         assert response is not None
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
         spoken = " ".join(item.text for item in response.speech)
         self.assertIn("没有动", spoken)
         self.assertNotIn("我会点头", spoken)
@@ -63,7 +63,7 @@ class RuntimeReliabilityStage4Tests(unittest.TestCase):
         self.assertIn("不能乱说", spoken)
         self.assertNotIn("查询服务", spoken)
         self.assertNotIn("未经验证", spoken)
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
 
 
     def test_chat_agent_disconnect_fails_closed_without_direct_answer(self) -> None:
@@ -83,7 +83,7 @@ class RuntimeReliabilityStage4Tests(unittest.TestCase):
         spoken = " ".join(item.text for item in response.speech)
         self.assertIn("不想乱答", spoken)
         self.assertNotIn("我觉得", spoken)
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
 
     def test_direct_llm_compatibility_is_blocked_in_apply_lane(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)

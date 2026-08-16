@@ -96,12 +96,13 @@ passive LLM task methods stored outside this executable capability directory.
 They cannot register a capability, provider, permission, or confirmation
 exemption.
 
-The existing typed manifest, live provider schema, capability registry, Trusted
-Capability Runtime, and Soridormi validation remain the only execution-
-authoritative path. Legacy `SkillRuntime`, `SkillRequest`, `SkillResult`, and
-`skill_id` names remain readable only at explicit compatibility boundaries. Do
-not add a second execution registry, script entrypoint, automatic provider-
-registration hook, or install mechanism. The planned Agent Skill
+The existing typed manifest, live provider schema, `CapabilityRegistry`, Trusted
+Capability Runtime (`CapabilityRuntime`), and Soridormi validation remain the only
+execution-authoritative path. Live Chromie contracts use canonical
+`CapabilityRequest`, `CapabilityResult`, and `capability_id`; retired executable
+`Skill*` names and `skill_id` aliases are not compatibility surfaces. Provider-local
+Soridormi wire `skill_id` is translated by its adapter. Do not add a second execution
+registry, script entrypoint, automatic provider-registration hook, or install mechanism. The planned Agent Skill
 registry is a read-only cognitive-content index with no execution authority.
 
 ## Prompt-tier preset

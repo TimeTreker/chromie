@@ -60,14 +60,14 @@ AUTOMATIC_MODES = {"synthetic", "virtual-mic", "acoustic"}
 ACCEPTANCE_MODES = ("synthetic", "virtual-mic", "acoustic", "supervised")
 FULL_CASE_ORDER = (
     "speech-only",
-    "speech-skill",
+    "speech-capability",
     "refusal",
     "barge-in",
     "body-cancel",
     "stop",
     "follow-up",
 )
-BODY_CASES = {"speech-skill", "refusal", "body-cancel", "stop"}
+BODY_CASES = {"speech-capability", "refusal", "body-cancel", "stop"}
 AGENT_COMPOSE_SERVICE = "chromie-agent"
 HOST_LOOPBACK_NAMES = {"localhost", "127.0.0.1", "::1"}
 RUNTIME_REEXEC_ENV = "CHROMIE_VOICE_ACCEPTANCE_RUNTIME_REEXEC"
@@ -251,12 +251,12 @@ CASES: dict[str, AcceptanceCase] = {
         (
             "ASR emits final text.",
             "Goal Interpretation and the goal-driven cognitive runtime complete.",
-            "Interaction reports zero skills and TTS playback completes.",
+            "Interaction reports zero capabilities and TTS playback completes.",
         ),
         (SpokenStep("Tell me one short fact about the Moon.", (("moon",),)),),
     ),
-    "speech-skill": AcceptanceCase(
-        "speech-skill",
+    "speech-capability": AcceptanceCase(
+        "speech-capability",
         "Confirmed speech plus named Soridormi skill",
         (
             "Ensure the MuJoCo-backed Soridormi endpoint is ready and safely idle.",
@@ -295,7 +295,7 @@ CASES: dict[str, AcceptanceCase] = {
         (
             "The exact pending request is denied and consumed.",
             "A user-facing denial is spoken.",
-            "No named body skill executes.",
+            "No named body capability executes.",
         ),
         (
             SpokenStep(
@@ -364,7 +364,7 @@ CASES: dict[str, AcceptanceCase] = {
     ),
     "body-cancel": AcceptanceCase(
         "body-cancel",
-        "Cancellation during a simulated body skill",
+        "Cancellation during a simulated body capability",
         (
             "Start a long named nod skill, which is long enough to interrupt.",
             "Approve the exact request when Chromie asks for confirmation.",
@@ -1192,22 +1192,22 @@ def friendly_event_line(event: dict[str, Any]) -> str | None:
     if name in {"interaction_done", "cognitive_interaction_ready"}:
         return (
             f"{prefix} Goal-driven interaction: speech={message_field(message, 'speech') or '?'} "
-            f"skills={message_field(message, 'skills') or '?'} "
+            f"capabilities={message_field(message, 'capabilities') or '?'} "
             "confirmation="
             f"{message_field(message, 'requires_confirmation') or '?'}"
         )
-    if name == "skill_proposed":
+    if name == "capability_proposed":
         return (
-            f"{prefix} Skill proposed: {message_field(message, 'skill_id') or '?'} "
+            f"{prefix} Capability proposed: {message_field(message, 'capability_id') or '?'} "
             f"request={message_field(message, 'request_id') or '?'} "
             f"confirmation={message_field(message, 'requires_confirmation') or '?'}"
         )
-    if name == "skill_result":
+    if name == "capability_result":
         return (
-            f"{prefix} Skill result: {message_field(message, 'skill_id') or '?'} "
+            f"{prefix} Capability result: {message_field(message, 'capability_id') or '?'} "
             f"status={message_field(message, 'status') or '?'}"
         )
-    if name == "skill_runtime_cancelled":
+    if name == "capability_runtime_cancelled":
         return f"{prefix} Skill runtime: cancelled"
     if name == "playback_start":
         return f"{prefix} TTS playback: started"
@@ -1730,18 +1730,18 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
         return interaction_rows
 
     def proposed_requests(
-        skill_id: str,
+        capability_id: str,
         *,
         count: int | None = None,
     ) -> list[tuple[int, str]]:
         proposal_rows = [
-            *rows("cognitive_skill_proposed"),
-            *rows("skill_proposed"),
+            *rows("cognitive_capability_proposed"),
+            *rows("capability_proposed"),
         ]
         proposal_rows.sort(key=lambda value: value[0])
         matches: list[tuple[int, str]] = []
         for index, item, message in proposal_rows:
-            if f"skill_id={skill_id}" not in message:
+            if f"capability_id={capability_id}" not in message:
                 continue
             if count is not None:
                 match = re.search(r"\bargs=(\{.*\})\s*$", message)
@@ -2046,11 +2046,11 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
                 and str(item.get("sid") or "") in forbidden_sids
                 and (
                     (
-                        item.get("event") == "skill_result"
+                        item.get("event") == "capability_result"
                         and field(item, "status") == "completed"
                     )
                     or (
-                        item.get("event") == "skill_runtime_done"
+                        item.get("event") == "capability_runtime_done"
                         and field(item, "status") == "completed"
                     )
                 )
@@ -2297,7 +2297,7 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
 
     if case_id in {
         "speech-only",
-        "speech-skill",
+        "speech-capability",
         "refusal",
         "body-cancel",
         "follow-up",
@@ -2315,15 +2315,15 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
                 for index, item, message in interaction_messages
                 if (speech := re.search(r"\bspeech=(\d+)\b", message))
                 and int(speech.group(1)) > 0
-                and re.search(r"\bskills=0\b", message)
+                and re.search(r"\bcapabilities=0\b", message)
             ),
             None,
         )
         checks.append(
             CheckResult(
-                "speech prepared without body skill",
+                "speech prepared without body capability",
                 prepared is not None,
-                "the prepared interaction must report speech>0 and skills=0",
+                "the prepared interaction must report speech>0 and capabilities=0",
             )
         )
         output_complete = False
@@ -2340,12 +2340,12 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
                 "a correlated TTS schedule, playback start/end, and clean session_done are required",
             )
         )
-    elif case_id == "speech-skill":
+    elif case_id == "speech-capability":
         proposals = proposed_requests("soridormi.nod_yes", count=2)
         proposal_ids = {request_id for _index, request_id in proposals}
         checks.append(
             CheckResult(
-                "exact nod skill proposed",
+                "exact nod capability proposed",
                 bool(proposals),
                 "the prepared interaction must propose soridormi.nod_yes count=2",
             )
@@ -2372,18 +2372,18 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
         completed_result = next(
             (
                 (index, item)
-                for index, item, _message in rows("skill_result")
+                for index, item, _message in rows("capability_result")
                 if index
                 > int(approval["terminal_index"] if approval else len(events))
                 and field(item, "request_id") in proposal_ids
-                and field(item, "skill_id") == "soridormi.nod_yes"
+                and field(item, "capability_id") == "soridormi.nod_yes"
                 and field(item, "status") == "completed"
             ),
             None,
         )
         checks.append(
             CheckResult(
-                "exact nod skill completed",
+                "exact nod capability completed",
                 completed_result is not None,
                 "soridormi.nod_yes must report status=completed",
             )
@@ -2411,7 +2411,7 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
         proposal_ids = {request_id for _index, request_id in proposals}
         checks.append(
             CheckResult(
-                "exact nod skill proposed",
+                "exact nod capability proposed",
                 bool(proposals),
                 "the denied request must be soridormi.nod_yes count=2",
             )
@@ -2422,8 +2422,8 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
             request_ids=proposal_ids,
         )
         body_invoked = any(
-            "skill_id=soridormi." in item
-            for item in event_messages(events, "skill_result")
+            "capability_id=soridormi." in item
+            for item in event_messages(events, "capability_result")
         )
         checks.append(
             CheckResult(
@@ -2453,9 +2453,9 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
         )
         checks.append(
             CheckResult(
-                "body skill not executed",
+                "body capability not executed",
                 not body_invoked,
-                "no Soridormi skill_result of any status may follow denial",
+                "no Soridormi capability_result of any status may follow denial",
             )
         )
     elif case_id == "barge-in":
@@ -2543,7 +2543,7 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
         proposal_ids = {request_id for _index, request_id in proposals}
         checks.append(
             CheckResult(
-                "exact long nod skill proposed",
+                "exact long nod capability proposed",
                 bool(proposals),
                 "the cancellable request must be soridormi.nod_yes count=8",
             )
@@ -2563,13 +2563,13 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
         execution_sid = str(approval["terminal_sid"]) if approval else ""
         cancellation_indices = [
             index
-            for index, item, _message in rows("skill_runtime_cancelled")
+            for index, item, _message in rows("capability_runtime_cancelled")
             if approval is not None
             and index > int(approval["terminal_index"])
             and str(item.get("sid") or "") == execution_sid
         ] + [
             index
-            for event_name in ("skill_runtime_done", "skill_result")
+            for event_name in ("capability_runtime_done", "capability_result")
             for index, item, _message in rows(event_name)
             if approval is not None
             and index > int(approval["terminal_index"])
@@ -3007,7 +3007,7 @@ def write_override_file(
     values = {
         "ORCH_ENABLE_AGENT": "1",
         "ORCH_ENABLE_INTERACTION_RESPONSE": "1",
-        "ORCH_ENABLE_SORIDORMI_SKILLS": "1" if enable_soridormi else "0",
+        "ORCH_ENABLE_SORIDORMI_CAPABILITIES": "1" if enable_soridormi else "0",
         "ORCH_COGNITIVE_RUNTIME_MODE": "apply",
         "ORCH_COGNITIVE_APPLY_LANES": (
             "chat,memory,robot_action,tool" if enable_soridormi else "chat,memory,tool"

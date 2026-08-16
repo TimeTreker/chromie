@@ -56,7 +56,7 @@
         }
       },
       "expect": {
-        "skills": [
+        "capabilities": [
           "soridormi.walk_velocity",
           "soridormi.blink_eyes"
         ],

@@ -14,7 +14,7 @@
     "runtime_status": "completed",
     "capabilities": [
       {
-        "skill_id": "chromie.scenario.stale_check",
+        "capability_id": "chromie.scenario.stale_check",
         "provider_id": "scenario.stale",
         "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
         "output_schema": {
@@ -35,7 +35,7 @@
       "steps": [
         {
           "step_id": "stale-check",
-          "skill_id": "chromie.scenario.stale_check",
+          "capability_id": "chromie.scenario.stale_check",
           "args": {},
           "timing": "sequential",
           "source_goal_ids": ["goal-stale"]
@@ -81,7 +81,7 @@
     "final_speech_only": false,
     "final_speech_count": 0,
     "final_goal_statuses": [],
-    "final_skill_ids": [],
+    "final_capability_ids": [],
     "runtime_call_count": 1
   }
 }

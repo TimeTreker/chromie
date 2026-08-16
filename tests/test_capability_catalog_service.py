@@ -274,7 +274,7 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         second = await catalog.snapshot(refresh=True)
         self.assertEqual(second["catalog_version"], first_version)
         self.assertEqual(second["capabilities"], first["capabilities"])
-        self.assertIn("duplicate Soridormi skill_id", second["live_refresh_error"])
+        self.assertIn("duplicate Soridormi wire skill_id", second["live_refresh_error"])
     async def test_live_named_skill_preserves_provider_neutral_resource_scope(self) -> None:
         invoker = _SequenceInvoker(
             [

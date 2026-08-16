@@ -43,11 +43,11 @@ class ScriptedOllama:
 
 
 class NoopInteractionRuntime:
-    async def ensure_skill_definitions(self, skill_ids):
-        if list(skill_ids):
+    async def ensure_capability_definitions(self, capability_ids):
+        if list(capability_ids):
             raise AssertionError("direct speech should not require capability lookup")
 
-    def skill_definition(self, skill_id):
+    def capability_definition(self, skill_id):
         raise AssertionError(f"unexpected skill lookup: {skill_id}")
 
 

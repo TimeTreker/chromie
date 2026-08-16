@@ -3,10 +3,10 @@ from __future__ import annotations
 """Chromie-side adapter for Soridormi dynamic named skills.
 
 This module intentionally lives inside the Orchestrator runtime because it
-implements Chromie's ``SkillRuntime`` provider interface. It is not the
+implements Chromie's ``CapabilityRuntime`` provider interface. It is not the
 Soridormi body controller and it does not contain per-skill hardware logic.
 
-The adapter accepts a trusted ``SkillRequest`` that has already passed Chromie
+The adapter accepts a trusted ``CapabilityRequest`` that has already passed Chromie
 preflight/confirmation gates, translates ``soridormi.<skill_id>`` into the
 upstream Soridormi named-skill ID, and invokes the Soridormi MCP planning,
 monitoring, execution, and cancellation tools. Soridormi still owns physical
@@ -14,7 +14,7 @@ planning, realtime safety, motion execution, refusal, and recovery.
 
 Do not add one method per Soridormi skill here. New body skills should be
 published by Soridormi through ``soridormi.skill.list`` and then imported into
-Chromie's ``SkillRegistry`` dynamically.
+Chromie's ``CapabilityRegistry`` dynamically.
 """
 
 import logging
@@ -25,20 +25,228 @@ from agent.app.tool_invocation import (
     ToolCallOutcome,
     ToolInvocationContext,
 )
-from shared.chromie_contracts.interaction import SkillRequest, SkillResult
+from shared.chromie_contracts.interaction import CapabilityRequest, CapabilityResult
 from shared.chromie_contracts.perception import live_perception_dependency_from_metadata
+from shared.chromie_contracts.soridormi_body_contract import normalize_soridormi_body_contract
 
-from .skill_runtime import SkillDefinition, SkillExecutionContext
+from .capability_runtime import (
+    CapabilityDefinition,
+    CapabilityExecutionContext,
+    CapabilityRegistry,
+    embodied_completion_evidence_policy,
+)
 
 logger = logging.getLogger(__name__)
+
+
+SORIDORMI_NAMED_CAPABILITY_OUTPUT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "completed": {"type": "boolean"},
+        "capability_id": {"type": "string"},
+        "mode": {"type": "string"},
+        "no_motion": {"type": "boolean"},
+        "recommendation_only": {"type": "boolean"},
+        "summary": {"type": "string"},
+        "resource_outcome": {
+            "type": ["object", "null"],
+            "properties": {
+                "responsibility_type": {
+                    "type": "string",
+                    "enum": ["acquire_and_deliver_resource"],
+                },
+                "resource_kind": {
+                    "type": "string",
+                    "enum": ["physical_object"],
+                },
+                "resource_description": {"type": "string"},
+                "resource_acquired": {"type": "boolean"},
+                "resource_delivered": {"type": "boolean"},
+                "recipient_description": {"type": "string"},
+                "mocked_simulation": {"type": "boolean"},
+                "evidence_summary": {"type": "string"},
+            },
+            "required": [
+                "responsibility_type",
+                "resource_kind",
+                "resource_acquired",
+                "resource_delivered",
+            ],
+            "additionalProperties": False,
+        },
+    },
+    "required": [
+        "completed",
+        "capability_id",
+        "mode",
+        "no_motion",
+        "recommendation_only",
+        "summary",
+    ],
+    "additionalProperties": False,
+}
+
+
+def import_soridormi_capability_catalog(
+    registry: CapabilityRegistry,
+    provider_skills: list[dict[str, Any]],
+    *,
+    provider_id: str = "soridormi.mcp",
+    version: str = "0.1.0",
+    mark_absent_unavailable: bool = True,
+) -> None:
+    """Translate Soridormi's wire skill catalog into canonical capabilities.
+
+    ``skill_id`` belongs to the Soridormi provider protocol.  This adapter is
+    the only layer that interprets it.  The generic CapabilityRegistry receives
+    only canonical CapabilityDefinition objects and therefore remains
+    provider/transport neutral.
+    """
+
+    definitions: list[CapabilityDefinition] = []
+    seen: set[str] = set()
+    for raw_item in provider_skills:
+        if not isinstance(raw_item, dict):
+            raise ValueError("Soridormi skill catalog entries must be objects")
+        item = dict(raw_item)
+        upstream_skill_id = str(item.get("skill_id", "")).strip()
+        if not upstream_skill_id:
+            raise ValueError("Soridormi skill catalog entry has no skill_id")
+        capability_id = f"soridormi.{upstream_skill_id}"
+        if capability_id in seen:
+            raise ValueError(
+                f"duplicate Soridormi wire skill_id in one catalog: {upstream_skill_id}"
+            )
+        seen.add(capability_id)
+
+        execution = item.get("execution")
+        execution_contract = execution if isinstance(execution, dict) else {}
+        availability = item.get("availability")
+        availability_contract = availability if isinstance(availability, dict) else {}
+        confirmation = item.get("confirmation")
+        confirmation_contract = confirmation if isinstance(confirmation, dict) else {}
+        effects_raw = item.get("effects")
+        if effects_raw is None:
+            effects = ["physical_motion"]
+        elif isinstance(effects_raw, list):
+            effects = [str(value) for value in effects_raw if str(value).strip()]
+        else:
+            raise ValueError(
+                f"Soridormi skill {upstream_skill_id!r} effects must be a list"
+            )
+        safety_class = str(item.get("safety_class") or "physical_motion")
+        provider_requires_confirmation = bool(
+            item.get(
+                "requires_confirmation",
+                confirmation_contract.get("required", False),
+            )
+        )
+        timeout_s = item.get("timeout_s", execution_contract.get("timeout_s", 30.0))
+        body_contract = normalize_soridormi_body_contract(item)
+        upstream_metadata = item.get("metadata")
+        if not isinstance(upstream_metadata, dict):
+            upstream_metadata = {}
+        input_schema = item.get("parameters_schema") or item.get("input_schema") or {}
+        if not isinstance(input_schema, dict):
+            raise ValueError(
+                f"Soridormi skill {upstream_skill_id!r} input schema must be an object"
+            )
+
+        definitions.append(
+            CapabilityDefinition(
+                capability_id=capability_id,
+                version=str(item.get("version") or version),
+                provider_id=provider_id,
+                description=str(item.get("description") or ""),
+                input_schema=dict(input_schema),
+                output_schema=SORIDORMI_NAMED_CAPABILITY_OUTPUT_SCHEMA,
+                completion_evidence_policy=embodied_completion_evidence_policy(),
+                available=bool(
+                    item.get(
+                        "available",
+                        availability_contract.get("available", True),
+                    )
+                ),
+                unavailable_reason=(
+                    item.get("unavailable_reason") or availability_contract.get("reason")
+                ),
+                requires_confirmation=provider_requires_confirmation,
+                interruptible=bool(item.get("interruptible", False)),
+                can_run_parallel=bool(body_contract["can_run_parallel"]),
+                exclusive_group=body_contract["exclusive_group"],
+                timeout_ms=max(1, int(float(timeout_s or 30.0) * 1000)),
+                idempotent=False,
+                requires_safety_monitor=False,
+                cancellation_domains=(
+                    ("embodied_motion",)
+                    if "physical_motion" in effects
+                    or body_contract["provider_local_activity_compilation"]
+                    else ()
+                ),
+                metadata={
+                    "upstream_skill_id": upstream_skill_id,
+                    "effects": effects,
+                    "safety_class": safety_class,
+                    "cancellation_granularity": (
+                        "provider_activity"
+                        if body_contract["provider_local_activity_compilation"]
+                        else "global_domain"
+                        if "physical_motion" in effects
+                        else "request"
+                    ),
+                    "execution": execution,
+                    "fallback": item.get("fallback"),
+                    "hardware_enabled": item.get("hardware_enabled"),
+                    "provider_managed_safety_monitor": True,
+                    "resource_claims": list(body_contract["resource_claims"]),
+                    "execution_lane": "activity",
+                    "body_lane": body_contract["body_lane"],
+                    "ability_class": body_contract["ability_class"],
+                    "control_coupling": body_contract["control_coupling"],
+                    "concurrency": dict(body_contract["canonical_concurrency"]),
+                    "parallel_metadata_declared": body_contract[
+                        "parallel_metadata_declared"
+                    ],
+                    "provider_local_activity_compilation": body_contract[
+                        "provider_local_activity_compilation"
+                    ],
+                    "execution_constraints": dict(
+                        body_contract["execution_constraints"]
+                    ),
+                    "output_contract": "chromie_soridormi_named_capability_v1",
+                    "behavior_domains": [
+                        str(value)
+                        for value in upstream_metadata.get("behavior_domains", [])
+                        if str(value).strip()
+                    ],
+                    "semantic_scope": (
+                        dict(upstream_metadata.get("semantic_scope"))
+                        if isinstance(upstream_metadata.get("semantic_scope"), dict)
+                        else {}
+                    ),
+                    "resource_contract": (
+                        dict(upstream_metadata.get("resource_contract"))
+                        if isinstance(upstream_metadata.get("resource_contract"), dict)
+                        else {}
+                    ),
+                },
+            )
+        )
+
+    registry.replace_provider_capabilities(
+        definitions,
+        provider_id=provider_id,
+        namespace_prefix="soridormi.",
+        mark_absent_unavailable=mark_absent_unavailable,
+    )
 
 
 class SoridormiInvoker(AsyncToolInvoker, Protocol):
     pass
 
 
-class SoridormiNamedSkillAdapter:
-    """Adapter from Chromie's SkillRuntime to Soridormi MCP named skills.
+class SoridormiCapabilityProvider:
+    """Adapter from Chromie's CapabilityRuntime to Soridormi MCP named skills.
 
     The class name deliberately says "adapter" rather than "controller" or
     "hardware provider". Chromie supplies proposal-derived intent and trace
@@ -53,13 +261,13 @@ class SoridormiNamedSkillAdapter:
 
     async def execute(
         self,
-        request: SkillRequest,
-        definition: SkillDefinition,
-        context: SkillExecutionContext,
-    ) -> SkillResult:
+        request: CapabilityRequest,
+        definition: CapabilityDefinition,
+        context: CapabilityExecutionContext,
+    ) -> CapabilityResult:
         upstream_skill_id = str(
             definition.metadata.get("upstream_skill_id")
-            or request.skill_id.removeprefix("soridormi.")
+            or request.capability_id.removeprefix("soridormi.")
         )
         planned = await self.invoker.invoke(
             "soridormi.skill.create_plan",
@@ -79,10 +287,10 @@ class SoridormiNamedSkillAdapter:
             return failure
         plan_id = planned.output.get("plan_id")
         if not isinstance(plan_id, str) or not plan_id:
-            return SkillResult(
+            return CapabilityResult(
                 request_id=request.request_id,
-                skill_id=request.skill_id,
-                skill_version=definition.version,
+                capability_id=request.capability_id,
+                capability_version=definition.version,
                 status="failed",
                 provider_id=self.provider_id,
                 reason_code="invalid_plan_response",
@@ -103,13 +311,13 @@ class SoridormiNamedSkillAdapter:
         if failure:
             return failure
         if monitored.output.get("ok") is not True:
-            return SkillResult(
+            return CapabilityResult(
                 request_id=request.request_id,
-                skill_id=request.skill_id,
-                skill_version=definition.version,
+                capability_id=request.capability_id,
+                capability_version=definition.version,
                 status="refused",
                 provider_id=self.provider_id,
-                output=monitored.output,
+                output=self._canonical_provider_output(monitored.output, request=request),
                 reason_code="safety_monitor_refused",
                 message=str(
                     monitored.output.get("event")
@@ -138,14 +346,14 @@ class SoridormiNamedSkillAdapter:
         completed = executed.output.get("completed") is True
         executed_skill_id = executed.output.get("skill_id")
         if executed_skill_id is not None and executed_skill_id != upstream_skill_id:
-            return SkillResult(
+            return CapabilityResult(
                 request_id=request.request_id,
-                skill_id=request.skill_id,
-                skill_version=definition.version,
+                capability_id=request.capability_id,
+                capability_version=definition.version,
                 status="failed",
                 provider_id=self.provider_id,
-                output=executed.output,
-                reason_code="execution_skill_mismatch",
+                output=self._canonical_provider_output(executed.output, request=request),
+                reason_code="execution_capability_mismatch",
                 message=(
                     "Soridormi completed a different skill than the requested "
                     f"{upstream_skill_id!r}"
@@ -159,19 +367,20 @@ class SoridormiNamedSkillAdapter:
             )
             if resource_failure is not None:
                 return resource_failure
-        return SkillResult(
+        return CapabilityResult(
             request_id=request.request_id,
-            skill_id=request.skill_id,
-            skill_version=definition.version,
+            capability_id=request.capability_id,
+            capability_version=definition.version,
             status="completed" if completed else "failed",
             provider_id=self.provider_id,
             output=(
                 self._successful_execution_output(
                     executed.output,
+                    request=request,
                     upstream_skill_id=upstream_skill_id,
                 )
                 if completed
-                else executed.output
+                else self._canonical_provider_output(executed.output, request=request)
             ),
             reason_code=None if completed else "execution_incomplete",
             message=(
@@ -184,9 +393,9 @@ class SoridormiNamedSkillAdapter:
     async def execute_group(
         self,
         items: list[
-            tuple[SkillRequest, SkillDefinition, SkillExecutionContext]
+            tuple[CapabilityRequest, CapabilityDefinition, CapabilityExecutionContext]
         ],
-    ) -> list[SkillResult]:
+    ) -> list[CapabilityResult]:
         """Compile and execute exact same-provider body members as one activity.
 
         Chromie's Cognitive Planner has already selected every semantic
@@ -216,7 +425,7 @@ class SoridormiNamedSkillAdapter:
         for request, definition, _ in items:
             upstream_skill_id = str(
                 definition.metadata.get("upstream_skill_id")
-                or request.skill_id.removeprefix("soridormi.")
+                or request.capability_id.removeprefix("soridormi.")
             )
             members.append(
                 {
@@ -336,7 +545,7 @@ class SoridormiNamedSkillAdapter:
         )
 
     @staticmethod
-    def _optional_auxiliary_member(request: SkillRequest) -> bool:
+    def _optional_auxiliary_member(request: CapabilityRequest) -> bool:
         metadata = request.metadata if isinstance(request.metadata, dict) else {}
         source_goal_ids = metadata.get("source_goal_ids") or []
         return bool(
@@ -398,22 +607,24 @@ class SoridormiNamedSkillAdapter:
     @staticmethod
     def _group_terminal_results(
         items: list[
-            tuple[SkillRequest, SkillDefinition, SkillExecutionContext]
+            tuple[CapabilityRequest, CapabilityDefinition, CapabilityExecutionContext]
         ],
         *,
         status: str,
         reason_code: str,
         message: str,
         output: dict[str, Any] | None = None,
-    ) -> list[SkillResult]:
+    ) -> list[CapabilityResult]:
         return [
-            SkillResult(
+            CapabilityResult(
                 request_id=request.request_id,
-                skill_id=request.skill_id,
-                skill_version=definition.version,
+                capability_id=request.capability_id,
+                capability_version=definition.version,
                 status=status,
-                provider_id=SoridormiNamedSkillAdapter.provider_id,
-                output=dict(output or {}),
+                provider_id=SoridormiCapabilityProvider.provider_id,
+                output=SoridormiCapabilityProvider._canonical_provider_output(
+                    output or {}, request=request
+                ),
                 reason_code=reason_code,
                 message=message,
             )
@@ -423,12 +634,12 @@ class SoridormiNamedSkillAdapter:
     def _group_failure_results(
         self,
         items: list[
-            tuple[SkillRequest, SkillDefinition, SkillExecutionContext]
+            tuple[CapabilityRequest, CapabilityDefinition, CapabilityExecutionContext]
         ],
         outcome: ToolCallOutcome,
         *,
         stage: str,
-    ) -> list[SkillResult] | None:
+    ) -> list[CapabilityResult] | None:
         if outcome.status == "success":
             return None
         status = "timed_out" if outcome.status == "timeout" else "failed"
@@ -443,27 +654,27 @@ class SoridormiNamedSkillAdapter:
     def _member_results_from_activity(
         self,
         items: list[
-            tuple[SkillRequest, SkillDefinition, SkillExecutionContext]
+            tuple[CapabilityRequest, CapabilityDefinition, CapabilityExecutionContext]
         ],
         output: dict[str, Any],
         *,
         activity_id: str,
         coordination_id: str,
-    ) -> list[SkillResult]:
+    ) -> list[CapabilityResult]:
         aggregate_status = str(output.get("status") or "").strip()
         member_results = output.get("member_results")
         if not isinstance(member_results, dict):
             member_results = {}
         mode = str(output.get("mode") or "")
-        results: list[SkillResult] = []
+        results: list[CapabilityResult] = []
         for request, definition, _ in items:
             raw = member_results.get(request.request_id)
             if not isinstance(raw, dict):
                 results.append(
-                    SkillResult(
+                    CapabilityResult(
                         request_id=request.request_id,
-                        skill_id=request.skill_id,
-                        skill_version=definition.version,
+                        capability_id=request.capability_id,
+                        capability_version=definition.version,
                         status="failed",
                         provider_id=self.provider_id,
                         reason_code="activity_member_result_missing",
@@ -484,7 +695,7 @@ class SoridormiNamedSkillAdapter:
             status = "completed" if completed else "cancelled" if cancelled else "failed"
             upstream_skill_id = str(
                 definition.metadata.get("upstream_skill_id")
-                or request.skill_id.removeprefix("soridormi.")
+                or request.capability_id.removeprefix("soridormi.")
             )
             reason_code = str(raw.get("reason_code") or "").strip() or None
             summary = str(
@@ -494,15 +705,15 @@ class SoridormiNamedSkillAdapter:
                 or ""
             )
             results.append(
-                SkillResult(
+                CapabilityResult(
                     request_id=request.request_id,
-                    skill_id=request.skill_id,
-                    skill_version=definition.version,
+                    capability_id=request.capability_id,
+                    capability_version=definition.version,
                     status=status,
                     provider_id=self.provider_id,
                     output={
                         "completed": completed,
-                        "skill_id": str(raw.get("skill_id") or upstream_skill_id),
+                        "capability_id": request.capability_id,
                         "mode": mode,
                         "no_motion": raw.get("no_motion") is True,
                         "recommendation_only": raw.get("recommendation_only") is True,
@@ -524,8 +735,8 @@ class SoridormiNamedSkillAdapter:
 
     @staticmethod
     def _trusted_named_skill_preflight(
-        request: SkillRequest,
-        definition: SkillDefinition,
+        request: CapabilityRequest,
+        definition: CapabilityDefinition,
         planned_output: dict[str, Any],
     ) -> bool:
         """Bridge Soridormi's coarse execute-plan confirmation gate safely.
@@ -585,10 +796,10 @@ class SoridormiNamedSkillAdapter:
 
     def _resource_completion_failure(
         self,
-        request: SkillRequest,
-        definition: SkillDefinition,
+        request: CapabilityRequest,
+        definition: CapabilityDefinition,
         output: dict[str, Any],
-    ) -> SkillResult | None:
+    ) -> CapabilityResult | None:
         metadata = definition.metadata if isinstance(definition.metadata, dict) else {}
         semantic_scope = metadata.get("semantic_scope")
         if not isinstance(semantic_scope, dict):
@@ -612,13 +823,13 @@ class SoridormiNamedSkillAdapter:
 
         resource_outcome = output.get("resource_outcome")
         if not isinstance(resource_outcome, dict):
-            return SkillResult(
+            return CapabilityResult(
                 request_id=request.request_id,
-                skill_id=request.skill_id,
-                skill_version=definition.version,
+                capability_id=request.capability_id,
+                capability_version=definition.version,
                 status="failed",
                 provider_id=self.provider_id,
-                output=output,
+                output=self._canonical_provider_output(output, request=request),
                 reason_code="resource_outcome_missing",
                 message=(
                     "Provider reported completion without required resource evidence"
@@ -630,13 +841,13 @@ class SoridormiNamedSkillAdapter:
             if resource_outcome.get(field) is not True
         ]
         if missing:
-            return SkillResult(
+            return CapabilityResult(
                 request_id=request.request_id,
-                skill_id=request.skill_id,
-                skill_version=definition.version,
+                capability_id=request.capability_id,
+                capability_version=definition.version,
                 status="failed",
                 provider_id=self.provider_id,
-                output=output,
+                output=self._canonical_provider_output(output, request=request),
                 reason_code="resource_completion_incomplete",
                 message=(
                     "Provider did not prove required resource completion fields: "
@@ -646,16 +857,48 @@ class SoridormiNamedSkillAdapter:
         return None
 
     @staticmethod
+    def _canonical_provider_output(
+        output: dict[str, Any],
+        *,
+        request: CapabilityRequest,
+    ) -> dict[str, Any]:
+        """Remove provider-local executable identity from canonical result output.
+
+        Soridormi wire ``skill_id`` is useful for adapter consistency checks, but it
+        is not Chromie's identity authority.  Preserve diagnostic/provider payload
+        fields while stripping retired executable identity names before a
+        CapabilityResult crosses back into the generic runtime.
+        """
+
+        def scrub(value: Any) -> Any:
+            if isinstance(value, dict):
+                return {
+                    str(key): scrub(item)
+                    for key, item in value.items()
+                    if str(key) not in {"skill_id", "skill_version"}
+                }
+            if isinstance(value, list):
+                return [scrub(item) for item in value]
+            return value
+
+        projected = scrub(dict(output))
+        if not isinstance(projected, dict):  # pragma: no cover - defensive typing guard
+            projected = {}
+        projected["capability_id"] = request.capability_id
+        return projected
+
+    @staticmethod
     def _successful_execution_output(
         output: dict[str, Any],
         *,
+        request: CapabilityRequest,
         upstream_skill_id: str,
     ) -> dict[str, Any]:
         """Project successful provider output into the declared adapter schema."""
 
         projected = {
             "completed": True,
-            "skill_id": str(output.get("skill_id") or upstream_skill_id),
+            "capability_id": str(request.capability_id),
             "mode": str(output.get("mode") or ""),
             "no_motion": output.get("no_motion") is True,
             "recommendation_only": output.get("recommendation_only") is True,
@@ -668,9 +911,9 @@ class SoridormiNamedSkillAdapter:
 
     def _chromie_intent_payload(
         self,
-        request: SkillRequest,
-        definition: SkillDefinition,
-        context: SkillExecutionContext,
+        request: CapabilityRequest,
+        definition: CapabilityDefinition,
+        context: CapabilityExecutionContext,
         *,
         upstream_skill_id: str,
     ) -> dict[str, Any]:
@@ -688,9 +931,9 @@ class SoridormiNamedSkillAdapter:
             "requires_runtime_validation": True,
             "interaction_id": context.interaction_id,
             "request_id": request.request_id,
-            "skill_id": request.skill_id,
+            "capability_id": request.capability_id,
             "upstream_skill_id": upstream_skill_id,
-            "skill_version": request.skill_version or definition.version,
+            "capability_version": request.capability_version or definition.version,
             "provider_id": self.provider_id,
             "trace_id": context.trace.trace_id,
             "source_component": str(
@@ -718,9 +961,9 @@ class SoridormiNamedSkillAdapter:
 
     async def cancel(
         self,
-        request: SkillRequest,
-        definition: SkillDefinition,
-        context: SkillExecutionContext,
+        request: CapabilityRequest,
+        definition: CapabilityDefinition,
+        context: CapabilityExecutionContext,
     ) -> None:
         activity_id = str(
             context.provider_state.get("provider_activity_id") or ""
@@ -744,9 +987,9 @@ class SoridormiNamedSkillAdapter:
         if outcome.status != "success":
             message = outcome.error or f"cancel returned {outcome.status}"
             logger.warning(
-                "Soridormi cancellation failed request_id=%s skill_id=%s: %s",
+                "Soridormi cancellation failed request_id=%s capability_id=%s: %s",
                 request.request_id,
-                request.skill_id,
+                request.capability_id,
                 message,
             )
             raise RuntimeError(message)
@@ -756,37 +999,31 @@ class SoridormiNamedSkillAdapter:
             )
             logger.warning(
                 "Soridormi cancellation unconfirmed request_id=%s "
-                "skill_id=%s output=%s",
+                "capability_id=%s output=%s",
                 request.request_id,
-                request.skill_id,
+                request.capability_id,
                 outcome.output,
             )
             raise RuntimeError(message)
 
     def _failure_result(
         self,
-        request: SkillRequest,
-        definition: SkillDefinition,
+        request: CapabilityRequest,
+        definition: CapabilityDefinition,
         outcome: ToolCallOutcome,
         *,
         stage: str,
-    ) -> SkillResult | None:
+    ) -> CapabilityResult | None:
         if outcome.status == "success":
             return None
         status = "timed_out" if outcome.status == "timeout" else "failed"
-        return SkillResult(
+        return CapabilityResult(
             request_id=request.request_id,
-            skill_id=request.skill_id,
-            skill_version=definition.version,
+            capability_id=request.capability_id,
+            capability_version=definition.version,
             status=status,
             provider_id=self.provider_id,
-            output=outcome.output,
+            output=self._canonical_provider_output(outcome.output, request=request),
             reason_code=f"{stage}_{outcome.status}",
             message=outcome.error or f"Soridormi {stage} failed",
         )
-
-
-# Backward-compatible name used by earlier Chromie tests and imports. Prefer
-# SoridormiNamedSkillAdapter in new code because this module adapts the generic
-# MCP named-skill protocol; it does not provide or control hardware skills.
-SoridormiMcpSkillProvider = SoridormiNamedSkillAdapter

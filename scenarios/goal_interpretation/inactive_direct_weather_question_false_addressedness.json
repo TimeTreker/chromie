@@ -107,7 +107,7 @@
     ],
     "task_types_forbid": [
       "speech.ignore",
-      "task.execute_skill"
+      "task.execute_capability"
     ],
     "metadata_json_forbid": [
       "semantic_addressedness_gate",

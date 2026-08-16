@@ -386,7 +386,7 @@ class ConversationStateTests(unittest.TestCase):
             "s1",
             InteractionResponse(
                 speech=[{"text": "Hello."}],
-                skills=[{"skill_id": "soridormi.nod_yes"}],
+                capabilities=[{"capability_id": "soridormi.nod_yes"}],
             ),
         )
 
@@ -744,7 +744,7 @@ class ConversationStateTests(unittest.TestCase):
         manager.record_agent_result(
             "s1",
             InteractionResponse(
-                skills=[{"request_id": "skill-1", "skill_id": "soridormi.nod_yes"}],
+                capabilities=[{"request_id": "skill-1", "capability_id": "soridormi.nod_yes"}],
             ),
         )
 
@@ -817,15 +817,15 @@ class GoalScopedLifecycleTests(unittest.TestCase):
         self.assertNotEqual(created[1]["task_id"], "goal-blink")
 
         response = InteractionResponse(
-            skills=[
+            capabilities=[
                 {
                     "request_id": "skill-walk",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "metadata": {"source_goal_ids": ["goal-walk"]},
                 },
                 {
                     "request_id": "skill-blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "metadata": {"source_goal_ids": ["goal-blink"]},
                 },
             ],
@@ -1027,10 +1027,10 @@ class GoalScopedLifecycleTests(unittest.TestCase):
                 manager.record_agent_result(
                     "sid-action",
                     InteractionResponse(
-                        skills=[
+                        capabilities=[
                             {
                                 "request_id": "skill-action",
-                                "skill_id": "soridormi.blink_eyes",
+                                "capability_id": "soridormi.blink_eyes",
                                 "metadata": {
                                     "source_goal_ids": ["goal-action"]
                                 },
@@ -1077,15 +1077,15 @@ class GoalScopedLifecycleTests(unittest.TestCase):
                 self._create_goals(manager, "goal-walk", "goal-blink")
                 response = InteractionResponse(
                     interaction_id=f"interaction-{decision}",
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "skill-walk",
-                            "skill_id": "soridormi.walk_forward",
+                            "capability_id": "soridormi.walk_forward",
                             "metadata": {"source_goal_ids": ["goal-walk"]},
                         },
                         {
                             "request_id": "skill-blink",
-                            "skill_id": "soridormi.blink_eyes",
+                            "capability_id": "soridormi.blink_eyes",
                             "metadata": {"source_goal_ids": ["goal-blink"]},
                         },
                     ],
@@ -1140,15 +1140,15 @@ class GoalScopedLifecycleTests(unittest.TestCase):
         self._create_goals(manager, "goal-walk", "goal-blink")
         response = InteractionResponse(
             interaction_id="interaction-approved",
-            skills=[
+            capabilities=[
                 {
                     "request_id": "skill-walk",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "metadata": {"source_goal_ids": ["goal-walk"]},
                 },
                 {
                     "request_id": "skill-blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "metadata": {"source_goal_ids": ["goal-blink"]},
                 },
             ],
@@ -1348,10 +1348,10 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             "sid-outcome",
             InteractionResponse(
                 interaction_id="interaction-outcome",
-                skills=[
+                capabilities=[
                     {
                         "request_id": "request-walk",
-                        "skill_id": "soridormi.walk_forward",
+                        "capability_id": "soridormi.walk_forward",
                         "metadata": {
                             "source_goal_ids": ["goal-walk"],
                             "canonical_plan_id": "plan-lifecycle",
@@ -1360,7 +1360,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
                     },
                     {
                         "request_id": "request-blink",
-                        "skill_id": "soridormi.blink_eyes",
+                        "capability_id": "soridormi.blink_eyes",
                         "metadata": {
                             "source_goal_ids": ["goal-blink"],
                             "canonical_plan_id": "plan-lifecycle",
@@ -1406,7 +1406,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
                     "evidence_id": "evidence-walk",
                     "request_id": "request-walk",
                     "step_id": "step-walk",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "source_goal_ids": ["goal-walk"],
                     "status": "completed",
                 },
@@ -1414,7 +1414,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
                     "evidence_id": "evidence-blink",
                     "request_id": "request-blink",
                     "step_id": "step-blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "source_goal_ids": ["goal-blink"],
                     "status": "not_run",
                     "missing_result": True,
@@ -1434,7 +1434,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
                     "step_ids": ["step-blink"],
                     "evidence_ids": ["evidence-blink"],
                     "unresolved_step_ids": ["step-blink"],
-                    "reason_codes": ["missing_skill_result"],
+                    "reason_codes": ["missing_capability_result"],
                 },
             ],
         )
@@ -1491,10 +1491,10 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             "sid-qualified",
             InteractionResponse(
                 interaction_id="interaction-qualified",
-                skills=[
+                capabilities=[
                     {
                         "request_id": "request-walk",
-                        "skill_id": "soridormi.walk_forward",
+                        "capability_id": "soridormi.walk_forward",
                         "metadata": {
                             "source_goal_ids": ["goal-walk"],
                             "canonical_plan_id": "plan-lifecycle",
@@ -1503,7 +1503,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
                     }
                 ],
                 metadata={
-                    "planning_result": "direct_skill",
+                    "planning_result": "direct_capability",
                     "turn_id": "turn-qualified",
                     "canonical_plan_id": "plan-lifecycle",
                     "canonical_plan_fingerprint": "q" * 64,
@@ -1549,7 +1549,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
                     "evidence_id": "evidence-walk",
                     "request_id": "request-walk",
                     "step_id": "step-walk",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "source_goal_ids": ["goal-walk"],
                     "status": "completed",
                     "completion_qualification": {
@@ -1599,10 +1599,10 @@ class GoalScopedLifecycleTests(unittest.TestCase):
         self._create_goals(manager, "goal-cup")
         response = InteractionResponse(
             interaction_id="interaction-cup",
-            skills=[
+            capabilities=[
                 {
                     "request_id": "request-cup",
-                    "skill_id": "soridormi.pick_up",
+                    "capability_id": "soridormi.pick_up",
                     "metadata": {
                         "source_goal_ids": ["goal-cup"],
                         "canonical_plan_id": "plan-lifecycle",
@@ -1642,7 +1642,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
                     "evidence_id": "evidence-cup",
                     "request_id": "request-cup",
                     "step_id": "step-cup",
-                    "skill_id": "soridormi.pick_up",
+                    "capability_id": "soridormi.pick_up",
                     "source_goal_ids": ["goal-cup"],
                     "status": "completed",
                 }
@@ -1706,10 +1706,10 @@ class GoalScopedLifecycleTests(unittest.TestCase):
         self._create_goals(manager, "goal-weather")
         response = InteractionResponse(
             interaction_id="interaction-weather",
-            skills=[
+            capabilities=[
                 {
                     "request_id": "request-weather",
-                    "skill_id": "chromie.weather.lookup",
+                    "capability_id": "chromie.weather.lookup",
                     "args": {"location": "上海", "date": "today"},
                     "timing": "parallel",
                     "metadata": {
@@ -1736,7 +1736,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
                     "steps": [
                         {
                             "step_id": "step-weather",
-                            "skill_id": "chromie.weather.lookup",
+                            "capability_id": "chromie.weather.lookup",
                             "args": {"location": "上海", "date": "today"},
                             "source_goal_ids": ["goal-weather"],
                         }
@@ -1766,7 +1766,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
                     "evidence_id": "evidence-weather",
                     "request_id": "request-weather",
                     "step_id": "step-weather",
-                    "skill_id": "chromie.weather.lookup",
+                    "capability_id": "chromie.weather.lookup",
                     "source_goal_ids": ["goal-weather"],
                     "status": "not_run",
                     "missing_result": True,
@@ -1784,7 +1784,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
                     "step_ids": ["step-weather"],
                     "evidence_ids": ["evidence-weather"],
                     "unresolved_step_ids": ["step-weather"],
-                    "reason_codes": ["missing_skill_result"],
+                    "reason_codes": ["missing_capability_result"],
                 }
             ],
         )
@@ -1801,7 +1801,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
         binding = snapshots[0]["metadata"]["execution_binding"]
         self.assertTrue(binding["retryable_safe_read"])
         self.assertEqual(
-            binding["planned_skills"][0]["args"],
+            binding["planned_capabilities"][0]["args"],
             {"location": "上海", "date": "today"},
         )
         opportunities = manager.derive_execution_cognitive_opportunities(
@@ -1815,7 +1815,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             opportunities[0].evidence_refs,
             ["outcome-weather-interrupted", "evidence-weather"],
         )
-        self.assertEqual(opportunities[0].reason_codes, ["missing_skill_result"])
+        self.assertEqual(opportunities[0].reason_codes, ["missing_capability_result"])
         self.assertEqual(opportunities[0].situation_digest, "s" * 64)
         self.assertNotIn("cognitive_opportunities", manager.snapshot())
 
@@ -1833,10 +1833,10 @@ class GoalScopedLifecycleTests(unittest.TestCase):
         ) -> InteractionResponse:
             return InteractionResponse(
                 interaction_id=interaction_id,
-                skills=[
+                capabilities=[
                     {
                         "request_id": request_id,
-                        "skill_id": "soridormi.walk_forward",
+                        "capability_id": "soridormi.walk_forward",
                         "metadata": {
                             "source_goal_ids": ["goal-walk"],
                             "canonical_plan_id": plan_id,
@@ -1896,7 +1896,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
                     "evidence_id": "evidence-old",
                     "request_id": "request-old",
                     "step_id": "step-walk",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "source_goal_ids": ["goal-walk"],
                     "status": "completed",
                 }
@@ -1933,10 +1933,10 @@ class GoalScopedLifecycleTests(unittest.TestCase):
         manager.record_agent_result(
             "sid-not-run",
             InteractionResponse(
-                skills=[
+                capabilities=[
                     {
                         "request_id": "request-not-run",
-                        "skill_id": "soridormi.walk_forward",
+                        "capability_id": "soridormi.walk_forward",
                         "metadata": {"source_goal_ids": ["goal-walk"]},
                     }
                 ],

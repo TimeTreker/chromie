@@ -28,7 +28,7 @@ from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
     MEDIA_CAPABILITY_IDS,
-    SkillRequest,
+    CapabilityRequest,
     VOCAL_MODES,
     VOCAL_PERFORMANCE_CAPABILITY_ID,
     output_schema_sha256,
@@ -434,7 +434,7 @@ class CognitiveEvidenceRecorder:
             "interaction_id": response.interaction_id,
             "status": response.status,
             "speech_count": len(response.speech),
-            "capability_ids": [item.capability_id for item in response.skills],
+            "capability_ids": [item.capability_id for item in response.capabilities],
             "requires_confirmation": response.requires_confirmation,
         }
 
@@ -489,7 +489,7 @@ class CanonicalPlanRuntimeAdapter:
 
     def _record_auxiliary_behavior_request(
         self,
-        request: SkillRequest,
+        request: CapabilityRequest,
         *,
         session_id: str,
     ) -> None:
@@ -540,9 +540,9 @@ class CanonicalPlanRuntimeAdapter:
             soridormi_ids | set(MEDIA_CAPABILITY_IDS.values())
         ):
             return "robot_action"
-        if all(step.skill_id.startswith("chromie.memory.") for step in plan.steps):
+        if all(step.capability_id.startswith("chromie.memory.") for step in plan.steps):
             return "memory"
-        if all(step.skill_id.startswith("chromie.") for step in plan.steps):
+        if all(step.capability_id.startswith("chromie.") for step in plan.steps):
             return "tool"
         return "unsupported"
 
@@ -551,7 +551,7 @@ class CanonicalPlanRuntimeAdapter:
             return False
         try:
             definitions = [
-                self.interaction_runtime.skill_definition(step.skill_id)
+                self.interaction_runtime.capability_definition(step.capability_id)
                 for step in plan.steps
             ]
         except ValueError:
@@ -587,9 +587,9 @@ class CanonicalPlanRuntimeAdapter:
             if plan.steps:
                 errors.append({"type": "non_execute_plan_has_steps"})
             return errors
-        skill_ids = [step.skill_id for step in plan.steps]
+        capability_ids = [step.capability_id for step in plan.steps]
         try:
-            await self.interaction_runtime.ensure_skill_definitions(skill_ids)
+            await self.interaction_runtime.ensure_capability_definitions(capability_ids)
         except Exception as exc:
             return [
                 {
@@ -602,11 +602,11 @@ class CanonicalPlanRuntimeAdapter:
         definitions: dict[str, Any] = {}
         for step in plan.steps:
             try:
-                definition = self.interaction_runtime.skill_definition(step.skill_id)
+                definition = self.interaction_runtime.capability_definition(step.capability_id)
             except Exception as exc:
                 errors.append(
                     {
-                        "type": "unknown_runtime_skill",
+                        "type": "unknown_runtime_capability",
                         "step_id": step.step_id,
                         "capability_id": step.capability_id,
                         "message": str(exc)[:300],
@@ -859,7 +859,7 @@ class CanonicalPlanRuntimeAdapter:
                 "reasons": [target_error],
             }
 
-        requests: list[SkillRequest] = []
+        requests: list[CapabilityRequest] = []
         reasons: list[str] = []
         interaction_state = runtime_context.get("social_attention_interaction_state")
         if not isinstance(interaction_state, dict):
@@ -875,8 +875,8 @@ class CanonicalPlanRuntimeAdapter:
         unresolved_embodied_primary_ids: set[str] = set()
         for capability_id in sorted(primary_capability_ids):
             try:
-                await self.interaction_runtime.ensure_skill_definitions([capability_id])
-                primary_definition = self.interaction_runtime.skill_definition(capability_id)
+                await self.interaction_runtime.ensure_capability_definitions([capability_id])
+                primary_definition = self.interaction_runtime.capability_definition(capability_id)
             except (TypeError, ValueError, ValidationError, RuntimeError):
                 if capability_id.startswith("soridormi."):
                     unresolved_embodied_primary_ids.add(capability_id)
@@ -898,9 +898,9 @@ class CanonicalPlanRuntimeAdapter:
         seen: set[str] = set()
         for index, behavior in enumerate(plan.behaviors):
             try:
-                if behavior.skill_id in primary_capability_ids:
+                if behavior.capability_id in primary_capability_ids:
                     reasons.append(
-                        f"duplicates_primary_activity:{behavior.skill_id}"
+                        f"duplicates_primary_activity:{behavior.capability_id}"
                     )
                     continue
                 if unresolved_embodied_primary_ids:
@@ -909,8 +909,8 @@ class CanonicalPlanRuntimeAdapter:
                         for capability_id in sorted(unresolved_embodied_primary_ids)
                     )
                     continue
-                await self.interaction_runtime.ensure_skill_definitions([behavior.skill_id])
-                definition = self.interaction_runtime.skill_definition(behavior.skill_id)
+                await self.interaction_runtime.ensure_capability_definitions([behavior.capability_id])
+                definition = self.interaction_runtime.capability_definition(behavior.capability_id)
                 metadata = definition.metadata if isinstance(definition.metadata, dict) else {}
                 domains = {
                     str(item).strip().lower()
@@ -918,39 +918,39 @@ class CanonicalPlanRuntimeAdapter:
                     if str(item).strip()
                 }
                 if "social_attention" not in domains:
-                    reasons.append(f"not_social_attention:{behavior.skill_id}")
+                    reasons.append(f"not_social_attention:{behavior.capability_id}")
                     continue
-                if behavior.skill_id in seen:
-                    reasons.append(f"duplicate_social_skill:{behavior.skill_id}")
+                if behavior.capability_id in seen:
+                    reasons.append(f"duplicate_social_skill:{behavior.capability_id}")
                     continue
                 if not definition.available:
-                    reasons.append(f"unavailable:{behavior.skill_id}")
+                    reasons.append(f"unavailable:{behavior.capability_id}")
                     continue
                 if definition.requires_confirmation:
-                    reasons.append(f"confirmation_required:{behavior.skill_id}")
+                    reasons.append(f"confirmation_required:{behavior.capability_id}")
                     continue
                 if behavior.timing != "parallel":
-                    reasons.append(f"auxiliary_must_be_parallel:{behavior.skill_id}")
+                    reasons.append(f"auxiliary_must_be_parallel:{behavior.capability_id}")
                     continue
                 if not definition.can_run_parallel:
-                    reasons.append(f"parallel_not_supported:{behavior.skill_id}")
+                    reasons.append(f"parallel_not_supported:{behavior.capability_id}")
                     continue
                 if (
-                    behavior.skill_id.startswith("soridormi.")
+                    behavior.capability_id.startswith("soridormi.")
                     and metadata.get("parallel_metadata_declared") is not True
                 ):
-                    reasons.append(f"parallel_metadata_missing:{behavior.skill_id}")
+                    reasons.append(f"parallel_metadata_missing:{behavior.capability_id}")
                     continue
                 if self._attention_conflicts_with_primary(
                     definition,
                     behavior.timing,
                     primary_definitions,
                 ):
-                    reasons.append(f"resource_conflict:{behavior.skill_id}")
+                    reasons.append(f"resource_conflict:{behavior.capability_id}")
                     continue
                 schema_errors = validate_args_for_schema(behavior.args, definition.input_schema)
                 if schema_errors:
-                    reasons.append(f"invalid_args:{behavior.skill_id}")
+                    reasons.append(f"invalid_args:{behavior.capability_id}")
                     continue
                 target_args_error = self._attention_target_args_error(
                     behavior.args,
@@ -959,17 +959,17 @@ class CanonicalPlanRuntimeAdapter:
                 )
                 if target_args_error:
                     reasons.append(
-                        f"target_error:{behavior.skill_id}:{target_args_error}"
+                        f"target_error:{behavior.capability_id}:{target_args_error}"
                     )
                     continue
                 schema_digest = output_schema_sha256(definition.output_schema)
                 digest = hashlib.sha256(
-                    f"{turn_id}|{primary_activity.activity_id}|{event}|{index}|{behavior.skill_id}".encode("utf-8")
+                    f"{turn_id}|{primary_activity.activity_id}|{event}|{index}|{behavior.capability_id}".encode("utf-8")
                 ).hexdigest()[:20]
-                request = SkillRequest(
+                request = CapabilityRequest(
                     request_id=f"social_{digest}",
-                    skill_id=behavior.skill_id,
-                    skill_version=definition.version,
+                    capability_id=behavior.capability_id,
+                    capability_version=definition.version,
                     args=dict(behavior.args),
                     timing="parallel",
                     timeout_ms=definition.timeout_ms,
@@ -1013,9 +1013,9 @@ class CanonicalPlanRuntimeAdapter:
                 )
                 requests.append(request)
                 self._record_auxiliary_behavior_request(request, session_id=session_id)
-                seen.add(behavior.skill_id)
+                seen.add(behavior.capability_id)
             except (TypeError, ValueError, ValidationError, RuntimeError) as exc:
-                reasons.append(f"invalid:{behavior.skill_id}:{type(exc).__name__}")
+                reasons.append(f"invalid:{behavior.capability_id}:{type(exc).__name__}")
 
         if not requests:
             return {
@@ -1050,7 +1050,7 @@ class CanonicalPlanRuntimeAdapter:
         response = InteractionResponse(
             interaction_id=interaction_id,
             status="ok",
-            skills=requests,
+            capabilities=requests,
             metadata=response_metadata,
         )
         execution = await self.interaction_runtime.execute(
@@ -1181,7 +1181,7 @@ class CanonicalPlanRuntimeAdapter:
             )
         ]
 
-        skills: list[SkillRequest] = []
+        capabilities: list[CapabilityRequest] = []
 
         metadata = {
             "source": "goal_driven_cognitive_runtime",
@@ -1208,7 +1208,7 @@ class CanonicalPlanRuntimeAdapter:
             interaction_id=f"cognitive_{session_id}",
             status="ok",
             speech=speech,
-            skills=skills,
+            capabilities=capabilities,
             metadata=metadata,
         )
         return response
@@ -1284,7 +1284,7 @@ class CanonicalPlanRuntimeAdapter:
             )
             span.set_attribute("response_status", response.status)
             span.set_attribute("speech_count", len(response.speech))
-            span.set_attribute("skill_count", len(response.skills))
+            span.set_attribute("capability_count", len(response.capabilities))
             if response.status == "error":
                 span.set_status("error")
             return response
@@ -1325,7 +1325,7 @@ class CanonicalPlanRuntimeAdapter:
         confirmation_goal_ids = set(executable_goal_ids) if alternative else set()
         if not alternative:
             for step in plan.steps:
-                definition = self.interaction_runtime.skill_definition(step.skill_id)
+                definition = self.interaction_runtime.capability_definition(step.capability_id)
                 if definition.requires_confirmation:
                     confirmation_goal_ids.update(step.source_goal_ids)
 
@@ -1357,8 +1357,8 @@ class CanonicalPlanRuntimeAdapter:
                 continue
             mixer_contracts: list[dict[str, Any]] = []
             for step_id in media_step_ids:
-                definition = self.interaction_runtime.skill_definition(
-                    plan_steps_by_id[step_id].skill_id
+                definition = self.interaction_runtime.capability_definition(
+                    plan_steps_by_id[step_id].capability_id
                 )
                 if definition.metadata.get("mixer_policy") != ("duck_media_during_vocal"):
                     raise ValueError(
@@ -1397,7 +1397,7 @@ class CanonicalPlanRuntimeAdapter:
         ]
         effectful_pre_execution = plan.disposition in {"execute", "mixed"} and bool(plan.steps)
         executable_definitions = (
-            [self.interaction_runtime.skill_definition(step.skill_id) for step in plan.steps]
+            [self.interaction_runtime.capability_definition(step.capability_id) for step in plan.steps]
             if effectful_pre_execution
             else []
         )
@@ -1763,14 +1763,14 @@ class CanonicalPlanRuntimeAdapter:
                 )
             )
 
-        skills: list[SkillRequest] = []
+        capabilities: list[CapabilityRequest] = []
         for step in plan.steps:
-            definition = self.interaction_runtime.skill_definition(step.skill_id)
+            definition = self.interaction_runtime.capability_definition(step.capability_id)
             execution_lane = str(definition.metadata.get("execution_lane") or "activity").strip()
             if execution_lane not in {"vocal", "activity"}:
                 raise ValueError(
                     "canonical plan capability has unsupported execution lane: "
-                    f"{step.skill_id}={execution_lane!r}"
+                    f"{step.capability_id}={execution_lane!r}"
                 )
             if (
                 step.capability_id == VOCAL_PERFORMANCE_CAPABILITY_ID
@@ -1800,10 +1800,10 @@ class CanonicalPlanRuntimeAdapter:
                 )
             if coordination is not None:
                 if not definition.can_run_parallel:
-                    raise ValueError("cross-lane capability is not parallel-safe: " + step.skill_id)
+                    raise ValueError("cross-lane capability is not parallel-safe: " + step.capability_id)
                 if definition.metadata.get("parallel_metadata_declared") is not True:
                     raise ValueError(
-                        "cross-lane capability lacks explicit parallel metadata: " + step.skill_id
+                        "cross-lane capability lacks explicit parallel metadata: " + step.capability_id
                     )
             coordination_metadata = (
                 {
@@ -1833,11 +1833,11 @@ class CanonicalPlanRuntimeAdapter:
             digest = hashlib.sha256(f"{fingerprint}|{step.step_id}".encode("utf-8")).hexdigest()[
                 :20
             ]
-            skills.append(
-                SkillRequest(
+            capabilities.append(
+                CapabilityRequest(
                     request_id=f"cogreq_{digest}",
-                    skill_id=step.skill_id,
-                    skill_version=definition.version,
+                    capability_id=step.capability_id,
+                    capability_version=definition.version,
                     args=step.args,
                     timing="parallel" if safe_read_parallel else step.timing,
                     timeout_ms=definition.timeout_ms,
@@ -1894,7 +1894,7 @@ class CanonicalPlanRuntimeAdapter:
             "refused": "refused",
         }
         primary_effectful_count = sum(
-            1 for request in skills if request.metadata.get("effectful") is True
+            1 for request in capabilities if request.metadata.get("effectful") is True
         )
         metadata = {
             "source": "goal_driven_cognitive_runtime",
@@ -1908,7 +1908,7 @@ class CanonicalPlanRuntimeAdapter:
                 "vocal": (
                     "response_delivery_and_provider_work"
                     if any(
-                        request.metadata.get("execution_lane") == "vocal" for request in skills
+                        request.metadata.get("execution_lane") == "vocal" for request in capabilities
                     )
                     else "response_delivery"
                 ),
@@ -1916,7 +1916,7 @@ class CanonicalPlanRuntimeAdapter:
                     "provider_work"
                     if any(
                         request.metadata.get("execution_lane") == "activity"
-                        for request in skills
+                        for request in capabilities
                     )
                     else "idle"
                 ),
@@ -1977,8 +1977,8 @@ class CanonicalPlanRuntimeAdapter:
         response = InteractionResponse(
             status=status_map.get(plan.disposition, "error"),
             speech=speech,
-            skills=skills,
-            requires_confirmation=any(item.requires_confirmation for item in skills),
+            capabilities=capabilities,
+            requires_confirmation=any(item.requires_confirmation for item in capabilities),
             reason=(
                 plan.escalation_reason if plan.disposition in {"unavailable", "refused"} else None
             ),
@@ -2260,7 +2260,7 @@ class GoalDrivenRuntimeCoordinator:
             add_unique(row, "vocal_modes", "speech")
             add_unique(row, "execution_item_ids", speech.id)
 
-        for request in interaction.skills:
+        for request in interaction.capabilities:
             capability_id = str(request.capability_id or "").strip()
             if not (
                 capability_id.startswith("soridormi.")
@@ -2787,7 +2787,7 @@ class GoalDrivenRuntimeCoordinator:
                     # Goal/Plan implementation merely because it shares the turn.
                     continue
                 capability_id = str(
-                    row.get("capability_id") or row.get("skill_id") or ""
+                    row.get("capability_id") or ""
                 ).strip()
                 if not capability_id:
                     continue
@@ -2800,7 +2800,7 @@ class GoalDrivenRuntimeCoordinator:
                         "candidate_id",
                         "step_id",
                         "capability_id",
-                        "skill_id",
+                        "capability_id",
                         "intent",
                         "args",
                         "source_goal_ids",
@@ -3958,26 +3958,26 @@ class GoalDrivenRuntimeCoordinator:
                     "capability_id": step.capability_id,
                     "step_id": step.step_id,
                     "execution_lane": str(
-                        self.adapter.interaction_runtime.skill_definition(
-                            step.skill_id
+                        self.adapter.interaction_runtime.capability_definition(
+                            step.capability_id
                         ).metadata.get("execution_lane")
                         or "activity"
                     ),
                     "effects": list(
-                        self.adapter.interaction_runtime.skill_definition(
-                            step.skill_id
+                        self.adapter.interaction_runtime.capability_definition(
+                            step.capability_id
                         ).metadata.get("effects")
                         or []
                     ),
                     "safety_class": str(
-                        self.adapter.interaction_runtime.skill_definition(
-                            step.skill_id
+                        self.adapter.interaction_runtime.capability_definition(
+                            step.capability_id
                         ).metadata.get("safety_class")
                         or ""
                     ),
                     "requires_confirmation": bool(
-                        self.adapter.interaction_runtime.skill_definition(
-                            step.skill_id
+                        self.adapter.interaction_runtime.capability_definition(
+                            step.capability_id
                         ).requires_confirmation
                     ),
                 }

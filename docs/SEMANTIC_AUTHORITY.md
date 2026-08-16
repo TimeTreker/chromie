@@ -76,7 +76,7 @@ semantic plan after the Goal-driven Runtime acquires a turn.
 | Orchestrator turn in `apply`; mapped route lane is allowlisted and apply preconditions pass | Goal-Driven Cognitive Core (current Goal-driven Runtime) | authoritative | Goal Interpretation → Responsibility evidence → pre-Goal Fast Planner advancement → optional immediate Activity + optional Goal Association → canonical Fast/Deep Planner when required → Response Composer → trusted adapter | Fail closed after ownership is acquired. |
 | Orchestrator turn in `apply`; mapped route lane is excluded | Goal-Driven Cognitive Core policy boundary | authoritative fail-closed | No semantic planner is entered; deprecated externally supplied `actions[]` remain unexecuted compatibility input only | Return a typed no-action/error outcome without legacy semantic re-entry. |
 | Orchestrator turn in `report_only` | Goal-Driven Cognitive Core (current Goal-driven Runtime) | observer | Same stages, evidence only | The existing routed Agent path remains the only authority. |
-| Agent `/interaction` or `/run` with deprecated exact `actions[]` compatibility input | No new semantic planner; legacy action materializer | adapter | Schema validation and `SkillRequest` materialization only | Invalid actions are blocked or clarified; no LLM reinterpretation and no claim that Fast Goal Interpretation authored them. |
+| Agent `/interaction` or `/run` with deprecated exact `actions[]` compatibility input | No new semantic planner; legacy action materializer | adapter | Schema validation and `CapabilityRequest` materialization only | Invalid actions are blocked or clarified; no LLM reinterpretation and no claim that Fast Goal Interpretation authored them. |
 | Explicit compatibility emergency | Legacy CapabilityAgent | authoritative | Legacy capability semantic planner | Requires both service gates and a per-turn emergency claim. |
 
 The maintained direct speech-only path is Fast-Planner-owned. Goal Interpretation emits
@@ -106,7 +106,7 @@ The CapabilityAgent remains in the repository for compatibility evidence and
 emergency operation. In normal operation it is an adapter:
 
 1. Deprecated compatibility `actions[]` supplied directly to legacy Agent entrypoints
-   are validated and converted to `SkillRequest` objects without calling the
+   are validated and converted to `CapabilityRequest` objects without calling the
    CapabilityAgent LLM. Current Fast Goal Interpretation does not author this field.
 2. A robot-action request without exact actions cannot invoke the old semantic
    planner by default.

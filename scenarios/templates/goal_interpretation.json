@@ -27,7 +27,7 @@
     "intent": "general_conversation",
     "source": "llm",
     "task_types_include": ["speech.answer"],
-    "task_types_forbid": ["task.execute_skill"],
+    "task_types_forbid": ["task.execute_capability"],
     "llm_calls": 1
   }
 }

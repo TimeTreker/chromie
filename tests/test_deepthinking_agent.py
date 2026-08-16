@@ -358,9 +358,9 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
         response = result.to_response()
 
         self.assertEqual(response.speech[0].text, "Moving now.")
-        self.assertEqual(len(response.skills), 1)
-        skill = response.skills[0]
-        self.assertEqual(skill.skill_id, "soridormi.walk_forward")
+        self.assertEqual(len(response.capabilities), 1)
+        skill = response.capabilities[0]
+        self.assertEqual(skill.capability_id, "soridormi.walk_forward")
         self.assertEqual(skill.args, {"duration_s": 15, "speed": "quick"})
         self.assertEqual(skill.timing, "sequential")
         self.assertTrue(skill.requires_confirmation)
@@ -377,10 +377,10 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
             TaskProposal.model_validate(item)
             for item in response.metadata["deepthinking_task_proposals"]
         ]
-        self.assertEqual([item.task_type for item in proposals], ["speech.speak", "task.execute_skill"])
+        self.assertEqual([item.task_type for item in proposals], ["speech.speak", "task.execute_capability"])
         self.assertEqual(proposals[0].state, "committed")
         self.assertEqual(proposals[1].state, "advisory")
-        self.assertEqual(proposals[1].skill_id, "soridormi.walk_forward")
+        self.assertEqual(proposals[1].capability_id, "soridormi.walk_forward")
         self.assertEqual(ollama.calls[0]["response_format"], "json")
 
     async def test_missing_desired_ability_is_proposed_but_not_executed(self) -> None:
@@ -445,7 +445,7 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
         result = await agent.run(request, draft)
         response = result.to_response()
 
-        self.assertEqual(len(response.skills), 0)
+        self.assertEqual(len(response.capabilities), 0)
         self.assertEqual(
             response.speech[0].text,
             "I understand you want me to pick up the bottle, but I do not have a trusted grasping ability yet.",
@@ -479,7 +479,7 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
                 "quick_review": {
                     "decision": "supersede",
                     "reason": "The fast Goal Interpreter treated a warning as a gaze command.",
-                    "superseded_task_ids": ["quick_intent:0:task.execute_skill"],
+                    "superseded_task_ids": ["quick_intent:0:task.execute_capability"],
                 },
                 "reason": "Warning semantics replace quick proposal.",
             }
@@ -510,10 +510,10 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
                             "quick_intent": "compound_common_catalog_task",
                             "quick_task_proposals": [
                                 {
-                                    "id": "quick_intent:0:task.execute_skill",
+                                    "id": "quick_intent:0:task.execute_capability",
                                     "source": "quick_intent",
                                     "proposal_kind": "action",
-                                    "task_type": "task.execute_skill",
+                                    "task_type": "task.execute_capability",
                                     "state": "advisory",
                                     "effectful": True,
                                     "priority": "normal",
@@ -541,7 +541,7 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
         ]
         self.assertEqual(len(proposals), 1)
         self.assertEqual(proposals[0].state, "superseded")
-        self.assertEqual(proposals[0].skill_id, "soridormi.look_at_window")
+        self.assertEqual(proposals[0].capability_id, "soridormi.look_at_window")
         self.assertEqual(
             proposals[0].superseded_by,
             "deepthinking:0:speech.speak",

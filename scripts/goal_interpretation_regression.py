@@ -12,7 +12,7 @@ class EvaluationResult:
 
 
 def _capability_id(item: Mapping[str, Any]) -> str:
-    capability_id = str(item.get("capability_id") or item.get("skill_id") or "").strip()
+    capability_id = str(item.get("capability_id") or "").strip()
     if capability_id:
         return capability_id
     intent = str(item.get("intent") or "").strip()

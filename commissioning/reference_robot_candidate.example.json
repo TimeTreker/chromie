@@ -26,8 +26,8 @@
     "provider_manifest": "capabilities/soridormi.json",
     "provider_configuration_sha256": ""
   },
-  "initial_low_risk_skill": {
-    "skill_id": "",
+  "initial_low_risk_capability": {
+    "capability_id": "",
     "workspace": "",
     "max_speed": "",
     "max_payload": "",
@@ -35,7 +35,7 @@
     "abort_conditions": []
   },
   "unsupported": {
-    "skills": [],
+    "capabilities": [],
     "configurations": [],
     "operating_conditions": []
   },

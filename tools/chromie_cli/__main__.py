@@ -203,7 +203,7 @@ def build_parser() -> argparse.ArgumentParser:
     trace_subparsers = trace.add_subparsers(dest="trace_command", metavar="COMMAND")
     trace_view_parser = trace_subparsers.add_parser(
         "view",
-        help="view retained session, interaction, Skill Runtime, and TaskGraph traces",
+        help="view retained session, interaction, Capability Runtime, and TaskGraph traces",
     )
     trace_view_parser.add_argument(
         "--trace-root",
@@ -225,7 +225,7 @@ def build_parser() -> argparse.ArgumentParser:
     trace_view_parser.add_argument(
         "--interaction",
         default=None,
-        help="filter by InteractionResponse or Skill Runtime interaction id",
+        help="filter by InteractionResponse or Capability Runtime interaction id",
     )
     trace_view_parser.add_argument(
         "--graph",
@@ -235,7 +235,7 @@ def build_parser() -> argparse.ArgumentParser:
     trace_view_parser.add_argument(
         "--trace",
         default=None,
-        help="filter by Skill Runtime trace id",
+        help="filter by Capability Runtime trace id",
     )
     trace_view_parser.add_argument(
         "--limit",

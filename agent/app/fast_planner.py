@@ -39,7 +39,7 @@ from .planner_contract import (
     evidence_bound_dialogue,
     expected_goal_ids,
     fast_multi_goal_response_schema,
-    is_planner_step_skill,
+    is_planner_step_capability,
     materialize_goal_outcomes,
     materialize_planner_metadata,
     normalize_schema_default_parameter_provenance,
@@ -381,7 +381,7 @@ class FastPlannerResolver:
             for item in capabilities
             if item.available
             and item.interaction_executable
-            and is_planner_step_skill(item.capability_id)
+            and is_planner_step_capability(item.capability_id)
         ]
         if response_only:
             executable = []
@@ -408,7 +408,7 @@ class FastPlannerResolver:
         response_schema = (
             fast_multi_goal_response_schema(
                 expected_goal_ids=expected_goal_ids_for_turn,
-                allowed_skill_ids=[item["capability_id"] for item in capability_payload],
+                allowed_capability_ids=[item["capability_id"] for item in capability_payload],
                 capability_input_schemas={
                     item["capability_id"]: item["input_schema"]
                     for item in capability_payload
@@ -421,7 +421,7 @@ class FastPlannerResolver:
             else canonical_plan_response_schema(
                 planner_tier="fast",
                 expected_goal_ids=expected_goal_ids_for_turn,
-                allowed_skill_ids=[item["capability_id"] for item in capability_payload],
+                allowed_capability_ids=[item["capability_id"] for item in capability_payload],
                 capability_input_schemas={
                     item["capability_id"]: item["input_schema"]
                     for item in capability_payload
@@ -1023,7 +1023,7 @@ class FastPlannerResolver:
         )
         goal_execution_contract = (
             "The canonical Goals are provider-free direct speech responsibilities. "
-            "This plan is response-only: do not select executable skills or plan steps. "
+            "This plan is response-only: do not select executable capabilities or plan steps. "
             if response_only
             else (
                 "At least one canonical Goal requires provider/effect evidence. The Plan "

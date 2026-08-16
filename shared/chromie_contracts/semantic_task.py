@@ -70,7 +70,7 @@ InformationResolution = Literal[
 ]
 
 PlanningResultKind = Literal[
-    "direct_skill",
+    "direct_capability",
     "composed_plan",
     "needs_context",
     "needs_clarification",

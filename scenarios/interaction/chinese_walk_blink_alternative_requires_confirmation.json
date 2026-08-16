@@ -97,9 +97,9 @@
     "ollama_reply": {
       "decision": "propose_alternative",
       "speech": "我目前不能在行走时同时眨眼，但可以先走十五秒，再眨两下眼睛，可以吗？",
-      "skills": [
+      "capabilities": [
         {
-          "skill_id": "soridormi.walk_forward",
+          "capability_id": "soridormi.walk_forward",
           "args": {
             "duration_s": 15.0,
             "speed": "quick"
@@ -107,7 +107,7 @@
           "timing": "sequential"
         },
         {
-          "skill_id": "soridormi.blink_eyes",
+          "capability_id": "soridormi.blink_eyes",
           "args": {
             "count": 2
           },
@@ -124,7 +124,7 @@
     }
   },
   "expect": {
-    "skills": [
+    "capabilities": [
       "soridormi.walk_forward",
       "soridormi.blink_eyes"
     ],

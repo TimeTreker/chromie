@@ -187,7 +187,7 @@ class TaskContinuityResolver:
             "Use goal_update for semantic changes and requires_replan when the implementation method may change. "
             "If task reference is ambiguous, return no modifying operation and use response_plan.immediate to ask one concise clarification. "
             "Immediate speech may acknowledge, evaluate, or clarify but must not claim unverified execution or completion. "
-            "Do not output skills, motor controls, authorization, chain-of-thought, hidden analysis, markdown, or text outside JSON."
+            "Do not output capabilities, motor controls, authorization, chain-of-thought, hidden analysis, markdown, or text outside JSON."
         )
 
     @staticmethod

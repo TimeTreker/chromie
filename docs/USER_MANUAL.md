@@ -164,9 +164,9 @@ conda run -n Chromie python scripts/interaction_text_mujoco_check.py \
   --cognitive-runtime \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi \
-  --expect-skill soridormi.walk_velocity \
-  --expect-skill soridormi.nod_yes \
-  --expect-skill soridormi.turn_in_place \
+  --expect-capability soridormi.walk_velocity \
+  --expect-capability soridormi.nod_yes \
+  --expect-capability soridormi.turn_in_place \
   --expect-arg 0:vx_mps=0.2 \
   --expect-arg 0:duration_s=10 \
   --expect-arg 1:count=2 \
@@ -208,7 +208,7 @@ conda run -n Chromie python scripts/interaction_text_mujoco_check.py \
   --soridormi-repo ../soridormi \
   --preview-only \
   --no-speaker \
-  --expect-skill soridormi.walk_forward \
+  --expect-capability soridormi.walk_forward \
   --reject-internal-speech
 ```
 

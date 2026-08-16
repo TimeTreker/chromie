@@ -308,7 +308,7 @@ def validate_operator_mode(
     required = {
         "ORCH_ENABLE_AGENT",
         "ORCH_ENABLE_INTERACTION_RESPONSE",
-        "ORCH_ENABLE_SORIDORMI_SKILLS",
+        "ORCH_ENABLE_SORIDORMI_CAPABILITIES",
         "ORCH_COGNITIVE_RUNTIME_MODE",
         "ORCH_COGNITIVE_APPLY_LANES",
         "ORCH_ACTION_DRY_RUN",
@@ -336,11 +336,11 @@ def validate_operator_mode(
         raise ConfigurationError(
             f"operator mode {mode_name} must retain chat and tool apply lanes"
         )
-    soridormi_enabled = enabled(mode.get("ORCH_ENABLE_SORIDORMI_SKILLS"))
+    soridormi_enabled = enabled(mode.get("ORCH_ENABLE_SORIDORMI_CAPABILITIES"))
     if "robot_action" in lanes and not soridormi_enabled:
         raise ConfigurationError(
             f"operator mode {mode_name} cannot enable robot_action without "
-            "ORCH_ENABLE_SORIDORMI_SKILLS=1"
+            "ORCH_ENABLE_SORIDORMI_CAPABILITIES=1"
         )
     if soridormi_enabled and "robot_action" not in lanes:
         raise ConfigurationError(

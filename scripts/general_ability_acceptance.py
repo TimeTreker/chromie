@@ -32,7 +32,7 @@ from scripts.outcome_observations import (  # noqa: E402
     collect_llm_integrity_violations,
     collect_observations,
     load_behavior_map,
-    observation_type_for_skill,
+    observation_type_for_capability,
     validate_expected_observations,
 )
 DEFAULT_MANIFEST = ROOT / "scenarios" / "general_ability_acceptance.json"
@@ -58,13 +58,13 @@ class TextScenarioCase:
     text: str
     language: str = ""
     expected_routes: tuple[str, ...] = field(default_factory=tuple)
-    expected_skills: tuple[str, ...] = field(default_factory=tuple)
+    expected_capabilities: tuple[str, ...] = field(default_factory=tuple)
     expected_args: tuple[tuple[int, str, Any], ...] = field(default_factory=tuple)
-    expect_no_skills: bool = False
+    expect_no_capabilities: bool = False
     expected_speech_all: tuple[str, ...] = field(default_factory=tuple)
     expected_speech_any: tuple[str, ...] = field(default_factory=tuple)
     forbidden_speech_any: tuple[str, ...] = field(default_factory=tuple)
-    forbidden_skills: tuple[str, ...] = field(default_factory=tuple)
+    forbidden_capabilities: tuple[str, ...] = field(default_factory=tuple)
     allow_expressive_cues: bool = True
     require_speech: bool = True
     require_fast_speech: bool = False
@@ -143,24 +143,24 @@ def _speech_text(summary: dict[str, Any]) -> str:
     )
 
 
-def _skill_items(summary: dict[str, Any]) -> list[dict[str, Any]]:
+def _capability_items(summary: dict[str, Any]) -> list[dict[str, Any]]:
     response = summary.get("interaction_response")
     if not isinstance(response, dict):
         return []
-    skills = response.get("skills")
-    if not isinstance(skills, list):
+    capabilities = response.get("capabilities")
+    if not isinstance(capabilities, list):
         return []
     return [
         item
-        for item in skills
+        for item in capabilities
         if isinstance(item, dict)
         and str(
-            item.get("capability_id") or item.get("skill_id") or ""
+            item.get("capability_id") or ""
         ).startswith("soridormi.")
     ]
 
 
-def _is_expressive_cue_skill(item: dict[str, Any]) -> bool:
+def _is_expressive_cue_capability(item: dict[str, Any]) -> bool:
     metadata = item.get("metadata")
     return bool(
         isinstance(metadata, dict)
@@ -171,11 +171,11 @@ def _is_expressive_cue_skill(item: dict[str, Any]) -> bool:
     )
 
 
-def _task_skill_ids(summary: dict[str, Any], *, allow_expressive_cues: bool) -> list[str]:
+def _task_capability_ids(summary: dict[str, Any], *, allow_expressive_cues: bool) -> list[str]:
     return [
-        str(item.get("capability_id") or item.get("skill_id") or "")
-        for item in _skill_items(summary)
-        if not (allow_expressive_cues and _is_expressive_cue_skill(item))
+        str(item.get("capability_id") or "")
+        for item in _capability_items(summary)
+        if not (allow_expressive_cues and _is_expressive_cue_capability(item))
     ]
 
 
@@ -188,9 +188,9 @@ def _plan_agent_skill_ids(cognitive: dict[str, Any]) -> set[str]:
         for item in plan.get("selected_agent_skills") or []:
             if not isinstance(item, dict):
                 continue
-            skill_id = str(item.get("agent_skill_id") or "").strip()
-            if skill_id:
-                selected.add(skill_id)
+            agent_skill_id = str(item.get("agent_skill_id") or "").strip()
+            if agent_skill_id:
+                selected.add(agent_skill_id)
     return selected
 
 
@@ -356,7 +356,7 @@ def diagnostic_evaluation(
     elif metrics["goal_outcome_count"] < metrics["required_goal_outcome_count"]:
         earliest_boundary = "planner_contract"
     elif metrics["safe_idle"] is False:
-        earliest_boundary = "skill_runtime_or_provider"
+        earliest_boundary = "capability_runtime_or_provider"
     elif errors:
         earliest_boundary = "response_or_user_outcome_boundary"
     overall_score = round(sum(axes.values()) / len(axes))
@@ -459,37 +459,37 @@ def validate_live_text_result(
     if forbidden:
         errors.append("speech contained forbidden phrase(s): " + ", ".join(forbidden))
 
-    skills = {
-        str(item.get("capability_id") or item.get("skill_id") or "")
-        for item in _skill_items(summary)
+    capabilities = {
+        str(item.get("capability_id") or "")
+        for item in _capability_items(summary)
     }
-    task_skills = sorted(
-        set(_task_skill_ids(
+    task_capabilities = sorted(
+        set(_task_capability_ids(
             summary,
             allow_expressive_cues=case.allow_expressive_cues,
         ))
     )
-    if case.expect_no_skills and task_skills:
+    if case.expect_no_capabilities and task_capabilities:
         errors.append(
-            "interaction emitted Soridormi task skills, expected none: "
-            + ", ".join(task_skills)
+            "interaction emitted Soridormi task capabilities, expected none: "
+            + ", ".join(task_capabilities)
         )
-    bad_skills = sorted(skills & set(case.forbidden_skills))
-    if bad_skills:
-        errors.append("forbidden skills emitted: " + ", ".join(bad_skills))
+    bad_capabilities = sorted(capabilities & set(case.forbidden_capabilities))
+    if bad_capabilities:
+        errors.append("forbidden capabilities emitted: " + ", ".join(bad_capabilities))
 
     expected_observations = [dict(item) for item in case.expected_observations]
-    if not expected_observations and case.expected_skills:
+    if not expected_observations and case.expected_capabilities:
         expected_arg_by_index: dict[int, dict[str, Any]] = {}
         for index, key, value in case.expected_args:
             expected_arg_by_index.setdefault(index, {})[key] = value
         expected_observations = [
             {
-                "type": observation_type_for_skill(skill_id, behavior_map),
+                "type": observation_type_for_capability(capability_id, behavior_map),
                 "args": expected_arg_by_index.get(index, {}),
                 "min_occurrences": 1,
             }
-            for index, skill_id in enumerate(case.expected_skills)
+            for index, capability_id in enumerate(case.expected_capabilities)
         ]
     if not bool(summary.get("preview_only")):
         for expected in expected_observations:
@@ -638,15 +638,15 @@ def _text_scenario_case(
         expected_routes=_tuple_of_strings(
             raw.get("expected_routes", raw.get("expected_route"))
         ),
-        expected_skills=_tuple_of_strings(
-            raw.get("expected_skills", raw.get("expect_skill"))
+        expected_capabilities=_tuple_of_strings(
+            raw.get("expected_capabilities", raw.get("expect_capability"))
         ),
         expected_args=expected_args,
-        expect_no_skills=bool(raw.get("expect_no_skills", False)),
+        expect_no_capabilities=bool(raw.get("expect_no_capabilities", False)),
         expected_speech_all=_tuple_of_strings(raw.get("expected_speech_all")),
         expected_speech_any=_tuple_of_strings(raw.get("expected_speech_any")),
         forbidden_speech_any=_tuple_of_strings(raw.get("forbidden_speech_any")),
-        forbidden_skills=_tuple_of_strings(raw.get("forbidden_skills")),
+        forbidden_capabilities=_tuple_of_strings(raw.get("forbidden_capabilities")),
         allow_expressive_cues=bool(raw.get("allow_expressive_cues", True)),
         require_speech=bool(raw.get("require_speech", True)),
         require_fast_speech=bool(raw.get("require_fast_speech", False)),
@@ -1070,16 +1070,16 @@ def _live_case_namespace(
         grant_confirmation=args.grant_confirmation,
         require_speech=case.require_speech,
         expect_route=expected_route if args.assertion_scope == "full" else None,
-        expect_no_skills=case.expect_no_skills and not case.allow_expressive_cues,
-        expect_skill=list(case.expected_skills) if args.assertion_scope == "full" else [],
+        expect_no_capabilities=case.expect_no_capabilities and not case.allow_expressive_cues,
+        expect_capability=list(case.expected_capabilities) if args.assertion_scope == "full" else [],
         expect_arg=list(case.expected_args) if args.assertion_scope == "full" else [],
         arg_tolerance=args.arg_tolerance,
         timeout_s=args.timeout_s,
         interrupt_text="",
-        interrupt_skill_prefix="soridormi.",
+        interrupt_capability_prefix="soridormi.",
         interrupt_start_timeout_s=30.0,
         expect_cancelled=False,
-        skill_timeout_s=args.skill_timeout_s,
+        capability_timeout_s=args.capability_timeout_s,
         reject_internal_speech=True,
         reject_speech_pattern=[],
         cognitive_runtime=args.goal_driven_runtime == "apply",
@@ -1510,7 +1510,7 @@ def build_parser() -> argparse.ArgumentParser:
             "implementation-path expectations."
         ),
     )
-    parser.add_argument("--execute", action="store_true", help="Execute live text skills through Soridormi/MuJoCo.")
+    parser.add_argument("--execute", action="store_true", help="Execute live text capabilities through Soridormi/MuJoCo.")
     parser.add_argument("--speaker", action="store_true", help="Play TTS for live text runs. Default is headless.")
     parser.add_argument("--allow-non-sim", action="store_true", help="Permit non-sim Soridormi mode under separate supervision.")
     parser.add_argument(
@@ -1533,7 +1533,7 @@ def build_parser() -> argparse.ArgumentParser:
             "being validated."
         ),
     )
-    parser.add_argument("--skill-timeout-s", type=float, default=120.0)
+    parser.add_argument("--capability-timeout-s", type=float, default=120.0)
     parser.add_argument(
         "--case-timeout-s",
         type=float,

@@ -57,7 +57,7 @@
       "steps": [
         {
           "step_id": "blink-first",
-          "skill_id": "soridormi.blink_eyes",
+          "capability_id": "soridormi.blink_eyes",
           "args": {
             "count": 2
           },
@@ -68,7 +68,7 @@
         },
         {
           "step_id": "blink-second",
-          "skill_id": "soridormi.blink_eyes",
+          "capability_id": "soridormi.blink_eyes",
           "args": {
             "count": 1
           },
@@ -107,7 +107,7 @@
     },
     "capabilities": [
       {
-        "skill_id": "soridormi.blink_eyes",
+        "capability_id": "soridormi.blink_eyes",
         "provider_id": "soridormi.mcp",
         "input_schema": {
           "type": "object",

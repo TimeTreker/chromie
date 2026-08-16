@@ -7,9 +7,9 @@ from pydantic import ValidationError
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
-    SkillRequest,
-    SkillResult,
-    SkillTrace,
+    CapabilityRequest,
+    CapabilityResult,
+    CapabilityTrace,
     output_schema_declaration_error,
     output_schema_sha256,
     validate_output_schema_declaration,
@@ -21,10 +21,10 @@ class InteractionContractTests(unittest.TestCase):
         response = InteractionResponse(
             interaction_id="  turn-1  ",
             speech=[{"id": "  speech-1  ", "text": "Hello."}],
-            skills=[
+            capabilities=[
                 {
                     "request_id": "skill-1",
-                    "skill_id": "chromie.test",
+                    "capability_id": "chromie.test",
                 }
             ],
         )
@@ -35,10 +35,10 @@ class InteractionContractTests(unittest.TestCase):
             InteractionResponse(
                 interaction_id="turn-duplicate",
                 speech=[{"id": "same", "text": "Hello."}],
-                skills=[
+                capabilities=[
                     {
                         "request_id": "same",
-                        "skill_id": "chromie.test",
+                        "capability_id": "chromie.test",
                     }
                 ],
             )
@@ -50,11 +50,11 @@ class InteractionContractTests(unittest.TestCase):
     def test_interaction_response_round_trip_supports_speech_and_skill(self) -> None:
         response = InteractionResponse(
             speech=[{"text": "Hello, nice to see you.", "timing": "immediate"}],
-            skills=[
+            capabilities=[
                 {
                     "request_id": "nod-1",
-                    "skill_id": "soridormi.nod_yes",
-                    "skill_version": "1.0.0",
+                    "capability_id": "soridormi.nod_yes",
+                    "capability_version": "1.0.0",
                     "args": {"count": 2, "amplitude": "small"},
                     "timing": "parallel",
                 }
@@ -64,33 +64,33 @@ class InteractionContractTests(unittest.TestCase):
         restored = InteractionResponse.model_validate_json(response.model_dump_json())
 
         self.assertEqual(restored.speech[0].text, "Hello, nice to see you.")
-        self.assertEqual(restored.skills[0].skill_id, "soridormi.nod_yes")
+        self.assertEqual(restored.capabilities[0].capability_id, "soridormi.nod_yes")
 
-    def test_skill_result_and_trace_round_trip(self) -> None:
-        result = SkillResult(
+    def test_capability_result_and_trace_round_trip(self) -> None:
+        result = CapabilityResult(
             request_id="nod-1",
-            skill_id="soridormi.nod_yes",
+            capability_id="soridormi.nod_yes",
             status="completed",
             provider_id="soridormi.mcp",
             output={"completed": True},
             trace_id="trace-1",
         )
-        trace = SkillTrace(
+        trace = CapabilityTrace(
             trace_id="trace-1",
             interaction_id="interaction-1",
             request_id="nod-1",
-            skill_id="soridormi.nod_yes",
+            capability_id="soridormi.nod_yes",
             provider_id="soridormi.mcp",
             status="completed",
             events=[{"type": "completed"}],
         )
 
         self.assertEqual(
-            SkillResult.model_validate_json(result.model_dump_json()).status,
+            CapabilityResult.model_validate_json(result.model_dump_json()).status,
             "completed",
         )
         self.assertEqual(
-            SkillTrace.model_validate_json(trace.model_dump_json()).events[0].type,
+            CapabilityTrace.model_validate_json(trace.model_dump_json()).events[0].type,
             "completed",
         )
 
@@ -105,7 +105,7 @@ class InteractionContractTests(unittest.TestCase):
         for payload in forbidden_payloads:
             with self.subTest(payload=payload):
                 with self.assertRaisesRegex(ValidationError, "forbidden low-level field"):
-                    SkillRequest(skill_id="soridormi.nod_yes", args=payload)
+                    CapabilityRequest(capability_id="soridormi.nod_yes", args=payload)
 
     def test_low_level_field_name_variants_are_rejected(self) -> None:
         variants = (
@@ -128,9 +128,9 @@ class InteractionContractTests(unittest.TestCase):
                     ValidationError,
                     "forbidden low-level field",
                 ):
-                    SkillResult(
+                    CapabilityResult(
                         request_id="unsafe-result",
-                        skill_id="soridormi.unsafe",
+                        capability_id="soridormi.unsafe",
                         status="completed",
                         output={"nested": {field_name: [0.0]}},
                     )
@@ -144,19 +144,19 @@ class InteractionContractTests(unittest.TestCase):
             "additionalProperties": False,
         }
         digest = output_schema_sha256(schema)
-        request = SkillRequest(
-            skill_id="soridormi.nod_yes",
+        request = CapabilityRequest(
+            capability_id="soridormi.nod_yes",
             committed_output_schema_sha256=digest,
         )
 
-        restored = SkillRequest.model_validate_json(request.model_dump_json())
+        restored = CapabilityRequest.model_validate_json(request.model_dump_json())
 
         self.assertEqual(restored.committed_output_schema_sha256, digest)
         self.assertEqual(len(digest), 64)
         self.assertNotIn("properties", request.model_dump_json())
         with self.assertRaises(ValidationError):
-            SkillRequest(
-                skill_id="soridormi.nod_yes",
+            CapabilityRequest(
+                capability_id="soridormi.nod_yes",
                 committed_output_schema_sha256="not-a-sha256",
             )
 
@@ -212,7 +212,7 @@ class InteractionContractTests(unittest.TestCase):
             InteractionResponse.model_validate(
                 {
                     "speech": [],
-                    "skills": [],
+                    "capabilities": [],
                     "raw_motor_commands": [],
                 }
             )

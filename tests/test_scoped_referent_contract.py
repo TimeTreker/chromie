@@ -20,7 +20,7 @@ def _satisfaction(goal_id: str) -> dict:
     }
 
 
-def _execute_output(*, goal_id: str, skill_id: str, args: dict) -> dict:
+def _execute_output(*, goal_id: str, capability_id: str, args: dict) -> dict:
     return {
         "goal_summary": "Query weather for the resolved location.",
         "goal_outcomes": {
@@ -37,7 +37,7 @@ def _execute_output(*, goal_id: str, skill_id: str, args: dict) -> dict:
         "steps": [
             {
                 "step_id": "weather-read-operation",
-                "skill_id": skill_id,
+                "capability_id": capability_id,
                 "args": args,
                 "timing": "parallel",
                 "source_goal_ids": [goal_id],
@@ -134,7 +134,7 @@ class ScopedReferentPlannerContractTests(unittest.TestCase):
         output = validate_planner_model_output(
             _execute_output(
                 goal_id=self.goal_id,
-                skill_id="chromie.weather.lookup",
+                capability_id="chromie.weather.lookup",
                 args={"location": "重庆", "date": "today"},
             ),
             planner_tier="fast",
@@ -150,7 +150,7 @@ class ScopedReferentPlannerContractTests(unittest.TestCase):
         output = validate_planner_model_output(
             _execute_output(
                 goal_id=self.goal_id,
-                skill_id="chromie.weather.lookup",
+                capability_id="chromie.weather.lookup",
                 args={"location": "内乡", "date": "today"},
             ),
             planner_tier="fast",
@@ -165,7 +165,7 @@ class ScopedReferentPlannerContractTests(unittest.TestCase):
         output = validate_planner_model_output(
             _execute_output(
                 goal_id=self.goal_id,
-                skill_id="chromie.memory.retrieve_verified_tool_result",
+                capability_id="chromie.memory.retrieve_verified_tool_result",
                 args={
                     "evidence_id": "evidence-chongqing",
                     "tool_id": "chromie.weather.lookup",

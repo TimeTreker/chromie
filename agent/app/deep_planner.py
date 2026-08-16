@@ -42,7 +42,7 @@ from .planner_contract import (
     coordinated_action_goal_ids,
     expected_goal_ids,
     goal_association_prompt_projection,
-    is_planner_step_skill,
+    is_planner_step_capability,
     materialize_goal_outcomes,
     materialize_planner_metadata,
     normalize_schema_default_parameter_provenance,
@@ -146,14 +146,14 @@ class DeepPlannerResolver:
             for item in capabilities
             if item.available
             and item.interaction_executable
-            and is_planner_step_skill(item.capability_id)
+            and is_planner_step_capability(item.capability_id)
         ]
         if response_only:
             executable = []
         payload = [self._capability_payload(item) for item in executable[: self.max_capabilities]]
         response_schema = self._response_schema(
             expected_goal_ids_for_turn,
-            allowed_skill_ids=[item["capability_id"] for item in payload],
+            allowed_capability_ids=[item["capability_id"] for item in payload],
             capability_input_schemas={
                 item["capability_id"]: item["input_schema"] for item in payload
             },
@@ -535,7 +535,7 @@ class DeepPlannerResolver:
                 request,
                 "deep_planner_semantic_validation_rejected",
                 unresolved=[
-                    item.get("step_id") or item.get("skill_id") or item["type"] for item in errors
+                    item.get("step_id") or item.get("capability_id") or item["type"] for item in errors
                 ],
                 metadata={
                     "validation_feedback": errors,
@@ -766,7 +766,7 @@ class DeepPlannerResolver:
         cls,
         expected_goal_ids: list[str],
         *,
-        allowed_skill_ids: list[str] | None = None,
+        allowed_capability_ids: list[str] | None = None,
         capability_input_schemas: dict[str, dict[str, Any]] | None = None,
         response_only: bool = False,
         requires_execution: bool = False,
@@ -777,7 +777,7 @@ class DeepPlannerResolver:
         return canonical_plan_response_schema(
             planner_tier="deep",
             expected_goal_ids=expected_goal_ids,
-            allowed_skill_ids=list(allowed_skill_ids or []),
+            allowed_capability_ids=list(allowed_capability_ids or []),
             capability_input_schemas=capability_input_schemas,
             response_only=response_only,
             requires_execution=requires_execution,
@@ -1113,18 +1113,18 @@ class DeepPlannerResolver:
         ]
         if len(parallel_fast) < 2:
             return
-        expected_skills = sorted(
-            str(item.get("capability_id") or item.get("skill_id") or "").strip()
+        expected_capabilities = sorted(
+            str(item.get("capability_id") or "").strip()
             for item in parallel_fast
-            if str(item.get("capability_id") or item.get("skill_id") or "").strip()
+            if str(item.get("capability_id") or "").strip()
         )
-        actual_skills = sorted(
-            str(item.get("capability_id") or item.get("skill_id") or "").strip()
+        actual_capabilities = sorted(
+            str(item.get("capability_id") or "").strip()
             for item in raw_steps
             if isinstance(item, dict)
-            and str(item.get("capability_id") or item.get("skill_id") or "").strip()
+            and str(item.get("capability_id") or "").strip()
         )
-        if expected_skills != actual_skills:
+        if expected_capabilities != actual_capabilities:
             return
         # Missing timing was rejected above.  Keep the Fast-plan comparison so
         # this boundary remains the owner for future exact replacement checks.
@@ -1177,7 +1177,7 @@ class DeepPlannerResolver:
         response_only, requires_execution = planner_goal_execution_requirements(grounding)
         goal_execution_contract = (
             "The canonical Goals are provider-free direct speech responsibilities. "
-            "This plan is response-only: do not select executable skills or plan steps. "
+            "This plan is response-only: do not select executable capabilities or plan steps. "
             if response_only
             else (
                 "At least one canonical Goal requires provider/effect evidence. The Plan "
@@ -1300,7 +1300,7 @@ class DeepPlannerResolver:
         def retain(value: Any) -> None:
             if isinstance(value, dict):
                 capability_id = str(
-                    value.get("capability_id") or value.get("skill_id") or ""
+                    value.get("capability_id") or ""
                 ).strip()
                 if capability_id and capability_id not in referenced_ids:
                     referenced_ids.append(capability_id)

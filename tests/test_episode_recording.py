@@ -6,8 +6,8 @@ import unittest
 from pathlib import Path
 
 from orchestrator.runtime.episode import EpisodeRecorder, EpisodeRecord
-from orchestrator.runtime.skill_runtime import SkillRuntimeResult
-from shared.chromie_contracts.interaction import InteractionResponse, SkillResult
+from orchestrator.runtime.capability_runtime import CapabilityRuntimeResult
+from shared.chromie_contracts.interaction import InteractionResponse, CapabilityResult
 from shared.chromie_contracts.mind import default_mind_profile
 
 
@@ -64,22 +64,22 @@ class EpisodeRecorderTests(unittest.TestCase):
                     }
                 },
                 speech=[{"text": "Please confirm a safe bounded walking plan."}],
-                skills=[
+                capabilities=[
                     {
                         "request_id": "walk-1",
-                        "skill_id": "soridormi.walk_velocity",
+                        "capability_id": "soridormi.walk_velocity",
                         "args": {"vx_mps": 0.2, "duration_s": 15},
                         "requires_confirmation": True,
                     }
                 ],
             )
-            execution = SkillRuntimeResult(
+            execution = CapabilityRuntimeResult(
                 interaction_id=second.interaction_id,
                 status="completed",
                 results=[
-                    SkillResult(
+                    CapabilityResult(
                         request_id="walk-1",
-                        skill_id="soridormi.walk_velocity",
+                        capability_id="soridormi.walk_velocity",
                         status="completed",
                         provider_id="soridormi.mcp",
                         output={
@@ -116,14 +116,14 @@ class EpisodeRecorderTests(unittest.TestCase):
             self.assertEqual(second_episode.turns[0].user_text, "Hello.")
             self.assertEqual(second_episode.turns[1].agent.speech, ["Please confirm a safe bounded walking plan."])
             self.assertEqual(
-                second_episode.turns[1].agent.selected_skills[0].skill_id,
+                second_episode.turns[1].agent.selected_capabilities[0].capability_id,
                 "soridormi.walk_velocity",
             )
             self.assertEqual(
-                second_episode.turns[1].execution.skill_results[0].status,
+                second_episode.turns[1].execution.capability_results[0].status,
                 "completed",
             )
-            recorded_result = second_episode.turns[1].execution.skill_results[0]
+            recorded_result = second_episode.turns[1].execution.capability_results[0]
             self.assertEqual(recorded_result.provider_id, "soridormi.mcp")
             self.assertEqual(recorded_result.execution_mode, "sim")
             self.assertFalse(recorded_result.no_motion)

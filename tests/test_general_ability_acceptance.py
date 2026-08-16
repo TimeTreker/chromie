@@ -66,7 +66,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         )
         summary = {
             "route": {"route": "tool", "fast_speech": None},
-            "interaction_response": {"speech": [], "skills": []},
+            "interaction_response": {"speech": [], "capabilities": []},
             "preview_only": True,
             "cognitive_runtime": {},
         }
@@ -100,7 +100,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                     "must_not_claim_completion": True,
                 },
             },
-            "interaction_response": {"speech": [], "skills": []},
+            "interaction_response": {"speech": [], "capabilities": []},
             "preview_only": True,
             "cognitive_runtime": {},
         }
@@ -301,7 +301,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             "ga-live-multi_goal_look_then_blink",
         )
         self.assertEqual(args.assertion_scope, "user-outcome")
-        self.assertEqual(namespace.expect_skill, [])
+        self.assertEqual(namespace.expect_capability, [])
         self.assertEqual(
             [item["type"] for item in case.expected_observations],
             ["social_attention.gaze", "social_attention.blink"],
@@ -314,7 +314,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             full_args, case, Path("/tmp/multi-goal-full")
         )
         self.assertEqual(
-            full_namespace.expect_skill,
+            full_namespace.expect_capability,
             ["soridormi.look_at_person", "soridormi.blink_eyes"],
         )
         self.assertEqual(case.expected_terminal_planner_tier, "fast")
@@ -333,9 +333,9 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         summary = {
             "route": {"route": "robot_action"},
             "interaction_response": {
-                "skills": [
+                "capabilities": [
                     {
-                        "skill_id": "soridormi.blink_eyes",
+                        "capability_id": "soridormi.blink_eyes",
                         "metadata": {},
                     }
                 ],
@@ -374,16 +374,16 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         summary = {
             "route": {"route": "chat"},
             "interaction_response": {
-                "skills": [
+                "capabilities": [
                     {
                         "request_id": "look",
-                        "skill_id": "soridormi.look_at_person",
+                        "capability_id": "soridormi.look_at_person",
                         "args": {"duration_s": 2.0},
                         "metadata": {"source_goal_ids": ["goal-look"]},
                     },
                     {
                         "request_id": "blink",
-                        "skill_id": "soridormi.blink_eyes",
+                        "capability_id": "soridormi.blink_eyes",
                         "args": {"count": 2},
                         "metadata": {"source_goal_ids": ["goal-blink"]},
                     },
@@ -423,16 +423,16 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         summary = {
             "route": {"route": "robot_action"},
             "interaction_response": {
-                "skills": [
+                "capabilities": [
                     {
                         "request_id": "look",
-                        "skill_id": "soridormi.look_at_person",
+                        "capability_id": "soridormi.look_at_person",
                         "args": {"duration_s": 2.0},
                         "metadata": {"source_goal_ids": ["goal-look"]},
                     },
                     {
                         "request_id": "blink",
-                        "skill_id": "soridormi.blink_eyes",
+                        "capability_id": "soridormi.blink_eyes",
                         "args": {"count": 2},
                         "metadata": {"source_goal_ids": ["goal-blink"]},
                     },
@@ -463,7 +463,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         case = ability.live_text_cases[0].case
         summary = {
             "route": {"route": "robot_action"},
-            "interaction_response": {"skills": [], "speech": [{"text": "Done."}]},
+            "interaction_response": {"capabilities": [], "speech": [{"text": "Done."}]},
             "session_state": {
                 "workflow_events": [
                     {
@@ -497,7 +497,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             "preview_only": True,
             "route": {"route": "robot_action"},
             "interaction_response": {
-                "skills": [
+                "capabilities": [
                     {
                         "request_id": "walk",
                         "capability_id": "soridormi.walk_forward",
@@ -542,7 +542,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             "preview_only": True,
             "route": {"route": "robot_action"},
             "interaction_response": {
-                "skills": [],
+                "capabilities": [],
                 "speech": [{"text": "I could not complete that."}],
             },
             "cognitive_runtime": {
@@ -586,7 +586,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                 "preview_only": True,
                 "route": {"route": "chat"},
                 "interaction_response": {
-                    "skills": [],
+                    "capabilities": [],
                     "speech": [{"text": "ok"}],
                 },
                 "cognitive_runtime": {
@@ -601,7 +601,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                 "preview_only": True,
                 "route": {"route": "chat"},
                 "interaction_response": {
-                    "skills": [],
+                    "capabilities": [],
                     "speech": [{"text": "ok"}],
                 },
                 "cognitive_runtime": {

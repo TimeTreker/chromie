@@ -1063,14 +1063,14 @@ async def run_interaction(request: AgentRunRequest) -> InteractionResponse:
     elapsed_ms = (time.perf_counter() - start) * 1000.0
     response.metadata["runtime_ms"] = round(elapsed_ms, 1)
     logger.info(
-        "interaction sid=%s route=%s intent=%s status=%s output_mode=%s speech=%d skills=%d confirmation=%s ms=%.1f",
+        "interaction sid=%s route=%s intent=%s status=%s output_mode=%s speech=%d capabilities=%d confirmation=%s ms=%.1f",
         request.sid,
         request.route_decision.route,
         request.route_decision.intent,
         response.status,
         response.metadata.get("interaction_output_mode"),
         len(response.speech),
-        len(response.skills),
+        len(response.capabilities),
         response.requires_confirmation,
         elapsed_ms,
     )

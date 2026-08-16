@@ -56,7 +56,7 @@
         }
       },
       "expect": {
-        "skills": ["soridormi.walk_velocity"],
+        "capabilities": ["soridormi.walk_velocity"],
         "requires_confirmation": true,
         "history_contains": ["Where exactly should I move?"],
         "current_task_context_contains": ["small step forward", "forward"]

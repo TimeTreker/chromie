@@ -105,9 +105,9 @@
           {
             "decision": "execute",
             "speech": "好的，我往前走十五秒，同时眨眼睛。",
-            "skills": [
+            "capabilities": [
               {
-                "skill_id": "soridormi.walk_forward",
+                "capability_id": "soridormi.walk_forward",
                 "proposed_args": {
                   "duration_s": 15,
                   "speed": "normal"
@@ -116,7 +116,7 @@
                 "step_id": "walk"
               },
               {
-                "skill_id": "soridormi.blink_eyes",
+                "capability_id": "soridormi.blink_eyes",
                 "proposed_args": {},
                 "timing": "parallel",
                 "step_id": "blink"
@@ -132,9 +132,9 @@
           {
             "decision": "propose_alternative",
             "speech": "我目前不能同时完成这两个动作，但可以先走十五秒，再眨四下眼睛，可以吗？",
-            "skills": [
+            "capabilities": [
               {
-                "skill_id": "soridormi.walk_forward",
+                "capability_id": "soridormi.walk_forward",
                 "proposed_args": {
                   "duration_s": 15,
                   "speed": "normal"
@@ -143,7 +143,7 @@
                 "step_id": "walk"
               },
               {
-                "skill_id": "soridormi.blink_eyes",
+                "capability_id": "soridormi.blink_eyes",
                 "proposed_args": {
                   "count": 4
                 },
@@ -175,7 +175,7 @@
           "缺少必要参数",
           "不能移动"
         ],
-        "skills": [
+        "capabilities": [
           "soridormi.walk_forward",
           "soridormi.blink_eyes"
         ],
@@ -229,9 +229,9 @@
         "ollama_reply": {
           "decision": "execute",
           "speech": "好，我先走十五秒，然后眨四下眼睛。",
-          "skills": [
+          "capabilities": [
             {
-              "skill_id": "soridormi.walk_forward",
+              "capability_id": "soridormi.walk_forward",
               "proposed_args": {
                 "duration_s": 15,
                 "speed": "normal"
@@ -240,7 +240,7 @@
               "step_id": "walk"
             },
             {
-              "skill_id": "soridormi.blink_eyes",
+              "capability_id": "soridormi.blink_eyes",
               "proposed_args": {
                 "count": 4
               },
@@ -265,7 +265,7 @@
           "schema-valid plan",
           "缺少必要参数"
         ],
-        "skills": [
+        "capabilities": [
           "soridormi.walk_forward",
           "soridormi.blink_eyes"
         ],

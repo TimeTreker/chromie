@@ -3,17 +3,15 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Mapping
 from datetime import datetime, timezone
-from typing import Any, Literal, Self, TypeVar
+from typing import Any, Literal, TypeVar
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 InteractionStatus = Literal["ok", "clarify", "refused", "ignored", "error"]
 CapabilityTiming = Literal["parallel", "sequential"]
-SkillTiming = CapabilityTiming
-SpeechTiming = Literal["immediate", "parallel", "sequential", "after_skills"]
+SpeechTiming = Literal["immediate", "parallel", "sequential", "after_capabilities"]
 CapabilityResultStatus = Literal[
     "accepted",
     "running",
@@ -23,7 +21,6 @@ CapabilityResultStatus = Literal[
     "cancelled",
     "timed_out",
 ]
-SkillResultStatus = CapabilityResultStatus
 
 VOCAL_PERFORMANCE_CAPABILITY_ID = "chromie.vocal.perform"
 VOCAL_MODES = (
@@ -685,7 +682,7 @@ def output_schema_sha256(output_schema: dict[str, Any]) -> str:
 def find_raw_controller_array_schema(value: Any, *, path: str = "$") -> str | None:
     """Return the first schema path exposing a raw planar command array.
 
-    Bounded named skills may expose semantic speed or duration parameters.  A
+    Bounded named capabilities may expose semantic speed or duration parameters.  A
     repeated ``commands[]`` surface containing the complete ``vx``/``vy``/``yaw``
     controller vector is different: it lets a model author a low-level motion
     recipe.  Keep that provider compatibility contract callable by trusted
@@ -835,67 +832,12 @@ def validate_output_schema_declaration(schema: Any) -> dict[str, Any]:
     return schema
 
 
-def _normalize_capability_identity_mapping(
-    value: Mapping[str, Any],
-) -> dict[str, Any]:
-    payload = dict(value)
-    has_capability = "capability_id" in payload
-    has_legacy = "skill_id" in payload
-    if not has_capability and not has_legacy:
-        return payload
-
-    capability_id = " ".join(str(payload.get("capability_id") or "").strip().split())
-    legacy_skill_id = " ".join(str(payload.get("skill_id") or "").strip().split())
-    if has_capability and has_legacy and capability_id != legacy_skill_id:
-        raise ValueError("conflicting capability_id and legacy skill_id executable identities")
-    normalized = capability_id or legacy_skill_id
-    if not normalized:
-        raise ValueError("capability_id must not be empty")
-    payload["capability_id"] = normalized
-    payload.pop("skill_id", None)
-    return payload
-
-
-def normalize_capability_identity_payload(value: Any) -> Any:
-    """Normalize one bounded legacy ``skill_id`` input to ``capability_id``.
-
-    New contracts serialize only ``capability_id``.  Historical payloads may
-    still provide ``skill_id`` at declared decode/persistence boundaries.  A
-    payload containing both names is accepted only when the normalized values
-    are identical; contradictory executable identity fails closed.
-    """
-
-    if not isinstance(value, Mapping):
-        return value
-    return _normalize_capability_identity_mapping(value)
-
-
-def _normalize_optional_capability_identity_mapping(
-    value: Mapping[str, Any],
-) -> dict[str, Any]:
-    payload = dict(value)
-    if "capability_id" not in payload and "skill_id" not in payload:
-        return payload
-    capability_id = " ".join(str(payload.get("capability_id") or "").strip().split())
-    legacy_skill_id = " ".join(str(payload.get("skill_id") or "").strip().split())
-    if capability_id and legacy_skill_id and capability_id != legacy_skill_id:
-        raise ValueError("conflicting capability_id and legacy skill_id executable identities")
-    payload["capability_id"] = capability_id or legacy_skill_id or None
-    payload.pop("skill_id", None)
-    return payload
-
-
 class OptionalCapabilityIdentityModel(BaseModel):
-    """Optional canonical executable identity with bounded legacy input support."""
+    """Optional canonical executable capability identity."""
+
+    model_config = ConfigDict(extra="forbid")
 
     capability_id: str | None = None
-
-    @model_validator(mode="before")
-    @classmethod
-    def normalize_legacy_identity(cls, value: Any) -> Any:
-        if not isinstance(value, Mapping):
-            return value
-        return _normalize_optional_capability_identity_mapping(value)
 
     @field_validator("capability_id", mode="before")
     @classmethod
@@ -905,55 +847,18 @@ class OptionalCapabilityIdentityModel(BaseModel):
         normalized = " ".join(str(value).strip().split())
         return normalized or None
 
-    @property
-    def skill_id(self) -> str | None:
-        """Read-only compatibility projection for retained callers."""
-
-        return self.capability_id
-
-    def model_copy(
-        self,
-        *,
-        update: Mapping[str, Any] | None = None,
-        deep: bool = False,
-    ) -> Self:
-        normalized = (
-            _normalize_optional_capability_identity_mapping(update) if update is not None else None
-        )
-        return super().model_copy(update=normalized, deep=deep)
-
 
 class CapabilityIdentityModel(BaseModel):
-    """Canonical executable identity with a bounded legacy read alias."""
+    """Canonical executable capability identity."""
 
     model_config = ConfigDict(extra="forbid")
 
     capability_id: str = Field(min_length=1)
 
-    @model_validator(mode="before")
-    @classmethod
-    def normalize_legacy_identity(cls, value: Any) -> Any:
-        return normalize_capability_identity_payload(value)
-
     @field_validator("capability_id", mode="before")
     @classmethod
     def normalize_capability_id(cls, value: Any) -> Any:
         return " ".join(value.strip().split()) if isinstance(value, str) else value
-
-    @property
-    def skill_id(self) -> str:
-        """Read-only compatibility projection for already-migrating callers."""
-
-        return self.capability_id
-
-    def model_copy(
-        self,
-        *,
-        update: Mapping[str, Any] | None = None,
-        deep: bool = False,
-    ) -> Self:
-        normalized = _normalize_capability_identity_mapping(update) if update is not None else None
-        return super().model_copy(update=normalized, deep=deep)
 
 
 class InteractionSpeech(BaseModel):
@@ -993,8 +898,8 @@ class InteractionSpeech(BaseModel):
 class CapabilityRequest(CapabilityIdentityModel):
     """One exact executable Capability request."""
 
-    request_id: str = Field(default_factory=lambda: f"skillreq_{uuid4().hex[:12]}")
-    skill_version: str | None = None
+    request_id: str = Field(default_factory=lambda: f"capreq_{uuid4().hex[:12]}")
+    capability_version: str | None = None
     args: dict[str, Any] = Field(default_factory=dict)
     timing: CapabilityTiming = "parallel"
     timeout_ms: int | None = Field(default=None, ge=1, le=120000)
@@ -1029,7 +934,7 @@ class CapabilityResult(CapabilityIdentityModel):
     """Terminal or intermediate result for one exact Capability request."""
 
     request_id: str
-    skill_version: str | None = None
+    capability_version: str | None = None
     status: CapabilityResultStatus
     provider_id: str | None = None
     output: dict[str, Any] = Field(default_factory=dict)
@@ -1063,7 +968,7 @@ class CapabilityTraceEvent(BaseModel):
 class CapabilityTrace(CapabilityIdentityModel):
     """Correlated execution trace for one exact Capability request."""
 
-    trace_id: str = Field(default_factory=lambda: f"skilltrace_{uuid4().hex[:12]}")
+    trace_id: str = Field(default_factory=lambda: f"captrace_{uuid4().hex[:12]}")
     interaction_id: str
     request_id: str
     provider_id: str
@@ -1073,22 +978,13 @@ class CapabilityTrace(CapabilityIdentityModel):
     finished_at: datetime | None = None
 
 
-# Bounded source compatibility.  These aliases accept legacy ``skill_id`` input
-# through the canonical models, while all new serialization emits
-# ``capability_id``.
-SkillRequest = CapabilityRequest
-SkillResult = CapabilityResult
-SkillTraceEvent = CapabilityTraceEvent
-SkillTrace = CapabilityTrace
-
-
 class InteractionResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     interaction_id: str = Field(default_factory=lambda: f"interaction_{uuid4().hex[:12]}")
     status: InteractionStatus = "ok"
     speech: list[InteractionSpeech] = Field(default_factory=list)
-    skills: list[CapabilityRequest] = Field(default_factory=list)
+    capabilities: list[CapabilityRequest] = Field(default_factory=list)
     requires_confirmation: bool = False
     reason: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -1108,14 +1004,14 @@ class InteractionResponse(BaseModel):
 
     @model_validator(mode="after")
     def propagate_confirmation_requirement(self) -> "InteractionResponse":
-        if any(request.requires_confirmation for request in self.skills):
+        if any(request.requires_confirmation for request in self.capabilities):
             self.requires_confirmation = True
         execution_ids = [
             *(item.id for item in self.speech),
-            *(item.request_id for item in self.skills),
+            *(item.request_id for item in self.capabilities),
         ]
         if len(execution_ids) != len(set(execution_ids)):
             raise ValueError(
-                "speech ids and skill request_ids must be unique within one interaction"
+                "speech ids and capability request_ids must be unique within one interaction"
             )
         return self

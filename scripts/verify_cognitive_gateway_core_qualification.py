@@ -132,7 +132,7 @@ def _terminal_capabilities(event: dict[str, Any]) -> list[str]:
         return []
     explicit = [
         str(item)
-        for item in (terminal.get("capability_ids") or terminal.get("skill_ids") or [])
+        for item in (terminal.get("capability_ids") or terminal.get("capability_ids") or [])
     ]
     if explicit:
         return explicit
@@ -347,7 +347,7 @@ def _validate_turn(
         terminal_capabilities = _terminal_capabilities(runtime)
         required_capabilities = (
             expectations.get("required_terminal_capabilities")
-            or expectations.get("required_terminal_skills")
+            or expectations.get("required_terminal_capabilities")
             or []
         )
         for capability_id in required_capabilities:
@@ -357,7 +357,7 @@ def _validate_turn(
                 )
         forbidden_capabilities = (
             expectations.get("forbidden_terminal_capabilities")
-            or expectations.get("forbidden_terminal_skills")
+            or expectations.get("forbidden_terminal_capabilities")
             or []
         )
         for capability_id in forbidden_capabilities:
@@ -459,13 +459,13 @@ def _validate_cancellation_summary(
         if isinstance(observation, dict) and isinstance(observation.get("requests"), list)
         else []
     )
-    required_skill = str(expectations.get("required_skill") or "")
+    required_capability = str(expectations.get("required_capability") or "")
     started_requests = [
         item
         for item in requests
         if isinstance(item, dict)
         and item.get("interaction_id") == interaction_id
-        and _evidence_capability_id(item) == required_skill
+        and _evidence_capability_id(item) == required_capability
         and item.get("provider_started") is True
         and item.get("task_done") is False
     ]
@@ -490,7 +490,7 @@ def _validate_cancellation_summary(
         item
         for item in results
         if isinstance(item, dict)
-        and _evidence_capability_id(item) == required_skill
+        and _evidence_capability_id(item) == required_capability
         and item.get("status") == "cancelled"
         and str(item.get("reason_code") or "").startswith("cancelled")
     ]
@@ -794,17 +794,17 @@ def verify(
                 if isinstance(cognitive, dict)
                 else []
             )
-            minimum_skills = int(
-                simulator_expectations.get("minimum_terminal_skill_count") or 0
+            minimum_capabilities = int(
+                simulator_expectations.get("minimum_terminal_capability_count") or 0
             )
-            if len(terminal_capabilities) < minimum_skills:
+            if len(terminal_capabilities) < minimum_capabilities:
                 errors.append(
                     "MuJoCo terminal plan contains "
-                    f"{len(terminal_capabilities)} capabilities; expected at least {minimum_skills}"
+                    f"{len(terminal_capabilities)} capabilities; expected at least {minimum_capabilities}"
                 )
             for capability_id in (
                 simulator_expectations.get("required_terminal_capabilities")
-                or simulator_expectations.get("required_terminal_skills")
+                or simulator_expectations.get("required_terminal_capabilities")
                 or []
             ):
                 if capability_id not in terminal_capabilities:

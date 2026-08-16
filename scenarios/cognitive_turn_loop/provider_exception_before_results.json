@@ -14,7 +14,7 @@
     "provider_exception": "synthetic-provider-secret must never be spoken",
     "capabilities": [
       {
-        "skill_id": "chromie.scenario.provider_first",
+        "capability_id": "chromie.scenario.provider_first",
         "provider_id": "scenario.provider",
         "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
         "output_schema": {
@@ -24,7 +24,7 @@
         }
       },
       {
-        "skill_id": "chromie.scenario.provider_second",
+        "capability_id": "chromie.scenario.provider_second",
         "provider_id": "scenario.provider",
         "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
         "output_schema": {
@@ -45,14 +45,14 @@
       "steps": [
         {
           "step_id": "provider-first",
-          "skill_id": "chromie.scenario.provider_first",
+          "capability_id": "chromie.scenario.provider_first",
           "args": {},
           "timing": "sequential",
           "source_goal_ids": ["goal-provider-first"]
         },
         {
           "step_id": "provider-second",
-          "skill_id": "chromie.scenario.provider_second",
+          "capability_id": "chromie.scenario.provider_second",
           "args": {},
           "timing": "sequential",
           "source_goal_ids": ["goal-provider-second"]
@@ -97,7 +97,7 @@
     "final_speech_only": true,
     "final_speech_count": 2,
     "final_goal_statuses": ["not_run", "not_run"],
-    "final_skill_ids": [],
+    "final_capability_ids": [],
     "runtime_call_count": 2,
     "final_speech_forbid": ["synthetic-provider-secret"]
   }

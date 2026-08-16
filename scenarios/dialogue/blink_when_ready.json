@@ -31,7 +31,7 @@
         }
       },
       "expect": {
-        "skills": ["soridormi.blink_eyes"],
+        "capabilities": ["soridormi.blink_eyes"],
         "requires_confirmation": true
       }
     },

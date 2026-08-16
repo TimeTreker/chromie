@@ -23,7 +23,7 @@
       "expect": {
         "speech_any": ["child is standing", "hold motion"],
         "forbidden_speech_any": ["Moving now", "Executing", "I will step"],
-        "forbidden_skills": ["soridormi.walk_velocity", "soridormi.walk_forward"],
+        "forbidden_capabilities": ["soridormi.walk_velocity", "soridormi.walk_forward"],
         "no_skills": true
       }
     },

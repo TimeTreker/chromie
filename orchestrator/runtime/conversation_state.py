@@ -758,15 +758,15 @@ class ConversationStateManager:
         metadata = context.get("metadata")
         if not isinstance(metadata, dict):
             metadata = {}
-        planned_skills: list[dict[str, Any]] = []
-        raw_planned_skills = metadata.get("planned_skills")
-        if isinstance(raw_planned_skills, list):
-            for item in raw_planned_skills[:8]:
+        planned_capabilities: list[dict[str, Any]] = []
+        raw_planned_capabilities = metadata.get("planned_capabilities")
+        if isinstance(raw_planned_capabilities, list):
+            for item in raw_planned_capabilities[:8]:
                 if not isinstance(item, dict):
                     continue
-                planned_skills.append(
+                planned_capabilities.append(
                     {
-                        "capability_id": str(item.get("capability_id") or item.get("skill_id") or "").strip(),
+                        "capability_id": str(item.get("capability_id") or "").strip(),
                         "request_id": str(item.get("request_id") or "").strip(),
                         "args": self._json_safe(
                             item.get("args") if isinstance(item.get("args"), dict) else {}
@@ -787,7 +787,7 @@ class ConversationStateManager:
             remaining_request_ids = []
         execution_binding = {
             "planning_result": str(metadata.get("planning_result") or "").strip(),
-            "planned_skills": planned_skills,
+            "planned_capabilities": planned_capabilities,
             "request_statuses": {
                 str(key): str(value)
                 for key, value in list(request_statuses.items())[:12]
@@ -796,7 +796,7 @@ class ConversationStateManager:
                 str(item) for item in remaining_request_ids[:12] if str(item).strip()
             ],
             "retryable_safe_read": any(
-                item.get("retryable_safe_read") is True for item in planned_skills
+                item.get("retryable_safe_read") is True for item in planned_capabilities
             ),
             "execution_outcome_status": str(
                 metadata.get("execution_outcome_status") or ""
@@ -2096,7 +2096,7 @@ class ConversationStateManager:
         )
         runtime_dispatch_uncertain = any(
             str(item).startswith(
-                ("skill_runtime:", "skill_runtime_legacy:")
+                ("capability_runtime:", "capability_runtime_legacy:")
             )
             for item in validated.dispatch_failures
         )
@@ -2130,14 +2130,14 @@ class ConversationStateManager:
             metadata: dict[str, Any],
         ) -> dict[str, str]:
             result: dict[str, str] = {}
-            planned = metadata.get("planned_skills")
+            planned = metadata.get("planned_capabilities")
             if not isinstance(planned, list):
                 return result
             for item in planned:
                 if not isinstance(item, dict):
                     continue
                 request_id = str(item.get("request_id") or "").strip()
-                capability_id = str(item.get("capability_id") or item.get("skill_id") or "").strip()
+                capability_id = str(item.get("capability_id") or "").strip()
                 if request_id:
                     result[request_id] = capability_id
             return result
@@ -2281,8 +2281,8 @@ class ConversationStateManager:
                 if output_dispatch_uncertain:
                     speech_requests = {
                         request_id
-                        for request_id, skill_id in skills_by_request.items()
-                        if skill_id == "chromie.speak"
+                        for request_id, capability_id in skills_by_request.items()
+                        if capability_id == "chromie.speak"
                     }
                     affected_speech = speech_requests.intersection(
                         remaining or speech_requests
@@ -3507,7 +3507,7 @@ class ConversationStateManager:
                 request_args = {}
             entry = {
                 "evidence_id": evidence_id,
-                "tool_id": str(raw.get("capability_id") or raw.get("skill_id") or "").strip(),
+                "tool_id": str(raw.get("capability_id") or "").strip(),
                 "status": str(raw.get("status") or "").strip(),
                 "data": self._json_safe(data),
                 "request_args": self._json_safe(request_args),
@@ -3901,7 +3901,7 @@ class ConversationStateManager:
         A clarification remains active and waits for the user.  Refusal and
         unavailability are terminal planning outcomes.  Respond outcomes are
         deliberately left for speech-request evidence, while execute outcomes
-        are left for their goal-scoped SkillRequest evidence.
+        are left for their goal-scoped CapabilityRequest evidence.
         """
 
         changed = False
@@ -3952,7 +3952,7 @@ class ConversationStateManager:
         summary: str,
         request_ids: list[str],
         planning_result: str,
-        planned_skills: list[dict[str, Any]],
+        planned_capabilities: list[dict[str, Any]],
         confirmation_pending: bool,
         interaction_id: str = "",
         turn_id: str = "",
@@ -3976,7 +3976,7 @@ class ConversationStateManager:
             "request_statuses": {},
             "planning_result": planning_result,
             "confirmation_pending": confirmation_pending,
-            "planned_skills": [dict(item) for item in planned_skills],
+            "planned_capabilities": [dict(item) for item in planned_capabilities],
             "interaction_id": str(interaction_id or "").strip(),
             "turn_id": str(turn_id or "").strip(),
             "canonical_plan_id": str(canonical_plan_id or "").strip(),
@@ -4044,14 +4044,14 @@ class ConversationStateManager:
         }
         by_goal: dict[str, list[dict[str, str]]] = {}
         scoped_request_ids: set[str] = set()
-        for raw_request in data.get("skills", []) or data.get("actions", []) or []:
+        for raw_request in data.get("capabilities", []) or data.get("actions", []) or []:
             if isinstance(raw_request, dict):
                 request = raw_request
             else:
                 request = {
                     "request_id": getattr(raw_request, "request_id", None),
                     "capability_id": getattr(raw_request, "capability_id", None),
-                    "skill_id": getattr(raw_request, "skill_id", None),
+                    "capability_id": getattr(raw_request, "capability_id", None),
                     "metadata": getattr(raw_request, "metadata", None),
                 }
             request_id = str(request.get("request_id") or "").strip()
@@ -4062,7 +4062,6 @@ class ConversationStateManager:
                 metadata = {}
             capability_id = str(
                 request.get("capability_id")
-                or request.get("skill_id")
                 or request.get("type")
                 or request.get("target")
                 or "action"
@@ -4388,12 +4387,12 @@ class ConversationStateManager:
                     "request_statuses": dict(statuses),
                     "remaining_request_ids": list(remaining),
                 }
-                planned_skills = context["metadata"].get("planned_skills")
-                speaking_only = bool(planned_skills) and all(
+                planned_capabilities = context["metadata"].get("planned_capabilities")
+                speaking_only = bool(planned_capabilities) and all(
                     isinstance(item, dict)
                     and str(item.get("capability_id") or "") == "chromie.speak"
-                    for item in planned_skills
-                ) if isinstance(planned_skills, list) else False
+                    for item in planned_capabilities
+                ) if isinstance(planned_capabilities, list) else False
                 if task_status == "done" and speaking_only:
                     self._set_goal_responsibility_status(
                         context,
@@ -5055,7 +5054,7 @@ class ConversationStateManager:
             context["plan_status"] = planning_result
             context["open_information_gaps"] = gaps
         elif planning_result in {
-            "direct_skill",
+            "direct_capability",
             "composed_plan",
             "safe_adjustment",
             "alternative_plan",
@@ -5084,11 +5083,11 @@ class ConversationStateManager:
             context["pending_questions"] = (
                 [confirmation_prompt] if confirmation_prompt else []
             )
-            planned_skills = metadata.get("planned_skills")
-            if isinstance(planned_skills, list):
+            planned_capabilities = metadata.get("planned_capabilities")
+            if isinstance(planned_capabilities, list):
                 context["plan_summary"] = {
                     "result": planning_result,
-                    "skills": [item for item in planned_skills if isinstance(item, dict)][:12],
+                    "capabilities": [item for item in planned_capabilities if isinstance(item, dict)][:12],
                 }
             if requires_confirmation:
                 context["confirmation"] = {
@@ -5183,7 +5182,7 @@ class ConversationStateManager:
 
         # A conversational Goal is not complete merely because Response
         # Composer produced text. Bind it to the concrete chromie.speak request
-        # IDs generated from InteractionSpeech so only Skill Runtime evidence
+        # IDs generated from InteractionSpeech so only Capability Runtime evidence
         # can make that Goal terminal. Clarification speech is intentionally not
         # bound: its Goal must remain active while waiting for the user.
         speech_items = [
@@ -5216,7 +5215,7 @@ class ConversationStateManager:
                 summary="chromie.speak",
                 request_ids=request_ids,
                 planning_result="respond",
-                planned_skills=[
+                planned_capabilities=[
                     {
                         "capability_id": "chromie.speak",
                         "request_id": request_id,
@@ -5231,7 +5230,7 @@ class ConversationStateManager:
                 canonical_plan_fingerprint=canonical_plan_fingerprint,
             )
 
-        actions = data.get("actions", []) or data.get("skills", []) or []
+        actions = data.get("actions", []) or data.get("capabilities", []) or []
         primary_actions: list[dict[str, Any]] = []
         for action in actions:
             if isinstance(action, dict):
@@ -5239,7 +5238,7 @@ class ConversationStateManager:
             else:
                 item = {
                     "request_id": getattr(action, "request_id", None),
-                    "capability_id": getattr(action, "capability_id", None) or getattr(action, "skill_id", None),
+                    "capability_id": getattr(action, "capability_id", None) or getattr(action, "capability_id", None),
                     "type": getattr(action, "type", None),
                     "target": getattr(action, "target", None),
                     "metadata": dict(getattr(action, "metadata", {}) or {}),
@@ -5286,12 +5285,12 @@ class ConversationStateManager:
                     if item.get("request_id")
                 ]
                 summaries = [
-                    str(item.get("capability_id") or item.get("skill_id") or item.get("type") or item.get("target") or "action")
+                    str(item.get("capability_id") or item.get("type") or item.get("target") or "action")
                     for item in goal_actions[:3]
                 ]
-                planned_skills = [
+                planned_capabilities = [
                     {
-                        "capability_id": item.get("capability_id") or item.get("skill_id"),
+                        "capability_id": item.get("capability_id"),
                         "request_id": item.get("request_id"),
                         "args": self._json_safe(
                             item.get("args") if isinstance(item.get("args"), dict) else {}
@@ -5316,7 +5315,7 @@ class ConversationStateManager:
                     summary=", ".join(summaries),
                     request_ids=request_ids,
                     planning_result=planning_result,
-                    planned_skills=planned_skills,
+                    planned_capabilities=planned_capabilities,
                     confirmation_pending=confirmation_pending,
                     interaction_id=interaction_id,
                     turn_id=turn_id,
@@ -5331,7 +5330,7 @@ class ConversationStateManager:
                     if item.get("request_id")
                 ]
                 action_summaries = [
-                    str(item.get("capability_id") or item.get("skill_id") or item.get("type") or item.get("target") or "action")
+                    str(item.get("capability_id") or item.get("type") or item.get("target") or "action")
                     for item in unscoped[:3]
                 ]
                 self.record_pending_task(

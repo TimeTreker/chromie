@@ -22,7 +22,7 @@
   "expect": {
     "speech_any": ["hello", "listening"],
     "forbidden_speech_any": ["let me think"],
-    "forbidden_skills": ["soridormi.walk_velocity"],
+    "forbidden_capabilities": ["soridormi.walk_velocity"],
     "no_skills": true
   }
 }

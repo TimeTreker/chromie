@@ -26,9 +26,9 @@ from .social_attention import SocialAttentionPlanner
 from .schema import AgentResult, AgentRunRequest, RouteDecision
 
 try:
-    from chromie_contracts.interaction import InteractionResponse, SkillRequest
+    from chromie_contracts.interaction import InteractionResponse, CapabilityRequest
 except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.interaction import InteractionResponse, SkillRequest
+    from shared.chromie_contracts.interaction import InteractionResponse, CapabilityRequest
 
 logger = logging.getLogger("chromie.agent.runtime")
 
@@ -346,9 +346,9 @@ class InteractionRuntime(_AgentPipeline):
         # the live catalog first, then discover every capability that declares
         # the domain. Explicit IDs remain an operator override for providers that
         # have not yet published domain metadata.
-        if hasattr(catalog, "refresh_live_named_skills"):
+        if hasattr(catalog, "refresh_live_named_capabilities"):
             try:
-                await catalog.refresh_live_named_skills()
+                await catalog.refresh_live_named_capabilities()
             except Exception as exc:  # pragma: no cover - defensive service boundary
                 logger.warning("social attention catalog refresh failed error=%s", exc)
 
@@ -692,23 +692,23 @@ class InteractionRuntime(_AgentPipeline):
         if mode == "report_only":
             result.metadata["social_attention_status"] = "report_only"
             return
-        skills, reasons = self.social_attention_planner.validate_and_materialize(
+        capabilities, reasons = self.social_attention_planner.validate_and_materialize(
             request,
             result,
             plan,
         )
         if reasons:
             result.metadata["social_attention_validation_reasons"] = reasons
-        if not skills:
+        if not capabilities:
             result.metadata["social_attention_status"] = (
                 "not_selected" if plan.decision == "none" else "not_applied"
             )
             return
-        for skill in skills:
-            result.add_skill(skill)
+        for skill in capabilities:
+            result.add_capability(skill)
         result.metadata["social_attention_status"] = "applied"
-        result.metadata["social_attention_capability_ids"] = [skill.capability_id for skill in skills]
+        result.metadata["social_attention_capability_ids"] = [skill.capability_id for skill in capabilities]
         result.trace.append(
             "runtime: applied model-authored social attention "
-            + ",".join(skill.skill_id for skill in skills)
+            + ",".join(skill.capability_id for skill in capabilities)
         )

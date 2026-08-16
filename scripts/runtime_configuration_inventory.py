@@ -218,7 +218,7 @@ def build_inventory(root: Path = ROOT) -> dict:
         "ORCH_COGNITIVE_RUNTIME_MODE",
         "ORCH_ENABLE_AGENT",
         "ORCH_ENABLE_INTERACTION_RESPONSE",
-        "ORCH_ENABLE_SORIDORMI_SKILLS",
+        "ORCH_ENABLE_SORIDORMI_CAPABILITIES",
     }
     for name, spec in sorted(modes.items()):
         if not isinstance(spec, dict):

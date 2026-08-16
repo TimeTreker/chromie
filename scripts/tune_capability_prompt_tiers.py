@@ -49,22 +49,22 @@ def _catalog_by_id(snapshot: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return catalog
 
 
-def _skill_successes(record: dict[str, Any]) -> set[str]:
-    results = record.get("skill_results")
+def _capability_successes(record: dict[str, Any]) -> set[str]:
+    results = record.get("capability_results")
     if not isinstance(results, list):
         status = str(record.get("execution_status") or "").lower()
         if status in FAILURE_STATUSES:
             return set()
-        selected = record.get("selected_skills")
+        selected = record.get("selected_capabilities")
         return {str(skill) for skill in selected or [] if str(skill).strip()}
     successes: set[str] = set()
     for result in results:
         if not isinstance(result, dict):
             continue
-        skill_id = str(result.get("skill_id") or "").strip()
+        capability_id = str(result.get("capability_id") or "").strip()
         status = str(result.get("status") or "").lower()
-        if skill_id and status not in FAILURE_STATUSES:
-            successes.add(skill_id)
+        if capability_id and status not in FAILURE_STATUSES:
+            successes.add(capability_id)
     return successes
 
 
@@ -82,11 +82,11 @@ def build_prompt_tier_overlay(
     for record in experience_records:
         selected = {
             str(skill).strip()
-            for skill in record.get("selected_skills") or []
+            for skill in record.get("selected_capabilities") or []
             if str(skill).strip()
         }
         selected_counts.update(selected)
-        success_counts.update(selected & _skill_successes(record))
+        success_counts.update(selected & _capability_successes(record))
 
     capability_ids = set(catalog) | set(selected_counts)
     prompt_tiers: dict[str, dict[str, Any]] = {}

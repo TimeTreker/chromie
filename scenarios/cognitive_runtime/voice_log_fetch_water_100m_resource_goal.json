@@ -102,7 +102,7 @@
       "steps": [
         {
           "step_id": "fetch-water",
-          "skill_id": "soridormi.acquire_and_deliver_resource",
+          "capability_id": "soridormi.acquire_and_deliver_resource",
           "args": {
             "resource": {
               "kind": "physical_object",
@@ -158,7 +158,7 @@
     },
     "capabilities": [
       {
-        "skill_id": "soridormi.acquire_and_deliver_resource",
+        "capability_id": "soridormi.acquire_and_deliver_resource",
         "provider_id": "soridormi.mcp",
         "input_schema": {
           "type": "object",

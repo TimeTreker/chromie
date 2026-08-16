@@ -9,9 +9,9 @@ from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.cognitive_turn_closure import CognitiveTurnClosure
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.session import SessionTracker
-from orchestrator.runtime.skill_runtime import (
-    SkillDefinition,
-    SkillRuntimeResult,
+from orchestrator.runtime.capability_runtime import (
+    CapabilityDefinition,
+    CapabilityRuntimeResult,
     schema_valid_completion_evidence_policy,
 )
 from shared.chromie_contracts.execution_outcome import (
@@ -20,7 +20,7 @@ from shared.chromie_contracts.execution_outcome import (
 )
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
-    SkillResult,
+    CapabilityResult,
     output_schema_sha256,
 )
 from shared.chromie_contracts.plan import CanonicalPlan
@@ -47,13 +47,13 @@ def _plan() -> CanonicalPlan:
         steps=[
             {
                 "step_id": "step-first",
-                "skill_id": "chromie.test.first",
+                "capability_id": "chromie.test.first",
                 "args": {},
                 "source_goal_ids": ["goal-first"],
             },
             {
                 "step_id": "step-second",
-                "skill_id": "chromie.test.second",
+                "capability_id": "chromie.test.second",
                 "args": {},
                 "source_goal_ids": ["goal-second"],
             },
@@ -87,10 +87,10 @@ def _response(plan: CanonicalPlan) -> InteractionResponse:
     )
     return InteractionResponse(
         interaction_id="interaction-turn-closure",
-        skills=[
+        capabilities=[
             {
                 "request_id": "request-first",
-                "skill_id": "chromie.test.first",
+                "capability_id": "chromie.test.first",
                 "timing": "sequential",
                 "committed_output_schema_sha256": output_schema_sha256(
                     _TEST_OUTPUT_SCHEMA
@@ -106,7 +106,7 @@ def _response(plan: CanonicalPlan) -> InteractionResponse:
             },
             {
                 "request_id": "request-second",
-                "skill_id": "chromie.test.second",
+                "capability_id": "chromie.test.second",
                 "timing": "sequential",
                 "committed_output_schema_sha256": output_schema_sha256(
                     _TEST_OUTPUT_SCHEMA
@@ -145,7 +145,7 @@ class _EvidenceRecorder:
 class _Runtime:
     def __init__(
         self,
-        first_result: SkillRuntimeResult | Exception,
+        first_result: CapabilityRuntimeResult | Exception,
         *,
         on_first_execute=None,
     ) -> None:
@@ -155,15 +155,15 @@ class _Runtime:
         self.session_ids: list[str | None] = []
         self.soridormi_invoker = None
         self._definitions = {
-            skill_id: SkillDefinition(
-                skill_id=skill_id,
+            skill_id: CapabilityDefinition(
+                capability_id=skill_id,
                 provider_id="test.provider",
                 output_schema=_TEST_OUTPUT_SCHEMA,
             )
             for skill_id in ("chromie.test.first", "chromie.test.second")
         }
 
-    def skill_definition(self, skill_id: str) -> SkillDefinition:
+    def capability_definition(self, skill_id: str) -> CapabilityDefinition:
         return self._definitions[skill_id]
 
     async def execute(
@@ -172,7 +172,7 @@ class _Runtime:
         *,
         session_id: str | None,
         confirmed_request_ids: set[str] | None = None,
-    ) -> SkillRuntimeResult:
+    ) -> CapabilityRuntimeResult:
         del confirmed_request_ids
         self.session_ids.append(session_id)
         self.calls.append(response)
@@ -182,13 +182,13 @@ class _Runtime:
             if isinstance(self.first_result, Exception):
                 raise self.first_result
             return self.first_result
-        return SkillRuntimeResult(
+        return CapabilityRuntimeResult(
             interaction_id=response.interaction_id,
             status="completed",
             results=[
-                SkillResult(
+                CapabilityResult(
                     request_id=speech.id,
-                    skill_id="chromie.speak",
+                    capability_id="chromie.speak",
                     status="completed",
                     output={"playback_started": True},
                 )
@@ -200,7 +200,7 @@ class _Runtime:
 class _CancellationAwareRuntime(_Runtime):
     def __init__(self, *, propagate: bool = False) -> None:
         super().__init__(
-            SkillRuntimeResult(
+            CapabilityRuntimeResult(
                 interaction_id="interaction-turn-closure",
                 status="cancelled",
             )
@@ -215,17 +215,17 @@ class _CancellationAwareRuntime(_Runtime):
         *,
         session_id: str | None,
         confirmed_request_ids: set[str] | None = None,
-    ) -> SkillRuntimeResult:
+    ) -> CapabilityRuntimeResult:
         del session_id, confirmed_request_ids
         self.calls.append(response)
         if len(self.calls) > 1:
-            return SkillRuntimeResult(
+            return CapabilityRuntimeResult(
                 interaction_id=response.interaction_id,
                 status="completed",
                 results=[
-                    SkillResult(
+                    CapabilityResult(
                         request_id=speech.id,
-                        skill_id="chromie.speak",
+                        capability_id="chromie.speak",
                         status="completed",
                         output={"playback_started": True},
                     )
@@ -240,13 +240,13 @@ class _CancellationAwareRuntime(_Runtime):
             self.provider_cancel_requested.set()
             if self.propagate:
                 raise
-            return SkillRuntimeResult(
+            return CapabilityRuntimeResult(
                 interaction_id=response.interaction_id,
                 status="cancelled",
                 results=[
-                    SkillResult(
+                    CapabilityResult(
                         request_id="request-first",
-                        skill_id="chromie.test.first",
+                        capability_id="chromie.test.first",
                         provider_id="test.provider",
                         status="cancelled",
                         reason_code="cancelled",
@@ -263,19 +263,19 @@ class _FailingFinalRuntime(_Runtime):
         *,
         session_id: str | None,
         confirmed_request_ids: set[str] | None = None,
-    ) -> SkillRuntimeResult:
+    ) -> CapabilityRuntimeResult:
         del session_id, confirmed_request_ids
         self.calls.append(response)
         if len(self.calls) == 1:
-            assert isinstance(self.first_result, SkillRuntimeResult)
+            assert isinstance(self.first_result, CapabilityRuntimeResult)
             return self.first_result
-        return SkillRuntimeResult(
+        return CapabilityRuntimeResult(
             interaction_id=response.interaction_id,
             status="failed",
             results=[
-                SkillResult(
+                CapabilityResult(
                     request_id=speech.id,
-                    skill_id="chromie.speak",
+                    capability_id="chromie.speak",
                     status="failed",
                     reason_code="playback_failed",
                 )
@@ -347,7 +347,7 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
     def test_runtime_result_interaction_id_mismatch_fails_closed(self) -> None:
         plan = _plan()
         response = _response(plan)
-        execution = SkillRuntimeResult(
+        execution = CapabilityRuntimeResult(
             interaction_id="interaction-from-another-turn",
             status="completed",
         )
@@ -366,20 +366,20 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
     def test_completion_evidence_policy_digest_mismatch_fails_qualification_closed(self) -> None:
         plan = _plan()
         response = _response(plan)
-        execution = SkillRuntimeResult(
+        execution = CapabilityRuntimeResult(
             interaction_id=response.interaction_id,
             status="completed",
             results=[
-                SkillResult(
+                CapabilityResult(
                     request_id="request-first",
-                    skill_id="chromie.test.first",
+                    capability_id="chromie.test.first",
                     provider_id="test.provider",
                     status="completed",
                     output={"user_summary": "first"},
                 ),
-                SkillResult(
+                CapabilityResult(
                     request_id="request-second",
-                    skill_id="chromie.test.second",
+                    capability_id="chromie.test.second",
                     provider_id="test.provider",
                     status="completed",
                     output={"user_summary": "second"},
@@ -387,8 +387,8 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
         runtime = _Runtime(execution)
-        runtime._definitions["chromie.test.first"] = SkillDefinition(
-            skill_id="chromie.test.first",
+        runtime._definitions["chromie.test.first"] = CapabilityDefinition(
+            capability_id="chromie.test.first",
             provider_id="test.provider",
             output_schema=_TEST_OUTPUT_SCHEMA,
             completion_evidence_policy=ClaimQualificationPolicy(
@@ -432,23 +432,23 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
             }
         ]
         response = InteractionResponse.model_validate(raw_response)
-        execution = SkillRuntimeResult(
+        execution = CapabilityRuntimeResult(
             interaction_id=response.interaction_id,
             status="completed",
             results=[
-                SkillResult(
+                CapabilityResult(
                     request_id="speech-pre-action",
-                    skill_id="chromie.speak",
+                    capability_id="chromie.speak",
                     status="completed",
                 ),
-                SkillResult(
+                CapabilityResult(
                     request_id="request-first",
-                    skill_id="chromie.test.first",
+                    capability_id="chromie.test.first",
                     status="completed",
                 ),
-                SkillResult(
+                CapabilityResult(
                     request_id="request-second",
-                    skill_id="chromie.test.second",
+                    capability_id="chromie.test.second",
                     status="completed",
                 ),
             ],
@@ -475,13 +475,13 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
         plan = _plan()
         response = _response(plan)
         runtime = _Runtime(
-            SkillRuntimeResult(
+            CapabilityRuntimeResult(
                 interaction_id=response.interaction_id,
                 status="failed",
                 results=[
-                    SkillResult(
+                    CapabilityResult(
                         request_id="request-first",
-                        skill_id="chromie.test.first",
+                        capability_id="chromie.test.first",
                         provider_id="test.provider",
                         status="completed",
                         output={"user_summary": "The first check passed"},
@@ -500,7 +500,7 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(execution.status, "failed")
         self.assertEqual(len(runtime.calls), 2)
         final_response = runtime.calls[1]
-        self.assertEqual(final_response.skills, [])
+        self.assertEqual(final_response.capabilities, [])
         self.assertEqual(
             [item.metadata["goal_status"] for item in final_response.speech],
             ["completed", "not_run"],
@@ -535,18 +535,18 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
             assistant_ref["assistant"].playback_generation += 1
 
         runtime = _Runtime(
-            SkillRuntimeResult(
+            CapabilityRuntimeResult(
                 interaction_id=response.interaction_id,
                 status="completed",
                 results=[
-                    SkillResult(
+                    CapabilityResult(
                         request_id="request-first",
-                        skill_id="chromie.test.first",
+                        capability_id="chromie.test.first",
                         status="completed",
                     ),
-                    SkillResult(
+                    CapabilityResult(
                         request_id="request-second",
-                        skill_id="chromie.test.second",
+                        capability_id="chromie.test.second",
                         status="completed",
                     ),
                 ],
@@ -589,18 +589,18 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
             asyncio.create_task(finish_newer_turn())
 
         runtime = _Runtime(
-            SkillRuntimeResult(
+            CapabilityRuntimeResult(
                 interaction_id=response.interaction_id,
                 status="completed",
                 results=[
-                    SkillResult(
+                    CapabilityResult(
                         request_id="request-first",
-                        skill_id="chromie.test.first",
+                        capability_id="chromie.test.first",
                         status="completed",
                     ),
-                    SkillResult(
+                    CapabilityResult(
                         request_id="request-second",
-                        skill_id="chromie.test.second",
+                        capability_id="chromie.test.second",
                         status="completed",
                     ),
                 ],
@@ -658,18 +658,18 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
         plan = _plan()
         response = _response(plan)
         runtime = _Runtime(
-            SkillRuntimeResult(
+            CapabilityRuntimeResult(
                 interaction_id=response.interaction_id,
                 status="completed",
                 results=[
-                    SkillResult(
+                    CapabilityResult(
                         request_id="request-first",
-                        skill_id="chromie.test.first",
+                        capability_id="chromie.test.first",
                         status="completed",
                     ),
-                    SkillResult(
+                    CapabilityResult(
                         request_id="request-second",
-                        skill_id="chromie.test.second",
+                        capability_id="chromie.test.second",
                         status="completed",
                     ),
                 ],
@@ -700,18 +700,18 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
         plan = _plan()
         response = _response(plan)
         runtime = _FailingFinalRuntime(
-            SkillRuntimeResult(
+            CapabilityRuntimeResult(
                 interaction_id=response.interaction_id,
                 status="completed",
                 results=[
-                    SkillResult(
+                    CapabilityResult(
                         request_id="request-first",
-                        skill_id="chromie.test.first",
+                        capability_id="chromie.test.first",
                         status="completed",
                     ),
-                    SkillResult(
+                    CapabilityResult(
                         request_id="request-second",
-                        skill_id="chromie.test.second",
+                        capability_id="chromie.test.second",
                         status="completed",
                     ),
                 ],
@@ -743,13 +743,13 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
         plan = _plan()
         response = _response(plan)
         secret_output = "must-not-cross-the-schema-commitment"
-        execution = SkillRuntimeResult(
+        execution = CapabilityRuntimeResult(
             interaction_id=response.interaction_id,
             status="failed",
             results=[
-                SkillResult(
+                CapabilityResult(
                     request_id="request-first",
-                    skill_id="chromie.test.first",
+                    capability_id="chromie.test.first",
                     provider_id="test.provider",
                     status="completed",
                     output={"summary": secret_output},
@@ -757,8 +757,8 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
         runtime = _Runtime(execution)
-        runtime._definitions["chromie.test.first"] = SkillDefinition(
-            skill_id="chromie.test.first",
+        runtime._definitions["chromie.test.first"] = CapabilityDefinition(
+            capability_id="chromie.test.first",
             provider_id="test.provider",
             output_schema={
                 "type": "object",
@@ -792,19 +792,19 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
     def test_missing_output_schema_commitment_fails_closed(self) -> None:
         plan = _plan()
         raw_response = _response(plan).model_dump(mode="json")
-        raw_response["skills"][0].pop(
+        raw_response["capabilities"][0].pop(
             "committed_output_schema_sha256",
             None,
         )
         response = InteractionResponse.model_validate(raw_response)
         secret_output = "legacy-live-schema-output"
-        execution = SkillRuntimeResult(
+        execution = CapabilityRuntimeResult(
             interaction_id=response.interaction_id,
             status="failed",
             results=[
-                SkillResult(
+                CapabilityResult(
                     request_id="request-first",
-                    skill_id="chromie.test.first",
+                    capability_id="chromie.test.first",
                     provider_id="test.provider",
                     status="completed",
                     output={"summary": secret_output},
@@ -832,18 +832,18 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
     def test_empty_committed_provider_schema_fails_closed(self) -> None:
         plan = _plan()
         raw_response = _response(plan).model_dump(mode="json")
-        raw_response["skills"][0][
+        raw_response["capabilities"][0][
             "committed_output_schema_sha256"
         ] = output_schema_sha256({})
         response = InteractionResponse.model_validate(raw_response)
         secret_output = "undeclared-provider-payload"
-        execution = SkillRuntimeResult(
+        execution = CapabilityRuntimeResult(
             interaction_id=response.interaction_id,
             status="failed",
             results=[
-                SkillResult(
+                CapabilityResult(
                     request_id="request-first",
-                    skill_id="chromie.test.first",
+                    capability_id="chromie.test.first",
                     provider_id="test.provider",
                     status="completed",
                     output={"summary": secret_output},
@@ -851,8 +851,8 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
         runtime = _Runtime(execution)
-        runtime._definitions["chromie.test.first"] = SkillDefinition(
-            skill_id="chromie.test.first",
+        runtime._definitions["chromie.test.first"] = CapabilityDefinition(
+            capability_id="chromie.test.first",
             provider_id="test.provider",
             output_schema={},
         )

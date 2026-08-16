@@ -43,7 +43,7 @@
       },
       "expect": {
         "history_contains": ["approved gesture skills"],
-        "skills": ["soridormi.nod_yes"],
+        "capabilities": ["soridormi.nod_yes"],
         "requires_confirmation": true
       }
     }

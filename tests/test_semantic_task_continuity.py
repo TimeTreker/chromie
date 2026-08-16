@@ -202,9 +202,9 @@ class ConversationSemanticTaskTests(unittest.TestCase):
                     "goal_version": 1,
                     "semantic_plan_confirmation_required": True,
                     "confirmation_prompt": "I can bring tea instead. Is that okay?",
-                    "planned_skills": [
+                    "planned_capabilities": [
                         {
-                            "skill_id": "service.prepare_tea",
+                            "capability_id": "service.prepare_tea",
                             "args": {"size": "small"},
                             "timing": "sequential",
                         }

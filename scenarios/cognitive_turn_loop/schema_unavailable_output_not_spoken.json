@@ -14,7 +14,7 @@
     "runtime_status": "completed",
     "capabilities": [
       {
-        "skill_id": "chromie.scenario.schema_less_check",
+        "capability_id": "chromie.scenario.schema_less_check",
         "provider_id": "scenario.schema-less",
         "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
         "output_schema": {"type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"], "additionalProperties": false}
@@ -34,7 +34,7 @@
       "steps": [
         {
           "step_id": "schema-less",
-          "skill_id": "chromie.scenario.schema_less_check",
+          "capability_id": "chromie.scenario.schema_less_check",
           "args": {},
           "timing": "sequential",
           "source_goal_ids": ["goal-schema-less"]
@@ -81,7 +81,7 @@
     "final_speech_only": true,
     "final_speech_count": 1,
     "final_goal_statuses": ["completed"],
-    "final_skill_ids": [],
+    "final_capability_ids": [],
     "runtime_call_count": 2,
     "final_speech_contains_all": ["could not confirm"],
     "final_speech_forbid": ["UNTRUSTED-SCHEMALESS-PAYLOAD", "Done."]

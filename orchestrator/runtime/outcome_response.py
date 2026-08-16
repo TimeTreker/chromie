@@ -209,7 +209,7 @@ def compose_outcome_response(
         interaction_id=bundle.interaction_id,
         status=response_status,
         speech=speech,
-        skills=[],
+        capabilities=[],
         requires_confirmation=False,
         reason=(
             None
@@ -301,7 +301,7 @@ def _validate_correlations(
             raise ValueError(
                 "post-execution evidence references an unknown canonical step"
             )
-        if evidence.skill_id != step.skill_id:
+        if evidence.capability_id != step.capability_id:
             raise ValueError(
                 "post-execution evidence capability does not match canonical step"
             )
@@ -422,14 +422,14 @@ def _internal_identifiers(
         *plan.goal_ids,
     }
     for step in plan.steps:
-        values.update({step.step_id, step.skill_id})
+        values.update({step.step_id, step.capability_id})
     for evidence in bundle.evidence:
         values.update(
             {
                 evidence.evidence_id,
                 evidence.request_id,
                 evidence.step_id,
-                evidence.skill_id,
+                evidence.capability_id,
             }
         )
         for optional in (

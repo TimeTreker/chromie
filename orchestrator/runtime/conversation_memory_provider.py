@@ -6,12 +6,12 @@ from typing import Any
 
 from agent.app.capabilities.loader import build_configured_registry, parse_manifest_paths
 from shared.chromie_contracts.interaction import (
-    SkillRequest,
-    SkillResult,
+    CapabilityRequest,
+    CapabilityResult,
     reject_forbidden_low_level_fields,
 )
 
-from .skill_runtime import SkillDefinition, SkillExecutionContext
+from .capability_runtime import CapabilityDefinition, CapabilityExecutionContext
 
 ConversationMemoryHandler = Callable[[dict[str, Any]], dict[str, Any]]
 
@@ -26,7 +26,7 @@ def _canonical_json_text(value: Any) -> str:
     )
 
 
-class ConversationMemorySkillProvider:
+class ConversationMemoryCapabilityProvider:
     """Host-owned exact retrieval of verified short-term tool evidence."""
 
     provider_id = "chromie.conversation_memory"
@@ -36,10 +36,10 @@ class ConversationMemorySkillProvider:
 
     async def execute(
         self,
-        request: SkillRequest,
-        definition: SkillDefinition,
-        context: SkillExecutionContext,
-    ) -> SkillResult:
+        request: CapabilityRequest,
+        definition: CapabilityDefinition,
+        context: CapabilityExecutionContext,
+    ) -> CapabilityResult:
         retrieved = self._handler(dict(request.args))
         reject_forbidden_low_level_fields(retrieved)
         found = bool(retrieved.get("found"))
@@ -82,10 +82,10 @@ class ConversationMemorySkillProvider:
             ),
             "source": str(retrieved.get("source") or ""),
         }
-        return SkillResult(
+        return CapabilityResult(
             request_id=request.request_id,
-            skill_id=request.skill_id,
-            skill_version=definition.version,
+            capability_id=request.capability_id,
+            capability_version=definition.version,
             status="completed" if found else "failed",
             provider_id=self.provider_id,
             output=output,
@@ -95,18 +95,18 @@ class ConversationMemorySkillProvider:
 
     async def cancel(
         self,
-        request: SkillRequest,
-        definition: SkillDefinition,
-        context: SkillExecutionContext,
+        request: CapabilityRequest,
+        definition: CapabilityDefinition,
+        context: CapabilityExecutionContext,
     ) -> None:
         return None
 
 
 def host_runtime_memory_definitions(
     manifest_paths: str | None = None,
-) -> list[SkillDefinition]:
+) -> list[CapabilityDefinition]:
     configured = build_configured_registry(parse_manifest_paths(manifest_paths or ""))
-    definitions: list[SkillDefinition] = []
+    definitions: list[CapabilityDefinition] = []
     for tool in configured.registry.list_tools():
         manifest = configured.registry.get_agent(tool.agent_id)
         if manifest.transport.kind != "host_runtime":
@@ -120,10 +120,10 @@ def host_runtime_memory_definitions(
         if tool.confirmation.required:
             continue
         definitions.append(
-            SkillDefinition(
-                skill_id=tool.name,
+            CapabilityDefinition(
+                capability_id=tool.name,
                 version=tool.version,
-                provider_id=ConversationMemorySkillProvider.provider_id,
+                provider_id=ConversationMemoryCapabilityProvider.provider_id,
                 description=tool.description,
                 input_schema=dict(tool.input_schema),
                 output_schema=dict(tool.output_schema),
@@ -164,6 +164,6 @@ def _truthy(value: Any) -> bool:
 
 __all__ = [
     "ConversationMemoryHandler",
-    "ConversationMemorySkillProvider",
+    "ConversationMemoryCapabilityProvider",
     "host_runtime_memory_definitions",
 ]

@@ -109,7 +109,7 @@
       "cognition.deep_think"
     ],
     "task_types_forbid": [
-      "task.execute_skill",
+      "task.execute_capability",
       "speech.speak"
     ],
     "metadata_json_contains": [

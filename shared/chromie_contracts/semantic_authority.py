@@ -135,7 +135,7 @@ def semantic_authority_route_matrix() -> list[dict[str, Any]]:
             "entrypoint": "agent./interaction with deprecated exact actions compatibility input",
             "owner": "goal_interpretation_action_adapter",
             "role": "adapter",
-            "planner_path": "schema validation and SkillRequest materialization only",
+            "planner_path": "schema validation and CapabilityRequest materialization only",
             "fallback": "none",
         },
         {

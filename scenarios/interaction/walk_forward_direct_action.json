@@ -30,7 +30,7 @@
   },
   "expect": {
     "forbidden_speech_any": ["let me think"],
-    "skills": ["soridormi.walk_velocity"],
+    "capabilities": ["soridormi.walk_velocity"],
     "requires_confirmation": true
   }
 }

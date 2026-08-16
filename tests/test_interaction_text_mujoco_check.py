@@ -101,7 +101,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         self.assertEqual(route.source, "rules")
         self.assertEqual(route.metadata["cancellation_scope"], "media_output")
         self.assertFalse(response.speech)
-        self.assertFalse(response.skills)
+        self.assertFalse(response.capabilities)
         self.assertTrue(evidence["goal_interpretation_bypassed"])
 
     def test_goal_driven_runtime_is_default_with_explicit_legacy_opt_out(self) -> None:
@@ -120,7 +120,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         )
         self.assertEqual(cancellation.interrupt_text, "Stop.")
         self.assertTrue(cancellation.expect_cancelled)
-        self.assertEqual(cancellation.interrupt_skill_prefix, "soridormi.")
+        self.assertEqual(cancellation.interrupt_capability_prefix, "soridormi.")
 
     def test_endpoint_source_revision_accepts_direct_and_nested_status(self) -> None:
         self.assertEqual(
@@ -353,9 +353,9 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         )
         response = InteractionResponse.model_validate(
             {
-                "skills": [
+                "capabilities": [
                     {
-                        "skill_id": "soridormi.walk_velocity",
+                        "capability_id": "soridormi.walk_velocity",
                         "args": {
                             "vx_mps": 0.2,
                             "vy_mps": 0.0,
@@ -365,12 +365,12 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
                         "timing": "sequential",
                     },
                     {
-                        "skill_id": "soridormi.nod_yes",
+                        "capability_id": "soridormi.nod_yes",
                         "args": {"count": 2},
                         "timing": "sequential",
                     },
                     {
-                        "skill_id": "soridormi.turn_in_place",
+                        "capability_id": "soridormi.turn_in_place",
                         "args": {"yaw_radps": 0.12},
                         "timing": "sequential",
                     },
@@ -382,12 +382,12 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
             route=route,
             response=response,
             expected_route=None,
-            expected_skills=[
+            expected_capabilities=[
                 "soridormi.walk_velocity",
                 "soridormi.nod_yes",
                 "soridormi.turn_in_place",
             ],
-            expect_no_skills=False,
+            expect_no_capabilities=False,
             expected_args=[
                 (0, "vx_mps", 0.2),
                 (0, "duration_s", 10.0),
@@ -412,14 +412,14 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         )
         response = InteractionResponse.model_validate(
             {
-                "skills": [
+                "capabilities": [
                     {
-                        "skill_id": "soridormi.walk_velocity",
+                        "capability_id": "soridormi.walk_velocity",
                         "args": {"vx_mps": 0.2, "duration_s": 10.0},
                         "timing": "sequential",
                     },
                     {
-                        "skill_id": "soridormi.blink_eyes",
+                        "capability_id": "soridormi.blink_eyes",
                         "args": {"count": 2},
                         "timing": "sequential",
                     },
@@ -431,11 +431,11 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
             route=route,
             response=response,
             expected_route=None,
-            expected_skills=[
+            expected_capabilities=[
                 "soridormi.walk_velocity",
                 "soridormi.blink_eyes",
             ],
-            expect_no_skills=False,
+            expect_no_capabilities=False,
             expected_args=[
                 (0, "vx_mps", 0.2),
                 (1, "count", 2),
@@ -458,9 +458,9 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         )
         response = InteractionResponse.model_validate(
             {
-                "skills": [
+                "capabilities": [
                     {
-                        "skill_id": "chromie.weather.lookup",
+                        "capability_id": "chromie.weather.lookup",
                         "args": {
                             "location": "chongqing",
                             "period": "tonight",
@@ -475,8 +475,8 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
             route=route,
             response=response,
             expected_route="tool",
-            expected_skills=["chromie.weather.lookup"],
-            expect_no_skills=False,
+            expected_capabilities=["chromie.weather.lookup"],
+            expect_no_capabilities=False,
             expected_args=[
                 (0, "location", "chongqing"),
                 (0, "period", "tonight"),
@@ -533,9 +533,9 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         )
         response = InteractionResponse.model_validate(
             {
-                "skills": [
+                "capabilities": [
                     {
-                        "skill_id": "soridormi.blink_eyes",
+                        "capability_id": "soridormi.blink_eyes",
                         "args": {"count": 2},
                         "timing": "sequential",
                     }
@@ -565,7 +565,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
                 "1:deep_thought:cognition.deep_think priority=normal",
             ],
         )
-        self.assertEqual(summary["skills"], ["soridormi.blink_eyes"])
+        self.assertEqual(summary["capabilities"], ["soridormi.blink_eyes"])
         self.assertEqual(summary["speech_items"], 1)
         self.assertEqual(len(summary["errors"]), 1)
 
@@ -585,15 +585,15 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
             route=route,
             response=response,
             expected_route=None,
-            expected_skills=["soridormi.walk_velocity"],
-            expect_no_skills=False,
+            expected_capabilities=["soridormi.walk_velocity"],
+            expect_no_capabilities=False,
             expected_args=[(0, "vx_mps", 0.2)],
             arg_tolerance=1e-6,
         )
 
         self.assertGreaterEqual(len(errors), 3)
         self.assertTrue(any("route=" in item for item in errors))
-        self.assertTrue(any("interaction skills mismatch" in item for item in errors))
+        self.assertTrue(any("interaction capabilities mismatch" in item for item in errors))
 
     def test_validate_contract_accepts_chat_without_soridormi_skills(self) -> None:
         route = RouteDecision.model_validate(
@@ -613,8 +613,8 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
             route=route,
             response=response,
             expected_route="chat",
-            expected_skills=[],
-            expect_no_skills=True,
+            expected_capabilities=[],
+            expect_no_capabilities=True,
             expected_args=[],
             arg_tolerance=1e-6,
         )
@@ -736,11 +736,11 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
                 "skipped_tts": 0,
                 "workflow_events": [
                     {
-                        "event": "skill_result",
+                        "event": "capability_result",
                         "severity": "error",
                         "message": (
-                            "skill_result: request_id=speech-1 "
-                            "skill_id=chromie.speak status=failed "
+                            "capability_result: request_id=speech-1 "
+                            "capability_id=chromie.speak status=failed "
                             "reason=playback_not_started"
                         ),
                     }
@@ -768,14 +768,14 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
     def test_apply_soridormi_timeout_sets_request_timeouts(self) -> None:
         response = InteractionResponse.model_validate(
             {
-                "skills": [
+                "capabilities": [
                     {
-                        "skill_id": "soridormi.walk_velocity",
+                        "capability_id": "soridormi.walk_velocity",
                         "args": {"vx_mps": 0.2, "duration_s": 10.0},
                         "timing": "sequential",
                     },
                     {
-                        "skill_id": "chromie.unrelated",
+                        "capability_id": "chromie.unrelated",
                         "args": {},
                         "timing": "sequential",
                         "timeout_ms": 1000,
@@ -786,36 +786,36 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
 
         updated = _apply_soridormi_skill_timeout(response, 120.0)
 
-        self.assertEqual(updated.skills[0].timeout_ms, 120000)
-        self.assertEqual(updated.skills[1].timeout_ms, 1000)
+        self.assertEqual(updated.capabilities[0].timeout_ms, 120000)
+        self.assertEqual(updated.capabilities[1].timeout_ms, 1000)
 
 
 class ProviderStartObservationTests(unittest.IsolatedAsyncioTestCase):
-    async def test_skill_runtime_empty_execution_observation_is_bounded(self) -> None:
-        from orchestrator.runtime.skill_runtime import SkillRegistry, SkillRuntime
+    async def test_capability_runtime_empty_execution_observation_is_bounded(self) -> None:
+        from orchestrator.runtime.capability_runtime import CapabilityRegistry, CapabilityRuntime
 
-        observation = await SkillRuntime(SkillRegistry()).execution_observation()
+        observation = await CapabilityRuntime(CapabilityRegistry()).execution_observation()
         self.assertEqual(observation.open_interaction_ids, [])
         self.assertEqual(observation.executing_interaction_ids, [])
         self.assertEqual(observation.requests, [])
 
     async def test_wait_for_provider_started_returns_bound_observation(self) -> None:
-        from orchestrator.runtime.skill_runtime import (
-            SkillRuntimeExecutionObservation,
-            SkillRuntimeRequestObservation,
+        from orchestrator.runtime.capability_runtime import (
+            CapabilityRuntimeExecutionObservation,
+            CapabilityRuntimeRequestObservation,
         )
 
         class Runtime:
             async def execution_observation(self):
-                return SkillRuntimeExecutionObservation(
+                return CapabilityRuntimeExecutionObservation(
                     captured_at="2026-07-27T00:00:00+00:00",
                     open_interaction_ids=["interaction-1"],
                     executing_interaction_ids=["interaction-1"],
                     requests=[
-                        SkillRuntimeRequestObservation(
+                        CapabilityRuntimeRequestObservation(
                             interaction_id="interaction-1",
                             request_id="request-1",
-                            skill_id="soridormi.walk_velocity",
+                            capability_id="soridormi.walk_velocity",
                             provider_id="soridormi.mcp",
                             source_goal_ids=["goal-1"],
                             provider_started=True,
@@ -836,22 +836,22 @@ class ProviderStartObservationTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_wait_for_provider_started_accepts_runtime_coordinator(self) -> None:
-        from orchestrator.runtime.skill_runtime import (
-            SkillRuntimeExecutionObservation,
-            SkillRuntimeRequestObservation,
+        from orchestrator.runtime.capability_runtime import (
+            CapabilityRuntimeExecutionObservation,
+            CapabilityRuntimeRequestObservation,
         )
 
         class Runtime:
             async def execution_observation(self):
-                return SkillRuntimeExecutionObservation(
+                return CapabilityRuntimeExecutionObservation(
                     captured_at="2026-07-31T00:00:00+00:00",
                     open_interaction_ids=["interaction-1"],
                     executing_interaction_ids=["interaction-1"],
                     requests=[
-                        SkillRuntimeRequestObservation(
+                        CapabilityRuntimeRequestObservation(
                             interaction_id="interaction-1",
                             request_id="request-1",
-                            skill_id="soridormi.walk_velocity",
+                            capability_id="soridormi.walk_velocity",
                             provider_id="soridormi.mcp",
                             source_goal_ids=["goal-1"],
                             provider_started=True,

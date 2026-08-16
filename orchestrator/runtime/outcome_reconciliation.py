@@ -24,9 +24,9 @@ from shared.chromie_contracts.execution_outcome import (
     claim_qualification_policy_sha256,
 )
 from shared.chromie_contracts.interaction import (
-    SkillRequest,
-    SkillResult,
-    SkillTrace,
+    CapabilityRequest,
+    CapabilityResult,
+    CapabilityTrace,
     output_schema_declaration_error,
 )
 from shared.chromie_contracts.plan import CanonicalPlan
@@ -150,15 +150,15 @@ class ExecutionOutcomeReconciler:
         turn_id: str,
         plan: CanonicalPlan,
         interaction_id: str,
-        requests: Iterable[SkillRequest],
-        results: Iterable[SkillResult],
+        requests: Iterable[CapabilityRequest],
+        results: Iterable[CapabilityResult],
         output_schemas: Mapping[str, dict[str, Any]] | None = None,
         completion_evidence_policies: Mapping[
             str, ClaimQualificationPolicy
         ] | None = None,
         completion_evidence_gate_reasons: Mapping[str, str] | None = None,
-        committed_auxiliary_result_skills: Mapping[str, str] | None = None,
-        traces: Iterable[SkillTrace] = (),
+        committed_auxiliary_result_capabilities: Mapping[str, str] | None = None,
+        traces: Iterable[CapabilityTrace] = (),
         provider_postconditions: Iterable[
             ProviderPostconditionEvidence
         ] = (),
@@ -196,8 +196,8 @@ class ExecutionOutcomeReconciler:
             list(results),
             planned_request_ids=planned_request_ids,
             auxiliary_requests=auxiliary_requests,
-            committed_auxiliary_result_skills=(
-                committed_auxiliary_result_skills or {}
+            committed_auxiliary_result_capabilities=(
+                committed_auxiliary_result_capabilities or {}
             ),
         )
         traces_by_request = self._traces_by_request(
@@ -251,13 +251,13 @@ class ExecutionOutcomeReconciler:
                         evidence_id=evidence_id,
                         request_id=request.request_id,
                         step_id=step.step_id,
-                        skill_id=step.skill_id,
+                        capability_id=step.capability_id,
                         source_goal_ids=step.source_goal_ids,
                         status="not_run",
                         completion_qualification=qualification,
-                        reason_code="missing_skill_result",
+                        reason_code="missing_capability_result",
                         message=(
-                            "No terminal SkillResult was returned for the "
+                            "No terminal CapabilityResult was returned for the "
                             "committed request."
                         ),
                         missing_result=True,
@@ -282,17 +282,17 @@ class ExecutionOutcomeReconciler:
                     )
                 )
                 continue
-            if result.skill_id != request.skill_id:
+            if result.capability_id != request.capability_id:
                 raise ValueError(
-                    "SkillResult skill_id does not match committed request"
+                    "CapabilityResult capability_id does not match committed request"
                 )
             if (
-                result.skill_version
-                and request.skill_version
-                and result.skill_version != request.skill_version
+                result.capability_version
+                and request.capability_version
+                and result.capability_version != request.capability_version
             ):
                 raise ValueError(
-                    "SkillResult skill_version does not match committed "
+                    "CapabilityResult capability_version does not match committed "
                     "request"
                 )
 
@@ -300,7 +300,7 @@ class ExecutionOutcomeReconciler:
             reason_code = result.reason_code or normalization_reason
             output_schema = schemas.get(
                 request.request_id,
-                schemas.get(step.skill_id),
+                schemas.get(step.capability_id),
             )
             observation = self.build_model_observation(
                 result.output,
@@ -329,24 +329,24 @@ class ExecutionOutcomeReconciler:
             if trace is not None:
                 if trace.interaction_id != normalized_interaction_id:
                     raise ValueError(
-                        "SkillTrace interaction_id does not match outcome "
+                        "CapabilityTrace interaction_id does not match outcome "
                         "interaction"
                     )
-                if trace.skill_id != step.skill_id:
+                if trace.capability_id != step.capability_id:
                     raise ValueError(
-                        "SkillTrace skill_id does not match planned step"
+                        "CapabilityTrace capability_id does not match planned step"
                     )
                 if trace.status != result.status:
                     raise ValueError(
-                        "SkillTrace status does not match SkillResult"
+                        "CapabilityTrace status does not match CapabilityResult"
                     )
                 if provider_id and provider_id != trace.provider_id:
                     raise ValueError(
-                        "SkillTrace provider_id does not match SkillResult"
+                        "CapabilityTrace provider_id does not match CapabilityResult"
                     )
                 if trace_id and trace_id != trace.trace_id:
                     raise ValueError(
-                        "SkillResult trace_id does not match SkillTrace"
+                        "CapabilityResult trace_id does not match CapabilityTrace"
                     )
                 provider_id = provider_id or trace.provider_id
                 trace_id = trace_id or trace.trace_id
@@ -385,7 +385,7 @@ class ExecutionOutcomeReconciler:
                     evidence_id=evidence_id,
                     request_id=request.request_id,
                     step_id=step.step_id,
-                    skill_id=step.skill_id,
+                    capability_id=step.capability_id,
                     source_goal_ids=step.source_goal_ids,
                     status=status,
                     reported_status=result.status,
@@ -400,7 +400,7 @@ class ExecutionOutcomeReconciler:
                     finished_at=finished_at,
                     missing_result=False,
                     metadata={
-                        "correlation": "plan_step_request_and_skill_result",
+                        "correlation": "plan_step_request_and_capability_result",
                         "request_args": dict(request.args),
                         "provider_execution": dict(result.metadata),
                         "reported_provider_completion": (
@@ -902,7 +902,7 @@ class ExecutionOutcomeReconciler:
     @staticmethod
     def _request_timing_matches_step(
         step: Any,
-        request: SkillRequest,
+        request: CapabilityRequest,
     ) -> bool:
         if request.timing == step.timing:
             return True
@@ -925,21 +925,21 @@ class ExecutionOutcomeReconciler:
         plan: CanonicalPlan,
         *,
         fingerprint: str,
-        requests: list[SkillRequest],
+        requests: list[CapabilityRequest],
     ) -> tuple[
-        dict[str, SkillRequest],
-        dict[str, SkillRequest],
+        dict[str, CapabilityRequest],
+        dict[str, CapabilityRequest],
         int,
     ]:
-        by_step: dict[str, SkillRequest] = {}
-        auxiliary_by_request: dict[str, SkillRequest] = {}
+        by_step: dict[str, CapabilityRequest] = {}
+        auxiliary_by_request: dict[str, CapabilityRequest] = {}
         seen_request_ids: set[str] = set()
         ignored = 0
         known_steps = {step.step_id: step for step in plan.steps}
         for request in requests:
             if request.request_id in seen_request_ids:
                 raise ValueError(
-                    "multiple committed SkillRequest values use one request_id"
+                    "multiple committed CapabilityRequest values use one request_id"
                 )
             seen_request_ids.add(request.request_id)
             metadata = request.metadata
@@ -988,9 +988,9 @@ class ExecutionOutcomeReconciler:
                 raise ValueError(
                     "canonical step request references an unknown step"
                 )
-            if request.skill_id != step.skill_id:
+            if request.capability_id != step.capability_id:
                 raise ValueError(
-                    "canonical step request skill_id does not match plan"
+                    "canonical step request capability_id does not match plan"
                 )
             if request.args != step.args:
                 raise ValueError(
@@ -1029,74 +1029,74 @@ class ExecutionOutcomeReconciler:
         ]
         if missing:
             raise ValueError(
-                "canonical plan steps have no committed SkillRequest: "
+                "canonical plan steps have no committed CapabilityRequest: "
                 + ",".join(missing)
             )
         return by_step, auxiliary_by_request, ignored
 
     @staticmethod
     def _results_by_request(
-        results: list[SkillResult],
+        results: list[CapabilityResult],
         *,
         planned_request_ids: set[str],
-        auxiliary_requests: Mapping[str, SkillRequest],
-        committed_auxiliary_result_skills: Mapping[str, str],
-    ) -> tuple[dict[str, SkillResult], int]:
-        by_request: dict[str, SkillResult] = {}
+        auxiliary_requests: Mapping[str, CapabilityRequest],
+        committed_auxiliary_result_capabilities: Mapping[str, str],
+    ) -> tuple[dict[str, CapabilityResult], int]:
+        by_request: dict[str, CapabilityResult] = {}
         ignored_request_ids: set[str] = set()
-        auxiliary_result_skills = {
-            request_id: request.skill_id
+        auxiliary_result_capabilities = {
+            request_id: request.capability_id
             for request_id, request in auxiliary_requests.items()
         }
-        for raw_request_id, raw_skill_id in (
-            committed_auxiliary_result_skills.items()
+        for raw_request_id, raw_capability_id in (
+            committed_auxiliary_result_capabilities.items()
         ):
             request_id = str(raw_request_id or "").strip()
-            skill_id = str(raw_skill_id or "").strip()
-            if not request_id or not skill_id:
+            capability_id = str(raw_capability_id or "").strip()
+            if not request_id or not capability_id:
                 raise ValueError(
                     "committed auxiliary result binding requires request_id "
-                    "and skill_id"
+                    "and capability_id"
                 )
             if (
                 request_id in planned_request_ids
-                or request_id in auxiliary_result_skills
+                or request_id in auxiliary_result_capabilities
             ):
                 raise ValueError(
                     "committed auxiliary result binding collides with a "
-                    "SkillRequest"
+                    "CapabilityRequest"
                 )
-            auxiliary_result_skills[request_id] = skill_id
+            auxiliary_result_capabilities[request_id] = capability_id
         ignored = 0
         for result in results:
             if result.request_id not in planned_request_ids:
                 auxiliary = auxiliary_requests.get(result.request_id)
-                expected_skill_id = auxiliary_result_skills.get(
+                expected_capability_id = auxiliary_result_capabilities.get(
                     result.request_id
                 )
-                if expected_skill_id is None:
+                if expected_capability_id is None:
                     raise ValueError(
-                        "SkillResult has no committed canonical or auxiliary "
-                        f"SkillRequest: {result.request_id}"
+                        "CapabilityResult has no committed canonical or auxiliary "
+                        f"CapabilityRequest: {result.request_id}"
                     )
                 if result.request_id in ignored_request_ids:
                     raise ValueError(
-                        "multiple SkillResult values reference one auxiliary "
+                        "multiple CapabilityResult values reference one auxiliary "
                         "request"
                     )
-                if result.skill_id != expected_skill_id:
+                if result.capability_id != expected_capability_id:
                     raise ValueError(
-                        "auxiliary SkillResult skill_id does not match "
+                        "auxiliary CapabilityResult capability_id does not match "
                         "committed request"
                     )
                 if (
                     auxiliary is not None
-                    and result.skill_version
-                    and auxiliary.skill_version
-                    and result.skill_version != auxiliary.skill_version
+                    and result.capability_version
+                    and auxiliary.capability_version
+                    and result.capability_version != auxiliary.capability_version
                 ):
                     raise ValueError(
-                        "auxiliary SkillResult skill_version does not match "
+                        "auxiliary CapabilityResult capability_version does not match "
                         "committed request"
                     )
                 ignored_request_ids.add(result.request_id)
@@ -1104,24 +1104,24 @@ class ExecutionOutcomeReconciler:
                 continue
             if result.request_id in by_request:
                 raise ValueError(
-                    "multiple SkillResult values reference one request"
+                    "multiple CapabilityResult values reference one request"
                 )
             by_request[result.request_id] = result
         return by_request, ignored
 
     @staticmethod
     def _traces_by_request(
-        traces: list[SkillTrace],
+        traces: list[CapabilityTrace],
         *,
         planned_request_ids: set[str],
-    ) -> dict[str, SkillTrace]:
-        by_request: dict[str, SkillTrace] = {}
+    ) -> dict[str, CapabilityTrace]:
+        by_request: dict[str, CapabilityTrace] = {}
         for trace in traces:
             if trace.request_id not in planned_request_ids:
                 continue
             if trace.request_id in by_request:
                 raise ValueError(
-                    "multiple SkillTrace values reference one request"
+                    "multiple CapabilityTrace values reference one request"
                 )
             by_request[trace.request_id] = trace
         return by_request
@@ -1139,7 +1139,7 @@ class ExecutionOutcomeReconciler:
             "refused",
         }:
             return normalized, None  # type: ignore[return-value]
-        return "failed", "non_terminal_skill_result"
+        return "failed", "non_terminal_capability_result"
 
 
 def build_execution_outcome_bundle(
@@ -1147,15 +1147,15 @@ def build_execution_outcome_bundle(
     turn_id: str,
     plan: CanonicalPlan,
     interaction_id: str,
-    requests: Iterable[SkillRequest],
-    results: Iterable[SkillResult],
+    requests: Iterable[CapabilityRequest],
+    results: Iterable[CapabilityResult],
     output_schemas: Mapping[str, dict[str, Any]] | None = None,
     completion_evidence_policies: Mapping[
         str, ClaimQualificationPolicy
     ] | None = None,
     completion_evidence_gate_reasons: Mapping[str, str] | None = None,
-    committed_auxiliary_result_skills: Mapping[str, str] | None = None,
-    traces: Iterable[SkillTrace] = (),
+    committed_auxiliary_result_capabilities: Mapping[str, str] | None = None,
+    traces: Iterable[CapabilityTrace] = (),
     provider_postconditions: Iterable[
         ProviderPostconditionEvidence
     ] = (),
@@ -1174,8 +1174,8 @@ def build_execution_outcome_bundle(
         output_schemas=output_schemas,
         completion_evidence_policies=completion_evidence_policies,
         completion_evidence_gate_reasons=completion_evidence_gate_reasons,
-        committed_auxiliary_result_skills=(
-            committed_auxiliary_result_skills
+        committed_auxiliary_result_capabilities=(
+            committed_auxiliary_result_capabilities
         ),
         traces=traces,
         provider_postconditions=provider_postconditions,

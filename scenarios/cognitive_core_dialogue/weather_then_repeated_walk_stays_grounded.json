@@ -195,7 +195,7 @@
           }
         ],
         "task_types_forbid": [
-          "task.execute_skill",
+          "task.execute_capability",
           "task.use_tool"
         ],
         "metadata_json_forbid": [
@@ -267,7 +267,7 @@
           }
         ],
         "task_types_forbid": [
-          "task.execute_skill",
+          "task.execute_capability",
           "task.use_tool"
         ],
         "metadata_json_forbid": [

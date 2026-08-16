@@ -9,8 +9,8 @@ from pathlib import Path
 
 from orchestrator.runtime.experience import ExperienceManager
 from orchestrator.runtime.mind import MindManager
-from orchestrator.runtime.skill_runtime import SkillRuntimeResult
-from shared.chromie_contracts.interaction import InteractionResponse, SkillResult
+from orchestrator.runtime.capability_runtime import CapabilityRuntimeResult
+from shared.chromie_contracts.interaction import InteractionResponse, CapabilityResult
 from shared.chromie_contracts.mind import (
     CorePrinciple,
     MindProfile,
@@ -208,21 +208,21 @@ class ExperienceManagerTests(unittest.TestCase):
                         "conversation_id": "local_default",
                     }
                 },
-                skills=[
+                capabilities=[
                     {
                         "request_id": "blink-1",
-                        "skill_id": "soridormi.blink_eyes",
+                        "capability_id": "soridormi.blink_eyes",
                     }
                 ],
                 speech=[{"text": "Blinking my eyes now."}],
             )
-            execution = SkillRuntimeResult(
+            execution = CapabilityRuntimeResult(
                 interaction_id=response.interaction_id,
                 status="completed",
                 results=[
-                    SkillResult(
+                    CapabilityResult(
                         request_id="blink-1",
-                        skill_id="soridormi.blink_eyes",
+                        capability_id="soridormi.blink_eyes",
                         status="completed",
                     )
                 ],
@@ -237,7 +237,7 @@ class ExperienceManagerTests(unittest.TestCase):
 
             self.assertIsNotNone(record)
             self.assertEqual(record.route, "robot_action")
-            self.assertEqual(record.selected_skills, ["soridormi.blink_eyes"])
+            self.assertEqual(record.selected_capabilities, ["soridormi.blink_eyes"])
             self.assertTrue(manager.log_path.exists())
             self.assertFalse(manager.proposal_path.exists())
 
@@ -330,7 +330,7 @@ class ExperienceManagerTests(unittest.TestCase):
                     }
                 ],
             )
-            execution = SkillRuntimeResult(
+            execution = CapabilityRuntimeResult(
                 interaction_id=response.interaction_id,
                 status="completed",
             )
@@ -410,7 +410,7 @@ class ExperienceManagerTests(unittest.TestCase):
                 },
                 speech=[{"text": "Thanks for warning me. I will hold still."}],
             )
-            execution = SkillRuntimeResult(
+            execution = CapabilityRuntimeResult(
                 interaction_id=response.interaction_id,
                 status="completed",
             )

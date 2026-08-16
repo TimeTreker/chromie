@@ -19,9 +19,9 @@ from shared.chromie_contracts.execution_outcome import (
     execution_outcome_fingerprint,
 )
 from shared.chromie_contracts.interaction import (
-    SkillRequest,
-    SkillResult,
-    SkillTrace,
+    CapabilityRequest,
+    CapabilityResult,
+    CapabilityTrace,
 )
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.response_composition import (
@@ -51,7 +51,7 @@ def single_plan() -> CanonicalPlan:
         steps=[
             {
                 "step_id": "lookup",
-                "skill_id": "chromie.weather.lookup",
+                "capability_id": "chromie.weather.lookup",
                 "args": {"city": "Beijing"},
                 "source_goal_ids": ["goal-weather"],
             }
@@ -71,13 +71,13 @@ def two_goal_plan() -> CanonicalPlan:
         steps=[
             {
                 "step_id": "lookup-weather",
-                "skill_id": "chromie.weather.lookup",
+                "capability_id": "chromie.weather.lookup",
                 "args": {"city": "Beijing"},
                 "source_goal_ids": ["goal-weather"],
             },
             {
                 "step_id": "lookup-calendar",
-                "skill_id": "chromie.calendar.lookup",
+                "capability_id": "chromie.calendar.lookup",
                 "args": {},
                 "source_goal_ids": ["goal-calendar"],
             },
@@ -111,7 +111,7 @@ def shared_step_plan() -> CanonicalPlan:
         steps=[
             {
                 "step_id": "shared-observation",
-                "skill_id": "chromie.scene.observe",
+                "capability_id": "chromie.scene.observe",
                 "args": {},
                 "source_goal_ids": ["goal-a", "goal-b"],
             }
@@ -145,7 +145,7 @@ def mixed_plan() -> CanonicalPlan:
         steps=[
             {
                 "step_id": "blink",
-                "skill_id": "soridormi.blink_eyes",
+                "capability_id": "soridormi.blink_eyes",
                 "args": {"count": 2},
                 "source_goal_ids": ["goal-action"],
             }
@@ -172,11 +172,11 @@ def request_for_step(
     step_id: str,
     *,
     request_id: str | None = None,
-) -> SkillRequest:
+) -> CapabilityRequest:
     step = next(item for item in plan.steps if item.step_id == step_id)
-    return SkillRequest(
+    return CapabilityRequest(
         request_id=request_id or f"request-{step_id}",
-        skill_id=step.skill_id,
+        capability_id=step.capability_id,
         args=step.args,
         timing=step.timing,
         metadata={
@@ -254,19 +254,19 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
         request = request_for_step(plan, "lookup")
         started = datetime.now(timezone.utc)
         finished = started + timedelta(milliseconds=20)
-        result = SkillResult(
+        result = CapabilityResult(
             request_id=request.request_id,
-            skill_id=request.skill_id,
+            capability_id=request.capability_id,
             status="completed",
             provider_id="weather.provider",
             output={"summary": "Light rain."},
             trace_id="trace-weather",
         )
-        trace = SkillTrace(
+        trace = CapabilityTrace(
             trace_id="trace-weather",
             interaction_id="interaction-weather",
             request_id=request.request_id,
-            skill_id=request.skill_id,
+            capability_id=request.capability_id,
             provider_id="weather.provider",
             status="completed",
             started_at=started,
@@ -302,9 +302,9 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
     def test_provider_completed_with_schema_invalid_observation_fails_closed(self) -> None:
         plan = single_plan()
         request = request_for_step(plan, "lookup")
-        result = SkillResult(
+        result = CapabilityResult(
             request_id=request.request_id,
-            skill_id=request.skill_id,
+            capability_id=request.capability_id,
             status="completed",
             provider_id="weather.provider",
             output={"summary": "Rain.", "unexpected": True},
@@ -345,9 +345,9 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
             interaction_id="interaction-contract-schema-invalid",
             requests=[request],
             results=[
-                SkillResult(
+                CapabilityResult(
                     request_id=request.request_id,
-                    skill_id=request.skill_id,
+                    capability_id=request.capability_id,
                     status="completed",
                     output={"summary": "Clear."},
                 )
@@ -380,15 +380,15 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
             request_for_step(plan, "lookup-calendar"),
         ]
         results = [
-            SkillResult(
+            CapabilityResult(
                 request_id=requests[0].request_id,
-                skill_id=requests[0].skill_id,
+                capability_id=requests[0].capability_id,
                 status="completed",
                 output={"summary": "Sunny."},
             ),
-            SkillResult(
+            CapabilityResult(
                 request_id=requests[1].request_id,
-                skill_id=requests[1].skill_id,
+                capability_id=requests[1].capability_id,
                 status="failed",
                 reason_code="provider_unavailable",
                 message="Calendar provider unavailable.",
@@ -425,15 +425,15 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
             request_for_step(plan, "lookup-calendar"),
         ]
         results = [
-            SkillResult(
+            CapabilityResult(
                 request_id=requests[0].request_id,
-                skill_id=requests[0].skill_id,
+                capability_id=requests[0].capability_id,
                 status="failed",
                 reason_code="provider_error",
             ),
-            SkillResult(
+            CapabilityResult(
                 request_id=requests[1].request_id,
-                skill_id=requests[1].skill_id,
+                capability_id=requests[1].capability_id,
                 status="timed_out",
                 reason_code="provider_timeout",
             ),
@@ -484,7 +484,7 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
         self.assertEqual(bundle.evidence[0].status, "not_run")
         self.assertEqual(
             bundle.evidence[0].reason_code,
-            "missing_skill_result",
+            "missing_capability_result",
         )
         self.assertEqual(
             bundle.evidence[0].metadata["request_args"],
@@ -495,9 +495,9 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
     def test_shared_step_evidence_can_support_multiple_owned_goals(self) -> None:
         plan = shared_step_plan()
         request = request_for_step(plan, "shared-observation")
-        result = SkillResult(
+        result = CapabilityResult(
             request_id=request.request_id,
-            skill_id=request.skill_id,
+            capability_id=request.capability_id,
             status="completed",
             output={"summary": "One person is present."},
         )
@@ -533,9 +533,9 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
     def test_non_execution_goals_are_retained_but_not_inferred_complete(self) -> None:
         plan = mixed_plan()
         request = request_for_step(plan, "blink")
-        result = SkillResult(
+        result = CapabilityResult(
             request_id=request.request_id,
-            skill_id=request.skill_id,
+            capability_id=request.capability_id,
             status="completed",
         )
 
@@ -563,9 +563,9 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
     def test_auxiliary_social_attention_and_its_result_are_ignored(self) -> None:
         plan = single_plan()
         request = request_for_step(plan, "lookup")
-        social = SkillRequest(
+        social = CapabilityRequest(
             request_id="social-look",
-            skill_id="soridormi.look_at_person",
+            capability_id="soridormi.look_at_person",
             metadata={
                 "source": "social_attention_plan",
                 "auxiliary_social_attention": True,
@@ -573,14 +573,14 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
             },
         )
         results = [
-            SkillResult(
+            CapabilityResult(
                 request_id=request.request_id,
-                skill_id=request.skill_id,
+                capability_id=request.capability_id,
                 status="completed",
             ),
-            SkillResult(
+            CapabilityResult(
                 request_id=social.request_id,
-                skill_id=social.skill_id,
+                capability_id=social.capability_id,
                 status="completed",
             ),
         ]
@@ -608,29 +608,29 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
     ) -> None:
         plan = single_plan()
         request = request_for_step(plan, "lookup")
-        completed = SkillResult(
+        completed = CapabilityResult(
             request_id=request.request_id,
-            skill_id=request.skill_id,
+            capability_id=request.capability_id,
             status="completed",
         )
-        unknown = SkillResult(
+        unknown = CapabilityResult(
             request_id="uncommitted-result",
-            skill_id="soridormi.unplanned_motion",
+            capability_id="soridormi.unplanned_motion",
             status="completed",
         )
-        committed_non_auxiliary = SkillRequest(
+        committed_non_auxiliary = CapabilityRequest(
             request_id="committed-non-auxiliary",
-            skill_id="soridormi.unplanned_motion",
+            capability_id="soridormi.unplanned_motion",
         )
-        non_auxiliary_result = SkillResult(
+        non_auxiliary_result = CapabilityResult(
             request_id=committed_non_auxiliary.request_id,
-            skill_id=committed_non_auxiliary.skill_id,
+            capability_id=committed_non_auxiliary.capability_id,
             status="completed",
         )
 
         with self.assertRaisesRegex(
             ValueError,
-            "no committed canonical or auxiliary SkillRequest",
+            "no committed canonical or auxiliary CapabilityRequest",
         ):
             build_execution_outcome_bundle(
                 turn_id="turn-unknown-result",
@@ -641,7 +641,7 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
             )
         with self.assertRaisesRegex(
             ValueError,
-            "no committed canonical or auxiliary SkillRequest",
+            "no committed canonical or auxiliary CapabilityRequest",
         ):
             build_execution_outcome_bundle(
                 turn_id="turn-non-auxiliary-result",
@@ -651,12 +651,12 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
                 results=[completed, non_auxiliary_result],
             )
 
-    def test_nonterminal_skill_result_fails_closed(self) -> None:
+    def test_nonterminal_capability_result_fails_closed(self) -> None:
         plan = single_plan()
         request = request_for_step(plan, "lookup")
-        result = SkillResult(
+        result = CapabilityResult(
             request_id=request.request_id,
-            skill_id=request.skill_id,
+            capability_id=request.capability_id,
             status="running",
         )
 
@@ -671,7 +671,7 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
         self.assertEqual(bundle.aggregate_status, "failed")
         self.assertEqual(
             bundle.evidence[0].reason_code,
-            "non_terminal_skill_result",
+            "non_terminal_capability_result",
         )
         self.assertEqual(bundle.evidence[0].reported_status, "running")
 
@@ -691,9 +691,9 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
                 }
             ],
         )
-        result = SkillResult(
+        result = CapabilityResult(
             request_id=request.request_id,
-            skill_id=request.skill_id,
+            capability_id=request.capability_id,
             status="completed",
             provider_id="weather.provider",
             output={"summary": "sunny"},
@@ -755,9 +755,9 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
                 }
             ],
         )
-        result = SkillResult(
+        result = CapabilityResult(
             request_id=request.request_id,
-            skill_id=request.skill_id,
+            capability_id=request.capability_id,
             status="completed",
             provider_id="soridormi.mcp",
             output={"completed": True},
@@ -863,9 +863,9 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
                 }
             ],
         )
-        result = SkillResult(
+        result = CapabilityResult(
             request_id=request.request_id,
-            skill_id=request.skill_id,
+            capability_id=request.capability_id,
             status="completed",
             provider_id="same.provider",
             output={"completed": True},
@@ -1026,9 +1026,9 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
 
         plan = single_plan()
         request = request_for_step(plan, "lookup")
-        result = SkillResult(
+        result = CapabilityResult(
             request_id=request.request_id,
-            skill_id=request.skill_id,
+            capability_id=request.capability_id,
             status="completed",
             output={"accessToken": secret},
         )
@@ -1041,7 +1041,7 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
             results=[result],
             output_schemas={
                 request.request_id: schema,
-                request.skill_id: schema,
+                request.capability_id: schema,
             },
         )
         speech = compose_outcome_response(bundle, plan, "en-US")
@@ -1069,9 +1069,9 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
                 }
             },
         )
-        wrong_result = SkillResult(
+        wrong_result = CapabilityResult(
             request_id=request.request_id,
-            skill_id="chromie.weather.other",
+            capability_id="chromie.weather.other",
             status="completed",
         )
 
@@ -1083,7 +1083,7 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
                 requests=[stale_request],
                 results=[],
             )
-        with self.assertRaisesRegex(ValueError, "SkillResult skill_id"):
+        with self.assertRaisesRegex(ValueError, "CapabilityResult capability_id"):
             build_execution_outcome_bundle(
                 turn_id="turn-wrong-result",
                 plan=plan,
@@ -1091,7 +1091,7 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
                 requests=[request],
                 results=[wrong_result],
             )
-        with self.assertRaisesRegex(ValueError, "no committed SkillRequest"):
+        with self.assertRaisesRegex(ValueError, "no committed CapabilityRequest"):
             build_execution_outcome_bundle(
                 turn_id="turn-no-request",
                 plan=plan,

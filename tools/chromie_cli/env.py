@@ -23,7 +23,7 @@ BOOL_VARS = (
     "AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION",
     "ORCH_ENABLE_AGENT",
     "ORCH_ENABLE_INTERACTION_RESPONSE",
-    "ORCH_ENABLE_SORIDORMI_SKILLS",
+    "ORCH_ENABLE_SORIDORMI_CAPABILITIES",
     "ORCH_ENABLE_CONVERSATION_STATE",
     "ORCH_ACTION_DRY_RUN",
     "ORCH_SAVE_AUDIO",
@@ -91,7 +91,7 @@ STATUS_KEYS = (
     "CHROMIE_HARDWARE_PROFILE",
     "ORCH_ENABLE_AGENT",
     "ORCH_ENABLE_INTERACTION_RESPONSE",
-    "ORCH_ENABLE_SORIDORMI_SKILLS",
+    "ORCH_ENABLE_SORIDORMI_CAPABILITIES",
     "ORCH_ACTION_DRY_RUN",
     "AGENT_INTERACTION_OUTPUT_MODE",
     "AGENT_NATIVE_INTERACTION_FALLBACK",
@@ -251,7 +251,7 @@ def load_env(root: Path) -> EnvSnapshot:
 
 def deployment_mode(snapshot: EnvSnapshot) -> str:
     interaction = snapshot.bool_value("ORCH_ENABLE_INTERACTION_RESPONSE")
-    soridormi = snapshot.bool_value("ORCH_ENABLE_SORIDORMI_SKILLS")
+    soridormi = snapshot.bool_value("ORCH_ENABLE_SORIDORMI_CAPABILITIES")
     physical = snapshot.bool_value("AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION")
     if physical:
         return "physical_robot_unsupported"
@@ -323,7 +323,7 @@ def validate_config(snapshot: EnvSnapshot) -> list[Diagnostic]:
     )
 
     interaction = snapshot.bool_value("ORCH_ENABLE_INTERACTION_RESPONSE")
-    soridormi = snapshot.bool_value("ORCH_ENABLE_SORIDORMI_SKILLS")
+    soridormi = snapshot.bool_value("ORCH_ENABLE_SORIDORMI_CAPABILITIES")
     physical = snapshot.bool_value("AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION")
     guarded = snapshot.bool_value("AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION")
 
@@ -332,7 +332,7 @@ def validate_config(snapshot: EnvSnapshot) -> list[Diagnostic]:
             Diagnostic(
                 "failure",
                 "soridormi_requires_interaction",
-                "ORCH_ENABLE_SORIDORMI_SKILLS=1 requires ORCH_ENABLE_INTERACTION_RESPONSE=1",
+                "ORCH_ENABLE_SORIDORMI_CAPABILITIES=1 requires ORCH_ENABLE_INTERACTION_RESPONSE=1",
             )
         )
     if soridormi and not values.get("SORIDORMI_MCP_URL", "").strip():

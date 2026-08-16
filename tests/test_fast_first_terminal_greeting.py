@@ -76,7 +76,7 @@ class FastFirstTerminalGreetingTests(unittest.IsolatedAsyncioTestCase):
                     [item.text for item in response.speech],
                     case["expected_speech"],
                 )
-                self.assertEqual(response.skills, [])
+                self.assertEqual(response.capabilities, [])
                 self.assertIn(case["trace"], response.metadata.get("trace", []))
 
 

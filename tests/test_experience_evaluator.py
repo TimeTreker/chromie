@@ -46,10 +46,10 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
                     agent={
                         "status": "ok",
                         "speech": ["I will turn my head to look at you."],
-                        "selected_skills": [
+                        "selected_capabilities": [
                             {
                                 "request_id": "look-1",
-                                "skill_id": "soridormi.look_at_person",
+                                "capability_id": "soridormi.look_at_person",
                                 "args": {"duration_s": 3},
                                 "timing": "sequential",
                                 "requires_confirmation": True,
@@ -60,10 +60,10 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
                     },
                     execution={
                         "status": "completed",
-                        "skill_results": [
+                        "capability_results": [
                             {
                                 "request_id": "look-1",
-                                "skill_id": "soridormi.look_at_person",
+                                "capability_id": "soridormi.look_at_person",
                                 "status": "completed",
                             }
                         ],
@@ -89,7 +89,7 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
             ],
             "evt_interaction_session_source",
         )
-        forbidden = candidate["turns"][0]["expect"]["forbidden_skills"]
+        forbidden = candidate["turns"][0]["expect"]["forbidden_capabilities"]
         self.assertIn("soridormi.look_at_person", forbidden)
         self.assertIn("soridormi.nod_yes", forbidden)
 
@@ -106,10 +106,10 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
                     agent={
                         "status": "ok",
                         "speech": ["Hello."],
-                        "selected_skills": [
+                        "selected_capabilities": [
                             {
                                 "request_id": "attn-1",
-                                "skill_id": "soridormi.express_attention",
+                                "capability_id": "soridormi.express_attention",
                                 "args": {},
                                 "timing": "parallel",
                                 "requires_confirmation": True,
@@ -151,10 +151,10 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
                     agent={
                         "status": "ok",
                         "speech": ["Okay, I blinked my eyes."],
-                        "selected_skills": [],
+                        "selected_capabilities": [],
                         "requires_confirmation": False,
                     },
-                    execution={"status": "completed", "skill_results": []},
+                    execution={"status": "completed", "capability_results": []},
                 )
             ],
         )
@@ -169,7 +169,7 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
         self.assertTrue(evaluation.candidate_scenario["recommended"])
         candidate = scenario_candidate_from_episode(episode, evaluation)
         expect = candidate["turns"][0]["expect"]
-        self.assertTrue(expect["no_skills"])
+        self.assertTrue(expect["no_capabilities"])
         self.assertIn("眨了", expect["forbidden_speech_any"])
 
     def test_offline_review_writes_owner_review_proposal_for_bad_case(self) -> None:
@@ -185,7 +185,7 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
                     agent={
                         "status": "ok",
                         "speech": ["Okay, I blinked my eyes."],
-                        "selected_skills": [],
+                        "selected_capabilities": [],
                     },
                     execution={"status": "completed"},
                 )

@@ -102,7 +102,7 @@ All risky or incomplete execution paths are default-off.
 |---|---:|---|
 | `ORCH_ENABLE_AGENT` | `1` | Enable the Agent-owned Cognitive Core and downstream runtime. |
 | `ORCH_ENABLE_INTERACTION_RESPONSE` | `1` | Enable strict structured responses. Unified cognitive `apply` requires this; the compatibility `/interaction` surface remains available for explicit diagnostics. |
-| `ORCH_ENABLE_SORIDORMI_SKILLS` | `0` | Allow named Soridormi skills in the structured path. |
+| `ORCH_ENABLE_SORIDORMI_CAPABILITIES` | `0` | Allow named Soridormi skills in the structured path. |
 | `ORCH_FAST_FIRST_RESPONSE_ENABLED` | `1` | Legacy/compatibility low-latency response gate. Maintained cognitive `apply` does not use Goal Interpretation as the wording owner; pre-Goal immediate speech is authored by Fast Planner and scheduled by the Cognitive Runtime. |
 | `ORCH_AGENT_GOAL_INTERPRETER_GENERATED_FAST_SPEECH_ENABLED` | `1` | Legacy compatibility gate for Goal-Interpreter-generated `fast_speech`. In maintained cognitive `apply`, Goal Interpretation emits Responsibility evidence only and this field is structurally `null`; Fast Planner owns any immediate conversational Activity. |
 | `ORCH_FAST_FIRST_AUDIO_ENABLED` | `1` | Enable startup-primed in-memory PCM acknowledgements as a last-resort latency presentation path when dynamic speech is not admissible, absent, invalid, or cannot be scheduled. Cache entries are generic and cannot claim a tool result, memory commit, physical effect, or completion. |
@@ -700,7 +700,7 @@ Do not commit a real execution token. Manifest strings may use required
 | `ORCH_ACTION_TIMEOUT_MS` | Host timeout for one legacy hardware-daemon action; common default `5000`. |
 | `ORCH_SORIDORMI_CATALOG_REFRESH_TTL_S` | Seconds to keep the Orchestrator-side Soridormi named-skill catalog before reloading; code default `30`. Unknown requested `soridormi.*` skills force an immediate refresh even before this TTL expires. Set `0` to reload before every body-skill execution. |
 | `ORCH_BODY_RECOVERY_MAX_ATTEMPTS` | Maximum request-bound B-level recovery retries for recoverable Soridormi single-skill failures; code default `1`. Set `0` to disable recovery prompts and use terminal fallback speech. |
-| `ORCH_BODY_RECOVERY_CONFIRMATION_TTL_S` | Confirmation TTL for B-level recovery prompts; code default `10`. A user confirmation after expiry does not retry; approved retries still re-enter preflight/SkillRuntime/Soridormi validation. |
+| `ORCH_BODY_RECOVERY_CONFIRMATION_TTL_S` | Confirmation TTL for B-level recovery prompts; code default `10`. A user confirmation after expiry does not retry; approved retries still re-enter preflight/CapabilityRuntime/Soridormi validation. |
 
 Ordinary semantic escalation and deep-thinking delegation are authored by the
 Goal-driven Cognitive Core and its planner models. The Host has no

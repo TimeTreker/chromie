@@ -39,7 +39,7 @@ class ChromieCliTests(unittest.TestCase):
                 Path(directory),
                 """
                 ORCH_ENABLE_INTERACTION_RESPONSE=1
-                ORCH_ENABLE_SORIDORMI_SKILLS=1
+                ORCH_ENABLE_SORIDORMI_CAPABILITIES=1
                 SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp
                 ORCH_SORIDORMI_MANIFEST=capabilities/soridormi.json
                 ORCH_ACTION_DRY_RUN=true
@@ -166,9 +166,9 @@ class ChromieCliTests(unittest.TestCase):
                         {
                             "sid": "sid-timeline",
                             "elapsed_ms": 460.0,
-                            "event": "skill_runtime_done",
+                            "event": "capability_runtime_done",
                             "status": "cancelled",
-                            "message": "skill_runtime_done: fallback speech after cancellation",
+                            "message": "capability_runtime_done: fallback speech after cancellation",
                         },
                         {
                             "sid": "sid-timeline",
@@ -205,7 +205,7 @@ class ChromieCliTests(unittest.TestCase):
         self.assertEqual(timeline["record_count"], 4)
         self.assertEqual(
             timeline["events"],
-            ["session_start", "goal_interpretation_done", "skill_runtime_done"],
+            ["session_start", "goal_interpretation_done", "capability_runtime_done"],
         )
         self.assertEqual(timeline["event_counts"]["session_start"], 1)
         self.assertEqual(timeline["status_counts"], {"ok": 2, "cancelled": 1})
@@ -428,10 +428,10 @@ class ChromieCliTests(unittest.TestCase):
                                     "timing": "immediate",
                                 }
                             ],
-                            "skills": [
+                            "capabilities": [
                                 {
                                     "request_id": "skill-1",
-                                    "skill_id": "soridormi.walk_velocity",
+                                    "capability_id": "soridormi.walk_velocity",
                                     "args": {"duration_s": 15, "vx_mps": 0.2},
                                 }
                             ],
@@ -443,7 +443,7 @@ class ChromieCliTests(unittest.TestCase):
                             "results": [
                                 {
                                     "request_id": "skill-1",
-                                    "skill_id": "soridormi.walk_velocity",
+                                    "capability_id": "soridormi.walk_velocity",
                                     "provider_id": "soridormi.mcp",
                                     "status": "completed",
                                     "trace_id": "trace-real",
@@ -522,7 +522,7 @@ class ChromieCliTests(unittest.TestCase):
                 """
                 CHROMIE_ACTIVE_PROFILE=test_profile
                 ORCH_ENABLE_INTERACTION_RESPONSE=0
-                ORCH_ENABLE_SORIDORMI_SKILLS=0
+                ORCH_ENABLE_SORIDORMI_CAPABILITIES=0
                 ORCH_ACTION_DRY_RUN=true
                 """,
                 runtime=True,
@@ -547,7 +547,7 @@ class ChromieCliTests(unittest.TestCase):
                 Path(directory),
                 """
                 ORCH_ENABLE_INTERACTION_RESPONSE=0
-                ORCH_ENABLE_SORIDORMI_SKILLS=1
+                ORCH_ENABLE_SORIDORMI_CAPABILITIES=1
                 AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION=1
                 AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION=0
                 ORCH_ACTION_DRY_RUN=false
@@ -580,7 +580,7 @@ class ChromieCliTests(unittest.TestCase):
                 """
                 CHROMIE_ACTIVE_PROFILE=test_profile
                 ORCH_ENABLE_INTERACTION_RESPONSE=0
-                ORCH_ENABLE_SORIDORMI_SKILLS=0
+                ORCH_ENABLE_SORIDORMI_CAPABILITIES=0
                 ORCH_ACTION_DRY_RUN=true
                 AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION=0
                 AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION=0
@@ -1103,7 +1103,7 @@ class ChromieCliTests(unittest.TestCase):
                 Path(directory),
                 """
                 ORCH_ENABLE_INTERACTION_RESPONSE=0
-                ORCH_ENABLE_SORIDORMI_SKILLS=0
+                ORCH_ENABLE_SORIDORMI_CAPABILITIES=0
                 ORCH_ACTION_DRY_RUN=true
                 """,
             )

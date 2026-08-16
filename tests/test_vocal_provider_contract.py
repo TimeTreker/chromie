@@ -6,7 +6,7 @@ import unittest
 
 from agent.app.capabilities.catalog import CapabilityCatalog
 from agent.app.capabilities.local import chromie_manifests
-from agent.app.capabilities.models import CapabilityBundle, CapabilityRegistry
+from agent.app.capabilities.models import CapabilityBundle, CapabilityRegistry as AgentCapabilityRegistry
 from agent.app.deep_planner import DeepPlannerResolver
 from agent.app.planner_contract import (
     PlannerModelOutput,
@@ -20,18 +20,18 @@ from orchestrator.runtime.cognitive_runtime import (
 )
 from orchestrator.runtime.cognitive_turn_closure import CognitiveTurnClosure
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
-from orchestrator.runtime.skill_runtime import (
-    LocalSpeechSkillProvider,
-    SkillRegistry,
-    SkillRuntime,
-    VocalPerformanceSkillProvider,
+from orchestrator.runtime.capability_runtime import (
+    LocalSpeechCapabilityProvider,
+    CapabilityRegistry as RuntimeCapabilityRegistry,
+    CapabilityRuntime,
+    VocalPerformanceCapabilityProvider,
     local_speech_definition,
     vocal_performance_definition,
 )
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
-    SkillRequest,
+    CapabilityRequest,
     VOCAL_PERFORMANCE_CAPABILITY_ID,
     VocalModeEvidence,
     VocalPerformanceDelivery,
@@ -167,11 +167,11 @@ class RuntimeDefinitionView:
     def __init__(self, definition) -> None:  # type: ignore[no-untyped-def]
         self.definition = definition
 
-    async def ensure_skill_definitions(self, skill_ids: list[str]) -> None:
-        if skill_ids != [VOCAL_PERFORMANCE_CAPABILITY_ID]:
-            raise ValueError(skill_ids)
+    async def ensure_capability_definitions(self, capability_ids: list[str]) -> None:
+        if capability_ids != [VOCAL_PERFORMANCE_CAPABILITY_ID]:
+            raise ValueError(capability_ids)
 
-    def skill_definition(self, skill_id: str):  # type: ignore[no-untyped-def]
+    def capability_definition(self, skill_id: str):  # type: ignore[no-untyped-def]
         if skill_id != VOCAL_PERFORMANCE_CAPABILITY_ID:
             raise ValueError(skill_id)
         return self.definition
@@ -212,7 +212,7 @@ class VocalDeclarationAndPlannerTests(unittest.TestCase):
 
     def test_qualified_catalog_exposes_exact_identity_without_backend_name(self) -> None:
         qualified = declaration("singing")
-        registry = CapabilityRegistry.from_bundles(
+        registry = AgentCapabilityRegistry.from_bundles(
             [CapabilityBundle(agents=chromie_manifests(vocal_provider=qualified))]
         )
         catalog = CapabilityCatalog(registry)
@@ -249,7 +249,7 @@ class VocalDeclarationAndPlannerTests(unittest.TestCase):
 
     def test_deep_planner_proposes_exact_qualified_vocal_step(self) -> None:
         qualified = declaration("singing")
-        registry = CapabilityRegistry.from_bundles(
+        registry = AgentCapabilityRegistry.from_bundles(
             [CapabilityBundle(agents=chromie_manifests(vocal_provider=qualified))]
         )
         catalog = CapabilityCatalog(registry)
@@ -295,7 +295,7 @@ class VocalDeclarationAndPlannerTests(unittest.TestCase):
         schema = canonical_plan_response_schema(
             planner_tier="deep",
             expected_goal_ids=["goal-vocal"],
-            allowed_skill_ids=[],
+            allowed_capability_ids=[],
             provider_required_vocal_goal_ids=["goal-vocal"],
         )
         vocal_outcome = schema["properties"]["goal_outcomes"]["properties"]["goal-vocal"]
@@ -360,17 +360,17 @@ class VocalTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 timing_marks_emitted=["word"],
             )
 
-        self.provider = VocalPerformanceSkillProvider(
+        self.provider = VocalPerformanceCapabilityProvider(
             self.declaration,
             handler,
         )
         self.definition = vocal_performance_definition(self.declaration)
-        self.registry = SkillRegistry()
+        self.registry = RuntimeCapabilityRegistry()
         self.registry.register(local_speech_definition())
         self.registry.register(self.definition)
-        self.runtime = SkillRuntime(self.registry)
+        self.runtime = CapabilityRuntime(self.registry)
         self.runtime.register_provider(
-            LocalSpeechSkillProvider(
+            LocalSpeechCapabilityProvider(
                 lambda _args: {
                     "scheduled": True,
                     "playback_started": True,
@@ -382,13 +382,13 @@ class VocalTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.runtime.register_provider(self.provider)
 
     async def test_unreleased_speech_blocks_following_provider_vocal(self) -> None:
-        registry = SkillRegistry()
+        registry = RuntimeCapabilityRegistry()
         speech_definition = local_speech_definition()
         registry.register(speech_definition)
         registry.register(self.definition)
-        runtime = SkillRuntime(registry)
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(
-            LocalSpeechSkillProvider(
+            LocalSpeechCapabilityProvider(
                 lambda _args: {
                     "scheduled": True,
                     "playback_started": True,
@@ -406,8 +406,8 @@ class VocalTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     timing="sequential",
                 )
             ],
-            skills=[
-                SkillRequest(
+            capabilities=[
+                CapabilityRequest(
                     request_id="recite-after-speech",
                     capability_id=VOCAL_PERFORMANCE_CAPABILITY_ID,
                     args={"text": "Hello from Chromie.", "mode": "recitation"},
@@ -435,15 +435,15 @@ class VocalTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(
-            coordinator.skill_definition(VOCAL_PERFORMANCE_CAPABILITY_ID).provider_id,
+            coordinator.capability_definition(VOCAL_PERFORMANCE_CAPABILITY_ID).provider_id,
             self.declaration.provider_id,
         )
         self.assertEqual(
-            coordinator.skill_definition("chromie.speak").provider_id,
+            coordinator.capability_definition("chromie.speak").provider_id,
             "chromie.local_speech",
         )
         self.assertEqual(
-            coordinator.skill_definition("chromie.speak").metadata["execution_lane"],
+            coordinator.capability_definition("chromie.speak").metadata["execution_lane"],
             "vocal",
         )
 
@@ -498,8 +498,8 @@ class VocalTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
             language="en-US",
         )
 
-        self.assertEqual(response.skills[0].capability_id, VOCAL_PERFORMANCE_CAPABILITY_ID)
-        self.assertEqual(response.skills[0].metadata["execution_lane"], "vocal")
+        self.assertEqual(response.capabilities[0].capability_id, VOCAL_PERFORMANCE_CAPABILITY_ID)
+        self.assertEqual(response.capabilities[0].metadata["execution_lane"], "vocal")
         execution = await self.runtime.execute(response)
         self.assertEqual(execution.status, "completed")
         vocal_result = next(
@@ -530,7 +530,7 @@ class VocalTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
         execution = await self.runtime.execute(
             InteractionResponse(
                 interaction_id="unsupported-vocal-mode",
-                skills=[
+                capabilities=[
                     {
                         "request_id": "unsupported-singing",
                         "capability_id": VOCAL_PERFORMANCE_CAPABILITY_ID,
@@ -565,13 +565,13 @@ class VocalTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 timing_marks_emitted=[],
             )
 
-        provider = VocalPerformanceSkillProvider(self.declaration, downgrade)
-        runtime = SkillRuntime(self.registry)
+        provider = VocalPerformanceCapabilityProvider(self.declaration, downgrade)
+        runtime = CapabilityRuntime(self.registry)
         runtime.register_provider(provider)
         execution = await runtime.execute(
             InteractionResponse(
                 interaction_id="vocal-no-downgrade",
-                skills=[
+                capabilities=[
                     {
                         "request_id": "recitation-no-downgrade",
                         "capability_id": VOCAL_PERFORMANCE_CAPABILITY_ID,
@@ -600,19 +600,19 @@ class VocalTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
         async def cancel_handler(request, _state) -> None:  # type: ignore[no-untyped-def]
             cancelled.append(request.request_id)
 
-        provider = VocalPerformanceSkillProvider(
+        provider = VocalPerformanceCapabilityProvider(
             self.declaration,
             blocked,
             cancel_handler,
         )
-        runtime = SkillRuntime(self.registry)
+        runtime = CapabilityRuntime(self.registry)
         runtime.register_provider(provider)
         interaction_id = "vocal-cancel"
         execution_task = asyncio.create_task(
             runtime.execute(
                 InteractionResponse(
                     interaction_id=interaction_id,
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "vocal-cancel-request",
                             "capability_id": VOCAL_PERFORMANCE_CAPABILITY_ID,

@@ -698,7 +698,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
 
         schema = DeepPlannerResolver._response_schema(
             ["goal-action"],
-            allowed_skill_ids=["soridormi.walk_velocity"],
+            allowed_capability_ids=["soridormi.walk_velocity"],
             capability_input_schemas={
                 "soridormi.walk_velocity": mismatch["capability_input_schema"]
             },
@@ -803,7 +803,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
     def test_deep_decoder_requires_explicit_step_timing(self):
         schema = DeepPlannerResolver._response_schema(
             ["goal-walk", "goal-blink"],
-            allowed_skill_ids=[
+            allowed_capability_ids=[
                 "soridormi.walk_forward",
                 "soridormi.blink_eyes",
             ],
@@ -821,7 +821,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
     def test_deep_decoder_enforces_exact_capability_argument_bounds(self):
         schema = DeepPlannerResolver._response_schema(
             ["goal-turn"],
-            allowed_skill_ids=["soridormi.turn_in_place"],
+            allowed_capability_ids=["soridormi.turn_in_place"],
             capability_input_schemas={
                 "soridormi.turn_in_place": {
                     "type": "object",

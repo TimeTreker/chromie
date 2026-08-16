@@ -44,7 +44,7 @@ def _catalog() -> CapabilityCatalog:
                             ToolCapability(
                                 name="soridormi.skill.list",
                                 agent_id="soridormi.skill",
-                                description="List named skills.",
+                                description="List named capabilities.",
                                 effects=["read_only"],
                                 safety_class="safe_read",
                             )
@@ -93,15 +93,15 @@ class CapabilityInterpreterActionTests(unittest.IsolatedAsyncioTestCase):
         )
         response = await runtime.run(request)
         self.assertEqual(
-            [item.skill_id for item in response.skills],
+            [item.capability_id for item in response.capabilities],
             ["soridormi.walk_velocity", "soridormi.turn_in_place", "soridormi.nod_yes"],
         )
-        self.assertTrue(all(item.timing == "sequential" for item in response.skills))
-        self.assertEqual(response.skills[0].args["duration_s"], 10.0)
-        self.assertEqual(response.skills[2].args["count"], 2)
-        self.assertEqual(response.skills[2].args["amplitude"], "small")
-        self.assertEqual(response.skills[2].args["duration_s"], 1.4)
-        for index, skill in enumerate(response.skills):
+        self.assertTrue(all(item.timing == "sequential" for item in response.capabilities))
+        self.assertEqual(response.capabilities[0].args["duration_s"], 10.0)
+        self.assertEqual(response.capabilities[2].args["count"], 2)
+        self.assertEqual(response.capabilities[2].args["amplitude"], "small")
+        self.assertEqual(response.capabilities[2].args["duration_s"], 1.4)
+        for index, skill in enumerate(response.capabilities):
             self.assertEqual(skill.metadata["source"], "goal_interpretation_actions")
             self.assertEqual(skill.metadata["source_component"], "agent.capability")
             self.assertEqual(skill.metadata["execution_mode"], "proposed")
@@ -147,13 +147,13 @@ class CapabilityInterpreterActionTests(unittest.IsolatedAsyncioTestCase):
         )
         response = await runtime.run(request)
         self.assertEqual(
-            [item.skill_id for item in response.skills],
+            [item.capability_id for item in response.capabilities],
             ["soridormi.walk_velocity", "soridormi.nod_yes"],
         )
         self.assertEqual([item.text for item in response.speech], ["Hello."])
-        self.assertEqual(response.skills[0].metadata["execution_mode"], "proposed")
-        self.assertEqual(response.skills[0].metadata["source_component"], "agent.capability")
-        self.assertEqual(response.skills[0].metadata["goal_interpretation_action_count"], 2)
+        self.assertEqual(response.capabilities[0].metadata["execution_mode"], "proposed")
+        self.assertEqual(response.capabilities[0].metadata["source_component"], "agent.capability")
+        self.assertEqual(response.capabilities[0].metadata["goal_interpretation_action_count"], 2)
 
     async def test_goal_interpretation_action_live_perception_metadata_is_structured(self) -> None:
         runtime = InteractionRuntime(
@@ -191,8 +191,8 @@ class CapabilityInterpreterActionTests(unittest.IsolatedAsyncioTestCase):
 
         response = await runtime.run(request)
 
-        self.assertEqual([item.skill_id for item in response.skills], ["soridormi.inspect_object"])
-        metadata = response.skills[0].metadata
+        self.assertEqual([item.capability_id for item in response.capabilities], ["soridormi.inspect_object"])
+        metadata = response.capabilities[0].metadata
         self.assertTrue(metadata["requires_live_perception"])
         self.assertEqual(metadata["perception_dependency"], "find")
         self.assertEqual(metadata["physical_state_source"], "soridormi_runtime")

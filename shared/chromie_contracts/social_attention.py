@@ -172,7 +172,7 @@ SocialAttentionTargetSource = Literal[
     "conversation_context",
     "none",
 ]
-SocialAttentionSkillTiming = Literal["parallel"]
+SocialAttentionCapabilityTiming = Literal["parallel"]
 SocialAttentionInteractionRole = Literal["auxiliary_expression"]
 SocialAttentionPurpose = Literal[
     "acknowledge",
@@ -218,7 +218,7 @@ class SocialAttentionBehavior(CapabilityIdentityModel):
     """One optional decorative body expression selected from the live catalog."""
 
     args: dict[str, Any] = Field(default_factory=dict)
-    timing: SocialAttentionSkillTiming = "parallel"
+    timing: SocialAttentionCapabilityTiming = "parallel"
     social_function: str | None = None
     reason: str | None = None
 

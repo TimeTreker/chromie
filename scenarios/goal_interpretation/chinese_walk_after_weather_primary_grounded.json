@@ -107,7 +107,7 @@
       "task.execute_robot_action"
     ],
     "task_types_forbid": [
-      "task.execute_skill",
+      "task.execute_capability",
       "task.use_tool",
       "speech.answer"
     ],

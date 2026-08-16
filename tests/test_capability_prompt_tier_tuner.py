@@ -10,24 +10,24 @@ class CapabilityPromptTierTunerTests(unittest.TestCase):
         overlay, audit = build_prompt_tier_overlay(
             experience_records=[
                 {
-                    "selected_skills": ["soridormi.blink_eyes"],
+                    "selected_capabilities": ["soridormi.blink_eyes"],
                     "execution_status": "success",
-                    "skill_results": [
-                        {"skill_id": "soridormi.blink_eyes", "status": "success"}
+                    "capability_results": [
+                        {"capability_id": "soridormi.blink_eyes", "status": "success"}
                     ],
                 },
                 {
-                    "selected_skills": ["soridormi.blink_eyes"],
+                    "selected_capabilities": ["soridormi.blink_eyes"],
                     "execution_status": "success",
-                    "skill_results": [
-                        {"skill_id": "soridormi.blink_eyes", "status": "success"}
+                    "capability_results": [
+                        {"capability_id": "soridormi.blink_eyes", "status": "success"}
                     ],
                 },
                 {
-                    "selected_skills": ["soridormi.blink_eyes"],
+                    "selected_capabilities": ["soridormi.blink_eyes"],
                     "execution_status": "success",
-                    "skill_results": [
-                        {"skill_id": "soridormi.blink_eyes", "status": "success"}
+                    "capability_results": [
+                        {"capability_id": "soridormi.blink_eyes", "status": "success"}
                     ],
                 },
             ],
@@ -55,21 +55,21 @@ class CapabilityPromptTierTunerTests(unittest.TestCase):
         overlay, audit = build_prompt_tier_overlay(
             experience_records=[
                 {
-                    "selected_skills": ["soridormi.motion.calibrate_floor"],
+                    "selected_capabilities": ["soridormi.motion.calibrate_floor"],
                     "execution_status": "success",
-                    "skill_results": [
+                    "capability_results": [
                         {
-                            "skill_id": "soridormi.motion.calibrate_floor",
+                            "capability_id": "soridormi.motion.calibrate_floor",
                             "status": "success",
                         }
                     ],
                 },
                 {
-                    "selected_skills": ["soridormi.motion.calibrate_floor"],
+                    "selected_capabilities": ["soridormi.motion.calibrate_floor"],
                     "execution_status": "success",
-                    "skill_results": [
+                    "capability_results": [
                         {
-                            "skill_id": "soridormi.motion.calibrate_floor",
+                            "capability_id": "soridormi.motion.calibrate_floor",
                             "status": "success",
                         }
                     ],

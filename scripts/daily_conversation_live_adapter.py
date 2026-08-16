@@ -111,9 +111,9 @@ def _semantic_turn_record(summary: Mapping[str, Any]) -> dict[str, Any]:
     response = summary.get("interaction_response")
     if not isinstance(response, Mapping):
         response = {}
-    skills = response.get("skills")
-    if not isinstance(skills, list):
-        skills = []
+    capabilities = response.get("capabilities")
+    if not isinstance(capabilities, list):
+        capabilities = []
     return {
         "input": summary.get("text"),
         "ok": summary.get("ok"),
@@ -128,7 +128,7 @@ def _semantic_turn_record(summary: Mapping[str, Any]) -> dict[str, Any]:
                 "timing": item.get("timing"),
                 "metadata": item.get("metadata"),
             }
-            for item in skills
+            for item in capabilities
             if isinstance(item, Mapping)
         ],
         "errors": summary.get("errors", []),

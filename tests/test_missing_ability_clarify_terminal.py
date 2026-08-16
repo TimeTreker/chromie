@@ -48,7 +48,7 @@ class MissingAbilityClarifyTerminalTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.status, "clarify")
         self.assertEqual(response.speech, [])
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
         self.assertIn(
             "runtime: terminal missing-ability clarify; skipped agent rewrite",
             response.metadata.get("trace", []),

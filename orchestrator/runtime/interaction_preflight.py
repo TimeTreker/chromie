@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from shared.chromie_contracts.interaction import InteractionResponse, SkillRequest
+from shared.chromie_contracts.interaction import InteractionResponse, CapabilityRequest
 
-from .skill_runtime import SkillRegistry, _validate_json_schema
+from .capability_runtime import CapabilityRegistry, _validate_json_schema
 
 
 PREFLIGHT_SCHEMA_VERSION = 1
@@ -14,7 +14,7 @@ PREFLIGHT_STRATEGY = "static_skill_preflight_v1"
 def annotate_preflight_validation(
     response: InteractionResponse,
     *,
-    registry: SkillRegistry,
+    registry: CapabilityRegistry,
     provider_ids: set[str],
     confirmed_request_ids: set[str] | None = None,
     safety_monitor_active: bool = False,
@@ -37,7 +37,7 @@ def annotate_preflight_validation(
             safety_monitor_active=safety_monitor_active,
             soridormi_catalog_loaded=soridormi_catalog_loaded,
         )
-        for request in response.skills
+        for request in response.capabilities
     ]
     return response.model_copy(
         deep=True,
@@ -61,9 +61,9 @@ def annotate_preflight_validation(
 
 
 def _preflight_skill_request(
-    request: SkillRequest,
+    request: CapabilityRequest,
     *,
-    registry: SkillRegistry,
+    registry: CapabilityRegistry,
     provider_ids: set[str],
     confirmed_request_ids: set[str],
     safety_monitor_active: bool,
@@ -74,9 +74,9 @@ def _preflight_skill_request(
         "capability_id": request.capability_id,
     }
     try:
-        definition = registry.get(request.skill_id)
+        definition = registry.get(request.capability_id)
     except ValueError as exc:
-        if request.skill_id.startswith("soridormi.") and not soridormi_catalog_loaded:
+        if request.capability_id.startswith("soridormi.") and not soridormi_catalog_loaded:
             return {
                 **base,
                 "status": "deferred",
@@ -100,13 +100,13 @@ def _preflight_skill_request(
             "message": f"no registered provider {definition.provider_id!r}",
             "world_feasibility": "unknown_until_runtime",
         }
-    if request.skill_version and request.skill_version != definition.version:
+    if request.capability_version and request.capability_version != definition.version:
         return {
             **base,
             "status": "blocked",
             "reason_code": "version_mismatch",
             "message": (
-                f"requested version {request.skill_version!r} does not match "
+                f"requested version {request.capability_version!r} does not match "
                 f"registered version {definition.version!r}"
             ),
             "world_feasibility": "unknown_until_runtime",

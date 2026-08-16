@@ -36,7 +36,7 @@
     "speech_any": ["机器人动作", "不能只用对话"],
     "forbidden_speech_any": ["这就为你往前走", "马上往前走"],
     "no_skills": true,
-    "forbidden_skills": ["soridormi.walk_forward", "soridormi.walk_velocity"],
+    "forbidden_capabilities": ["soridormi.walk_forward", "soridormi.walk_velocity"],
     "requires_confirmation": false
   }
 }

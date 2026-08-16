@@ -118,7 +118,7 @@ def runtime_event(
     identity: str,
     *,
     lane: str,
-    skills=None,
+    capabilities=None,
     goal_ids=None,
     targets=None,
 ):
@@ -143,7 +143,7 @@ def runtime_event(
         "core_interpretation": {"authority": "goal_driven_cognitive_core"},
         "terminal_plan": {
             "goal_ids": list(goal_ids or []),
-            "skill_ids": list(skills or []),
+            "capability_ids": list(capabilities or []),
         },
         "goal_association": {
             "associations": associations,
@@ -216,7 +216,7 @@ class CognitiveGatewayCoreQualificationTests(unittest.TestCase):
                 "conv-weather",
                 digest,
                 lane="tool",
-                skills=["chromie.weather.lookup"],
+                capabilities=["chromie.weather.lookup"],
                 goal_ids=["goal-weather"],
             ),
             {
@@ -239,7 +239,7 @@ class CognitiveGatewayCoreQualificationTests(unittest.TestCase):
                 "conv-weather",
                 digest,
                 lane="chat",
-                skills=[],
+                capabilities=[],
                 targets=["goal-weather"],
             ),
         ]
@@ -260,11 +260,11 @@ class CognitiveGatewayCoreQualificationTests(unittest.TestCase):
                     "skipped_tts": 0,
                     "workflow_events": [
                         {
-                            "event": "skill_result",
+                            "event": "capability_result",
                             "severity": "info",
                             "message": (
-                                "skill_result: request_id=speech-fixture "
-                                "skill_id=chromie.speak status=completed"
+                                "capability_result: request_id=speech-fixture "
+                                "capability_id=chromie.speak status=completed"
                             ),
                         }
                     ],

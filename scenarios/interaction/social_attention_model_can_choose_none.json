@@ -59,7 +59,7 @@
   },
   "expect": {
     "speech_any": ["sentence clearly"],
-    "skills": [],
+    "capabilities": [],
     "metadata_json_contains": ["social_attention_plan", "not_selected"],
     "requires_confirmation": false
   }

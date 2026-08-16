@@ -266,7 +266,7 @@ class CognitionSettings:
     action_dry_run: bool
     enable_agent: bool
     enable_interaction_response: bool
-    enable_soridormi_skills: bool
+    enable_soridormi_capabilities: bool
     fast_first_response_enabled: bool
     core_generated_fast_speech_enabled: bool
     fast_planner_mode: str
@@ -649,8 +649,8 @@ class HostSettingsSnapshot:
                 enable_interaction_response=_bool(
                     values, "ORCH_ENABLE_INTERACTION_RESPONSE", False
                 ),
-                enable_soridormi_skills=_bool(
-                    values, "ORCH_ENABLE_SORIDORMI_SKILLS", False
+                enable_soridormi_capabilities=_bool(
+                    values, "ORCH_ENABLE_SORIDORMI_CAPABILITIES", False
                 ),
                 fast_first_response_enabled=_bool(
                     values, "ORCH_FAST_FIRST_RESPONSE_ENABLED", True

@@ -24,7 +24,7 @@ TOP_LEVEL_KEYS = {
     "network",
     "power_constraints",
     "revisions",
-    "initial_low_risk_skill",
+    "initial_low_risk_capability",
     "unsupported",
     "safety",
     "calibration_artifacts",
@@ -252,12 +252,12 @@ def verify_candidate(
             "revisions.provider_configuration_sha256 must be a 64-character SHA-256"
         )
 
-    skill = _mapping(payload, "initial_low_risk_skill", errors)
+    skill = _mapping(payload, "initial_low_risk_capability", errors)
     _check_keys(
         skill,
-        "initial_low_risk_skill",
+        "initial_low_risk_capability",
         {
-            "skill_id",
+            "capability_id",
             "workspace",
             "max_speed",
             "max_payload",
@@ -266,31 +266,31 @@ def verify_candidate(
         },
         errors,
     )
-    for field in ("skill_id", "workspace", "max_speed", "max_payload"):
+    for field in ("capability_id", "workspace", "max_speed", "max_payload"):
         if not _nonempty(skill.get(field)):
-            blockers.append(f"initial_low_risk_skill.{field} is required")
+            blockers.append(f"initial_low_risk_capability.{field} is required")
     if skill.get("supervision") != "direct_operator":
         blockers.append(
-            "initial_low_risk_skill.supervision must be direct_operator"
+            "initial_low_risk_capability.supervision must be direct_operator"
         )
     abort_conditions = _string_list(
         skill.get("abort_conditions"),
-        "initial_low_risk_skill.abort_conditions",
+        "initial_low_risk_capability.abort_conditions",
         errors,
     )
     if not abort_conditions or any(not _nonempty(item) for item in abort_conditions):
         blockers.append(
-            "initial_low_risk_skill.abort_conditions must not be empty"
+            "initial_low_risk_capability.abort_conditions must not be empty"
         )
 
     unsupported = _mapping(payload, "unsupported", errors)
     _check_keys(
         unsupported,
         "unsupported",
-        {"skills", "configurations", "operating_conditions"},
+        {"capabilities", "configurations", "operating_conditions"},
         errors,
     )
-    for field in ("skills", "configurations", "operating_conditions"):
+    for field in ("capabilities", "configurations", "operating_conditions"):
         values = _string_list(
             unsupported.get(field),
             f"unsupported.{field}",
@@ -425,7 +425,7 @@ def verify_candidate(
         "network.",
         "power_constraints",
         "revisions.",
-        "initial_low_risk_skill.",
+        "initial_low_risk_capability.",
         "unsupported.",
     )
     core_blockers = [

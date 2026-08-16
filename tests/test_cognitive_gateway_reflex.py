@@ -311,10 +311,10 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
                     self.dialogue.begin(
                         InteractionResponse(
                             interaction_id="interaction-stop",
-                            skills=[
+                            capabilities=[
                                 {
                                     "request_id": "move-stop",
-                                    "skill_id": "soridormi.walk_velocity",
+                                    "capability_id": "soridormi.walk_velocity",
                                     "args": {"vx_mps": 0.1, "duration_s": 1.0},
                                     "requires_confirmation": True,
                                 }
@@ -336,10 +336,10 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
 
         class _Runtime:
             async def cancel_all(self) -> None:
-                events.append("skill_runtime_cancel_all")
+                events.append("capability_runtime_cancel_all")
 
             async def cancel_scope(self, directive: Any) -> Any:
-                events.append("skill_runtime_cancel_scope")
+                events.append("capability_runtime_cancel_scope")
                 if with_pending_confirmation:
                     approval_during_provider_cancel.append(
                         confirmation_dialogue.resolve("confirm").decision
@@ -504,7 +504,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
             events.index("output_invalidation"),
             events.index("record_user_turn"),
         )
-        self.assertLess(events.index("skill_runtime_cancel_scope"), events.index("record_user_turn"))
+        self.assertLess(events.index("capability_runtime_cancel_scope"), events.index("record_user_turn"))
         self.assertIn("cognitive_gateway_reflex_detected", events)
         self.assertIn("cognitive_gateway_reflex_applied", events)
         self.assertEqual(assistant.sessions.state["sid-stop"]["llm_done"], True)
@@ -561,7 +561,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
             events.index("confirmation_scope_cancelled"),
         )
         self.assertLess(
-            events.index("skill_runtime_cancel_scope"),
+            events.index("capability_runtime_cancel_scope"),
             events.index("confirmation_scope_cancelled"),
         )
         self.assertLess(
@@ -904,7 +904,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertTrue(
             any(
-                failure.startswith("skill_runtime:RuntimeError:")
+                failure.startswith("capability_runtime:RuntimeError:")
                 for failure in receipt.dispatch_failures
             )
         )
@@ -980,10 +980,10 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         pending = assistant.confirmation_dialogue.begin(
             InteractionResponse(
                 interaction_id="confirm-output",
-                skills=[
+                capabilities=[
                     {
                         "request_id": "weather-request",
-                        "skill_id": "chromie.weather",
+                        "capability_id": "chromie.weather",
                     }
                 ],
             ),
@@ -1009,10 +1009,10 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         assistant.confirmation_dialogue.begin(
             InteractionResponse(
                 interaction_id="confirm-unknown-motion",
-                skills=[
+                capabilities=[
                     {
                         "request_id": "unknown-request",
-                        "skill_id": "unknown.pending.skill",
+                        "capability_id": "unknown.pending.skill",
                     }
                 ],
             ),
@@ -1052,14 +1052,14 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         assistant.confirmation_dialogue.begin(
             InteractionResponse(
                 interaction_id="confirm-mixed-motion",
-                skills=[
+                capabilities=[
                     {
                         "request_id": "motion-request",
-                        "skill_id": "soridormi.walk",
+                        "capability_id": "soridormi.walk",
                     },
                     {
                         "request_id": "tool-request",
-                        "skill_id": "chromie.weather",
+                        "capability_id": "chromie.weather",
                     },
                 ],
             ),

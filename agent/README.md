@@ -26,7 +26,7 @@ commissioning.
 
 `POST /interaction` now uses `InteractionRuntime` by default. Specialized agents
 write through a native accumulator that creates `InteractionSpeech` and
-`CapabilityRequest` objects (with `SkillRequest` retained as a compatibility alias) as the pipeline runs; the endpoint does not convert a
+`CapabilityRequest` objects as the pipeline runs; the endpoint does not convert a
 final `AgentResult`. The serialized result is validated again against the strict
 shared contract before it is returned.
 

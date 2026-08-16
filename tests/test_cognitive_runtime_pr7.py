@@ -17,11 +17,11 @@ from orchestrator.runtime.cognitive_runtime import (
 )
 from orchestrator.runtime.interaction_ledger import InteractionLedger
 from orchestrator.runtime.conversation_state import ConversationStateManager
-from orchestrator.runtime.skill_runtime import (
-    LocalSpeechSkillProvider,
-    SkillDefinition,
-    SkillRegistry,
-    SkillRuntime,
+from orchestrator.runtime.capability_runtime import (
+    LocalSpeechCapabilityProvider,
+    CapabilityDefinition,
+    CapabilityRegistry,
+    CapabilityRuntime,
     local_speech_definition,
 )
 from orchestrator.runtime.task_proposals import annotate_task_proposal_ledger
@@ -109,25 +109,25 @@ def admitted_core(
 
 
 class FakeRuntime:
-    def __init__(self, definitions: list[SkillDefinition] | None = None):
-        self.definitions = {item.skill_id: item for item in (definitions or [])}
+    def __init__(self, definitions: list[CapabilityDefinition] | None = None):
+        self.definitions = {item.capability_id: item for item in (definitions or [])}
         self.ensure_calls: list[list[str]] = []
 
-    async def ensure_skill_definitions(self, skill_ids):
-        ids = list(skill_ids)
+    async def ensure_capability_definitions(self, capability_ids):
+        ids = list(capability_ids)
         self.ensure_calls.append(ids)
         missing = [item for item in ids if item not in self.definitions]
         if missing:
-            raise ValueError(f"unknown skills: {missing}")
+            raise ValueError(f"unknown capabilities: {missing}")
 
-    def skill_definition(self, skill_id):
+    def capability_definition(self, skill_id):
         if skill_id not in self.definitions:
             raise ValueError(f"unknown skill {skill_id}")
         return self.definitions[skill_id]
 
 
 class FastAdvanceRuntime(FakeRuntime):
-    def __init__(self, definitions: list[SkillDefinition] | None = None):
+    def __init__(self, definitions: list[CapabilityDefinition] | None = None):
         super().__init__(definitions)
         self.started_fast_activities: list[tuple[str, str]] = []
 
@@ -406,7 +406,7 @@ def execute_plan(
         steps=[
             {
                 "step_id": "blink",
-                "skill_id": "soridormi.blink_eyes",
+                "capability_id": "soridormi.blink_eyes",
                 "args": {"count": 4},
                 "source_goal_ids": [goal_id],
             }
@@ -420,9 +420,9 @@ def execute_plan(
     )
 
 
-def blink_definition(*, confirmation: bool = False) -> SkillDefinition:
-    return SkillDefinition(
-        skill_id="soridormi.blink_eyes",
+def blink_definition(*, confirmation: bool = False) -> CapabilityDefinition:
+    return CapabilityDefinition(
+        capability_id="soridormi.blink_eyes",
         provider_id="soridormi.mcp",
         description="Blink the robot eyes.",
         input_schema={
@@ -442,9 +442,9 @@ def blink_definition(*, confirmation: bool = False) -> SkillDefinition:
     )
 
 
-def weather_definition() -> SkillDefinition:
-    return SkillDefinition(
-        skill_id="chromie.weather.lookup",
+def weather_definition() -> CapabilityDefinition:
+    return CapabilityDefinition(
+        capability_id="chromie.weather.lookup",
         provider_id="chromie.local",
         description="Read the current weather forecast for a requested place.",
         input_schema={
@@ -475,9 +475,9 @@ def weather_definition() -> SkillDefinition:
     )
 
 
-def walk_definition() -> SkillDefinition:
-    return SkillDefinition(
-        skill_id="soridormi.walk_forward",
+def walk_definition() -> CapabilityDefinition:
+    return CapabilityDefinition(
+        capability_id="soridormi.walk_forward",
         provider_id="soridormi.mcp",
         description="Walk forward for a bounded duration.",
         input_schema={
@@ -1157,7 +1157,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         result = self.run_resolution(coordinator, client)
         self.assertEqual(result.status, "applied")
         self.assertEqual(result.lane, "chat")
-        self.assertEqual(result.interaction_response.skills, [])
+        self.assertEqual(result.interaction_response.capabilities, [])
         self.assertEqual(result.interaction_response.speech[0].text, "你好。")
         self.assertEqual(result.metadata["fast_planner_path"], "direct_vocal_output")
         self.assertFalse(result.metadata["deep_planner_invoked"])
@@ -1211,11 +1211,11 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             "scheduled",
         )
 
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(local_speech_definition())
-        runtime = SkillRuntime(registry)
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(
-            LocalSpeechSkillProvider(lambda _args: {"scheduled": False})
+            LocalSpeechCapabilityProvider(lambda _args: {"scheduled": False})
         )
         execution = asyncio.run(runtime.execute(response))
 
@@ -1269,7 +1269,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(client.calls, ["advance", "association", "fast", "compose"])
         self.assertIsNotNone(result.interaction_response)
         self.assertEqual(
-            [item.capability_id for item in result.interaction_response.skills],
+            [item.capability_id for item in result.interaction_response.capabilities],
             ["soridormi.blink_eyes"],
         )
         self.assertTrue(runtime.ensure_calls)
@@ -1311,7 +1311,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "weather",
-                    "skill_id": "chromie.weather.lookup",
+                    "capability_id": "chromie.weather.lookup",
                     "args": {"location": "重庆", "date": "today"},
                     "source_goal_ids": ["goal-weather"],
                 }
@@ -1382,8 +1382,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertFalse(
             response.speech[0].metadata["playback_start_required_for_effects"]
         )
-        self.assertEqual(response.skills[0].timing, "parallel")
-        self.assertTrue(response.skills[0].metadata["retryable_safe_read"])
+        self.assertEqual(response.capabilities[0].timing, "parallel")
+        self.assertTrue(response.capabilities[0].metadata["retryable_safe_read"])
         self.assertEqual(
             response.metadata["user_turn_envelope"],
             user_turn_envelope,
@@ -1405,7 +1405,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "weather",
-                    "skill_id": "chromie.weather.lookup",
+                    "capability_id": "chromie.weather.lookup",
                     "args": {"location": "重庆", "date": "tomorrow"},
                     "source_goal_ids": ["goal-weather"],
                 }
@@ -1524,7 +1524,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "walk",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 15},
                     "source_goal_ids": ["goal-walk"],
                 }
@@ -1581,9 +1581,9 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(len(response.skills), 1)
+        self.assertEqual(len(response.capabilities), 1)
         self.assertEqual(
-            response.skills[0].capability_id,
+            response.capabilities[0].capability_id,
             "soridormi.walk_forward",
         )
         self.assertEqual(len(response.speech), 1)
@@ -1607,7 +1607,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "weather",
-                    "skill_id": "chromie.weather.lookup",
+                    "capability_id": "chromie.weather.lookup",
                     "args": {"location": "上海", "date": "today"},
                     "source_goal_ids": ["goal-weather"],
                 }
@@ -1644,8 +1644,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(response.speech, [])
-        self.assertEqual(response.skills[0].timing, "parallel")
-        self.assertTrue(response.skills[0].metadata["retryable_safe_read"])
+        self.assertEqual(response.capabilities[0].timing, "parallel")
+        self.assertTrue(response.capabilities[0].metadata["retryable_safe_read"])
         self.assertTrue(response.metadata["safe_read_parallel_execution"])
 
     def test_effectful_pre_execution_preserves_model_speech_with_barrier(self):
@@ -1722,19 +1722,19 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "walk",
-                    "skill_id": "soridormi.walk_velocity",
+                    "capability_id": "soridormi.walk_velocity",
                     "args": {"duration_s": 10.0, "speed": "0.2"},
                     "source_goal_ids": ["goal-walk"],
                 },
                 {
                     "step_id": "nod",
-                    "skill_id": "soridormi.nod_yes",
+                    "capability_id": "soridormi.nod_yes",
                     "args": {"count": 2},
                     "source_goal_ids": ["goal-nod"],
                 },
                 {
                     "step_id": "turn",
-                    "skill_id": "soridormi.turn_in_place",
+                    "capability_id": "soridormi.turn_in_place",
                     "args": {"yaw_radps": -0.12},
                     "source_goal_ids": ["goal-turn"],
                 },
@@ -1779,8 +1779,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             confidence=0.95,
         )
         definitions = [
-            SkillDefinition(
-                skill_id=skill_id,
+            CapabilityDefinition(
+                capability_id=skill_id,
                 provider_id="soridormi.mcp",
                 input_schema={"type": "object"},
                 output_schema=TEST_SKILL_OUTPUT_SCHEMA,
@@ -1858,7 +1858,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "nod",
-                    "skill_id": "soridormi.nod_yes",
+                    "capability_id": "soridormi.nod_yes",
                     "args": {"count": 2},
                     "source_goal_ids": ["goal-nod"],
                 }
@@ -1910,8 +1910,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             ),
             confidence=0.92,
         )
-        nod = SkillDefinition(
-            skill_id="soridormi.nod_yes",
+        nod = CapabilityDefinition(
+            capability_id="soridormi.nod_yes",
             provider_id="soridormi.mcp",
             input_schema={
                 "type": "object",
@@ -1958,7 +1958,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             goal_ids=["goal-blink", "goal-joke"],
             steps=[{
                 "step_id": "blink",
-                "skill_id": "soridormi.blink_eyes",
+                "capability_id": "soridormi.blink_eyes",
                 "args": {"count": 2},
                 "source_goal_ids": ["goal-blink"],
             }],
@@ -2170,7 +2170,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(result.status, "applied")
         self.assertEqual(result.lane, "robot_action")
-        request = result.interaction_response.skills[0]
+        request = result.interaction_response.capabilities[0]
         self.assertTrue(request.requires_confirmation)
         self.assertEqual(request.args, {"count": 4})
         self.assertIn("canonical_plan_fingerprint", request.metadata)
@@ -2296,8 +2296,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
 
     def test_runtime_conflict_fails_closed_without_host_replan(self):
-        walk = SkillDefinition(
-            skill_id="soridormi.walk_forward",
+        walk = CapabilityDefinition(
+            capability_id="soridormi.walk_forward",
             provider_id="soridormi.mcp",
             input_schema={
                 "type": "object",
@@ -2329,7 +2329,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "walk",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 15},
                     "timing": "parallel",
                     "source_goal_ids": ["goal-1"],
@@ -2625,8 +2625,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         self.assertEqual(errors, [])
         self.assertEqual(response.status, "ok")
-        self.assertEqual([item.skill_id for item in response.skills], ["soridormi.blink_eyes"])
-        self.assertEqual(response.skills[0].metadata["source_goal_ids"], ["goal-blink"])
+        self.assertEqual([item.capability_id for item in response.capabilities], ["soridormi.blink_eyes"])
+        self.assertEqual(response.capabilities[0].metadata["source_goal_ids"], ["goal-blink"])
         self.assertEqual(response.metadata["planning_result"], "composed_plan")
         self.assertEqual(
             [item.text for item in response.speech],

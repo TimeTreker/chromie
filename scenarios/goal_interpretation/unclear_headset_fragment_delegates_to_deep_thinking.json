@@ -47,7 +47,7 @@
     ],
     "task_types_forbid": [
       "speech.ask_clarification",
-      "task.execute_skill"
+      "task.execute_capability"
     ],
     "metadata_json_forbid": [
       "intent_review",

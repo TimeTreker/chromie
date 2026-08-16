@@ -172,7 +172,7 @@
     },
     {
       "path": "agent/app/capabilities/catalog.py",
-      "symbol": "CapabilityCatalog.refresh_live_named_skills",
+      "symbol": "CapabilityCatalog.refresh_live_named_capabilities",
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "agent",
@@ -294,6 +294,32 @@
       "failure_signals": [
         "diagnostic",
         "return"
+      ]
+    },
+    {
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Map model transport/runtime failures to InterpretationUnavailableError; never continue with untrusted semantic output.",
+      "review_status": "reviewed",
+      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
+      "symbol": "OllamaGoalInterpreter.interpret_goal",
+      "ordinal": 1,
+      "body_sha256": "94e9774028745a00b95897ef0014197d0db0648d9b32232fa8107afaaf3600e5",
+      "failure_signals": [
+        "raise"
+      ]
+    },
+    {
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Fail closed after one invalid Goal Interpretation DTO repair; never accept malformed or authority-violating output.",
+      "review_status": "reviewed",
+      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
+      "symbol": "OllamaGoalInterpreter.interpret_goal",
+      "ordinal": 2,
+      "body_sha256": "b1353699afa12843ffe1fb72f282e66b385b009bcb718f65f609ea4b45314b62",
+      "failure_signals": [
+        "raise"
       ]
     },
     {
@@ -1274,7 +1300,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "e10f26eb26bbe1f02379c69d4c04d8541802b9b1b09c4ab0390a0c75ebfb482a",
+      "body_sha256": "5d10a17b5f9bab1d02ae43b9f692d81da56a589167535c37c1ebf1b48937ac44",
       "failure_signals": [
         "state_update"
       ]
@@ -1371,7 +1397,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "be5fad8098ccb762dcb340b9dc2f0859f7e6cad5a01f32246ec159728c8be369",
+      "body_sha256": "f32a18dca438471a3a66e59398765cfb34c8c4e9c9f33465fdd5b20aa70c2a82",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -1451,7 +1477,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "d115a8be9c13953b2c6383380876322ccf52828cf84c37364491d128ed31c98b",
+      "body_sha256": "c35895286f584adfadb2ca780432ce2034928199508c27c44adf66bfa911de5f",
       "failure_signals": [
         "bare_reraise",
         "diagnostic",
@@ -1507,22 +1533,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "ae8f36bfa99654fbfcc98098537ed78a7a52a4815ee526429612ee9f6d2c5d24",
-      "failure_signals": [
-        "diagnostic",
-        "return",
-        "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant.handle_routed_text",
-      "ordinal": 4,
-      "classification": "fail_closed_boundary",
-      "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "51c2f87e8773d7ecfe69d0e9642ded4ed0758400f1d125dbe1184c4924f00c02",
+      "body_sha256": "20dae0fafe12231dc87cba46322faeb1a0daf3634a7505df6d205385a6d89671",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -1557,6 +1568,98 @@
       ]
     },
     {
+      "path": "orchestrator/runtime/capability_adapters.py",
+      "symbol": "_with_residual_replan",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "db51771e88ff730d27111c8d9e1c25f1295cdf4e8ae6f4713c92db86bf83d268",
+      "failure_signals": [
+        "return"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/capability_runtime.py",
+      "symbol": "CapabilityRuntime._invoke_provider_cancel",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "a0619797155cda8d9680fa67066dfb54bbceff4822a54c602e0779f906b854b2",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/capability_runtime.py",
+      "symbol": "CapabilityRuntime._run_one",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "79b7004d1fdabd74c5e134e07b96598888a1d6c4eefadb767703c55f56e1bd98",
+      "failure_signals": [
+        "state_update"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/capability_runtime.py",
+      "symbol": "CapabilityRuntime._run_provider_group",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map a provider-local compiled activity exception into explicit failed member results without authorizing partial or unvalidated body work.",
+      "review_status": "reviewed",
+      "body_sha256": "f5067b21ee039023d44286598eb0ffcb0aebe0bd0b223a362e27c895d58f0de1",
+      "failure_signals": [
+        "state_update"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/capability_runtime.py",
+      "symbol": "CapabilityRuntime.execute",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "9dfd73f419e08e94596198f4154747eb2d91872f9aea5ea920686eab870d60c3",
+      "failure_signals": [
+        "bare_reraise"
+      ]
+    },
+    {
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map invalid or exceptional media lifecycle evidence to a failed CapabilityResult without fabricating completion.",
+      "review_status": "reviewed",
+      "path": "orchestrator/runtime/capability_runtime.py",
+      "symbol": "MediaPlaybackCapabilityProvider.execute",
+      "ordinal": 1,
+      "body_sha256": "0d00301200485fd2580c05d09fdbb390dbf03c006aaf0468c30750892c1a4543",
+      "failure_signals": [
+        "return"
+      ]
+    },
+    {
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map invalid or exceptional vocal delivery evidence to a failed CapabilityResult without fabricating completion.",
+      "review_status": "reviewed",
+      "path": "orchestrator/runtime/capability_runtime.py",
+      "symbol": "VocalPerformanceCapabilityProvider.execute",
+      "ordinal": 1,
+      "body_sha256": "6977f2357feb3e3b1f2c8dbad2c5e34076efad491913ed57e06f5bf71206d97c",
+      "failure_signals": [
+        "return"
+      ]
+    },
+    {
       "path": "orchestrator/runtime/cognitive_runtime.py",
       "symbol": "CanonicalPlanRuntimeAdapter._validation_errors",
       "ordinal": 1,
@@ -1577,7 +1680,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "6152a1a1b61706036ec86b0914290876ccbb8fe4ca58ef80753354f5054f8bf2",
+      "body_sha256": "dc935d5a7dc66b95c002b59b2f7b1e179f50bb005bc778542c1029743441d60e",
       "failure_signals": [
         "continue"
       ]
@@ -1656,7 +1759,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "5804723a838f5d0ce439a4dc6b2a0a08c46e804ec6acd6b7375df3f745dcbbe4",
+      "body_sha256": "52ea03f4c8fc975a5bbaa05ce3a8831b8de1673380a389dcb4fe465fdc35358f",
       "failure_signals": [
         "continue",
         "state_update"
@@ -2174,98 +2277,6 @@
       "body_sha256": "7c1d3718a57f4fc602bc2e8723075b6a4526e3d9037f972676bc340c73b55b22",
       "failure_signals": [
         "diagnostic"
-      ]
-    },
-    {
-      "path": "orchestrator/runtime/skill_adapters.py",
-      "symbol": "_with_residual_replan",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "db51771e88ff730d27111c8d9e1c25f1295cdf4e8ae6f4713c92db86bf83d268",
-      "failure_signals": [
-        "return"
-      ]
-    },
-    {
-      "path": "orchestrator/runtime/skill_runtime.py",
-      "symbol": "MediaPlaybackSkillProvider.execute",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map backend or lifecycle-schema failures into a correlated failed media Capability result without claiming completion or selecting another operation.",
-      "review_status": "reviewed",
-      "body_sha256": "c78deeee73fe46e96f8f3609c3d1432edffce918785f81a491e6679fe5935483",
-      "failure_signals": [
-        "return"
-      ]
-    },
-    {
-      "path": "orchestrator/runtime/skill_runtime.py",
-      "symbol": "SkillRuntime._invoke_provider_cancel",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "c35e7ef341c49e1fe428695f68ce92d2b5c9d22745ea6c6f4439cd0ff601a0fa",
-      "failure_signals": [
-        "diagnostic",
-        "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/runtime/skill_runtime.py",
-      "symbol": "SkillRuntime._run_one",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "1beb3f16d6883dca170e29f365a5e6a5695ec761786619e80ac9141458baa6ed",
-      "failure_signals": [
-        "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/runtime/skill_runtime.py",
-      "symbol": "SkillRuntime._run_provider_group",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map a provider-local compiled activity exception into explicit failed member results without authorizing partial or unvalidated body work.",
-      "review_status": "reviewed",
-      "body_sha256": "f5067b21ee039023d44286598eb0ffcb0aebe0bd0b223a362e27c895d58f0de1",
-      "failure_signals": [
-        "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/runtime/skill_runtime.py",
-      "symbol": "SkillRuntime.execute",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "9dfd73f419e08e94596198f4154747eb2d91872f9aea5ea920686eab870d60c3",
-      "failure_signals": [
-        "bare_reraise"
-      ]
-    },
-    {
-      "path": "orchestrator/runtime/skill_runtime.py",
-      "symbol": "VocalPerformanceSkillProvider.execute",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map backend or delivery-schema failures into a correlated failed vocal Capability result without claiming completion or selecting another mode.",
-      "review_status": "reviewed",
-      "body_sha256": "fa785da94b08f604d54977232e82f62769a1385d78f24be789a3c97b960c6c9e",
-      "failure_signals": [
-        "return"
       ]
     },
     {

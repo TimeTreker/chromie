@@ -42,10 +42,10 @@ def _soridormi_bundle() -> CapabilityBundle:
                         input_schema={
                             "type": "object",
                             "properties": {
-                                "skill_id": {"type": "string", "enum": ["walk_forward"]},
+                                "capability_id": {"type": "string", "enum": ["walk_forward"]},
                                 "parameters": {"type": "object"},
                             },
-                            "required": ["skill_id"],
+                            "required": ["capability_id"],
                         },
                         output_schema={"type": "object", "properties": {"plan_id": {"type": "string"}, "summary": {"type": "string"}}},
                         effects=["planning_only", "creates_plan"],
@@ -109,7 +109,7 @@ def _motion_graph() -> TaskGraph:
                     "type": "plan",
                     "depends_on": ["status"],
                     "args": {
-                        "skill_id": "walk_forward",
+                        "capability_id": "walk_forward",
                         "parameters": {"duration_s": 2.0, "speed": "slow"},
                     },
                 },

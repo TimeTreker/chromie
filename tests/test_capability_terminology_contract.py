@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import unittest
 
 from pydantic import ValidationError
@@ -7,17 +8,14 @@ from pydantic import ValidationError
 from agent.app.cognitive_core.goal_interpreter.schema import RouteItem as GoalInterpreterRouteItem
 from agent.app.schema import RouteItem as AgentRouteItem
 from orchestrator.runtime.episode import (
-    EpisodeSkillRequestRecord,
-    EpisodeSkillResultRecord,
+    EpisodeCapabilityRequestRecord,
+    EpisodeCapabilityResultRecord,
 )
 from orchestrator.schemas.route import RouteItem as OrchestratorRouteItem
-from orchestrator.runtime.skill_runtime import (
+from orchestrator.runtime.capability_runtime import (
     CapabilityDefinition,
     CapabilityRegistry,
-    SkillDefinition,
-    SkillRegistry,
-    SkillRuntime,
-    TrustedCapabilityRuntime,
+    CapabilityRuntime,
 )
 from shared.chromie_contracts import (
     CapabilityRequest,
@@ -26,9 +24,6 @@ from shared.chromie_contracts import (
     CanonicalPlanStep,
     ExecutionEvidence,
     InteractionResponse,
-    SkillRequest,
-    SkillResult,
-    SkillTrace,
     RouteItem as SharedRouteItem,
     SocialAttentionBehavior,
     TaskProposal,
@@ -37,91 +32,53 @@ from shared.chromie_contracts.interaction import CapabilityTraceEvent
 
 
 class CapabilityTerminologyContractTests(unittest.TestCase):
-    def test_canonical_request_serializes_only_capability_id(self) -> None:
+    def test_canonical_request_uses_capability_identity_and_version_only(self) -> None:
         request = CapabilityRequest(
             request_id="req-1",
             capability_id="chromie.weather.lookup",
+            capability_version="1.2.3",
             args={"location": "内乡"},
         )
 
         payload = request.model_dump(mode="json")
 
         self.assertEqual(payload["capability_id"], "chromie.weather.lookup")
+        self.assertEqual(payload["capability_version"], "1.2.3")
         self.assertNotIn("skill_id", payload)
-        self.assertEqual(request.skill_id, request.capability_id)
+        self.assertNotIn("skill_version", payload)
+        self.assertNotIn("skill_id", request.model_json_schema()["properties"])
+        self.assertNotIn("skill_version", request.model_json_schema()["properties"])
 
-    def test_legacy_request_normalizes_immediately(self) -> None:
-        request = CapabilityRequest.model_validate(
-            {
-                "request_id": "req-legacy",
-                "skill_id": "soridormi.nod_yes",
-                "args": {},
-            }
-        )
-
-        self.assertEqual(request.capability_id, "soridormi.nod_yes")
-        self.assertEqual(
-            set(request.model_dump(mode="json")),
-            {
-                "capability_id",
-                "request_id",
-                "skill_version",
-                "args",
-                "timing",
-                "timeout_ms",
-                "cancellable",
-                "requires_confirmation",
-                "idempotency_key",
-                "committed_output_schema_sha256",
-                "committed_completion_evidence_sha256",
-                "metadata",
-            },
-        )
-
-    def test_equal_dual_identity_is_accepted_and_canonicalized(self) -> None:
-        request = CapabilityRequest.model_validate(
-            {
-                "request_id": "req-dual",
-                "capability_id": "soridormi.blink_eyes",
-                "skill_id": "soridormi.blink_eyes",
-            }
-        )
-
-        self.assertEqual(request.capability_id, "soridormi.blink_eyes")
-        self.assertNotIn("skill_id", request.model_dump(mode="json"))
-
-    def test_conflicting_dual_identity_fails_closed(self) -> None:
-        with self.assertRaisesRegex(
-            ValidationError,
-            "conflicting capability_id and legacy skill_id",
-        ):
+    def test_legacy_request_identity_is_rejected_instead_of_normalized(self) -> None:
+        with self.assertRaises(ValidationError):
             CapabilityRequest.model_validate(
                 {
-                    "request_id": "req-conflict",
-                    "capability_id": "soridormi.nod_yes",
-                    "skill_id": "soridormi.shake_no",
+                    "request_id": "req-legacy",
+                    "skill_id": "soridormi.nod_yes",
+                    "args": {},
                 }
             )
 
-    def test_legacy_class_aliases_use_canonical_contract(self) -> None:
-        self.assertIs(SkillRequest, CapabilityRequest)
-        self.assertIs(SkillResult, CapabilityResult)
-        self.assertIs(SkillTrace, CapabilityTrace)
-
-        request = SkillRequest(request_id="req-alias", skill_id="chromie.speak")
-        self.assertEqual(request.capability_id, "chromie.speak")
-        self.assertNotIn("skill_id", request.model_dump(mode="json"))
+        with self.assertRaises(ValidationError):
+            CapabilityRequest.model_validate(
+                {
+                    "request_id": "req-legacy-version",
+                    "capability_id": "soridormi.nod_yes",
+                    "skill_version": "1.0.0",
+                }
+            )
 
     def test_result_and_trace_emit_canonical_identity(self) -> None:
         result = CapabilityResult(
             request_id="req-result",
-            skill_id="soridormi.stand_idle",
+            capability_id="soridormi.stand_idle",
+            capability_version="1.0.0",
             status="completed",
         )
         trace = CapabilityTrace(
             interaction_id="interaction-1",
             request_id="req-result",
-            skill_id="soridormi.stand_idle",
+            capability_id="soridormi.stand_idle",
             provider_id="soridormi.mcp",
             events=[CapabilityTraceEvent(type="completed")],
         )
@@ -131,13 +88,13 @@ class CapabilityTerminologyContractTests(unittest.TestCase):
         self.assertNotIn("skill_id", result.model_dump(mode="json"))
         self.assertNotIn("skill_id", trace.model_dump(mode="json"))
 
-    def test_interaction_nested_serialization_is_canonical(self) -> None:
+    def test_interaction_response_uses_capabilities_not_skills(self) -> None:
         response = InteractionResponse(
             interaction_id="interaction-canonical",
-            skills=[
+            capabilities=[
                 {
                     "request_id": "req-nested",
-                    "skill_id": "soridormi.look_at_person",
+                    "capability_id": "soridormi.look_at_person",
                 }
             ],
         )
@@ -145,69 +102,55 @@ class CapabilityTerminologyContractTests(unittest.TestCase):
         payload = response.model_dump(mode="json")
 
         self.assertEqual(
-            payload["skills"][0]["capability_id"],
+            payload["capabilities"][0]["capability_id"],
             "soridormi.look_at_person",
         )
-        self.assertNotIn("skill_id", payload["skills"][0])
+        self.assertNotIn("skills", payload)
+        with self.assertRaises(ValidationError):
+            InteractionResponse.model_validate(
+                {
+                    "interaction_id": "legacy-interaction",
+                    "skills": [
+                        {
+                            "request_id": "legacy-request",
+                            "capability_id": "soridormi.look_at_person",
+                        }
+                    ],
+                }
+            )
 
-    def test_plan_step_accepts_legacy_and_serializes_canonical(self) -> None:
-        step = CanonicalPlanStep(
-            step_id="weather-lookup",
-            skill_id="chromie.weather.lookup",
-            source_goal_ids=["goal-1"],
-        )
-
-        payload = step.model_dump(mode="json")
-
-        self.assertEqual(payload["capability_id"], "chromie.weather.lookup")
-        self.assertNotIn("skill_id", payload)
-
-    def test_execution_evidence_accepts_legacy_and_serializes_canonical(self) -> None:
-        evidence = ExecutionEvidence(
-            evidence_id="evidence-1",
-            request_id="req-1",
-            step_id="weather-lookup",
-            skill_id="chromie.weather.lookup",
-            source_goal_ids=["goal-1"],
-            status="completed",
-        )
-
-        payload = evidence.model_dump(mode="json")
-
-        self.assertEqual(payload["capability_id"], "chromie.weather.lookup")
-        self.assertNotIn("skill_id", payload)
-
-    def test_model_copy_normalizes_legacy_update(self) -> None:
-        request = CapabilityRequest(
-            request_id="req-copy",
-            capability_id="soridormi.nod_yes",
-        )
-
-        copied = request.model_copy(update={"skill_id": "soridormi.shake_no"})
-
-        self.assertEqual(copied.capability_id, "soridormi.shake_no")
-        self.assertNotIn("skill_id", copied.model_dump(mode="json"))
-
-
-    def test_remaining_model_and_evidence_contracts_emit_capability_id(self) -> None:
+    def test_plan_evidence_and_optional_identity_contracts_are_canonical(self) -> None:
         contracts = [
-            SharedRouteItem(route="tool", skill_id="chromie.weather.lookup"),
-            AgentRouteItem(route="tool", skill_id="chromie.weather.lookup"),
-            GoalInterpreterRouteItem(route="tool", skill_id="chromie.weather.lookup"),
-            OrchestratorRouteItem(route="tool", skill_id="chromie.weather.lookup"),
-            SocialAttentionBehavior(skill_id="soridormi.blink_eyes"),
+            CanonicalPlanStep(
+                step_id="weather-lookup",
+                capability_id="chromie.weather.lookup",
+                source_goal_ids=["goal-1"],
+            ),
+            ExecutionEvidence(
+                evidence_id="evidence-1",
+                request_id="req-1",
+                step_id="weather-lookup",
+                capability_id="chromie.weather.lookup",
+                source_goal_ids=["goal-1"],
+                status="completed",
+            ),
+            SharedRouteItem(route="tool", capability_id="chromie.weather.lookup"),
+            AgentRouteItem(route="tool", capability_id="chromie.weather.lookup"),
+            GoalInterpreterRouteItem(route="tool", capability_id="chromie.weather.lookup"),
+            OrchestratorRouteItem(route="tool", capability_id="chromie.weather.lookup"),
+            SocialAttentionBehavior(capability_id="soridormi.blink_eyes"),
             TaskProposal(
                 id="proposal-1",
                 state="advisory",
-                skill_id="chromie.weather.lookup",
+                capability_id="chromie.weather.lookup",
             ),
-            EpisodeSkillRequestRecord(
+            EpisodeCapabilityRequestRecord(
                 request_id="request-episode",
-                skill_id="chromie.weather.lookup",
+                capability_id="chromie.weather.lookup",
             ),
-            EpisodeSkillResultRecord(
+            EpisodeCapabilityResultRecord(
                 request_id="request-episode",
-                skill_id="chromie.weather.lookup",
+                capability_id="chromie.weather.lookup",
                 status="completed",
             ),
         ]
@@ -219,37 +162,34 @@ class CapabilityTerminologyContractTests(unittest.TestCase):
                 self.assertNotIn("skill_id", payload)
                 self.assertNotIn("skill_id", contract.model_json_schema()["properties"])
 
-    def test_optional_identity_contracts_accept_omitted_identity_and_reject_conflict(self) -> None:
-        item = SharedRouteItem(route="chat")
-        self.assertIsNone(item.capability_id)
-        self.assertNotIn("skill_id", item.model_dump(mode="json"))
-
-        with self.assertRaisesRegex(ValidationError, "conflicting capability_id"):
+        optional = SharedRouteItem(route="chat")
+        self.assertIsNone(optional.capability_id)
+        with self.assertRaises(ValidationError):
             SharedRouteItem.model_validate(
-                {
-                    "route": "tool",
-                    "capability_id": "chromie.weather.lookup",
-                    "skill_id": "chromie.memory.retrieve_verified_tool_result",
-                }
+                {"route": "tool", "skill_id": "chromie.weather.lookup"}
             )
 
-    def test_runtime_definition_uses_canonical_identity_with_legacy_reader(self) -> None:
-        definition = CapabilityDefinition(
-            skill_id="chromie.test.capability",
-            provider_id="test.provider",
-        )
+    def test_executable_skill_class_aliases_are_removed(self) -> None:
+        interaction_module = importlib.import_module("shared.chromie_contracts.interaction")
+        runtime_module = importlib.import_module("orchestrator.runtime.capability_runtime")
+        shared_package = importlib.import_module("shared.chromie_contracts")
 
-        payload = definition.model_dump(mode="json")
+        for name in ("SkillRequest", "SkillResult", "SkillTrace", "SkillTraceEvent"):
+            self.assertFalse(hasattr(interaction_module, name), name)
+            self.assertFalse(hasattr(shared_package, name), name)
 
-        self.assertEqual(definition.capability_id, "chromie.test.capability")
-        self.assertEqual(definition.skill_id, "chromie.test.capability")
-        self.assertEqual(payload["capability_id"], "chromie.test.capability")
-        self.assertNotIn("skill_id", payload)
+        for name in (
+            "SkillRuntime",
+            "SkillDefinition",
+            "SkillRegistry",
+            "SkillProvider",
+            "TrustedCapabilityRuntime",
+        ):
+            self.assertFalse(hasattr(runtime_module, name), name)
 
-    def test_runtime_names_are_canonical_aliases_not_second_authority(self) -> None:
-        self.assertIs(CapabilityDefinition, SkillDefinition)
-        self.assertIs(CapabilityRegistry, SkillRegistry)
-        self.assertIs(TrustedCapabilityRuntime, SkillRuntime)
+        self.assertTrue(issubclass(CapabilityDefinition, object))
+        self.assertTrue(issubclass(CapabilityRegistry, object))
+        self.assertTrue(issubclass(CapabilityRuntime, object))
 
 
 if __name__ == "__main__":

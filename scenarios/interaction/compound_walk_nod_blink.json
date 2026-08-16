@@ -43,7 +43,7 @@
     }
   },
   "expect": {
-    "skills": ["soridormi.walk_velocity", "soridormi.nod_yes", "soridormi.blink_eyes"],
+    "capabilities": ["soridormi.walk_velocity", "soridormi.nod_yes", "soridormi.blink_eyes"],
     "requires_confirmation": true
   }
 }

@@ -86,7 +86,7 @@ class ConfirmationDialogue:
         ttl_s: float | None = None,
     ) -> PendingConfirmation:
         request_ids = frozenset(confirmed_request_ids)
-        known_ids = {request.request_id for request in response.skills}
+        known_ids = {request.request_id for request in response.capabilities}
         if not request_ids:
             raise ValueError("confirmation must bind at least one skill request")
         if not request_ids.issubset(known_ids):
@@ -243,7 +243,7 @@ def pending_confirmation_goal_ids(
     """Return the exact Goals owned by the confirmation-bound requests."""
 
     goal_ids: set[str] = set()
-    for request in pending.response.skills:
+    for request in pending.response.capabilities:
         if request.request_id not in pending.confirmed_request_ids:
             continue
         metadata = request.metadata if isinstance(request.metadata, dict) else {}
@@ -296,7 +296,7 @@ def _request_fingerprint(
         "interaction_id": response.interaction_id,
         "requests": [
             request.model_dump(mode="json")
-            for request in response.skills
+            for request in response.capabilities
             if request.request_id in request_ids
         ],
     }

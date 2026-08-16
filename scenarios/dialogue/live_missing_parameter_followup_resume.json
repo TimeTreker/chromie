@@ -65,7 +65,7 @@
         "ollama_reply": {
           "decision": "clarify",
           "speech": "你希望我往前走多少秒？眨眼次数我可以采用一个自然的小次数。",
-          "skills": [],
+          "capabilities": [],
           "information_gaps": [
             {
               "gap_id": "soridormi.walk_forward:duration_s",
@@ -135,16 +135,16 @@
         "ollama_reply": {
           "decision": "propose_alternative",
           "speech": "我可以先往前走十五秒，再眨四下眼睛，可以吗？",
-          "skills": [
+          "capabilities": [
             {
-              "skill_id": "soridormi.walk_forward",
+              "capability_id": "soridormi.walk_forward",
               "proposed_args": {"duration_s": 15, "speed": "normal"},
               "parameter_grounding": {"duration_s": {"resolution": "user_supplied"}},
               "timing": "sequential",
               "step_id": "walk"
             },
             {
-              "skill_id": "soridormi.blink_eyes",
+              "capability_id": "soridormi.blink_eyes",
               "proposed_args": {"count": 4},
               "parameter_grounding": {"count": {"resolution": "use_safe_default"}},
               "timing": "sequential",
@@ -158,7 +158,7 @@
         }
       },
       "expect": {
-        "skills": ["soridormi.walk_forward", "soridormi.blink_eyes"],
+        "capabilities": ["soridormi.walk_forward", "soridormi.blink_eyes"],
         "skill_args": [
           {"duration_s": 15.0, "speed": "normal"},
           {"count": 4}

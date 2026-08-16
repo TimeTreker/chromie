@@ -12,13 +12,13 @@ from orchestrator.runtime.session import (
     now_ms,
     summarize_provider_start_evidence,
 )
-from orchestrator.runtime.skill_runtime import SkillRuntimeResult
+from orchestrator.runtime.capability_runtime import CapabilityRuntimeResult
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
-    SkillRequest,
-    SkillTrace,
-    SkillTraceEvent,
+    CapabilityRequest,
+    CapabilityTrace,
+    CapabilityTraceEvent,
 )
 
 
@@ -29,13 +29,13 @@ class SessionEvidenceTests(unittest.TestCase):
         request_id: str,
         capability_id: str,
         provider_id: str,
-    ) -> SkillTrace:
-        return SkillTrace(
+    ) -> CapabilityTrace:
+        return CapabilityTrace(
             interaction_id="interaction-evidence",
             request_id=request_id,
-            skill_id=capability_id,
+            capability_id=capability_id,
             provider_id=provider_id,
-            events=[SkillTraceEvent(type="started")],
+            events=[CapabilityTraceEvent(type="started")],
         )
 
     def test_provider_start_evidence_scopes_speech_away_from_requested_work(self) -> None:
@@ -43,7 +43,7 @@ class SessionEvidenceTests(unittest.TestCase):
             interaction_id="interaction-evidence",
             speech=[InteractionSpeech(id="speech-fallback", text="I could not do that.")],
         )
-        execution = SkillRuntimeResult(
+        execution = CapabilityRuntimeResult(
             interaction_id=response.interaction_id,
             status="completed",
             traces=[
@@ -67,15 +67,15 @@ class SessionEvidenceTests(unittest.TestCase):
         response = InteractionResponse(
             interaction_id="interaction-evidence",
             speech=[InteractionSpeech(id="speech-result", text="Here is the result.")],
-            skills=[
-                SkillRequest(
+            capabilities=[
+                CapabilityRequest(
                     request_id="weather-request",
-                    skill_id="chromie.weather.lookup",
+                    capability_id="chromie.weather.lookup",
                     args={"location": "Shanghai"},
                 )
             ],
         )
-        execution = SkillRuntimeResult(
+        execution = CapabilityRuntimeResult(
             interaction_id=response.interaction_id,
             status="completed",
             traces=[
@@ -221,7 +221,7 @@ class SessionEvidenceTests(unittest.TestCase):
             interaction_id="fallback-interaction",
             speech=[InteractionSpeech(id="fallback-speech", text="No verified result yet.")],
         )
-        execution = SkillRuntimeResult(
+        execution = CapabilityRuntimeResult(
             interaction_id=response.interaction_id,
             status="completed",
             traces=[
@@ -416,7 +416,7 @@ class SessionEvidenceTests(unittest.TestCase):
             tracker.log(sid, "agent_start: route=%s agents=%s intent=%s", "robot_action", "capability_agent,speaker_agent", "robot_action")
             tracker.log(
                 sid,
-                "interaction_done: agent_ms=%.1f speech=%s skills=%s requires_confirmation=%s",
+                "interaction_done: agent_ms=%.1f speech=%s capabilities=%s requires_confirmation=%s",
                 1000.0,
                 1,
                 0,
@@ -424,7 +424,7 @@ class SessionEvidenceTests(unittest.TestCase):
             )
             tracker.log(
                 sid,
-                "skill_runtime_done: status=%s results=%s traces=%s runtime_ms=%.1f",
+                "capability_runtime_done: status=%s results=%s traces=%s runtime_ms=%.1f",
                 "completed",
                 1,
                 1,
@@ -448,7 +448,7 @@ class SessionEvidenceTests(unittest.TestCase):
             self.assertIn("goal_interpretation_done:", message)
             self.assertIn("agent_start:", message)
             self.assertIn("interaction_done:", message)
-            self.assertIn("skill_runtime_done:", message)
+            self.assertIn("capability_runtime_done:", message)
             self.assertIn("tts_schedule:", message)
             self.assertIn("playback_end:", message)
             self.assertIn("session_done:", message)
@@ -589,7 +589,7 @@ class SessionEvidenceTests(unittest.TestCase):
             with self.assertLogs("orchestrator.runtime.session", level="ERROR") as error_logs:
                 tracker.log(
                     sid,
-                    "skill_result: request_id=%s skill_id=%s status=%s reason=%s message=%s",
+                    "capability_result: request_id=%s capability_id=%s status=%s reason=%s message=%s",
                     "move-1",
                     "soridormi.walk_forward",
                     "failed",
@@ -600,7 +600,7 @@ class SessionEvidenceTests(unittest.TestCase):
 
             records = [json.loads(line) for line in path.read_text().splitlines()]
             interpretation_records = [record for record in records if record["event"] == "goal_interpretation_done"]
-            skill_records = [record for record in records if record["event"] == "skill_result"]
+            skill_records = [record for record in records if record["event"] == "capability_result"]
             self.assertEqual(interpretation_records[-1]["severity"], "warning")
             self.assertEqual(skill_records[-1]["severity"], "error")
 
@@ -659,7 +659,7 @@ class SessionEvidenceTests(unittest.TestCase):
             with self.assertLogs("orchestrator.runtime.session", level="ERROR") as error_logs:
                 tracker.log(
                     sid,
-                    "skill_runtime_done: status=%s results=%s traces=%s runtime_ms=%.1f",
+                    "capability_runtime_done: status=%s results=%s traces=%s runtime_ms=%.1f",
                     "failed",
                     0,
                     1,

@@ -48,8 +48,8 @@
     "intent": "general_conversation",
     "source": "llm",
     "task_types_include": ["speech.answer"],
-    "task_types_forbid": ["task.execute_skill"],
-    "metadata_json_forbid": ["\"recovered_from_route\": \"chat\"", "\"task_type\": \"task.execute_skill\""],
+    "task_types_forbid": ["task.execute_capability"],
+    "metadata_json_forbid": ["\"recovered_from_route\": \"chat\"", "\"task_type\": \"task.execute_capability\""],
     "llm_calls": 1
   }
 }

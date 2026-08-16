@@ -9,14 +9,14 @@ try:
     from chromie_contracts.interaction import (
         InteractionResponse,
         InteractionSpeech,
-        SkillRequest,
+        CapabilityRequest,
     )
     from chromie_contracts.task_proposal import TaskProposal
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.interaction import (
         InteractionResponse,
         InteractionSpeech,
-        SkillRequest,
+        CapabilityRequest,
     )
     from shared.chromie_contracts.task_proposal import TaskProposal
 
@@ -47,8 +47,8 @@ def _validation_error_summary(exc: Exception) -> str:
     return message[:500] or type(exc).__name__
 
 
-class LegacyActionSkillMapper:
-    """Map the established ActionCommand contract to trusted SkillRequest values."""
+class LegacyActionCapabilityMapper:
+    """Map the established ActionCommand contract to trusted CapabilityRequest values."""
 
     _RESERVED_METADATA_KEYS = frozenset(
         {
@@ -61,16 +61,16 @@ class LegacyActionSkillMapper:
         }
     )
 
-    def to_skill(self, action: ActionCommand) -> SkillRequest:
-        skill_id, args = self._named_skill(action)
-        translated_named_skill = skill_id != action.type
-        return SkillRequest(
+    def to_capability(self, action: ActionCommand) -> CapabilityRequest:
+        capability_id, args = self._named_capability(action)
+        translated_named_capability = capability_id != action.type
+        return CapabilityRequest(
             request_id=action.id,
-            skill_id=skill_id,
-            skill_version=action.metadata.get("skill_version"),
+            capability_id=capability_id,
+            capability_version=action.metadata.get("capability_version"),
             args=args,
             timing="sequential" if action.blocking else "parallel",
-            timeout_ms=None if translated_named_skill else action.timeout_ms,
+            timeout_ms=None if translated_named_capability else action.timeout_ms,
             requires_confirmation=action.requires_confirmation,
             metadata={
                 **action.metadata,
@@ -83,15 +83,15 @@ class LegacyActionSkillMapper:
             },
         )
 
-    def to_action(self, request: SkillRequest) -> ActionCommand:
+    def to_action(self, request: CapabilityRequest) -> ActionCommand:
         metadata = request.metadata
-        action_type = str(metadata.get("legacy_action_type") or request.skill_id)
+        action_type = str(metadata.get("legacy_action_type") or request.capability_id)
         target = str(metadata.get("legacy_target") or "tool_executor")
         raw_params = metadata.get("legacy_params")
         params = (
             dict(raw_params)
             if isinstance(raw_params, dict)
-            else self._legacy_params_from_named_skill(request)
+            else self._legacy_params_from_named_capability(request)
         )
         action_metadata = {
             key: value
@@ -110,10 +110,10 @@ class LegacyActionSkillMapper:
             metadata=action_metadata,
         )
 
-    def is_legacy_action_skill(self, request: SkillRequest) -> bool:
+    def is_legacy_action_capability(self, request: CapabilityRequest) -> bool:
         return "legacy_action_type" in request.metadata
 
-    def _named_skill(self, action: ActionCommand) -> tuple[str, dict[str, Any]]:
+    def _named_capability(self, action: ActionCommand) -> tuple[str, dict[str, Any]]:
         if action.type == "head.nod":
             return "soridormi.nod_yes", {
                 "count": max(2, int(action.params.get("times", 1))),
@@ -128,14 +128,14 @@ class LegacyActionSkillMapper:
             if isinstance(duration_ms, (int, float)) and duration_ms > 0:
                 args["duration_s"] = duration_ms / 1000.0
             return "soridormi.look_at_person", args
-        return str(action.metadata.get("skill_id") or action.type), dict(action.params)
+        return str(action.metadata.get("capability_id") or action.type), dict(action.params)
 
-    def _legacy_params_from_named_skill(self, request: SkillRequest) -> dict[str, Any]:
-        if request.skill_id == "soridormi.nod_yes":
+    def _legacy_params_from_named_capability(self, request: CapabilityRequest) -> dict[str, Any]:
+        if request.capability_id == "soridormi.nod_yes":
             return {"times": int(request.args.get("count", 2))}
-        if request.skill_id == "soridormi.shake_no":
+        if request.capability_id == "soridormi.shake_no":
             return {"times": int(request.args.get("count", 2))}
-        if request.skill_id == "soridormi.look_at_person":
+        if request.capability_id == "soridormi.look_at_person":
             duration_s = request.args.get("duration_s")
             if isinstance(duration_s, (int, float)) and duration_s > 0:
                 return {"duration_ms": int(duration_s * 1000)}
@@ -148,7 +148,7 @@ class InteractionDraft:
 
     Existing specialized agents still use the established helper surface
     (`add_action`, `speak_immediate`, and so on), but those operations are
-    projected into InteractionSpeech and SkillRequest objects immediately.
+    projected into InteractionSpeech and CapabilityRequest objects immediately.
     There is no AgentResult-to-InteractionResponse conversion at the end of the
     native pipeline.
     """
@@ -162,20 +162,20 @@ class InteractionDraft:
         self.trace: list[str] = []
         self.metadata: dict[str, Any] = {}
         self._speech: list[InteractionSpeech] = []
-        self._skills: list[SkillRequest] = []
-        self._mapper = LegacyActionSkillMapper()
+        self._capabilities: list[CapabilityRequest] = []
+        self._mapper = LegacyActionCapabilityMapper()
 
     @property
     def speak_immediate(self) -> list[SpeakItem]:
         return [
             self._to_speak_item(item)
             for item in self._speech
-            if item.timing != "after_skills"
+            if item.timing != "after_capabilities"
         ]
 
     @speak_immediate.setter
     def speak_immediate(self, items: list[SpeakItem]) -> None:
-        after = [item for item in self._speech if item.timing == "after_skills"]
+        after = [item for item in self._speech if item.timing == "after_capabilities"]
         self._speech = [self._to_interaction_speech(item, timing="immediate") for item in items]
         self._speech.extend(after)
 
@@ -184,34 +184,34 @@ class InteractionDraft:
         return [
             self._to_speak_item(item)
             for item in self._speech
-            if item.timing == "after_skills"
+            if item.timing == "after_capabilities"
         ]
 
     @speak_after.setter
     def speak_after(self, items: list[SpeakItem]) -> None:
-        immediate = [item for item in self._speech if item.timing != "after_skills"]
+        immediate = [item for item in self._speech if item.timing != "after_capabilities"]
         self._speech = immediate + [
-            self._to_interaction_speech(item, timing="after_skills") for item in items
+            self._to_interaction_speech(item, timing="after_capabilities") for item in items
         ]
 
     @property
     def actions(self) -> list[ActionCommand]:
         return [
             self._mapper.to_action(item)
-            for item in self._skills
-            if self._mapper.is_legacy_action_skill(item)
+            for item in self._capabilities
+            if self._mapper.is_legacy_action_capability(item)
         ]
 
     @actions.setter
     def actions(self, actions: list[ActionCommand]) -> None:
         native_only = [
             item
-            for item in self._skills
-            if not self._mapper.is_legacy_action_skill(item)
+            for item in self._capabilities
+            if not self._mapper.is_legacy_action_capability(item)
         ]
-        self._skills = native_only + [self._mapper.to_skill(action) for action in actions]
+        self._capabilities = native_only + [self._mapper.to_capability(action) for action in actions]
         self.requires_confirmation = any(
-            item.requires_confirmation for item in self._skills
+            item.requires_confirmation for item in self._capabilities
         )
 
     def add_speak_immediate(
@@ -251,7 +251,7 @@ class InteractionDraft:
             self._speech.append(
                 InteractionSpeech(
                     text=normalized,
-                    timing="after_skills",
+                    timing="after_capabilities",
                     style=style,
                     priority=priority,
                     metadata=metadata,
@@ -259,8 +259,8 @@ class InteractionDraft:
             )
 
     def normalize_speech(self, max_chars: int) -> None:
-        immediate = [item for item in self._speech if item.timing != "after_skills"]
-        after = [item for item in self._speech if item.timing == "after_skills"]
+        immediate = [item for item in self._speech if item.timing != "after_capabilities"]
+        after = [item for item in self._speech if item.timing == "after_capabilities"]
         self._speech = [
             *self._dedupe_and_trim_speech(immediate, max_chars),
             *self._dedupe_and_trim_speech(after, max_chars),
@@ -286,29 +286,29 @@ class InteractionDraft:
             requires_confirmation=requires_confirmation,
             reason=reason,
         )
-        self._skills.append(self._mapper.to_skill(action))
+        self._capabilities.append(self._mapper.to_capability(action))
         if requires_confirmation:
             self.requires_confirmation = True
         return action
 
-    def add_skill(self, request: SkillRequest) -> SkillRequest:
-        self._skills.append(request)
+    def add_capability(self, request: CapabilityRequest) -> CapabilityRequest:
+        self._capabilities.append(request)
         if request.requires_confirmation:
             self.requires_confirmation = True
         return request
 
-    def add_task_graph(self, graph: dict[str, Any]) -> SkillRequest:
+    def add_task_graph(self, graph: dict[str, Any]) -> CapabilityRequest:
         requires_confirmation = self.requires_confirmation or bool(
             graph.get("requires_confirmation")
         )
-        request = SkillRequest(
-            skill_id="chromie.task_graph.execute",
+        request = CapabilityRequest(
+            capability_id="chromie.task_graph.execute",
             args={"graph": graph},
             timing="sequential",
             requires_confirmation=requires_confirmation,
             metadata={"source": "task_graph_planner"},
         )
-        self._skills.append(request)
+        self._capabilities.append(request)
         if requires_confirmation:
             self.requires_confirmation = True
         return request
@@ -317,13 +317,13 @@ class InteractionDraft:
         status = "refused" if self.status == "blocked" else self.status
         agent_task_proposals = _agent_task_proposals(
             self._speech,
-            self._skills,
+            self._capabilities,
         )
         return InteractionResponse.model_validate(
             {
                 "status": status,
                 "speech": [item.model_dump(mode="json") for item in self._speech],
-                "skills": [item.model_dump(mode="json") for item in self._skills],
+                "capabilities": [item.model_dump(mode="json") for item in self._capabilities],
                 "requires_confirmation": self.requires_confirmation,
                 "reason": self.reason,
                 "metadata": {
@@ -357,7 +357,7 @@ class InteractionDraft:
         self,
         item: SpeakItem,
         *,
-        timing: Literal["immediate", "after_skills"],
+        timing: Literal["immediate", "after_capabilities"],
     ) -> InteractionSpeech:
         metadata = dict(item.metadata)
         if item.after_action_id:
@@ -398,7 +398,7 @@ class AgentResultInteractionAdapter:
     """
 
     def __init__(self) -> None:
-        self._mapper = LegacyActionSkillMapper()
+        self._mapper = LegacyActionCapabilityMapper()
 
     def convert(self, result: AgentResult) -> InteractionResponse:
         speech = [
@@ -415,7 +415,7 @@ class AgentResultInteractionAdapter:
         speech.extend(
             InteractionSpeech(
                 text=item.text,
-                timing="after_skills",
+                timing="after_capabilities",
                 style=item.style,
                 priority=item.priority,
                 interruptible=item.interruptible,
@@ -423,10 +423,10 @@ class AgentResultInteractionAdapter:
             )
             for item in result.speak_after
         )
-        skills = [self._mapper.to_skill(action) for action in result.actions]
-        skills.extend(
-            SkillRequest(
-                skill_id="chromie.task_graph.execute",
+        capabilities = [self._mapper.to_capability(action) for action in result.actions]
+        capabilities.extend(
+            CapabilityRequest(
+                capability_id="chromie.task_graph.execute",
                 args={"graph": graph},
                 timing="sequential",
                 requires_confirmation=result.requires_confirmation
@@ -434,11 +434,11 @@ class AgentResultInteractionAdapter:
             )
             for graph in result.task_graphs
         )
-        agent_task_proposals = _agent_task_proposals(speech, skills)
+        agent_task_proposals = _agent_task_proposals(speech, capabilities)
         return InteractionResponse(
             status="refused" if result.status == "blocked" else result.status,
             speech=speech,
-            skills=skills,
+            capabilities=capabilities,
             requires_confirmation=result.requires_confirmation,
             reason=result.reason,
             metadata={
@@ -469,7 +469,7 @@ class NativeInteractionOutputError(RuntimeError):
 
 def _agent_task_proposals(
     speech: list[InteractionSpeech],
-    skills: list[SkillRequest],
+    capabilities: list[CapabilityRequest],
 ) -> list[dict[str, Any]]:
     proposals: list[dict[str, Any]] = []
     for index, item in enumerate(speech):
@@ -479,7 +479,7 @@ def _agent_task_proposals(
                 source=str(item.metadata.get("source") or "agent"),
                 proposal_kind="speech",
                 task_type="speech.speak",
-                skill_id="chromie.speak",
+                capability_id="chromie.speak",
                 state="committed",
                 reason="Agent speech committed to InteractionResponse",
                 effectful=False,
@@ -491,22 +491,22 @@ def _agent_task_proposals(
             ).model_dump(mode="json", exclude_none=True)
         )
     offset = len(proposals)
-    for index, item in enumerate(skills):
+    for index, item in enumerate(capabilities):
         if item.metadata.get("auxiliary_social_attention") is True:
             continue
-        skill_id = item.skill_id
+        capability_id = item.capability_id
         proposals.append(
             TaskProposal(
                 id=f"agent:skill:{item.request_id}",
                 source=str(item.metadata.get("source") or "agent"),
                 proposal_kind="skill",
-                task_type=_task_type_for_skill(skill_id),
+                task_type=_task_type_for_capability(capability_id),
                 state="committed",
                 reason="Agent skill committed to InteractionResponse",
-                effectful=_is_effectful_skill(skill_id),
+                effectful=_is_effectful_skill(capability_id),
                 priority="normal",
                 sequence=offset + index,
-                skill_id=skill_id,
+                capability_id=capability_id,
                 request_id=item.request_id,
                 timing=item.timing,
                 requires_confirmation=item.requires_confirmation,
@@ -515,24 +515,24 @@ def _agent_task_proposals(
     return proposals
 
 
-def _task_type_for_skill(skill_id: str) -> str:
-    if skill_id == "chromie.speak":
+def _task_type_for_capability(capability_id: str) -> str:
+    if capability_id == "chromie.speak":
         return "speech.speak"
-    if skill_id == "session.interrupt":
+    if capability_id == "session.interrupt":
         return "task.cancel_current_action"
-    if skill_id == "chromie.task_graph.execute":
+    if capability_id == "chromie.task_graph.execute":
         return "task.execute_task_graph"
-    return "task.execute_skill"
+    return "task.execute_capability"
 
 
-def _is_effectful_skill(skill_id: str) -> bool:
+def _is_effectful_skill(capability_id: str) -> bool:
     return (
-        skill_id.startswith("soridormi.")
-        or skill_id == "session.interrupt"
-        or skill_id == "chromie.task_graph.execute"
+        capability_id.startswith("soridormi.")
+        or capability_id == "session.interrupt"
+        or capability_id == "chromie.task_graph.execute"
         or (
-            skill_id.startswith("chromie.")
-            and skill_id != "chromie.speak"
+            capability_id.startswith("chromie.")
+            and capability_id != "chromie.speak"
         )
     )
 

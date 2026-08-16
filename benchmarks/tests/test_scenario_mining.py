@@ -62,7 +62,7 @@ def _candidate(text: str = "Walk forward, not a social gesture.") -> dict:
                 "id": "turn_1",
                 "ask": text,
                 "stub": {"route_decision": {"route": "robot_action"}},
-                "expect": {"forbidden_skills": ["soridormi.look_at_person"]},
+                "expect": {"forbidden_capabilities": ["soridormi.look_at_person"]},
             }
         ],
     }

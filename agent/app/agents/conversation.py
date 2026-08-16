@@ -514,7 +514,7 @@ class ConversationAgent(BaseAgent):
 
         normalized = [item for item in candidates if isinstance(item, dict)]
         capability_ids = [
-            str(item.get("capability_id") or item.get("skill_id") or "").strip()
+            str(item.get("capability_id") or "").strip()
             for item in normalized
         ]
         capability_ids = [item for item in capability_ids if item]
@@ -528,7 +528,7 @@ class ConversationAgent(BaseAgent):
         ]
         lines.append("能力详情：" if zh else "Capability details:")
         for item in normalized[:12]:
-            capability_id = str(item.get("capability_id") or item.get("skill_id") or "")
+            capability_id = str(item.get("capability_id") or "")
             description = str(item.get("description") or "")
             api = json.dumps(
                 item.get("input_schema") or {},

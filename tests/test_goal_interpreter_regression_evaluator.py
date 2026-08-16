@@ -19,7 +19,7 @@ class GoalInterpreterRegressionEvaluatorTests(unittest.TestCase):
             "intent": "compound_robot_action",
             "actions": [
                 {"capability_id": "soridormi.walk_velocity"},
-                {"skill_id": "soridormi.turn_in_place"},
+                {"capability_id": "soridormi.turn_in_place"},
                 {"intent": "capability:soridormi.nod_yes"},
             ],
         }

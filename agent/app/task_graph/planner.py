@@ -54,7 +54,7 @@ class TaskGraphPlanner:
             "You are Chromie's TaskGraph planner. Return one JSON object matching the requested schema. "
             "Use only tools listed in the capability registry. Never invent tool names. "
             "Do not call restricted or unavailable tools. Physical motion must depend on a confirmation node "
-            "and be covered by a safety monitor. Use concrete Soridormi named skills only when the "
+            "and be covered by a safety monitor. Use concrete Soridormi named capabilities only when the "
             "request is explicit and bounded by the user. For richer embodied goals such as navigation, "
             "approach, inspection, recovery, or object delivery, use soridormi.task.get_capabilities, "
             "soridormi.task.preview, soridormi.task.submit, and task monitoring instead of lowering the "

@@ -25,11 +25,11 @@ from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.host_settings import HostSettingsSnapshot
 from orchestrator.runtime.mind import MindManager
 from orchestrator.runtime.session import SessionTracker
-from orchestrator.runtime.skill_runtime import SkillRuntimeResult
+from orchestrator.runtime.capability_runtime import CapabilityRuntimeResult
 from orchestrator.schemas.route import RouteDecision
 from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision as AgentRouteDecision
 from shared.chromie_contracts.mind import default_mind_profile
-from shared.chromie_contracts.interaction import InteractionResponse, SkillResult
+from shared.chromie_contracts.interaction import InteractionResponse, CapabilityResult
 
 
 class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
@@ -113,7 +113,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         response = InteractionResponse(
             status="error",
             speech=[],
-            skills=[],
+            capabilities=[],
             metadata={"source": "test_failure"},
         )
 
@@ -630,7 +630,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 self,
                 response: InteractionResponse,
             ) -> set[str]:
-                return {request.request_id for request in response.skills}
+                return {request.request_id for request in response.capabilities}
 
 
         def session_log(
@@ -676,15 +676,15 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
         response = InteractionResponse(
             interaction_id="interaction-confirm-denied",
-            skills=[
+            capabilities=[
                 {
                     "request_id": "walk-1",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "metadata": {"source_goal_ids": ["goal-walk"]},
                 },
                 {
                     "request_id": "blink-1",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "metadata": {"source_goal_ids": ["goal-blink"]},
                 },
             ],
@@ -771,7 +771,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 self,
                 response: InteractionResponse,
             ) -> set[str]:
-                return {request.request_id for request in response.skills}
+                return {request.request_id for request in response.capabilities}
 
 
         def session_log(
@@ -813,15 +813,15 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
         response = InteractionResponse(
             interaction_id="interaction-confirm-approved",
-            skills=[
+            capabilities=[
                 {
                     "request_id": "walk-1",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "metadata": {"source_goal_ids": ["goal-walk"]},
                 },
                 {
                     "request_id": "blink-1",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "metadata": {"source_goal_ids": ["goal-blink"]},
                 },
             ],
@@ -2033,9 +2033,9 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 *,
                 session_id: str | None,
                 confirmed_request_ids: set[str] | None = None,
-            ) -> SkillRuntimeResult:
+            ) -> CapabilityRuntimeResult:
                 del session_id, confirmed_request_ids
-                return SkillRuntimeResult(
+                return CapabilityRuntimeResult(
                     interaction_id=response.interaction_id,
                     status="completed",
                 )
@@ -2080,9 +2080,9 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 *,
                 session_id: str | None,
                 confirmed_request_ids: set[str] | None = None,
-            ) -> SkillRuntimeResult:
+            ) -> CapabilityRuntimeResult:
                 del session_id, confirmed_request_ids
-                return SkillRuntimeResult(
+                return CapabilityRuntimeResult(
                     interaction_id=response.interaction_id,
                     status="completed",
                 )
@@ -2093,7 +2093,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
         await assistant.execute_interaction_response(
             InteractionResponse(
-                skills=[{"skill_id": "soridormi.express_attention"}],
+                capabilities=[{"capability_id": "soridormi.express_attention"}],
             ),
             session_id,
             reset_playback=False,
@@ -2122,7 +2122,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             self: VoiceAssistant,
             *,
             response: InteractionResponse,
-            execution: SkillRuntimeResult | None,
+            execution: CapabilityRuntimeResult | None,
             session_id: str | None,
         ) -> None:
             return None
@@ -2144,15 +2144,15 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 *,
                 session_id: str | None,
                 confirmed_request_ids: set[str] | None = None,
-            ) -> SkillRuntimeResult:
+            ) -> CapabilityRuntimeResult:
                 del confirmed_request_ids
-                return SkillRuntimeResult(
+                return CapabilityRuntimeResult(
                     interaction_id=response.interaction_id,
                     status="cancelled",
                     results=[
                         {
                             "request_id": "speech-1",
-                            "skill_id": "chromie.speak",
+                            "capability_id": "chromie.speak",
                             "status": "completed",
                         }
                     ],
@@ -2168,9 +2168,9 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         await assistant.execute_interaction_response(
             InteractionResponse(
                 speech=[{"id": "speech-1", "text": "Moving."}],
-                skills=[
-                    {"request_id": "walk-1", "skill_id": "soridormi.walk_forward"},
-                    {"request_id": "turn-1", "skill_id": "soridormi.turn_left"},
+                capabilities=[
+                    {"request_id": "walk-1", "capability_id": "soridormi.walk_forward"},
+                    {"request_id": "turn-1", "capability_id": "soridormi.turn_left"},
                 ],
             ),
             session_id,
@@ -2212,7 +2212,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             self: VoiceAssistant,
             *,
             response: InteractionResponse,
-            execution: SkillRuntimeResult | None,
+            execution: CapabilityRuntimeResult | None,
             session_id: str | None,
             errors: list[str] | None = None,
         ) -> None:
@@ -2262,17 +2262,17 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 *,
                 session_id: str | None,
                 confirmed_request_ids: set[str] | None = None,
-            ) -> SkillRuntimeResult:
+            ) -> CapabilityRuntimeResult:
                 del session_id, confirmed_request_ids
                 execute_calls.append(response)
                 if len(execute_calls) == 1:
-                    return SkillRuntimeResult(
+                    return CapabilityRuntimeResult(
                         interaction_id=response.interaction_id,
                         status="failed",
                         results=[
-                            SkillResult(
+                            CapabilityResult(
                                 request_id="grasp-1",
-                                skill_id="soridormi.grasp_object",
+                                capability_id="soridormi.grasp_object",
                                 status="failed",
                                 reason_code="execution_incomplete",
                                 output={
@@ -2283,13 +2283,13 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                             )
                         ],
                     )
-                return SkillRuntimeResult(
+                return CapabilityRuntimeResult(
                     interaction_id=response.interaction_id,
                     status="completed",
                     results=[
-                        SkillResult(
+                        CapabilityResult(
                             request_id=response.speech[0].id,
-                            skill_id="chromie.speak",
+                            capability_id="chromie.speak",
                             status="completed",
                             output={"playback_started": True},
                         )
@@ -2306,10 +2306,10 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         await assistant.execute_interaction_response(
             InteractionResponse(
                 interaction_id="interaction-grasp",
-                skills=[
+                capabilities=[
                     {
                         "request_id": "grasp-1",
-                        "skill_id": "soridormi.grasp_object",
+                        "capability_id": "soridormi.grasp_object",
                         "args": {"object": "cup"},
                     }
                 ],
@@ -2328,7 +2328,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             frozenset({"grasp-1_recovery1"}),
         )
         self.assertEqual(
-            pending.response.skills[0].metadata["body_recovery_attempt"],
+            pending.response.capabilities[0].metadata["body_recovery_attempt"],
             1,
         )
         self.assertEqual(pending_records[0]["task_type"], "body_recovery_confirmation")
@@ -2361,13 +2361,13 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             "Please confirm.",
             style="confirm",
         )
-        execution = SkillRuntimeResult(
+        execution = CapabilityRuntimeResult(
             interaction_id=response.interaction_id,
             status="completed",
             results=[
-                SkillResult(
+                CapabilityResult(
                     request_id=response.speech[0].id,
-                    skill_id="chromie.speak",
+                    capability_id="chromie.speak",
                     status="completed",
                     output={"scheduled": True},
                 )

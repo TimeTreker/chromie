@@ -12,13 +12,13 @@ from orchestrator.runtime.cognitive_runtime import (
     GoalDrivenRuntimeCoordinator,
 )
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
-from orchestrator.runtime.skill_runtime import SkillDefinition
+from orchestrator.runtime.capability_runtime import CapabilityDefinition
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
-    SkillRequest,
-    SkillResult,
+    CapabilityRequest,
+    CapabilityResult,
 )
 from shared.chromie_contracts.semantic_task import SemanticGoal
 from shared.chromie_contracts.social_attention import SocialAttentionPlan
@@ -58,9 +58,9 @@ def social_activity_context(
     }
 
 
-def blink_definition() -> SkillDefinition:
-    return SkillDefinition(
-        skill_id="chromie.social.blink",
+def blink_definition() -> CapabilityDefinition:
+    return CapabilityDefinition(
+        capability_id="chromie.social.blink",
         version="1.0",
         provider_id="test.social",
         description="test independent blink",
@@ -89,9 +89,9 @@ def blink_definition() -> SkillDefinition:
     )
 
 
-def nod_definition(*, resource_claim: str = "visual.head") -> SkillDefinition:
-    return SkillDefinition(
-        skill_id="chromie.social.nod",
+def nod_definition(*, resource_claim: str = "visual.head") -> CapabilityDefinition:
+    return CapabilityDefinition(
+        capability_id="chromie.social.nod",
         version="1.0",
         provider_id="test.social",
         description="test independent nod",
@@ -128,10 +128,10 @@ class SocialProvider:
 
     async def execute(self, request, definition, context):
         self.calls += 1
-        return SkillResult(
+        return CapabilityResult(
             request_id=request.request_id,
-            skill_id=request.skill_id,
-            skill_version=definition.version,
+            capability_id=request.capability_id,
+            capability_version=definition.version,
             status="completed",
             provider_id=self.provider_id,
             output={"summary": "blink completed"},
@@ -156,7 +156,7 @@ def test_independent_social_attention_uses_same_trusted_runtime_without_goal_aut
                 "target": {"target_ref": "none", "source": "none"},
                 "behaviors": [
                     {
-                        "capability_id": definition.skill_id,
+                        "capability_id": definition.capability_id,
                         "args": {"count": 1},
                         "timing": "parallel",
                         "reason": "A subtle acknowledgement is natural.",
@@ -206,7 +206,7 @@ def test_social_attention_cooldown_is_scoped_to_primary_activity_not_turn():
                         "target": {"target_ref": "none", "source": "none"},
                         "behaviors": [
                             {
-                                "capability_id": definition.skill_id,
+                                "capability_id": definition.capability_id,
                                 "args": {"count": 1},
                                 "timing": "parallel",
                                 "reason": "One subtle blink is enough.",
@@ -343,7 +343,7 @@ def test_social_attention_cannot_duplicate_explicit_primary_activity():
                 "decision": "express",
                 "behaviors": [
                     {
-                        "capability_id": definition.skill_id,
+                        "capability_id": definition.capability_id,
                         "args": {"count": 1},
                         "timing": "parallel",
                     }
@@ -361,17 +361,17 @@ def test_social_attention_cannot_duplicate_explicit_primary_activity():
                 **social_activity_context(
                     "activity-social-primary",
                     execution_lane="activity",
-                    capability_ids=[definition.skill_id],
+                    capability_ids=[definition.capability_id],
                 ),
                 "social_attention_interaction_state": {
-                    "primary_capability_ids": [definition.skill_id]
+                    "primary_capability_ids": [definition.capability_id]
                 },
             },
         )
 
         assert result["status"] == "rejected"
         assert result["materialized_count"] == 0
-        assert f"duplicates_primary_activity:{definition.skill_id}" in result["reasons"]
+        assert f"duplicates_primary_activity:{definition.capability_id}" in result["reasons"]
         assert provider.calls == 0
 
     asyncio.run(scenario())
@@ -393,7 +393,7 @@ def test_social_attention_allows_a_different_compatible_auxiliary_cue():
                 "decision": "express",
                 "behaviors": [
                     {
-                        "capability_id": auxiliary.skill_id,
+                        "capability_id": auxiliary.capability_id,
                         "args": {"count": 1},
                         "timing": "parallel",
                         "reason": "A small compatible cue supports the playful framing.",
@@ -412,10 +412,10 @@ def test_social_attention_allows_a_different_compatible_auxiliary_cue():
                 **social_activity_context(
                     "activity-social-compatible",
                     execution_lane="activity",
-                    capability_ids=[primary.skill_id],
+                    capability_ids=[primary.capability_id],
                 ),
                 "social_attention_interaction_state": {
-                    "primary_capability_ids": [primary.skill_id]
+                    "primary_capability_ids": [primary.capability_id]
                 },
             },
         )
@@ -443,7 +443,7 @@ def test_social_attention_rejects_a_different_cue_that_conflicts_with_primary_ac
                 "decision": "express",
                 "behaviors": [
                     {
-                        "capability_id": auxiliary.skill_id,
+                        "capability_id": auxiliary.capability_id,
                         "args": {"count": 1},
                         "timing": "parallel",
                     }
@@ -461,17 +461,17 @@ def test_social_attention_rejects_a_different_cue_that_conflicts_with_primary_ac
                 **social_activity_context(
                     "activity-social-conflict",
                     execution_lane="activity",
-                    capability_ids=[primary.skill_id],
+                    capability_ids=[primary.capability_id],
                 ),
                 "social_attention_interaction_state": {
-                    "primary_capability_ids": [primary.skill_id]
+                    "primary_capability_ids": [primary.capability_id]
                 },
             },
         )
 
         assert result["status"] == "rejected"
         assert result["materialized_count"] == 0
-        assert f"resource_conflict:{auxiliary.skill_id}" in result["reasons"]
+        assert f"resource_conflict:{auxiliary.capability_id}" in result["reasons"]
         assert provider.calls == 0
 
     asyncio.run(scenario())
@@ -518,10 +518,10 @@ def test_social_attention_projects_semantic_activities_not_execution_modalities(
                     },
                 )
             ],
-            skills=[
-                SkillRequest(
+            capabilities=[
+                CapabilityRequest(
                     request_id="request-wave",
-                    skill_id="soridormi.wave_hand",
+                    capability_id="soridormi.wave_hand",
                     args={},
                     metadata={
                         "canonical_plan_id": "plan-compound-social",
@@ -530,9 +530,9 @@ def test_social_attention_projects_semantic_activities_not_execution_modalities(
                         "source_goal_ids": ["goal-greet"],
                     },
                 ),
-                SkillRequest(
+                CapabilityRequest(
                     request_id="request-walk",
-                    skill_id="soridormi.walk_forward",
+                    capability_id="soridormi.walk_forward",
                     args={"duration_s": 2},
                     metadata={
                         "canonical_plan_id": "plan-compound-social",
@@ -541,9 +541,9 @@ def test_social_attention_projects_semantic_activities_not_execution_modalities(
                         "source_goal_ids": ["goal-walk"],
                     },
                 ),
-                SkillRequest(
+                CapabilityRequest(
                     request_id="request-sing",
-                    skill_id="chromie.vocal.perform",
+                    capability_id="chromie.vocal.perform",
                     args={"mode": "singing", "content": "la la"},
                     metadata={
                         "canonical_plan_id": "plan-compound-social",
@@ -689,9 +689,9 @@ def test_social_attention_uses_scheduled_primary_speech_as_activity_anchor(caplo
     assert "event=primary_activity_ready" in caplog.text
 
 
-def stateful_write_definition() -> SkillDefinition:
-    return SkillDefinition(
-        skill_id="chromie.test.write",
+def stateful_write_definition() -> CapabilityDefinition:
+    return CapabilityDefinition(
+        capability_id="chromie.test.write",
         version="1.0",
         provider_id="test.write",
         description="test stateful write",

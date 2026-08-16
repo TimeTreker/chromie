@@ -136,8 +136,9 @@ ownership, and started/done state only. It excludes arguments and Provider
 payloads and does not authorize cancellation.
 
 Current execution results, Provider observations, and canonical Plan steps bind
-named work with `capability_id`. The verifier reads that canonical field and
-accepts `skill_id` only as a bounded retained-artifact compatibility alias.
+named work with `capability_id`. The verifier reads that canonical field only;
+provider-local or historical executable `skill_id` must be translated before it
+enters maintained qualification evidence.
 
 ## Retained MuJoCo case
 
@@ -288,9 +289,9 @@ python scripts/interaction_text_mujoco_check.py \
   --evidence-dir "${EVIDENCE_ROOT}/mujoco" \
   --no-speaker \
   --expect-route robot_action \
-  --expect-skill soridormi.walk_velocity \
-  --expect-skill soridormi.nod_yes \
-  --expect-skill soridormi.turn_in_place \
+  --expect-capability soridormi.walk_velocity \
+  --expect-capability soridormi.nod_yes \
+  --expect-capability soridormi.turn_in_place \
   --reject-internal-speech
 ```
 
@@ -305,7 +306,7 @@ python scripts/interaction_text_mujoco_check.py \
   --no-speaker \
   --expect-route robot_action \
   --interrupt-text "Stop." \
-  --interrupt-skill-prefix soridormi.walk_velocity \
+  --interrupt-capability-prefix soridormi.walk_velocity \
   --expect-cancelled \
   --reject-internal-speech
 ```

@@ -47,7 +47,7 @@ configuration, contracts, or current architecture claims still fail closed.
 | `architecture.host_semantic_authority` | Outside the protective reflex boundary, runtime code may not infer ordinary intent, confirmation, conversation reset, capability retrieval or selection, argument meaning, speech claims, deep-thinking delegation, discourse, memory, or social meaning from regexes, phrase tables, token lists, lexical scores, punctuation, or aliases. Compatibility fallbacks may report only bounded operational failure. |
 | `architecture.legacy_phrase_agents` | Removed phrase/regex motion and pose agents cannot be restored or enabled through caller context. |
 | `memory.model_authored_update` | Session-memory meaning must come from a typed model-authored proposal; `MemoryAgent` may not classify raw text. |
-| `contracts.canonical_capability_identity` | Current model, Plan, API, trace, and evidence identities emit `capability_id`; bounded readers may still normalize retained `skill_id` input. |
+| `contracts.canonical_capability_identity` | Current model, Plan, API, trace, and evidence identities use canonical `capability_id` only; executable `skill_id` aliases are forbidden in live Chromie contracts. Agent Skill `agent_skill_id` and provider-local wire fields are separate namespaces. |
 
 The failure rules are intentionally narrower than a generic style linter. A broad
 handler that re-raises, emits diagnostics/evidence, or returns an explicit typed

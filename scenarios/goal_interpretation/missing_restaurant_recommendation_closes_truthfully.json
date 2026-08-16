@@ -77,7 +77,7 @@
     ],
     "task_types_forbid": [
       "task.use_tool",
-      "task.execute_skill"
+      "task.execute_capability"
     ],
     "metadata_json_forbid": [
       "capability_grounding_review",

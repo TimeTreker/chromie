@@ -293,10 +293,10 @@ def _collect_stages(
     speaker_flag = _flag(args.speaker, "speaker")
 
     simulator = manifest.get("simulator_expectations")
-    required_skills = (
-        simulator.get("required_terminal_skills")
+    required_capabilities = (
+        simulator.get("required_terminal_capabilities")
         if isinstance(simulator, dict)
-        and isinstance(simulator.get("required_terminal_skills"), list)
+        and isinstance(simulator.get("required_terminal_capabilities"), list)
         else []
     )
     cancellation = manifest.get("cancellation_expectations")
@@ -304,8 +304,8 @@ def _collect_stages(
         raise ValueError("qualification manifest has no cancellation expectations")
     command_text = str(cancellation.get("command_text") or "").strip()
     interrupt_text = str(cancellation.get("interrupt_text") or "").strip()
-    required_skill = str(cancellation.get("required_skill") or "").strip()
-    if not command_text or not interrupt_text or not required_skill:
+    required_capability = str(cancellation.get("required_capability") or "").strip()
+    if not command_text or not interrupt_text or not required_capability:
         raise ValueError("qualification cancellation expectations are incomplete")
 
     preflight_command: list[str] = [
@@ -375,8 +375,8 @@ def _collect_stages(
         "robot_action",
         "--reject-internal-speech",
     ]
-    for skill_id in required_skills:
-        mujoco_command.extend(("--expect-skill", str(skill_id)))
+    for capability_id in required_capabilities:
+        mujoco_command.extend(("--expect-capability", str(capability_id)))
 
     cancellation_command = [
         python,
@@ -401,8 +401,8 @@ def _collect_stages(
         "robot_action",
         "--interrupt-text",
         interrupt_text,
-        "--interrupt-skill-prefix",
-        required_skill,
+        "--interrupt-capability-prefix",
+        required_capability,
         "--expect-cancelled",
         "--reject-internal-speech",
     ]

@@ -13,7 +13,7 @@
     "network",
     "power_constraints",
     "revisions",
-    "initial_low_risk_skill",
+    "initial_low_risk_capability",
     "unsupported",
     "safety",
     "calibration_artifacts",
@@ -85,11 +85,11 @@
         "provider_configuration_sha256": {"type": "string"}
       }
     },
-    "initial_low_risk_skill": {
+    "initial_low_risk_capability": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "skill_id",
+        "capability_id",
         "workspace",
         "max_speed",
         "max_payload",
@@ -97,7 +97,7 @@
         "abort_conditions"
       ],
       "properties": {
-        "skill_id": {"type": "string"},
+        "capability_id": {"type": "string"},
         "workspace": {"type": "string"},
         "max_speed": {"type": "string"},
         "max_payload": {"type": "string"},
@@ -111,9 +111,9 @@
     "unsupported": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["skills", "configurations", "operating_conditions"],
+      "required": ["capabilities", "configurations", "operating_conditions"],
       "properties": {
-        "skills": {"type": "array", "items": {"type": "string"}},
+        "capabilities": {"type": "array", "items": {"type": "string"}},
         "configurations": {"type": "array", "items": {"type": "string"}},
         "operating_conditions": {
           "type": "array",

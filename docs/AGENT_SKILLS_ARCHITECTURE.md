@@ -172,13 +172,16 @@ Canonical terms:
 - **CapabilityRuntime**: source name for the Trusted Capability Runtime;
 - **Capability Provider**: implementation authority behind an exact registered Capability.
 
-Executable `skill_id`, `SkillRequest`, `SkillResult`, `SkillRuntime`, `SkillDefinition`,
-`SkillRegistry`, and similar names are not part of the target architecture. They are
-pre-Agent-Skill migration debt in current source and must be renamed or deleted by the
-dedicated cleanup Issue rather than retained as perpetual aliases. Historical retained
-artifacts that genuinely require old-field readability should be migrated/versioned at an
-explicit ingestion/archive boundary; ordinary live runtime contracts must not carry dual
-identity indefinitely.
+Chromie's canonical executable runtime uses `capability_id`, `capability_version`,
+`CapabilityRequest`, `CapabilityResult`, `CapabilityRuntime`, `CapabilityDefinition`,
+`CapabilityRegistry`, and `CapabilityProvider`. The retired executable names `skill_id`,
+`skill_version`, `SkillRequest`, `SkillResult`, `SkillRuntime`, `SkillDefinition`,
+`SkillRegistry`, and `SkillProvider` are not live Chromie contracts or compatibility aliases.
+Soridormi may still expose provider-local wire `skill_id`; its adapter translates that field
+to Chromie's canonical `capability_id` and does not transfer identity authority upstream.
+Agent Skill vocabulary remains separate and intentionally uses `agent_skill_id`. Historical
+artifacts that genuinely require old-field readability must be migrated/versioned at an
+explicit ingestion/archive boundary rather than widening live runtime contracts.
 
 The naming cleanup changes no semantic or physical authority. Capability registration,
 schema validation, confirmation, authorization, resource arbitration, provider ownership,

@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from orchestrator.runtime.conversation_state import ConversationStateManager
-from shared.chromie_contracts.interaction import InteractionResponse, SkillRequest
+from shared.chromie_contracts.interaction import InteractionResponse, CapabilityRequest
 from shared.chromie_contracts.reflex import CancellationDispatchReceipt
 
 
@@ -31,24 +31,24 @@ def _bind_execution(
     goal_id: str,
     interaction_id: str,
     request_ids: list[str],
-    skill_ids: list[str] | None = None,
+    capability_ids: list[str] | None = None,
     status: str = "running",
 ) -> None:
-    skills = skill_ids or ["soridormi.walk_forward"] * len(request_ids)
+    capabilities = capability_ids or ["soridormi.walk_forward"] * len(request_ids)
     manager._record_goal_pending_execution(
         sid="sid-run",
         goal_id=goal_id,
         status=status,
-        summary=", ".join(skills),
+        summary=", ".join(capabilities),
         request_ids=request_ids,
         planning_result="execute",
-        planned_skills=[
+        planned_capabilities=[
             {
                 "request_id": request_id,
-                "skill_id": skill_id,
+                "capability_id": skill_id,
                 "source_goal_ids": [goal_id],
             }
-            for request_id, skill_id in zip(request_ids, skills, strict=True)
+            for request_id, skill_id in zip(request_ids, capabilities, strict=True)
         ],
         confirmation_pending=False,
         interaction_id=interaction_id,
@@ -124,7 +124,7 @@ class FixedReflexCancellationReconciliationTests(unittest.TestCase):
             goal_id="goal-a",
             interaction_id="interaction-parent",
             request_ids=["request-motion", "request-report"],
-            skill_ids=["soridormi.walk_forward", "chromie.report"],
+            capability_ids=["soridormi.walk_forward", "chromie.report"],
         )
         receipt = CancellationDispatchReceipt(
             source_turn_id="turn-stop-motion",
@@ -241,7 +241,7 @@ class FixedReflexCancellationReconciliationTests(unittest.TestCase):
             effective_scope="global_emergency",
             interaction_ids=("interaction-preflight",),
             host_interaction_ids=("interaction-preflight",),
-            dispatch_failures=("skill_runtime:RuntimeError:unavailable",),
+            dispatch_failures=("capability_runtime:RuntimeError:unavailable",),
             host_task_cancel_requested_interaction_ids=("interaction-preflight",),
             emergency_stop_evidence={
                 "status": "unconfirmed",
@@ -272,10 +272,10 @@ class FixedReflexCancellationReconciliationTests(unittest.TestCase):
         _create_goal(manager, "goal-a", "Walk.")
         response = InteractionResponse(
             interaction_id="interaction-confirm",
-            skills=[
-                SkillRequest(
+            capabilities=[
+                CapabilityRequest(
                     request_id="request-a",
-                    skill_id="soridormi.walk_forward",
+                    capability_id="soridormi.walk_forward",
                     requires_confirmation=True,
                     metadata={"source_goal_ids": ["goal-a"]},
                 )

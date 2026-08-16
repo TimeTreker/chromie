@@ -116,7 +116,7 @@
     "speech_any": [
       "Understood"
     ],
-    "skills": [],
+    "capabilities": [],
     "metadata_json_contains": [
       "social_attention_plan"
     ],

@@ -24,7 +24,7 @@ from orchestrator.runtime.evidence_identity import (  # noqa: E402
 
 REQUIRED_CASES = {
     "speech-only",
-    "speech-skill",
+    "speech-capability",
     "refusal",
     "barge-in",
     "body-cancel",
@@ -371,12 +371,12 @@ def _validate_live_voice_turn(
                 f"Speech-only Core resolution has critical failure class {failure_class!r}"
             )
 
-    speech_skill_results = [
+    speech_capability_results = [
         item
         for item in session_runtime
-        if item.get("event") == "skill_result"
+        if item.get("event") == "capability_result"
         and re.search(
-            r"(?:^|\s)skill_id=chromie\.speak(?:\s|$)",
+            r"(?:^|\s)capability_id=chromie\.speak(?:\s|$)",
             str(item.get("message") or ""),
         )
         and re.search(
@@ -389,15 +389,15 @@ def _validate_live_voice_turn(
         message = str(item.get("message") or "")
         runtime_result_count = _message_field(message, "results")
         expected_speech_runtime_event = (
-            event_name == "skill_result" and item in speech_skill_results
+            event_name == "capability_result" and item in speech_capability_results
         ) or (
-            event_name == "skill_runtime_done"
-            and bool(speech_skill_results)
+            event_name == "capability_runtime_done"
+            and bool(speech_capability_results)
             and _message_field(message, "status") == "completed"
-            and runtime_result_count == str(len(speech_skill_results))
+            and runtime_result_count == str(len(speech_capability_results))
         )
         if not expected_speech_runtime_event and event_name.startswith(
-            ("cognitive_skill_", "confirmation_", "skill_", "soridormi_")
+            ("cognitive_capability_", "confirmation_", "capability_", "soridormi_")
         ):
             errors.append(
                 f"Speech-only runtime contains executable work event {event_name!r}"
@@ -835,7 +835,7 @@ def verify_bundle(
 
     required_overrides = {
         "ORCH_ENABLE_INTERACTION_RESPONSE": "1",
-        "ORCH_ENABLE_SORIDORMI_SKILLS": "0" if live_voice_profile else "1",
+        "ORCH_ENABLE_SORIDORMI_CAPABILITIES": "0" if live_voice_profile else "1",
         "AGENT_INTERACTION_OUTPUT_MODE": "native",
         "AGENT_NATIVE_INTERACTION_FALLBACK": "0",
     }
@@ -960,7 +960,7 @@ def verify_bundle(
 
     expected_lane_by_case = {
         "speech-only": "chat",
-        "speech-skill": "robot_action",
+        "speech-capability": "robot_action",
         "refusal": "robot_action",
         "barge-in": "chat",
         "body-cancel": "robot_action",
@@ -1018,11 +1018,11 @@ def verify_bundle(
                 f"Case {case_id} contains a correlated cognitive runtime error"
             )
 
-        if case_id in {"speech-skill", "body-cancel"}:
+        if case_id in {"speech-capability", "body-cancel"}:
             case_provider_modes = {
                 match.group(1)
                 for item in case_runtime_events
-                if item.get("event") == "skill_runtime_done"
+                if item.get("event") == "capability_runtime_done"
                 for match in [
                     re.search(
                         r"(?:^|\s)provider_mode=([^\s]+)",
@@ -1049,7 +1049,7 @@ def verify_bundle(
         match.group(1)
         for item in runtime_events
         if str(item.get("sid") or "") in acceptance_session_ids
-        and item.get("event") == "skill_runtime_done"
+        and item.get("event") == "capability_runtime_done"
         for match in [
             re.search(
                 r"(?:^|\s)provider_mode=([^\s]+)",

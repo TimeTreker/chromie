@@ -84,11 +84,11 @@ Chromie 已接受 Agent Skills 架构：Agent 在自己的职责范围内，根�
 Goal 和上下文选择零个、一个或多个 Agent Skills，并生成本次 Plan；Skill
 只提供可复用方法和领域经验，没有独立 Goal、Provider 注册、权限或执行权；
 Plan 最终仍只能通过 `capability_id` 调用已注册 Capability，并经过 Trusted
-Trusted Capability Runtime（当前代码兼容名仍为 Skill Runtime）与
-Provider/Soridormi 校验。
+Capability Runtime（`CapabilityRuntime`）与 Provider/Soridormi 校验。
+Chromie 的实时可执行合同只使用 `capability_id`；Soridormi 的 wire `skill_id`
+仅在 adapter 边界翻译，Agent Skill 的 `agent_skill_id` 则属于独立认知命名空间。
 
-该架构已经实现：当前输出使用 `capability_id`，保留有界的历史
-`skill_id` 读取；仓库拥有只读 Loader、模型选择、按 Agent 职责投影、Plan
+该架构已经实现：当前输出和实时输入使用 canonical `capability_id`；仓库拥有只读 Loader、模型选择、按 Agent 职责投影、Plan
 provenance，以及 grounded external information 与 weather 两个方法包。真实
 模型选择和 Provider-backed weather 仍需保留当前版本的目标证据。详见
 [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md) 和

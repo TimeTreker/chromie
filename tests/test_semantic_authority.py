@@ -38,7 +38,7 @@ class _CountingCapabilityOllama:
         return {
             "decision": "execute",
             "speech": "Nodding.",
-            "skills": [{"skill_id": "soridormi.nod_yes", "args": {}}],
+            "capabilities": [{"capability_id": "soridormi.nod_yes", "args": {}}],
         }
 
 
@@ -275,7 +275,7 @@ class CapabilityAuthorityBoundaryTests(unittest.IsolatedAsyncioTestCase):
         )
         response = await runtime.run(_robot_request())
         self.assertEqual(ollama.calls, 0)
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
         self.assertEqual(
             response.metadata["planning_result"],
             "legacy_semantic_planner_disabled",
@@ -308,7 +308,7 @@ class CapabilityAuthorityBoundaryTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(ollama.calls, 0)
         self.assertEqual(
-            [item.skill_id for item in response.skills],
+            [item.capability_id for item in response.capabilities],
             ["soridormi.nod_yes"],
         )
         self.assertEqual(
@@ -342,7 +342,7 @@ class CapabilityAuthorityBoundaryTests(unittest.IsolatedAsyncioTestCase):
             )
         )
         self.assertEqual(ollama.calls, 0)
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
         self.assertEqual(
             response.metadata["semantic_authority_rejected"]["reason"],
             "invalid_claim",
@@ -379,7 +379,7 @@ class CapabilityAuthorityBoundaryTests(unittest.IsolatedAsyncioTestCase):
             )
         )
         self.assertEqual(ollama.calls, 0)
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
         self.assertEqual(
             response.metadata["semantic_authority_rejected"],
             {
@@ -420,7 +420,7 @@ class CapabilityAuthorityBoundaryTests(unittest.IsolatedAsyncioTestCase):
             _robot_request(context=context_with_semantic_authority({}, claim))
         )
         self.assertEqual(service_disabled_ollama.calls, 0)
-        self.assertEqual(blocked.skills, [])
+        self.assertEqual(blocked.capabilities, [])
 
         authorized_ollama = _CountingCapabilityOllama()
         authorized = InteractionRuntime(
@@ -438,7 +438,7 @@ class CapabilityAuthorityBoundaryTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(authorized_ollama.calls, 1)
         self.assertEqual(
-            [item.skill_id for item in response.skills],
+            [item.capability_id for item in response.capabilities],
             ["soridormi.nod_yes"],
         )
         self.assertTrue(response.metadata["legacy_emergency_fallback"])

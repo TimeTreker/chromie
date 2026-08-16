@@ -196,7 +196,7 @@ def _scenario_schema_summary(suite: str) -> str:
             "Dialogue scenarios must set turns[], where each turn has id, ask, "
             "stub.route_decision, optional stub.ollama_reply/catalog_capabilities, "
             "and expect fields. Expect speech_any/speech_all, forbidden_speech_any, "
-            "skills, forbidden_skills, no_skills, requires_confirmation, status, "
+            "capabilities, forbidden_capabilities, no_capabilities, requires_confirmation, status, "
             "skill_args, history_contains, session_memory_contains, "
             "post_history_contains, post_session_memory_contains, "
             "extracted_memory_contains, post_extracted_memory_contains, "
@@ -207,7 +207,7 @@ def _scenario_schema_summary(suite: str) -> str:
     return (
         "Interaction scenarios must set stub.route_decision and optional "
         "stub.ollama_reply/catalog_capabilities. Expect speech_any/speech_all, "
-        "forbidden_speech_any, skills, forbidden_skills, no_skills, "
+        "forbidden_speech_any, capabilities, forbidden_capabilities, no_capabilities, "
         "skill_args, status, metadata booleans, and requires_confirmation."
     )
 

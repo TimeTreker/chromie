@@ -498,8 +498,8 @@ class ExperienceRecord(BaseModel):
     route_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     response_status: str = "unknown"
     execution_status: str = "unknown"
-    selected_skills: list[str] = Field(default_factory=list)
-    skill_results: list[dict[str, Any]] = Field(default_factory=list)
+    selected_capabilities: list[str] = Field(default_factory=list)
+    capability_results: list[dict[str, Any]] = Field(default_factory=list)
     speech_count: int = 0
     errors: list[str] = Field(default_factory=list)
     mind_profile_id: str | None = None

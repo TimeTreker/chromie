@@ -50,7 +50,7 @@
         }
       },
       "expect": {
-        "skills": [
+        "capabilities": [
           "soridormi.walk_velocity"
         ],
         "requires_confirmation": true,

@@ -101,7 +101,7 @@
         {
           "evidence_kind": "host_accepted_auxiliary_request",
           "execution_claim": "not_observed",
-          "skill_id": "soridormi.nod_yes",
+          "capability_id": "soridormi.nod_yes",
           "args": {
             "count": 1,
             "amplitude": 0.25,
@@ -129,7 +129,7 @@
     "speech_any": [
       "You are welcome"
     ],
-    "skills": [],
+    "capabilities": [],
     "metadata_json_contains": [
       "social_attention_plan"
     ],

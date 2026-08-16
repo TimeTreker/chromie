@@ -39,7 +39,7 @@ TRACE_CONTENT_KEYS = {
     "route",
     "intent",
     "results",
-    "skills",
+    "capabilities",
     "debug_summary",
 }
 
@@ -425,8 +425,8 @@ def _json_kind(path: Path, value: Any) -> str:
         if "graph_id" in value and ("node_results" in value or "outcome_summary" in value):
             return "task_graph_trace"
         if "interaction_id" in value and "traces" in value and "results" in value:
-            return "skill_runtime_execution"
-        if "interaction_id" in value and "skills" in value:
+            return "capability_runtime_execution"
+        if "interaction_id" in value and "capabilities" in value:
             return "interaction_response"
         if "route" in value and "intent" in value:
             return "route_decision"
@@ -475,13 +475,13 @@ def _summarize_json_payload(value: Any, *, limit: int) -> dict[str, Any]:
     if isinstance(value.get("errors"), list):
         summary["errors"] = [_shorten(item) for item in value["errors"][:limit]]
         summary["error_count"] = len(value["errors"])
-    if isinstance(value.get("skills"), list):
+    if isinstance(value.get("capabilities"), list):
         summary["capability_ids"] = [
-            str(item.get("capability_id") or item.get("skill_id") or item.get("id") or "")
-            for item in value["skills"][:limit]
+            str(item.get("capability_id") or item.get("id") or "")
+            for item in value["capabilities"][:limit]
             if isinstance(item, dict)
         ]
-        summary["capability_count"] = len(value["skills"])
+        summary["capability_count"] = len(value["capabilities"])
     if isinstance(value.get("results"), list):
         summary["results"] = [
             _summarize_result(item)
@@ -491,7 +491,7 @@ def _summarize_json_payload(value: Any, *, limit: int) -> dict[str, Any]:
         summary["result_count"] = len(value["results"])
     if isinstance(value.get("traces"), list):
         summary["traces"] = [
-            _summarize_skill_trace(item)
+            _summarize_capability_trace(item)
             for item in value["traces"][:limit]
             if isinstance(item, dict)
         ]
@@ -571,7 +571,6 @@ def _summarize_route_action(item: dict[str, Any]) -> dict[str, Any]:
         key: _shorten(item[key])
         for key in (
             "capability_id",
-            "skill_id",
             "sequence",
             "timing",
             "requires_confirmation",
@@ -603,14 +602,14 @@ def _summarize_interaction_response(
             if isinstance(item, dict)
         ]
         summary["speech_count"] = len(speech)
-    skills = response.get("skills")
-    if isinstance(skills, list):
+    capabilities = response.get("capabilities")
+    if isinstance(capabilities, list):
         summary["capability_ids"] = [
-            str(item.get("capability_id") or item.get("skill_id") or item.get("id") or "")
-            for item in skills[:limit]
+            str(item.get("capability_id") or item.get("id") or "")
+            for item in capabilities[:limit]
             if isinstance(item, dict)
         ]
-        summary["capability_count"] = len(skills)
+        summary["capability_count"] = len(capabilities)
     metadata = response.get("metadata")
     if isinstance(metadata, dict):
         summary["metadata_keys"] = sorted(str(key) for key in metadata.keys())[:limit]
@@ -814,7 +813,7 @@ def _summarize_result(item: dict[str, Any]) -> dict[str, Any]:
         key: _shorten(item[key])
         for key in (
             "request_id",
-            "skill_id",
+            "capability_id",
             "provider_id",
             "status",
             "reason_code",
@@ -825,14 +824,14 @@ def _summarize_result(item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _summarize_skill_trace(item: dict[str, Any]) -> dict[str, Any]:
+def _summarize_capability_trace(item: dict[str, Any]) -> dict[str, Any]:
     summary = {
         key: _shorten(item[key])
         for key in (
             "trace_id",
             "interaction_id",
             "request_id",
-            "skill_id",
+            "capability_id",
             "provider_id",
             "status",
         )

@@ -43,10 +43,10 @@ class VoiceLogGoalReplayRegressionTests(unittest.TestCase):
             "sid-motion",
             InteractionResponse(
                 interaction_id="interaction-motion",
-                skills=[
+                capabilities=[
                     {
                         "request_id": "request-walk",
-                        "skill_id": "soridormi.walk_forward",
+                        "capability_id": "soridormi.walk_forward",
                         "metadata": {
                             "source_goal_ids": ["goal-walk"],
                             "canonical_plan_id": "plan-motion",
@@ -55,7 +55,7 @@ class VoiceLogGoalReplayRegressionTests(unittest.TestCase):
                     },
                     {
                         "request_id": "request-blink",
-                        "skill_id": "soridormi.blink_eyes",
+                        "capability_id": "soridormi.blink_eyes",
                         "metadata": {
                             "source_goal_ids": ["goal-blink"],
                             "canonical_plan_id": "plan-motion",
@@ -126,7 +126,7 @@ class VoiceLogGoalReplayRegressionTests(unittest.TestCase):
                     "evidence_id": "evidence-walk",
                     "request_id": "request-walk",
                     "step_id": "walk",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "source_goal_ids": ["goal-walk"],
                     "status": "completed",
                 },
@@ -134,7 +134,7 @@ class VoiceLogGoalReplayRegressionTests(unittest.TestCase):
                     "evidence_id": "evidence-blink",
                     "request_id": "request-blink",
                     "step_id": "blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "source_goal_ids": ["goal-blink"],
                     "status": "completed",
                 },

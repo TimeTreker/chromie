@@ -46,9 +46,9 @@
     "ollama_reply": {
       "decision": "execute",
       "speech": "好，我眨两下眼睛。",
-      "skills": [
+      "capabilities": [
         {
-          "skill_id": "soridormi.blink_eyes",
+          "capability_id": "soridormi.blink_eyes",
           "proposed_args": {"count": 2},
           "parameter_grounding": {
             "count": {"resolution": "user_supplied"}
@@ -63,7 +63,7 @@
   "expect": {
     "speech_all": ["眨两下"],
     "forbidden_speech_any": ["没有生成可执行动作", "不会假装"],
-    "skills": ["soridormi.blink_eyes"],
+    "capabilities": ["soridormi.blink_eyes"],
     "skill_args": [{"count": 2}],
     "requires_confirmation": false
   }

@@ -7,7 +7,7 @@ from agent.app.capabilities.models import CapabilityRegistry
 from agent.app.clients.weather_client import WeatherLookupError, WeatherReport
 from agent.app.local_tool_execution import LocalToolExecutor
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
-from shared.chromie_contracts.interaction import InteractionResponse, SkillRequest
+from shared.chromie_contracts.interaction import InteractionResponse, CapabilityRequest
 from shared.chromie_contracts.tool_result import ToolExecutionRequest, ToolExecutionResponse
 
 
@@ -176,10 +176,10 @@ class LocalToolExecutionTests(unittest.IsolatedAsyncioTestCase):
         result = await coordinator.execute(
             InteractionResponse(
                 interaction_id="interaction-weather",
-                skills=[
-                    SkillRequest(
+                capabilities=[
+                    CapabilityRequest(
                         request_id="weather-host-1",
-                        skill_id="chromie.weather.lookup",
+                        capability_id="chromie.weather.lookup",
                         args={"location": "北京", "date": "today", "units": "metric"},
                         metadata={
                             "language": "zh-CN",

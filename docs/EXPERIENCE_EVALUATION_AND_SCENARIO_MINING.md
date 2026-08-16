@@ -283,7 +283,7 @@ review metadata:
       "id": "walk_fast_not_gaze",
       "ask": "Walk forward for 15 seconds, quickly.",
       "expect": {
-        "forbidden_skills": ["soridormi.look_at_person", "soridormi.nod_yes"],
+        "forbidden_capabilities": ["soridormi.look_at_person", "soridormi.nod_yes"],
         "no_unrelated_social_fallback": true
       }
     }

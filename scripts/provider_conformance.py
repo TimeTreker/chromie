@@ -86,9 +86,9 @@ class NoMotionProviderStub:
             return ToolCallOutcome.success(
                 {
                     "mode": self.mode,
-                    "skills": [
+                    "capabilities": [
                         {
-                            "skill_id": "nod_yes",
+                            "capability_id": "nod_yes",
                             "version": "0.1.0",
                             "available": True,
                             "parameters_schema": {
@@ -111,7 +111,7 @@ class NoMotionProviderStub:
             return ToolCallOutcome.success(
                 {
                     "plan_id": "conformance-plan",
-                    "skill_id": args.get("skill_id"),
+                    "capability_id": args.get("skill_id"),
                     "mode": self.mode,
                 }
             )
@@ -127,7 +127,7 @@ class NoMotionProviderStub:
             return ToolCallOutcome.success(
                 {
                     "completed": True,
-                    "skill_id": "nod_yes",
+                    "capability_id": "nod_yes",
                     "mode": self.mode,
                     "no_motion": self.mode != "sim",
                     "recommendation_only": self.mode == "hardware_shadow",
@@ -335,8 +335,8 @@ async def run_conformance(
             f"expected={expected_mode} actual={actual_mode}",
         )
     )
-    skills = catalog.output.get("skills")
-    skill_items = skills if isinstance(skills, list) else []
+    capabilities = catalog.output.get("capabilities")
+    skill_items = capabilities if isinstance(capabilities, list) else []
     nod = next(
         (
             item
@@ -365,7 +365,7 @@ async def run_conformance(
 
     planned = await traced.invoke(
         "soridormi.skill.create_plan",
-        {"skill_id": "nod_yes", "parameters": {"count": 2}},
+        {"capability_id": "nod_yes", "parameters": {"count": 2}},
     )
     if not record_outcome(checks, "plan call", planned):
         return report(
@@ -430,7 +430,7 @@ async def run_conformance(
                 "explicit matching completion",
                 executed.output.get("completed") is True
                 and executed.output.get("skill_id") == "nod_yes",
-                "completed=true and skill_id=nod_yes",
+                "completed=true and capability_id=nod_yes",
             )
         )
         if expected_mode == "hardware_shadow":

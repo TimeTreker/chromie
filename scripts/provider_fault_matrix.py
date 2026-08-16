@@ -26,7 +26,7 @@ from orchestrator.runtime.interaction_coordinator import (
     InteractionRuntimeCoordinator,
     build_soridormi_invoker,
 )
-from shared.chromie_contracts.interaction import InteractionResponse, SkillResult
+from shared.chromie_contracts.interaction import InteractionResponse, CapabilityResult
 
 MATRIX_VERSION = "1.2"
 
@@ -253,9 +253,9 @@ class ScenarioInvoker:
             return ToolCallOutcome.success(
                 {
                     "mode": "sim",
-                    "skills": [
+                    "capabilities": [
                         {
-                            "skill_id": "nod_yes",
+                            "capability_id": "nod_yes",
                             "available": available,
                             "unavailable_reason": (
                                 None
@@ -289,7 +289,7 @@ class ScenarioInvoker:
                     retryable=True,
                 )
             if scenario_id == "malformed_plan":
-                return ToolCallOutcome.success({"skill_id": "nod_yes"})
+                return ToolCallOutcome.success({"capability_id": "nod_yes"})
             return ToolCallOutcome.success({"plan_id": "plan-fault-matrix"})
         if tool_name == "soridormi.safety.monitor_motion":
             if scenario_id == "monitor_refused":
@@ -314,11 +314,11 @@ class ScenarioInvoker:
                 await asyncio.sleep(5)
             if scenario_id == "execute_incomplete":
                 return ToolCallOutcome.success(
-                    {"completed": False, "skill_id": "nod_yes"}
+                    {"completed": False, "capability_id": "nod_yes"}
                 )
             if scenario_id == "execute_skill_mismatch":
                 return ToolCallOutcome.success(
-                    {"completed": True, "skill_id": "wave_hand"}
+                    {"completed": True, "capability_id": "wave_hand"}
                 )
             if scenario_id == "execute_timeout":
                 return ToolCallOutcome(
@@ -331,7 +331,7 @@ class ScenarioInvoker:
                     retryable=True,
                 )
             return ToolCallOutcome.success(
-                {"completed": True, "skill_id": "nod_yes"}
+                {"completed": True, "capability_id": "nod_yes"}
             )
         if tool_name == "soridormi.motion.cancel":
             return ToolCallOutcome.success({"cancelled": True})
@@ -456,16 +456,16 @@ async def run_scenario(
         lambda args: spoken.append(str(args["text"])) or {"scheduled": True},
         soridormi_invoker=invoker,
     )
-    speech = [{"text": "Done.", "timing": "after_skills"}]
+    speech = [{"text": "Done.", "timing": "after_capabilities"}]
     if scenario.operator_cancel:
         speech.insert(0, {"text": "Starting.", "timing": "immediate"})
     response = InteractionResponse(
         interaction_id=f"fault-matrix-{scenario.scenario_id}",
         speech=speech,
-        skills=[
+        capabilities=[
             {
                 "request_id": "fault-matrix-request",
-                "skill_id": "soridormi.nod_yes",
+                "capability_id": "soridormi.nod_yes",
                 "args": {"count": 2},
                 "timeout_ms": (
                     request_timeout_override_ms
@@ -494,7 +494,7 @@ async def run_scenario(
         (
             result
             for result in execution.results
-            if result.skill_id.startswith("soridormi.")
+            if result.capability_id.startswith("soridormi.")
         ),
         None,
     )

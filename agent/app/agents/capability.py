@@ -35,7 +35,7 @@ from .base import BaseAgent
 logger = logging.getLogger("chromie.agent.capability")
 
 
-class _PlannedSkill(CapabilityIdentityModel):
+class _PlannedCapability(CapabilityIdentityModel):
     args: dict[str, Any] = Field(default_factory=dict)
     proposed_args: dict[str, Any] = Field(default_factory=dict)
     semantic_intent: dict[str, Any] = Field(default_factory=dict)
@@ -49,7 +49,7 @@ class _PlannedSkill(CapabilityIdentityModel):
 class _CapabilityPlan(BaseModel):
     decision: Literal["execute", "propose_alternative", "clarify", "unsupported"]
     speech: str = ""
-    skills: list[_PlannedSkill] = Field(default_factory=list)
+    capabilities: list[_PlannedCapability] = Field(default_factory=list)
     information_gaps: list[InformationGap] = Field(default_factory=list)
     plan_relation: Literal["exact", "safe_adjustment", "alternative", "partial", "none"] = "none"
     user_confirmation_required: bool = False
@@ -59,7 +59,7 @@ class _CapabilityPlan(BaseModel):
     @model_validator(mode="after")
     def validate_plan_shape(self) -> "_CapabilityPlan":
         if self.decision in {"execute", "propose_alternative"}:
-            if not self.skills:
+            if not self.capabilities:
                 raise ValueError(f"decision={self.decision} requires at least one skill")
             speech = _natural_speech_or_empty(self.speech)
             if not speech:
@@ -71,7 +71,7 @@ class _CapabilityPlan(BaseModel):
                 self.plan_relation = "alternative"
 
         seen_steps: dict[tuple[str, str], set[str]] = {}
-        for item in self.skills:
+        for item in self.capabilities:
             args = item.proposed_args if item.proposed_args else item.args
             duplicate_key = (
                 item.capability_id,
@@ -100,7 +100,7 @@ class _CapabilityPlanReview(BaseModel):
     decision: Literal["accept", "revise", "propose_alternative", "clarify", "unsupported"]
     reason: str = ""
     speech: str = ""
-    skills: list[_PlannedSkill] = Field(default_factory=list)
+    capabilities: list[_PlannedCapability] = Field(default_factory=list)
     plan_relation: Literal["exact", "safe_adjustment", "alternative", "partial", "none"] = "none"
     user_confirmation_required: bool = False
     assessment: dict[str, Any] = Field(default_factory=dict)
@@ -117,8 +117,8 @@ class CapabilityAgent(BaseAgent):
 
     async def run(self, request: AgentRunRequest, result: AgentResult) -> AgentResult:
         catalog = self.services.capability_catalog
-        add_skill = getattr(result, "add_skill", None)
-        if catalog is None or not callable(add_skill):
+        add_capability = getattr(result, "add_capability", None)
+        if catalog is None or not callable(add_capability):
             return result
 
         search_text = self._capability_search_text(request)
@@ -258,7 +258,7 @@ class CapabilityAgent(BaseAgent):
                 selected_ids.append(capability_id)
             if selected_ids:
                 for request_item in selected_requests:
-                    add_skill(request_item)
+                    add_capability(request_item)
                 speech = (
                     ""
                     if request.route_decision.speak_first or "chromie.speak" in selected_ids
@@ -271,9 +271,9 @@ class CapabilityAgent(BaseAgent):
                 result.metadata["semantic_authority_owner"] = "goal_interpretation_action_adapter"
                 result.metadata["semantic_authority_role"] = "adapter"
                 result.metadata["planning_result"] = (
-                    "direct_skill" if len(selected_ids) == 1 else "composed_plan"
+                    "direct_capability" if len(selected_ids) == 1 else "composed_plan"
                 )
-                result.metadata["planned_skills"] = [
+                result.metadata["planned_capabilities"] = [
                     {
                         "capability_id": str(action.get("capability_id") or ""),
                         "args": dict(action.get("args") or {}),
@@ -425,7 +425,7 @@ class CapabilityAgent(BaseAgent):
                 if isinstance(issues, list) and issues:
                     first_issue = issues[0] if isinstance(issues[0], dict) else {}
                     result.metadata["invalid_capability_args"] = {
-                        "capability_id": str(first_issue.get("capability_id") or first_issue.get("skill_id") or ""),
+                        "capability_id": str(first_issue.get("capability_id") or ""),
                         "errors": [
                             str(item)
                             for item in (first_issue.get("errors") or [])
@@ -442,7 +442,7 @@ class CapabilityAgent(BaseAgent):
         selected_requests: list[CapabilityRequest] = []
         seen_requests: set[tuple[str, str, str]] = set()
         any_adjustment = False
-        for item in plan.skills:
+        for item in plan.capabilities:
             match = allowed.get(item.capability_id)
             if match is None:
                 logger.warning("LLM selected capability outside candidate set: %s", item.capability_id)
@@ -620,7 +620,7 @@ class CapabilityAgent(BaseAgent):
             ]
 
         for request_item in selected_requests:
-            add_skill(request_item)
+            add_capability(request_item)
 
         speech = self._natural_plan_speech(plan.speech)
         if speech and not semantic_confirmation:
@@ -632,7 +632,7 @@ class CapabilityAgent(BaseAgent):
             if plan.decision == "propose_alternative"
             else "safe_adjustment"
             if plan.plan_relation == "safe_adjustment"
-            else "direct_skill"
+            else "direct_capability"
             if len(selected_requests) == 1
             else "composed_plan"
         )
@@ -650,7 +650,7 @@ class CapabilityAgent(BaseAgent):
                     "confirmation_prompt": speech,
                 }
             )
-        result.metadata["planned_skills"] = [
+        result.metadata["planned_capabilities"] = [
             {
                 "capability_id": item.capability_id,
                 "args": dict(item.args),
@@ -695,7 +695,7 @@ class CapabilityAgent(BaseAgent):
                     request.sid,
                     request.route_decision.route,
                     request.route_decision.intent,
-                    [item.capability_id for item in plan.skills],
+                    [item.capability_id for item in plan.capabilities],
                 )
                 return self._review_unavailable_plan(request)
             return plan
@@ -723,7 +723,7 @@ class CapabilityAgent(BaseAgent):
             "- Review unresolved parameters semantically. A low-consequence bounded field may use an explicit schema default or a conservative ordinary value; a materially safety- or outcome-sensitive field must be asked of the user.\n"
             "- Clarification speech must ask for the exact missing fact rather than saying only that parameters are missing or movement is impossible.\n"
             "- If the proposed plan materially changes, omits, or serializes a requested component, return propose_alternative with a complete replacement plan and a natural confirmation question.\n"
-            "- If a safe executable or alternative plan is not clear, revise to clarify or unsupported with no skills.\n\n"
+            "- If a safe executable or alternative plan is not clear, revise to clarify or unsupported with no capabilities.\n\n"
             "Task Context Group:\n"
             f"- Latest user input: {request.text}\n"
             f"{selected_line}"
@@ -731,16 +731,16 @@ class CapabilityAgent(BaseAgent):
             f"- Proposed capability plan JSON: {plan.model_dump_json()}\n\n"
             "Cost Function:\n"
             "- Accept only when the plan is complete, every selected capability is semantically necessary, its arguments fit the schema, and requested timing is compatible with supplied provider/resource evidence.\n"
-            "- If the Goal Interpretation selected an exact capability_id and the proposed plan replaced it, do not use decision=accept. Revise to an executable plan that preserves the routed intent, or return clarify/unsupported with no skills.\n"
+            "- If the Goal Interpretation selected an exact capability_id and the proposed plan replaced it, do not use decision=accept. Revise to an executable plan that preserves the routed intent, or return clarify/unsupported with no capabilities.\n"
             "- Reject or revise plans that substitute a different behavior class for the user's intent, such as social acknowledgement, gaze, or attention when the user requested locomotion or another body task.\n"
             "- Prefer a clarification over executing a skill that merely seems generally robot-like but does not satisfy the request.\n"
-            "- Preserve the no-raw-motor boundary and never invent skills outside the supplied API surface.\n\n"
+            "- Preserve the no-raw-motor boundary and never invent capabilities outside the supplied API surface.\n\n"
             "Output Contract:\n"
-            "- Return JSON only with keys decision, reason, speech, skills, plan_relation, user_confirmation_required, and assessment.\n"
-            "- decision=accept keeps the original plan; use empty speech and skills.\n"
-            "- decision=revise replaces the original exact plan and must include natural speech plus one or more exact candidate skills with schema-valid args.\n"
+            "- Return JSON only with keys decision, reason, speech, capabilities, plan_relation, user_confirmation_required, and assessment.\n"
+            "- decision=accept keeps the original plan; use empty speech and capabilities.\n"
+            "- decision=revise replaces the original exact plan and must include natural speech plus one or more exact candidate capabilities with schema-valid args.\n"
             "- decision=propose_alternative replaces the plan with a materially changed complete alternative, must include natural speech asking for confirmation, and must set user_confirmation_required=true.\n"
-            "- decision=clarify or unsupported blocks execution; include natural speech and no skills.\n"
+            "- decision=clarify or unsupported blocks execution; include natural speech and no capabilities.\n"
             "- Spoken speech must be brief and must not expose internal capability IDs."
         )
         system = (
@@ -795,7 +795,7 @@ class CapabilityAgent(BaseAgent):
                     "capability plan reviewer accepted an exact-intent substitution; blocking execution sid=%s intent=%s plan=%s reason=%r",
                     request.sid,
                     request.route_decision.intent,
-                    [item.capability_id for item in plan.skills],
+                    [item.capability_id for item in plan.capabilities],
                     review.reason[:200],
                 )
                 return self._review_unavailable_plan(request)
@@ -811,7 +811,7 @@ class CapabilityAgent(BaseAgent):
                         else "execute"
                     ),
                     speech=speech,
-                    skills=review.skills,
+                    capabilities=review.capabilities,
                     plan_relation=review.plan_relation,
                     user_confirmation_required=(
                         review.user_confirmation_required
@@ -880,7 +880,7 @@ class CapabilityAgent(BaseAgent):
             f"- Available capability API surface: {json.dumps(candidate_payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'))}\n"
             f"- Previous clarification JSON: {plan.model_dump_json()}\n\n"
             "Output Contract:\n"
-            "- Return JSON only with keys decision, speech, skills, information_gaps, plan_relation, user_confirmation_required, original_goal_summary, and assessment.\n"
+            "- Return JSON only with keys decision, speech, capabilities, information_gaps, plan_relation, user_confirmation_required, original_goal_summary, and assessment.\n"
             "- decision is execute, propose_alternative, clarify, or unsupported.\n"
             "- clarify requires natural speech and at least one specific information_gaps item.\n"
             "- execute/propose_alternative requires the complete plan with schema-valid concrete arguments.\n"
@@ -974,11 +974,11 @@ class CapabilityAgent(BaseAgent):
             f"- Current plan JSON: {plan.model_dump_json()}\n"
             f"- Structural parameter issues JSON: {json.dumps(issues, ensure_ascii=False, sort_keys=True, separators=(',', ':'))}\n\n"
             "Output Contract:\n"
-            "- Return JSON only with keys decision, speech, skills, information_gaps, plan_relation, user_confirmation_required, original_goal_summary, and assessment.\n"
+            "- Return JSON only with keys decision, speech, capabilities, information_gaps, plan_relation, user_confirmation_required, original_goal_summary, and assessment.\n"
             "- decision is execute, propose_alternative, clarify, or unsupported.\n"
             "- For execute/propose_alternative, output the complete plan, not just the repaired step. Every required field must be concrete and schema-valid.\n"
             "- Record how each inferred value was grounded in parameter_grounding. Use resolution values such as schema_default, use_safe_default, user_supplied, observed_context, or trusted_service, with a short rationale.\n"
-            "- For clarify, output no skills. speech must ask a specific natural question. information_gaps must identify each exact missing field, why it matters, preferred_resolution, and candidate_values when the schema supplies them.\n"
+            "- For clarify, output no capabilities. speech must ask a specific natural question. information_gaps must identify each exact missing field, why it matters, preferred_resolution, and candidate_values when the schema supplies them.\n"
             "- Do not expose skill IDs, schema field names, or internal validation errors in spoken speech."
         )
         system = (
@@ -1042,7 +1042,7 @@ class CapabilityAgent(BaseAgent):
             for match in candidates
         }
         issues: list[dict[str, Any]] = []
-        for item in plan.skills:
+        for item in plan.capabilities:
             match = allowed.get(item.capability_id)
             if match is None:
                 issues.append(
@@ -1104,7 +1104,7 @@ class CapabilityAgent(BaseAgent):
         }
         gaps: list[InformationGap] = []
         for issue in issues:
-            capability_id = str(issue.get("capability_id") or issue.get("skill_id") or "").strip()
+            capability_id = str(issue.get("capability_id") or "").strip()
             match = by_id.get(capability_id)
             if match is None:
                 continue
@@ -1155,7 +1155,7 @@ class CapabilityAgent(BaseAgent):
             return False
         if request.route_decision.route != "robot_action":
             return False
-        return plan.decision == "execute" and bool(plan.skills)
+        return plan.decision == "execute" and bool(plan.capabilities)
 
     def _selected_route_stage(self, request: AgentRunRequest) -> str:
         metadata = request.route_decision.metadata or {}
@@ -1199,7 +1199,7 @@ class CapabilityAgent(BaseAgent):
         candidate_ids = {str(getattr(match, "capability_id", "")) for match in candidates}
         if selected_id not in candidate_ids:
             return False
-        planned_ids = {item.capability_id for item in plan.skills}
+        planned_ids = {item.capability_id for item in plan.capabilities}
         return bool(planned_ids) and selected_id not in planned_ids
 
     def _review_unavailable_plan(self, request: AgentRunRequest) -> _CapabilityPlan:
@@ -1214,14 +1214,14 @@ class CapabilityAgent(BaseAgent):
         )
 
     @staticmethod
-    def _skill_proposal_args(item: _PlannedSkill) -> dict[str, Any]:
+    def _skill_proposal_args(item: _PlannedCapability) -> dict[str, Any]:
         """Return the LLM's proposed executable args for schema adjudication.
 
         ``args`` remains the backward-compatible contract. ``proposed_args`` is
         the preferred proposal form because it makes the LLM/skill-agent split
         explicit: the LLM proposes semantic parameters, and this CapabilityAgent
         adjudicates them against the concrete skill schema before creating a
-        trusted SkillRequest.
+        trusted CapabilityRequest.
         """
 
         if isinstance(item.proposed_args, dict) and item.proposed_args:
@@ -1230,7 +1230,7 @@ class CapabilityAgent(BaseAgent):
 
     def _skill_proposal_metadata(
         self,
-        item: _PlannedSkill,
+        item: _PlannedCapability,
         *,
         proposal_args: dict[str, Any],
         accepted_args: dict[str, Any],
@@ -1445,24 +1445,24 @@ class CapabilityAgent(BaseAgent):
             "- For execute, produce a complete semantic plan that preserves the requested outcome.\n"
             "- Use propose_alternative when available capabilities, schemas, provider constraints, or safety context require a material change such as omitting a requested action, changing concurrency to sequence, or substituting a different method.\n"
             "- A proposed alternative must not execute until the user confirms it.\n"
-            "- Do not answer unrelated chat here; return unsupported with no skills when no physical/tool skill should run.\n\n"
+            "- Do not answer unrelated chat here; return unsupported with no capabilities when no physical/tool skill should run.\n\n"
             "Task Context Group:\n"
             f"- Latest user input: {request.text}\n"
             f"- {selected_line.rstrip()}\n"
             f"- Available capability API surface: {json.dumps(candidate_payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'))}\n"
             "- Ability interpretation: choose only from the provided capability_id values and satisfy that candidate's input_schema.\n"
-            "- Treat can_run_parallel, exclusive_group, resource_claims, and execution_constraints as provider/runtime evidence about whether skills may overlap.\n"
+            "- Treat can_run_parallel, exclusive_group, resource_claims, and execution_constraints as provider/runtime evidence about whether capabilities may overlap.\n"
             "- Do not infer concurrency from a skill name. If the evidence does not support overlap, do not claim simultaneous execution.\n"
             "- If Goal-Interpreter-selected exact capability_id is best, use it; if another candidate better satisfies the action/schema, choose that candidate.\n"
             "- Treat modifiers such as direction, duration, distance, count, speed, urgency, target, and object references as semantic parameter intent. Ground them to schema fields when the schema exposes a compatible field.\n"
             "- If the schema does not expose a field for a user modifier, do not invent that field; place the unsupported modifier in unmapped_intent and explain briefly in speech when it matters.\n"
             "- Polite ability-shaped requests can be action requests when they ask Chromie to perform a listed physical action now.\n"
-            "- For questions, identity/status, greetings, jokes, stories, songs, or other speech-only conversation, return unsupported with no skills.\n"
+            "- For questions, identity/status, greetings, jokes, stories, songs, or other speech-only conversation, return unsupported with no capabilities.\n"
             "- Never combine an unrelated spoken answer with a body skill.\n"
             "- Use recent conversation/task context for follow-ups; distinguish gaze/attention/orientation from locomotion by meaning and descriptions.\n\n"
             "Cost Function:\n"
-            "- Choose the smallest complete validated set of executable skills. Completeness means every material part of the reconstructed user goal is either satisfied or explicitly represented in an alternative proposal.\n"
-            "- Prefer human-facing wrapper skills over lower-level velocity/control skills when both satisfy the request.\n"
+            "- Choose the smallest complete validated set of executable capabilities. Completeness means every material part of the reconstructed user goal is either satisfied or explicitly represented in an alternative proposal.\n"
+            "- Prefer human-facing wrapper capabilities over lower-level velocity/control capabilities when both satisfy the request.\n"
             "- Preserve the user's intended action class. Do not use social acknowledgement, gaze, attention, or idle gestures as fallback actions for an unrelated body request.\n"
             "- Convert human modifiers into schema-grounded proposal args, but let schema and runtime bound the final executable parameters.\n"
             "- Resolve missing parameters semantically before giving up: inspect the field description, schema default, bounds, safety class, effects, provider constraints, and how materially the value changes the user's outcome.\n"
@@ -1477,12 +1477,12 @@ class CapabilityAgent(BaseAgent):
             "- Do not ask the user for a world fact Chromie can observe or query from a trusted service.\n"
             "- Prefer natural, brief speech that accurately describes only the selected plan.\n\n"
             "Output Contract:\n"
-            "- Return JSON only with keys decision, speech, skills, information_gaps, plan_relation, user_confirmation_required, original_goal_summary, and assessment.\n"
+            "- Return JSON only with keys decision, speech, capabilities, information_gaps, plan_relation, user_confirmation_required, original_goal_summary, and assessment.\n"
             "- decision must be execute, propose_alternative, clarify, or unsupported.\n"
             "- plan_relation must be exact, safe_adjustment, alternative, partial, or none.\n"
             "- original_goal_summary must briefly capture the complete requested outcome.\n"
             "- assessment should explain goal coverage, provider/resource compatibility, safety considerations, and any changed or omitted requirement in structured fields.\n"
-            "- When decision is execute, skills is required and must contain at least one item. Never return execute with skills omitted, empty, null, or only speech.\n"
+            "- When decision is execute, capabilities is required and must contain at least one item. Never return execute with capabilities omitted, empty, null, or only speech.\n"
             "- Each execute or propose_alternative item must include capability_id and may include args or proposed_args. capability_id must be an exact candidate capability_id.\n"
             "- Each capability item may include timing=parallel or sequential and an optional stable step_id. Use distinct step_id values when the complete plan intentionally repeats the same skill with identical args. Use parallel only when explicit supplied provider/resource evidence permits overlap; absent or undeclared parallel metadata is not proof of compatibility.\n"
             "- Prefer proposed_args when you are translating human intent into concrete parameters; args remains accepted for backward compatibility.\n"

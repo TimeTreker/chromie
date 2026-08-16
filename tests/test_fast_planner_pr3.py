@@ -1952,7 +1952,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "execution_binding": {
                             "execution_outcome_status": "failed",
                             "retryable_safe_read": True,
-                            "planned_skills": [
+                            "planned_capabilities": [
                                 {
                                     "capability_id": "chromie.weather.lookup",
                                     "safety_class": "safe_read",

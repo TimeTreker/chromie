@@ -25,14 +25,14 @@ logger = logging.getLogger("chromie.agent.deepthinking")
 
 class _DeepThinkingSpeechTask(BaseModel):
     text: str = ""
-    timing: Literal["immediate", "parallel", "sequential", "after_skills"] = "immediate"
+    timing: Literal["immediate", "parallel", "sequential", "after_capabilities"] = "immediate"
     style: str = "brief"
     priority: str = "normal"
 
 
 class _DeepThinkingTask(CapabilityIdentityModel):
     args: dict[str, Any] = Field(default_factory=dict)
-    timing: Literal["immediate", "parallel", "sequential", "after_skills"] = "sequential"
+    timing: Literal["immediate", "parallel", "sequential", "after_capabilities"] = "sequential"
     timeout_ms: int | None = Field(default=None, ge=1, le=120000)
     cancellable: bool = True
     requires_confirmation: bool | None = None
@@ -64,28 +64,6 @@ class _DeepThinkingTaskProposal(BaseModel):
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     reason: str = ""
 
-    @model_validator(mode="before")
-    @classmethod
-    def normalize_legacy_matched_identity(cls, value: Any) -> Any:
-        if not isinstance(value, dict):
-            return value
-        payload = dict(value)
-        has_capability = "matched_capability_id" in payload
-        has_legacy = "matched_skill_id" in payload
-        if has_capability or has_legacy:
-            capability_id = str(payload.get("matched_capability_id") or "").strip()
-            legacy_skill_id = str(payload.get("matched_skill_id") or "").strip()
-            if has_capability and has_legacy and capability_id != legacy_skill_id:
-                raise ValueError(
-                    "conflicting matched_capability_id and legacy matched_skill_id"
-                )
-            payload["matched_capability_id"] = capability_id or legacy_skill_id or None
-            payload.pop("matched_skill_id", None)
-        return payload
-
-    @property
-    def matched_skill_id(self) -> str | None:
-        return self.matched_capability_id
 
 
 class _DeepThinkingPlan(BaseModel):
@@ -297,7 +275,7 @@ class DeepThinkingAgent(BaseAgent):
             "Task field rules:\n"
             "- capability_id: use chromie.speak for speech, otherwise copy one exact capability_id from Capability catalog.\n"
             "- args: object matching the selected capability schema. For chromie.speak use text, style, and priority.\n"
-            "- timing: immediate, parallel, sequential, or after_skills. Non-speech tasks should normally use sequential or parallel.\n"
+            "- timing: immediate, parallel, sequential, or after_capabilities. Non-speech tasks should normally use sequential or parallel.\n"
             "- timeout_ms: integer milliseconds or null.\n"
             "- cancellable: boolean.\n"
             "- requires_confirmation: boolean or null; null means defer to the candidate capability definition.\n"
@@ -456,7 +434,7 @@ class DeepThinkingAgent(BaseAgent):
         valid_task_count = 0
         proposed_effect_count = 0
         valid_effect_count = 0
-        add_skill = getattr(result, "add_skill", None)
+        add_capability = getattr(result, "add_capability", None)
         candidates = self._candidate_capabilities(request)
 
         for index, task in enumerate(tasks):
@@ -474,7 +452,7 @@ class DeepThinkingAgent(BaseAgent):
                 valid_task_count += 1
                 continue
             proposed_effect_count += 1
-            if callable(add_skill):
+            if callable(add_capability):
                 candidate = self._candidate_for_task(task, candidates)
                 if candidate is None:
                     task_proposals.append(
@@ -519,7 +497,7 @@ class DeepThinkingAgent(BaseAgent):
                     if task.requires_confirmation is None
                     else bool(task.requires_confirmation)
                 )
-                capability_id = self._candidate_skill_id(candidate) or task.capability_id
+                capability_id = self._candidate_capability_id(candidate) or task.capability_id
                 skill = CapabilityRequest(
                     capability_id=capability_id,
                     args=args,
@@ -533,7 +511,7 @@ class DeepThinkingAgent(BaseAgent):
                         "schema_normalized_args": normalized,
                     },
                 )
-                add_skill(skill)
+                add_capability(skill)
                 task_proposals.append(
                     self._task_proposal(
                         task,
@@ -659,11 +637,11 @@ class DeepThinkingAgent(BaseAgent):
                 "sequence": self._safe_sequence(proposal.get("sequence"), index),
                 "superseded_by": replacement_id,
             }
-            skill_id = str(
-                proposal.get("capability_id") or proposal.get("skill_id") or ""
+            capability_id = str(
+                proposal.get("capability_id") or ""
             ).strip()
-            if skill_id:
-                item["capability_id"] = skill_id
+            if capability_id:
+                item["capability_id"] = capability_id
             superseded.append(item)
         return superseded
 
@@ -687,7 +665,7 @@ class DeepThinkingAgent(BaseAgent):
         committed_by: str | None = None,
     ) -> dict[str, Any]:
         normalized_capability_id = capability_id or task.capability_id.strip()
-        task_type = self._task_type_for_skill(normalized_capability_id)
+        task_type = self._task_type_for_capability(normalized_capability_id)
         proposal = TaskProposal(
             id=f"deepthinking:{index}:{task_type}",
             source="deepthinking",
@@ -695,7 +673,7 @@ class DeepThinkingAgent(BaseAgent):
             task_type=task_type,
             state=state,  # type: ignore[arg-type]
             reason=self._bounded_text(reason, 240),
-            effectful=self._is_effectful_skill_id(normalized_capability_id),
+            effectful=self._is_effectful_capability_id(normalized_capability_id),
             priority="normal",
             sequence=index,
             capability_id=normalized_capability_id,
@@ -753,24 +731,24 @@ class DeepThinkingAgent(BaseAgent):
         return item.model_dump(mode="json", exclude_none=True)
 
     @staticmethod
-    def _task_type_for_skill(skill_id: str) -> str:
-        if skill_id == "chromie.speak":
+    def _task_type_for_capability(capability_id: str) -> str:
+        if capability_id == "chromie.speak":
             return "speech.speak"
-        if skill_id == "session.interrupt":
+        if capability_id == "session.interrupt":
             return "task.cancel_current_action"
-        if skill_id == "chromie.task_graph.execute":
+        if capability_id == "chromie.task_graph.execute":
             return "task.execute_task_graph"
-        return "task.execute_skill"
+        return "task.execute_capability"
 
     @staticmethod
-    def _is_effectful_skill_id(skill_id: str) -> bool:
+    def _is_effectful_capability_id(capability_id: str) -> bool:
         return (
-            skill_id.startswith("soridormi.")
-            or skill_id == "session.interrupt"
-            or skill_id == "chromie.task_graph.execute"
+            capability_id.startswith("soridormi.")
+            or capability_id == "session.interrupt"
+            or capability_id == "chromie.task_graph.execute"
             or (
-                skill_id.startswith("chromie.")
-                and skill_id != "chromie.speak"
+                capability_id.startswith("chromie.")
+                and capability_id != "chromie.speak"
             )
         )
 
@@ -831,7 +809,7 @@ class DeepThinkingAgent(BaseAgent):
 
     @staticmethod
     def _is_speech_task(task: _DeepThinkingTask) -> bool:
-        return task.skill_id.strip() == "chromie.speak"
+        return task.capability_id.strip() == "chromie.speak"
 
     @staticmethod
     def _speech_task_text(task: _DeepThinkingTask) -> str:
@@ -857,7 +835,7 @@ class DeepThinkingAgent(BaseAgent):
     def _add_speech_task(self, result: AgentResult, task: _DeepThinkingSpeechTask) -> None:
         text = task.text or ""
         for chunk in self._split_spoken_response(text):
-            if task.timing == "after_skills":
+            if task.timing == "after_capabilities":
                 result.add_speak_after(
                     chunk,
                     style=task.style,
@@ -892,13 +870,13 @@ class DeepThinkingAgent(BaseAgent):
         task: _DeepThinkingTask,
         candidates: list[dict[str, Any]],
     ) -> dict[str, Any] | None:
-        requested = task.skill_id.strip()
+        requested = task.capability_id.strip()
         if not requested:
             return None
         for candidate in candidates:
             ids = {
                 str(candidate.get("capability_id") or "").strip(),
-                str(candidate.get("skill_id") or "").strip(),
+                str(candidate.get("capability_id") or "").strip(),
             }
             ids.discard("")
             if requested not in ids:
@@ -910,8 +888,8 @@ class DeepThinkingAgent(BaseAgent):
             return candidate
         return None
 
-    def _candidate_skill_id(self, candidate: dict[str, Any]) -> str:
-        return str(candidate.get("capability_id") or candidate.get("skill_id") or "").strip()
+    def _candidate_capability_id(self, candidate: dict[str, Any]) -> str:
+        return str(candidate.get("capability_id") or "").strip()
 
     @staticmethod
     def _skill_timing(task: _DeepThinkingTask) -> Literal["parallel", "sequential"]:
@@ -1270,7 +1248,7 @@ class DeepThinkingAgent(BaseAgent):
         for item in candidates[:8]:
             if not isinstance(item, dict):
                 continue
-            capability_id = str(item.get("capability_id") or item.get("skill_id") or "")
+            capability_id = str(item.get("capability_id") or "")
             description = str(item.get("description") or "")
             api = json.dumps(
                 item.get("input_schema") or {},

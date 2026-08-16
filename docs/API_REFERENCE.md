@@ -164,14 +164,12 @@ Activities, response wording, `route`, and `intent` are forbidden.
 
 `POST /fast-plan` is the canonical Fast Planner phase, available only when `AGENT_FAST_PLANNER_ENABLED=1` and Agent LLM use is enabled. It runs after Goal Association when persistent Goal grounding is required and returns the shared `CanonicalPlan` contract. Ollama itself receives an exact flat semantic DTO schema; the host adds `schema_version`, `plan_id`, `planner_tier`, and authoritative Goal Association IDs after model validation. The canonical Fast Planner may return a complete direct common-capability plan or an escalation. Partial or uncertain coverage is contractually required to contain zero executable steps. The endpoint never executes by itself; the host uses it inside unified `report_only` observation or authoritative `apply`, where the trusted runtime revalidates every terminal plan.
 
-Executable identity is canonicalized as `capability_id` in new planner schemas,
+Executable identity is canonicalized as `capability_id` in planner schemas,
 Canonical Plan steps, Interaction Capability requests/results/traces, and
-execution evidence. Declared compatibility readers accept historical
-`skill_id`, normalize it immediately, and reject a payload containing
-contradictory dual fields. New serializers do not emit executable `skill_id`.
-The existing `skills` collection name in `InteractionResponse` is a bounded
-transport compatibility surface; each contained request is a canonical
-`CapabilityRequest`.
+execution evidence. Live Chromie contracts do not accept or emit executable
+`skill_id` aliases, and `InteractionResponse.capabilities` contains canonical
+`CapabilityRequest` objects. Provider-local identity such as Soridormi wire
+`skill_id` is translated only inside the owning adapter boundary.
 
 Planner responses also expose `CanonicalPlan.selected_agent_skills`. Each item is
 a content-free provenance record containing the exact selection/disclosure IDs,
@@ -190,7 +188,7 @@ Capability authorization and execution.
 
 `POST /compose-response-plan` is available when `AGENT_RESPONSE_COMPOSER_ENABLED=1`. It requires a terminal `CanonicalPlan` in request context and returns `ResponseCompositionResolution`. Ollama receives the exact `ResponseComposerModelOutput` schema: a `ResponsePlan`, lane coordination, confidence, and rationale, with response-stage Goal IDs constrained to the immutable plan. Social Attention is intentionally absent from this DTO; `SocialAttentionPlanner` owns optional decoration independently. The Host constructs composition identity, embeds the immutable plan and its SHA-256 fingerprint, requires every plan goal to be covered by response stages, and forbids pre-execution completion claims. One mechanically invalid response DTO may receive one same-meaning regeneration; semantic/truth rejection is terminal and cannot author a replacement response through another reviewer. An immediate Fast-Planner conversational Activity is already one semantic act and is not rewritten by Response Composer. Planned safe reads may use execution-only response materialization after canonical Goal/Plan binding instead of waiting for unrelated pre-evidence composition.
 
-`POST /tools/execute` is a trusted provider boundary, not a semantic router. It accepts an exact `capability_id` and schema-valid arguments already produced by the Goal-driven planner. The Agent rejects unknown, unavailable, non-local, side-effecting, confirmation-gated, or non-`safe_read` capabilities and returns structured output without composing user speech. The Trusted Capability Runtime (legacy code name: Skill Runtime) remains responsible for provider registration, input validation, timing, cancellation, and correlated execution evidence. The first maintained binding is `chromie.weather.lookup`; additional local tools require an explicit manifest declaration and trusted provider binding rather than phrase rules.
+`POST /tools/execute` is a trusted provider boundary, not a semantic router. It accepts an exact `capability_id` and schema-valid arguments already produced by the Goal-driven planner. The Agent rejects unknown, unavailable, non-local, side-effecting, confirmation-gated, or non-`safe_read` capabilities and returns structured output without composing user speech. The Trusted Capability Runtime (`CapabilityRuntime`) remains responsible for provider registration, input validation, timing, cancellation, and correlated execution evidence. The first maintained binding is `chromie.weather.lookup`; additional local tools require an explicit manifest declaration and trusted provider binding rather than phrase rules.
 
 `chromie.weather.lookup` accepts the canonical place, `date=today|tomorrow`,
 and `period=day|tonight`. `tonight` is a narrower local day-part contract, not
@@ -439,7 +437,7 @@ Trusted Capability Runtime can route that request to `POST /task-graphs/execute-
 The Agent-side planning execution flag still controls whether the graph runs;
 disabled planning execution returns a safe failure instead of falling back to
 raw control or guarded execution. Failed, aborted, or cancelled graph traces are
-reported back as non-completed capability results so `after_skills` speech is not
+reported back as non-completed capability results so `after_capabilities` speech is not
 played as if the task succeeded.
 TaskGraph `$ref` arguments may read `<node>.output[.<field>]`, `<node>.error`,
 or `<node>.status`; LLM-planned Soridormi task-submit nodes that omit a failure

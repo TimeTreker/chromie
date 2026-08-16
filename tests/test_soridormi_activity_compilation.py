@@ -6,17 +6,20 @@ from typing import Any
 from agent.app.capabilities.catalog import CapabilityCatalog
 from agent.app.capabilities.loader import build_chromie_registry
 from agent.app.tool_invocation import ToolCallOutcome, ToolInvocationContext
-from orchestrator.runtime.skill_runtime import (
+from orchestrator.runtime.capability_runtime import (
     RuntimeAuthorization,
-    SkillExecutionContext,
-    SkillRegistry,
-    SkillRuntime,
+    CapabilityExecutionContext,
+    CapabilityRegistry,
+    CapabilityRuntime,
 )
-from orchestrator.runtime.soridormi_skill_provider import SoridormiNamedSkillAdapter
+from orchestrator.runtime.soridormi_capability_provider import (
+    SoridormiCapabilityProvider,
+    import_soridormi_capability_catalog,
+)
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
-    SkillRequest,
-    SkillTrace,
+    CapabilityRequest,
+    CapabilityTrace,
 )
 
 
@@ -91,13 +94,13 @@ class _ActivityInvoker:
                         "walk-request": {
                             "status": "completed",
                             "completed": True,
-                            "skill_id": "walk_forward",
+                            "capability_id": "walk_forward",
                             "summary": "walk completed",
                         },
                         "blink-request": {
                             "status": "completed",
                             "completed": True,
-                            "skill_id": "blink_eyes",
+                            "capability_id": "blink_eyes",
                             "summary": "blink completed",
                             "optional": True,
                         },
@@ -135,9 +138,9 @@ class _CatalogInvoker:
 
 
 class SoridormiActivityCompilationTests(unittest.IsolatedAsyncioTestCase):
-    def _runtime(self, invoker: _ActivityInvoker) -> SkillRuntime:
-        registry = SkillRegistry()
-        registry.import_soridormi_catalog(
+    def _runtime(self, invoker: _ActivityInvoker) -> CapabilityRuntime:
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry,
             [
                 _skill(
                     "walk_forward",
@@ -153,13 +156,13 @@ class SoridormiActivityCompilationTests(unittest.IsolatedAsyncioTestCase):
                 ),
             ]
         )
-        runtime = SkillRuntime(registry, max_concurrency=3)
-        runtime.register_provider(SoridormiNamedSkillAdapter(invoker))
+        runtime = CapabilityRuntime(registry, max_concurrency=3)
+        runtime.register_provider(SoridormiCapabilityProvider(invoker))
         return runtime
 
     async def test_registry_preserves_nested_provider_contract_exactly(self) -> None:
-        registry = SkillRegistry()
-        registry.import_soridormi_catalog(
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry,
             [
                 _skill(
                     "walk_forward",
@@ -209,10 +212,10 @@ class SoridormiActivityCompilationTests(unittest.IsolatedAsyncioTestCase):
         runtime = self._runtime(invoker)
         response = InteractionResponse(
             interaction_id="activity-interaction",
-            skills=[
-                SkillRequest(
+            capabilities=[
+                CapabilityRequest(
                     request_id="walk-request",
-                    skill_id="soridormi.walk_forward",
+                    capability_id="soridormi.walk_forward",
                     args={},
                     timing="parallel",
                     metadata={
@@ -221,9 +224,9 @@ class SoridormiActivityCompilationTests(unittest.IsolatedAsyncioTestCase):
                         "source_goal_ids": ["goal-walk"],
                     },
                 ),
-                SkillRequest(
+                CapabilityRequest(
                     request_id="blink-request",
-                    skill_id="soridormi.blink_eyes",
+                    capability_id="soridormi.blink_eyes",
                     args={},
                     timing="parallel",
                     metadata={
@@ -284,9 +287,9 @@ class SoridormiActivityCompilationTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_activity_cancel_uses_compiled_activity_identity(self) -> None:
         invoker = _ActivityInvoker()
-        adapter = SoridormiNamedSkillAdapter(invoker)
-        registry = SkillRegistry()
-        registry.import_soridormi_catalog(
+        adapter = SoridormiCapabilityProvider(invoker)
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry,
             [
                 _skill(
                     "walk_forward",
@@ -297,17 +300,17 @@ class SoridormiActivityCompilationTests(unittest.IsolatedAsyncioTestCase):
             ]
         )
         definition = registry.get("soridormi.walk_forward")
-        request = SkillRequest(
+        request = CapabilityRequest(
             request_id="walk-request",
-            skill_id="soridormi.walk_forward",
+            capability_id="soridormi.walk_forward",
         )
-        context = SkillExecutionContext(
+        context = CapabilityExecutionContext(
             interaction_id="activity-interaction",
             provider_state={"provider_activity_id": "activity-1"},
-            trace=SkillTrace(
+            trace=CapabilityTrace(
                 interaction_id="activity-interaction",
                 request_id="walk-request",
-                skill_id="soridormi.walk_forward",
+                capability_id="soridormi.walk_forward",
                 provider_id=adapter.provider_id,
             ),
         )

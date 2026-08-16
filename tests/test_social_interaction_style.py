@@ -43,7 +43,7 @@ class _Catalog:
             )
         ]
 
-    async def refresh_live_named_skills(self) -> None:
+    async def refresh_live_named_capabilities(self) -> None:
         return None
 
     def entries(self):
@@ -97,7 +97,7 @@ class SocialInteractionStyleTests(unittest.TestCase):
         item = request()
         item.context["mind"] = default_mind_profile().prompt_context()
         item.context["recent_auxiliary_behavior_evidence"] = [
-            {"skill_id": f"soridormi.old_{index}"}
+            {"capability_id": f"soridormi.old_{index}"}
             for index in range(20)
         ]
         runtime = InteractionRuntime(
@@ -115,7 +115,7 @@ class SocialInteractionStyleTests(unittest.TestCase):
         self.assertIn("explicit user action", style["restraint"])
         self.assertEqual(len(item.context["recent_auxiliary_behavior_evidence"]), 12)
         self.assertEqual(
-            item.context["recent_auxiliary_behavior_evidence"][0]["skill_id"],
+            item.context["recent_auxiliary_behavior_evidence"][0]["capability_id"],
             "soridormi.old_8",
         )
         self.assertEqual(
@@ -131,7 +131,7 @@ class SocialInteractionStyleTests(unittest.TestCase):
                 {
                     "evidence_kind": "host_accepted_auxiliary_request",
                     "execution_claim": "not_observed",
-                    "skill_id": "soridormi.attention",
+                    "capability_id": "soridormi.attention",
                 }
             ],
         }
@@ -171,7 +171,7 @@ class SocialInteractionStyleTests(unittest.TestCase):
                     "purpose": "acknowledge",
                     "behaviors": [
                         {
-                            "skill_id": "soridormi.attention",
+                            "capability_id": "soridormi.attention",
                             "args": {"intensity": "subtle"},
                             "timing": "sequential",
                         }
@@ -192,7 +192,7 @@ class SocialInteractionStyleTests(unittest.TestCase):
             {"mujoco", "physical"},
         )
         self.assertEqual(
-            {case["skill_id"] for case in payload["cases"]},
+            {case["capability_id"] for case in payload["cases"]},
             {"soridormi.attention"},
         )
         self.assertEqual(

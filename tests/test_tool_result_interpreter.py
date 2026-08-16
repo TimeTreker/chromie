@@ -510,7 +510,7 @@ class ToolResultHostIntegrationTests(unittest.IsolatedAsyncioTestCase):
             steps=[
                 {
                     "step_id": "step-weather",
-                    "skill_id": "chromie.weather.lookup",
+                    "capability_id": "chromie.weather.lookup",
                     "source_goal_ids": ["goal-weather"],
                 }
             ],
@@ -549,7 +549,7 @@ class ToolResultHostIntegrationTests(unittest.IsolatedAsyncioTestCase):
                     evidence_id="evidence-weather",
                     request_id="request-weather",
                     step_id="step-weather",
-                    skill_id="chromie.weather.lookup",
+                    capability_id="chromie.weather.lookup",
                     source_goal_ids=["goal-weather"],
                     status="completed",
                     observation=observation,

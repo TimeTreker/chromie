@@ -126,7 +126,7 @@ class CapabilityCatalog:
     """Shared, queryable catalog for Goal Interpretation and interaction handling.
 
     Static entries come from Chromie's capability registry. Soridormi named
-    skills are refreshed from the live provider because those exact IDs are the
+    capabilities are refreshed from the live provider because those exact IDs are the
     IDs the host InteractionRuntime can execute.
     """
 
@@ -169,7 +169,7 @@ class CapabilityCatalog:
         return [merged[key] for key in sorted(merged)]
 
     async def snapshot(self, *, refresh: bool = False) -> dict[str, Any]:
-        await self.refresh_live_named_skills(force=refresh)
+        await self.refresh_live_named_capabilities(force=refresh)
         return {
             "schema_version": "0.1",
             "catalog_version": self._version,
@@ -183,7 +183,7 @@ class CapabilityCatalog:
         scope: Literal["common", "all"] = "common",
         refresh: bool = False,
     ) -> list[CatalogCapability]:
-        await self.refresh_live_named_skills(force=refresh)
+        await self.refresh_live_named_capabilities(force=refresh)
         entries = [item for item in self.entries() if item.available]
         if scope == "common":
             entries = [
@@ -208,7 +208,7 @@ class CapabilityCatalog:
         *,
         refresh: bool = False,
     ) -> CatalogCapability | None:
-        await self.refresh_live_named_skills(force=refresh)
+        await self.refresh_live_named_capabilities(force=refresh)
         target = (capability_id or "").strip()
         if not target:
             return None
@@ -235,7 +235,7 @@ class CapabilityCatalog:
         """
 
         del language
-        await self.refresh_live_named_skills(force=refresh)
+        await self.refresh_live_named_capabilities(force=refresh)
         query = " ".join((text or "").strip().split())
         limit = max(1, int(limit))
         available = [item for item in self.entries() if item.available]
@@ -299,7 +299,7 @@ class CapabilityCatalog:
             )
         return "\n".join(lines)
 
-    async def refresh_live_named_skills(self, *, force: bool = False) -> None:
+    async def refresh_live_named_capabilities(self, *, force: bool = False) -> None:
         if self.live_invoker is None:
             return
         now = time.monotonic()
@@ -315,11 +315,11 @@ class CapabilityCatalog:
                 if getattr(outcome, "status", None) != "success":
                     raise RuntimeError(getattr(outcome, "error", None) or "skill catalog lookup failed")
                 output = getattr(outcome, "output", {})
-                skills = output.get("skills") if isinstance(output, dict) else None
-                if not isinstance(skills, list):
+                provider_skills = output.get("skills") if isinstance(output, dict) else None
+                if not isinstance(provider_skills, list):
                     raise RuntimeError("skill catalog response has no skills list")
                 live: dict[str, CatalogCapability] = {}
-                for raw_item in skills:
+                for raw_item in provider_skills:
                     if not isinstance(raw_item, dict):
                         raise ValueError(
                             "Soridormi skill catalog entries must be objects"
@@ -330,12 +330,12 @@ class CapabilityCatalog:
                         raise ValueError(
                             "Soridormi skill catalog entry has no skill_id"
                         )
-                    # Match the host SkillRegistry namespace exactly. The
-                    # provider contract returns an unprefixed opaque skill_id.
+                    # Soridormi wire identity stays provider-local; expose only the
+                    # translated canonical capability_id above this adapter boundary.
                     capability_id = f"soridormi.{upstream_id}"
                     if capability_id in live:
                         raise ValueError(
-                            "duplicate Soridormi skill_id in one catalog: "
+                            "duplicate Soridormi wire skill_id in one catalog: "
                             f"{upstream_id}"
                         )
 
@@ -421,7 +421,7 @@ class CapabilityCatalog:
                             )
                         ),
                         route="robot_action",
-                        source="soridormi.live_named_skills",
+                        source="soridormi.live_named_capabilities",
                         invocation_kind="named_skill",
                         interaction_executable=True,
                         prompt_tier=self._prompt_tier_for_live_skill(

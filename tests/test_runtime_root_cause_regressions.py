@@ -20,7 +20,7 @@ from agent.app.response_composer import ResponseComposerResolver
 from agent.app.schema import AgentRunRequest
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.outcome_reconciliation import ExecutionOutcomeReconciler
-from shared.chromie_contracts.interaction import SkillRequest
+from shared.chromie_contracts.interaction import CapabilityRequest
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.response_composition import canonical_plan_fingerprint
 from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage
@@ -169,7 +169,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         schema = canonical_plan_response_schema(
             planner_tier="deep",
             expected_goal_ids=["goal-walk"],
-            allowed_skill_ids=["soridormi.walk_forward"],
+            allowed_capability_ids=["soridormi.walk_forward"],
         )
         relation_constraint = next(
             item
@@ -197,7 +197,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         base = canonical_plan_response_schema(
             planner_tier="deep",
             expected_goal_ids=["goal-walk", "goal-blink"],
-            allowed_skill_ids=[
+            allowed_capability_ids=[
                 "soridormi.walk_forward",
                 "soridormi.blink_eyes",
             ],
@@ -337,13 +337,13 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         for schema in (
             fast_multi_goal_response_schema(
                 expected_goal_ids=["goal-walk", "goal-song"],
-                allowed_skill_ids=["soridormi.walk_forward"],
+                allowed_capability_ids=["soridormi.walk_forward"],
                 response_goal_ids=["goal-song"],
             ),
             canonical_plan_response_schema(
                 planner_tier="deep",
                 expected_goal_ids=["goal-walk", "goal-song"],
-                allowed_skill_ids=["soridormi.walk_forward"],
+                allowed_capability_ids=["soridormi.walk_forward"],
                 response_goal_ids=["goal-song"],
             ),
         ):
@@ -408,7 +408,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         tool_schema = canonical_plan_response_schema(
             planner_tier="deep",
             expected_goal_ids=["goal-lookup", "goal-joke"],
-            allowed_skill_ids=["chromie.weather.lookup"],
+            allowed_capability_ids=["chromie.weather.lookup"],
             requires_execution=True,
             response_goal_ids=["goal-joke"],
         )
@@ -487,7 +487,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         schema = canonical_plan_response_schema(
             planner_tier="fast",
             expected_goal_ids=["goal-weather"],
-            allowed_skill_ids=["chromie.weather.lookup"],
+            allowed_capability_ids=["chromie.weather.lookup"],
         )
         outcomes = schema["properties"]["goal_outcomes"]
 
@@ -500,13 +500,13 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
     def test_tool_route_planner_schemas_forbid_model_authored_speech(self) -> None:
         fast = fast_multi_goal_response_schema(
             expected_goal_ids=["goal-weather"],
-            allowed_skill_ids=["chromie.weather.lookup"],
+            allowed_capability_ids=["chromie.weather.lookup"],
             requires_execution=True,
         )
         deep = canonical_plan_response_schema(
             planner_tier="deep",
             expected_goal_ids=["goal-weather"],
-            allowed_skill_ids=["chromie.weather.lookup"],
+            allowed_capability_ids=["chromie.weather.lookup"],
             requires_execution=True,
         )
 
@@ -561,7 +561,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             steps=[
                 {
                     "step_id": "lookup",
-                    "skill_id": "chromie.weather.lookup",
+                    "capability_id": "chromie.weather.lookup",
                     "args": {"location": "重庆", "date": "today"},
                     "timing": "parallel",
                     "source_goal_ids": ["goal-weather"],
@@ -782,12 +782,12 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                 "steps": [
                     {
                         "step_id": "walk",
-                        "skill_id": "soridormi.walk_forward",
+                        "capability_id": "soridormi.walk_forward",
                         "timing": "parallel",
                     },
                     {
                         "step_id": "blink",
-                        "skill_id": "soridormi.blink_eyes",
+                        "capability_id": "soridormi.blink_eyes",
                         "timing": "parallel",
                     },
                 ]
@@ -797,12 +797,12 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             "steps": [
                 {
                     "step_id": "walk",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 15},
                 },
                 {
                     "step_id": "blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                 },
             ]
@@ -827,12 +827,12 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             "steps": [
                 {
                     "step_id": "walk",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 15},
                 },
                 {
                     "step_id": "blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                 },
             ]
@@ -861,7 +861,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             steps=[
                 {
                     "step_id": "lookup",
-                    "skill_id": "chromie.weather.lookup",
+                    "capability_id": "chromie.weather.lookup",
                     "args": {"location": "重庆", "date": "today"},
                     "timing": "sequential",
                     "source_goal_ids": ["goal-weather"],
@@ -877,9 +877,9 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
         fingerprint = canonical_plan_fingerprint(plan)
-        request = SkillRequest(
+        request = CapabilityRequest(
             request_id="weather-request",
-            skill_id="chromie.weather.lookup",
+            capability_id="chromie.weather.lookup",
             args={"location": "重庆", "date": "today"},
             timing="parallel",
             requires_confirmation=False,
@@ -1074,7 +1074,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         schema = canonical_plan_response_schema(
             planner_tier="deep",
             expected_goal_ids=["goal-weather"],
-            allowed_skill_ids=["chromie.weather.lookup"],
+            allowed_capability_ids=["chromie.weather.lookup"],
             requires_execution=True,
         )
         outcome = schema["properties"]["goal_outcomes"]["properties"][

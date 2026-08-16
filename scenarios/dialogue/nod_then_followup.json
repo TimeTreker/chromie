@@ -31,7 +31,7 @@
         }
       },
       "expect": {
-        "skills": ["soridormi.nod_yes"],
+        "capabilities": ["soridormi.nod_yes"],
         "requires_confirmation": true
       }
     },

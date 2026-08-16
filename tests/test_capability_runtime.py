@@ -9,31 +9,34 @@ from shared.chromie_contracts.action import ActionCommand
 from shared.chromie_contracts.interaction import InteractionResponse
 from shared.chromie_contracts.reflex import CancellationDirective
 
-from orchestrator.runtime.skill_adapters import AgentResultInteractionAdapter
-from orchestrator.runtime.skill_runtime import (
-    LocalSpeechSkillProvider,
-    MockSkillProvider,
+from orchestrator.runtime.capability_adapters import AgentResultInteractionAdapter
+from orchestrator.runtime.capability_runtime import (
+    LocalSpeechCapabilityProvider,
+    MockCapabilityProvider,
     RuntimeAuthorization,
-    SORIDORMI_NAMED_SKILL_OUTPUT_SCHEMA,
-    SkillDefinition,
-    SkillRegistry,
-    SkillRuntime,
+    CapabilityDefinition,
+    CapabilityRegistry,
+    CapabilityRuntime,
     local_speech_definition,
+)
+from orchestrator.runtime.soridormi_capability_provider import (
+    SORIDORMI_NAMED_CAPABILITY_OUTPUT_SCHEMA,
+    import_soridormi_capability_catalog,
 )
 
 
 def _body_definition(
     *,
-    skill_id: str = "soridormi.nod_yes",
+    capability_id: str = "soridormi.nod_yes",
     provider_id: str = "mock.body",
     timeout_ms: int = 1000,
     requires_confirmation: bool = False,
     interruptible: bool = True,
     can_run_parallel: bool = True,
     exclusive_group: str | None = "soridormi.robot_motion",
-) -> SkillDefinition:
-    return SkillDefinition(
-        skill_id=skill_id,
+) -> CapabilityDefinition:
+    return CapabilityDefinition(
+        capability_id=capability_id,
         version="1.0.0",
         provider_id=provider_id,
         input_schema={
@@ -60,12 +63,12 @@ def _body_definition(
 
 def _tool_definition(
     *,
-    skill_id: str,
+    capability_id: str,
     provider_id: str = "mock.tool",
     interruptible: bool = True,
-) -> SkillDefinition:
-    return SkillDefinition(
-        skill_id=skill_id,
+) -> CapabilityDefinition:
+    return CapabilityDefinition(
+        capability_id=capability_id,
         version="1.0.0",
         provider_id=provider_id,
         input_schema={
@@ -83,9 +86,9 @@ def _tool_definition(
     )
 
 
-class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
+class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
     def test_soridormi_resource_outcome_schema_accepts_simulation_marker(self) -> None:
-        resource = SORIDORMI_NAMED_SKILL_OUTPUT_SCHEMA["properties"]["resource_outcome"]
+        resource = SORIDORMI_NAMED_CAPABILITY_OUTPUT_SCHEMA["properties"]["resource_outcome"]
         self.assertIn("mocked_simulation", resource["properties"])
         self.assertEqual(
             resource["properties"]["mocked_simulation"],
@@ -98,30 +101,30 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         response = InteractionResponse(
             interaction_id="collision-turn",
             speech=[{"id": "same-id", "text": "Hello."}],
-            skills=[
+            capabilities=[
                 {
                     "request_id": "different-id",
-                    "skill_id": "chromie.test",
+                    "capability_id": "chromie.test",
                 }
             ],
         )
         unsafe = response.model_copy(
             update={
-                "skills": [
-                    response.skills[0].model_copy(
+                "capabilities": [
+                    response.capabilities[0].model_copy(
                         update={"request_id": "same-id"}
                     )
                 ]
             }
         )
-        runtime = SkillRuntime(SkillRegistry())
+        runtime = CapabilityRuntime(CapabilityRegistry())
 
         with self.assertRaisesRegex(ValueError, "must be unique"):
             await runtime.execute(unsafe)
 
     async def test_soridormi_import_preserves_provider_confirmation_requirement(self) -> None:
-        registry = SkillRegistry()
-        registry.import_soridormi_catalog(
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry,
             [
                 {
                     "skill_id": "nod_yes",
@@ -138,12 +141,12 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(registry.get("soridormi.nod_yes").requires_confirmation)
         self.assertEqual(
             registry.get("soridormi.nod_yes").output_schema,
-            SORIDORMI_NAMED_SKILL_OUTPUT_SCHEMA,
+            SORIDORMI_NAMED_CAPABILITY_OUTPUT_SCHEMA,
         )
 
     async def test_soridormi_import_preserves_provider_confirmation_exemption(self) -> None:
-        registry = SkillRegistry()
-        registry.import_soridormi_catalog(
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry,
             [
                 {
                     "skill_id": "nod_yes",
@@ -160,8 +163,8 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(registry.get("soridormi.nod_yes").requires_confirmation)
 
     async def test_soridormi_import_upserts_catalog_entries(self) -> None:
-        registry = SkillRegistry()
-        registry.import_soridormi_catalog(
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry,
             [
                 {
                     "skill_id": "nod_yes",
@@ -172,7 +175,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 }
             ]
         )
-        registry.import_soridormi_catalog(
+        import_soridormi_capability_catalog(registry,
             [
                 {
                     "skill_id": "nod_yes",
@@ -219,16 +222,16 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             definition.output_schema,
-            SORIDORMI_NAMED_SKILL_OUTPUT_SCHEMA,
+            SORIDORMI_NAMED_CAPABILITY_OUTPUT_SCHEMA,
         )
         self.assertEqual(
             definition.metadata["output_contract"],
-            "chromie_soridormi_named_skill_v1",
+            "chromie_soridormi_named_capability_v1",
         )
 
     async def test_soridormi_import_accepts_nested_catalog_contracts(self) -> None:
-        registry = SkillRegistry()
-        registry.import_soridormi_catalog(
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry,
             [
                 {
                     "skill_id": "look_at_person",
@@ -261,14 +264,14 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(definition.metadata["resource_claims"], ["head"])
 
     async def test_soridormi_import_rejects_duplicate_catalog_atomically(self) -> None:
-        registry = SkillRegistry()
-        registry.import_soridormi_catalog(
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry,
             [{"skill_id": "nod_yes", "available": True}]
         )
         before = registry.get("soridormi.nod_yes").model_dump(mode="json")
 
-        with self.assertRaisesRegex(ValueError, "duplicate Soridormi skill_id"):
-            registry.import_soridormi_catalog(
+        with self.assertRaisesRegex(ValueError, "duplicate Soridormi wire skill_id"):
+            import_soridormi_capability_catalog(registry,
                 [
                     {"skill_id": "wave_hand", "available": True},
                     {"skill_id": "wave_hand", "available": False},
@@ -279,18 +282,18 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
             registry.get("soridormi.nod_yes").model_dump(mode="json"),
             before,
         )
-        with self.assertRaisesRegex(ValueError, "unknown skill"):
+        with self.assertRaisesRegex(ValueError, "unknown capability"):
             registry.get("soridormi.wave_hand")
 
-    async def test_soridormi_import_marks_absent_live_skills_unavailable(self) -> None:
-        registry = SkillRegistry()
-        registry.import_soridormi_catalog(
+    async def test_soridormi_import_marks_absent_live_capabilities_unavailable(self) -> None:
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry,
             [
                 {"skill_id": "nod_yes", "available": True},
                 {"skill_id": "wave_hand", "available": True},
             ]
         )
-        registry.import_soridormi_catalog(
+        import_soridormi_capability_catalog(registry,
             [{"skill_id": "wave_hand", "available": True}]
         )
 
@@ -298,18 +301,18 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(removed.available)
         self.assertEqual(
             removed.unavailable_reason,
-            "not present in latest Soridormi catalog",
+            "not present in latest provider catalog",
         )
         self.assertTrue(removed.metadata["catalog_absent"])
         self.assertTrue(registry.get("soridormi.wave_hand").available)
 
     async def test_speech_only_request_completes(self) -> None:
         spoken: list[str] = []
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(local_speech_definition())
-        runtime = SkillRuntime(registry)
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(
-            LocalSpeechSkillProvider(
+            LocalSpeechCapabilityProvider(
                 lambda args: spoken.append(args["text"]) or {"spoken": True}
             )
         )
@@ -330,7 +333,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(execution.status, "completed")
         self.assertEqual(spoken, ["Hello."])
-        self.assertEqual(execution.results[0].skill_id, "chromie.speak")
+        self.assertEqual(execution.results[0].capability_id, "chromie.speak")
         self.assertEqual(
             execution.results[0].metadata["source_goal_ids"],
             ["goal-greeting"],
@@ -341,13 +344,13 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_failed_playback_start_barrier_prevents_following_body_effect(self) -> None:
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(local_speech_definition())
         registry.register(_body_definition())
-        body = MockSkillProvider("mock.body")
-        runtime = SkillRuntime(registry)
+        body = MockCapabilityProvider("mock.body")
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(
-            LocalSpeechSkillProvider(
+            LocalSpeechCapabilityProvider(
                 lambda _args: {
                     "scheduled": True,
                     "playback_started": False,
@@ -365,10 +368,10 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                         "metadata": {"wait_for_playback_start": True},
                     }
                 ],
-                skills=[
+                capabilities=[
                     {
                         "request_id": "nod-after-cue",
-                        "skill_id": "soridormi.nod_yes",
+                        "capability_id": "soridormi.nod_yes",
                         "timing": "sequential",
                     }
                 ],
@@ -386,17 +389,17 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
             events.append("playback_start")
             return {"scheduled": True, "playback_started": True}
 
-        class OrderedBodyProvider(MockSkillProvider):
+        class OrderedBodyProvider(MockCapabilityProvider):
             async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
                 events.append("body_start")
                 return await super().execute(request, definition, context)
 
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(local_speech_definition())
         registry.register(_body_definition())
         body = OrderedBodyProvider("mock.body")
-        runtime = SkillRuntime(registry)
-        runtime.register_provider(LocalSpeechSkillProvider(speak))
+        runtime = CapabilityRuntime(registry)
+        runtime.register_provider(LocalSpeechCapabilityProvider(speak))
         runtime.register_provider(body)
 
         execution = await runtime.execute(
@@ -408,10 +411,10 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                         "metadata": {"wait_for_playback_start": True},
                     }
                 ],
-                skills=[
+                capabilities=[
                     {
                         "request_id": "nod-after-cue",
-                        "skill_id": "soridormi.nod_yes",
+                        "capability_id": "soridormi.nod_yes",
                         "timing": "parallel",
                     }
                 ],
@@ -422,19 +425,19 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(events, ["playback_start", "body_start"])
 
     async def test_action_only_request_reaches_mock_provider(self) -> None:
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(_body_definition())
-        provider = MockSkillProvider("mock.body")
-        runtime = SkillRuntime(registry)
+        provider = MockCapabilityProvider("mock.body")
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
 
         execution = await runtime.execute(
             InteractionResponse(
-                skills=[
+                capabilities=[
                     {
                         "request_id": "nod-1",
-                        "skill_id": "soridormi.nod_yes",
-                        "skill_version": "1.0.0",
+                        "capability_id": "soridormi.nod_yes",
+                        "capability_version": "1.0.0",
                         "args": {"count": 2, "amplitude": "small"},
                     }
                 ]
@@ -453,26 +456,26 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
             events.append(("speech_end", time.monotonic()))
             return {"spoken": True}
 
-        class TimedProvider(MockSkillProvider):
+        class TimedProvider(MockCapabilityProvider):
             async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
                 events.append(("body_start", time.monotonic()))
                 result = await super().execute(request, definition, context)
                 events.append(("body_end", time.monotonic()))
                 return result
 
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(local_speech_definition())
         registry.register(_body_definition())
-        runtime = SkillRuntime(registry)
-        runtime.register_provider(LocalSpeechSkillProvider(speak))
+        runtime = CapabilityRuntime(registry)
+        runtime.register_provider(LocalSpeechCapabilityProvider(speak))
         runtime.register_provider(TimedProvider("mock.body", delay_s=0.05))
 
         await runtime.execute(
             InteractionResponse(
                 speech=[{"text": "Hello.", "timing": "parallel"}],
-                skills=[
+                capabilities=[
                     {
-                        "skill_id": "soridormi.nod_yes",
+                        "capability_id": "soridormi.nod_yes",
                         "args": {"count": 2},
                         "timing": "parallel",
                     }
@@ -488,7 +491,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         active = 0
         peak = 0
 
-        class VariableProvider(MockSkillProvider):
+        class VariableProvider(MockCapabilityProvider):
             async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
                 nonlocal active, peak
                 active += 1
@@ -497,11 +500,11 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 active -= 1
                 return await super().execute(request, definition, context)
 
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         for index in range(3):
             registry.register(
-                SkillDefinition(
-                    skill_id=f"test.skill_{index}",
+                CapabilityDefinition(
+                    capability_id=f"test.skill_{index}",
                     provider_id="mock.body",
                     input_schema={
                         "type": "object",
@@ -513,15 +516,15 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 )
             )
         provider = VariableProvider("mock.body")
-        runtime = SkillRuntime(registry, max_concurrency=2)
+        runtime = CapabilityRuntime(registry, max_concurrency=2)
 
         runtime.register_provider(provider)
         execution = await runtime.execute(
             InteractionResponse(
-                skills=[
+                capabilities=[
                     {
                         "request_id": f"request-{index}",
-                        "skill_id": f"test.skill_{index}",
+                        "capability_id": f"test.skill_{index}",
                         "args": {"delay_s": delay},
                         "timing": "parallel",
                     }
@@ -540,7 +543,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         active = 0
         peak = 0
 
-        class ExclusiveProvider(MockSkillProvider):
+        class ExclusiveProvider(MockCapabilityProvider):
             async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
                 nonlocal active, peak
                 active += 1
@@ -549,20 +552,20 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 active -= 1
                 return await super().execute(request, definition, context)
 
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(_body_definition())
         provider = ExclusiveProvider("mock.body")
-        runtime = SkillRuntime(registry, max_concurrency=2)
+        runtime = CapabilityRuntime(registry, max_concurrency=2)
         runtime.register_provider(provider)
 
         await asyncio.gather(
             runtime.execute(
                 InteractionResponse(
                     interaction_id="interaction-a",
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "same-request",
-                            "skill_id": "soridormi.nod_yes",
+                            "capability_id": "soridormi.nod_yes",
                         }
                     ],
                 )
@@ -570,10 +573,10 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
             runtime.execute(
                 InteractionResponse(
                     interaction_id="interaction-b",
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "same-request",
-                            "skill_id": "soridormi.nod_yes",
+                            "capability_id": "soridormi.nod_yes",
                         }
                     ],
                 )
@@ -585,7 +588,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
     async def test_duplicate_request_ids_do_not_collide_across_interactions(self) -> None:
         cancelled_interactions: list[str] = []
 
-        class CollisionProvider(MockSkillProvider):
+        class CollisionProvider(MockCapabilityProvider):
             async def cancel(self, request, definition, context):  # type: ignore[no-untyped-def]
                 cancelled_interactions.append(context.interaction_id)
                 raise RuntimeError(
@@ -593,13 +596,13 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 )
 
         provider = CollisionProvider("mock.body", delay_s=5)
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(
             _body_definition(
                 exclusive_group=None,
             )
         )
-        runtime = SkillRuntime(registry, max_concurrency=2)
+        runtime = CapabilityRuntime(registry, max_concurrency=2)
         runtime.register_provider(provider)
 
         executions = [
@@ -607,10 +610,10 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 runtime.execute(
                     InteractionResponse(
                         interaction_id=interaction_id,
-                        skills=[
+                        capabilities=[
                             {
                                 "request_id": "shared-request",
-                                "skill_id": "soridormi.nod_yes",
+                                "capability_id": "soridormi.nod_yes",
                             }
                         ],
                     )
@@ -674,7 +677,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
     async def test_cancelling_one_execution_does_not_cancel_another_interaction(self) -> None:
         release_keep = asyncio.Event()
 
-        class IsolatedProvider(MockSkillProvider):
+        class IsolatedProvider(MockCapabilityProvider):
             async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
                 self.calls.append(request)
                 if context.interaction_id == "keep":
@@ -684,19 +687,19 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 return await super().execute(request, definition, context)
 
         provider = IsolatedProvider("mock.body")
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(_body_definition(exclusive_group=None))
-        runtime = SkillRuntime(registry, max_concurrency=2)
+        runtime = CapabilityRuntime(registry, max_concurrency=2)
         runtime.register_provider(provider)
 
         cancel_task = asyncio.create_task(
             runtime.execute(
                 InteractionResponse(
                     interaction_id="cancel",
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "cancel-request",
-                            "skill_id": "soridormi.nod_yes",
+                            "capability_id": "soridormi.nod_yes",
                         }
                     ],
                 )
@@ -706,10 +709,10 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
             runtime.execute(
                 InteractionResponse(
                     interaction_id="keep",
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "keep-request",
-                            "skill_id": "soridormi.nod_yes",
+                            "capability_id": "soridormi.nod_yes",
                         }
                     ],
                 )
@@ -753,23 +756,23 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.Event().wait()
             return {"spoken": True}
 
-        class BodyProvider(MockSkillProvider):
+        class BodyProvider(MockCapabilityProvider):
             async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
                 body_started.set()
                 await release_body.wait()
-                return await MockSkillProvider.execute(
+                return await MockCapabilityProvider.execute(
                     self,
                     request,
                     definition,
                     context,
                 )
 
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(local_speech_definition())
         registry.register(_body_definition())
-        speech_provider = LocalSpeechSkillProvider(speak)
+        speech_provider = LocalSpeechCapabilityProvider(speak)
         body_provider = BodyProvider("mock.body")
-        runtime = SkillRuntime(registry)
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(speech_provider)
         runtime.register_provider(body_provider)
         interaction_id = "scoped-output"
@@ -784,10 +787,10 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                             "timing": "parallel",
                         }
                     ],
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "motion-keep",
-                            "skill_id": "soridormi.nod_yes",
+                            "capability_id": "soridormi.nod_yes",
                             "timing": "parallel",
                         }
                     ],
@@ -835,49 +838,49 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         tool_started = asyncio.Event()
         release_tool = asyncio.Event()
 
-        class MotionProvider(MockSkillProvider):
+        class MotionProvider(MockCapabilityProvider):
             async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
                 motion_started.set()
                 await asyncio.Event().wait()
-                return await MockSkillProvider.execute(
+                return await MockCapabilityProvider.execute(
                     self,
                     request,
                     definition,
                     context,
                 )
 
-        class ToolProvider(MockSkillProvider):
+        class ToolProvider(MockCapabilityProvider):
             async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
                 tool_started.set()
                 await release_tool.wait()
-                return await MockSkillProvider.execute(
+                return await MockCapabilityProvider.execute(
                     self,
                     request,
                     definition,
                     context,
                 )
 
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(_body_definition())
-        registry.register(_tool_definition(skill_id="chromie.weather"))
+        registry.register(_tool_definition(capability_id="chromie.weather"))
         motion_provider = MotionProvider("mock.body")
         tool_provider = ToolProvider("mock.tool")
-        runtime = SkillRuntime(registry)
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(motion_provider)
         runtime.register_provider(tool_provider)
         execution_task = asyncio.create_task(
             runtime.execute(
                 InteractionResponse(
                     interaction_id="scoped-motion",
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "motion-cancel",
-                            "skill_id": "soridormi.nod_yes",
+                            "capability_id": "soridormi.nod_yes",
                             "timing": "parallel",
                         },
                         {
                             "request_id": "weather-keep",
-                            "skill_id": "chromie.weather",
+                            "capability_id": "chromie.weather",
                             "timing": "parallel",
                         },
                     ],
@@ -916,33 +919,33 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         first_started = asyncio.Event()
         release_first = asyncio.Event()
 
-        class SequentialProvider(MockSkillProvider):
+        class SequentialProvider(MockCapabilityProvider):
             async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
                 if request.request_id == "keep-first":
                     first_started.set()
                     await release_first.wait()
-                return await MockSkillProvider.execute(
+                return await MockCapabilityProvider.execute(
                     self,
                     request,
                     definition,
                     context,
                 )
 
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(
             _tool_definition(
-                skill_id="chromie.keep",
+                capability_id="chromie.keep",
                 provider_id="mock.tool",
             )
         )
         registry.register(
             _tool_definition(
-                skill_id="chromie.cancel",
+                capability_id="chromie.cancel",
                 provider_id="mock.tool",
             )
         )
         provider = SequentialProvider("mock.tool")
-        runtime = SkillRuntime(registry)
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
         plan_metadata = {
             "canonical_plan_id": "plan-scoped",
@@ -952,10 +955,10 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
             runtime.execute(
                 InteractionResponse(
                     interaction_id="specific-queued",
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "keep-first",
-                            "skill_id": "chromie.keep",
+                            "capability_id": "chromie.keep",
                             "timing": "sequential",
                             "metadata": {
                                 **plan_metadata,
@@ -964,7 +967,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                         },
                         {
                             "request_id": "cancel-before-start",
-                            "skill_id": "chromie.cancel",
+                            "capability_id": "chromie.cancel",
                             "timing": "sequential",
                             "metadata": {
                                 **plan_metadata,
@@ -1016,15 +1019,15 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
     async def test_specific_goal_rule_survives_open_preflight_window(
         self,
     ) -> None:
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(
             _tool_definition(
-                skill_id="chromie.future_bound_task",
+                capability_id="chromie.future_bound_task",
                 provider_id="mock.tool",
             )
         )
-        provider = MockSkillProvider("mock.tool")
-        runtime = SkillRuntime(registry)
+        provider = MockCapabilityProvider("mock.tool")
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
         interaction_id = "specific-preflight"
         self.assertTrue(runtime.begin_interaction(interaction_id))
@@ -1043,10 +1046,10 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
             execution = await runtime.execute(
                 InteractionResponse(
                     interaction_id=interaction_id,
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "future-bound-request",
-                            "skill_id": "chromie.future_bound_task",
+                            "capability_id": "chromie.future_bound_task",
                             "metadata": {
                                 "canonical_plan_id": "plan-future",
                                 "canonical_plan_fingerprint": (
@@ -1076,33 +1079,33 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         unrelated_started = asyncio.Event()
         release_unrelated = asyncio.Event()
 
-        class Provider(MockSkillProvider):
+        class Provider(MockCapabilityProvider):
             async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
                 if request.request_id == "unrelated-active":
                     unrelated_started.set()
                     await release_unrelated.wait()
-                return await MockSkillProvider.execute(
+                return await MockCapabilityProvider.execute(
                     self,
                     request,
                     definition,
                     context,
                 )
 
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(
             _tool_definition(
-                skill_id="chromie.unrelated_active",
+                capability_id="chromie.unrelated_active",
                 provider_id="mock.tool",
             )
         )
         registry.register(
             _tool_definition(
-                skill_id="chromie.later_exact_target",
+                capability_id="chromie.later_exact_target",
                 provider_id="mock.tool",
             )
         )
         provider = Provider("mock.tool")
-        runtime = SkillRuntime(registry)
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
         interaction_id = "specific-unrelated-scheduled"
         self.assertTrue(runtime.begin_interaction(interaction_id))
@@ -1116,10 +1119,10 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 runtime.execute(
                     InteractionResponse(
                         interaction_id=interaction_id,
-                        skills=[
+                        capabilities=[
                             {
                                 "request_id": "unrelated-active",
-                                "skill_id": "chromie.unrelated_active",
+                                "capability_id": "chromie.unrelated_active",
                                 "metadata": {
                                     **plan_metadata,
                                     "source_goal_ids": ["goal-unrelated"],
@@ -1146,10 +1149,10 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
             target_execution = await runtime.execute(
                 InteractionResponse(
                     interaction_id=interaction_id,
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "later-exact-target",
-                            "skill_id": "chromie.later_exact_target",
+                            "capability_id": "chromie.later_exact_target",
                             "metadata": {
                                 **plan_metadata,
                                 "source_goal_ids": ["goal-later"],
@@ -1178,18 +1181,18 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
     async def test_broader_rule_dominates_earlier_output_rule(
         self,
     ) -> None:
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(local_speech_definition())
         registry.register(_body_definition())
-        speech_provider = LocalSpeechSkillProvider(
+        speech_provider = LocalSpeechCapabilityProvider(
             lambda _args: {
                 "scheduled": True,
                 "playback_started": True,
                 "spoken": True,
             }
         )
-        body_provider = MockSkillProvider("mock.body")
-        runtime = SkillRuntime(registry)
+        body_provider = MockCapabilityProvider("mock.body")
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(speech_provider)
         runtime.register_provider(body_provider)
         interaction_id = "scope-monotonic"
@@ -1223,10 +1226,10 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                             },
                         }
                     ],
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "future-motion",
-                            "skill_id": "soridormi.nod_yes",
+                            "capability_id": "soridormi.nod_yes",
                             "timing": "sequential",
                         }
                     ],
@@ -1253,33 +1256,33 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
     ) -> None:
         target_started = asyncio.Event()
 
-        class SequentialProvider(MockSkillProvider):
+        class SequentialProvider(MockCapabilityProvider):
             async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
                 if request.request_id == "cancel-active":
                     target_started.set()
                     await asyncio.Event().wait()
-                return await MockSkillProvider.execute(
+                return await MockCapabilityProvider.execute(
                     self,
                     request,
                     definition,
                     context,
                 )
 
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(
             _tool_definition(
-                skill_id="chromie.cancel",
+                capability_id="chromie.cancel",
                 provider_id="mock.tool",
             )
         )
         registry.register(
             _tool_definition(
-                skill_id="chromie.keep",
+                capability_id="chromie.keep",
                 provider_id="mock.tool",
             )
         )
         provider = SequentialProvider("mock.tool")
-        runtime = SkillRuntime(registry)
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
         plan_metadata = {
             "canonical_plan_id": "plan-active",
@@ -1289,10 +1292,10 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
             runtime.execute(
                 InteractionResponse(
                     interaction_id="specific-active",
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "cancel-active",
-                            "skill_id": "chromie.cancel",
+                            "capability_id": "chromie.cancel",
                             "timing": "sequential",
                             "metadata": {
                                 **plan_metadata,
@@ -1301,7 +1304,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                         },
                         {
                             "request_id": "keep-after",
-                            "skill_id": "chromie.keep",
+                            "capability_id": "chromie.keep",
                             "timing": "sequential",
                             "metadata": {
                                 **plan_metadata,
@@ -1348,35 +1351,35 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         started = asyncio.Event()
         release = asyncio.Event()
 
-        class SharedProvider(MockSkillProvider):
+        class SharedProvider(MockCapabilityProvider):
             async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
                 started.set()
                 await release.wait()
-                return await MockSkillProvider.execute(
+                return await MockCapabilityProvider.execute(
                     self,
                     request,
                     definition,
                     context,
                 )
 
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(
             _tool_definition(
-                skill_id="chromie.shared",
+                capability_id="chromie.shared",
                 provider_id="mock.tool",
             )
         )
         provider = SharedProvider("mock.tool")
-        runtime = SkillRuntime(registry)
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
         execution_task = asyncio.create_task(
             runtime.execute(
                 InteractionResponse(
                     interaction_id="specific-shared",
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "shared-request",
-                            "skill_id": "chromie.shared",
+                            "capability_id": "chromie.shared",
                             "metadata": {
                                 "canonical_plan_id": "plan-shared",
                                 "canonical_plan_fingerprint": "fingerprint-shared",
@@ -1417,35 +1420,35 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         started = asyncio.Event()
         release = asyncio.Event()
 
-        class Provider(MockSkillProvider):
+        class Provider(MockCapabilityProvider):
             async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
                 started.set()
                 await release.wait()
-                return await MockSkillProvider.execute(
+                return await MockCapabilityProvider.execute(
                     self,
                     request,
                     definition,
                     context,
                 )
 
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(
             _tool_definition(
-                skill_id="chromie.bound_task",
+                capability_id="chromie.bound_task",
                 provider_id="mock.tool",
             )
         )
         provider = Provider("mock.tool")
-        runtime = SkillRuntime(registry)
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
         execution_task = asyncio.create_task(
             runtime.execute(
                 InteractionResponse(
                     interaction_id="specific-stale",
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "stale-request",
-                            "skill_id": "chromie.bound_task",
+                            "capability_id": "chromie.bound_task",
                             "metadata": {
                                 "canonical_plan_id": "plan-current",
                                 "canonical_plan_fingerprint": (
@@ -1487,7 +1490,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         both_started = asyncio.Event()
         started_count = 0
 
-        class Provider(MockSkillProvider):
+        class Provider(MockCapabilityProvider):
             async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
                 nonlocal started_count
                 started_count += 1
@@ -1497,7 +1500,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 raise AssertionError("cancelled motion resumed")
 
         definition_a = _body_definition(
-            skill_id="soridormi.motion_a",
+            capability_id="soridormi.motion_a",
             can_run_parallel=True,
             exclusive_group=None,
         ).model_copy(
@@ -1510,13 +1513,13 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
             }
         )
         definition_b = definition_a.model_copy(
-            update={"skill_id": "soridormi.motion_b"}
+            update={"capability_id": "soridormi.motion_b"}
         )
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(definition_a)
         registry.register(definition_b)
         provider = Provider("mock.body")
-        runtime = SkillRuntime(registry, max_concurrency=2)
+        runtime = CapabilityRuntime(registry, max_concurrency=2)
         runtime.register_provider(provider)
         plan_metadata = {
             "canonical_plan_id": "plan-physical",
@@ -1526,10 +1529,10 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
             runtime.execute(
                 InteractionResponse(
                     interaction_id="specific-physical",
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "motion-a",
-                            "skill_id": definition_a.skill_id,
+                            "capability_id": definition_a.capability_id,
                             "timing": "parallel",
                             "metadata": {
                                 **plan_metadata,
@@ -1538,7 +1541,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                         },
                         {
                             "request_id": "motion-b",
-                            "skill_id": definition_b.skill_id,
+                            "capability_id": definition_b.capability_id,
                             "timing": "parallel",
                             "metadata": {
                                 **plan_metadata,
@@ -1582,11 +1585,11 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
     async def test_specific_speech_goal_reports_shared_output_widening(
         self,
     ) -> None:
-        registry = SkillRegistry()
-        for skill_id in ("chromie.speech-a", "chromie.speech-b"):
+        registry = CapabilityRegistry()
+        for capability_id in ("chromie.speech-a", "chromie.speech-b"):
             registry.register(
-                SkillDefinition(
-                    skill_id=skill_id,
+                CapabilityDefinition(
+                    capability_id=capability_id,
                     version="1.0.0",
                     provider_id="mock.output",
                     input_schema={
@@ -1600,8 +1603,8 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     metadata={"cancellation_granularity": "global_domain"},
                 )
             )
-        runtime = SkillRuntime(registry)
-        provider = MockSkillProvider("mock.output", delay_s=10.0)
+        runtime = CapabilityRuntime(registry)
+        provider = MockCapabilityProvider("mock.output", delay_s=10.0)
         runtime.register_provider(provider)
         plan_metadata = {
             "canonical_plan_id": "plan-speech",
@@ -1611,10 +1614,10 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
             runtime.execute(
                 InteractionResponse(
                     interaction_id="speech-a",
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "speech-request-a",
-                            "skill_id": "chromie.speech-a",
+                            "capability_id": "chromie.speech-a",
                             "metadata": {
                                 **plan_metadata,
                                 "source_goal_ids": ["goal-speech-a"],
@@ -1628,10 +1631,10 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
             runtime.execute(
                 InteractionResponse(
                     interaction_id="speech-b",
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "speech-request-b",
-                            "skill_id": "chromie.speech-b",
+                            "capability_id": "chromie.speech-b",
                             "metadata": {
                                 **plan_metadata,
                                 "source_goal_ids": ["goal-speech-b"],
@@ -1682,12 +1685,12 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         }
         release_keep = asyncio.Event()
 
-        class Provider(MockSkillProvider):
+        class Provider(MockCapabilityProvider):
             async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
                 started[context.interaction_id].set()
                 if context.interaction_id == "keep":
                     await release_keep.wait()
-                    return await MockSkillProvider.execute(
+                    return await MockCapabilityProvider.execute(
                         self,
                         request,
                         definition,
@@ -1696,24 +1699,24 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 await asyncio.Event().wait()
                 raise AssertionError("cancelled request resumed")
 
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(
             _tool_definition(
-                skill_id="chromie.long_task",
+                capability_id="chromie.long_task",
                 provider_id="mock.tool",
             )
         )
         provider = Provider("mock.tool")
-        runtime = SkillRuntime(registry, max_concurrency=2)
+        runtime = CapabilityRuntime(registry, max_concurrency=2)
         runtime.register_provider(provider)
         cancel_task = asyncio.create_task(
             runtime.execute(
                 InteractionResponse(
                     interaction_id="cancel",
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "cancel-request",
-                            "skill_id": "chromie.long_task",
+                            "capability_id": "chromie.long_task",
                         }
                     ],
                 )
@@ -1723,10 +1726,10 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
             runtime.execute(
                 InteractionResponse(
                     interaction_id="keep",
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "keep-request",
-                            "skill_id": "chromie.long_task",
+                            "capability_id": "chromie.long_task",
                         }
                     ],
                 )
@@ -1760,35 +1763,35 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         started = asyncio.Event()
         release = asyncio.Event()
 
-        class Provider(MockSkillProvider):
+        class Provider(MockCapabilityProvider):
             async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
                 started.set()
                 await release.wait()
-                return await MockSkillProvider.execute(
+                return await MockCapabilityProvider.execute(
                     self,
                     request,
                     definition,
                     context,
                 )
 
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(
             _tool_definition(
-                skill_id="chromie.long_task",
+                capability_id="chromie.long_task",
                 provider_id="mock.tool",
             )
         )
         provider = Provider("mock.tool")
-        runtime = SkillRuntime(registry)
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
         first = asyncio.create_task(
             runtime.execute(
                 InteractionResponse(
                     interaction_id="reused-interaction",
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "first-request",
-                            "skill_id": "chromie.long_task",
+                            "capability_id": "chromie.long_task",
                         }
                     ],
                 )
@@ -1803,10 +1806,10 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
             await runtime.execute(
                 InteractionResponse(
                     interaction_id="reused-interaction",
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "second-request",
-                            "skill_id": "chromie.long_task",
+                            "capability_id": "chromie.long_task",
                         }
                     ],
                 )
@@ -1822,11 +1825,11 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         started = asyncio.Event()
         release = asyncio.Event()
 
-        class Provider(MockSkillProvider):
+        class Provider(MockCapabilityProvider):
             async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
                 started.set()
                 await release.wait()
-                return await MockSkillProvider.execute(
+                return await MockCapabilityProvider.execute(
                     self,
                     request,
                     definition,
@@ -1834,19 +1837,19 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 )
 
         definition = _body_definition(interruptible=False)
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(definition)
         provider = Provider("mock.body")
-        runtime = SkillRuntime(registry)
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
         execution_task = asyncio.create_task(
             runtime.execute(
                 InteractionResponse(
                     interaction_id="non-interruptible",
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "cannot-interrupt",
-                            "skill_id": definition.skill_id,
+                            "capability_id": definition.capability_id,
                             "cancellable": True,
                         }
                     ],
@@ -1879,21 +1882,21 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
     ) -> None:
         started = asyncio.Event()
 
-        class Provider(MockSkillProvider):
+        class Provider(MockCapabilityProvider):
             async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
                 if request.request_id == "active-barrier":
                     started.set()
                     await asyncio.Event().wait()
-                return await MockSkillProvider.execute(
+                return await MockCapabilityProvider.execute(
                     self,
                     request,
                     definition,
                     context,
                 )
 
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         barrier_definition = _tool_definition(
-            skill_id="chromie.barrier",
+            capability_id="chromie.barrier",
             provider_id="mock.tool",
         ).model_copy(
             update={
@@ -1910,14 +1913,14 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         registry.register(local_speech_definition())
         registry.register(
             _tool_definition(
-                skill_id="chromie.queued",
+                capability_id="chromie.queued",
                 provider_id="mock.tool",
             )
         )
         provider = Provider("mock.tool")
-        runtime = SkillRuntime(registry)
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(
-            LocalSpeechSkillProvider(
+            LocalSpeechCapabilityProvider(
                 lambda _args: {
                     "scheduled": True,
                     "playback_started": True,
@@ -1937,10 +1940,10 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                             "timing": "sequential",
                         }
                     ],
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "active-barrier",
-                            "skill_id": "chromie.barrier",
+                            "capability_id": "chromie.barrier",
                             "timing": "sequential",
                             "args": {
                                 "metadata": {
@@ -1950,7 +1953,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                         },
                         {
                             "request_id": "queued-after-barrier",
-                            "skill_id": "chromie.queued",
+                            "capability_id": "chromie.queued",
                             "timing": "sequential",
                         },
                     ],
@@ -2011,12 +2014,12 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.Event().wait()
             raise AssertionError("cancelled speech resumed")
 
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(local_speech_definition())
         registry.register(_body_definition())
-        speech_provider = LocalSpeechSkillProvider(speak)
-        body_provider = MockSkillProvider("mock.body")
-        runtime = SkillRuntime(registry)
+        speech_provider = LocalSpeechCapabilityProvider(speak)
+        body_provider = MockCapabilityProvider("mock.body")
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(speech_provider)
         runtime.register_provider(body_provider)
         execution_task = asyncio.create_task(
@@ -2033,10 +2036,10 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                             },
                         }
                     ],
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "motion-after-speech",
-                            "skill_id": "soridormi.nod_yes",
+                            "capability_id": "soridormi.nod_yes",
                             "timing": "sequential",
                         }
                     ],
@@ -2078,7 +2081,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
     ) -> None:
         started = asyncio.Event()
 
-        class Provider(MockSkillProvider):
+        class Provider(MockCapabilityProvider):
             async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
                 self.calls.append(request)
                 started.set()
@@ -2089,19 +2092,19 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 raise ConnectionError("physical cancel failed")
 
         definition = _body_definition()
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(definition)
         provider = Provider("mock.body")
-        runtime = SkillRuntime(registry)
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
         execution_task = asyncio.create_task(
             runtime.execute(
                 InteractionResponse(
                     interaction_id="cancel-failure",
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "motion-unknown",
-                            "skill_id": definition.skill_id,
+                            "capability_id": definition.capability_id,
                         }
                     ],
                 )
@@ -2139,7 +2142,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         cancel_started = asyncio.Event()
         release_cancel = asyncio.Event()
 
-        class Provider(MockSkillProvider):
+        class Provider(MockCapabilityProvider):
             cancel_attempts = 0
 
             async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
@@ -2154,19 +2157,19 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 await release_cancel.wait()
                 raise ConnectionError("shared physical cancel failure")
 
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(_body_definition())
         provider = Provider("mock.body")
-        runtime = SkillRuntime(registry)
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
         execution_task = asyncio.create_task(
             runtime.execute(
                 InteractionResponse(
                     interaction_id="concurrent-cancel-failure",
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "motion-concurrent-failure",
-                            "skill_id": "soridormi.nod_yes",
+                            "capability_id": "soridormi.nod_yes",
                         }
                     ],
                 )
@@ -2212,7 +2215,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         cancel_started = asyncio.Event()
         release_cancel = asyncio.Event()
 
-        class Provider(MockSkillProvider):
+        class Provider(MockCapabilityProvider):
             cancel_attempts = 0
 
             async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
@@ -2235,19 +2238,19 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 }
             }
         )
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(definition)
         provider = Provider("mock.body")
-        runtime = SkillRuntime(registry)
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
         execution_task = asyncio.create_task(
             runtime.execute(
                 InteractionResponse(
                     interaction_id="distinct-turn-shared-cancel",
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "motion-shared-in-flight",
-                            "skill_id": definition.skill_id,
+                            "capability_id": definition.capability_id,
                         }
                     ],
                 )
@@ -2301,7 +2304,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         release_execution = asyncio.Event()
         cancel_completed = asyncio.Event()
 
-        class Provider(MockSkillProvider):
+        class Provider(MockCapabilityProvider):
             cancel_attempts = 0
 
             async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
@@ -2311,7 +2314,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                         await release_execution.wait()
                     except asyncio.CancelledError:
                         continue
-                return await MockSkillProvider.execute(
+                return await MockCapabilityProvider.execute(
                     self,
                     request,
                     definition,
@@ -2333,20 +2336,20 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 }
             }
         )
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(definition)
         provider = Provider("mock.body")
-        runtime = SkillRuntime(registry)
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
         active_key = ("completed-success-reuse", "motion-success-reuse")
         execution_task = asyncio.create_task(
             runtime.execute(
                 InteractionResponse(
                     interaction_id=active_key[0],
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": active_key[1],
-                            "skill_id": definition.skill_id,
+                            "capability_id": definition.capability_id,
                         }
                     ],
                 )
@@ -2419,7 +2422,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         two_cancel_attempts = asyncio.Event()
         release_cancel = asyncio.Event()
 
-        class Provider(MockSkillProvider):
+        class Provider(MockCapabilityProvider):
             cancel_attempts = 0
 
             async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
@@ -2444,19 +2447,19 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 }
             }
         )
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(definition)
         provider = Provider("mock.body")
-        runtime = SkillRuntime(registry, max_concurrency=2)
+        runtime = CapabilityRuntime(registry, max_concurrency=2)
         runtime.register_provider(provider)
         first_execution = asyncio.create_task(
             runtime.execute(
                 InteractionResponse(
                     interaction_id="global-epoch-first",
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "motion-first-epoch",
-                            "skill_id": definition.skill_id,
+                            "capability_id": definition.capability_id,
                         }
                     ],
                 )
@@ -2477,10 +2480,10 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
             runtime.execute(
                 InteractionResponse(
                     interaction_id="global-epoch-second",
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "motion-second-epoch",
-                            "skill_id": definition.skill_id,
+                            "capability_id": definition.capability_id,
                         }
                     ],
                 )
@@ -2530,7 +2533,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
     ) -> None:
         started = asyncio.Event()
 
-        class Provider(MockSkillProvider):
+        class Provider(MockCapabilityProvider):
             async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
                 self.calls.append(request)
                 started.set()
@@ -2541,7 +2544,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 raise ConnectionError("current provider cancel failed")
 
         barrier_definition = _tool_definition(
-            skill_id="chromie.current-barrier",
+            capability_id="chromie.current-barrier",
         ).model_copy(
             update={
                 "input_schema": {
@@ -2553,22 +2556,22 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 }
             }
         )
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(barrier_definition)
         registry.register(
-            _tool_definition(skill_id="chromie.current-queued")
+            _tool_definition(capability_id="chromie.current-queued")
         )
         provider = Provider("mock.tool")
-        runtime = SkillRuntime(registry)
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
         execution_task = asyncio.create_task(
             runtime.execute(
                 InteractionResponse(
                     interaction_id="current-cancel-failure",
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "active-current-failure",
-                            "skill_id": barrier_definition.skill_id,
+                            "capability_id": barrier_definition.capability_id,
                             "timing": "sequential",
                             "args": {
                                 "metadata": {
@@ -2578,7 +2581,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                         },
                         {
                             "request_id": "queued-current-failure",
-                            "skill_id": "chromie.current-queued",
+                            "capability_id": "chromie.current-queued",
                             "timing": "sequential",
                         },
                     ],
@@ -2624,23 +2627,23 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_sequential_requests_preserve_order(self) -> None:
-        provider = MockSkillProvider("mock.body")
-        registry = SkillRegistry()
-        registry.register(_body_definition(skill_id="soridormi.nod_yes"))
-        registry.register(_body_definition(skill_id="soridormi.express_attention"))
-        runtime = SkillRuntime(registry)
+        provider = MockCapabilityProvider("mock.body")
+        registry = CapabilityRegistry()
+        registry.register(_body_definition(capability_id="soridormi.nod_yes"))
+        registry.register(_body_definition(capability_id="soridormi.express_attention"))
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
 
         await runtime.execute(
             InteractionResponse(
-                skills=[
+                capabilities=[
                     {
-                        "skill_id": "soridormi.nod_yes",
+                        "capability_id": "soridormi.nod_yes",
                         "args": {},
                         "timing": "sequential",
                     },
                     {
-                        "skill_id": "soridormi.express_attention",
+                        "capability_id": "soridormi.express_attention",
                         "args": {},
                         "timing": "sequential",
                     },
@@ -2649,37 +2652,37 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(
-            [request.skill_id for request in provider.calls],
+            [request.capability_id for request in provider.calls],
             ["soridormi.nod_yes", "soridormi.express_attention"],
         )
 
-    async def test_after_skills_speech_waits_for_parallel_body_work(self) -> None:
+    async def test_after_capabilities_speech_waits_for_parallel_body_work(self) -> None:
         events: list[str] = []
 
         async def speak(args: dict[str, object]) -> dict[str, object]:
             events.append("speech")
             return {"spoken": True}
 
-        class OrderedBodyProvider(MockSkillProvider):
+        class OrderedBodyProvider(MockCapabilityProvider):
             async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
                 events.append("body_start")
                 await asyncio.sleep(0.01)
                 events.append("body_end")
                 return await super().execute(request, definition, context)
 
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(local_speech_definition())
         registry.register(_body_definition())
-        runtime = SkillRuntime(registry)
-        runtime.register_provider(LocalSpeechSkillProvider(speak))
+        runtime = CapabilityRuntime(registry)
+        runtime.register_provider(LocalSpeechCapabilityProvider(speak))
         runtime.register_provider(OrderedBodyProvider("mock.body"))
 
         await runtime.execute(
             InteractionResponse(
-                speech=[{"text": "Done.", "timing": "after_skills"}],
-                skills=[
+                speech=[{"text": "Done.", "timing": "after_capabilities"}],
+                capabilities=[
                     {
-                        "skill_id": "soridormi.nod_yes",
+                        "capability_id": "soridormi.nod_yes",
                         "args": {},
                         "timing": "parallel",
                     }
@@ -2689,23 +2692,23 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(events, ["body_start", "body_end", "speech"])
 
-    async def test_preflight_rejects_unknown_invalid_and_unconfirmed_skills(self) -> None:
-        provider = MockSkillProvider("mock.body")
-        registry = SkillRegistry()
+    async def test_preflight_rejects_unknown_invalid_and_unconfirmed_capabilities(self) -> None:
+        provider = MockCapabilityProvider("mock.body")
+        registry = CapabilityRegistry()
         registry.register(_body_definition(requires_confirmation=True))
-        runtime = SkillRuntime(registry)
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
 
-        with self.assertRaisesRegex(ValueError, "unknown skill"):
+        with self.assertRaisesRegex(ValueError, "unknown capability"):
             await runtime.execute(
-                InteractionResponse(skills=[{"skill_id": "missing.skill"}])
+                InteractionResponse(capabilities=[{"capability_id": "missing.skill"}])
             )
         with self.assertRaisesRegex(ValueError, "unknown fields"):
             await runtime.execute(
                 InteractionResponse(
-                    skills=[
+                    capabilities=[
                         {
-                            "skill_id": "soridormi.nod_yes",
+                            "capability_id": "soridormi.nod_yes",
                             "args": {"joint": "not-in-schema"},
                         }
                     ]
@@ -2714,21 +2717,21 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError, "requires confirmation"):
             await runtime.execute(
                 InteractionResponse(
-                    skills=[{"request_id": "nod-1", "skill_id": "soridormi.nod_yes"}]
+                    capabilities=[{"request_id": "nod-1", "capability_id": "soridormi.nod_yes"}]
                 )
             )
         self.assertEqual(provider.calls, [])
 
     async def test_confirmation_proof_allows_request(self) -> None:
-        provider = MockSkillProvider("mock.body")
-        registry = SkillRegistry()
+        provider = MockCapabilityProvider("mock.body")
+        registry = CapabilityRegistry()
         registry.register(_body_definition(requires_confirmation=True))
-        runtime = SkillRuntime(registry)
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
 
         execution = await runtime.execute(
             InteractionResponse(
-                skills=[{"request_id": "nod-1", "skill_id": "soridormi.nod_yes"}]
+                capabilities=[{"request_id": "nod-1", "capability_id": "soridormi.nod_yes"}]
             ),
             authorization=RuntimeAuthorization(confirmed_request_ids={"nod-1"}),
         )
@@ -2736,15 +2739,15 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(execution.status, "completed")
 
     async def test_timeout_calls_provider_cancel(self) -> None:
-        provider = MockSkillProvider("mock.body", delay_s=0.2)
-        registry = SkillRegistry()
+        provider = MockCapabilityProvider("mock.body", delay_s=0.2)
+        registry = CapabilityRegistry()
         registry.register(_body_definition(timeout_ms=10))
-        runtime = SkillRuntime(registry)
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
 
         execution = await runtime.execute(
             InteractionResponse(
-                skills=[{"request_id": "nod-1", "skill_id": "soridormi.nod_yes"}]
+                capabilities=[{"request_id": "nod-1", "capability_id": "soridormi.nod_yes"}]
             )
         )
 
@@ -2752,19 +2755,19 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(provider.cancelled_request_ids, ["nod-1"])
 
     async def test_cancel_failure_does_not_override_timeout(self) -> None:
-        class FailingCancelProvider(MockSkillProvider):
+        class FailingCancelProvider(MockCapabilityProvider):
             async def cancel(self, request, definition, context):  # type: ignore[no-untyped-def]
                 raise ConnectionError("provider disconnected during cancellation")
 
         provider = FailingCancelProvider("mock.body", delay_s=0.2)
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(_body_definition(timeout_ms=10))
-        runtime = SkillRuntime(registry)
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
 
         execution = await runtime.execute(
             InteractionResponse(
-                skills=[{"request_id": "nod-1", "skill_id": "soridormi.nod_yes"}]
+                capabilities=[{"request_id": "nod-1", "capability_id": "soridormi.nod_yes"}]
             )
         )
 
@@ -2777,7 +2780,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_cancel_failure_does_not_override_interruption(self) -> None:
-        class FailingCancelProvider(MockSkillProvider):
+        class FailingCancelProvider(MockCapabilityProvider):
             cancel_attempts = 0
 
             async def cancel(self, request, definition, context):  # type: ignore[no-untyped-def]
@@ -2785,17 +2788,17 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 raise ConnectionError("provider disconnected during cancellation")
 
         provider = FailingCancelProvider("mock.body", delay_s=5)
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(_body_definition())
-        runtime = SkillRuntime(registry)
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
         task = asyncio.create_task(
             runtime.execute(
                 InteractionResponse(
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "nod-1",
-                            "skill_id": "soridormi.nod_yes",
+                            "capability_id": "soridormi.nod_yes",
                         }
                     ]
                 )
@@ -2827,14 +2830,14 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(provider.cancel_attempts, 1)
 
     async def test_interruption_cancels_all_cancellable_children(self) -> None:
-        speech_provider = LocalSpeechSkillProvider(
+        speech_provider = LocalSpeechCapabilityProvider(
             lambda args: asyncio.sleep(5, result={"spoken": True})
         )
-        body_provider = MockSkillProvider("mock.body", delay_s=5)
-        registry = SkillRegistry()
+        body_provider = MockCapabilityProvider("mock.body", delay_s=5)
+        registry = CapabilityRegistry()
         registry.register(local_speech_definition())
         registry.register(_body_definition())
-        runtime = SkillRuntime(registry)
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(speech_provider)
         runtime.register_provider(body_provider)
 
@@ -2842,10 +2845,10 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
             runtime.execute(
                 InteractionResponse(
                     speech=[{"id": "speech-1", "text": "Hello."}],
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "nod-1",
-                            "skill_id": "soridormi.nod_yes",
+                            "capability_id": "soridormi.nod_yes",
                         }
                     ],
                 )
@@ -2882,35 +2885,35 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(runtime.scheduler_status().active_count, 0)
 
     async def test_interruption_omits_unstarted_sequential_request(self) -> None:
-        provider = MockSkillProvider("mock.body", delay_s=5)
-        registry = SkillRegistry()
+        provider = MockCapabilityProvider("mock.body", delay_s=5)
+        registry = CapabilityRegistry()
         registry.register(
             _body_definition(
-                skill_id="soridormi.nod_yes",
+                capability_id="soridormi.nod_yes",
                 exclusive_group=None,
             )
         )
         registry.register(
             _body_definition(
-                skill_id="soridormi.express_attention",
+                capability_id="soridormi.express_attention",
                 exclusive_group=None,
             )
         )
-        runtime = SkillRuntime(registry)
+        runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
 
         task = asyncio.create_task(
             runtime.execute(
                 InteractionResponse(
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "first-active",
-                            "skill_id": "soridormi.nod_yes",
+                            "capability_id": "soridormi.nod_yes",
                             "timing": "sequential",
                         },
                         {
                             "request_id": "second-unstarted",
-                            "skill_id": "soridormi.express_attention",
+                            "capability_id": "soridormi.express_attention",
                             "timing": "sequential",
                         },
                     ],
@@ -2961,10 +2964,10 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(response.speech[0].timing, "immediate")
-        self.assertEqual(response.speech[1].timing, "after_skills")
-        self.assertEqual(response.skills[0].skill_id, "soridormi.nod_yes")
-        self.assertEqual(response.skills[1].skill_id, "chromie.task_graph.execute")
-        self.assertTrue(response.skills[1].requires_confirmation)
+        self.assertEqual(response.speech[1].timing, "after_capabilities")
+        self.assertEqual(response.capabilities[0].capability_id, "soridormi.nod_yes")
+        self.assertEqual(response.capabilities[1].capability_id, "chromie.task_graph.execute")
+        self.assertTrue(response.capabilities[1].requires_confirmation)
         self.assertTrue(response.requires_confirmation)
 
 

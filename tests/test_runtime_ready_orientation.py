@@ -6,7 +6,7 @@ import unittest
 from orchestrator.runtime.runtime_ready_greeting import (
     execute_default_runtime_ready_orientation,
 )
-from orchestrator.runtime.skill_runtime import SkillDefinition
+from orchestrator.runtime.capability_runtime import CapabilityDefinition
 
 
 class _OrientationRuntime:
@@ -14,11 +14,11 @@ class _OrientationRuntime:
         self.requested: list[str] = []
         self.executed = []
 
-    async def ensure_skill_definitions(self, skill_ids) -> None:
-        self.requested.extend(list(skill_ids))
+    async def ensure_capability_definitions(self, capability_ids) -> None:
+        self.requested.extend(list(capability_ids))
 
-    def skill_definition(self, skill_id: str) -> SkillDefinition:
-        return SkillDefinition(
+    def capability_definition(self, skill_id: str) -> CapabilityDefinition:
+        return CapabilityDefinition(
             capability_id=skill_id,
             provider_id="soridormi.mcp",
             description="Untargeted startup attention.",
@@ -55,7 +55,7 @@ class RuntimeReadyOrientationTests(unittest.IsolatedAsyncioTestCase):
 
         result = await execute_default_runtime_ready_orientation(
             runtime,
-            enable_soridormi_skills=True,
+            enable_soridormi_capabilities=True,
         )
 
         self.assertEqual(result["status"], "completed")
@@ -66,8 +66,8 @@ class RuntimeReadyOrientationTests(unittest.IsolatedAsyncioTestCase):
         response, session_id = runtime.executed[0]
         self.assertIsNone(session_id)
         self.assertEqual(response.speech, [])
-        self.assertEqual(len(response.skills), 1)
-        request = response.skills[0]
+        self.assertEqual(len(response.capabilities), 1)
+        request = response.capabilities[0]
         self.assertEqual(request.capability_id, "soridormi.express_attention")
         self.assertEqual(
             request.args,
@@ -84,7 +84,7 @@ class RuntimeReadyOrientationTests(unittest.IsolatedAsyncioTestCase):
 
         result = await execute_default_runtime_ready_orientation(
             runtime,
-            enable_soridormi_skills=True,
+            enable_soridormi_capabilities=True,
         )
 
         self.assertEqual(result["status"], "completed")

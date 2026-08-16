@@ -71,9 +71,9 @@
     "ollama_reply": {
       "decision": "execute",
       "speech": "I will nod my head to acknowledge you.",
-      "skills": [
+      "capabilities": [
         {
-          "skill_id": "soridormi.nod_yes",
+          "capability_id": "soridormi.nod_yes",
           "args": {"count": 2}
         }
       ]
@@ -82,13 +82,13 @@
       "decision": "clarify",
       "reason": "The proposed nod is a social acknowledgement and does not satisfy walking.",
       "speech": "Please confirm a safe bounded walking plan before I move.",
-      "skills": []
+      "capabilities": []
     }
   },
   "expect": {
     "speech_any": ["safe bounded walking plan"],
     "no_skills": true,
-    "forbidden_skills": [
+    "forbidden_capabilities": [
       "soridormi.nod_yes",
       "soridormi.look_at_person",
       "soridormi.express_attention"

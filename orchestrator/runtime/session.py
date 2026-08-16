@@ -48,13 +48,13 @@ def summarize_provider_start_evidence(
 
     requested_ids = {
         request.request_id
-        for request in response.skills
-        if request.skill_id != "chromie.speak"
+        for request in response.capabilities
+        if request.capability_id != "chromie.speak"
     }
     speech_ids = {speech.id for speech in response.speech} | {
         request.request_id
-        for request in response.skills
-        if request.skill_id == "chromie.speak"
+        for request in response.capabilities
+        if request.capability_id == "chromie.speak"
     }
     started = [
         trace
@@ -68,7 +68,7 @@ def summarize_provider_start_evidence(
             trace.request_id in requested_ids for trace in started
         ),
         "speech_delivery_provider_start_observed": any(
-            trace.request_id in speech_ids or trace.skill_id == "chromie.speak"
+            trace.request_id in speech_ids or trace.capability_id == "chromie.speak"
             for trace in started
         ),
         "any_provider_start_observed": bool(started),
@@ -181,9 +181,9 @@ class SessionTracker:
         "agent_start",
         "interaction_done",
         "cognitive_interaction_ready",
-        "cognitive_skill_proposed",
-        "skill_runtime_done",
-        "skill_result",
+        "cognitive_capability_proposed",
+        "capability_runtime_done",
+        "capability_result",
         "soridormi_post_status",
         "soridormi_post_status_failed",
         "experience_recorded",
@@ -816,14 +816,14 @@ class SessionTracker:
         if event_name in {"llm_prompt_context_pressure", "llm_output_budget_pressure"}:
             return logging.WARNING
 
-        if event_name == "skill_result":
+        if event_name == "capability_result":
             status = self._field_value(rendered, "status").casefold()
             if status and status not in {"completed", "ok", "success"}:
                 if status in {"cancelled", "canceled", "skipped", "ignored"}:
                     return logging.WARNING
                 return logging.ERROR
 
-        if event_name == "skill_runtime_done":
+        if event_name == "capability_runtime_done":
             status = self._field_value(rendered, "status").casefold()
             if status and status not in {"completed", "ok", "success"}:
                 if status in {"cancelled", "canceled", "interrupted"}:
@@ -1141,7 +1141,7 @@ class SessionTracker:
             "session_id",
             "severity",
             "sid",
-            "skill_id",
+            "capability_id",
             "stage",
             "status",
             "termination_state",
@@ -1309,9 +1309,9 @@ class SessionTracker:
             )
         visible_runtime_events = {
             "asr_final",
-            "cognitive_skill_proposed",
-            "skill_runtime_done",
-            "skill_result",
+            "cognitive_capability_proposed",
+            "capability_runtime_done",
+            "capability_result",
             "tts_schedule",
             "playback_start",
             "playback_end",

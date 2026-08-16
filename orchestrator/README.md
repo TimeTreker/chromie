@@ -106,7 +106,7 @@ the body provider and additionally enables `robot_action`:
 
 ```env
 ORCH_ENABLE_INTERACTION_RESPONSE=1
-ORCH_ENABLE_SORIDORMI_SKILLS=1
+ORCH_ENABLE_SORIDORMI_CAPABILITIES=1
 ORCH_COGNITIVE_RUNTIME_MODE=apply
 ORCH_COGNITIVE_APPLY_LANES=chat,memory,robot_action,tool
 SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp
@@ -117,7 +117,7 @@ structured Agent output by default. It is not the maintained semantic planner
 when unified `apply` owns the turn. Legacy-adapter mode and validation fallback
 are explicit rollback controls.
 
-Use `ORCH_ENABLE_SORIDORMI_SKILLS=0` for speech-only rollout. Named body skills
+Use `ORCH_ENABLE_SORIDORMI_CAPABILITIES=0` for speech-only rollout. Named body skills
 fail closed when their provider is disabled or unavailable.
 
 Soridormi's live named-skill catalog supplies the effective confirmation

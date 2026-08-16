@@ -57,7 +57,7 @@
       "steps": [
         {
           "step_id": "look",
-          "skill_id": "soridormi.look_at_person",
+          "capability_id": "soridormi.look_at_person",
           "args": {
             "duration_s": 2
           },
@@ -68,7 +68,7 @@
         },
         {
           "step_id": "nod",
-          "skill_id": "soridormi.nod_yes",
+          "capability_id": "soridormi.nod_yes",
           "args": {
             "count": 2
           },
@@ -107,7 +107,7 @@
     },
     "capabilities": [
       {
-        "skill_id": "soridormi.look_at_person",
+        "capability_id": "soridormi.look_at_person",
         "provider_id": "soridormi.mcp",
         "input_schema": {
           "type": "object",
@@ -129,7 +129,7 @@
         ]
       },
       {
-        "skill_id": "soridormi.nod_yes",
+        "capability_id": "soridormi.nod_yes",
         "provider_id": "soridormi.mcp",
         "input_schema": {
           "type": "object",

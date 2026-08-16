@@ -28,25 +28,25 @@
       "metadata": {
         "task_proposals": [
           {
-            "id": "quick_intent:0:task.execute_skill",
+            "id": "quick_intent:0:task.execute_capability",
             "source": "quick_intent",
             "proposal_kind": "action",
-            "task_type": "task.execute_skill",
+            "task_type": "task.execute_capability",
             "state": "advisory",
             "reason": "fast Goal Interpreter misread warning as a window gaze request",
             "effectful": true,
             "priority": "high",
             "sequence": 0,
-            "skill_id": "soridormi.look_at_window"
+            "capability_id": "soridormi.look_at_window"
           }
         ],
         "superseded_task_proposals": [
           {
-            "id": "quick_intent:0:task.execute_skill:superseded",
+            "id": "quick_intent:0:task.execute_capability:superseded",
             "source": "quick_intent",
             "proposal_kind": "action",
-            "task_type": "task.execute_skill",
-            "skill_id": "soridormi.look_at_window",
+            "task_type": "task.execute_capability",
+            "capability_id": "soridormi.look_at_window",
             "reason": "deepthinking interpreted 'Look out!' as a warning instead of a gaze command",
             "superseded_by": "deepthinking:0:speech.speak",
             "effectful": true,
@@ -61,7 +61,7 @@
     "ollama_reply": {
       "tasks": [
         {
-          "skill_id": "chromie.speak",
+          "capability_id": "chromie.speak",
           "args": {
             "text": "Sorry, I misunderstood that as a direction. Thanks for warning me. I will hold still.",
             "style": "warning",
@@ -74,7 +74,7 @@
           "reason": "Treat the utterance as a safety warning, not a window-gaze command."
         },
         {
-          "skill_id": "soridormi.look_at_window",
+          "capability_id": "soridormi.look_at_window",
           "args": {},
           "timing": "sequential",
           "timeout_ms": null,
@@ -90,7 +90,7 @@
     "speech_all": ["Sorry", "Thanks for warning me", "hold still"],
     "forbidden_speech_any": ["Looking out", "out of the window", "Moving now"],
     "no_skills": true,
-    "forbidden_skills": ["soridormi.look_at_window"],
+    "forbidden_capabilities": ["soridormi.look_at_window"],
     "requires_confirmation": false,
     "status": "ok",
     "metadata_true": ["truth_reconciled"],

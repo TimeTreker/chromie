@@ -5,9 +5,8 @@ from typing import Any
 
 from agent.app.tool_invocation import ToolCallOutcome, ToolInvocationContext
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
-from orchestrator.runtime.soridormi_skill_provider import (
-    SoridormiMcpSkillProvider,
-    SoridormiNamedSkillAdapter,
+from orchestrator.runtime.soridormi_capability_provider import (
+    SoridormiCapabilityProvider,
 )
 from shared.chromie_contracts.interaction import InteractionResponse
 
@@ -96,10 +95,10 @@ class SoridormiArchitectureIntegrationTests(unittest.IsolatedAsyncioTestCase):
         result = await coordinator.execute(
             InteractionResponse(
                 interaction_id="interaction-dynamic-wave",
-                skills=[
+                capabilities=[
                     {
                         "request_id": "wave-1",
-                        "skill_id": "soridormi.wave_hand",
+                        "capability_id": "soridormi.wave_hand",
                         "args": {"count": 2},
                         "metadata": {
                             "source_component": "agent.capability",
@@ -148,10 +147,10 @@ class SoridormiArchitectureIntegrationTests(unittest.IsolatedAsyncioTestCase):
 
         result = await coordinator.execute(
             InteractionResponse(
-                skills=[
+                capabilities=[
                     {
                         "request_id": "inspect-1",
-                        "skill_id": "soridormi.inspect_object",
+                        "capability_id": "soridormi.inspect_object",
                         "args": {"semantic_target": "phone"},
                         "metadata": {
                             "requires_live_perception": True,
@@ -180,9 +179,8 @@ class SoridormiArchitectureIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("x", chromie_intent)
         self.assertNotIn("y", chromie_intent)
 
-    def test_old_provider_name_is_backward_compatible_alias(self) -> None:
-        self.assertIs(SoridormiMcpSkillProvider, SoridormiNamedSkillAdapter)
-        self.assertEqual(SoridormiNamedSkillAdapter.provider_id, "soridormi.mcp")
+    def test_provider_uses_canonical_capability_name(self) -> None:
+        self.assertEqual(SoridormiCapabilityProvider.provider_id, "soridormi.mcp")
 
 
 if __name__ == "__main__":

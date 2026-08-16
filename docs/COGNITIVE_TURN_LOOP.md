@@ -522,7 +522,7 @@ conversation or final answer away from the Core.
 
 Execution results return through a versioned `ExecutionOutcomeBundle`. It is
 constructed by deterministic joins over the immutable plan, committed
-requests, and trusted `SkillResult` or provider evidence. It is never inferred
+requests, and trusted `CapabilityResult` or provider evidence. It is never inferred
 from generated speech.
 
 The bundle contains:
@@ -582,8 +582,8 @@ manifest must declare a versioned, non-empty output schema. An absent schema,
 capability with no domain payload still declares an explicit unit-result schema
 with its terminal status and evidence fields. At plan-to-request commitment, the
 host stores the full SHA-256 identity of the canonical output schema in a
-closed, validated `SkillRequest` field; it does not copy the raw schema into
-request metadata. At closure, the current trusted `SkillDefinition` schema is
+closed, validated `CapabilityRequest` field; it does not copy the raw schema into
+request metadata. At closure, the current trusted `CapabilityDefinition` schema is
 usable only when its digest exactly matches that commitment. A missing
 commitment, missing definition, changed or invalid schema, or an empty schema
 produces `schema_unavailable` with a bounded reason and exposes no provider

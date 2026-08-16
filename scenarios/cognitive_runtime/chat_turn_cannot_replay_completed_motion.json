@@ -78,7 +78,7 @@
       "steps": [
         {
           "step_id": "replay-walk",
-          "skill_id": "soridormi.walk_forward",
+          "capability_id": "soridormi.walk_forward",
           "args": {
             "duration_s": 15.0,
             "speed": "normal"
@@ -90,7 +90,7 @@
         },
         {
           "step_id": "replay-blink",
-          "skill_id": "soridormi.blink_eyes",
+          "capability_id": "soridormi.blink_eyes",
           "args": {
             "count": 2
           },

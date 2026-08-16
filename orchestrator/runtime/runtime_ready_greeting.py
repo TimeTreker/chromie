@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import logging
 from typing import Any
 
-from shared.chromie_contracts.interaction import InteractionResponse, SkillRequest
+from shared.chromie_contracts.interaction import InteractionResponse, CapabilityRequest
 
 
 logger = logging.getLogger("chromie-orchestrator")
@@ -33,7 +33,7 @@ class RuntimeReadyGreetingPolicy:
 async def execute_default_runtime_ready_orientation(
     interaction_runtime: Any,
     *,
-    enable_soridormi_skills: bool,
+    enable_soridormi_capabilities: bool,
 ) -> dict[str, Any]:
     """Execute one quiet, untargeted, capability-grounded startup orientation.
 
@@ -44,7 +44,7 @@ async def execute_default_runtime_ready_orientation(
     observation claim.
     """
 
-    if not enable_soridormi_skills:
+    if not enable_soridormi_capabilities:
         return {"status": "skipped", "reason": "soridormi_skills_disabled"}
 
     candidates = (
@@ -57,8 +57,8 @@ async def execute_default_runtime_ready_orientation(
     reasons: list[str] = []
     for capability_id, args in candidates:
         try:
-            await interaction_runtime.ensure_skill_definitions([capability_id])
-            definition = interaction_runtime.skill_definition(capability_id)
+            await interaction_runtime.ensure_capability_definitions([capability_id])
+            definition = interaction_runtime.capability_definition(capability_id)
             behavior_domains = {
                 str(value).strip()
                 for value in definition.metadata.get("behavior_domains", [])
@@ -77,8 +77,8 @@ async def execute_default_runtime_ready_orientation(
                 continue
 
             response = InteractionResponse(
-                skills=[
-                    SkillRequest(
+                capabilities=[
+                    CapabilityRequest(
                         capability_id=capability_id,
                         args=args,
                         timing="parallel",

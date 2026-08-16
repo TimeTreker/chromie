@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Any, Iterable
 
 from shared.chromie_contracts.execution_outcome import ExecutionOutcomeBundle
-from shared.chromie_contracts.interaction import SkillRequest, SkillResult
+from shared.chromie_contracts.interaction import CapabilityRequest, CapabilityResult
 from shared.chromie_contracts.interaction_ledger import (
     InteractionContextProjection,
     InteractionEventDomain,
@@ -336,7 +336,7 @@ class InteractionLedger:
         session_id: str,
         turn_id: str,
         interaction_id: str,
-        requests: Iterable[SkillRequest],
+        requests: Iterable[CapabilityRequest],
     ) -> list[InteractionLedgerEvent]:
         recorded: list[InteractionLedgerEvent] = []
         for request in requests:
@@ -484,8 +484,8 @@ class InteractionLedger:
         session_id: str,
         turn_id: str,
         interaction_id: str,
-        requests: Iterable[SkillRequest],
-        results: Iterable[SkillResult],
+        requests: Iterable[CapabilityRequest],
+        results: Iterable[CapabilityResult],
     ) -> list[InteractionLedgerEvent]:
         requests_by_id = {
             item.request_id: item

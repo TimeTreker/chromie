@@ -13,7 +13,7 @@ class OutcomeObservationTests(unittest.TestCase):
     def _summary(self) -> dict:
         return {
             "interaction_response": {
-                "skills": [
+                "capabilities": [
                     {
                         "request_id": "req-blink",
                         "capability_id": "soridormi.blink_eyes",
@@ -25,7 +25,7 @@ class OutcomeObservationTests(unittest.TestCase):
                     },
                     {
                         "request_id": "req-attention",
-                        "skill_id": "soridormi.look_at_person",
+                        "capability_id": "soridormi.look_at_person",
                         "args": {"target_ref": "current_speaker", "duration_s": 2.0},
                         "metadata": {
                             "auxiliary_social_attention": True,

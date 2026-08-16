@@ -518,7 +518,7 @@ class _Ollama:
         return {
             "decision": "execute",
             "speech": "Walking ahead for 10 minutes.",
-            "skills": [
+            "capabilities": [
                 {
                     "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 1.0},
@@ -534,7 +534,7 @@ class _InvalidWalkOllama:
         return {
             "decision": "execute",
             "speech": "Walking forward for five seconds.",
-            "skills": [
+            "capabilities": [
                 {
                     "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 5.0},
@@ -551,7 +551,7 @@ class _OverLimitBlinkClarifyOllama:
         return {
             "decision": "execute",
             "speech": "Okay, I'll blink my eyes 15 times in three batches.",
-            "skills": [
+            "capabilities": [
                 {"capability_id": "soridormi.blink_eyes", "args": {"count": 6}, "timing": "sequential", "step_id": "blink-batch-1"},
                 {"capability_id": "soridormi.blink_eyes", "args": {"count": 6}, "timing": "sequential", "step_id": "blink-batch-2"},
                 {"capability_id": "soridormi.blink_eyes", "args": {"count": 3}, "timing": "sequential", "step_id": "blink-batch-3"},
@@ -569,7 +569,7 @@ class _OverLimitBlinkClampedExecuteOllama:
         return {
             "decision": "execute",
             "speech": "Okay, I'll blink my eyes 15 times in three batches.",
-            "skills": [
+            "capabilities": [
                 {"capability_id": "soridormi.blink_eyes", "args": {"count": 6}, "timing": "sequential", "step_id": "blink-batch-1"},
                 {"capability_id": "soridormi.blink_eyes", "args": {"count": 6}, "timing": "sequential", "step_id": "blink-batch-2"},
                 {"capability_id": "soridormi.blink_eyes", "args": {"count": 3}, "timing": "sequential", "step_id": "blink-batch-3"},
@@ -605,13 +605,13 @@ class _SelectedWalkOllama:
         assert "soridormi.walk_forward" in prompt
         assert "Goal-Interpreter-selected exact capability_id: soridormi.walk_forward" in prompt
         assert kwargs["response_format"] == "json"
-        assert "When decision is execute, skills is required" in prompt
-        assert "Never return execute with skills omitted" in prompt
+        assert "When decision is execute, capabilities is required" in prompt
+        assert "Never return execute with capabilities omitted" in prompt
         assert "Goal-Interpreter-selected exact capability_id is best" in prompt
         return {
             "decision": "execute",
             "speech": "Walking forward for 3 seconds.",
-            "skills": [
+            "capabilities": [
                 {
                     "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 3.0, "speed": "quick"},
@@ -635,7 +635,7 @@ class _ExtractedMemoryCapabilityOllama:
         return {
             "decision": "execute",
             "speech": "Walking forward.",
-            "skills": [
+            "capabilities": [
                 {
                     "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 1.0, "speed": "quick"},
@@ -653,7 +653,7 @@ class _SelectedVelocityBetterForwardOllama:
         return {
             "decision": "execute",
             "speech": "Walking forward quickly for 15 seconds.",
-            "skills": [
+            "capabilities": [
                 {
                     "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 15.0, "speed": "quick"},
@@ -696,7 +696,7 @@ class _LookForwardOllama:
         return {
             "decision": "execute",
             "speech": "Looking forward and blinking.",
-            "skills": [
+            "capabilities": [
                 {
                     "capability_id": "soridormi.look_at_person",
                     "args": {"duration_s": 5.0},
@@ -721,7 +721,7 @@ class _PoliteHeadQuestionOllama:
         return {
             "decision": "execute",
             "speech": "我会摇头。",
-            "skills": [
+            "capabilities": [
                 {
                     "capability_id": "soridormi.shake_no",
                     "args": {"count": 2},
@@ -737,7 +737,7 @@ class _EmptySpeechHeadQuestionOllama:
         return {
             "decision": "execute",
             "speech": "",
-            "skills": [
+            "capabilities": [
                 {
                     "capability_id": "soridormi.shake_no",
                     "args": {"count": 2},
@@ -756,7 +756,7 @@ class _AdverbSpeedOllama:
             return {
                 "decision": "execute",
                 "speech": "Walking ahead quickly.",
-                "skills": [
+                "capabilities": [
                     {
                         "capability_id": "soridormi.walk_forward",
                         "args": {"duration_s": 1.0, "speed": "quick"},
@@ -770,7 +770,7 @@ class _AdverbSpeedOllama:
         return {
             "decision": "execute",
             "speech": "Walking ahead quickly.",
-            "skills": [
+            "capabilities": [
                 {
                     "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 1.0, "speed": "quickly"},
@@ -791,7 +791,7 @@ class _ProposalAdjustedWalkOllama:
         return {
             "decision": "execute",
             "speech": "I will walk forward quickly with a safe bounded plan.",
-            "skills": [
+            "capabilities": [
                 {
                     "capability_id": "soridormi.walk_forward",
                     "semantic_intent": {
@@ -830,7 +830,7 @@ class _WalkBlinkAlternativeOllama:
         return {
             "decision": "propose_alternative",
             "speech": "我目前不能在行走时同时眨眼，但可以先走十五秒，再眨两下眼睛，可以吗？",
-            "skills": [
+            "capabilities": [
                 {
                     "capability_id": "soridormi.walk_velocity",
                     "args": {"vx_mps": 0.25, "duration_s": 15.0},
@@ -864,7 +864,7 @@ class _WalkBlinkParallelOllama:
         return {
             "decision": "execute",
             "speech": "I can walk forward while blinking twice.",
-            "skills": [
+            "capabilities": [
                 {
                     "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 15.0, "speed": "quick"},
@@ -889,7 +889,7 @@ class _WalkBlinkInvalidSecondSkillOllama:
         return {
             "decision": "execute",
             "speech": "I will walk and blink.",
-            "skills": [
+            "capabilities": [
                 {
                     "capability_id": "soridormi.walk_velocity",
                     "args": {"vx_mps": 0.25, "duration_s": 3.0},
@@ -918,7 +918,7 @@ class _BlinkSafeDefaultRepairOllama:
             return {
                 "decision": "execute",
                 "speech": "我眨四下眼睛。",
-                "skills": [
+                "capabilities": [
                     {
                         "capability_id": "soridormi.blink_eyes",
                         "proposed_args": {"count": 4},
@@ -938,7 +938,7 @@ class _BlinkSafeDefaultRepairOllama:
         return {
             "decision": "execute",
             "speech": "我眨眼睛。",
-            "skills": [
+            "capabilities": [
                 {
                     "capability_id": "soridormi.blink_eyes",
                     "proposed_args": {},
@@ -962,7 +962,7 @@ class _ImportantWalkParameterRepairOllama:
             return {
                 "decision": "clarify",
                 "speech": "你希望我往前走多久？请告诉我秒数。",
-                "skills": [],
+                "capabilities": [],
                 "information_gaps": [
                     {
                         "gap_id": "soridormi.walk_velocity:duration_s",
@@ -986,7 +986,7 @@ class _ImportantWalkParameterRepairOllama:
         return {
             "decision": "execute",
             "speech": "我往前走。",
-            "skills": [
+            "capabilities": [
                 {
                     "capability_id": "soridormi.walk_velocity",
                     "proposed_args": {"vx_mps": 0.15},
@@ -1007,7 +1007,7 @@ class _DuplicateWalkOllama:
         return {
             "decision": "execute",
             "speech": "Walking forward.",
-            "skills": [
+            "capabilities": [
                 {
                     "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 1.0, "speed": "quick"},
@@ -1030,7 +1030,7 @@ class _FullApiOllama:
         return {
             "decision": "execute",
             "speech": "Waving.",
-            "skills": [
+            "capabilities": [
                 {
                     "capability_id": "soridormi.wave_hand",
                     "args": {"count": 2},
@@ -1061,7 +1061,7 @@ class _PromptBudgetOllama:
         return {
             "decision": "execute",
             "speech": "Walking forward for one second.",
-            "skills": [
+            "capabilities": [
                 {
                     "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 1.0},
@@ -1083,7 +1083,7 @@ class _BadSocialFallbackOllama:
         return {
             "decision": "execute",
             "speech": "I will nod my head to acknowledge you.",
-            "skills": [
+            "capabilities": [
                 {
                     "capability_id": "soridormi.nod_yes",
                     "args": {"count": 2},
@@ -1103,7 +1103,7 @@ class _ExactBadSocialFallbackOllama:
         return {
             "decision": "execute",
             "speech": "I will nod my head to acknowledge you.",
-            "skills": [
+            "capabilities": [
                 {
                     "capability_id": "soridormi.nod_yes",
                     "args": {"count": 2},
@@ -1126,7 +1126,7 @@ class _RejectSocialFallbackReviewer:
             "decision": "clarify",
             "reason": "The proposed nod is a social acknowledgement and does not satisfy walking.",
             "speech": "Please confirm a safe bounded walking plan before I move.",
-            "skills": [],
+            "capabilities": [],
         }
 
 
@@ -1139,7 +1139,7 @@ class _AcceptCapabilityReviewer:
             "decision": "accept",
             "reason": "The proposed skill preserves the routed action.",
             "speech": "",
-            "skills": [],
+            "capabilities": [],
         }
 
 
@@ -1162,7 +1162,7 @@ class _AcceptBadSubstitutionReviewer:
             "decision": "accept",
             "reason": "Bad review fixture accepting a substitution.",
             "speech": "",
-            "skills": [],
+            "capabilities": [],
         }
 
 
@@ -1231,7 +1231,7 @@ def _catalog_with_invoker(invoker: Any) -> CapabilityCatalog:
                             ToolCapability(
                                 name="soridormi.skill.list",
                                 agent_id="soridormi.skill",
-                                description="List named skills.",
+                                description="List named capabilities.",
                                 effects=["read_only"],
                                 safety_class="safe_read",
                             )
@@ -1274,7 +1274,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(request.route_decision.source, "fallback")
         self.assertEqual(request.route_decision.route, "chat")
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
         self.assertIn("conversation_agent", response.metadata["handled_by"])
         self.assertNotIn("capability_agent", response.metadata["handled_by"])
 
@@ -1305,9 +1305,9 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         response = await runtime.run(request)
 
-        self.assertEqual(response.skills[0].skill_id, "soridormi.walk_forward")
-        self.assertEqual(response.skills[0].args["speed"], "quick")
-        self.assertNotIn("schema_normalized_args", response.skills[0].metadata)
+        self.assertEqual(response.capabilities[0].capability_id, "soridormi.walk_forward")
+        self.assertEqual(response.capabilities[0].args["speed"], "quick")
+        self.assertNotIn("schema_normalized_args", response.capabilities[0].metadata)
 
     async def test_capability_agent_adjudicates_llm_proposal_with_bounded_adjustment(self) -> None:
         runtime = InteractionRuntime(
@@ -1336,9 +1336,9 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         response = await runtime.run(request)
 
-        self.assertEqual(len(response.skills), 1)
-        skill = response.skills[0]
-        self.assertEqual(skill.skill_id, "soridormi.walk_forward")
+        self.assertEqual(len(response.capabilities), 1)
+        skill = response.capabilities[0]
+        self.assertEqual(skill.capability_id, "soridormi.walk_forward")
         self.assertEqual(skill.args, {"duration_s": 5.0, "speed": "quick"})
         self.assertTrue(skill.requires_confirmation)
         self.assertEqual(skill.metadata["execution_mode"], "proposed")
@@ -1390,10 +1390,10 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         response = await runtime.run(request)
 
         self.assertEqual(
-            [item.skill_id for item in response.skills],
+            [item.capability_id for item in response.capabilities],
             ["soridormi.walk_velocity", "soridormi.blink_eyes"],
         )
-        self.assertEqual([item.timing for item in response.skills], ["sequential", "sequential"])
+        self.assertEqual([item.timing for item in response.capabilities], ["sequential", "sequential"])
         self.assertTrue(response.requires_confirmation)
         self.assertTrue(response.metadata["semantic_plan_confirmation_required"])
         self.assertEqual(response.metadata["planning_result"], "alternative_plan")
@@ -1428,10 +1428,10 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         response = await runtime.run(request)
 
         self.assertEqual(
-            [item.skill_id for item in response.skills],
+            [item.capability_id for item in response.capabilities],
             ["soridormi.walk_forward", "soridormi.blink_eyes"],
         )
-        self.assertEqual([item.timing for item in response.skills], ["parallel", "parallel"])
+        self.assertEqual([item.timing for item in response.capabilities], ["parallel", "parallel"])
         self.assertEqual(response.metadata["planning_result"], "composed_plan")
         self.assertEqual(response.metadata["semantic_plan_relation"], "exact")
         self.assertFalse(response.metadata.get("semantic_plan_confirmation_required", False))
@@ -1464,7 +1464,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         response = await runtime.run(request)
 
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
         self.assertTrue(response.metadata["atomic_plan_rejected"])
         self.assertEqual(response.metadata["capability_decision"], "clarify")
         self.assertEqual(response.metadata["planning_result"], "needs_clarification")
@@ -1499,11 +1499,11 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         response = await runtime.run(request)
 
         self.assertEqual(planner.calls, 2)
-        self.assertEqual(len(response.skills), 1)
-        self.assertEqual(response.skills[0].skill_id, "soridormi.blink_eyes")
-        self.assertEqual(response.skills[0].args, {"count": 4})
-        self.assertEqual(response.metadata["planning_result"], "direct_skill")
-        grounding = response.skills[0].metadata["proposal_parameter_grounding"]
+        self.assertEqual(len(response.capabilities), 1)
+        self.assertEqual(response.capabilities[0].capability_id, "soridormi.blink_eyes")
+        self.assertEqual(response.capabilities[0].args, {"count": 4})
+        self.assertEqual(response.metadata["planning_result"], "direct_capability")
+        grounding = response.capabilities[0].metadata["proposal_parameter_grounding"]
         self.assertEqual(grounding["count"]["resolution"], "use_safe_default")
         self.assertEqual(response.speech[0].text, "我眨四下眼睛。")
 
@@ -1536,7 +1536,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         response = await runtime.run(request)
 
         self.assertEqual(planner.calls, 2)
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
         self.assertEqual(response.metadata["capability_decision"], "clarify")
         self.assertEqual(response.metadata["planning_result"], "needs_clarification")
         self.assertEqual(
@@ -1573,7 +1573,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         response = await runtime.run(request)
 
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
         self.assertEqual(response.metadata["capability_decision"], "clarify")
         self.assertEqual(response.metadata["planning_result"], "needs_clarification")
         self.assertEqual(
@@ -1595,7 +1595,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         )
         request = _legacy_request(
             {
-                "sid": "goal-interpreter-selected-omitted-skills",
+                "sid": "goal-interpreter-selected-omitted-capabilities",
                 "text": "Walk forward quickly for 3 seconds.",
                 "route_decision": {
                     "route": "robot_action",
@@ -1610,9 +1610,9 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         response = await runtime.run(request)
 
-        self.assertEqual(len(response.skills), 1)
-        self.assertEqual(response.skills[0].skill_id, "soridormi.walk_forward")
-        self.assertEqual(response.skills[0].args, {"duration_s": 3.0, "speed": "quick"})
+        self.assertEqual(len(response.capabilities), 1)
+        self.assertEqual(response.capabilities[0].capability_id, "soridormi.walk_forward")
+        self.assertEqual(response.capabilities[0].args, {"duration_s": 3.0, "speed": "quick"})
 
     async def test_capability_prompt_uses_extracted_memory_not_raw_history(self) -> None:
         ollama = _ExtractedMemoryCapabilityOllama()
@@ -1670,10 +1670,10 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         response = await runtime.run(request)
 
-        self.assertEqual(response.skills[0].skill_id, "soridormi.walk_forward")
+        self.assertEqual(response.capabilities[0].capability_id, "soridormi.walk_forward")
         self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(
-            response.skills[0].metadata["source"],
+            response.capabilities[0].metadata["source"],
             "capability_catalog",
         )
         self.assertEqual(response.metadata["capability_selected"], ["soridormi.walk_forward"])
@@ -1686,7 +1686,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                     {
                         "decision": "execute",
                         "speech": "Okay, I'll blink my eyes 5 times.",
-                        "skills": [{"capability_id": "soridormi.blink_eyes", "args": {"count": 5}}],
+                        "capabilities": [{"capability_id": "soridormi.blink_eyes", "args": {"count": 5}}],
                         "plan_relation": "exact",
                         "original_goal_summary": "blink five times",
                     },
@@ -1712,10 +1712,10 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                     "metadata": {
                         "task_list": [
                             {
-                                "id": "quick_intent:0:task.execute_skill",
+                                "id": "quick_intent:0:task.execute_capability",
                                 "source_stage": "quick_intent",
                                 "kind": "action",
-                                "task_type": "task.execute_skill",
+                                "task_type": "task.execute_capability",
                                 "route": "robot_action",
                                 "intent": "capability:soridormi.blink_eyes",
                                 "priority": "normal",
@@ -1731,10 +1731,10 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         response = await runtime.run(request)
 
-        self.assertEqual([item.skill_id for item in response.skills], ["soridormi.blink_eyes"])
-        self.assertEqual(response.skills[0].args, {"count": 5})
+        self.assertEqual([item.capability_id for item in response.capabilities], ["soridormi.blink_eyes"])
+        self.assertEqual(response.capabilities[0].args, {"count": 5})
         self.assertEqual(
-            response.skills[0].metadata["source"],
+            response.capabilities[0].metadata["source"],
             "capability_catalog",
         )
         self.assertEqual(response.metadata["capability_decision"], "execute")
@@ -1748,7 +1748,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                     {
                         "decision": "execute",
                         "speech": "好的，我会眨眼2次。",
-                        "skills": [{"capability_id": "soridormi.blink_eyes", "args": {"count": 2}}],
+                        "capabilities": [{"capability_id": "soridormi.blink_eyes", "args": {"count": 2}}],
                         "plan_relation": "exact",
                         "original_goal_summary": "眨眼两次",
                     },
@@ -1774,10 +1774,10 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                     "metadata": {
                         "task_list": [
                             {
-                                "id": "quick_intent:0:task.execute_skill",
+                                "id": "quick_intent:0:task.execute_capability",
                                 "source_stage": "quick_intent",
                                 "kind": "action",
-                                "task_type": "task.execute_skill",
+                                "task_type": "task.execute_capability",
                                 "route": "robot_action",
                                 "intent": "capability:soridormi.blink_eyes",
                                 "priority": "normal",
@@ -1793,8 +1793,8 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         response = await runtime.run(request)
 
-        self.assertEqual([item.skill_id for item in response.skills], ["soridormi.blink_eyes"])
-        self.assertEqual(response.skills[0].args, {"count": 2})
+        self.assertEqual([item.capability_id for item in response.capabilities], ["soridormi.blink_eyes"])
+        self.assertEqual(response.capabilities[0].args, {"count": 2})
         self.assertEqual(response.speech[0].text, "好的，我会眨眼2次。")
 
     async def test_goal_interpreter_task_list_fast_path_allows_optional_defaulted_blink_fields(self) -> None:
@@ -1804,7 +1804,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                     {
                         "decision": "execute",
                         "speech": "Okay, I'll blink my eyes 5 times.",
-                        "skills": [{"capability_id": "soridormi.blink_eyes", "args": {"count": 5}}],
+                        "capabilities": [{"capability_id": "soridormi.blink_eyes", "args": {"count": 5}}],
                         "plan_relation": "exact",
                         "original_goal_summary": "blink five times",
                     },
@@ -1830,10 +1830,10 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                     "metadata": {
                         "task_list": [
                             {
-                                "id": "quick_intent:0:task.execute_skill",
+                                "id": "quick_intent:0:task.execute_capability",
                                 "source_stage": "quick_intent",
                                 "kind": "action",
-                                "task_type": "task.execute_skill",
+                                "task_type": "task.execute_capability",
                                 "route": "robot_action",
                                 "intent": "capability:soridormi.blink_eyes",
                                 "priority": "normal",
@@ -1849,10 +1849,10 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         response = await runtime.run(request)
 
-        self.assertEqual([item.skill_id for item in response.skills], ["soridormi.blink_eyes"])
-        self.assertEqual(response.skills[0].args, {"count": 5})
+        self.assertEqual([item.capability_id for item in response.capabilities], ["soridormi.blink_eyes"])
+        self.assertEqual(response.capabilities[0].args, {"count": 5})
         self.assertEqual(
-            response.skills[0].metadata["source"],
+            response.capabilities[0].metadata["source"],
             "capability_catalog",
         )
 
@@ -1863,7 +1863,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                     {
                         "decision": "execute",
                         "speech": "Okay, I'll blink my eyes 15 times in three sequential batches.",
-                        "skills": [
+                        "capabilities": [
                             {"capability_id": "soridormi.blink_eyes", "args": {"count": 6}, "timing": "sequential", "step_id": "blink-batch-1"},
                             {"capability_id": "soridormi.blink_eyes", "args": {"count": 6}, "timing": "sequential", "step_id": "blink-batch-2"},
                             {"capability_id": "soridormi.blink_eyes", "args": {"count": 3}, "timing": "sequential", "step_id": "blink-batch-3"},
@@ -1893,10 +1893,10 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                     "metadata": {
                         "task_list": [
                             {
-                                "id": "quick_intent:0:task.execute_skill",
+                                "id": "quick_intent:0:task.execute_capability",
                                 "source_stage": "quick_intent",
                                 "kind": "action",
-                                "task_type": "task.execute_skill",
+                                "task_type": "task.execute_capability",
                                 "route": "robot_action",
                                 "intent": "capability:soridormi.blink_eyes",
                                 "priority": "normal",
@@ -1913,7 +1913,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         response = await runtime.run(request)
 
         self.assertEqual(
-            [item.skill_id for item in response.skills],
+            [item.capability_id for item in response.capabilities],
             [
                 "soridormi.blink_eyes",
                 "soridormi.blink_eyes",
@@ -1921,7 +1921,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
         self.assertEqual(
-            [item.args for item in response.skills],
+            [item.args for item in response.capabilities],
             [{"count": 6}, {"count": 6}, {"count": 3}],
         )
         self.assertIn("15", response.speech[0].text)
@@ -1933,7 +1933,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                     {
                         "decision": "execute",
                         "speech": "Walking forward quickly for three seconds.",
-                        "skills": [
+                        "capabilities": [
                             {
                                 "capability_id": "soridormi.walk_forward",
                                 "args": {"duration_s": 3.0, "speed": "quick"},
@@ -1964,10 +1964,10 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                     "metadata": {
                         "task_list": [
                             {
-                                "id": "quick_intent:0:task.execute_skill",
+                                "id": "quick_intent:0:task.execute_capability",
                                 "source_stage": "quick_intent",
                                 "kind": "action",
-                                "task_type": "task.execute_skill",
+                                "task_type": "task.execute_capability",
                                 "route": "robot_action",
                                 "intent": "capability:soridormi.walk_forward",
                                 "priority": "normal",
@@ -1983,12 +1983,12 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         response = await runtime.run(request)
 
-        self.assertEqual(response.skills[0].skill_id, "soridormi.walk_forward")
-        self.assertEqual(response.skills[0].args, {"duration_s": 3.0, "speed": "quick"})
-        self.assertTrue(response.skills[0].requires_confirmation)
+        self.assertEqual(response.capabilities[0].capability_id, "soridormi.walk_forward")
+        self.assertEqual(response.capabilities[0].args, {"duration_s": 3.0, "speed": "quick"})
+        self.assertTrue(response.capabilities[0].requires_confirmation)
         self.assertTrue(response.requires_confirmation)
         self.assertEqual(
-            response.skills[0].metadata["source"],
+            response.capabilities[0].metadata["source"],
             "capability_catalog",
         )
 
@@ -2019,9 +2019,9 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         response = await runtime.run(request)
 
-        self.assertEqual(len(response.skills), 1)
-        self.assertEqual(response.skills[0].skill_id, "soridormi.walk_forward")
-        self.assertEqual(response.skills[0].args, {"duration_s": 15.0, "speed": "quick"})
+        self.assertEqual(len(response.capabilities), 1)
+        self.assertEqual(response.capabilities[0].capability_id, "soridormi.walk_forward")
+        self.assertEqual(response.capabilities[0].args, {"duration_s": 15.0, "speed": "quick"})
         self.assertEqual(response.metadata["capability_selected"], ["soridormi.walk_forward"])
         self.assertEqual(response.speech[0].text, "Walking forward quickly for 15 seconds.")
 
@@ -2052,10 +2052,10 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         response = await runtime.run(request)
 
-        self.assertEqual(len(response.skills), 1)
-        self.assertEqual(response.skills[0].skill_id, "soridormi.walk_forward")
+        self.assertEqual(len(response.capabilities), 1)
+        self.assertEqual(response.capabilities[0].capability_id, "soridormi.walk_forward")
         self.assertEqual(
-            response.skills[0].args,
+            response.capabilities[0].args,
             {"duration_s": 15.0, "speed": "quick"},
         )
         self.assertEqual(response.metadata["deepthinking_output_mode"], "capability_tasks")
@@ -2092,8 +2092,8 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         response = await runtime.run(request)
 
-        self.assertEqual(response.skills[0].skill_id, "soridormi.shake_no")
-        self.assertEqual(response.skills[0].args, {"count": 2})
+        self.assertEqual(response.capabilities[0].capability_id, "soridormi.shake_no")
+        self.assertEqual(response.capabilities[0].args, {"count": 2})
         self.assertEqual(response.speech[0].text, "我会摇头。")
 
     async def test_capability_plan_rejects_execute_without_llm_speech(self) -> None:
@@ -2123,7 +2123,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         response = await runtime.run(request)
 
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
         self.assertEqual(response.metadata["capability_decision"], "clarify")
         self.assertNotEqual(response.speech[0].text, "Shaking my head.")
 
@@ -2154,7 +2154,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         response = await runtime.run(request)
 
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
         self.assertTrue(response.speech)
         self.assertNotIn("schema-valid plan", response.speech[0].text)
         self.assertNotIn("duration_s", response.speech[0].text)
@@ -2192,7 +2192,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         response = await runtime.run(request)
 
         self.assertEqual(
-            [item.skill_id for item in response.skills],
+            [item.capability_id for item in response.capabilities],
             [
                 "soridormi.blink_eyes",
                 "soridormi.blink_eyes",
@@ -2200,7 +2200,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
         self.assertEqual(
-            [item.args for item in response.skills],
+            [item.args for item in response.capabilities],
             [{"count": 6}, {"count": 6}, {"count": 3}],
         )
         self.assertFalse(response.requires_confirmation)
@@ -2236,7 +2236,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         response = await runtime.run(request)
 
         self.assertEqual(
-            [item.skill_id for item in response.skills],
+            [item.capability_id for item in response.capabilities],
             [
                 "soridormi.blink_eyes",
                 "soridormi.blink_eyes",
@@ -2244,7 +2244,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
         self.assertEqual(
-            [item.args for item in response.skills],
+            [item.args for item in response.capabilities],
             [{"count": 6}, {"count": 6}, {"count": 3}],
         )
         self.assertEqual(response.metadata["capability_decision"], "execute")
@@ -2276,7 +2276,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         response = await runtime.run(request)
 
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
         self.assertEqual(
             response.speech[0].text,
             "I heard the movement request, but I could not produce a valid motion command, so I will not move.",
@@ -2329,7 +2329,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         response = await runtime.run(request)
 
-        self.assertEqual(response.skills[0].skill_id, "soridormi.walk_forward")
+        self.assertEqual(response.capabilities[0].capability_id, "soridormi.walk_forward")
         self.assertEqual(response.speech[0].text, "Walking forward for one second.")
 
     async def test_capability_plan_reviewer_blocks_social_fallback_for_walking_request(self) -> None:
@@ -2373,7 +2373,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         response = await runtime.run(request)
 
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
         self.assertEqual(response.metadata["capability_decision"], "clarify")
         self.assertEqual(
             response.speech[0].text,
@@ -2409,7 +2409,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         response = await runtime.run(request)
 
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
         self.assertEqual(response.metadata["capability_decision"], "clarify")
         self.assertEqual(
             response.speech[0].text,
@@ -2444,7 +2444,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         response = await runtime.run(request)
 
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
         self.assertEqual(response.metadata["capability_decision"], "clarify")
         self.assertEqual(
             response.speech[0].text,
@@ -2480,7 +2480,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         response = await runtime.run(request)
 
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
         self.assertEqual(response.metadata["capability_decision"], "clarify")
         self.assertEqual(
             response.speech[0].text,
@@ -2529,11 +2529,11 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         response = await runtime.run(request)
 
         self.assertEqual(
-            [item.skill_id for item in response.skills],
+            [item.capability_id for item in response.capabilities],
             ["soridormi.look_at_person", "soridormi.blink_eyes"],
         )
-        self.assertEqual(response.skills[0].args, {"duration_s": 5.0})
-        self.assertEqual(response.skills[1].args, {"count": 2})
+        self.assertEqual(response.capabilities[0].args, {"duration_s": 5.0})
+        self.assertEqual(response.capabilities[1].args, {"count": 2})
         self.assertEqual(response.speech[0].text, "Looking forward and blinking.")
 
     async def test_capability_plan_sees_full_api_surface_beyond_search_match(self) -> None:
@@ -2563,8 +2563,8 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         response = await runtime.run(request)
 
-        self.assertEqual([item.skill_id for item in response.skills], ["soridormi.wave_hand"])
-        self.assertEqual(response.skills[0].args, {"count": 2})
+        self.assertEqual([item.capability_id for item in response.capabilities], ["soridormi.wave_hand"])
+        self.assertEqual(response.capabilities[0].args, {"count": 2})
         self.assertEqual(response.metadata["capability_catalog_version"], 7)
 
 

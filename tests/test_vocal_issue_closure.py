@@ -128,7 +128,7 @@ def passing_summary() -> dict:
             },
         },
         "interaction_response": {
-            "skills": [
+            "capabilities": [
                 {
                     "capability_id": WALK,
                     "timing": "parallel",
@@ -199,7 +199,7 @@ class VocalIssueClosureTests(unittest.TestCase):
 
     def test_singing_goal_cannot_own_activity_request_or_result(self) -> None:
         summary = passing_summary()
-        summary["interaction_response"]["skills"][0]["metadata"][
+        summary["interaction_response"]["capabilities"][0]["metadata"][
             "source_goal_ids"
         ] = ["goal-sing"]
         summary["execution"]["results"][0]["metadata"]["source_goal_ids"] = [
@@ -385,18 +385,18 @@ class VocalIssueClosureTests(unittest.TestCase):
             runtime_identity_path=Path("/tmp/runtime-identity.json"),
             conversation_id="vocal-issue-1-test",
             timeout_s=1200.0,
-            skill_timeout_s=180.0,
+            capability_timeout_s=180.0,
             speaker=False,
         )
 
-        self.assertEqual(command.count("--skill-timeout-s"), 1)
+        self.assertEqual(command.count("--capability-timeout-s"), 1)
         parsed = build_live_parser().parse_args(command[2:])
         self.assertEqual(parsed.text, "你好，你往前走个15秒，然后边走边唱歌，同时眨眼睛。")
         self.assertEqual(parsed.expect_route, "robot_action")
         self.assertTrue(parsed.cognitive_runtime)
         self.assertTrue(parsed.grant_confirmation)
         self.assertFalse(parsed.speaker)
-        self.assertEqual(parsed.skill_timeout_s, 180.0)
+        self.assertEqual(parsed.capability_timeout_s, 180.0)
 
     def test_deployment_auto_mode_is_default_and_builds_headless_stack(self) -> None:
         parser = build_parser()

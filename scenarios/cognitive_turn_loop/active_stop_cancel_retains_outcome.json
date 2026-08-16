@@ -14,7 +14,7 @@
     "stop_text": "Stop now.",
     "capabilities": [
       {
-        "skill_id": "chromie.scenario.long_first",
+        "capability_id": "chromie.scenario.long_first",
         "provider_id": "scenario.blocking",
         "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
         "output_schema": {
@@ -25,7 +25,7 @@
         "interruptible": true
       },
       {
-        "skill_id": "chromie.scenario.queued_second",
+        "capability_id": "chromie.scenario.queued_second",
         "provider_id": "scenario.blocking",
         "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
         "output_schema": {
@@ -47,14 +47,14 @@
       "steps": [
         {
           "step_id": "active-first",
-          "skill_id": "chromie.scenario.long_first",
+          "capability_id": "chromie.scenario.long_first",
           "args": {},
           "timing": "sequential",
           "source_goal_ids": ["goal-active"]
         },
         {
           "step_id": "queued-second",
-          "skill_id": "chromie.scenario.queued_second",
+          "capability_id": "chromie.scenario.queued_second",
           "args": {},
           "timing": "sequential",
           "source_goal_ids": ["goal-queued"]
@@ -98,7 +98,7 @@
     "final_speech_only": false,
     "final_speech_count": 0,
     "final_goal_statuses": [],
-    "final_skill_ids": [],
+    "final_capability_ids": [],
     "runtime_call_count": 1,
     "stop_admission": "reflex_and_admit",
     "stop_reflex_action": "interrupt",

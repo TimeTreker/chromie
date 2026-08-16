@@ -182,7 +182,7 @@ docker compose -f compose.sim.yaml --profile mcp-runtime logs -f mcp-runtime
 
 ```env
 ORCH_ENABLE_INTERACTION_RESPONSE=1
-ORCH_ENABLE_SORIDORMI_SKILLS=1
+ORCH_ENABLE_SORIDORMI_CAPABILITIES=1
 SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp
 ORCH_COGNITIVE_RUNTIME_MODE=apply
 ORCH_COGNITIVE_APPLY_LANES=chat,memory,robot_action,tool

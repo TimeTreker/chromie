@@ -35,7 +35,7 @@ Examples:
 
 Regression assertion example:
   ./scripts/run_voice_mujoco_text_case.sh "Please nod twice." --speaker
-  ./scripts/run_voice_mujoco_text_case.sh "Please nod twice." --no-speaker --expect-skill soridormi.nod_yes
+  ./scripts/run_voice_mujoco_text_case.sh "Please nod twice." --no-speaker --expect-capability soridormi.nod_yes
 
 Options:
   --mcp-url URL              Soridormi MCP URL; default: http://127.0.0.1:8000/mcp
@@ -44,7 +44,7 @@ Options:
   --no-speaker               Headless check without speaker playback
   --preview-only             Route and validate without executing Soridormi skills
   --no-grant-confirmation   Do not grant confirmation in this diagnostic harness
-  --skill-timeout-s SECONDS  Per-Soridormi-skill timeout; default: 120
+  --capability-timeout-s SECONDS  Per-Soridormi-skill timeout; default: 120
   --goal-driven-runtime      Use the maintained goal-driven apply path; default
   --legacy-agent-runtime     Use Agent /interaction compatibility mode explicitly
   --evidence-dir DIR         Write evidence to a specific directory
@@ -52,7 +52,7 @@ Options:
                              robot_action, tool, memory, clarify, interrupt,
                              or ignore
   --expect-no-skills         Post-run assertion for no Soridormi skill emission
-  --expect-skill SKILL_ID    Post-run assertion for the exact planned skill sequence
+  --expect-capability SKILL_ID    Post-run assertion for the exact planned skill sequence
   --expect-arg I:KEY=VALUE   Post-run assertion for an emitted skill argument
   --reject-internal-speech   Fail if spoken output leaks planner labels or
                              model-facing skill IDs
@@ -69,13 +69,13 @@ while [ "$#" -gt 0 ]; do
     --no-speaker) SPEAKER_FLAG=--no-speaker; shift ;;
     --preview-only) PREVIEW_ONLY=1; shift ;;
     --no-grant-confirmation) GRANT_CONFIRMATION=0; shift ;;
-    --skill-timeout-s) SKILL_TIMEOUT_S="${2:?--skill-timeout-s requires seconds}"; shift 2 ;;
+    --capability-timeout-s) SKILL_TIMEOUT_S="${2:?--capability-timeout-s requires seconds}"; shift 2 ;;
     --goal-driven-runtime) SEMANTIC_RUNTIME_FLAG=--cognitive-runtime; shift ;;
     --legacy-agent-runtime) SEMANTIC_RUNTIME_FLAG=--no-cognitive-runtime; shift ;;
     --evidence-dir) EVIDENCE_DIR="${2:?--evidence-dir requires a directory}"; shift 2 ;;
     --expect-route) EXPECT_ROUTE+=(--expect-route "${2:?--expect-route requires a route}"); shift 2 ;;
     --expect-no-skills) EXPECT_NO_SKILLS+=(--expect-no-skills); shift ;;
-    --expect-skill) EXPECT_SKILL+=(--expect-skill "${2:?--expect-skill requires a skill id}"); shift 2 ;;
+    --expect-capability) EXPECT_SKILL+=(--expect-capability "${2:?--expect-capability requires a skill id}"); shift 2 ;;
     --expect-arg) EXPECT_ARGS+=(--expect-arg "${2:?--expect-arg requires I:KEY=VALUE}"); shift 2 ;;
     --reject-internal-speech) REJECT_INTERNAL_SPEECH+=(--reject-internal-speech); shift ;;
     --reject-speech-pattern) REJECT_SPEECH_PATTERNS+=(--reject-speech-pattern "${2:?--reject-speech-pattern requires a regex}"); shift 2 ;;
@@ -135,7 +135,7 @@ args=(
   --manifest capabilities/soridormi.json
   "$SPEAKER_FLAG"
   --require-speech
-  --skill-timeout-s "$SKILL_TIMEOUT_S"
+  --capability-timeout-s "$SKILL_TIMEOUT_S"
   "$SEMANTIC_RUNTIME_FLAG"
 )
 if [ "$PREVIEW_ONLY" = "1" ]; then args+=(--preview-only); fi

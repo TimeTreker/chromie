@@ -75,9 +75,9 @@
     "ollama_reply": {
       "decision": "execute",
       "speech": "I will nod my head to say yes for you.",
-      "skills": [
+      "capabilities": [
         {
-          "skill_id": "soridormi.nod_yes",
+          "capability_id": "soridormi.nod_yes",
           "args": {"count": 2}
         }
       ]
@@ -86,7 +86,7 @@
   "expect": {
     "speech_any": ["reliable review", "will not move"],
     "no_skills": true,
-    "forbidden_skills": [
+    "forbidden_capabilities": [
       "soridormi.nod_yes",
       "soridormi.express_attention"
     ],

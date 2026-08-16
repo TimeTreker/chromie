@@ -2296,9 +2296,9 @@ The Deep Planner does not send simple steps back to the Fast Planner.
 
 Executable capabilities are leaf nodes in either planner's canonical plan and
 use canonical `capability_id`. Agent Skills are reusable planning methods and do
-not belong to a planner tier. The target architecture has no executable `skill_id`
-identity. Any remaining `skill_id` reader in current source is temporary migration
-debt and must be removed rather than promoted into another compatibility contract.
+not belong to a planner tier. Maintained Chromie executable contracts have no
+`skill_id` identity; provider-local wire fields are translated at their adapters
+and Agent Skill `agent_skill_id` remains a separate cognitive namespace.
 
 ### 8.4 Shared planner primitives
 
@@ -2498,7 +2498,7 @@ envelope; that safety constraint is not semantic goal ownership or a Plan. A
 speech-only `chat` turn cannot become `robot_action` after Goal
 Association or planning merely because both lanes are enabled. Such escalation
 stops at the authority boundary before Response Composition, capability
-validation, or any SkillRequest is emitted.
+validation, or any CapabilityRequest is emitted.
 
 For an accepted effectful plan, executable wording from the Response Composer
 is not treated as execution evidence. The trusted adapter preserves that
@@ -2721,11 +2721,11 @@ contract proves.
 ### 14.1 Asynchronous Capability Runtime lifecycle
 
 `CapabilityRuntime` is the canonical source/runtime name for the Trusted Capability
-Runtime. It is not a second planner and not a new Work authority. The architecture does
-not retain executable `SkillRuntime` / `SkillRequest` / `SkillResult` terminology as a
-permanent compatibility layer; those names are migration debt until the dedicated
-source-cleanup Issue removes them. Agent Skills remain a separate passive cognitive
-concept and therefore keep the word *Skill*.
+Runtime. It is not a second planner and not a new Work authority. `CapabilityRuntime`,
+`CapabilityRequest`, `CapabilityResult`, and the rest of the executable `Capability*`
+vocabulary are now the maintained Chromie contracts; the retired executable `Skill*`
+aliases are removed rather than preserved. Agent Skills remain a separate passive
+cognitive concept and therefore keep the word *Skill*.
 
 Capability execution uses a non-blocking lifecycle:
 

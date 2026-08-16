@@ -11,8 +11,8 @@ acceptance tools. It includes:
 
 - route requests and `RouteDecision`;
 - agent requests, `AgentResult`, speech, memory, and compatibility actions;
-- strict `InteractionResponse`, `InteractionSpeech`, `SkillRequest`,
-  `SkillResult`, and `SkillTrace` contracts;
+- strict `InteractionResponse`, `InteractionSpeech`, `CapabilityRequest`,
+  `CapabilityResult`, and `CapabilityTrace` contracts;
 - deterministic `ReflexOutcome`, `CancellationDirective`, and
   `CancellationDispatchReceipt` contracts. Fixed reflex scopes remain separate
   from exact plan/fingerprint-bound goal cancellation, while both paths reconcile
@@ -32,7 +32,7 @@ model or adapter from smuggling low-level embodiment commands through metadata
 or nested skill arguments.
 
 Contract validation is necessary but not sufficient authorization. A valid
-`SkillRequest` must still resolve through the trusted Skill Registry and pass
+`CapabilityRequest` must still resolve through the trusted Skill Registry and pass
 provider, confirmation, resource, timeout, and cancellation policy.
 
 ## `chromie_runtime`
@@ -58,7 +58,7 @@ pip install -e shared
 Example imports:
 
 ```python
-from chromie_contracts.interaction import InteractionResponse, SkillRequest
+from chromie_contracts.interaction import InteractionResponse, CapabilityRequest
 from chromie_contracts.route import RouteDecision
 from chromie_runtime import ResourceArbiter
 ```

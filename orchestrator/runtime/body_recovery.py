@@ -10,8 +10,8 @@ from pydantic import ValidationError
 
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
-    SkillRequest,
-    SkillResult,
+    CapabilityRequest,
+    CapabilityResult,
 )
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.response_composition import (
@@ -40,7 +40,7 @@ class BodyRecoveryConfirmation:
 
     The confirmation is intentionally request-bound. Approval is not physical
     authorization by itself; it only lets the retry response re-enter the normal
-    InteractionRuntime -> SkillRuntime -> Soridormi preflight/validation path.
+    InteractionRuntime -> CapabilityRuntime -> Soridormi preflight/validation path.
     """
 
     response: InteractionResponse
@@ -52,7 +52,7 @@ class BodyRecoveryConfirmation:
     max_attempts: int
 
 
-def is_recoverable_body_result(result: SkillResult) -> bool:
+def is_recoverable_body_result(result: CapabilityResult) -> bool:
     """Return True for B-level body failures that may ask user preference.
 
     A-level safety refusals, cancellations, and timeouts are terminal at this
@@ -60,7 +60,7 @@ def is_recoverable_body_result(result: SkillResult) -> bool:
     prompt because the physical world may no longer match the original plan.
     """
 
-    if not result.skill_id.startswith("soridormi."):
+    if not result.capability_id.startswith("soridormi."):
         return False
     if result.status in {"refused", "timed_out", "cancelled"}:
         return False
@@ -84,13 +84,13 @@ def is_recoverable_body_result(result: SkillResult) -> bool:
     return False
 
 
-def recoverable_body_results(results: list[SkillResult]) -> list[SkillResult]:
+def recoverable_body_results(results: list[CapabilityResult]) -> list[CapabilityResult]:
     return [result for result in results if is_recoverable_body_result(result)]
 
 
 def build_body_recovery_confirmation(
     response: InteractionResponse,
-    results: list[SkillResult],
+    results: list[CapabilityResult],
     *,
     max_attempts: int,
     timeout_s: float,
@@ -99,12 +99,12 @@ def build_body_recovery_confirmation(
     """Create a bounded retry confirmation for recoverable body failures.
 
     The retry response contains only failed Soridormi requests plus any original
-    after-skills speech. It does not replay earlier immediate filler speech.
+    after-capabilities speech. It does not replay earlier immediate filler speech.
     """
 
     if max_attempts <= 0:
         return None
-    results_by_request: dict[str, SkillResult] = {}
+    results_by_request: dict[str, CapabilityResult] = {}
     for result in results:
         if result.request_id in results_by_request:
             # Recovery must not choose between contradictory terminal evidence.
@@ -116,14 +116,14 @@ def build_body_recovery_confirmation(
     )
     committed_effect_request_ids = {
         request.request_id
-        for request in response.skills
+        for request in response.capabilities
         if (
             request.metadata.get("source")
             == "goal_driven_canonical_plan"
             if cognitive_response
             else (
-                request.skill_id.startswith("soridormi.")
-                or request.skill_id == _TASK_GRAPH_SKILL_ID
+                request.capability_id.startswith("soridormi.")
+                or request.capability_id == _TASK_GRAPH_SKILL_ID
             )
         )
     }
@@ -156,8 +156,8 @@ def build_body_recovery_confirmation(
         # Never hide a non-recoverable sibling behind a retry prompt.
         return None
 
-    requests_by_id = {request.request_id: request for request in response.skills}
-    retry_requests: list[SkillRequest] = []
+    requests_by_id = {request.request_id: request for request in response.capabilities}
+    retry_requests: list[CapabilityRequest] = []
     retry_request_ids: list[str] = []
     failed_request_ids: list[str] = []
     next_attempt = 0
@@ -233,10 +233,10 @@ def build_body_recovery_confirmation(
             for request in retry_requests
         ]
 
-    after_skills_speech = [
+    after_capabilities_speech = [
         speech
         for speech in response.speech
-        if speech.timing == "after_skills"
+        if speech.timing == "after_capabilities"
     ]
     metadata = {
         **response.metadata,
@@ -262,8 +262,8 @@ def build_body_recovery_confirmation(
         )
     retry_response = InteractionResponse(
         interaction_id=f"{response.interaction_id}_recovery{next_attempt}",
-        speech=after_skills_speech,
-        skills=retry_requests,
+        speech=after_capabilities_speech,
+        capabilities=retry_requests,
         requires_confirmation=True,
         metadata=metadata,
     )
@@ -288,7 +288,7 @@ def build_body_recovery_confirmation(
 def _recovery_canonical_plan(
     response: InteractionResponse,
     *,
-    retry_requests: list[SkillRequest],
+    retry_requests: list[CapabilityRequest],
     attempt: int,
 ) -> CanonicalPlan | None:
     raw_plan = response.metadata.get("canonical_plan")
@@ -367,7 +367,7 @@ def _recovery_canonical_plan(
 
 
 def body_recovery_prompt(
-    results: list[SkillResult],
+    results: list[CapabilityResult],
     *,
     language: str,
     timeout_s: float,
@@ -401,7 +401,7 @@ def body_recovery_prompt(
 
 
 def conservative_body_failure_message(
-    results: list[SkillResult],
+    results: list[CapabilityResult],
     *,
     language: str,
 ) -> str | None:
@@ -414,7 +414,7 @@ def conservative_body_failure_message(
     return "The movement hit a recoverable issue again, so I will not keep retrying. I have stayed in the safer fallback state."
 
 
-def _recovery_attempt(request: SkillRequest) -> int:
+def _recovery_attempt(request: CapabilityRequest) -> int:
     value = request.metadata.get("body_recovery_attempt")
     if isinstance(value, bool):
         return 0
@@ -448,7 +448,7 @@ def _dict_value(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
-def _short_reason(result: SkillResult, *, zh: bool) -> str:
+def _short_reason(result: CapabilityResult, *, zh: bool) -> str:
     output = result.output or {}
     recovery = _dict_value(output.get("recovery"))
     message = (

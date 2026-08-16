@@ -10,7 +10,7 @@ from .user_turn import normalize_turn_text
 
 _PLANNER_OWNED_BINDING_FIELDS = frozenset({
     "capability_id",
-    "skill_id",
+    "capability_id",
     "tool_name",
     "provider_id",
     "execution_method",

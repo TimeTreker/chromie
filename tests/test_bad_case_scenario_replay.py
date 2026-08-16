@@ -90,7 +90,7 @@ class BadCaseScenarioReplayTests(unittest.TestCase):
             with self.subTest(text=text):
                 response = InteractionResponse(
                     speech=[{"text": text}],
-                    skills=[],
+                    capabilities=[],
                     metadata={
                         "language": "zh-CN",
                         "route_final": "deep_thought",
@@ -134,7 +134,7 @@ class BadCaseScenarioReplayTests(unittest.TestCase):
             text="Thank.",
             language="en-US",
             route_decision=decision,
-            context={"pending_tasks": [{"skill_id": "soridormi.walk_forward"}]},
+            context={"pending_tasks": [{"capability_id": "soridormi.walk_forward"}]},
         )
 
         result = asyncio.run(runtime.run(request))

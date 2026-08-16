@@ -286,7 +286,7 @@ CanonicalPlan
 → InteractionResponse
 → InteractionRuntime.prepare_response()
 → confirmation
-→ SkillRuntime.execute_response()
+→ CapabilityRuntime.execute_response()
 ```
 
 The adapter assigns:

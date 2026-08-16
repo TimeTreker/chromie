@@ -112,7 +112,7 @@ class ContractCompatibilityTests(unittest.TestCase):
             "steps": [
                 {
                     "step_id": "blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                 }
             ],
@@ -152,9 +152,9 @@ class ContractCompatibilityTests(unittest.TestCase):
                     id="proposal-1",
                     source="interaction_response",
                     proposal_kind="skill",
-                    task_type="task.execute_skill",
+                    task_type="task.execute_capability",
                     state="committed",
-                    skill_id="soridormi.nod_yes",
+                    capability_id="soridormi.nod_yes",
                     request_id="nod-1",
                     effectful=True,
                 )
@@ -181,7 +181,7 @@ class ContractCompatibilityTests(unittest.TestCase):
                 id="bad-proposal",
                 source="test",
                 proposal_kind="skill",
-                task_type="task.execute_skill",
+                task_type="task.execute_capability",
                 state="committed",
                 metadata={"joint_target": [0.1, 0.2]},
             )

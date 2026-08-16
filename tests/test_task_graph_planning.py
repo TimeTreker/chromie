@@ -64,9 +64,9 @@ class CapabilityOllama:
         return {
             "decision": "execute",
             "speech": "Walking forward for 1 second.",
-            "skills": [
+            "capabilities": [
                 {
-                    "skill_id": "soridormi.walk_velocity",
+                    "capability_id": "soridormi.walk_velocity",
                     "args": {"vx_mps": 0.2, "duration_s": 1.0},
                 }
             ],
@@ -146,7 +146,7 @@ def _soridormi_task_registry() -> CapabilityRegistry:
                             ToolCapability(
                                 name="soridormi.skill.list",
                                 agent_id="soridormi.skill",
-                                description="List concrete bounded Soridormi named skills.",
+                                description="List concrete bounded Soridormi named capabilities.",
                                 safety_class="safe_read",
                                 effects=["read_only"],
                             )
@@ -472,8 +472,8 @@ class TaskGraphPlanningTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(request.route_decision.route, "tool")
         self.assertEqual(request.route_decision.intent, "soridormi_task_planning")
-        self.assertEqual(response.skills[0].skill_id, "chromie.task_graph.execute")
-        graph = response.skills[0].args["graph"]
+        self.assertEqual(response.capabilities[0].capability_id, "chromie.task_graph.execute")
+        graph = response.capabilities[0].args["graph"]
         self.assertEqual(
             [node["tool"] for node in graph["nodes"]],
             [
@@ -584,8 +584,8 @@ class TaskGraphPlanningTests(unittest.IsolatedAsyncioTestCase):
 
                 self.assertEqual(request.route_decision.route, "tool")
                 self.assertEqual(request.route_decision.intent, "soridormi_task_planning")
-                self.assertEqual(response.skills[0].skill_id, "chromie.task_graph.execute")
-                graph = response.skills[0].args["graph"]
+                self.assertEqual(response.capabilities[0].capability_id, "chromie.task_graph.execute")
+                graph = response.capabilities[0].args["graph"]
                 self.assertEqual(graph["nodes"][1]["args"]["task_type"], task_type)
                 self.assertEqual(graph["nodes"][2]["args"]["task_type"], task_type)
                 graph_tools = {node["tool"] for node in graph["nodes"]}
@@ -635,9 +635,9 @@ class TaskGraphPlanningTests(unittest.IsolatedAsyncioTestCase):
         response = await runtime.run(request)
 
         self.assertEqual(request.route_decision.route, "robot_action")
-        self.assertEqual(response.skills[0].skill_id, "soridormi.walk_velocity")
-        self.assertEqual(response.skills[0].args, {"vx_mps": 0.2, "duration_s": 1.0})
-        self.assertTrue(response.skills[0].requires_confirmation)
+        self.assertEqual(response.capabilities[0].capability_id, "soridormi.walk_velocity")
+        self.assertEqual(response.capabilities[0].args, {"vx_mps": 0.2, "duration_s": 1.0})
+        self.assertTrue(response.capabilities[0].requires_confirmation)
         self.assertEqual(response.speech[0].text, "Walking forward for 1 second.")
         self.assertEqual(len(capability_ollama.calls), 1)
 

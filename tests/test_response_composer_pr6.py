@@ -160,7 +160,7 @@ class ResponseCompositionContractTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "walk",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 15},
                 }
             ],
@@ -228,13 +228,13 @@ class ResponseComposerResolverTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "look",
-                    "skill_id": "soridormi.look_at_person",
+                    "capability_id": "soridormi.look_at_person",
                     "args": {"duration_s": 2.0, "target_ref": "person"},
                     "source_goal_ids": ["goal-look"],
                 },
                 {
                     "step_id": "blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                     "source_goal_ids": ["goal-blink"],
                 },
@@ -325,13 +325,13 @@ class ResponseComposerResolverTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "look",
-                    "skill_id": "soridormi.look_at_person",
+                    "capability_id": "soridormi.look_at_person",
                     "args": {"duration_s": 2.0, "target_ref": "person"},
                     "source_goal_ids": ["goal-look"],
                 },
                 {
                     "step_id": "blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                     "source_goal_ids": ["goal-blink"],
                 },
@@ -363,7 +363,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "nod",
-                    "skill_id": "soridormi.nod_yes",
+                    "capability_id": "soridormi.nod_yes",
                     "args": {"count": 2},
                     "source_goal_ids": ["goal-nod"],
                 }
@@ -411,7 +411,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "bring-water",
-                    "skill_id": "soridormi.acquire_and_deliver_resource",
+                    "capability_id": "soridormi.acquire_and_deliver_resource",
                     "args": {},
                     "source_goal_ids": ["goal-water"],
                 }
@@ -542,7 +542,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "weather",
-                    "skill_id": "chromie.weather.lookup",
+                    "capability_id": "chromie.weather.lookup",
                     "args": {"location": "重庆", "date": "today"},
                 }
             ],
@@ -587,7 +587,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "walk",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 15},
                     "source_goal_ids": ["goal-walk"],
                 }
@@ -636,7 +636,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "walk",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 2},
                 }
             ],
@@ -692,7 +692,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "walk",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 15},
                 }
             ],
@@ -744,7 +744,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertTrue(result.metadata["fail_soft_primary_activity"])
         assert result.composition is not None
         self.assertEqual(
-            [step.skill_id for step in result.composition.canonical_plan.steps],
+            [step.capability_id for step in result.composition.canonical_plan.steps],
             ["soridormi.walk_forward"],
         )
         stage = result.composition.response_plan.pre_action
@@ -763,7 +763,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "nod",
-                    "skill_id": "soridormi.nod_yes",
+                    "capability_id": "soridormi.nod_yes",
                     "args": {"count": 2},
                 }
             ],
@@ -832,7 +832,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "walk",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 15.0},
                     "timing": "parallel",
                     "source_goal_ids": ["goal-walk"],
@@ -929,7 +929,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "walk",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 15},
                     "source_goal_ids": ["goal-walk"],
                 }
@@ -1032,7 +1032,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "weather",
-                    "skill_id": "chromie.weather.lookup",
+                    "capability_id": "chromie.weather.lookup",
                     "args": {"location": "重庆", "date": "today"},
                 }
             ],
@@ -1064,7 +1064,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "walk",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 15},
                     "source_goal_ids": ["goal-walk"],
                 }
@@ -1178,7 +1178,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "walk",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 10},
                     "source_goal_ids": ["goal-walk"],
                 }
@@ -1282,7 +1282,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "weather",
-                    "skill_id": "chromie.weather.lookup",
+                    "capability_id": "chromie.weather.lookup",
                     "args": {"location": "上海", "date": "today"},
                 }
             ],
@@ -1330,7 +1330,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "weather",
-                    "skill_id": "chromie.weather.lookup",
+                    "capability_id": "chromie.weather.lookup",
                     "args": {"location": "上海", "date": "today"},
                 }
             ],
@@ -1372,7 +1372,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "weather",
-                    "skill_id": "chromie.weather.lookup",
+                    "capability_id": "chromie.weather.lookup",
                     "args": {"location": "内乡", "date": "today"},
                 }
             ],
@@ -1408,7 +1408,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "weather",
-                    "skill_id": "chromie.weather.lookup",
+                    "capability_id": "chromie.weather.lookup",
                     "args": {"location": "Seattle"},
                 }
             ],
@@ -1476,7 +1476,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "weather",
-                    "skill_id": "chromie.weather.lookup",
+                    "capability_id": "chromie.weather.lookup",
                     "args": {"location": "重庆"},
                 }
             ],
@@ -1538,7 +1538,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             result.composition.metadata["pure_safe_read_fast_act_reference_only"]
         )
         self.assertEqual(
-            [step.skill_id for step in result.composition.canonical_plan.steps],
+            [step.capability_id for step in result.composition.canonical_plan.steps],
             ["chromie.weather.lookup"],
         )
 
@@ -1553,7 +1553,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "weather",
-                    "skill_id": "chromie.weather.lookup",
+                    "capability_id": "chromie.weather.lookup",
                     "args": {"location": "内乡", "date": "today"},
                     "source_goal_ids": ["goal-weather"],
                 }
@@ -1643,7 +1643,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             goal_ids=["goal-blink", "goal-joke"],
             steps=[{
                 "step_id": "blink",
-                "skill_id": "soridormi.blink_eyes",
+                "capability_id": "soridormi.blink_eyes",
                 "args": {"count": 2},
                 "source_goal_ids": ["goal-blink"],
             }],
@@ -1695,7 +1695,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                     "timing": "sequential",
                     "source_goal_ids": ["goal-blink"],
@@ -1764,7 +1764,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                     "timing": "sequential",
                     "source_goal_ids": ["goal-blink"],
@@ -1839,7 +1839,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "nod",
-                    "skill_id": "soridormi.nod_yes",
+                    "capability_id": "soridormi.nod_yes",
                     "args": {"count": 2},
                     "source_goal_ids": ["goal-nod"],
                 }

@@ -116,8 +116,8 @@ def evaluate_episode_contract_precheck(episode: EpisodeRecord) -> EpisodeEvaluat
 
     for turn in episode.turns:
         text = turn.user_text.lower()
-        skills = [item.skill_id for item in turn.agent.selected_skills]
-        skill_set = set(skills)
+        capabilities = [item.capability_id for item in turn.agent.selected_capabilities]
+        skill_set = set(capabilities)
         route = turn.goal_interpretation.route
         speech = " ".join(turn.agent.speech).strip()
 
@@ -125,10 +125,10 @@ def evaluate_episode_contract_precheck(episode: EpisodeRecord) -> EpisodeEvaluat
         selected_social_fallback = sorted(skill_set & SOCIAL_FALLBACK_SKILLS)
         selected_locomotion = any(
             any(skill.startswith(prefix) for prefix in LOCOMOTION_SKILL_PREFIXES)
-            for skill in skills
+            for skill in capabilities
         )
         looks_like_eye_action = any(hint in text for hint in EYE_ACTION_HINTS)
-        selected_eye_action = _has_skill_prefix(skills, EYE_ACTION_SKILL_PREFIXES)
+        selected_eye_action = _has_skill_prefix(capabilities, EYE_ACTION_SKILL_PREFIXES)
 
         if looks_like_locomotion and selected_social_fallback and not selected_locomotion:
             _add_tag(failure_tags, "wrong_action_class")
@@ -191,7 +191,7 @@ def evaluate_episode_contract_precheck(episode: EpisodeRecord) -> EpisodeEvaluat
                 scores["speech_quality"] = min(scores["speech_quality"], 20)
                 cap = min(cap, 40)
 
-        if turn.agent.requires_confirmation and not skills:
+        if turn.agent.requires_confirmation and not capabilities:
             _add_tag(failure_tags, "confirmation_without_skill")
             scores["safety_confirmation"] = min(scores["safety_confirmation"], 55)
 
@@ -363,11 +363,11 @@ def offline_review_from_episode(
         root_cause=root_cause,
         case_quality=case_quality,
     )
-    selected_skill_count = sum(len(turn.agent.selected_skills) for turn in episode.turns)
+    selected_skill_count = sum(len(turn.agent.selected_capabilities) for turn in episode.turns)
     completed_skill_count = sum(
         1
         for turn in episode.turns
-        for result in turn.execution.skill_results
+        for result in turn.execution.capability_results
         if result.status == "completed"
     )
     return EpisodeOfflineReview(
@@ -501,22 +501,22 @@ def scenario_candidate_from_episode(
         interaction_session_evidence = None
     turns = []
     for turn in episode.turns:
-        selected_skills = [item.skill_id for item in turn.agent.selected_skills]
-        forbidden = sorted(set(selected_skills) & SOCIAL_FALLBACK_SKILLS)
+        selected_capabilities = [item.capability_id for item in turn.agent.selected_capabilities]
+        forbidden = sorted(set(selected_capabilities) & SOCIAL_FALLBACK_SKILLS)
         if "social_fallback_for_locomotion" in evaluation.failure_tags:
             forbidden = sorted(set(forbidden) | SOCIAL_FALLBACK_SKILLS)
         expect: dict[str, Any] = {
             "post_history_contains": [turn.user_text],
         }
         if forbidden:
-            expect["forbidden_skills"] = forbidden
+            expect["forbidden_capabilities"] = forbidden
         if "body_skill_for_chat" in evaluation.failure_tags and turn.goal_interpretation.route == "chat":
-            expect["no_skills"] = True
+            expect["no_capabilities"] = True
         if "missing_eye_skill" in evaluation.failure_tags:
             if turn.goal_interpretation.route == "robot_action":
-                expect["skills"] = ["soridormi.blink_eyes"]
+                expect["capabilities"] = ["soridormi.blink_eyes"]
             else:
-                expect["no_skills"] = True
+                expect["no_capabilities"] = True
                 expect["forbidden_speech_any"] = [
                     "blinked",
                     "blinking",
@@ -524,8 +524,8 @@ def scenario_candidate_from_episode(
                     "眨眼",
                     "👁",
                 ]
-        if not forbidden and selected_skills:
-            expect["forbidden_skills"] = sorted(set(selected_skills))
+        if not forbidden and selected_capabilities:
+            expect["forbidden_capabilities"] = sorted(set(selected_capabilities))
         turns.append(
             {
                 "id": f"turn_{turn.turn_index}",
@@ -616,8 +616,8 @@ def _add_tag(tags: list[str], tag: str) -> None:
         tags.append(tag)
 
 
-def _has_skill_prefix(skills: list[str], prefixes: tuple[str, ...]) -> bool:
-    return any(any(skill.startswith(prefix) for prefix in prefixes) for skill in skills)
+def _has_skill_prefix(capabilities: list[str], prefixes: tuple[str, ...]) -> bool:
+    return any(any(skill.startswith(prefix) for prefix in prefixes) for skill in capabilities)
 
 
 def _speech_claims_action(speech: str, action_hints: tuple[str, ...]) -> bool:
@@ -657,14 +657,14 @@ def _strengths_from_episode(
     strengths: list[str] = []
     completed = sorted(
         {
-            result.skill_id
+            result.capability_id
             for turn in episode.turns
-            for result in turn.execution.skill_results
+            for result in turn.execution.capability_results
             if result.status == "completed"
         }
     )
     if completed:
-        strengths.append(f"Runtime reported completed skills: {', '.join(completed[:4])}.")
+        strengths.append(f"Runtime reported completed capabilities: {', '.join(completed[:4])}.")
     if any(turn.agent.speech for turn in episode.turns):
         strengths.append("The robot produced user-facing speech.")
     if evaluation.passed:
@@ -681,7 +681,7 @@ def _compact_memory_notes_from_review(
     tags = set(evaluation.failure_tags)
     notes: list[str] = []
     if case_quality == "good_case":
-        notes.append("Experience positive reference: route, speech, skills, and execution matched the user's intent.")
+        notes.append("Experience positive reference: route, speech, capabilities, and execution matched the user's intent.")
     if "claimed_action_without_skill" in tags:
         notes.append("Experience correction: do not describe a physical action as done unless a matching runtime skill was selected and executed.")
     if "missing_eye_skill" in tags:

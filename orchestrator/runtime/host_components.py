@@ -130,7 +130,7 @@ def build_interaction_runtime(
     cognition = settings.cognition
     session = settings.session
     invoker = None
-    if cognition.enable_soridormi_skills:
+    if cognition.enable_soridormi_capabilities:
         invoker = build_soridormi_invoker(
             manifest_path=cognition.soridormi_manifest,
         )

@@ -25,7 +25,7 @@ class CanonicalPlanOwnershipTests(unittest.TestCase):
                 steps=[
                     {
                         "step_id": "step-a",
-                        "skill_id": "soridormi.blink_eyes",
+                        "capability_id": "soridormi.blink_eyes",
                         "args": {"count": 1},
                         "source_goal_ids": ["goal-a"],
                     }
@@ -52,7 +52,7 @@ class CanonicalPlanOwnershipTests(unittest.TestCase):
                 steps=[
                     {
                         "step_id": "step-a",
-                        "skill_id": "soridormi.blink_eyes",
+                        "capability_id": "soridormi.blink_eyes",
                         "args": {"count": 1},
                         "source_goal_ids": ["goal-a"],
                     }
@@ -79,13 +79,13 @@ class CanonicalPlanOwnershipTests(unittest.TestCase):
                 steps=[
                     {
                         "step_id": "step-a",
-                        "skill_id": "soridormi.blink_eyes",
+                        "capability_id": "soridormi.blink_eyes",
                         "args": {"count": 1},
                         "source_goal_ids": ["goal-a"],
                     },
                     {
                         "step_id": "step-b",
-                        "skill_id": "soridormi.blink_eyes",
+                        "capability_id": "soridormi.blink_eyes",
                         "args": {"count": 1},
                         "source_goal_ids": ["goal-b"],
                     },
@@ -123,7 +123,7 @@ class CanonicalPlanOwnershipTests(unittest.TestCase):
                 steps=[
                     {
                         "step_id": "step-a",
-                        "skill_id": "soridormi.blink_eyes",
+                        "capability_id": "soridormi.blink_eyes",
                         "args": {"count": 1},
                         "source_goal_ids": ["goal-a"],
                     }
@@ -156,7 +156,7 @@ class CanonicalPlanOwnershipTests(unittest.TestCase):
                 steps=[
                     {
                         "step_id": "step-a",
-                        "skill_id": "soridormi.blink_eyes",
+                        "capability_id": "soridormi.blink_eyes",
                         "args": {"count": 1},
                         "source_goal_ids": ["goal-a"],
                     }
@@ -183,7 +183,7 @@ class CanonicalPlanOwnershipTests(unittest.TestCase):
                 steps=[
                     {
                         "step_id": "step-a",
-                        "skill_id": "soridormi.walk_forward",
+                        "capability_id": "soridormi.walk_forward",
                         "args": {"duration_s": 1},
                         "source_goal_ids": ["goal-a"],
                     }

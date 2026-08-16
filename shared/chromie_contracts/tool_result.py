@@ -46,7 +46,7 @@ class ToolExecutionRequest(BaseModel):
 
 
 class ToolExecutionResponse(BaseModel):
-    """Normalized provider result returned to the trusted Host Skill Runtime."""
+    """Normalized provider result returned to the trusted Host Capability Runtime."""
 
     model_config = ConfigDict(extra="forbid")
 

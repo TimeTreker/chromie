@@ -38,20 +38,22 @@ from orchestrator.runtime.cognitive_runtime import (
     GoalDrivenRuntimeCoordinator,
 )
 from orchestrator.runtime.session import SessionTracker
-from orchestrator.runtime.skill_runtime import (
-    LocalSpeechSkillProvider,
-    SkillDefinition,
-    SkillRegistry,
-    SkillRuntime,
-    SkillRuntimeResult,
-    SORIDORMI_NAMED_SKILL_OUTPUT_SCHEMA,
+from orchestrator.runtime.capability_runtime import (
+    LocalSpeechCapabilityProvider,
+    CapabilityDefinition,
+    CapabilityRegistry,
+    CapabilityRuntime,
+    CapabilityRuntimeResult,
     local_speech_definition,
+)
+from orchestrator.runtime.soridormi_capability_provider import (
+    SORIDORMI_NAMED_CAPABILITY_OUTPUT_SCHEMA,
 )
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     MEDIA_CAPABILITY_IDS,
-    SkillResult,
+    CapabilityResult,
     VOCAL_PERFORMANCE_CAPABILITY_ID,
     media_capability_output_schema,
     vocal_performance_output_schema,
@@ -292,30 +294,30 @@ class _AgentOllama:
 
 class _CognitiveScenarioRuntime:
     def __init__(self, capabilities: list[dict[str, Any]]) -> None:
-        self.definitions: dict[str, SkillDefinition] = {}
+        self.definitions: dict[str, CapabilityDefinition] = {}
         for item in capabilities:
-            skill_id = str(
-                item.get("skill_id") or item.get("capability_id") or ""
+            capability_id = str(
+                item.get("capability_id") or item.get("capability_id") or ""
             )
             raw_output_schema = item.get("output_schema")
-            if raw_output_schema is None and skill_id.startswith("soridormi."):
+            if raw_output_schema is None and capability_id.startswith("soridormi."):
                 # These fixtures model the upstream Soridormi catalog. Chromie's
                 # production catalog adapter owns the stable named-skill result
                 # envelope, so reproduce that materialization here instead of
                 # requiring every scenario to duplicate an adapter-owned schema.
-                raw_output_schema = SORIDORMI_NAMED_SKILL_OUTPUT_SCHEMA
+                raw_output_schema = SORIDORMI_NAMED_CAPABILITY_OUTPUT_SCHEMA
             elif (
                 raw_output_schema is None
-                and skill_id == VOCAL_PERFORMANCE_CAPABILITY_ID
+                and capability_id == VOCAL_PERFORMANCE_CAPABILITY_ID
             ):
                 raw_output_schema = vocal_performance_output_schema()
             elif (
                 raw_output_schema is None
-                and skill_id in MEDIA_CAPABILITY_IDS.values()
+                and capability_id in MEDIA_CAPABILITY_IDS.values()
             ):
                 raw_output_schema = media_capability_output_schema()
-            definition = SkillDefinition(
-                skill_id=skill_id,
+            definition = CapabilityDefinition(
+                capability_id=capability_id,
                 version=str(item.get("version") or "0.1.0"),
                 provider_id=str(item.get("provider_id") or "scenario.provider"),
                 description=str(item.get("description") or ""),
@@ -333,18 +335,18 @@ class _CognitiveScenarioRuntime:
                     **dict(item.get("metadata") or {}),
                 },
             )
-            self.definitions[definition.skill_id] = definition
+            self.definitions[definition.capability_id] = definition
 
-    async def ensure_skill_definitions(self, skill_ids: list[str]) -> None:
-        missing = [skill_id for skill_id in skill_ids if skill_id not in self.definitions]
+    async def ensure_capability_definitions(self, capability_ids: list[str]) -> None:
+        missing = [capability_id for capability_id in capability_ids if capability_id not in self.definitions]
         if missing:
-            raise ValueError("unknown scenario skills: " + ",".join(missing))
+            raise ValueError("unknown scenario capabilities: " + ",".join(missing))
 
-    def skill_definition(self, skill_id: str) -> SkillDefinition:
+    def capability_definition(self, capability_id: str) -> CapabilityDefinition:
         try:
-            return self.definitions[skill_id]
+            return self.definitions[capability_id]
         except KeyError as exc:
-            raise ValueError(f"unknown scenario skill {skill_id!r}") from exc
+            raise ValueError(f"unknown scenario capability {capability_id!r}") from exc
 
 
 class _CognitiveTurnEvidenceRecorder:
@@ -370,9 +372,9 @@ class _BlockingScenarioProvider:
     async def execute(
         self,
         request: Any,
-        definition: SkillDefinition,
+        definition: CapabilityDefinition,
         context: Any,
-    ) -> SkillResult:
+    ) -> CapabilityResult:
         del definition, context
         self.started.set()
         await asyncio.Event().wait()
@@ -383,7 +385,7 @@ class _BlockingScenarioProvider:
     async def cancel(
         self,
         request: Any,
-        definition: SkillDefinition,
+        definition: CapabilityDefinition,
         context: Any,
     ) -> None:
         del definition, context
@@ -405,15 +407,15 @@ class _CognitiveTurnScenarioRuntime:
         self.cancelled_request_ids: list[str] = []
         self.on_effectful_done: Any = None
         self.soridormi_invoker = None
-        self.runtime: SkillRuntime | None = None
+        self.runtime: CapabilityRuntime | None = None
         if self.mode == "active_cancel":
-            registry = SkillRegistry()
+            registry = CapabilityRegistry()
             registry.register(local_speech_definition())
             for definition in self.definitions.values():
                 registry.register(definition)
-            self.runtime = SkillRuntime(registry)
+            self.runtime = CapabilityRuntime(registry)
             self.runtime.register_provider(
-                LocalSpeechSkillProvider(
+                LocalSpeechCapabilityProvider(
                     lambda _args: {
                         "scheduled": True,
                         "playback_started": True,
@@ -432,43 +434,43 @@ class _CognitiveTurnScenarioRuntime:
                     )
                 )
 
-    async def ensure_skill_definitions(self, skill_ids: list[str]) -> None:
+    async def ensure_capability_definitions(self, capability_ids: list[str]) -> None:
         missing = [
-            skill_id for skill_id in skill_ids
-            if skill_id not in self.definitions
+            capability_id for capability_id in capability_ids
+            if capability_id not in self.definitions
         ]
         if missing:
             raise ValueError(
-                "unknown cognitive-turn scenario skills: "
+                "unknown cognitive-turn scenario capabilities: "
                 + ",".join(missing)
             )
 
-    def skill_definition(self, skill_id: str) -> SkillDefinition:
+    def capability_definition(self, capability_id: str) -> CapabilityDefinition:
         try:
-            return self.definitions[skill_id]
+            return self.definitions[capability_id]
         except KeyError as exc:
             raise ValueError(
-                f"unknown cognitive-turn scenario skill {skill_id!r}"
+                f"unknown cognitive-turn scenario capability {capability_id!r}"
             ) from exc
 
     def apply_current_schema_overrides(self) -> None:
         raw = self.stub.get("current_output_schemas") or {}
         if not isinstance(raw, dict):
             raise ValueError("stub.current_output_schemas must be an object")
-        for skill_id, schema in raw.items():
-            if skill_id not in self.definitions:
+        for capability_id, schema in raw.items():
+            if capability_id not in self.definitions:
                 raise ValueError(
-                    f"current schema override references unknown skill {skill_id!r}"
+                    f"current schema override references unknown capability {capability_id!r}"
                 )
             if not isinstance(schema, dict):
                 raise ValueError(
-                    f"current schema override for {skill_id!r} must be an object"
+                    f"current schema override for {capability_id!r} must be an object"
                 )
-            updated = self.definitions[skill_id].model_copy(
+            updated = self.definitions[capability_id].model_copy(
                 deep=True,
                 update={"output_schema": dict(schema)},
             )
-            self.definitions[skill_id] = updated
+            self.definitions[capability_id] = updated
             if self.runtime is not None:
                 self.runtime.registry.upsert(updated)
 
@@ -478,23 +480,23 @@ class _CognitiveTurnScenarioRuntime:
         *,
         session_id: str | None,
         confirmed_request_ids: set[str] | None = None,
-    ) -> SkillRuntimeResult:
+    ) -> CapabilityRuntimeResult:
         del session_id
         self.calls.append(response)
         plan_requests = [
             request
-            for request in response.skills
+            for request in response.capabilities
             if request.metadata.get("source")
             == "goal_driven_canonical_plan"
         ]
         if not plan_requests:
-            return SkillRuntimeResult(
+            return CapabilityRuntimeResult(
                 interaction_id=response.interaction_id,
                 status="completed",
                 results=[
-                    SkillResult(
+                    CapabilityResult(
                         request_id=item.id,
-                        skill_id="chromie.speak",
+                        capability_id="chromie.speak",
                         status="completed",
                         provider_id="chromie.local_speech",
                         output={"playback_started": True},
@@ -521,7 +523,7 @@ class _CognitiveTurnScenarioRuntime:
             str(request.metadata.get("step_id") or ""): request
             for request in plan_requests
         }
-        results: list[SkillResult] = []
+        results: list[CapabilityResult] = []
         for raw in self.stub.get("results") or []:
             if not isinstance(raw, dict):
                 raise ValueError("stub.results entries must be objects")
@@ -532,13 +534,13 @@ class _CognitiveTurnScenarioRuntime:
                     f"scripted result references unknown step {step_id!r}"
                 )
             results.append(
-                SkillResult(
+                CapabilityResult(
                     request_id=request.request_id,
-                    skill_id=request.skill_id,
-                    skill_version=request.skill_version,
+                    capability_id=request.capability_id,
+                    capability_version=request.capability_version,
                     status=str(raw.get("status") or "completed"),
-                    provider_id=self.skill_definition(
-                        request.skill_id
+                    provider_id=self.capability_definition(
+                        request.capability_id
                     ).provider_id,
                     output=dict(raw.get("output") or {}),
                     reason_code=raw.get("reason_code"),
@@ -554,7 +556,7 @@ class _CognitiveTurnScenarioRuntime:
                 else "failed"
             )
         )
-        execution = SkillRuntimeResult(
+        execution = CapabilityRuntimeResult(
             interaction_id=response.interaction_id,
             status=status,
             results=results,
@@ -1234,7 +1236,7 @@ def _evaluate_interaction_expectations(
     scenario: BehaviorScenario,
     *,
     speech: str,
-    skill_ids: list[str],
+    capability_ids: list[str],
     skill_args: list[dict[str, Any]],
     skill_timeout_ms: list[int | None],
     skill_metadata: list[dict[str, Any]],
@@ -1258,14 +1260,14 @@ def _evaluate_interaction_expectations(
     if forbidden:
         errors.append(f"speech contained forbidden phrases {forbidden!r}: {speech!r}")
 
-    expected_skills = _tuple_of_strings(expect.get("skills"))
-    if bool(expect.get("no_skills", False)) and skill_ids:
-        errors.append(f"skills={skill_ids!r}, expected none")
-    if expected_skills and skill_ids != list(expected_skills):
-        errors.append(f"skills={skill_ids!r}, expected {list(expected_skills)!r}")
-    for skill_id in _tuple_of_strings(expect.get("forbidden_skills")):
-        if skill_id in skill_ids:
-            errors.append(f"forbidden skill {skill_id!r} emitted")
+    expected_capabilities = _tuple_of_strings(expect.get("capabilities"))
+    if bool(expect.get("no_capabilities", False)) and capability_ids:
+        errors.append(f"capabilities={capability_ids!r}, expected none")
+    if expected_capabilities and capability_ids != list(expected_capabilities):
+        errors.append(f"capabilities={capability_ids!r}, expected {list(expected_capabilities)!r}")
+    for capability_id in _tuple_of_strings(expect.get("forbidden_capabilities")):
+        if capability_id in capability_ids:
+            errors.append(f"forbidden capability {capability_id!r} emitted")
     expected_skill_args = expect.get("skill_args")
     if expected_skill_args is not None and skill_args != expected_skill_args:
         errors.append(f"skill_args={skill_args!r}, expected {expected_skill_args!r}")
@@ -1438,13 +1440,13 @@ async def _run_interaction_turn(
 
 def _interaction_actual(response: Any) -> dict[str, Any]:
     speech = _speech_text(response)
-    skill_ids = [skill.skill_id for skill in response.skills]
-    skill_args = [skill.args for skill in response.skills]
-    skill_timeout_ms = [skill.timeout_ms for skill in response.skills]
-    skill_metadata = [skill.metadata for skill in response.skills]
+    capability_ids = [skill.capability_id for skill in response.capabilities]
+    skill_args = [skill.args for skill in response.capabilities]
+    skill_timeout_ms = [skill.timeout_ms for skill in response.capabilities]
+    skill_metadata = [skill.metadata for skill in response.capabilities]
     return {
         "speech": speech,
-        "skills": skill_ids,
+        "capabilities": capability_ids,
         "skill_args": skill_args,
         "skill_timeout_ms": skill_timeout_ms,
         "skill_metadata": skill_metadata,
@@ -1464,14 +1466,14 @@ async def evaluate_interaction_scenario(scenario: BehaviorScenario) -> dict[str,
         stub=scenario.stub,
     )
     speech = _speech_text(response)
-    skill_ids = [skill.skill_id for skill in response.skills]
-    skill_args = [skill.args for skill in response.skills]
-    skill_timeout_ms = [skill.timeout_ms for skill in response.skills]
-    skill_metadata = [skill.metadata for skill in response.skills]
+    capability_ids = [skill.capability_id for skill in response.capabilities]
+    skill_args = [skill.args for skill in response.capabilities]
+    skill_timeout_ms = [skill.timeout_ms for skill in response.capabilities]
+    skill_metadata = [skill.metadata for skill in response.capabilities]
     errors = _evaluate_interaction_expectations(
         scenario,
         speech=speech,
-        skill_ids=skill_ids,
+        capability_ids=capability_ids,
         skill_args=skill_args,
         skill_timeout_ms=skill_timeout_ms,
         skill_metadata=skill_metadata,
@@ -1518,14 +1520,14 @@ def _adapter_result_from_stub(scenario: BehaviorScenario) -> AgentResult:
 async def evaluate_adapter_scenario(scenario: BehaviorScenario) -> dict[str, Any]:
     response = AgentResultInteractionAdapter().convert(_adapter_result_from_stub(scenario))
     speech = _speech_text(response)
-    skill_ids = [skill.skill_id for skill in response.skills]
-    skill_args = [skill.args for skill in response.skills]
-    skill_timeout_ms = [skill.timeout_ms for skill in response.skills]
-    skill_metadata = [skill.metadata for skill in response.skills]
+    capability_ids = [skill.capability_id for skill in response.capabilities]
+    skill_args = [skill.args for skill in response.capabilities]
+    skill_timeout_ms = [skill.timeout_ms for skill in response.capabilities]
+    skill_metadata = [skill.metadata for skill in response.capabilities]
     errors = _evaluate_interaction_expectations(
         scenario,
         speech=speech,
-        skill_ids=skill_ids,
+        capability_ids=capability_ids,
         skill_args=skill_args,
         skill_timeout_ms=skill_timeout_ms,
         skill_metadata=skill_metadata,
@@ -1714,7 +1716,7 @@ async def evaluate_dialogue_scenario(scenario: BehaviorScenario) -> dict[str, An
             errors = _evaluate_interaction_expectations(
                 turn_scenario,
                 speech=actual["speech"],
-                skill_ids=actual["skills"],
+                capability_ids=actual["capabilities"],
                 skill_args=actual["skill_args"],
                 skill_timeout_ms=actual["skill_timeout_ms"],
                 skill_metadata=actual["skill_metadata"],
@@ -1849,7 +1851,7 @@ async def evaluate_cognitive_core_dialogue_scenario(
                 _evaluate_interaction_expectations(
                     turn_scenario,
                     speech=interaction_actual["speech"],
-                    skill_ids=interaction_actual["skills"],
+                    capability_ids=interaction_actual["capabilities"],
                     skill_args=interaction_actual["skill_args"],
                     skill_timeout_ms=interaction_actual["skill_timeout_ms"],
                     skill_metadata=interaction_actual["skill_metadata"],
@@ -1983,16 +1985,16 @@ async def evaluate_cognitive_runtime_scenario(
         "disposition": terminal.disposition if terminal is not None else None,
         "coverage": terminal.coverage if terminal is not None else None,
         "goal_outcomes": goal_outcomes,
-        "capability_ids": [item.capability_id for item in interaction.skills] if interaction else [],
-        "capability_args": [item.args for item in interaction.skills] if interaction else [],
-        "capability_timings": [item.timing for item in interaction.skills] if interaction else [],
+        "capability_ids": [item.capability_id for item in interaction.capabilities] if interaction else [],
+        "capability_args": [item.args for item in interaction.capabilities] if interaction else [],
+        "capability_timings": [item.timing for item in interaction.capabilities] if interaction else [],
         "capability_source_goal_ids": [
             list(item.metadata.get("source_goal_ids") or [])
-            for item in interaction.skills
+            for item in interaction.capabilities
         ] if interaction else [],
         "capability_execution_lanes": [
             str(item.metadata.get("execution_lane") or "")
-            for item in interaction.skills
+            for item in interaction.capabilities
         ] if interaction else [],
         "interaction_status": interaction.status if interaction else None,
         "speech_texts": [item.text for item in speech_items],
@@ -2016,8 +2018,8 @@ async def evaluate_cognitive_runtime_scenario(
             f"expected {list(expect['goal_outcomes'])!r}"
         )
     expected_capability_ids = expect.get("capability_ids")
-    if expected_capability_ids is None and "skill_ids" in expect:
-        expected_capability_ids = expect["skill_ids"]
+    if expected_capability_ids is None and "capability_ids" in expect:
+        expected_capability_ids = expect["capability_ids"]
     if (
         expected_capability_ids is not None
         and actual["capability_ids"] != list(expected_capability_ids)
@@ -2335,7 +2337,7 @@ async def evaluate_cognitive_turn_loop_scenario(
     }
     request_step_ids = {
         request.request_id: str(request.metadata.get("step_id") or "")
-        for request in response.skills
+        for request in response.capabilities
     }
     execution_by_request_id = {
         result.request_id: result for result in execution.results
@@ -2387,15 +2389,15 @@ async def evaluate_cognitive_turn_loop_scenario(
         "suppression_reason": retained.get("suppression_reason"),
         "final_response_absent": final_response is None,
         "final_speech_only": bool(
-            final_response is not None and not final_response.skills
+            final_response is not None and not final_response.capabilities
         ),
         "final_speech_count": len(final_speech),
         "final_speech_texts": [item.text for item in final_speech],
         "final_goal_statuses": [
             item.metadata.get("goal_status") for item in final_speech
         ],
-        "final_skill_ids": (
-            [item.skill_id for item in final_response.skills]
+        "final_capability_ids": (
+            [item.capability_id for item in final_response.capabilities]
             if final_response is not None
             else []
         ),
@@ -2439,7 +2441,7 @@ async def evaluate_cognitive_turn_loop_scenario(
                 if request.request_id in execution_by_request_id
                 else None
             )
-            for request in response.skills
+            for request in response.capabilities
             if request.metadata.get("source")
             == "goal_driven_canonical_plan"
         ],
@@ -2450,7 +2452,7 @@ async def evaluate_cognitive_turn_loop_scenario(
             next(
                 (
                     str(request.metadata.get("step_id") or "")
-                    for request in response.skills
+                    for request in response.capabilities
                     if request.request_id == request_id
                 ),
                 request_id,
@@ -2478,7 +2480,7 @@ async def evaluate_cognitive_turn_loop_scenario(
         "final_speech_only",
         "final_speech_count",
         "final_goal_statuses",
-        "final_skill_ids",
+        "final_capability_ids",
         "runtime_call_count",
         "stop_admission",
         "stop_reflex_action",

@@ -5,13 +5,13 @@ import unittest
 
 from agent.app.capabilities.validator import validate_value_for_schema
 from orchestrator.runtime.conversation_memory_provider import (
-    ConversationMemorySkillProvider,
+    ConversationMemoryCapabilityProvider,
     host_runtime_memory_definitions,
 )
-from orchestrator.runtime.skill_runtime import SkillExecutionContext
+from orchestrator.runtime.capability_runtime import CapabilityExecutionContext
 from shared.chromie_contracts.interaction import (
-    SkillRequest,
-    SkillTrace,
+    CapabilityRequest,
+    CapabilityTrace,
     validate_output_schema_declaration,
 )
 
@@ -19,7 +19,7 @@ from shared.chromie_contracts.interaction import (
 class ConversationMemoryProviderTests(unittest.TestCase):
     def test_definition_is_read_only_and_not_reference_authority(self) -> None:
         definitions = {
-            item.skill_id: item for item in host_runtime_memory_definitions()
+            item.capability_id: item for item in host_runtime_memory_definitions()
         }
         self.assertEqual(
             set(definitions),
@@ -35,7 +35,7 @@ class ConversationMemoryProviderTests(unittest.TestCase):
         )
 
     def test_provider_returns_only_exact_handler_result(self) -> None:
-        provider = ConversationMemorySkillProvider(
+        provider = ConversationMemoryCapabilityProvider(
             lambda args: {
                 "found": args["material_args"]["location"] == "内乡",
                 "reason": "exact_verified_match",
@@ -46,11 +46,11 @@ class ConversationMemoryProviderTests(unittest.TestCase):
             }
         )
         definition = {
-            item.skill_id: item for item in host_runtime_memory_definitions()
+            item.capability_id: item for item in host_runtime_memory_definitions()
         }["chromie.memory.retrieve_verified_tool_result"]
-        request = SkillRequest(
+        request = CapabilityRequest(
             request_id="memory-1",
-            skill_id=definition.skill_id,
+            capability_id=definition.capability_id,
             args={
                 "evidence_id": "evidence-neixiang",
                 "tool_id": "chromie.weather.lookup",
@@ -62,12 +62,12 @@ class ConversationMemoryProviderTests(unittest.TestCase):
             provider.execute(
                 request,
                 definition,
-                SkillExecutionContext(
+                CapabilityExecutionContext(
                     interaction_id="interaction-memory",
-                    trace=SkillTrace(
+                    trace=CapabilityTrace(
                         interaction_id="interaction-memory",
                         request_id=request.request_id,
-                        skill_id=request.skill_id,
+                        capability_id=request.capability_id,
                         provider_id=provider.provider_id,
                     ),
                 ),

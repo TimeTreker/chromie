@@ -163,10 +163,10 @@ class TaskGraphResidualCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         result = await coordinator.execute(
             InteractionResponse(
-                skills=[
+                capabilities=[
                     {
                         "request_id": "graph-1",
-                        "skill_id": "chromie.task_graph.execute",
+                        "capability_id": "chromie.task_graph.execute",
                         "args": {"graph": graph},
                     }
                 ],

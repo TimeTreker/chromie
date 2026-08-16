@@ -9,7 +9,10 @@ from agent.app.capabilities.catalog import CapabilityMatch
 from agent.app.runtime import InteractionRuntime
 from agent.app.schema import AgentRunRequest, RouteDecision
 from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
-from orchestrator.runtime.skill_runtime import SkillDefinition, SkillRegistry
+from orchestrator.runtime.capability_runtime import CapabilityDefinition, CapabilityRegistry
+from orchestrator.runtime.soridormi_capability_provider import (
+    import_soridormi_capability_catalog,
+)
 from shared.chromie_contracts.social_attention import (
     SocialAttentionPlan,
     normalize_social_attention_mode,
@@ -55,7 +58,7 @@ class _Catalog:
             ),
         ]
 
-    async def refresh_live_named_skills(self) -> None:
+    async def refresh_live_named_capabilities(self) -> None:
         return None
 
     def entries(self):
@@ -70,15 +73,15 @@ class _Catalog:
 
 class _Runtime:
     def __init__(self, definitions):
-        self.definitions = {item.skill_id: item for item in definitions}
+        self.definitions = {item.capability_id: item for item in definitions}
         self.executed = []
 
-    async def ensure_skill_definitions(self, skill_ids):
-        for skill_id in skill_ids:
+    async def ensure_capability_definitions(self, capability_ids):
+        for skill_id in capability_ids:
             if skill_id not in self.definitions:
                 raise ValueError(skill_id)
 
-    def skill_definition(self, skill_id):
+    def capability_definition(self, skill_id):
         return self.definitions[skill_id]
 
     async def execute(self, response, *, session_id):
@@ -102,9 +105,9 @@ def _request() -> AgentRunRequest:
     )
 
 
-def _definition(skill_id: str, *, backend: str) -> SkillDefinition:
-    return SkillDefinition(
-        skill_id=skill_id,
+def _definition(skill_id: str, *, backend: str) -> CapabilityDefinition:
+    return CapabilityDefinition(
+        capability_id=skill_id,
         provider_id="soridormi.mcp",
         input_schema={"type": "object", "properties": {}, "additionalProperties": False},
         output_schema={
@@ -220,7 +223,7 @@ class SocialAttentionPolicyClosureTests(unittest.TestCase):
         response, session_id = runtime.executed[0]
         self.assertEqual(session_id, "social-policy")
         self.assertEqual(
-            [item.skill_id for item in response.skills],
+            [item.capability_id for item in response.capabilities],
             ["soridormi.hardware_attention"],
         )
         evidence = adapter.recent_auxiliary_behavior_evidence("social-policy")
@@ -229,8 +232,8 @@ class SocialAttentionPolicyClosureTests(unittest.TestCase):
         self.assertEqual(adapter.recent_auxiliary_behavior_evidence("other-session"), [])
 
     def test_registry_preserves_semantic_taxonomy_not_backend_mode(self):
-        registry = SkillRegistry()
-        registry.import_soridormi_catalog(
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry,
             [
                 {
                     "skill_id": "opaque_attention",

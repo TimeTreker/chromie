@@ -115,7 +115,7 @@
     "speech_any": [
       "Hello"
     ],
-    "skills": [],
+    "capabilities": [],
     "metadata_json_contains": [
       "social_attention_plan"
     ],

@@ -108,7 +108,7 @@ def _events_report(events: list[dict[str, Any]]) -> dict[str, Any]:
         if isinstance(interaction, dict):
             applied_capabilities.extend(
                 str(value)
-                for value in (interaction.get("capability_ids") or interaction.get("skill_ids") or [])
+                for value in (interaction.get("capability_ids") or interaction.get("capability_ids") or [])
             )
     return {
         "evidence_class": "live_text_operational",
@@ -195,7 +195,7 @@ def _run_provenance(summary: dict[str, Any]) -> dict[str, Any]:
 def _evidence_capability_id(item: dict[str, Any]) -> str:
     """Read the canonical evidence identity with bounded legacy compatibility."""
 
-    return str(item.get("capability_id") or item.get("skill_id") or "")
+    return str(item.get("capability_id") or "")
 
 
 def _simulator_report(

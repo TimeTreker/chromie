@@ -9,7 +9,7 @@ from orchestrator.runtime.interaction_coordinator import (
     InteractionRuntimeCoordinator,
 )
 from orchestrator.runtime.interaction_ledger import InteractionLedger
-from shared.chromie_contracts.interaction import InteractionResponse, SkillRequest
+from shared.chromie_contracts.interaction import InteractionResponse, CapabilityRequest
 from shared.chromie_contracts.reflex import CancellationDirective
 
 
@@ -200,10 +200,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
         response = InteractionResponse(
             interaction_id="interaction-1",
-            skills=[
-                SkillRequest(
+            capabilities=[
+                CapabilityRequest(
                     request_id="speak-1",
-                    skill_id="chromie.speak",
+                    capability_id="chromie.speak",
                     args={"text": "Hello."},
                     metadata={
                         "execution_lane": "vocal",
@@ -239,10 +239,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
         response = InteractionResponse(
             interaction_id="interaction-blocked",
-            skills=[
-                SkillRequest(
+            capabilities=[
+                CapabilityRequest(
                     request_id="interrupt-leak",
-                    skill_id="session.interrupt",
+                    capability_id="session.interrupt",
                     args={},
                     metadata={"source_goal_ids": ["goal-blocked"]},
                 )
@@ -290,10 +290,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         prepared = coordinator.prepare_response(
             InteractionResponse(
-                skills=[
+                capabilities=[
                     {
                         "request_id": "walk-leak",
-                        "skill_id": "soridormi.walk_forward",
+                        "capability_id": "soridormi.walk_forward",
                         "args": {"duration_s": 15.0, "speed": "quick"},
                     }
                 ],
@@ -305,7 +305,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             session_id="sid-structured-block",
         )
 
-        self.assertEqual(prepared.skills, [])
+        self.assertEqual(prepared.capabilities, [])
         self.assertFalse(prepared.requires_confirmation)
         self.assertTrue(prepared.metadata["structured_planning_execution_suppressed"])
         self.assertEqual(
@@ -350,10 +350,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_read_only_chromie_tool_is_not_classified_as_effectful_motion(self) -> None:
         response = InteractionResponse(
-            skills=[
-                SkillRequest(
+            capabilities=[
+                CapabilityRequest(
                     request_id="weather-read",
-                    skill_id="chromie.weather.lookup",
+                    capability_id="chromie.weather.lookup",
                     metadata={
                         "effects": ["read_only", "external_read", "weather_lookup"],
                         "safety_class": "safe_read",
@@ -368,10 +368,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_physical_skill_metadata_remains_effectful(self) -> None:
         response = InteractionResponse(
-            skills=[
-                SkillRequest(
+            capabilities=[
+                CapabilityRequest(
                     request_id="walk",
-                    skill_id="soridormi.walk_velocity",
+                    capability_id="soridormi.walk_velocity",
                     metadata={
                         "effects": ["physical_motion"],
                         "safety_class": "physical_motion",
@@ -396,10 +396,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                     "language": "en-US",
                     "route_task_list": [
                         {
-                            "id": "quick_intent:0:task.execute_skill",
+                            "id": "quick_intent:0:task.execute_capability",
                             "source_stage": "quick_intent",
                             "kind": "action",
-                            "task_type": "task.execute_skill",
+                            "task_type": "task.execute_capability",
                             "capability_id": "walk_forward",
                         }
                     ],
@@ -435,10 +435,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                     "truth_reconciliation_reason": "quick_intent_misread_warning",
                     "superseded_task_proposals": [
                         {
-                            "id": "quick_intent:0:task.execute_skill:superseded",
+                            "id": "quick_intent:0:task.execute_capability:superseded",
                             "source": "quick_intent",
                             "proposal_kind": "action",
-                            "task_type": "task.execute_skill",
+                            "task_type": "task.execute_capability",
                             "capability_id": "soridormi.look_at_window",
                             "reason": "deepthinking interpreted Look out as a warning",
                             "superseded_by": "deepthinking:0:speech.speak",
@@ -472,14 +472,14 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         prepared = coordinator.prepare_response(
             InteractionResponse(
-                skills=[
+                capabilities=[
                     {
                         "request_id": "local-unknown",
-                        "skill_id": "chromie.unknown",
+                        "capability_id": "chromie.unknown",
                     },
                     {
                         "request_id": "body-deferred",
-                        "skill_id": "soridormi.nod_yes",
+                        "capability_id": "soridormi.nod_yes",
                     },
                 ]
             ),
@@ -523,10 +523,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             soridormi_invoker=_SoridormiInvoker(requires_confirmation=True),
         )
         response = InteractionResponse(
-            skills=[
+            capabilities=[
                 {
                     "request_id": "nod-1",
-                    "skill_id": "soridormi.nod_yes",
+                    "capability_id": "soridormi.nod_yes",
                     "args": {"count": 2},
                 }
             ]
@@ -559,10 +559,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         result = await coordinator.execute(
             InteractionResponse(
-                skills=[
+                capabilities=[
                     {
                         "request_id": "interrupt-1",
-                        "skill_id": "session.interrupt",
+                        "capability_id": "session.interrupt",
                     }
                 ]
             ),
@@ -570,7 +570,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(result.status, "completed")
-        self.assertEqual(result.results[0].skill_id, "session.interrupt")
+        self.assertEqual(result.results[0].capability_id, "session.interrupt")
         self.assertEqual(result.results[0].provider_id, "chromie.session_control")
         self.assertEqual(
             result.results[0].output,
@@ -587,10 +587,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         result = await coordinator.execute(
             InteractionResponse(
-                skills=[
+                capabilities=[
                     {
                         "request_id": "nod-1",
-                        "skill_id": "soridormi.nod_yes",
+                        "capability_id": "soridormi.nod_yes",
                         "args": {"count": 2},
                     }
                 ]
@@ -620,10 +620,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         for request_id in ["nod-1", "nod-2"]:
             result = await coordinator.execute(
                 InteractionResponse(
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": request_id,
-                            "skill_id": "soridormi.nod_yes",
+                            "capability_id": "soridormi.nod_yes",
                             "args": {"count": 1},
                         }
                     ]
@@ -684,11 +684,11 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
 
         first = await coordinator.execute(
-            InteractionResponse(skills=[{"skill_id": "soridormi.nod_yes"}]),
+            InteractionResponse(capabilities=[{"capability_id": "soridormi.nod_yes"}]),
             session_id="sid-nod",
         )
         second = await coordinator.execute(
-            InteractionResponse(skills=[{"skill_id": "soridormi.wave_hand"}]),
+            InteractionResponse(capabilities=[{"capability_id": "soridormi.wave_hand"}]),
             session_id="sid-wave",
         )
 
@@ -740,10 +740,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         for request_id in ["nod-1", "nod-2"]:
             result = await coordinator.execute(
                 InteractionResponse(
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": request_id,
-                            "skill_id": "soridormi.nod_yes",
+                            "capability_id": "soridormi.nod_yes",
                         }
                     ]
                 ),
@@ -804,7 +804,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
 
         first = await coordinator.execute(
-            InteractionResponse(skills=[{"skill_id": "soridormi.wave_hand"}]),
+            InteractionResponse(capabilities=[{"capability_id": "soridormi.wave_hand"}]),
             session_id="sid-wave-1",
         )
         await coordinator.refresh_soridormi_catalog(force=True)
@@ -814,7 +814,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
 
         second = await coordinator.execute(
-            InteractionResponse(skills=[{"skill_id": "soridormi.wave_hand"}]),
+            InteractionResponse(capabilities=[{"capability_id": "soridormi.wave_hand"}]),
             session_id="sid-wave-2",
         )
 
@@ -834,10 +834,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                     ),
                 )
                 response = InteractionResponse(
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "nod-1",
-                            "skill_id": "soridormi.nod_yes",
+                            "capability_id": "soridormi.nod_yes",
                             "args": {"count": 2},
                         }
                     ]
@@ -854,10 +854,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             soridormi_invoker=_SoridormiInvoker(),
         )
         response = InteractionResponse(
-            skills=[
+            capabilities=[
                 {
                     "request_id": "nod-alternative",
-                    "skill_id": "soridormi.nod_yes",
+                    "capability_id": "soridormi.nod_yes",
                     "args": {"count": 2},
                     "requires_confirmation": True,
                 }
@@ -878,7 +878,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(RuntimeError, "disabled"):
             await coordinator.execute(
                 InteractionResponse(
-                    skills=[{"skill_id": "soridormi.nod_yes"}]
+                    capabilities=[{"capability_id": "soridormi.nod_yes"}]
                 ),
                 session_id="sid-1",
             )
@@ -902,10 +902,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         result = await coordinator.execute(
             InteractionResponse(
-                skills=[
+                capabilities=[
                     {
                         "request_id": "nod-1",
-                        "skill_id": "soridormi.nod_yes",
+                        "capability_id": "soridormi.nod_yes",
                     }
                 ]
             ),
@@ -938,10 +938,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         result = await coordinator.execute(
             InteractionResponse(
-                skills=[
+                capabilities=[
                     {
                         "request_id": "attention-1",
-                        "skill_id": "soridormi.express_attention",
+                        "capability_id": "soridormi.express_attention",
                     }
                 ],
                 metadata={"optional_body" + "_cue": True},
@@ -982,10 +982,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError, "requires confirmation"):
             await coordinator.execute(
                 InteractionResponse(
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "attention-1",
-                            "skill_id": "soridormi.express_attention",
+                            "capability_id": "soridormi.express_attention",
                             "requires_confirmation": True,
                         }
                     ],
@@ -1027,10 +1027,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         result = await coordinator.execute(
             InteractionResponse(
-                skills=[
+                capabilities=[
                     {
                         "request_id": "nod-1",
-                        "skill_id": "soridormi.nod_yes",
+                        "capability_id": "soridormi.nod_yes",
                     }
                 ]
             ),
@@ -1055,10 +1055,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             soridormi_invoker=invoker,
         )
         response = InteractionResponse(
-            skills=[
+            capabilities=[
                 {
                     "request_id": "nod-1",
-                    "skill_id": "soridormi.nod_yes",
+                    "capability_id": "soridormi.nod_yes",
                     "args": {"count": 2},
                 }
             ]
@@ -1097,12 +1097,12 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             InteractionResponse(
                 speech=[
                     {"text": "Starting.", "timing": "immediate"},
-                    {"text": "Done.", "timing": "after_skills"},
+                    {"text": "Done.", "timing": "after_capabilities"},
                 ],
-                skills=[
+                capabilities=[
                     {
                         "request_id": "nod-1",
-                        "skill_id": "soridormi.nod_yes",
+                        "capability_id": "soridormi.nod_yes",
                     }
                 ],
                 metadata={"language": "en-US"},
@@ -1138,12 +1138,12 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             InteractionResponse(
                 speech=[
                     {"text": "Starting.", "timing": "immediate"},
-                    {"text": "Done.", "timing": "after_skills"},
+                    {"text": "Done.", "timing": "after_capabilities"},
                 ],
-                skills=[
+                capabilities=[
                     {
                         "request_id": "nod-cognitive",
-                        "skill_id": "soridormi.nod_yes",
+                        "capability_id": "soridormi.nod_yes",
                     }
                 ],
                 metadata={
@@ -1179,7 +1179,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         result = await coordinator.execute(
             InteractionResponse(
-                skills=[{"skill_id": "soridormi.nod_yes"}],
+                capabilities=[{"capability_id": "soridormi.nod_yes"}],
                 metadata={"language": "zh-CN"},
             ),
             session_id="sid-timeout",
@@ -1205,7 +1205,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         result = await coordinator.execute(
             InteractionResponse(
-                skills=[{"skill_id": "soridormi.nod_yes"}],
+                capabilities=[{"capability_id": "soridormi.nod_yes"}],
                 metadata={"language": "en-US"},
             ),
             session_id="sid-refused",
@@ -1220,7 +1220,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
 
-    async def test_successful_body_skill_keeps_after_skills_speech(self) -> None:
+    async def test_successful_body_skill_keeps_after_capabilities_speech(self) -> None:
         spoken: list[str] = []
         coordinator = InteractionRuntimeCoordinator(
             lambda args: spoken.append(str(args["text"])) or {"scheduled": True},
@@ -1229,8 +1229,8 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         result = await coordinator.execute(
             InteractionResponse(
-                speech=[{"text": "Done.", "timing": "after_skills"}],
-                skills=[{"skill_id": "soridormi.nod_yes"}],
+                speech=[{"text": "Done.", "timing": "after_capabilities"}],
+                capabilities=[{"capability_id": "soridormi.nod_yes"}],
             ),
             session_id="sid-success",
         )
@@ -1261,11 +1261,11 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         result = await coordinator.execute(
             InteractionResponse(
-                speech=[{"text": "Done.", "timing": "after_skills"}],
-                skills=[
+                speech=[{"text": "Done.", "timing": "after_capabilities"}],
+                capabilities=[
                     {
                         "request_id": "graph-1",
-                        "skill_id": "chromie.task_graph.execute",
+                        "capability_id": "chromie.task_graph.execute",
                         "args": {"graph": {"graph_id": "nav", "nodes": []}},
                         "timing": "sequential",
                     }
@@ -1277,7 +1277,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status, "completed")
         self.assertEqual(graphs, [{"graph_id": "nav", "nodes": []}])
         self.assertEqual(spoken, ["Done."])
-        self.assertEqual(result.results[0].skill_id, "chromie.task_graph.execute")
+        self.assertEqual(result.results[0].capability_id, "chromie.task_graph.execute")
         self.assertEqual(result.results[0].status, "completed")
 
     async def test_failed_task_graph_suppresses_completion_speech_and_falls_back(
@@ -1304,11 +1304,11 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         result = await coordinator.execute(
             InteractionResponse(
-                speech=[{"text": "Done.", "timing": "after_skills"}],
-                skills=[
+                speech=[{"text": "Done.", "timing": "after_capabilities"}],
+                capabilities=[
                     {
                         "request_id": "graph-1",
-                        "skill_id": "chromie.task_graph.execute",
+                        "capability_id": "chromie.task_graph.execute",
                         "args": {"graph": {"graph_id": "nav", "nodes": []}},
                         "timing": "sequential",
                     }
@@ -1353,10 +1353,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                 )
                 result = await coordinator.execute(
                     InteractionResponse(
-                        skills=[
+                        capabilities=[
                             {
                                 "request_id": "graph-1",
-                                "skill_id": "chromie.task_graph.execute",
+                                "capability_id": "chromie.task_graph.execute",
                                 "args": {
                                     "graph": {"graph_id": "nav", "nodes": []}
                                 },
@@ -1397,11 +1397,11 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         result = await coordinator.execute(
             InteractionResponse(
-                speech=[{"text": "Done.", "timing": "after_skills"}],
-                skills=[
+                speech=[{"text": "Done.", "timing": "after_capabilities"}],
+                capabilities=[
                     {
                         "request_id": "graph-1",
-                        "skill_id": "chromie.task_graph.execute",
+                        "capability_id": "chromie.task_graph.execute",
                         "args": {"graph": {"graph_id": "nav", "nodes": []}},
                         "timing": "sequential",
                     }
@@ -1443,10 +1443,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             coordinator.execute(
                 InteractionResponse(
                     interaction_id="interaction-task-graph-cancel",
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "graph-request",
-                            "skill_id": "chromie.task_graph.execute",
+                            "capability_id": "chromie.task_graph.execute",
                             "args": {
                                 "graph": {
                                     "graph_id": "graph-cancel",
@@ -1501,10 +1501,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             coordinator.execute(
                 InteractionResponse(
                     interaction_id="interaction-task-graph-no-cancel",
-                    skills=[
+                    capabilities=[
                         {
                             "request_id": "graph-request",
-                            "skill_id": "chromie.task_graph.execute",
+                            "capability_id": "chromie.task_graph.execute",
                             "args": {
                                 "graph": {
                                     "graph_id": "graph-no-cancel",
@@ -1550,10 +1550,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         result = await coordinator.execute(
             InteractionResponse(
-                skills=[
+                capabilities=[
                     {
                         "request_id": "graph-1",
-                        "skill_id": "chromie.task_graph.execute",
+                        "capability_id": "chromie.task_graph.execute",
                         "args": {"graph": {"graph_id": "nav", "nodes": []}},
                         "timing": "sequential",
                     }
@@ -1579,9 +1579,9 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                 InteractionResponse(
                     speech=[
                         {"text": "Starting.", "timing": "immediate"},
-                        {"text": "Done.", "timing": "after_skills"},
+                        {"text": "Done.", "timing": "after_capabilities"},
                     ],
-                    skills=[{"skill_id": "soridormi.nod_yes"}],
+                    capabilities=[{"capability_id": "soridormi.nod_yes"}],
                 ),
                 session_id="sid-cancelled",
             )
@@ -1620,12 +1620,12 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             InteractionResponse(
                 speech=[
                     {"text": "Starting.", "timing": "immediate"},
-                    {"text": "Done.", "timing": "after_skills"},
+                    {"text": "Done.", "timing": "after_capabilities"},
                 ],
-                skills=[
+                capabilities=[
                     {
                         "request_id": "nod-1",
-                        "skill_id": "soridormi.nod_yes",
+                        "capability_id": "soridormi.nod_yes",
                     }
                 ],
                 metadata={"language": "en-US"},
@@ -1635,7 +1635,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.status, "failed")
         body_results = [
-            item for item in result.results if item.skill_id.startswith("soridormi.")
+            item for item in result.results if item.capability_id.startswith("soridormi.")
         ]
         self.assertEqual(body_results[0].status, "failed")
         self.assertEqual([item["text"] for item in spoken], ["Starting."])
@@ -1661,10 +1661,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         result = await coordinator.execute(
             InteractionResponse(
-                skills=[
+                capabilities=[
                     {
                         "request_id": "nod-1_recovery1",
-                        "skill_id": "soridormi.nod_yes",
+                        "capability_id": "soridormi.nod_yes",
                         "metadata": {"body_recovery_attempt": 1},
                     }
                 ],

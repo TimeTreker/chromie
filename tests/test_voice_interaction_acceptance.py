@@ -140,7 +140,7 @@ class NaturalConfirmationPromptDetectionTests(unittest.TestCase):
         )
 
 
-def speech_skill_runtime_events(
+def speech_capability_runtime_events(
     *,
     include_confirmation_prompt: bool = True,
 ) -> list[dict[str, object]]:
@@ -149,12 +149,12 @@ def speech_skill_runtime_events(
         event("goal_interpretation_done", "goal_interpretation_done: route=robot_action", "sid-1"),
         event(
             "interaction_done",
-            "interaction_done: speech=1 skills=1 requires_confirmation=True",
+            "interaction_done: speech=1 capabilities=1 requires_confirmation=True",
             "sid-1",
         ),
         event(
-            "skill_proposed",
-            'skill_proposed: request_id=nod-1 skill_id=soridormi.nod_yes '
+            "capability_proposed",
+            'capability_proposed: request_id=nod-1 capability_id=soridormi.nod_yes '
             'timing=parallel cancellable=True requires_confirmation=True args={"count":2}',
             "sid-1",
         ),
@@ -183,8 +183,8 @@ def speech_skill_runtime_events(
                 "sid-2",
             ),
             event(
-                "skill_result",
-                "skill_result: request_id=nod-1 skill_id=soridormi.nod_yes "
+                "capability_result",
+                "capability_result: request_id=nod-1 capability_id=soridormi.nod_yes "
                 "status=completed",
                 "sid-2",
             ),
@@ -237,30 +237,30 @@ def write_cognitive_runtime_fixture(root: Path) -> None:
     runtime_events = [
         event("asr_final", "asr_final: text='Moon fact'", "sid-0"),
         event("goal_interpretation_done", "goal_interpretation_done: route=chat", "sid-0"),
-        event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 skills=0 requires_confirmation=False", "sid-0"),
+        event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 capabilities=0 requires_confirmation=False", "sid-0"),
         *tts_completion_events("sid-0", "The Moon has lower gravity than Earth."),
         event("asr_final", "asr_final: text='nod twice'", "sid-1"),
         event("goal_interpretation_done", "goal_interpretation_done: route=robot_action", "sid-1"),
-        event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 skills=1 requires_confirmation=True", "sid-1"),
-        event("cognitive_skill_proposed", 'cognitive_skill_proposed: request_id=nod-2 skill_id=soridormi.nod_yes timing=parallel requires_confirmation=True args={"count":2}', "sid-1"),
+        event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 capabilities=1 requires_confirmation=True", "sid-1"),
+        event("cognitive_capability_proposed", 'cognitive_capability_proposed: request_id=nod-2 capability_id=soridormi.nod_yes timing=parallel requires_confirmation=True args={"count":2}', "sid-1"),
         event("confirmation_requested", "confirmation_requested: confirmation_id=c1 interaction_id=i1 request_ids=nod-2 fingerprint=fp1 expires_at=1.0", "sid-1"),
         *confirmation_prompt_playback_events("sid-1"),
         event("confirmation_reply", "confirmation_reply: confirmation_id=c1 decision=approved fingerprint=fp1", "sid-1"),
         event("confirmation_authorized", "confirmation_authorized: confirmation_id=c1 interaction_id=i1 request_ids=nod-2 fingerprint=fp1", "sid-1"),
-        event("skill_runtime_done", "skill_runtime_done: status=completed results=1 traces=1 provider_mode=sim runtime_ms=10.0", "sid-1"),
-        event("skill_result", "skill_result: request_id=nod-2 skill_id=soridormi.nod_yes status=completed", "sid-1"),
+        event("capability_runtime_done", "capability_runtime_done: status=completed results=1 traces=1 provider_mode=sim runtime_ms=10.0", "sid-1"),
+        event("capability_result", "capability_result: request_id=nod-2 capability_id=soridormi.nod_yes status=completed", "sid-1"),
         event("soridormi_post_status", status_message, "sid-1"),
         event("asr_final", "asr_final: text='nod twice'", "sid-2"),
         event("goal_interpretation_done", "goal_interpretation_done: route=robot_action", "sid-2"),
-        event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 skills=1 requires_confirmation=True", "sid-2"),
-        event("cognitive_skill_proposed", 'cognitive_skill_proposed: request_id=nod-denied skill_id=soridormi.nod_yes timing=parallel requires_confirmation=True args={"count":2}', "sid-2"),
+        event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 capabilities=1 requires_confirmation=True", "sid-2"),
+        event("cognitive_capability_proposed", 'cognitive_capability_proposed: request_id=nod-denied capability_id=soridormi.nod_yes timing=parallel requires_confirmation=True args={"count":2}', "sid-2"),
         event("confirmation_requested", "confirmation_requested: confirmation_id=c2 interaction_id=i2 request_ids=nod-denied fingerprint=fp2 expires_at=1.0", "sid-2"),
         event("confirmation_reply", "confirmation_reply: confirmation_id=c2 decision=denied fingerprint=fp2", "sid-2"),
         event("confirmation_rejected", "confirmation_rejected: confirmation_id=c2 reason=denied fingerprint=fp2", "sid-2"),
         *tts_completion_events("sid-2", "Okay, I will not perform that action."),
         event("asr_final", "asr_final: text='tell me a long story'", "sid-3"),
         event("goal_interpretation_done", "goal_interpretation_done: route=chat", "sid-3"),
-        event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 skills=0 requires_confirmation=False", "sid-3"),
+        event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 capabilities=0 requires_confirmation=False", "sid-3"),
         event("tts_schedule", "tts_schedule: order=0 chars=20 scheduled_tts=1 generation=1 text='A long Moon story begins.'", "sid-3"),
         event("playback_start", "playback_start: order=0 source_rate=44100 output_rate=44100 audio_ms=30000.0 generation=1", "sid-3"),
         event("playback_duck_started", "playback_duck_started: generation=1 vad_start_to_duck_ms=40.0 cancel_cognitive_work=false pause_error=none", "sid-3"),
@@ -272,19 +272,19 @@ def write_cognitive_runtime_fixture(root: Path) -> None:
         event("playback_aborted_by_interrupt", "playback_aborted_by_interrupt: order=0 playback_ms=100.0 generation=1", "sid-3"),
         event("asr_final", "asr_final: text='nod eight times'", "sid-4"),
         event("goal_interpretation_done", "goal_interpretation_done: route=robot_action", "sid-4"),
-        event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 skills=1 requires_confirmation=True", "sid-4"),
-        event("cognitive_skill_proposed", 'cognitive_skill_proposed: request_id=nod-8 skill_id=soridormi.nod_yes timing=parallel requires_confirmation=True args={"count":8}', "sid-4"),
+        event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 capabilities=1 requires_confirmation=True", "sid-4"),
+        event("cognitive_capability_proposed", 'cognitive_capability_proposed: request_id=nod-8 capability_id=soridormi.nod_yes timing=parallel requires_confirmation=True args={"count":8}', "sid-4"),
         event("confirmation_requested", "confirmation_requested: confirmation_id=c4 interaction_id=i4 request_ids=nod-8 fingerprint=fp4 expires_at=1.0", "sid-4"),
         event("confirmation_reply", "confirmation_reply: confirmation_id=c4 decision=approved fingerprint=fp4", "sid-4"),
         event("confirmation_authorized", "confirmation_authorized: confirmation_id=c4 interaction_id=i4 request_ids=nod-8 fingerprint=fp4", "sid-4"),
         event("asr_final", "asr_final: text='stop talking'", "sid-4-follow"),
         event("goal_interpretation_done", "goal_interpretation_done: route=interrupt", "sid-4-follow"),
-        event("skill_runtime_cancelled", "skill_runtime_cancelled: runtime_ms=10.0", "sid-4"),
+        event("capability_runtime_cancelled", "capability_runtime_cancelled: runtime_ms=10.0", "sid-4"),
         event("soridormi_post_status", status_message, "sid-4"),
         event("interrupt_previous_audio_done", "interrupt_previous_audio_done: playback_generation=3", "sid-4-follow"),
         event("asr_final", "asr_final: text='tell me a long space story'", "sid-5"),
         event("goal_interpretation_done", "goal_interpretation_done: route=chat", "sid-5"),
-        event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 skills=0 requires_confirmation=False", "sid-5"),
+        event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 capabilities=0 requires_confirmation=False", "sid-5"),
         event("tts_schedule", "tts_schedule: order=0 chars=20 scheduled_tts=1 generation=3 text='A long space story begins.'", "sid-5"),
         event("playback_start", "playback_start: order=0 source_rate=44100 output_rate=44100 audio_ms=30000.0 generation=3", "sid-5"),
         event("session_interrupted_by_new_session", "session_interrupted_by_new_session: new_sid=sid-5-follow", "sid-5"),
@@ -293,11 +293,11 @@ def write_cognitive_runtime_fixture(root: Path) -> None:
         event("interrupt_previous_audio_done", "interrupt_previous_audio_done: playback_generation=4", "sid-5-follow"),
         event("asr_final", "asr_final: text='remember blue'", "sid-6"),
         event("goal_interpretation_done", "goal_interpretation_done: route=chat", "sid-6"),
-        event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 skills=0 requires_confirmation=False", "sid-6"),
+        event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 capabilities=0 requires_confirmation=False", "sid-6"),
         event("context_snapshot", "context_snapshot: conversation_id=conv-1 history_turns=0", "sid-6"),
         event("asr_final", "asr_final: text='what color'", "sid-6-follow"),
         event("goal_interpretation_done", "goal_interpretation_done: route=chat", "sid-6-follow"),
-        event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 skills=0 requires_confirmation=False", "sid-6-follow"),
+        event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 capabilities=0 requires_confirmation=False", "sid-6-follow"),
         event("context_snapshot", "context_snapshot: conversation_id=conv-1 history_turns=2", "sid-6-follow"),
         *tts_completion_events("sid-6-follow", "Your test color was blue."),
     ]
@@ -365,7 +365,7 @@ def write_live_voice_fixture(root: Path) -> None:
     (root / "cases.json").write_text(json.dumps(cases), encoding="utf-8")
     (root / "acceptance-overrides.env").write_text(
         "ORCH_ENABLE_INTERACTION_RESPONSE=1\n"
-        "ORCH_ENABLE_SORIDORMI_SKILLS=0\n"
+        "ORCH_ENABLE_SORIDORMI_CAPABILITIES=0\n"
         "AGENT_INTERACTION_OUTPUT_MODE=native\n"
         "AGENT_NATIVE_INTERACTION_FALLBACK=0\n"
         "ORCH_AUDIO_INPUT_MODE=device\n"
@@ -472,17 +472,17 @@ def write_live_voice_fixture(root: Path) -> None:
         event("goal_interpretation_done", "goal_interpretation_done: route=chat", sid),
         event(
             "cognitive_interaction_ready",
-            "cognitive_interaction_ready: speech=1 skills=0 requires_confirmation=False",
+            "cognitive_interaction_ready: speech=1 capabilities=0 requires_confirmation=False",
             sid,
         ),
         event(
-            "skill_runtime_done",
-            "skill_runtime_done: status=completed results=1 traces=1 runtime_ms=20.0",
+            "capability_runtime_done",
+            "capability_runtime_done: status=completed results=1 traces=1 runtime_ms=20.0",
             sid,
         ),
         event(
-            "skill_result",
-            "skill_result: request_id=speak-1 skill_id=chromie.speak status=completed",
+            "capability_result",
+            "capability_result: request_id=speak-1 capability_id=chromie.speak status=completed",
             sid,
         ),
         *tts_completion_events(sid, "The Moon has lower gravity than Earth."),
@@ -541,7 +541,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
 
     def test_confirmation_replies_wait_for_prompt_playback(self) -> None:
         for case_id, step_index in (
-            ("speech-skill", 1),
+            ("speech-capability", 1),
             ("refusal", 1),
             ("body-cancel", 1),
         ):
@@ -701,7 +701,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             [
                 "--preflight-only",
                 "--cases",
-                "speech-skill",
+                "speech-capability",
                 "--soridormi-mcp-url",
                 "http://127.0.0.1:8000/mcp",
                 "--soridormi-repo",
@@ -723,7 +723,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                 side_effect=ConnectionRefusedError("refused"),
             ),
         ):
-            checks = acceptance_readiness(args, ["speech-skill"])
+            checks = acceptance_readiness(args, ["speech-capability"])
 
         failures = {item.name: item.detail for item in checks if not item.passed}
         self.assertIn("Docker CLI", failures)
@@ -929,7 +929,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             )
 
             text = path.read_text(encoding="utf-8")
-            self.assertIn("ORCH_ENABLE_SORIDORMI_SKILLS=0", text)
+            self.assertIn("ORCH_ENABLE_SORIDORMI_CAPABILITIES=0", text)
             self.assertIn("ORCH_COGNITIVE_APPLY_LANES=chat,memory,tool", text)
             self.assertIn(f"ORCH_COGNITIVE_RUN_IDENTITY_PATH={identity}", text)
 
@@ -1362,15 +1362,15 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
     def test_friendly_trace_renders_skill_identity_and_status(self) -> None:
         proposed = friendly_event_line(
             event(
-                "skill_proposed",
-                "skill_proposed: request_id=req-1 skill_id=soridormi.nod_yes "
+                "capability_proposed",
+                "capability_proposed: request_id=req-1 capability_id=soridormi.nod_yes "
                 "timing=parallel cancellable=True requires_confirmation=False",
             )
         )
         completed = friendly_event_line(
             event(
-                "skill_result",
-                "skill_result: request_id=req-1 skill_id=soridormi.nod_yes "
+                "capability_result",
+                "capability_result: request_id=req-1 capability_id=soridormi.nod_yes "
                 "status=completed reason=None message=done",
             )
         )
@@ -1379,8 +1379,8 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
 
     def test_case_events_are_isolated_by_session(self) -> None:
         records = [
-            event("skill_result", "skill_result: status=completed", "old"),
-            event("interaction_done", "interaction_done: skills=0", "current"),
+            event("capability_result", "capability_result: status=completed", "old"),
+            event("interaction_done", "interaction_done: capabilities=0", "current"),
         ]
         self.assertEqual(
             events_for_sessions(records, {"current"}),
@@ -1397,7 +1397,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             [
                 event("asr_final", "asr_final: text='hello'"),
                 event("goal_interpretation_done", "goal_interpretation_done: route=chat"),
-                event("interaction_done", "interaction_done: speech=1 skills=0"),
+                event("interaction_done", "interaction_done: speech=1 capabilities=0"),
                 *tts_completion_events("sid-1", "A short spoken answer."),
             ],
         )
@@ -1414,7 +1414,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                 ),
                 event(
                     "cognitive_interaction_ready",
-                    "cognitive_interaction_ready: speech=1 skills=0",
+                    "cognitive_interaction_ready: speech=1 capabilities=0",
                 ),
                 *tts_completion_events("sid-1", "A short spoken answer."),
             ],
@@ -1427,7 +1427,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             [
                 event("asr_final", "asr_final: text='hello'"),
                 event("goal_interpretation_done", "goal_interpretation_done: route=chat"),
-                event("interaction_done", "interaction_done: speech=1 skills=0"),
+                event("interaction_done", "interaction_done: speech=1 capabilities=0"),
                 event(
                     "session_done",
                     "session_done: scheduled_tts=0 queued_tts=0 played_tts=0 "
@@ -1445,7 +1445,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             records = [
                 event("asr_final", "asr_final: text='hello'"),
                 event("goal_interpretation_done", "goal_interpretation_done: route=chat"),
-                event("interaction_done", "interaction_done: speech=1 skills=0"),
+                event("interaction_done", "interaction_done: speech=1 capabilities=0"),
                 *tts_completion_events("sid-1", "A short spoken answer."),
             ]
             path.write_text("".join(json.dumps(item) + "\n" for item in records))
@@ -1465,8 +1465,8 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             [
                 event("asr_final", "asr_final: text='nod eight times'", "body-session"),
                 event("goal_interpretation_done", "goal_interpretation_done: route=robot_action", "body-session"),
-                event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 skills=1 requires_confirmation=True", "body-session"),
-                event("cognitive_skill_proposed", 'cognitive_skill_proposed: request_id=body-1 skill_id=soridormi.nod_yes timing=parallel requires_confirmation=True args={"count":8}', "body-session"),
+                event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 capabilities=1 requires_confirmation=True", "body-session"),
+                event("cognitive_capability_proposed", 'cognitive_capability_proposed: request_id=body-1 capability_id=soridormi.nod_yes timing=parallel requires_confirmation=True args={"count":8}', "body-session"),
                 event(
                     "confirmation_requested",
                     "confirmation_requested: confirmation_id=confirm-1 "
@@ -1498,8 +1498,8 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                     "stop-session",
                 ),
                 event(
-                    "skill_runtime_cancelled",
-                    "skill_runtime_cancelled: runtime_ms=10.0",
+                    "capability_runtime_cancelled",
+                    "capability_runtime_cancelled: runtime_ms=10.0",
                     "body-session",
                 ),
                 event(
@@ -1729,8 +1729,8 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                 "stop",
             ),
             event(
-                "skill_result",
-                "skill_result: request_id=late skill_id=soridormi.nod_yes "
+                "capability_result",
+                "capability_result: request_id=late capability_id=soridormi.nod_yes "
                 "status=completed",
                 "old",
             ),
@@ -1775,8 +1775,8 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
 
     def test_speech_skill_requires_bound_spoken_approval(self) -> None:
         checks = analyze_case(
-            "speech-skill",
-            speech_skill_runtime_events(),
+            "speech-capability",
+            speech_capability_runtime_events(),
         )
 
         self.assertTrue(all(item.passed for item in checks))
@@ -1785,8 +1785,8 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
         self,
     ) -> None:
         checks = analyze_case(
-            "speech-skill",
-            speech_skill_runtime_events(include_confirmation_prompt=False),
+            "speech-capability",
+            speech_capability_runtime_events(include_confirmation_prompt=False),
         )
 
         self.assertFalse(
@@ -1799,14 +1799,14 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
 
     def test_speech_skill_rejects_mismatched_confirmation_fingerprint(self) -> None:
         checks = analyze_case(
-            "speech-skill",
+            "speech-capability",
             [
                 event("asr_final", "asr_final: text='Please nod twice.'"),
                 event("goal_interpretation_done", "goal_interpretation_done: route=robot_action"),
-                event("interaction_done", "interaction_done: speech=1 skills=1"),
+                event("interaction_done", "interaction_done: speech=1 capabilities=1"),
                 event(
-                    "skill_proposed",
-                    'skill_proposed: request_id=nod-1 skill_id=soridormi.nod_yes '
+                    "capability_proposed",
+                    'capability_proposed: request_id=nod-1 capability_id=soridormi.nod_yes '
                     'requires_confirmation=True args={"count":2}',
                 ),
                 event(
@@ -1844,12 +1844,12 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                 event("goal_interpretation_done", "goal_interpretation_done: route=robot_action", "sid-1"),
                 event(
                     "interaction_done",
-                    "interaction_done: speech=1 skills=1 requires_confirmation=True",
+                    "interaction_done: speech=1 capabilities=1 requires_confirmation=True",
                     "sid-1",
                 ),
                 event(
-                    "skill_proposed",
-                    'skill_proposed: request_id=nod-1 skill_id=soridormi.nod_yes '
+                    "capability_proposed",
+                    'capability_proposed: request_id=nod-1 capability_id=soridormi.nod_yes '
                     'timing=parallel cancellable=True requires_confirmation=True args={"count":2}',
                     "sid-1",
                 ),
@@ -1884,10 +1884,10 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
         records = [
             event("asr_final", "asr_final: text='Please nod twice.'"),
             event("goal_interpretation_done", "goal_interpretation_done: route=robot_action"),
-            event("interaction_done", "interaction_done: speech=1 skills=1"),
+            event("interaction_done", "interaction_done: speech=1 capabilities=1"),
             event(
-                "skill_proposed",
-                'skill_proposed: request_id=nod-1 skill_id=soridormi.nod_yes '
+                "capability_proposed",
+                'capability_proposed: request_id=nod-1 capability_id=soridormi.nod_yes '
                 'requires_confirmation=True args={"count":2}',
             ),
             event(
@@ -1922,11 +1922,11 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             [
                 event("asr_final", "asr_final: text='remember blue'", "sid-1"),
                 event("goal_interpretation_done", "goal_interpretation_done: route=chat", "sid-1"),
-                event("interaction_done", "interaction_done: speech=1 skills=0", "sid-1"),
+                event("interaction_done", "interaction_done: speech=1 capabilities=0", "sid-1"),
                 event("context_snapshot", "context_snapshot: conversation_id=conv-1 history_turns=0", "sid-1"),
                 event("asr_final", "asr_final: text='what color'", "sid-2"),
                 event("goal_interpretation_done", "goal_interpretation_done: route=chat", "sid-2"),
-                event("interaction_done", "interaction_done: speech=1 skills=0", "sid-2"),
+                event("interaction_done", "interaction_done: speech=1 capabilities=0", "sid-2"),
                 event("context_snapshot", "context_snapshot: conversation_id=conv-1 history_turns=2", "sid-2"),
                 *tts_completion_events("sid-2", "Your test color was blue."),
             ],
@@ -1939,11 +1939,11 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             [
                 event("asr_final", "asr_final: text='remember blue'", "sid-1"),
                 event("goal_interpretation_done", "goal_interpretation_done: route=chat", "sid-1"),
-                event("interaction_done", "interaction_done: speech=1 skills=0", "sid-1"),
+                event("interaction_done", "interaction_done: speech=1 capabilities=0", "sid-1"),
                 event("context_snapshot", "context_snapshot: conversation_id=conv-1 history_turns=0", "sid-1"),
                 event("asr_final", "asr_final: text='what color'", "sid-2"),
                 event("goal_interpretation_done", "goal_interpretation_done: route=chat", "sid-2"),
-                event("interaction_done", "interaction_done: speech=1 skills=0", "sid-2"),
+                event("interaction_done", "interaction_done: speech=1 capabilities=0", "sid-2"),
                 event("context_snapshot", "context_snapshot: conversation_id=conv-1 history_turns=2", "sid-2"),
                 *tts_completion_events("sid-2", "I do not remember."),
             ],
@@ -2042,7 +2042,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                 ],
             )
 
-        def add_skill(root: Path) -> None:
+        def add_capability(root: Path) -> None:
             _update_jsonl(
                 root / "cognitive-runtime.jsonl",
                 lambda events: [
@@ -2056,21 +2056,21 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                 ],
             )
 
-        def add_body_skill_result(root: Path) -> None:
+        def add_body_capability_result(root: Path) -> None:
             _update_jsonl(
                 root / "events.jsonl",
                 lambda events: [
                     *events,
                     event(
-                        "skill_result",
-                        "skill_result: request_id=nod-1 "
-                        "skill_id=soridormi.nod_yes status=completed",
+                        "capability_result",
+                        "capability_result: request_id=nod-1 "
+                        "capability_id=soridormi.nod_yes status=completed",
                         "live-speech",
                     ),
                 ],
             )
 
-        def claim_unretained_skill_result(root: Path) -> None:
+        def claim_unretained_capability_result(root: Path) -> None:
             _update_jsonl(
                 root / "events.jsonl",
                 lambda events: [
@@ -2080,7 +2080,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                             "results=1", "results=2"
                         ),
                     }
-                    if item.get("event") == "skill_runtime_done"
+                    if item.get("event") == "capability_runtime_done"
                     else item
                     for item in events
                 ],
@@ -2139,9 +2139,9 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
 
         for label, mutate in {
             "partial playback": remove_playback_end,
-            "executable skill": add_skill,
-            "body skill runtime result": add_body_skill_result,
-            "unretained skill runtime result": claim_unretained_skill_result,
+            "executable capability": add_capability,
+            "body capability runtime result": add_body_capability_result,
+            "unretained capability runtime result": claim_unretained_capability_result,
             "stale playback": add_stale_playback,
             "critical model timeout": add_timeout,
             "truncated model output": add_truncation,
@@ -2247,7 +2247,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             (root / "cases.json").write_text(json.dumps(cases))
             (root / "acceptance-overrides.env").write_text(
                 "ORCH_ENABLE_INTERACTION_RESPONSE=1\n"
-                "ORCH_ENABLE_SORIDORMI_SKILLS=1\n"
+                "ORCH_ENABLE_SORIDORMI_CAPABILITIES=1\n"
                 "AGENT_INTERACTION_OUTPUT_MODE=native\n"
                 "AGENT_NATIVE_INTERACTION_FALLBACK=0\n"
                 "ORCH_AUDIO_INPUT_MODE=device\n"
@@ -2332,7 +2332,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             (generated / "01-test.wav").write_bytes(b"RIFFfixture")
             (root / "acceptance-overrides.env").write_text(
                 "ORCH_ENABLE_INTERACTION_RESPONSE=1\n"
-                "ORCH_ENABLE_SORIDORMI_SKILLS=1\n"
+                "ORCH_ENABLE_SORIDORMI_CAPABILITIES=1\n"
                 "AGENT_INTERACTION_OUTPUT_MODE=native\n"
                 "AGENT_NATIVE_INTERACTION_FALLBACK=0\n"
                 "ORCH_AUDIO_INPUT_MODE=stdin\n"
@@ -2458,7 +2458,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             )
             (evidence / "acceptance-overrides.env").write_text(
                 "ORCH_ENABLE_INTERACTION_RESPONSE=1\n"
-                "ORCH_ENABLE_SORIDORMI_SKILLS=1\n"
+                "ORCH_ENABLE_SORIDORMI_CAPABILITIES=1\n"
                 "AGENT_INTERACTION_OUTPUT_MODE=native\n"
                 "AGENT_NATIVE_INTERACTION_FALLBACK=0\n"
                 "ORCH_AUDIO_INPUT_MODE=device\n"
@@ -2628,7 +2628,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             )
             (root / "acceptance-overrides.env").write_text(
                 "ORCH_ENABLE_INTERACTION_RESPONSE=1\n"
-                "ORCH_ENABLE_SORIDORMI_SKILLS=1\n"
+                "ORCH_ENABLE_SORIDORMI_CAPABILITIES=1\n"
                 "AGENT_INTERACTION_OUTPUT_MODE=native\n"
                 "AGENT_NATIVE_INTERACTION_FALLBACK=0\n"
                 "ORCH_AUDIO_INPUT_MODE=device\n"

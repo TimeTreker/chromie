@@ -93,8 +93,8 @@ def validate_contract(
     route: Any,
     response: Any,
     expected_route: str | None,
-    expected_skills: list[str],
-    expect_no_skills: bool,
+    expected_capabilities: list[str],
+    expect_no_capabilities: bool,
     expected_args: list[tuple[int, str, Any]],
     arg_tolerance: float,
 ) -> list[str]:
@@ -103,50 +103,50 @@ def validate_contract(
         str(item.get("capability_id") or "")
         for item in getattr(route, "actions", [])
     ]
-    skills = [
+    capabilities = [
         item
-        for item in getattr(response, "skills", [])
-        if str(item.skill_id) != "chromie.speak"
+        for item in getattr(response, "capabilities", [])
+        if str(item.capability_id) != "chromie.speak"
     ]
-    skill_ids = [item.skill_id for item in skills]
+    capability_ids = [item.capability_id for item in capabilities]
 
     if expected_route and route.route != expected_route:
         errors.append(f"route={route.route!r}, expected {expected_route!r}")
 
-    if expected_skills:
+    if expected_capabilities:
         expects_only_soridormi = all(
-            skill_id.startswith("soridormi.") for skill_id in expected_skills
+            capability_id.startswith("soridormi.") for capability_id in expected_capabilities
         )
         if expects_only_soridormi and route.route != "robot_action":
             errors.append(f"route={route.route!r}, expected 'robot_action'")
-        if expects_only_soridormi and route_actions and route_actions != expected_skills:
+        if expects_only_soridormi and route_actions and route_actions != expected_capabilities:
             errors.append(
                 "goal interpretation actions mismatch: "
-                f"expected {expected_skills!r}, got {route_actions!r}"
+                f"expected {expected_capabilities!r}, got {route_actions!r}"
             )
-        if skill_ids != expected_skills:
+        if capability_ids != expected_capabilities:
             errors.append(
-                "interaction skills mismatch: "
-                f"expected {expected_skills!r}, got {skill_ids!r}"
+                "interaction capabilities mismatch: "
+                f"expected {expected_capabilities!r}, got {capability_ids!r}"
             )
 
-    if expect_no_skills:
+    if expect_no_capabilities:
         if route_actions:
             errors.append(f"goal interpretation emitted Soridormi actions, expected none: {route_actions!r}")
-        if skill_ids:
-            errors.append(f"interaction emitted executable skills, expected none: {skill_ids!r}")
+        if capability_ids:
+            errors.append(f"interaction emitted executable capabilities, expected none: {capability_ids!r}")
 
     for index, key, expected in expected_args:
-        if index >= len(skills):
+        if index >= len(capabilities):
             errors.append(
                 f"expected arg {index}:{key}={expected!r}, "
-                f"but only {len(skills)} Soridormi skill(s) were emitted"
+                f"but only {len(capabilities)} Soridormi skill(s) were emitted"
             )
             continue
-        actual = skills[index].args.get(key)
+        actual = capabilities[index].args.get(key)
         if not _numbers_close(actual, expected, tolerance=arg_tolerance):
             errors.append(
-                f"arg mismatch for skill[{index}] {skills[index].skill_id} "
+                f"arg mismatch for skill[{index}] {capabilities[index].capability_id} "
                 f"{key}: expected {expected!r}, got {actual!r}"
             )
     return errors
@@ -244,12 +244,11 @@ def required_speech_delivery_errors(
     workflow_events = session_state.get("workflow_events") or []
     if isinstance(workflow_events, list):
         for item in workflow_events:
-            if not isinstance(item, dict) or item.get("event") != "skill_result":
+            if not isinstance(item, dict) or item.get("event") != "capability_result":
                 continue
             message = str(item.get("message") or "")
             capability_id = (
                 _workflow_field(message, "capability_id")
-                or _workflow_field(message, "skill_id")
             )
             status = _workflow_field(message, "status").casefold()
             if capability_id == "chromie.speak" and status not in {
@@ -286,7 +285,7 @@ def should_apply_cognitive_runtime(
 
 
 def _short_capability_id(item: dict[str, Any]) -> str:
-    capability_id = str(item.get("capability_id") or item.get("skill_id") or "").strip()
+    capability_id = str(item.get("capability_id") or "").strip()
     return capability_id or "unknown"
 
 
@@ -343,10 +342,10 @@ def build_debug_summary(
                 count=len(tasks) if isinstance(tasks, list) else 0,
             )
         )
-    skills = [
-        str(item.skill_id)
-        for item in getattr(response, "skills", [])
-        if str(item.skill_id).startswith("soridormi.")
+    capabilities = [
+        str(item.capability_id)
+        for item in getattr(response, "capabilities", [])
+        if str(item.capability_id).startswith("soridormi.")
     ]
     speech = [str(item.text) for item in getattr(response, "speech", [])]
     return {
@@ -361,7 +360,7 @@ def build_debug_summary(
         "candidate_capabilities": candidates,
         "stages": stages,
         "task_list": task_list,
-        "skills": skills,
+        "capabilities": capabilities,
         "speech_items": len(speech),
         "speech_preview": speech[0][:160] if speech else "",
         "errors": list(errors),
@@ -386,10 +385,10 @@ def print_debug_summary(debug_summary: dict[str, Any]) -> None:
             + ", ".join(debug_summary["route_actions"]),
             file=sys.stderr,
         )
-    if debug_summary.get("skills"):
+    if debug_summary.get("capabilities"):
         print(
             "[interaction-text-mujoco][debug] emitted_skills: "
-            + ", ".join(debug_summary["skills"]),
+            + ", ".join(debug_summary["capabilities"]),
             file=sys.stderr,
         )
     else:
@@ -573,15 +572,15 @@ def _apply_soridormi_skill_timeout(response: Any, timeout_s: float | None) -> An
     if timeout_s is None or timeout_s <= 0:
         return response
     timeout_ms = int(timeout_s * 1000)
-    skills = [
+    capabilities = [
         skill.model_copy(
             update={"timeout_ms": max(int(skill.timeout_ms or 0), timeout_ms)}
         )
-        if str(skill.skill_id).startswith("soridormi.")
+        if str(skill.capability_id).startswith("soridormi.")
         else skill
-        for skill in response.skills
+        for skill in response.capabilities
     ]
-    return response.model_copy(deep=True, update={"skills": skills})
+    return response.model_copy(deep=True, update={"capabilities": capabilities})
 
 
 def _configure_environment(args: argparse.Namespace, evidence_dir: Path) -> None:
@@ -598,7 +597,7 @@ def _configure_environment(args: argparse.Namespace, evidence_dir: Path) -> None
     os.environ["AGENT_URL"] = args.agent_url
     os.environ["ORCH_ENABLE_AGENT"] = "1"
     os.environ["ORCH_ENABLE_INTERACTION_RESPONSE"] = "1"
-    os.environ["ORCH_ENABLE_SORIDORMI_SKILLS"] = "1"
+    os.environ["ORCH_ENABLE_SORIDORMI_CAPABILITIES"] = "1"
     os.environ["ORCH_AUDIO_INPUT_MODE"] = "stdin"
     os.environ["ORCH_AUDIO_OUTPUT_MODE"] = "device" if args.speaker else "discard"
     if not args.speaker:
@@ -681,7 +680,7 @@ async def wait_for_provider_started(
 
     # VoiceAssistant exposes the trusted runtime through its coordinator. Keep
     # the qualification boundary read-only while accepting either the
-    # coordinator or the underlying SkillRuntime in focused tests/tools.
+    # coordinator or the underlying CapabilityRuntime in focused tests/tools.
     observer = getattr(runtime, "runtime", runtime)
     observe = getattr(observer, "execution_observation", None)
     if not callable(observe):
@@ -694,7 +693,7 @@ async def wait_for_provider_started(
         for request in observation.requests:
             if (
                 request.interaction_id == interaction_id
-                and request.skill_id.startswith(skill_prefix)
+                and request.capability_id.startswith(skill_prefix)
                 and request.provider_started
                 and not request.task_done
             ):
@@ -944,8 +943,8 @@ async def run_check(
                     route=route,
                     response=response,
                     expected_route=args.expect_route,
-                    expected_skills=args.expect_skill,
-                    expect_no_skills=args.expect_no_skills,
+                    expected_capabilities=args.expect_capability,
+                    expect_no_capabilities=args.expect_no_capabilities,
                     expected_args=args.expect_arg,
                     arg_tolerance=args.arg_tolerance,
                 )
@@ -1002,7 +1001,7 @@ async def run_check(
                 "sid": sid,
                 "speaker": args.speaker,
                 "preview_only": False,
-                "skill_timeout_s": args.skill_timeout_s,
+                "capability_timeout_s": args.capability_timeout_s,
                 "evidence_dir": str(evidence_dir),
                 "timings_ms": {
                     **{
@@ -1193,17 +1192,17 @@ async def run_check(
                 }
             },
         )
-        response = _apply_soridormi_skill_timeout(response, args.skill_timeout_s)
+        response = _apply_soridormi_skill_timeout(response, args.capability_timeout_s)
         _write_json(
             evidence_dir / "interaction_response.json",
             response.model_dump(mode="json"),
         )
         assistant.session_log(
             sid,
-            "text_check_interaction_done: status=%s speech=%s skills=%s confirmation=%s agent_ms=%.1f",
+            "text_check_interaction_done: status=%s speech=%s capabilities=%s confirmation=%s agent_ms=%.1f",
             response.status,
             len(response.speech),
-            len(response.skills),
+            len(response.capabilities),
             response.requires_confirmation,
             agent_ms,
         )
@@ -1213,8 +1212,8 @@ async def run_check(
                 route=route,
                 response=response,
                 expected_route=args.expect_route,
-                expected_skills=args.expect_skill,
-                expect_no_skills=args.expect_no_skills,
+                expected_capabilities=args.expect_capability,
+                expect_no_capabilities=args.expect_no_capabilities,
                 expected_args=args.expect_arg,
                 arg_tolerance=args.arg_tolerance,
             )
@@ -1272,7 +1271,7 @@ async def run_check(
                 provider_observation = await wait_for_provider_started(
                     assistant.interaction_runtime,
                     interaction_id=response.interaction_id,
-                    skill_prefix=args.interrupt_skill_prefix,
+                    skill_prefix=args.interrupt_capability_prefix,
                     timeout_s=args.interrupt_start_timeout_s,
                 )
                 interrupt_sid = assistant.create_session()
@@ -1320,7 +1319,7 @@ async def run_check(
             body_results = [
                 result
                 for result in execution.results
-                if result.skill_id.startswith("soridormi.")
+                if result.capability_id.startswith("soridormi.")
             ]
             if args.expect_cancelled:
                 if not args.interrupt_text:
@@ -1345,7 +1344,7 @@ async def run_check(
                 for result in body_results:
                     if result.status != "completed":
                         errors.append(
-                            f"{result.skill_id} ended with status {result.status!r}: "
+                            f"{result.capability_id} ended with status {result.status!r}: "
                             f"{result.reason_code or result.message}"
                         )
             try:
@@ -1403,7 +1402,7 @@ async def run_check(
             "sid": sid,
             "speaker": args.speaker,
             "preview_only": args.preview_only,
-            "skill_timeout_s": args.skill_timeout_s,
+            "capability_timeout_s": args.capability_timeout_s,
             "evidence_dir": str(evidence_dir),
             "timings_ms": {
                 **{name: round(value, 1) for name, value in timings_ms.items()},
@@ -1544,7 +1543,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="chat,memory,robot_action,tool",
         help="Comma-separated PR7 apply lanes used with --cognitive-runtime.",
     )
-    parser.add_argument("--preview-only", action="store_true", help="Route and validate /interaction without executing Soridormi skills.")
+    parser.add_argument("--preview-only", action="store_true", help="Route and validate /interaction without executing Soridormi capabilities.")
     parser.add_argument("--allow-non-sim", action="store_true", help="Permit non-sim Soridormi modes. Use only under separate supervision.")
     parser.add_argument(
         "--grant-confirmation",
@@ -1571,12 +1570,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional post-run assertion; this is not sent to the Cognitive Core or Agent runtime.",
     )
     parser.add_argument(
-        "--expect-no-skills",
+        "--expect-no-capabilities",
         action="store_true",
-        help="Optional post-run assertion that no Soridormi skills were emitted.",
+        help="Optional post-run assertion that no Soridormi capabilities were emitted.",
     )
     parser.add_argument(
-        "--expect-skill",
+        "--expect-capability",
         action="append",
         default=[],
         help="Optional post-run assertion for the exact Soridormi skill sequence.",
@@ -1616,7 +1615,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--interrupt-skill-prefix",
+        "--interrupt-capability-prefix",
         default="soridormi.",
         help="Skill prefix whose provider-start boundary triggers the interrupt.",
     )
@@ -1635,7 +1634,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--skill-timeout-s",
+        "--capability-timeout-s",
         type=float,
         default=120.0,
         help=(
@@ -1649,8 +1648,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
-    if args.expect_no_skills and args.expect_skill:
-        parser.error("--expect-no-skills cannot be combined with --expect-skill")
+    if args.expect_no_capabilities and args.expect_capability:
+        parser.error("--expect-no-capabilities cannot be combined with --expect-capability")
     if args.expect_cancelled and not args.interrupt_text:
         parser.error("--expect-cancelled requires --interrupt-text")
     if args.interrupt_text and args.preview_only:

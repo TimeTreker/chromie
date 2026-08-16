@@ -125,7 +125,7 @@
       "speech.answer"
     ],
     "task_types_forbid": [
-      "task.execute_skill",
+      "task.execute_capability",
       "cognition.deep_think"
     ],
     "metadata_json_forbid": [

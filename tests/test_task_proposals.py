@@ -14,10 +14,10 @@ class TaskProposalLedgerTests(unittest.TestCase):
             metadata={
                 "route_task_list": [
                     {
-                        "id": "quick_intent:0:task.execute_skill",
+                        "id": "quick_intent:0:task.execute_capability",
                         "source_stage": "quick_intent",
                         "kind": "action",
-                        "task_type": "task.execute_skill",
+                        "task_type": "task.execute_capability",
                         "capability_id": "look_at_window",
                         "priority": "normal",
                     }
@@ -41,16 +41,16 @@ class TaskProposalLedgerTests(unittest.TestCase):
             metadata={
                 "route_task_proposals": [
                     {
-                        "id": "quick_intent:0:task.execute_skill",
+                        "id": "quick_intent:0:task.execute_capability",
                         "source": "quick_intent",
                         "proposal_kind": "action",
-                        "task_type": "task.execute_skill",
+                        "task_type": "task.execute_capability",
                         "state": "advisory",
                         "reason": "goal-interpreter proposal awaiting Orchestrator merge and commit",
                         "effectful": True,
                         "priority": "normal",
                         "sequence": 0,
-                        "skill_id": "soridormi.look_at_window",
+                        "capability_id": "soridormi.look_at_window",
                     }
                 ],
                 "route_task_list": [
@@ -67,27 +67,27 @@ class TaskProposalLedgerTests(unittest.TestCase):
         annotated = annotate_task_proposal_ledger(response)
         proposals = annotated.metadata["task_proposal_ledger"]["proposals"]
 
-        self.assertEqual(proposals[0]["id"], "quick_intent:0:task.execute_skill")
+        self.assertEqual(proposals[0]["id"], "quick_intent:0:task.execute_capability")
         self.assertEqual(proposals[0]["state"], "not_committed")
         self.assertEqual(proposals[0]["capability_id"], "soridormi.look_at_window")
         self.assertNotIn("legacy:0:speech.answer", {item["id"] for item in proposals})
 
     def test_matching_interaction_skill_commits_route_proposal(self) -> None:
         response = InteractionResponse(
-            skills=[
+            capabilities=[
                 {
                     "request_id": "look-1",
-                    "skill_id": "soridormi.look_at_person",
+                    "capability_id": "soridormi.look_at_person",
                     "args": {"target": "user"},
                 }
             ],
             metadata={
                 "route_task_list": [
                     {
-                        "id": "quick_intent:0:task.execute_skill",
+                        "id": "quick_intent:0:task.execute_capability",
                         "source_stage": "quick_intent",
                         "kind": "action",
-                        "task_type": "task.execute_skill",
+                        "task_type": "task.execute_capability",
                         "capability_id": "look_at_person",
                     }
                 ]
@@ -104,10 +104,10 @@ class TaskProposalLedgerTests(unittest.TestCase):
 
     def test_committed_skill_proposal_includes_static_preflight_status(self) -> None:
         response = InteractionResponse(
-            skills=[
+            capabilities=[
                 {
                     "request_id": "nod-1",
-                    "skill_id": "soridormi.nod_yes",
+                    "capability_id": "soridormi.nod_yes",
                 }
             ],
             metadata={
@@ -116,7 +116,7 @@ class TaskProposalLedgerTests(unittest.TestCase):
                     "items": [
                         {
                             "request_id": "nod-1",
-                            "skill_id": "soridormi.nod_yes",
+                            "capability_id": "soridormi.nod_yes",
                             "status": "needs_confirmation",
                             "reason_code": "confirmation_required",
                             "world_feasibility": "unknown_until_runtime",
@@ -146,10 +146,10 @@ class TaskProposalLedgerTests(unittest.TestCase):
                     "timing": "immediate",
                 }
             ],
-            skills=[
+            capabilities=[
                 {
                     "request_id": "nod-1",
-                    "skill_id": "soridormi.nod_yes",
+                    "capability_id": "soridormi.nod_yes",
                     "args": {"count": 2},
                     "timing": "parallel",
                 }
@@ -161,7 +161,7 @@ class TaskProposalLedgerTests(unittest.TestCase):
                         "source": "conversation_agent",
                         "proposal_kind": "speech",
                         "task_type": "speech.speak",
-                        "skill_id": "chromie.speak",
+                        "capability_id": "chromie.speak",
                         "state": "committed",
                         "reason": "Agent speech committed to InteractionResponse",
                         "effectful": False,
@@ -175,8 +175,8 @@ class TaskProposalLedgerTests(unittest.TestCase):
                         "id": "agent:skill:nod-1",
                         "source": "capability_agent",
                         "proposal_kind": "skill",
-                        "task_type": "task.execute_skill",
-                        "skill_id": "soridormi.nod_yes",
+                        "task_type": "task.execute_capability",
+                        "capability_id": "soridormi.nod_yes",
                         "request_id": "nod-1",
                         "state": "committed",
                         "reason": "Agent skill committed to InteractionResponse",
@@ -212,8 +212,8 @@ class TaskProposalLedgerTests(unittest.TestCase):
             metadata={
                 "deepthinking_rejected_tasks": [
                     {
-                        "task_type": "task.execute_skill",
-                        "skill_id": "invented.jump",
+                        "task_type": "task.execute_capability",
+                        "capability_id": "invented.jump",
                         "reason": "unknown skill",
                     }
                 ]
@@ -245,25 +245,25 @@ class TaskProposalLedgerTests(unittest.TestCase):
                         "effectful": False,
                         "priority": "normal",
                         "sequence": 0,
-                        "skill_id": "chromie.speak",
+                        "capability_id": "chromie.speak",
                     },
                     {
-                        "id": "deepthinking:1:task.execute_skill",
+                        "id": "deepthinking:1:task.execute_capability",
                         "source": "deepthinking",
                         "proposal_kind": "skill",
-                        "task_type": "task.execute_skill",
+                        "task_type": "task.execute_capability",
                         "state": "rejected",
                         "reason": "not_available_interaction_executable_candidate",
                         "effectful": True,
                         "priority": "normal",
                         "sequence": 1,
-                        "skill_id": "soridormi.jump",
+                        "capability_id": "soridormi.jump",
                     },
                 ],
                 "deepthinking_rejected_tasks": [
                     {
-                        "task_type": "task.execute_skill",
-                        "skill_id": "soridormi.jump",
+                        "task_type": "task.execute_capability",
+                        "capability_id": "soridormi.jump",
                         "reason": "legacy duplicate should not be emitted",
                     }
                 ],
@@ -277,7 +277,7 @@ class TaskProposalLedgerTests(unittest.TestCase):
         ]
 
         self.assertEqual(len(rejected), 1)
-        self.assertEqual(rejected[0]["id"], "deepthinking:1:task.execute_skill")
+        self.assertEqual(rejected[0]["id"], "deepthinking:1:task.execute_capability")
         self.assertEqual(ledger["summary"]["states"]["rejected"], 1)
         self.assertEqual(ledger["summary"]["sources"]["deepthinking"], 2)
 
@@ -327,11 +327,11 @@ class TaskProposalLedgerTests(unittest.TestCase):
             metadata={
                 "superseded_task_proposals": [
                     {
-                        "id": "quick_intent:0:task.execute_skill",
+                        "id": "quick_intent:0:task.execute_capability",
                         "source": "quick_intent",
                         "kind": "action",
-                        "task_type": "task.execute_skill",
-                        "skill_id": "look_at_window",
+                        "task_type": "task.execute_capability",
+                        "capability_id": "look_at_window",
                         "reason": "later warning interpretation superseded window gaze",
                         "superseded_by": "deep_reconciler:hold",
                     }
@@ -348,7 +348,7 @@ class TaskProposalLedgerTests(unittest.TestCase):
         ]
 
         self.assertEqual(len(superseded), 1)
-        self.assertEqual(superseded[0].skill_id, "soridormi.look_at_window")
+        self.assertEqual(superseded[0].capability_id, "soridormi.look_at_window")
         self.assertEqual(superseded[0].superseded_by, "deep_reconciler:hold")
         self.assertEqual(ledger.summary.superseded_count, 1)
         self.assertEqual(
@@ -367,16 +367,16 @@ class TaskProposalLedgerTests(unittest.TestCase):
             metadata={
                 "route_task_proposals": [
                     {
-                        "id": "quick_intent:0:task.execute_skill",
+                        "id": "quick_intent:0:task.execute_capability",
                         "source": "quick_intent",
                         "proposal_kind": "action",
-                        "task_type": "task.execute_skill",
+                        "task_type": "task.execute_capability",
                         "state": "advisory",
                         "reason": "fast Goal Interpreter misread warning as a window gaze request",
                         "effectful": True,
                         "priority": "high",
                         "sequence": 0,
-                        "skill_id": "soridormi.look_at_window",
+                        "capability_id": "soridormi.look_at_window",
                     }
                 ],
                 "revised_task_proposals": [
@@ -385,16 +385,16 @@ class TaskProposalLedgerTests(unittest.TestCase):
                         "source": "deep_reconciler",
                         "proposal_kind": "speech",
                         "task_type": "speech.speak",
-                        "skill_id": "chromie.speak",
+                        "capability_id": "chromie.speak",
                         "speech_id": "speech-repair",
                         "state": "committed",
                         "reason": "warning repair speech replaces window gaze",
                         "effectful": False,
                         "priority": "high",
                         "sequence": 1,
-                        "supersedes_id": "quick_intent:0:task.execute_skill",
-                        "superseded_task_type": "task.execute_skill",
-                        "superseded_skill_id": "soridormi.look_at_window",
+                        "supersedes_id": "quick_intent:0:task.execute_capability",
+                        "superseded_task_type": "task.execute_capability",
+                        "superseded_capability_id": "soridormi.look_at_window",
                         "superseded_reason": "later warning interpretation superseded window gaze",
                         "superseded_effectful": True,
                     }
@@ -409,19 +409,19 @@ class TaskProposalLedgerTests(unittest.TestCase):
         proposals_by_id = {proposal.id: proposal for proposal in ledger.proposals}
 
         self.assertEqual(
-            proposals_by_id["quick_intent:0:task.execute_skill"].state,
+            proposals_by_id["quick_intent:0:task.execute_capability"].state,
             "not_committed",
         )
         replacement = proposals_by_id["deep_reconciler:0:speech.speak"]
         self.assertEqual(replacement.state, "committed")
-        self.assertEqual(replacement.skill_id, "chromie.speak")
+        self.assertEqual(replacement.capability_id, "chromie.speak")
         self.assertEqual(
             replacement.metadata["supersedes"],
-            "quick_intent:0:task.execute_skill",
+            "quick_intent:0:task.execute_capability",
         )
-        superseded = proposals_by_id["quick_intent:0:task.execute_skill:superseded"]
+        superseded = proposals_by_id["quick_intent:0:task.execute_capability:superseded"]
         self.assertEqual(superseded.state, "superseded")
-        self.assertEqual(superseded.skill_id, "soridormi.look_at_window")
+        self.assertEqual(superseded.capability_id, "soridormi.look_at_window")
         self.assertEqual(superseded.superseded_by, "deep_reconciler:0:speech.speak")
         self.assertEqual(ledger.summary.superseded_count, 1)
         self.assertEqual(ledger.summary.states["superseded"], 1)

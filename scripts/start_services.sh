@@ -166,14 +166,14 @@ SERVICES=(
   chromie-asr
   chromie-llm
   "$TTS_SERVICE"
- 
+
   chromie-agent
 )
 
 BUILD_SERVICES=(
   chromie-asr
   "$TTS_SERVICE"
- 
+
   chromie-agent
 )
 

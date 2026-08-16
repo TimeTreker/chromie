@@ -73,7 +73,7 @@
         "steps": [
           {
             "step_id": "walk",
-            "skill_id": "soridormi.walk_forward",
+            "capability_id": "soridormi.walk_forward",
             "args": {
               "duration_s": 1
             },
@@ -84,7 +84,7 @@
           },
           {
             "step_id": "blink",
-            "skill_id": "soridormi.blink_eyes",
+            "capability_id": "soridormi.blink_eyes",
             "args": {
               "count": 2
             },
@@ -131,7 +131,7 @@
     ],
     "capabilities": [
       {
-        "skill_id": "soridormi.walk_forward",
+        "capability_id": "soridormi.walk_forward",
         "provider_id": "soridormi.mcp",
         "input_schema": {
           "type": "object",
@@ -154,7 +154,7 @@
         ]
       },
       {
-        "skill_id": "soridormi.blink_eyes",
+        "capability_id": "soridormi.blink_eyes",
         "provider_id": "soridormi.mcp",
         "input_schema": {
           "type": "object",

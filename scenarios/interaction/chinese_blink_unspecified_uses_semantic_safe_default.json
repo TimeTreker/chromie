@@ -56,9 +56,9 @@
     "ollama_reply": {
       "decision": "execute",
       "speech": "我眨四下眼睛。",
-      "skills": [
+      "capabilities": [
         {
-          "skill_id": "soridormi.blink_eyes",
+          "capability_id": "soridormi.blink_eyes",
           "proposed_args": {
             "count": 4
           },
@@ -86,7 +86,7 @@
       "缺少必要参数",
       "不能移动"
     ],
-    "skills": [
+    "capabilities": [
       "soridormi.blink_eyes"
     ],
     "skill_args": [
@@ -97,7 +97,7 @@
     "requires_confirmation": false,
     "metadata_json_contains": [
       "safe_default",
-      "direct_skill"
+      "direct_capability"
     ]
   }
 }

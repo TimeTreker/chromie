@@ -35,7 +35,7 @@ def status(root: Path) -> CommandResult:
         if snapshot.bool_value("ORCH_ENABLE_INTERACTION_RESPONSE")
         else "compatibility_rollback",
         "soridormi_skills": "enabled"
-        if snapshot.bool_value("ORCH_ENABLE_SORIDORMI_SKILLS")
+        if snapshot.bool_value("ORCH_ENABLE_SORIDORMI_CAPABILITIES")
         else "disabled",
         "risk_summary": {
             "physical_task_graph": snapshot.get(

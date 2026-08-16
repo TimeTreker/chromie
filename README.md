@@ -91,7 +91,7 @@ Host Orchestrator
                                                         |
         -> exact ready-progress adoption OR Fast Planner -> terminal Deep Planner when needed
         -> Response Composer only when a new presentation decision is still needed
-        -> Trusted Capability Runtime (legacy code name: Skill Runtime)
+        -> Trusted Capability Runtime (`CapabilityRuntime`)
         -> named capability -> Soridormi / peer providers
         -> structured results and traces
         -> exact plan/request/result join -> per-goal outcome reconciliation

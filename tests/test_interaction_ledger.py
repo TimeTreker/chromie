@@ -12,7 +12,7 @@ from shared.chromie_contracts.execution_outcome import (
     ExecutionOutcomeBundle,
     GoalExecutionOutcome,
 )
-from shared.chromie_contracts.interaction import SkillRequest, SkillResult
+from shared.chromie_contracts.interaction import CapabilityRequest, CapabilityResult
 from shared.chromie_contracts.interaction_ledger import InteractionLedgerEvent
 
 
@@ -92,9 +92,9 @@ class InteractionLedgerTests(unittest.TestCase):
 
     def test_committed_request_remains_unresolved_until_trusted_outcome(self) -> None:
         ledger = InteractionLedger()
-        request = SkillRequest(
+        request = CapabilityRequest(
             request_id="request-walk",
-            skill_id="soridormi.walk_forward",
+            capability_id="soridormi.walk_forward",
             args={"duration_s": 15},
             metadata={
                 "canonical_plan_id": "plan-walk",
@@ -128,7 +128,7 @@ class InteractionLedgerTests(unittest.TestCase):
                     evidence_id="evidence-walk",
                     request_id="request-walk",
                     step_id="step-walk",
-                    skill_id="soridormi.walk_forward",
+                    capability_id="soridormi.walk_forward",
                     source_goal_ids=["goal-walk"],
                     status="completed",
                     metadata={"execution_lane": "activity"},
@@ -172,9 +172,9 @@ class InteractionLedgerTests(unittest.TestCase):
         self,
     ) -> None:
         ledger = InteractionLedger()
-        request = SkillRequest(
+        request = CapabilityRequest(
             request_id="social-look",
-            skill_id="soridormi.look_at_person",
+            capability_id="soridormi.look_at_person",
             args={},
             metadata={
                 "auxiliary_social_attention": True,
@@ -193,9 +193,9 @@ class InteractionLedgerTests(unittest.TestCase):
             interaction_id="interaction-1",
             requests=[request],
             results=[
-                SkillResult(
+                CapabilityResult(
                     request_id="social-look",
-                    skill_id="soridormi.look_at_person",
+                    capability_id="soridormi.look_at_person",
                     status="completed",
                     provider_id="soridormi.mcp",
                 )

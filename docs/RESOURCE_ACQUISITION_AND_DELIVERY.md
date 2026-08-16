@@ -503,12 +503,13 @@ local planner, learned policies, deterministic controllers, or another hierarchy
 Those mechanisms do not become a second Chromie semantic planner because they are
 bounded by the already-selected capability contract.
 
-Successful composite-provider evidence may include:
+After the Soridormi adapter validates provider identity, canonical Chromie terminal
+evidence may include:
 
 ```json
 {
   "completed": true,
-  "skill_id": "acquire_and_deliver_resource",
+  "capability_id": "soridormi.acquire_and_deliver_resource",
   "resource_outcome": {
     "responsibility_type": "acquire_and_deliver_resource",
     "resource_kind": "physical_object",

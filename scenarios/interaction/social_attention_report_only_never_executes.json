@@ -109,7 +109,7 @@
       },
       "behaviors": [
         {
-          "skill_id": "soridormi.nod_yes",
+          "capability_id": "soridormi.nod_yes",
           "args": {
             "count": 1,
             "amplitude": 0.25,
@@ -127,7 +127,7 @@
     "speech_any": [
       "Hello"
     ],
-    "skills": [],
+    "capabilities": [],
     "metadata_json_contains": [
       "social_attention_plan"
     ],

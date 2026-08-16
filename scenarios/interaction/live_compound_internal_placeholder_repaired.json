@@ -58,22 +58,22 @@
     "ollama_reply": {
       "decision": "clarify",
       "speech": "请告诉我：the specific action detail needed to form a schema-valid plan。",
-      "skills": [],
+      "capabilities": [],
       "information_gaps": [],
       "plan_relation": "none"
     },
     "reviewer_reply": {
       "decision": "propose_alternative",
       "speech": "我目前不能同时完成这两个动作，但可以先走十五秒，再眨四下眼睛，可以吗？",
-      "skills": [
+      "capabilities": [
         {
-          "skill_id": "soridormi.walk_forward",
+          "capability_id": "soridormi.walk_forward",
           "proposed_args": {"duration_s": 15, "speed": "normal"},
           "timing": "sequential",
           "step_id": "walk"
         },
         {
-          "skill_id": "soridormi.blink_eyes",
+          "capability_id": "soridormi.blink_eyes",
           "proposed_args": {"count": 4},
           "parameter_grounding": {
             "count": {
@@ -96,7 +96,7 @@
   },
   "expect": {
     "forbidden_speech_any": ["schema-valid plan", "specific action detail", "缺少必要参数"],
-    "skills": ["soridormi.walk_forward", "soridormi.blink_eyes"],
+    "capabilities": ["soridormi.walk_forward", "soridormi.blink_eyes"],
     "skill_args": [
       {"duration_s": 15.0, "speed": "normal"},
       {"count": 4}

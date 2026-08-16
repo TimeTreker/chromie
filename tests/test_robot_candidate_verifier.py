@@ -41,8 +41,8 @@ def selected_candidate() -> dict[str, object]:
             "provider_manifest": "capabilities/soridormi.json",
             "provider_configuration_sha256": sha256,
         },
-        "initial_low_risk_skill": {
-            "skill_id": "nod_yes",
+        "initial_low_risk_capability": {
+            "capability_id": "nod_yes",
             "workspace": "marked 1m supervised test area",
             "max_speed": "10 percent of rated speed",
             "max_payload": "no payload",
@@ -50,7 +50,7 @@ def selected_candidate() -> dict[str, object]:
             "abort_conditions": ["unexpected motion", "status loss"],
         },
         "unsupported": {
-            "skills": ["walking"],
+            "capabilities": ["walking"],
             "configurations": ["payload attachment"],
             "operating_conditions": ["unattended operation"],
         },
@@ -180,18 +180,18 @@ class RobotCandidateVerifierTests(unittest.TestCase):
     def test_explicit_exclusions_and_abort_conditions_are_required(self) -> None:
         payload = copy.deepcopy(selected_candidate())
         payload["candidate_state"] = "draft"
-        payload["unsupported"]["skills"] = []  # type: ignore[index]
-        payload["initial_low_risk_skill"]["abort_conditions"] = []  # type: ignore[index]
+        payload["unsupported"]["capabilities"] = []  # type: ignore[index]
+        payload["initial_low_risk_capability"]["abort_conditions"] = []  # type: ignore[index]
 
         report = verify_candidate(payload)
 
         self.assertFalse(report["ready_for_no_motion_review"])
-        self.assertTrue(any("unsupported.skills" in item for item in report["blockers"]))
+        self.assertTrue(any("unsupported.capabilities" in item for item in report["blockers"]))
         self.assertTrue(any("abort_conditions" in item for item in report["blockers"]))
 
     def test_unknown_low_level_fields_are_rejected(self) -> None:
         payload = selected_candidate()
-        payload["initial_low_risk_skill"]["joint_targets"] = [0.1, 0.2]  # type: ignore[index]
+        payload["initial_low_risk_capability"]["joint_targets"] = [0.1, 0.2]  # type: ignore[index]
 
         report = verify_candidate(payload)
 

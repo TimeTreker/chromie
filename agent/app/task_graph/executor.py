@@ -228,8 +228,8 @@ class DagDryRunExecutor:
         if tool == "soridormi.skill.create_plan":
             return {
                 "plan_id": f"dryrun-{node.id}",
-                "skill_id": args.get("skill_id", ""),
-                "summary": f"Dry-run Soridormi named-skill plan for {args.get('skill_id', '<missing>')}.",
+                "capability_id": args.get("capability_id", ""),
+                "summary": f"Dry-run Soridormi named-skill plan for {args.get('capability_id', '<missing>')}.",
                 "requires_confirmation": True,
             }
         if tool == "soridormi.motion.execute_plan":

@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from orchestrator.runtime.skill_runtime import SkillDefinition
+from orchestrator.runtime.capability_runtime import CapabilityDefinition
 from shared.chromie_contracts.execution_outcome import (
     ClaimQualification,
     ClaimQualificationPolicy,
@@ -87,8 +87,8 @@ def test_claim_policy_digest_is_stable_and_request_commit_is_typed() -> None:
         )
 
 
-def test_skill_definition_carries_owner_reviewed_completion_policy() -> None:
-    definition = SkillDefinition(
+def test_capability_definition_carries_owner_reviewed_completion_policy() -> None:
+    definition = CapabilityDefinition(
         capability_id="soridormi.nod_yes",
         provider_id="soridormi.mcp",
         completion_evidence_policy=completion_policy(),

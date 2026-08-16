@@ -34,7 +34,7 @@
     "intent": "deep_thought_low_confidence",
     "source": "llm",
     "task_types_include": ["cognition.delegate_deep_thought", "cognition.deep_think"],
-    "task_types_forbid": ["speech.thinking_ack", "task.execute_skill"],
+    "task_types_forbid": ["speech.thinking_ack", "task.execute_capability"],
     "llm_calls": 1
   }
 }

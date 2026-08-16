@@ -193,7 +193,7 @@ class CapabilityProbeTests(unittest.IsolatedAsyncioTestCase):
         expected = {
             "type": "object",
             "properties": {
-                "skill_id": {"type": "string"},
+                "capability_id": {"type": "string"},
                 "chromie_intent": {
                     "type": "object",
                     "properties": {
@@ -207,7 +207,7 @@ class CapabilityProbeTests(unittest.IsolatedAsyncioTestCase):
         actual = {
             "type": "object",
             "properties": {
-                "skill_id": {"type": "string"},
+                "capability_id": {"type": "string"},
             },
             "required": ["skill_id"],
         }
@@ -218,7 +218,7 @@ class CapabilityProbeTests(unittest.IsolatedAsyncioTestCase):
         expected = {
             "type": "object",
             "properties": {
-                "skill_id": {"type": "string"},
+                "capability_id": {"type": "string"},
                 "chromie_intent": {"type": "object"},
             },
             "required": ["skill_id"],
@@ -226,7 +226,7 @@ class CapabilityProbeTests(unittest.IsolatedAsyncioTestCase):
         actual = {
             "type": "object",
             "properties": {
-                "skill_id": {"type": "string"},
+                "capability_id": {"type": "string"},
             },
             "required": ["skill_id"],
             "additionalProperties": False,
@@ -239,7 +239,7 @@ class CapabilityProbeTests(unittest.IsolatedAsyncioTestCase):
         registry.get_tool("remote.plan").input_schema = {
             "type": "object",
             "properties": {
-                "skill_id": {"type": "string"},
+                "capability_id": {"type": "string"},
                 "chromie_intent": {"type": "object"},
             },
             "required": ["skill_id"],
@@ -251,7 +251,7 @@ class CapabilityProbeTests(unittest.IsolatedAsyncioTestCase):
                 "remote.plan": {
                     "type": "object",
                     "properties": {
-                        "skill_id": {"type": "string"},
+                        "capability_id": {"type": "string"},
                     },
                     "required": ["skill_id"],
                 },

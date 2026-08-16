@@ -16,7 +16,7 @@ from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
-    SkillRequest,
+    CapabilityRequest,
 )
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.reflex import CancellationDispatchReceipt
@@ -35,14 +35,14 @@ def _plan() -> CanonicalPlan:
             "steps": [
                 {
                     "step_id": "step-a",
-                    "skill_id": "soridormi.nod_yes",
+                    "capability_id": "soridormi.nod_yes",
                     "args": {"count": 1},
                     "timing": "sequential",
                     "source_goal_ids": ["goal-a"],
                 },
                 {
                     "step_id": "step-b",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                     "timing": "sequential",
                     "source_goal_ids": ["goal-b"],
@@ -374,9 +374,9 @@ class NamedGoalCancellationClosureTests(unittest.TestCase):
 
         asyncio.run(
             assistant._cancel_interaction_speech(
-                SkillRequest(
+                CapabilityRequest(
                     request_id="speech-a",
-                    skill_id="chromie.speak",
+                    capability_id="chromie.speak",
                     args={
                         "text": "Starting.",
                         "metadata": {"session_id": "sid-speech"},
@@ -606,7 +606,7 @@ class NamedGoalCancellationClosureTests(unittest.TestCase):
                 "steps": [
                     {
                         "step_id": "step-shared",
-                        "skill_id": "soridormi.nod_yes",
+                        "capability_id": "soridormi.nod_yes",
                         "args": {"count": 1},
                         "timing": "sequential",
                         "source_goal_ids": ["goal-a", "goal-b"],
@@ -631,10 +631,10 @@ class NamedGoalCancellationClosureTests(unittest.TestCase):
         fingerprint = canonical_plan_fingerprint(plan)
         response = InteractionResponse(
             interaction_id="interaction-shared",
-            skills=[
-                SkillRequest(
+            capabilities=[
+                CapabilityRequest(
                     request_id="request-shared",
-                    skill_id="soridormi.nod_yes",
+                    capability_id="soridormi.nod_yes",
                     args={"count": 1},
                     timing="sequential",
                     requires_confirmation=True,
@@ -747,10 +747,10 @@ class NamedGoalCancellationClosureTests(unittest.TestCase):
                     },
                 )
             ],
-            skills=[
-                SkillRequest(
+            capabilities=[
+                CapabilityRequest(
                     request_id="request-a",
-                    skill_id="soridormi.nod_yes",
+                    capability_id="soridormi.nod_yes",
                     args={"count": 1},
                     timing="sequential",
                     requires_confirmation=True,
@@ -762,9 +762,9 @@ class NamedGoalCancellationClosureTests(unittest.TestCase):
                         "canonical_plan_fingerprint": fingerprint,
                     },
                 ),
-                SkillRequest(
+                CapabilityRequest(
                     request_id="request-b",
-                    skill_id="soridormi.blink_eyes",
+                    capability_id="soridormi.blink_eyes",
                     args={"count": 2},
                     timing="sequential",
                     requires_confirmation=True,
@@ -835,9 +835,9 @@ class NamedGoalCancellationClosureTests(unittest.TestCase):
         self.assertIsNotNone(replacement)
         assert replacement is not None
         self.assertNotEqual(replacement.confirmation_id, pending.confirmation_id)
-        self.assertEqual(len(replacement.response.skills), 1)
-        remaining = replacement.response.skills[0]
-        self.assertEqual(remaining.skill_id, "soridormi.blink_eyes")
+        self.assertEqual(len(replacement.response.capabilities), 1)
+        remaining = replacement.response.capabilities[0]
+        self.assertEqual(remaining.capability_id, "soridormi.blink_eyes")
         self.assertNotEqual(remaining.request_id, "request-b")
         child_plan = CanonicalPlan.model_validate(
             replacement.response.metadata["canonical_plan"]

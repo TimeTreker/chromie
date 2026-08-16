@@ -9,13 +9,13 @@
     "explicit_user_actions_are_primary_goals",
     "auxiliary_behavior_is_parallel_and_optional",
     "backend_selection_is_provider_owned",
-    "named_skill_and_semantic_arguments_are_backend_stable"
+    "named_capability_and_semantic_arguments_are_backend_stable"
   ],
   "cases": [
     {
       "name": "simulator_provider",
       "provider_backend": "mujoco",
-      "skill_id": "soridormi.attention",
+      "capability_id": "soridormi.attention",
       "semantic_args": {
         "intensity": "subtle"
       },
@@ -24,7 +24,7 @@
     {
       "name": "physical_provider",
       "provider_backend": "physical",
-      "skill_id": "soridormi.attention",
+      "capability_id": "soridormi.attention",
       "semantic_args": {
         "intensity": "subtle"
       },

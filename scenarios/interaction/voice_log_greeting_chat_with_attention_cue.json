@@ -79,7 +79,7 @@
       },
       "behaviors": [
         {
-          "skill_id": "soridormi.express_attention",
+          "capability_id": "soridormi.express_attention",
           "args": {
             "style": "neutral",
             "duration_s": 2.0,
@@ -95,7 +95,7 @@
   },
   "expect": {
     "speech_any": ["Hello", "doing well"],
-    "skills": ["soridormi.express_attention"],
+    "capabilities": ["soridormi.express_attention"],
     "skill_args": [
       {
         "style": "neutral",

@@ -14,7 +14,7 @@ from shared.chromie_contracts.interaction import CapabilityIdentityModel, Intera
 from shared.chromie_contracts.mind import MindProfile
 from shared.chromie_runtime.runtime_events import persist_runtime_event
 
-from .skill_runtime import SkillRuntimeResult
+from .capability_runtime import CapabilityRuntimeResult
 
 
 logger = logging.getLogger("chromie.orchestrator.episode")
@@ -44,7 +44,7 @@ class EpisodeGoalInterpretationRecord(BaseModel):
     latency_ms: float | None = Field(default=None, ge=0.0)
 
 
-class EpisodeSkillRequestRecord(CapabilityIdentityModel):
+class EpisodeCapabilityRequestRecord(CapabilityIdentityModel):
     request_id: str
     args: dict[str, Any] = Field(default_factory=dict)
     timing: str = "parallel"
@@ -56,7 +56,7 @@ class EpisodeAgentRecord(BaseModel):
 
     status: str = "unknown"
     speech: list[str] = Field(default_factory=list)
-    selected_skills: list[EpisodeSkillRequestRecord] = Field(default_factory=list)
+    selected_capabilities: list[EpisodeCapabilityRequestRecord] = Field(default_factory=list)
     requires_confirmation: bool = False
     reason: str | None = None
     latency_ms: float | None = Field(default=None, ge=0.0)
@@ -67,7 +67,7 @@ class EpisodeAgentRecord(BaseModel):
         return [_compact_text(item, limit=500) for item in value if item.strip()]
 
 
-class EpisodeSkillResultRecord(CapabilityIdentityModel):
+class EpisodeCapabilityResultRecord(CapabilityIdentityModel):
     request_id: str
     status: str
     provider_id: str | None = None
@@ -87,7 +87,7 @@ class EpisodeExecutionRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     status: str = "not_executed"
-    skill_results: list[EpisodeSkillResultRecord] = Field(default_factory=list)
+    capability_results: list[EpisodeCapabilityResultRecord] = Field(default_factory=list)
 
 
 class EpisodeTurnRecord(BaseModel):
@@ -265,7 +265,7 @@ class EpisodeRecorder:
         self,
         *,
         response: InteractionResponse,
-        execution: SkillRuntimeResult | None,
+        execution: CapabilityRuntimeResult | None,
         session_id: str | None,
         mind_profile: MindProfile,
         errors: list[str] | None = None,
@@ -412,13 +412,13 @@ class EpisodeRecorder:
         self,
         *,
         response: InteractionResponse,
-        execution: SkillRuntimeResult | None,
+        execution: CapabilityRuntimeResult | None,
         session_id: str | None,
         context: dict[str, Any],
         turn_index: int,
         errors: list[str] | None,
     ) -> EpisodeTurnRecord:
-        skill_results: list[EpisodeSkillResultRecord] = []
+        capability_results: list[EpisodeCapabilityResultRecord] = []
         execution_status = "not_executed"
         if execution is not None:
             execution_status = execution.status
@@ -427,8 +427,8 @@ class EpisodeRecorder:
                 mode = str(output.get("mode") or "").strip() or None
                 no_motion = output.get("no_motion")
                 recommendation_only = output.get("recommendation_only")
-                skill_results.append(
-                    EpisodeSkillResultRecord(
+                capability_results.append(
+                    EpisodeCapabilityResultRecord(
                         request_id=result.request_id,
                         capability_id=result.capability_id,
                         status=result.status,
@@ -460,15 +460,15 @@ class EpisodeRecorder:
             agent=EpisodeAgentRecord(
                 status=response.status,
                 speech=[item.text for item in response.speech],
-                selected_skills=[
-                    EpisodeSkillRequestRecord(
+                selected_capabilities=[
+                    EpisodeCapabilityRequestRecord(
                         request_id=request.request_id,
                         capability_id=request.capability_id,
                         args=request.args,
                         timing=request.timing,
                         requires_confirmation=request.requires_confirmation,
                     )
-                    for request in response.skills
+                    for request in response.capabilities
                 ],
                 requires_confirmation=response.requires_confirmation,
                 reason=response.reason,
@@ -476,7 +476,7 @@ class EpisodeRecorder:
             ),
             execution=EpisodeExecutionRecord(
                 status=execution_status,
-                skill_results=skill_results,
+                capability_results=capability_results,
             ),
             errors=list(errors or ()),
             metadata={

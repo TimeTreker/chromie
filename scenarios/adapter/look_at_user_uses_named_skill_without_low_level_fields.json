@@ -20,7 +20,7 @@
     ]
   },
   "expect": {
-    "skills": ["soridormi.look_at_person"],
+    "capabilities": ["soridormi.look_at_person"],
     "skill_args": [
       {
         "duration_s": 3.0

@@ -60,7 +60,7 @@
           "expected_routes": [
             "robot_action"
           ],
-          "expected_skills": [
+          "expected_capabilities": [
             "soridormi.walk_forward"
           ],
           "expected_speech_any": [
@@ -131,7 +131,7 @@
           "expected_routes": [
             "robot_action"
           ],
-          "expected_skills": [
+          "expected_capabilities": [
             "soridormi.nod_yes"
           ],
           "expected_args": [
@@ -152,7 +152,7 @@
           "expected_routes": [
             "robot_action"
           ],
-          "expected_skills": [
+          "expected_capabilities": [
             "soridormi.walk_forward"
           ],
           "expected_args": [
@@ -209,7 +209,7 @@
             "tool",
             "chat"
           ],
-          "expect_no_skills": true,
+          "expect_no_capabilities": true,
           "expected_speech_any": [
             "天信",
             "天气",
@@ -230,7 +230,7 @@
           "expected_routes": [
             "clarify"
           ],
-          "expect_no_skills": true,
+          "expect_no_capabilities": true,
           "expected_speech_any": [
             "B",
             "heard",
@@ -277,7 +277,7 @@
           "expected_routes": [
             "robot_action"
           ],
-          "expected_skills": [
+          "expected_capabilities": [
             "soridormi.walk_velocity",
             "soridormi.nod_yes",
             "soridormi.turn_in_place"
@@ -334,7 +334,7 @@
               "expected_routes": [
                 "tool"
               ],
-              "expect_no_skills": true,
+              "expect_no_capabilities": true,
               "require_speech": true,
               "description": "Establish a real completed weather Goal and retained weather Skill context."
             },
@@ -345,7 +345,7 @@
               "expected_routes": [
                 "robot_action"
               ],
-              "expected_skills": [
+              "expected_capabilities": [
                 "soridormi.walk_forward",
                 "soridormi.blink_eyes"
               ],
@@ -502,7 +502,7 @@
           "expected_routes": [
             "tool"
           ],
-          "expect_no_skills": true,
+          "expect_no_capabilities": true,
           "require_speech": true,
           "require_fast_speech": true,
           "expected_fast_speech_purposes": [
@@ -640,7 +640,7 @@
           "expected_routes": [
             "robot_action"
           ],
-          "expected_skills": [
+          "expected_capabilities": [
             "soridormi.look_at_person",
             "soridormi.blink_eyes"
           ],
@@ -682,7 +682,7 @@
           "expected_routes": [
             "robot_action"
           ],
-          "expected_skills": [
+          "expected_capabilities": [
             "soridormi.nod_yes",
             "soridormi.blink_eyes"
           ],
@@ -724,7 +724,7 @@
           "expected_routes": [
             "robot_action"
           ],
-          "expected_skills": [
+          "expected_capabilities": [
             "soridormi.walk_forward",
             "soridormi.blink_eyes"
           ],
@@ -766,7 +766,7 @@
           "expected_routes": [
             "robot_action"
           ],
-          "expected_skills": [
+          "expected_capabilities": [
             "soridormi.blink_eyes"
           ],
           "expected_args": [

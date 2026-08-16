@@ -11,7 +11,7 @@ EFFECTFUL_TASK_TYPES = {
     "body.stop_motion",
     "task.cancel_current_action",
     "task.execute_robot_action",
-    "task.execute_skill",
+    "task.execute_capability",
     "task.execute_task_graph",
     "task.use_tool",
 }
@@ -92,13 +92,13 @@ def _route_task_proposals(response: InteractionResponse) -> list[dict[str, Any]]
     if not isinstance(route_tasks, list):
         return []
 
-    committed_skills = {_normalized_skill_id(request.skill_id) for request in response.skills}
+    committed_skills = {_normalized_capability_id(request.capability_id) for request in response.capabilities}
     proposals: list[dict[str, Any]] = []
     for index, task in enumerate(route_tasks):
         if not isinstance(task, dict):
             continue
         task_type = str(task.get("task_type") or "").strip()
-        capability_id = _normalized_skill_id(str(task.get("capability_id") or "").strip())
+        capability_id = _normalized_capability_id(str(task.get("capability_id") or "").strip())
         source_stage = str(task.get("source_stage") or "goal_interpreter").strip() or "goal_interpreter"
         committed_by = ""
         state = "advisory"
@@ -134,7 +134,7 @@ def _route_shared_task_proposals(
     response: InteractionResponse,
     route_proposals: list[Any],
 ) -> list[dict[str, Any]]:
-    committed_skills = {_normalized_skill_id(request.skill_id) for request in response.skills}
+    committed_skills = {_normalized_capability_id(request.capability_id) for request in response.capabilities}
     proposals: list[dict[str, Any]] = []
     for index, raw in enumerate(route_proposals):
         if not isinstance(raw, dict):
@@ -143,11 +143,11 @@ def _route_shared_task_proposals(
             mode="json",
             exclude_none=True,
         )
-        skill_id = _normalized_skill_id(str(proposal.get("capability_id") or proposal.get("skill_id") or "").strip())
+        capability_id = _normalized_capability_id(str(proposal.get("capability_id") or "").strip())
         task_type = str(proposal.get("task_type") or "").strip()
         state = str(proposal.get("state") or "advisory")
         if state not in {"rejected", "superseded"}:
-            if skill_id and skill_id in committed_skills:
+            if capability_id and capability_id in committed_skills:
                 proposal["state"] = "committed"
                 proposal["committed_by"] = "interaction_response.capability"
                 proposal["reason"] = "matching InteractionResponse capability was committed"
@@ -155,8 +155,8 @@ def _route_shared_task_proposals(
                 proposal["state"] = "not_committed"
                 proposal["reason"] = "effectful route proposal requires an InteractionResponse capability before execution"
         proposal["sequence"] = _safe_int(proposal.get("sequence"), index)
-        if skill_id:
-            proposal["capability_id"] = skill_id
+        if capability_id:
+            proposal["capability_id"] = capability_id
         proposals.append(proposal)
     return proposals
 
@@ -192,7 +192,7 @@ def _deepthinking_task_proposals(response: InteractionResponse) -> list[dict[str
     raw = response.metadata.get("deepthinking_task_proposals")
     if not isinstance(raw, list):
         return []
-    committed_skills = {_normalized_skill_id(request.skill_id) for request in response.skills}
+    committed_skills = {_normalized_capability_id(request.capability_id) for request in response.capabilities}
     has_speech = bool(response.speech)
     proposals: list[dict[str, Any]] = []
     for index, item in enumerate(raw):
@@ -202,11 +202,11 @@ def _deepthinking_task_proposals(response: InteractionResponse) -> list[dict[str
             mode="json",
             exclude_none=True,
         )
-        skill_id = _normalized_skill_id(str(proposal.get("capability_id") or proposal.get("skill_id") or "").strip())
+        capability_id = _normalized_capability_id(str(proposal.get("capability_id") or "").strip())
         task_type = str(proposal.get("task_type") or "").strip()
         state = str(proposal.get("state") or "advisory")
         if state not in {"rejected", "superseded", "committed"}:
-            if skill_id and skill_id in committed_skills:
+            if capability_id and capability_id in committed_skills:
                 proposal["state"] = "committed"
                 proposal["committed_by"] = "interaction_response.capability"
                 proposal["reason"] = "matching InteractionResponse capability was committed"
@@ -218,8 +218,8 @@ def _deepthinking_task_proposals(response: InteractionResponse) -> list[dict[str
                 proposal["state"] = "not_committed"
                 proposal["reason"] = "effectful deepthinking proposal requires an InteractionResponse capability before execution"
         proposal["sequence"] = _safe_int(proposal.get("sequence"), index)
-        if skill_id:
-            proposal["capability_id"] = skill_id
+        if capability_id:
+            proposal["capability_id"] = capability_id
         proposals.append(proposal)
     return proposals
 
@@ -227,18 +227,18 @@ def _deepthinking_task_proposals(response: InteractionResponse) -> list[dict[str
 def _committed_skill_proposals(response: InteractionResponse) -> list[dict[str, Any]]:
     proposals: list[dict[str, Any]] = []
     preflight = _preflight_items_by_request_id(response)
-    for index, request in enumerate(response.skills):
-        skill_id = _normalized_skill_id(request.skill_id)
+    for index, request in enumerate(response.capabilities):
+        capability_id = _normalized_capability_id(request.capability_id)
         proposal = {
             "id": f"interaction_response:skill:{request.request_id}",
             "source": str(request.metadata.get("source") or "interaction_response"),
             "proposal_kind": "capability",
-            "task_type": _task_type_for_skill(skill_id),
-            "capability_id": skill_id,
+            "task_type": _task_type_for_capability(capability_id),
+            "capability_id": capability_id,
             "request_id": request.request_id,
             "state": "committed",
             "reason": "InteractionResponse capability is eligible for Trusted Capability Runtime validation",
-            "effectful": _is_effectful_skill(skill_id),
+            "effectful": _is_effectful_skill(capability_id),
             "priority": "normal",
             "sequence": index,
             "timing": request.timing,
@@ -291,7 +291,7 @@ def _rejected_deepthinking_proposals(response: InteractionResponse) -> list[dict
         if not isinstance(task, dict):
             continue
         task_type = str(task.get("task_type") or task.get("type") or "unknown").strip() or "unknown"
-        skill_id = _normalized_skill_id(str(task.get("capability_id") or task.get("skill_id") or "").strip())
+        capability_id = _normalized_capability_id(str(task.get("capability_id") or "").strip())
         proposal = {
             "id": f"deepthinking:rejected:{index}:{task_type}",
             "source": "deepthinking",
@@ -299,12 +299,12 @@ def _rejected_deepthinking_proposals(response: InteractionResponse) -> list[dict
             "task_type": task_type,
             "state": "rejected",
             "reason": str(task.get("reason") or "deepthinking task did not pass validation"),
-            "effectful": _is_effectful_task_type(task_type) or _is_effectful_skill(skill_id),
+            "effectful": _is_effectful_task_type(task_type) or _is_effectful_skill(capability_id),
             "priority": "normal",
             "sequence": index,
         }
-        if skill_id:
-            proposal["capability_id"] = skill_id
+        if capability_id:
+            proposal["capability_id"] = capability_id
         proposals.append(proposal)
     return proposals
 
@@ -320,7 +320,7 @@ def _superseded_proposals(response: InteractionResponse) -> list[dict[str, Any]]
         if not isinstance(item, dict):
             continue
         task_type = str(item.get("task_type") or item.get("type") or "unknown").strip() or "unknown"
-        skill_id = _normalized_skill_id(str(item.get("capability_id") or item.get("skill_id") or "").strip())
+        capability_id = _normalized_capability_id(str(item.get("capability_id") or "").strip())
         proposal = {
             "id": str(item.get("id") or f"superseded:{index}:{task_type}"),
             "source": str(item.get("source") or "orchestrator_merge"),
@@ -328,15 +328,15 @@ def _superseded_proposals(response: InteractionResponse) -> list[dict[str, Any]]
             "task_type": task_type,
             "state": "superseded",
             "reason": str(item.get("reason") or "proposal was superseded by a later correction"),
-            "effectful": bool(item.get("effectful")) or _is_effectful_task_type(task_type) or _is_effectful_skill(skill_id),
+            "effectful": bool(item.get("effectful")) or _is_effectful_task_type(task_type) or _is_effectful_skill(capability_id),
             "priority": str(item.get("priority") or "normal"),
             "sequence": _safe_int(item.get("sequence"), index),
         }
         superseded_by = str(item.get("superseded_by") or item.get("replacement_id") or "").strip()
         if superseded_by:
             proposal["superseded_by"] = superseded_by
-        if skill_id:
-            proposal["capability_id"] = skill_id
+        if capability_id:
+            proposal["capability_id"] = capability_id
         proposals.append(proposal)
     return proposals
 
@@ -361,13 +361,13 @@ def _revised_task_proposals(response: InteractionResponse) -> list[dict[str, Any
 
 def _revision_replacement_proposal(item: dict[str, Any], index: int) -> dict[str, Any]:
     task_type = str(item.get("task_type") or item.get("type") or "unknown").strip() or "unknown"
-    skill_id = _normalized_skill_id(
-        str(item.get("capability_id") or item.get("skill_id") or "").strip()
+    capability_id = _normalized_capability_id(
+        str(item.get("capability_id") or "").strip()
     )
     state = str(item.get("state") or "advisory").strip() or "advisory"
     if state not in PROPOSAL_STATES or state == "superseded":
         state = "advisory"
-    default_effectful = _is_effectful_task_type(task_type) or _is_effectful_skill(skill_id)
+    default_effectful = _is_effectful_task_type(task_type) or _is_effectful_skill(capability_id)
     metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
     metadata = dict(metadata)
     supersedes = _first_string(
@@ -388,8 +388,8 @@ def _revision_replacement_proposal(item: dict[str, Any], index: int) -> dict[str
         "priority": str(item.get("priority") or "normal"),
         "sequence": _safe_int(item.get("sequence"), index),
     }
-    if skill_id:
-        proposal["capability_id"] = skill_id
+    if capability_id:
+        proposal["capability_id"] = capability_id
     for field in ("request_id", "speech_id", "committed_by", "timing"):
         value = str(item.get(field) or "").strip()
         if value:
@@ -424,18 +424,15 @@ def _revision_superseded_marker(
         .strip()
         or "unknown"
     )
-    skill_id = _normalized_skill_id(
+    capability_id = _normalized_capability_id(
         str(
             item.get("superseded_capability_id")
-            or item.get("superseded_skill_id")
             or item.get("old_capability_id")
-            or item.get("old_skill_id")
             or item.get("previous_capability_id")
-            or item.get("previous_skill_id")
             or ""
         ).strip()
     )
-    default_effectful = _is_effectful_task_type(task_type) or _is_effectful_skill(skill_id)
+    default_effectful = _is_effectful_task_type(task_type) or _is_effectful_skill(capability_id)
     proposal: dict[str, Any] = {
         "id": str(item.get("superseded_id") or f"{supersedes}:superseded"),
         "source": str(
@@ -465,8 +462,8 @@ def _revision_superseded_marker(
         ),
         "superseded_by": str(replacement.get("id") or ""),
     }
-    if skill_id:
-        proposal["capability_id"] = skill_id
+    if capability_id:
+        proposal["capability_id"] = capability_id
     return TaskProposal.model_validate(proposal).model_dump(mode="json", exclude_none=True)
 
 
@@ -557,35 +554,35 @@ def _first_string(item: dict[str, Any], keys: tuple[str, ...]) -> str:
     return ""
 
 
-def _normalized_skill_id(value: str) -> str:
-    skill_id = (value or "").strip()
-    if not skill_id:
+def _normalized_capability_id(value: str) -> str:
+    capability_id = (value or "").strip()
+    if not capability_id:
         return ""
-    if skill_id.startswith("soridormi.") or skill_id.startswith("chromie.") or skill_id.startswith("session."):
-        return skill_id
-    return f"soridormi.{skill_id}"
+    if capability_id.startswith("soridormi.") or capability_id.startswith("chromie.") or capability_id.startswith("session."):
+        return capability_id
+    return f"soridormi.{capability_id}"
 
 
-def _task_type_for_skill(skill_id: str) -> str:
-    if skill_id == "chromie.speak":
+def _task_type_for_capability(capability_id: str) -> str:
+    if capability_id == "chromie.speak":
         return "speech.speak"
-    if skill_id == "session.interrupt":
+    if capability_id == "session.interrupt":
         return "task.cancel_current_action"
-    if skill_id == "chromie.task_graph.execute":
+    if capability_id == "chromie.task_graph.execute":
         return "task.execute_task_graph"
-    if skill_id.startswith("soridormi."):
-        return "task.execute_skill"
-    return "task.execute_skill"
+    if capability_id.startswith("soridormi."):
+        return "task.execute_capability"
+    return "task.execute_capability"
 
 
-def _is_effectful_skill(skill_id: str) -> bool:
+def _is_effectful_skill(capability_id: str) -> bool:
     return (
-        skill_id.startswith("soridormi.")
-        or skill_id == "session.interrupt"
-        or skill_id == "chromie.task_graph.execute"
+        capability_id.startswith("soridormi.")
+        or capability_id == "session.interrupt"
+        or capability_id == "chromie.task_graph.execute"
         or (
-            skill_id.startswith("chromie.")
-            and skill_id != "chromie.speak"
+            capability_id.startswith("chromie.")
+            and capability_id != "chromie.speak"
         )
     )
 

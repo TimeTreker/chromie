@@ -28,16 +28,16 @@
       "metadata": {
         "task_proposals": [
           {
-            "id": "quick_intent:0:task.execute_skill",
+            "id": "quick_intent:0:task.execute_capability",
             "source": "quick_intent",
             "proposal_kind": "action",
-            "task_type": "task.execute_skill",
+            "task_type": "task.execute_capability",
             "state": "advisory",
             "reason": "fast Goal Interpreter misread look out as a window gaze request",
             "effectful": true,
             "priority": "high",
             "sequence": 0,
-            "skill_id": "soridormi.look_at_window"
+            "capability_id": "soridormi.look_at_window"
           }
         ],
         "revised_task_proposals": [
@@ -46,14 +46,14 @@
             "source": "deep_reconciler",
             "proposal_kind": "speech",
             "task_type": "speech.speak",
-            "skill_id": "chromie.speak",
+            "capability_id": "chromie.speak",
             "state": "committed",
             "reason": "warning speech replaces the earlier window gaze interpretation",
             "effectful": false,
             "priority": "high",
             "sequence": 1,
-            "supersedes_id": "quick_intent:0:task.execute_skill",
-            "superseded_task_type": "task.execute_skill",
+            "supersedes_id": "quick_intent:0:task.execute_capability",
+            "superseded_task_type": "task.execute_capability",
             "superseded_skill_id": "soridormi.look_at_window",
             "superseded_reason": "later warning interpretation superseded window gaze",
             "superseded_effectful": true
@@ -67,14 +67,14 @@
     "speech_all": ["Thanks for warning me", "hold still", "cable"],
     "forbidden_speech_any": ["Looking out", "out of the window", "Moving now"],
     "no_skills": true,
-    "forbidden_skills": ["soridormi.look_at_window"],
+    "forbidden_capabilities": ["soridormi.look_at_window"],
     "requires_confirmation": false,
     "status": "ok",
     "metadata_json_contains": [
       "task_proposal_ledger",
       "revised_task_proposals",
       "deep_reconciler:0:speech.speak",
-      "quick_intent:0:task.execute_skill:superseded",
+      "quick_intent:0:task.execute_capability:superseded",
       "supersedes",
       "soridormi.look_at_window",
       "not_committed",

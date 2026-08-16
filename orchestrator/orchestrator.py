@@ -112,15 +112,15 @@ from shared.chromie_runtime.accelerator_telemetry import (
     ACCELERATOR_SAMPLE_MODULE,
 )
 from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
-from orchestrator.runtime.skill_runtime import SkillRuntimeResult
+from orchestrator.runtime.capability_runtime import CapabilityRuntimeResult
 from orchestrator.schemas.agent import AgentResult
 from orchestrator.schemas.route import RouteDecision
 from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
-    SkillRequest,
-    SkillResult,
+    CapabilityRequest,
+    CapabilityResult,
 )
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.execution_outcome import (
@@ -244,7 +244,7 @@ def _selected_capability_ids(decision: RouteDecision) -> list[str]:
     metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
     for item in metadata.get("task_list") or []:
         if isinstance(item, dict):
-            add(item.get("capability_id") or item.get("skill_id"))
+            add(item.get("capability_id"))
     return selected
 
 
@@ -324,7 +324,7 @@ class VoiceAssistant:
         self.enable_interaction_response = (
             cognition_settings.enable_interaction_response
         )
-        self.enable_soridormi_skills = cognition_settings.enable_soridormi_skills
+        self.enable_soridormi_capabilities = cognition_settings.enable_soridormi_capabilities
         self.addressedness_gate_enabled = session_settings.addressedness_gate_enabled
         self.addressedness_engagement_timeout_s = (
             session_settings.addressedness_engagement_timeout_s
@@ -695,7 +695,7 @@ class VoiceAssistant:
             "core_generated_fast_speech=%s fast_first_audio=%s hedge_ms=%s "
             "cache_dir=%s prime_on_startup=%s prime_timeout_ms=%s",
             self.enable_interaction_response,
-            self.enable_soridormi_skills,
+            self.enable_soridormi_capabilities,
             self.confirmation_dialogue.ttl_s,
             self.fast_first_response_enabled,
             self.core_generated_fast_speech_enabled,
@@ -2019,14 +2019,14 @@ class VoiceAssistant:
 
     async def _cancel_interaction_speech(
         self,
-        request: SkillRequest,
+        request: CapabilityRequest,
         scheduled: dict[str, Any],
     ) -> None:
         """Cancel one goal-bound speech request at the shared output boundary.
 
         Pending chunks are invalidated by exact generation/order.  Once any
         chunk may have started, Chromie's playback resource is global, so the
-        only truthful cancellation is a shared output abort.  Skill Runtime
+        only truthful cancellation is a shared output abort.  Capability Runtime
         marks that provider as global-domain and records every coaffected Goal.
         """
 
@@ -3083,7 +3083,7 @@ class VoiceAssistant:
         self,
         *,
         response: InteractionResponse,
-        execution: SkillRuntimeResult | None,
+        execution: CapabilityRuntimeResult | None,
         session_id: str | None,
         errors: list[str] | None = None,
     ) -> None:
@@ -3188,7 +3188,7 @@ class VoiceAssistant:
         self,
         *,
         response: InteractionResponse,
-        execution: SkillRuntimeResult | None,
+        execution: CapabilityRuntimeResult | None,
         session_id: str | None,
         confirmed_request_ids: set[str] | None,
         errors: list[str] | None = None,
@@ -3758,7 +3758,7 @@ class VoiceAssistant:
             "lane": resolution.lane,
             "interaction_response_constructed": interaction is not None,
             "provider_request_count": (
-                len(interaction.skills) if interaction is not None else 0
+                len(interaction.capabilities) if interaction is not None else 0
             ),
             "provider_dispatch_possible": interaction is not None,
             "plan_id": terminal.plan_id if terminal is not None else None,
@@ -4693,18 +4693,18 @@ class VoiceAssistant:
         )
         self.session_log(
             session_id,
-            "cognitive_interaction_ready: speech=%s skills=%s requires_confirmation=%s",
+            "cognitive_interaction_ready: speech=%s capabilities=%s requires_confirmation=%s",
             len(response.speech),
-            len(response.skills),
+            len(response.capabilities),
             response.requires_confirmation,
         )
-        for request in response.skills:
+        for request in response.capabilities:
             self.session_log(
                 session_id,
-                "cognitive_skill_proposed: request_id=%s skill_id=%s timing=%s "
+                "cognitive_capability_proposed: request_id=%s capability_id=%s timing=%s "
                 "requires_confirmation=%s args=%s",
                 request.request_id,
-                request.skill_id,
+                request.capability_id,
                 request.timing,
                 request.requires_confirmation,
                 json.dumps(request.args, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
@@ -5638,8 +5638,8 @@ class VoiceAssistant:
                 task_type="confirmation",
                 status="awaiting_confirmation",
                 summary=", ".join(
-                    request.skill_id
-                    for request in response.skills
+                    request.capability_id
+                    for request in response.capabilities
                     if request.request_id in pending.confirmed_request_ids
                 ),
                 metadata={
@@ -5848,7 +5848,7 @@ class VoiceAssistant:
                 getattr(pending, "confirmed_request_ids", ()) or ()
             )
             response = getattr(pending, "response", None)
-            requests = getattr(response, "skills", ()) or ()
+            requests = getattr(response, "capabilities", ()) or ()
             registry = getattr(
                 getattr(self, "interaction_runtime", None),
                 "registry",
@@ -5862,7 +5862,7 @@ class VoiceAssistant:
                     continue
                 seen_confirmed_request_ids.add(request.request_id)
                 try:
-                    definition = registry.get(request.skill_id)
+                    definition = registry.get(request.capability_id)
                 except (AttributeError, ValueError):
                     unknown_confirmed_request = True
                     continue
@@ -5904,7 +5904,7 @@ class VoiceAssistant:
         )
         request_by_id = {
             str(request.request_id): request
-            for request in (getattr(response, "skills", ()) or ())
+            for request in (getattr(response, "capabilities", ()) or ())
         }
         for request_id in confirmed_request_ids:
             request = request_by_id.get(request_id)
@@ -5912,7 +5912,7 @@ class VoiceAssistant:
                 unknown_request_ids.add(request_id)
                 continue
             try:
-                definition = registry.get(request.skill_id)
+                definition = registry.get(request.capability_id)
             except (AttributeError, ValueError):
                 unknown_request_ids.add(request_id)
                 continue
@@ -6187,7 +6187,7 @@ class VoiceAssistant:
             "interaction_response_constructed", interaction_constructed
         )
         provider_request_count = (
-            len(resolution.interaction_response.skills)
+            len(resolution.interaction_response.capabilities)
             if interaction_constructed
             else 0
         )
@@ -6527,7 +6527,7 @@ class VoiceAssistant:
                 isinstance(item, dict)
                 and (
                     str(item.get("task_type") or "").startswith("task.execute")
-                    or bool(str(item.get("capability_id") or item.get("skill_id") or "").strip())
+                    or bool(str(item.get("capability_id") or "").strip())
                 )
                 for item in task_list
             )
@@ -6778,7 +6778,7 @@ class VoiceAssistant:
     def _record_successfully_delivered_speech(
         self,
         response: InteractionResponse,
-        execution: SkillRuntimeResult,
+        execution: CapabilityRuntimeResult,
         *,
         session_id: str | None,
         log_event: str,
@@ -6798,7 +6798,7 @@ class VoiceAssistant:
             for speech in response.speech
             if (
                 (result := results_by_request.get(speech.id)) is not None
-                and result.skill_id == "chromie.speak"
+                and result.capability_id == "chromie.speak"
                 and result.status == "completed"
                 and (
                     not (
@@ -6828,7 +6828,7 @@ class VoiceAssistant:
             deep=True,
             update={
                 "speech": delivered_speech,
-                "skills": [],
+                "capabilities": [],
                 "requires_confirmation": False,
             },
         )
@@ -6859,7 +6859,7 @@ class VoiceAssistant:
         self,
         *,
         response: InteractionResponse,
-        execution: SkillRuntimeResult,
+        execution: CapabilityRuntimeResult,
         session_id: str | None,
         generation: int,
         provider_status: dict[str, Any] | None,
@@ -6884,7 +6884,7 @@ class VoiceAssistant:
                     session_id=str(session_id or interaction_turn_id),
                     turn_id=interaction_turn_id,
                     interaction_id=response.interaction_id,
-                    requests=response.skills,
+                    requests=response.capabilities,
                     results=execution.results,
                 )
             except Exception as exc:
@@ -7421,8 +7421,8 @@ class VoiceAssistant:
             value = str(metadata.get(key) or "").strip()
             if value in {"tool", "robot_action", "memory"}:
                 return value
-        skill_ids = [str(step.skill_id or "") for step in getattr(plan, "steps", [])]
-        if any(skill_id.startswith("soridormi.") for skill_id in skill_ids):
+        capability_ids = [str(step.capability_id or "") for step in getattr(plan, "steps", [])]
+        if any(capability_id.startswith("soridormi.") for capability_id in capability_ids):
             return "robot_action"
         return "tool"
 
@@ -7517,7 +7517,7 @@ class VoiceAssistant:
             evidence.append(
                 ToolResultEvidence(
                     evidence_id=item.evidence_id,
-                    tool_id=item.skill_id,
+                    tool_id=item.capability_id,
                     status=item.status,
                     data=observation.data,
                     output_sha256=canonical_value_sha256(observation.data),
@@ -7655,7 +7655,7 @@ class VoiceAssistant:
                     },
                 )
             ],
-            skills=[],
+            capabilities=[],
             requires_confirmation=False,
             reason=(
                 None
@@ -7809,7 +7809,7 @@ class VoiceAssistant:
         confirmed_request_ids: set[str] | None = None,
         reset_playback: bool = True,
         mark_session_done: bool = True,
-    ) -> SkillRuntimeResult:
+    ) -> CapabilityRuntimeResult:
         if reset_playback:
             await self.reset_playback_ordering()
         execution_generation = int(
@@ -7817,9 +7817,9 @@ class VoiceAssistant:
         )
         started_ms = now_ms()
         has_soridormi_request = any(
-            request.skill_id.startswith("soridormi.") for request in response.skills
+            request.capability_id.startswith("soridormi.") for request in response.capabilities
         )
-        execution: SkillRuntimeResult | None = None
+        execution: CapabilityRuntimeResult | None = None
         provider_status: dict[str, Any] | None = None
         cognitive_closure_attempted = False
         try:
@@ -7888,7 +7888,7 @@ class VoiceAssistant:
             )
             self.session_log(
                 session_id,
-                "skill_runtime_done: status=%s results=%s traces=%s runtime_ms=%.1f",
+                "capability_runtime_done: status=%s results=%s traces=%s runtime_ms=%.1f",
                 execution.status,
                 len(execution.results),
                 len(execution.traces),
@@ -7897,9 +7897,9 @@ class VoiceAssistant:
             for result in execution.results:
                 self.session_log(
                     session_id,
-                    "skill_result: request_id=%s skill_id=%s status=%s reason=%s message=%s",
+                    "capability_result: request_id=%s capability_id=%s status=%s reason=%s message=%s",
                     result.request_id,
-                    result.skill_id,
+                    result.capability_id,
                     result.status,
                     result.reason_code,
                     result.message,
@@ -7927,9 +7927,9 @@ class VoiceAssistant:
                 is_cognitive_effectful = bool(
                     response.metadata.get("cognitive_runtime_apply") is True
                     and response.metadata.get("canonical_plan")
-                    and response.skills
+                    and response.capabilities
                 )
-                for request in response.skills:
+                for request in response.capabilities:
                     if request.request_id in completed_request_ids:
                         continue
                     self.conversation_state.update_pending_task_status_for_request_id(
@@ -7977,7 +7977,7 @@ class VoiceAssistant:
         except asyncio.CancelledError:
             self.session_log(
                 session_id,
-                "skill_runtime_cancelled: runtime_ms=%.1f",
+                "capability_runtime_cancelled: runtime_ms=%.1f",
                 now_ms() - started_ms,
             )
             cancelled_execution = (
@@ -7990,7 +7990,7 @@ class VoiceAssistant:
                 result.request_id: result
                 for result in cancelled_execution.results
             }
-            for request in response.skills:
+            for request in response.capabilities:
                 result = completed_by_request.get(request.request_id)
                 self.conversation_state.update_pending_task_status_for_request_id(
                     request_id=request.request_id,
@@ -8046,7 +8046,7 @@ class VoiceAssistant:
         except Exception as exc:
             self.session_log(
                 session_id,
-                "skill_runtime_exception: runtime_ms=%.1f error=%s",
+                "capability_runtime_exception: runtime_ms=%.1f error=%s",
                 now_ms() - started_ms,
                 exc,
             )
@@ -8059,7 +8059,7 @@ class VoiceAssistant:
             except Exception:
                 cognitive_plan = None
             if cognitive_plan is not None:
-                outcome_execution = execution or SkillRuntimeResult(
+                outcome_execution = execution or CapabilityRuntimeResult(
                     interaction_id=response.interaction_id,
                     status="failed",
                 )
@@ -8068,7 +8068,7 @@ class VoiceAssistant:
                         await self._record_soridormi_post_status(session_id)
                     )
                 if execution is None:
-                    for request in response.skills:
+                    for request in response.capabilities:
                         self.conversation_state.update_pending_task_status_for_request_id(
                             request_id=request.request_id,
                             status="not_run",
@@ -8110,7 +8110,7 @@ class VoiceAssistant:
                 )
                 return outcome_execution
             for request_id in [
-                *(request.request_id for request in response.skills),
+                *(request.request_id for request in response.capabilities),
                 *(speech.id for speech in response.speech),
             ]:
                 self.conversation_state.update_pending_task_status_for_request_id(
@@ -8139,8 +8139,8 @@ class VoiceAssistant:
     @staticmethod
     def _cancelled_execution_with_unknown_request_results(
         response: InteractionResponse,
-        execution: SkillRuntimeResult | None,
-    ) -> SkillRuntimeResult:
+        execution: CapabilityRuntimeResult | None,
+    ) -> CapabilityRuntimeResult:
         """Conservatively retain cancellation when terminal evidence is lost.
 
         When cancellation propagates through a coordinator, the host cannot
@@ -8154,16 +8154,16 @@ class VoiceAssistant:
         existing_by_request = {
             result.request_id: result for result in existing_results
         }
-        merged_results: list[SkillResult] = []
+        merged_results: list[CapabilityResult] = []
         committed_request_ids: set[str] = set()
-        for request in response.skills:
+        for request in response.capabilities:
             committed_request_ids.add(request.request_id)
             result = existing_by_request.get(request.request_id)
             if result is None:
-                result = SkillResult(
+                result = CapabilityResult(
                     request_id=request.request_id,
-                    skill_id=request.skill_id,
-                    skill_version=request.skill_version,
+                    capability_id=request.capability_id,
+                    capability_version=request.capability_version,
                     status="cancelled",
                     reason_code=(
                         "interaction_cancelled_terminal_result_unavailable"
@@ -8180,7 +8180,7 @@ class VoiceAssistant:
             for result in existing_results
             if result.request_id not in committed_request_ids
         )
-        return SkillRuntimeResult(
+        return CapabilityRuntimeResult(
             interaction_id=response.interaction_id,
             status="cancelled",
             results=merged_results,
@@ -8234,7 +8234,7 @@ class VoiceAssistant:
     async def _maybe_stage_body_recovery_confirmation(
         self,
         response: InteractionResponse,
-        execution: SkillRuntimeResult,
+        execution: CapabilityRuntimeResult,
         session_id: str | None,
     ) -> bool:
         if execution.status == "cancelled":
@@ -8287,8 +8287,8 @@ class VoiceAssistant:
             task_type="body_recovery_confirmation",
             status="awaiting_confirmation",
             summary=", ".join(
-                request.skill_id
-                for request in recovery.response.skills
+                request.capability_id
+                for request in recovery.response.capabilities
                 if request.request_id in recovery.confirmed_request_ids
             ),
             metadata={
@@ -8402,7 +8402,7 @@ class VoiceAssistant:
         # must stop for every output interruption or it can enqueue fresh audio
         # after the queues below have been invalidated. The broader routed turn
         # is cancelled separately so output-only scope can preserve committed
-        # Skill Runtime work.
+        # Capability Runtime work.
         if self.active_llm_task and not self.active_llm_task.done():
             self.active_llm_task.cancel()
         if cancel_cognitive_work:
@@ -8639,15 +8639,15 @@ class VoiceAssistant:
                         )
                     else:
                         dispatch_failures.append(
-                            "skill_runtime:dispatch_unsupported"
+                            "capability_runtime:dispatch_unsupported"
                         )
                 elif scope == "embodied_motion":
                     dispatch_failures.append(
-                        "skill_runtime:scoped_dispatch_unsupported"
+                        "capability_runtime:scoped_dispatch_unsupported"
                     )
                 elif scope == "media_output":
                     dispatch_failures.append(
-                        "skill_runtime:scoped_dispatch_unsupported"
+                        "capability_runtime:scoped_dispatch_unsupported"
                     )
 
         if scope in {
@@ -8681,19 +8681,19 @@ class VoiceAssistant:
             if operation_kind == "runtime_scope":
                 if isinstance(result, BaseException):
                     dispatch_failures.append(
-                        "skill_runtime:"
+                        "capability_runtime:"
                         f"{type(result).__name__}:{str(result)[:300]}"
                     )
                 elif isinstance(result, CancellationDispatchReceipt):
                     receipt = result
                 else:
                     dispatch_failures.append(
-                        "skill_runtime:invalid_dispatch_receipt"
+                        "capability_runtime:invalid_dispatch_receipt"
                     )
             elif operation_kind == "runtime_legacy":
                 if isinstance(result, BaseException):
                     dispatch_failures.append(
-                        "skill_runtime_legacy:"
+                        "capability_runtime_legacy:"
                         f"{type(result).__name__}:{str(result)[:300]}"
                     )
                 elif active_interaction_id:
@@ -9305,14 +9305,14 @@ class VoiceAssistant:
             return await self.schedule_tts_text(text, session_id=None)
 
         orientation_enabled = bool(
-            getattr(self, "enable_soridormi_skills", False)
+            getattr(self, "enable_soridormi_capabilities", False)
         )
 
         async def execute_orientation() -> dict[str, Any]:
             return await execute_default_runtime_ready_orientation(
                 self.interaction_runtime,
-                enable_soridormi_skills=getattr(
-                    self, "enable_soridormi_skills", False
+                enable_soridormi_capabilities=getattr(
+                    self, "enable_soridormi_capabilities", False
                 ),
             )
 

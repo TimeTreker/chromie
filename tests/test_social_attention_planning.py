@@ -11,7 +11,7 @@ from agent.app.interaction import InteractionDraft
 from agent.app.runtime import InteractionRuntime
 from agent.app.social_attention import SocialAttentionPlanner
 from agent.app.schema import AgentRunRequest
-from shared.chromie_contracts.interaction import FORBIDDEN_LOW_LEVEL_FIELDS, SkillRequest
+from shared.chromie_contracts.interaction import FORBIDDEN_LOW_LEVEL_FIELDS, CapabilityRequest
 from shared.chromie_contracts.social_attention import (
     SocialAttentionActivityAnchor,
     SocialAttentionPlan,
@@ -103,7 +103,7 @@ class _Catalog:
 
 
 class _DomainCatalog(_Catalog):
-    async def refresh_live_named_skills(self) -> None:
+    async def refresh_live_named_capabilities(self) -> None:
         return None
 
     def entries(self) -> list[CapabilityMatch]:
@@ -224,7 +224,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
                     "warmth": "warm",
                 },
                 "recent_auxiliary_behavior_evidence": [
-                    {"skill_id": "soridormi.nod_yes", "event": "speaking"}
+                    {"capability_id": "soridormi.nod_yes", "event": "speaking"}
                 ],
             },
         )
@@ -508,7 +508,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
                 },
                 "behaviors": [
                     {
-                        "skill_id": "soridormi.express_attention",
+                        "capability_id": "soridormi.express_attention",
                         "args": {"style": "neutral", "duration_s": 1.8, "hold_fraction": 0.3},
                         "timing": "parallel",
                         "reason": "A subtle cue supports the greeting.",
@@ -538,9 +538,9 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
             )
         ).run(request)
 
-        self.assertEqual(response.skills[0].skill_id, "soridormi.express_attention")
-        self.assertEqual(response.skills[0].timing, "parallel")
-        self.assertTrue(response.skills[0].metadata["auxiliary_social_attention"])
+        self.assertEqual(response.capabilities[0].capability_id, "soridormi.express_attention")
+        self.assertEqual(response.capabilities[0].timing, "parallel")
+        self.assertTrue(response.capabilities[0].metadata["auxiliary_social_attention"])
         self.assertEqual(response.metadata["social_attention_status"], "applied")
         self.assertIn("known_right_side", attention.prompts[0])
         proposals = response.metadata["agent_task_proposals"]
@@ -606,7 +606,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
             )
         ).run(self._request())
 
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
         self.assertEqual(response.metadata["social_attention_status"], "not_selected")
 
     async def test_invalid_social_args_do_not_change_primary_response(self) -> None:
@@ -621,7 +621,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
                 },
                 "behaviors": [
                     {
-                        "skill_id": "soridormi.blink_eyes",
+                        "capability_id": "soridormi.blink_eyes",
                         "args": {"count": 99},
                         "timing": "parallel",
                         "reason": "Optional blink.",
@@ -643,7 +643,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
         ).run(self._request())
 
         self.assertEqual(response.speech[0].text, "I am here with you.")
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
         self.assertEqual(response.metadata["social_attention_status"], "not_applied")
         self.assertIn("invalid_args:soridormi.blink_eyes", response.metadata["social_attention_validation_reasons"][0])
 
@@ -659,7 +659,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
                 },
                 "behaviors": [
                     {
-                        "skill_id": "soridormi.blink_eyes",
+                        "capability_id": "soridormi.blink_eyes",
                         "args": {"count": 2},
                         "timing": "parallel",
                         "reason": "Optional blink.",
@@ -683,7 +683,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
         ).run(self._request())
 
         self.assertEqual(
-            [item.skill_id for item in response.skills],
+            [item.capability_id for item in response.capabilities],
             ["soridormi.blink_eyes"],
         )
         self.assertEqual(response.metadata["social_attention_status"], "applied")
@@ -700,7 +700,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
                 },
                 "behaviors": [
                     {
-                        "skill_id": "soridormi.blink_eyes",
+                        "capability_id": "soridormi.blink_eyes",
                         "args": {"count": 2},
                         "timing": "parallel",
                         "reason": "Optional blink.",
@@ -723,7 +723,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
             )
         ).run(self._request())
 
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
         self.assertEqual(
             response.metadata["social_attention_status"],
             "skipped_latency_budget",
@@ -746,7 +746,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
                 },
                 "behaviors": [
                     {
-                        "skill_id": "soridormi.express_attention",
+                        "capability_id": "soridormi.express_attention",
                         "args": {"style": "neutral", "duration_s": 1.4, "hold_fraction": 0.25},
                         "timing": "parallel",
                         "reason": "Maintain attention toward the tracked user.",
@@ -774,7 +774,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
         ).run(request)
 
         self.assertEqual(response.metadata["social_attention_status"], "applied")
-        target = response.skills[0].metadata["attention_target"]
+        target = response.capabilities[0].metadata["attention_target"]
         self.assertEqual(target["source"], "live_perception")
         self.assertEqual(target["target_ref"], "tracked_user_7")
         self.assertNotIn("known_right_side", attention.prompts[0].split('attention_target_evidence', 1)[1].split('eligible_social_capabilities', 1)[0])
@@ -792,7 +792,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
                 },
                 "behaviors": [
                     {
-                        "skill_id": "soridormi.express_attention",
+                        "capability_id": "soridormi.express_attention",
                         "args": {"style": "neutral", "duration_s": 1.5, "hold_fraction": 0.3},
                         "timing": "parallel",
                         "reason": "Look toward the invented target.",
@@ -822,7 +822,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
             )
         ).run(request)
 
-        self.assertEqual(response.skills, [])
+        self.assertEqual(response.capabilities, [])
         self.assertEqual(response.metadata["social_attention_status"], "not_applied")
         self.assertIn(
             "attention_target_ref_mismatch",
@@ -851,9 +851,9 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
         request.context["capability_candidates"] = [primary]
         result = InteractionDraft()
         result.add_speak_immediate("I will handle that safely.")
-        result.add_skill(
-            SkillRequest(
-                skill_id="soridormi.walk_forward",
+        result.add_capability(
+            CapabilityRequest(
+                capability_id="soridormi.walk_forward",
                 args={"duration_s": 2},
                 timing="parallel",
             )
@@ -868,7 +868,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
                 },
                 "behaviors": [
                     {
-                        "skill_id": "soridormi.blink_eyes",
+                        "capability_id": "soridormi.blink_eyes",
                         "args": {"count": 2},
                         "timing": "parallel",
                     }
@@ -877,9 +877,9 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
             }
         )
 
-        skills, reasons = planner.validate_and_materialize(request, result, plan)
+        capabilities, reasons = planner.validate_and_materialize(request, result, plan)
 
-        self.assertEqual(skills, [])
+        self.assertEqual(capabilities, [])
         self.assertIn("resource_conflict:soridormi.blink_eyes", reasons)
 
     def test_contract_rejects_low_level_fields(self) -> None:
@@ -895,7 +895,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
                     },
                     "behaviors": [
                         {
-                            "skill_id": "soridormi.express_attention",
+                            "capability_id": "soridormi.express_attention",
                             "args": {forbidden: [0.0]},
                             "timing": "parallel",
                         }
@@ -919,7 +919,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
                 "target": {"target_ref": "none", "source": "none"},
                 "behaviors": [
                     {
-                        "skill_id": "soridormi.blink_eyes",
+                        "capability_id": "soridormi.blink_eyes",
                         "args": {"count": 1},
                         "timing": "parallel",
                         "social_function": "acknowledge_presence",
@@ -940,9 +940,9 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
         ).run(self._request())
 
         self.assertEqual(response.metadata["social_attention_status"], "applied")
-        self.assertEqual(response.skills[0].skill_id, "soridormi.blink_eyes")
+        self.assertEqual(response.capabilities[0].capability_id, "soridormi.blink_eyes")
         self.assertEqual(
-            response.skills[0].metadata["behavior_domain"],
+            response.capabilities[0].metadata["behavior_domain"],
             "social_attention",
         )
 

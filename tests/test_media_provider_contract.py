@@ -6,7 +6,7 @@ import unittest
 
 from agent.app.capabilities.catalog import CapabilityCatalog
 from agent.app.capabilities.local import chromie_manifests
-from agent.app.capabilities.models import CapabilityBundle, CapabilityRegistry
+from agent.app.capabilities.models import CapabilityBundle, CapabilityRegistry as AgentCapabilityRegistry
 from agent.app.goal_association import GoalAssociationModelGoal
 from agent.app.planner_contract import (
     PlannerModelOutput,
@@ -15,11 +15,11 @@ from agent.app.planner_contract import (
 )
 from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
-from orchestrator.runtime.skill_runtime import (
-    LocalSpeechSkillProvider,
-    MediaPlaybackSkillProvider,
-    SkillRegistry,
-    SkillRuntime,
+from orchestrator.runtime.capability_runtime import (
+    LocalSpeechCapabilityProvider,
+    MediaPlaybackCapabilityProvider,
+    CapabilityRegistry as RuntimeCapabilityRegistry,
+    CapabilityRuntime,
     local_speech_definition,
     media_playback_definitions,
 )
@@ -183,7 +183,7 @@ class MediaDeclarationAndPlannerTests(unittest.TestCase):
 
     def test_qualified_catalog_exposes_activity_contract_without_backend_name(self) -> None:
         qualified = declaration()
-        registry = CapabilityRegistry.from_bundles(
+        registry = AgentCapabilityRegistry.from_bundles(
             [CapabilityBundle(agents=chromie_manifests(media_provider=qualified))]
         )
         catalog = CapabilityCatalog(registry)
@@ -266,7 +266,7 @@ class MediaDeclarationAndPlannerTests(unittest.TestCase):
         unavailable = canonical_plan_response_schema(
             planner_tier="deep",
             expected_goal_ids=["goal-media"],
-            allowed_skill_ids=[MEDIA_CAPABILITY_IDS["pause"]],
+            allowed_capability_ids=[MEDIA_CAPABILITY_IDS["pause"]],
             provider_required_media_goal_operations={"goal-media": "play"},
         )
         outcome = unavailable["properties"]["goal_outcomes"]["properties"]["goal-media"]
@@ -319,17 +319,17 @@ class MediaTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         self.declaration = declaration()
         self.backend = StatefulFakeMediaBackend()
-        self.provider = MediaPlaybackSkillProvider(
+        self.provider = MediaPlaybackCapabilityProvider(
             self.declaration,
             self.backend.handle,
         )
-        self.registry = SkillRegistry()
+        self.registry = RuntimeCapabilityRegistry()
         self.registry.register(local_speech_definition())
         for definition in media_playback_definitions(self.declaration):
             self.registry.register(definition)
-        self.runtime = SkillRuntime(self.registry)
+        self.runtime = CapabilityRuntime(self.registry)
         self.runtime.register_provider(
-            LocalSpeechSkillProvider(lambda _args: {"scheduled": True, "playback_started": True})
+            LocalSpeechCapabilityProvider(lambda _args: {"scheduled": True, "playback_started": True})
         )
         self.runtime.register_provider(self.provider)
 
@@ -341,7 +341,7 @@ class MediaTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
         return await self.runtime.execute(
             InteractionResponse(
                 interaction_id=f"interaction-{operation}",
-                skills=[
+                capabilities=[
                     {
                         "request_id": f"request-{operation}",
                         "capability_id": MEDIA_CAPABILITY_IDS[operation],
@@ -358,15 +358,15 @@ class MediaTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(
-            coordinator.skill_definition(MEDIA_CAPABILITY_IDS["play"]).provider_id,
+            coordinator.capability_definition(MEDIA_CAPABILITY_IDS["play"]).provider_id,
             self.declaration.provider_id,
         )
         self.assertEqual(
-            coordinator.skill_definition(MEDIA_CAPABILITY_IDS["play"]).metadata["execution_lane"],
+            coordinator.capability_definition(MEDIA_CAPABILITY_IDS["play"]).metadata["execution_lane"],
             "activity",
         )
         self.assertEqual(
-            coordinator.skill_definition("chromie.speak").provider_id,
+            coordinator.capability_definition("chromie.speak").provider_id,
             "chromie.local_speech",
         )
 
@@ -438,7 +438,7 @@ class MediaTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertTrue(response.speech[0].metadata["media_ducking_required"])
         self.assertEqual(response.speech[0].metadata["media_ducking_gain_db"], -12.0)
-        media_request = response.skills[0]
+        media_request = response.capabilities[0]
         self.assertEqual(
             media_request.metadata["media_mixer_policy"],
             "duck_media_during_vocal",
@@ -537,12 +537,12 @@ class MediaTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 delivery_evidence_id="wrong-operation",
             )
 
-        runtime = SkillRuntime(self.registry)
-        runtime.register_provider(MediaPlaybackSkillProvider(self.declaration, wrong))
+        runtime = CapabilityRuntime(self.registry)
+        runtime.register_provider(MediaPlaybackCapabilityProvider(self.declaration, wrong))
         execution = await runtime.execute(
             InteractionResponse(
                 interaction_id="wrong-operation",
-                skills=[
+                capabilities=[
                     {
                         "request_id": "play-request",
                         "capability_id": MEDIA_CAPABILITY_IDS["play"],
@@ -591,20 +591,20 @@ class MediaTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
             async def cancel_media(request, _state):  # type: ignore[no-untyped-def]
                 media_cancelled.append(request.request_id)
 
-            provider = MediaPlaybackSkillProvider(
+            provider = MediaPlaybackCapabilityProvider(
                 self.declaration,
                 media,
                 cancel_media,
             )
-            runtime = SkillRuntime(self.registry)
-            runtime.register_provider(LocalSpeechSkillProvider(speech, cancel_speech))
+            runtime = CapabilityRuntime(self.registry)
+            runtime.register_provider(LocalSpeechCapabilityProvider(speech, cancel_speech))
             runtime.register_provider(provider)
             interaction_id = f"cancel-{scope}"
             task = asyncio.create_task(
                 runtime.execute(
                     InteractionResponse(
                         interaction_id=interaction_id,
-                        skills=[
+                        capabilities=[
                             {
                                 "request_id": "speech-request",
                                 "capability_id": "chromie.speak",

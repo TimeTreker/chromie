@@ -113,7 +113,7 @@ that preserves the original goal, completed steps, failed step, failure code,
 current physical state, irreversible effects, Soridormi recommended next
 actions, and a residual-only replan scope. This context is advisory: it is not
 a retry authorization, and any follow-up plan must be newly validated and pass
-the usual confirmation, SkillRuntime, and Soridormi gates.
+the usual confirmation, CapabilityRuntime, and Soridormi gates.
 Planning execution may run `chromie.report` nodes through a local trace-only
 adapter, primarily as failure-policy fallback nodes. This records a report in
 the execution trace without invoking TTS or audio playback. `chromie.speak`

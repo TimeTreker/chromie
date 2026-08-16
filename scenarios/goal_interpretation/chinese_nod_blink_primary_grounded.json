@@ -120,7 +120,7 @@
       "task.execute_robot_action"
     ],
     "task_types_forbid": [
-      "task.execute_skill",
+      "task.execute_capability",
       "speech.answer"
     ],
     "metadata_json_forbid": [

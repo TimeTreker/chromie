@@ -98,7 +98,7 @@ def _chat_turn(
     metadata: dict[str, Any] | None = None,
     extra_expect: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    expect: dict[str, Any] = {"speech_any": [expect_phrase], "no_skills": True}
+    expect: dict[str, Any] = {"speech_any": [expect_phrase], "no_capabilities": True}
     if extra_expect:
         expect.update(extra_expect)
     return {
@@ -470,7 +470,7 @@ def _clarify_cases(start: int) -> list[dict[str, Any]]:
                         "stub": {"route_decision": _clarify_decision("clarify_reference", clarify)},
                         "expect": {
                             "speech_any": [clarify.split("?")[0]],
-                            "no_skills": True,
+                            "no_capabilities": True,
                         },
                     },
                     _chat_turn(
@@ -527,7 +527,7 @@ def _motion_cases(start: int) -> list[dict[str, Any]]:
                         },
                         "expect": {
                             "speech_any": ["run that action"],
-                            "skills": ["soridormi.walk_velocity"],
+                            "capabilities": ["soridormi.walk_velocity"],
                             "requires_confirmation": True,
                             "current_task_context_contains": [phrase],
                         },
@@ -579,7 +579,7 @@ def _motion_cases(start: int) -> list[dict[str, Any]]:
                         },
                         "expect": {
                             "speech_any": ["run that action"],
-                            "skills": ["soridormi.nod_yes"],
+                            "capabilities": ["soridormi.nod_yes"],
                             "requires_confirmation": True,
                             "current_task_context_contains": [phrase],
                         },
@@ -637,7 +637,7 @@ def _motion_cases(start: int) -> list[dict[str, Any]]:
                         },
                         "expect": {
                             "speech_any": ["run that action"],
-                            "skills": ["soridormi.blink_eyes"],
+                            "capabilities": ["soridormi.blink_eyes"],
                             "requires_confirmation": True,
                             "current_task_context_contains": [phrase],
                         },
@@ -668,9 +668,9 @@ def _motion_cases(start: int) -> list[dict[str, Any]]:
         ("nod yes and blink once", ["soridormi.nod_yes", "soridormi.blink_eyes"]),
     ]
     base += len(blink_rows)
-    for index, (phrase, skills) in enumerate(compound_rows, start=base):
+    for index, (phrase, capabilities) in enumerate(compound_rows, start=base):
         actions: list[dict[str, Any]] = []
-        for sequence, skill in enumerate(skills):
+        for sequence, skill in enumerate(capabilities):
             args: dict[str, Any]
             if skill == "soridormi.walk_velocity":
                 args = {"vx_mps": 0.1, "duration_s": 1.0}
@@ -698,7 +698,7 @@ def _motion_cases(start: int) -> list[dict[str, Any]]:
                         },
                         "expect": {
                             "speech_any": ["selected actions in order"],
-                            "skills": skills,
+                            "capabilities": capabilities,
                             "requires_confirmation": True,
                             "current_task_context_contains": [phrase],
                         },
@@ -710,7 +710,7 @@ def _motion_cases(start: int) -> list[dict[str, Any]]:
                         intent="task_status",
                         expect_phrase=phrase,
                         metadata={"task_relation": "continue_task"},
-                        extra_expect={"session_memory_contains": skills},
+                        extra_expect={"session_memory_contains": capabilities},
                     ),
                 ],
             )

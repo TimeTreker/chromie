@@ -406,7 +406,7 @@ def chromie_manifests(
         ),
         transport=TransportSpec(
             kind="host_runtime",
-            module="orchestrator.runtime.skill_runtime",
+            module="orchestrator.runtime.capability_runtime",
         ),
         tags=["chromie", "media", "playback", "activity"],
         tools=media_playback_tools(media_provider),

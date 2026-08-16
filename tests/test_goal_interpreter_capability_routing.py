@@ -919,7 +919,7 @@ class InterpreterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                             "route": "robot_action",
                             "intent": "chromie.speak",
                             "confidence": 0.95,
-                            "lane": "skill_runtime",
+                            "lane": "capability_runtime",
                             "context_profile": "capability_safety",
                         }
                     ]

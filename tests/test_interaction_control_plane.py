@@ -168,11 +168,11 @@ class InteractionControlPlaneTests(unittest.IsolatedAsyncioTestCase):
         ).execute(
             response,
             session_id=route_request.sid,
-            confirmed_request_ids={response.skills[0].request_id},
+            confirmed_request_ids={response.capabilities[0].request_id},
         )
 
         self.assertEqual(execution.status, "completed")
-        self.assertEqual(response.skills[0].skill_id, "soridormi.nod_yes")
+        self.assertEqual(response.capabilities[0].capability_id, "soridormi.nod_yes")
         self.assertEqual(spoken, [])
         self.assertEqual(
             invoker.calls,
@@ -210,7 +210,7 @@ class InteractionControlPlaneTests(unittest.IsolatedAsyncioTestCase):
             update={
                 "speech": [
                     *response.speech,
-                    InteractionSpeech(text="Arrived.", timing="after_skills"),
+                    InteractionSpeech(text="Arrived.", timing="after_capabilities"),
                 ]
             },
         )
@@ -235,10 +235,10 @@ class InteractionControlPlaneTests(unittest.IsolatedAsyncioTestCase):
             task_graph_handler=execute_graph,
         ).execute(response, session_id="rich-task")
 
-        self.assertEqual(response.skills[0].skill_id, "chromie.task_graph.execute")
+        self.assertEqual(response.capabilities[0].capability_id, "chromie.task_graph.execute")
         self.assertEqual(graphs[0]["graph_id"], "rich-body-task")
         self.assertEqual(execution.status, "failed")
-        self.assertEqual(execution.results[0].skill_id, "chromie.task_graph.execute")
+        self.assertEqual(execution.results[0].capability_id, "chromie.task_graph.execute")
         self.assertNotIn("Arrived.", spoken)
         self.assertEqual(
             spoken,

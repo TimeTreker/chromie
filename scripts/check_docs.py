@@ -449,7 +449,7 @@ def check_configuration_reference(errors: list[str]) -> None:
     values = common_env_values()
     safety_default_names = (
         "ORCH_ENABLE_INTERACTION_RESPONSE",
-        "ORCH_ENABLE_SORIDORMI_SKILLS",
+        "ORCH_ENABLE_SORIDORMI_CAPABILITIES",
         "ORCH_GOAL_ASSOCIATION_MODE",
         "ORCH_FAST_PLANNER_MODE",
         "ORCH_DEEP_PLANNER_MODE",

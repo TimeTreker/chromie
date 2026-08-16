@@ -56,7 +56,7 @@ def test_daily_conversation_live_adapter_retains_goal_and_plan_semantics() -> No
             "route": {"route": "robot_action"},
             "interaction_response": {
                 "speech": [{"text": "Once upon a time"}],
-                "skills": [
+                "capabilities": [
                     {
                         "capability_id": "soridormi.walk_forward",
                         "args": {"duration_s": 5},

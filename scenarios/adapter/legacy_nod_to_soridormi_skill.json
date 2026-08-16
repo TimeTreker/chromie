@@ -28,7 +28,7 @@
   },
   "expect": {
     "speech_all": ["Okay."],
-    "skills": ["soridormi.nod_yes"],
+    "capabilities": ["soridormi.nod_yes"],
     "skill_args": [
       {
         "count": 2

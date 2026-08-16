@@ -147,7 +147,7 @@ adding a manager because a useful explanatory term exists.
 The Trusted Capability Runtime now has an approved target architecture. Current source
 already has request identity, validation, resource arbitration, cancellation, provider
 execution, and bounded internal concurrency, but terminal results are still aggregated
-behind long-running `SkillRuntime.execute(...)` call stacks. The target is one canonical
+behind long-running `CapabilityRuntime.execute(...)` call stacks. The target is one canonical
 `CapabilityRuntime`: non-blocking dispatch, independent request lifecycle events, terminal
 Evidence reconciliation, and cognitive re-entry without creating a second Work/Result
 manager or semantic agent. Provider transport and durable-execution backend remain below
@@ -155,11 +155,13 @@ the Capability contract.
 
 Implement this line as separate focused Issues and separate patches:
 
-- **Issue — Canonicalize Capability Runtime vocabulary.** Rename executable
-  `SkillRuntime`/`SkillDefinition`/`SkillRegistry`/`SkillProvider` and related source, tests,
-  files, logs, and DTO aliases to Capability terminology; delete live `skill_id` and
-  executable-Skill compatibility instead of extending it. Agent Skills keep their own
-  deliberate Skill vocabulary.
+- **Issue — Canonicalize Capability Runtime vocabulary — source implementation complete.**
+  Canonical executable source now uses `CapabilityRuntime`, `CapabilityDefinition`,
+  `CapabilityRegistry`, `CapabilityProvider`, `CapabilityRequest`, `CapabilityResult`,
+  `capability_id`, and `capability_version`. The old executable `Skill*` aliases/files and
+  live `skill_id` compatibility are removed; Agent Skills retain `agent_skill_id`, while
+  Soridormi wire `skill_id` is translated only at its adapter boundary. This naming/authority
+  cleanup does **not** claim the asynchronous dispatch behavior of the later Issues.
 - **Issue — Split capability dispatch from terminal completion.** Add a small
   `CapabilityDispatchReceipt` contract and `CapabilityRuntime.submit(...)` semantics so
   acceptance/scheduling returns promptly while provider execution continues. Preserve

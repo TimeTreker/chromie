@@ -410,9 +410,13 @@ def audit_agent_skill_authority(root: Path) -> list[PolicyFinding]:
         "CapabilityRegistry",
         "CapabilityProvider",
         "CapabilityDefinition",
+        "CapabilityRuntime",
+        "SkillRegistry",
+        "SkillProvider",
+        "SkillDefinition",
+        "SkillRuntime",
         "TrustedCapabilityRuntime",
         "TrustedSkillRuntime",
-        "SkillRuntime",
     }
     forbidden_calls = {
         "register",
@@ -1083,6 +1087,13 @@ def _base_name(node: ast.expr) -> str:
 
 
 def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
+    """Enforce canonical executable Capability vocabulary.
+
+    Agent Skills and provider-local wire protocols are separate namespaces. This
+    rule protects Chromie-owned model/runtime/evidence contracts from reviving
+    the retired executable ``Skill*`` API or ``skill_id`` compatibility fields.
+    """
+
     targets = {
         "shared/chromie_contracts/route.py": {
             "RouteItem": "OptionalCapabilityIdentityModel",
@@ -1101,8 +1112,8 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
             "TaskProposal": "OptionalCapabilityIdentityModel",
         },
         "orchestrator/runtime/episode.py": {
-            "EpisodeSkillRequestRecord": "CapabilityIdentityModel",
-            "EpisodeSkillResultRecord": "CapabilityIdentityModel",
+            "EpisodeCapabilityRequestRecord": "CapabilityIdentityModel",
+            "EpisodeCapabilityResultRecord": "CapabilityIdentityModel",
         },
     }
     findings: list[PolicyFinding] = []
@@ -1136,25 +1147,98 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
                         path=relative,
                         line=node.lineno,
                         symbol=class_name,
-                        message=f"must inherit {expected_base} so legacy input normalizes and new output emits capability_id",
+                        message=(
+                            f"must inherit {expected_base} so canonical output uses "
+                            "capability_id"
+                        ),
                     )
                 )
             for field_name, field_node in _class_field_names(node):
-                if field_name == "skill_id":
+                if field_name in {"skill_id", "skill_version"}:
                     findings.append(
                         PolicyFinding(
                             rule_id=RULE_CANONICAL_CAPABILITY_ID,
                             path=relative,
                             line=getattr(field_node, "lineno", 0) or 0,
-                            symbol=f"{class_name}.skill_id",
-                            message="new model/evidence contracts must declare capability_id, not skill_id",
+                            symbol=f"{class_name}.{field_name}",
+                            message=(
+                                "Chromie executable contracts must declare "
+                                "capability_id/capability_version, not executable Skill aliases"
+                            ),
                         )
                     )
+
+    retired_runtime_paths = (
+        "orchestrator/runtime/skill_runtime.py",
+        "orchestrator/runtime/skill_adapters.py",
+        "orchestrator/runtime/soridormi_skill_provider.py",
+    )
+    for relative in retired_runtime_paths:
+        if (root / relative).exists():
+            findings.append(
+                _source_policy_finding(
+                    root=root,
+                    path=relative,
+                    rule_id=RULE_CANONICAL_CAPABILITY_ID,
+                    symbol="<retired-runtime-path>",
+                    message="retired executable-Skill runtime module must not exist",
+                )
+            )
+
+    # These are Chromie-owned executable/runtime sources. Agent Skill code and
+    # Soridormi wire payload strings are intentionally not scanned as aliases.
+    retired_symbols = (
+        "SkillRuntime",
+        "SkillDefinition",
+        "SkillRegistry",
+        "SkillProvider",
+        "SkillRequest",
+        "SkillResult",
+        "SkillTrace",
+        "TrustedCapabilityRuntime",
+    )
+    canonical_runtime_files = (
+        "shared/chromie_contracts/interaction.py",
+        "shared/chromie_contracts/__init__.py",
+        "orchestrator/runtime/capability_runtime.py",
+        "orchestrator/runtime/capability_adapters.py",
+        "orchestrator/runtime/interaction_coordinator.py",
+        "orchestrator/runtime/outcome_reconciliation.py",
+        "orchestrator/runtime/interaction_preflight.py",
+        "orchestrator/runtime/episode.py",
+        "orchestrator/runtime/experience.py",
+        "orchestrator/runtime/task_proposals.py",
+        "agent/app/agents/capability.py",
+        "agent/app/agents/deepthinking.py",
+        "agent/app/fast_planner.py",
+        "agent/app/deep_planner.py",
+        "agent/app/planner_contract.py",
+    )
+    for relative in canonical_runtime_files:
+        path = root / relative
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        for token in retired_symbols:
+            if re.search(rf"\b{re.escape(token)}\b", text):
+                findings.append(
+                    _source_policy_finding(
+                        root=root,
+                        path=relative,
+                        rule_id=RULE_CANONICAL_CAPABILITY_ID,
+                        symbol=token,
+                        message=(
+                            "Chromie canonical executable runtime must not expose "
+                            "retired executable-Skill symbols"
+                        ),
+                    )
+                )
+
     canonical_source_checks = {
         "agent/app/fast_planner.py": (
             "FINAL ALLOWED EXECUTABLE SKILL IDS",
             "exact supplied skill IDs",
-            "Do not use capability_id",
+            "Skills are plan leaves",
         ),
         "agent/app/deep_planner.py": (
             "step_id, skill_id",
@@ -1162,26 +1246,26 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
             "Skills are plan leaves",
         ),
         "agent/app/agents/deepthinking.py": (
-            '"skill_id": task.skill_id',
             'item["skill_id"]',
+            'item.get("skill_id")',
         ),
         "orchestrator/runtime/cognitive_runtime.py": (
-            '"skill_id": step.skill_id',
-            '"skill_id": request.skill_id',
-            '"skill_ids": [item.skill_id',
+            '"skill_id": step.',
+            '"skill_id": request.',
+            '"skill_ids":',
         ),
         "orchestrator/runtime/experience.py": (
-            '"skill_id": result.skill_id',
+            '"skill_id": result.',
         ),
         "orchestrator/runtime/interaction_preflight.py": (
-            '"skill_id": request.skill_id',
+            '"skill_id": request.',
         ),
         "orchestrator/runtime/interaction_coordinator.py": (
             '"suppressed_skill_ids"',
         ),
         "orchestrator/runtime/task_proposals.py": (
             'proposal["skill_id"]',
-            '"skill_id": skill_id',
+            'proposal.get("skill_id")',
         ),
         "orchestrator/runtime/conversation_state.py": (
             '"skill_id": "chromie.speak"',

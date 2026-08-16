@@ -86,7 +86,7 @@
             "runtime_status": "applied",
             "runtime_lane": "tool",
             "require_delivered_speech": true,
-            "required_terminal_skills": [
+            "required_terminal_capabilities": [
               "chromie.weather.lookup"
             ],
             "require_completed_outcome": true
@@ -101,7 +101,7 @@
             "core_authority": "goal_driven_cognitive_core",
             "runtime_status": "applied",
             "require_delivered_speech": true,
-            "forbidden_terminal_skills": [
+            "forbidden_terminal_capabilities": [
               "chromie.weather.lookup"
             ],
             "required_context_reference_types": [
@@ -115,10 +115,10 @@
   ],
   "simulator_expectations": {
     "required": true,
-    "minimum_terminal_skill_count": 3,
+    "minimum_terminal_capability_count": 3,
     "minimum_completed_soridormi_results": 3,
     "safe_idle_required": true,
-    "required_terminal_skills": [
+    "required_terminal_capabilities": [
       "soridormi.walk_velocity",
       "soridormi.nod_yes",
       "soridormi.turn_in_place"
@@ -128,7 +128,7 @@
     "required": true,
     "command_text": "Walk forward at 0.2 meters per second for 20 seconds.",
     "interrupt_text": "Stop.",
-    "required_skill": "soridormi.walk_velocity",
+    "required_capability": "soridormi.walk_velocity",
     "provider_started_required": true,
     "gateway_admission": "reflex_and_admit",
     "reflex_action": "interrupt",

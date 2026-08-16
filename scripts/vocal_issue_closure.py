@@ -322,7 +322,7 @@ def _steps_by_id(plan: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 
 def _capability_id(item: dict[str, Any]) -> str:
-    return str(item.get("capability_id") or item.get("skill_id") or "").strip()
+    return str(item.get("capability_id") or "").strip()
 
 
 def _source_goal_ids(item: dict[str, Any]) -> set[str]:
@@ -564,7 +564,7 @@ def validate_closure_summary(
 
     response = summary.get("interaction_response")
     response = response if isinstance(response, dict) else {}
-    requests = response.get("skills")
+    requests = response.get("capabilities")
     requests = requests if isinstance(requests, list) else []
     request_items = [item for item in requests if isinstance(item, dict)]
     requested_by_capability = {
@@ -729,7 +729,7 @@ def _build_live_command(
     runtime_identity_path: Path,
     conversation_id: str,
     timeout_s: float,
-    skill_timeout_s: float,
+    capability_timeout_s: float,
     speaker: bool,
 ) -> list[str]:
     command = [
@@ -762,8 +762,8 @@ def _build_live_command(
         "robot_action",
         "--timeout-s",
         str(timeout_s),
-        "--skill-timeout-s",
-        str(skill_timeout_s),
+        "--capability-timeout-s",
+        str(capability_timeout_s),
         "--speaker" if speaker else "--no-speaker",
     ]
     return command
@@ -816,7 +816,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--walk-capability", default="soridormi.walk_forward")
     parser.add_argument("--blink-capability", default="soridormi.blink_eyes")
     parser.add_argument("--timeout-s", type=float, default=1200.0)
-    parser.add_argument("--skill-timeout-s", type=float, default=180.0)
+    parser.add_argument("--capability-timeout-s", type=float, default=180.0)
     parser.add_argument(
         "--speaker",
         action=argparse.BooleanOptionalAction,
@@ -980,7 +980,7 @@ def main(argv: list[str] | None = None) -> int:
                         runtime_identity_path=runtime_identity_path,
                         conversation_id=f"vocal-issue-1-{_acceptance_id()}",
                         timeout_s=args.timeout_s,
-                        skill_timeout_s=args.skill_timeout_s,
+                        capability_timeout_s=args.capability_timeout_s,
                         speaker=args.speaker,
                     )
                     live = _run(command, log_path=output_dir / "live_run.log")

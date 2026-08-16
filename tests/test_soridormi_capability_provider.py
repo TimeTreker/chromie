@@ -4,17 +4,20 @@ import unittest
 from typing import Any
 
 from agent.app.tool_invocation import ToolCallOutcome, ToolInvocationContext
-from orchestrator.runtime.skill_runtime import (
+from orchestrator.runtime.capability_runtime import (
     RuntimeAuthorization,
-    SkillExecutionContext,
-    SkillRegistry,
-    SkillRuntime,
+    CapabilityExecutionContext,
+    CapabilityRegistry,
+    CapabilityRuntime,
 )
-from orchestrator.runtime.soridormi_skill_provider import SoridormiMcpSkillProvider
+from orchestrator.runtime.soridormi_capability_provider import (
+    SoridormiCapabilityProvider,
+    import_soridormi_capability_catalog,
+)
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
-    SkillRequest,
-    SkillTrace,
+    CapabilityRequest,
+    CapabilityTrace,
 )
 
 
@@ -60,10 +63,10 @@ class _RecordingInvoker:
         return ToolCallOutcome.failed(f"unexpected tool {tool_name}")
 
 
-class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
-    def _runtime(self, invoker: _RecordingInvoker) -> SkillRuntime:
-        registry = SkillRegistry()
-        registry.import_soridormi_catalog(
+class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
+    def _runtime(self, invoker: _RecordingInvoker) -> CapabilityRuntime:
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry,
             [
                 {
                     "skill_id": "nod_yes",
@@ -86,13 +89,13 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
                 }
             ]
         )
-        runtime = SkillRuntime(registry)
-        runtime.register_provider(SoridormiMcpSkillProvider(invoker))
+        runtime = CapabilityRuntime(registry)
+        runtime.register_provider(SoridormiCapabilityProvider(invoker))
         return runtime
 
     def test_imported_embodied_skill_has_host_owned_completion_evidence_policy(self) -> None:
-        registry = SkillRegistry()
-        registry.import_soridormi_catalog(
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry,
             [
                 {
                     "skill_id": "nod_yes",
@@ -128,10 +131,10 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
         invoker = _RecordingInvoker()
         execution = await self._runtime(invoker).execute(
             InteractionResponse(
-                skills=[
+                capabilities=[
                     {
                         "request_id": "nod-1",
-                        "skill_id": "soridormi.nod_yes",
+                        "capability_id": "soridormi.nod_yes",
                         "args": {"count": 2, "amplitude": "small"},
                     }
                 ]
@@ -147,7 +150,7 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
             execution.results[0].output,
             {
                 "completed": True,
-                "skill_id": "nod_yes",
+                "capability_id": "soridormi.nod_yes",
                 "mode": "",
                 "no_motion": False,
                 "recommendation_only": False,
@@ -184,7 +187,7 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(create_plan_args["chromie_intent"]["request_id"], "nod-1")
         self.assertEqual(
-            create_plan_args["chromie_intent"]["skill_id"],
+            create_plan_args["chromie_intent"]["capability_id"],
             "soridormi.nod_yes",
         )
         self.assertEqual(
@@ -228,8 +231,8 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
                 ),
             }
         )
-        registry = SkillRegistry()
-        registry.import_soridormi_catalog(
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry,
             [
                 {
                     "skill_id": "blink_eyes",
@@ -253,16 +256,16 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
                 }
             ]
         )
-        runtime = SkillRuntime(registry)
-        runtime.register_provider(SoridormiMcpSkillProvider(invoker))
+        runtime = CapabilityRuntime(registry)
+        runtime.register_provider(SoridormiCapabilityProvider(invoker))
 
         execution = await runtime.execute(
             InteractionResponse(
                 interaction_id="social-interaction",
-                skills=[
+                capabilities=[
                     {
                         "request_id": "social-blink",
-                        "skill_id": "soridormi.blink_eyes",
+                        "capability_id": "soridormi.blink_eyes",
                         "args": {"count": 2},
                         "timing": "parallel",
                         "requires_confirmation": False,
@@ -292,8 +295,8 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_social_preflight_does_not_override_provider_confirmation(self) -> None:
         invoker = _RecordingInvoker()
-        registry = SkillRegistry()
-        registry.import_soridormi_catalog(
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry,
             [
                 {
                     "skill_id": "blink_eyes",
@@ -309,16 +312,16 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
                 }
             ]
         )
-        runtime = SkillRuntime(registry)
-        runtime.register_provider(SoridormiMcpSkillProvider(invoker))
+        runtime = CapabilityRuntime(registry)
+        runtime.register_provider(SoridormiCapabilityProvider(invoker))
 
         await runtime.execute(
             InteractionResponse(
                 interaction_id="provider-confirmation",
-                skills=[
+                capabilities=[
                     {
                         "request_id": "provider-confirmed-blink",
-                        "skill_id": "soridormi.blink_eyes",
+                        "capability_id": "soridormi.blink_eyes",
                         "args": {},
                         "requires_confirmation": False,
                         "metadata": {
@@ -355,8 +358,8 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
                 )
             }
         )
-        registry = SkillRegistry()
-        registry.import_soridormi_catalog(
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry,
             [
                 {
                     "skill_id": "blink_eyes",
@@ -372,16 +375,16 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
                 }
             ]
         )
-        runtime = SkillRuntime(registry)
-        runtime.register_provider(SoridormiMcpSkillProvider(invoker))
+        runtime = CapabilityRuntime(registry)
+        runtime.register_provider(SoridormiCapabilityProvider(invoker))
 
         await runtime.execute(
             InteractionResponse(
                 interaction_id="ordinary-interaction",
-                skills=[
+                capabilities=[
                     {
                         "request_id": "ordinary-blink",
-                        "skill_id": "soridormi.blink_eyes",
+                        "capability_id": "soridormi.blink_eyes",
                         "args": {},
                         "requires_confirmation": False,
                         "metadata": {"source": "canonical_plan"},
@@ -423,8 +426,8 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
                 ),
             }
         )
-        registry = SkillRegistry()
-        registry.import_soridormi_catalog(
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry,
             [
                 {
                     "skill_id": "walk_forward",
@@ -449,16 +452,16 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
                 }
             ]
         )
-        runtime = SkillRuntime(registry)
-        runtime.register_provider(SoridormiMcpSkillProvider(invoker))
+        runtime = CapabilityRuntime(registry)
+        runtime.register_provider(SoridormiCapabilityProvider(invoker))
 
         execution = await runtime.execute(
             InteractionResponse(
                 interaction_id="goal-grounded-motion",
-                skills=[
+                capabilities=[
                     {
                         "request_id": "walk-request",
-                        "skill_id": "soridormi.walk_forward",
+                        "capability_id": "soridormi.walk_forward",
                         "args": {"duration_s": 15.0},
                         "requires_confirmation": False,
                         "metadata": {
@@ -489,8 +492,8 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_goal_grounded_preflight_does_not_override_provider_confirmation(self) -> None:
         invoker = _RecordingInvoker()
-        registry = SkillRegistry()
-        registry.import_soridormi_catalog(
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry,
             [
                 {
                     "skill_id": "walk_forward",
@@ -506,16 +509,16 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
                 }
             ]
         )
-        runtime = SkillRuntime(registry)
-        runtime.register_provider(SoridormiMcpSkillProvider(invoker))
+        runtime = CapabilityRuntime(registry)
+        runtime.register_provider(SoridormiCapabilityProvider(invoker))
 
         await runtime.execute(
             InteractionResponse(
                 interaction_id="provider-confirmed-motion",
-                skills=[
+                capabilities=[
                     {
                         "request_id": "walk-request",
-                        "skill_id": "soridormi.walk_forward",
+                        "capability_id": "soridormi.walk_forward",
                         "args": {},
                         "requires_confirmation": False,
                         "metadata": {
@@ -547,10 +550,10 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
         execution = await self._runtime(invoker).execute(
             InteractionResponse(
                 interaction_id="interaction-route-trace",
-                skills=[
+                capabilities=[
                     {
                         "request_id": "nod-1",
-                        "skill_id": "soridormi.nod_yes",
+                        "capability_id": "soridormi.nod_yes",
                         "args": {"count": 1, "amplitude": "small"},
                         "metadata": {
                             "source": "agent.capability",
@@ -587,10 +590,10 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
         execution = await self._runtime(invoker).execute(
             InteractionResponse(
                 interaction_id="interaction-live-perception",
-                skills=[
+                capabilities=[
                     {
                         "request_id": "inspect-1",
-                        "skill_id": "soridormi.nod_yes",
+                        "capability_id": "soridormi.nod_yes",
                         "args": {"count": 1, "amplitude": "small"},
                         "metadata": {
                             "requires_live_perception": True,
@@ -616,9 +619,9 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertTrue(chromie_intent["soridormi_owns_pose_estimation"])
 
-    async def test_catalog_preserves_unavailable_skill_reason(self) -> None:
-        registry = SkillRegistry()
-        registry.import_soridormi_catalog(
+    async def test_catalog_preserves_unavailable_capability_reason(self) -> None:
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry,
             [
                 {
                     "skill_id": "wave_hand",
@@ -628,13 +631,13 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
                 }
             ]
         )
-        runtime = SkillRuntime(registry)
-        runtime.register_provider(SoridormiMcpSkillProvider(_RecordingInvoker()))
+        runtime = CapabilityRuntime(registry)
+        runtime.register_provider(SoridormiCapabilityProvider(_RecordingInvoker()))
 
         with self.assertRaisesRegex(ValueError, "not executable"):
             await runtime.execute(
                 InteractionResponse(
-                    skills=[{"skill_id": "soridormi.wave_hand"}]
+                    capabilities=[{"capability_id": "soridormi.wave_hand"}]
                 ),
                 authorization=RuntimeAuthorization(
                     safety_monitor_active=True,
@@ -652,10 +655,10 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
 
         execution = await self._runtime(invoker).execute(
             InteractionResponse(
-                skills=[
+                capabilities=[
                     {
                         "request_id": "nod-1",
-                        "skill_id": "soridormi.nod_yes",
+                        "capability_id": "soridormi.nod_yes",
                         "args": {"count": 1},
                     }
                 ]
@@ -668,8 +671,10 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(execution.status, "failed")
         self.assertEqual(execution.results[0].reason_code, "execution_incomplete")
+        self.assertEqual(execution.results[0].output["capability_id"], "soridormi.nod_yes")
+        self.assertNotIn("skill_id", execution.results[0].output)
 
-    async def test_execute_rejects_mismatched_skill_identity(self) -> None:
+    async def test_execute_rejects_mismatched_provider_identity(self) -> None:
         invoker = _RecordingInvoker(
             overrides={
                 "soridormi.skill.execute_plan": ToolCallOutcome.success(
@@ -680,10 +685,10 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
 
         execution = await self._runtime(invoker).execute(
             InteractionResponse(
-                skills=[
+                capabilities=[
                     {
                         "request_id": "nod-1",
-                        "skill_id": "soridormi.nod_yes",
+                        "capability_id": "soridormi.nod_yes",
                         "args": {"count": 1},
                     }
                 ]
@@ -697,30 +702,32 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(execution.status, "failed")
         self.assertEqual(
             execution.results[0].reason_code,
-            "execution_skill_mismatch",
+            "execution_capability_mismatch",
         )
+        self.assertEqual(execution.results[0].output["capability_id"], "soridormi.nod_yes")
+        self.assertNotIn("skill_id", execution.results[0].output)
 
     async def test_cancel_requires_explicit_cancelled_true(self) -> None:
-        request = SkillRequest(
+        request = CapabilityRequest(
             request_id="nod-cancel",
-            skill_id="soridormi.nod_yes",
+            capability_id="soridormi.nod_yes",
         )
-        context = SkillExecutionContext(
+        context = CapabilityExecutionContext(
             interaction_id="interaction-cancel",
-            trace=SkillTrace(
+            trace=CapabilityTrace(
                 interaction_id="interaction-cancel",
                 request_id=request.request_id,
-                skill_id=request.skill_id,
+                capability_id=request.capability_id,
                 provider_id="soridormi.mcp",
             ),
         )
         definition = self._runtime(_RecordingInvoker()).registry.get(
-            request.skill_id
+            request.capability_id
         )
 
         for output in ({"cancelled": False}, {}):
             with self.subTest(output=output):
-                provider = SoridormiMcpSkillProvider(
+                provider = SoridormiCapabilityProvider(
                     _RecordingInvoker(
                         overrides={
                             "soridormi.motion.cancel": (
@@ -741,8 +748,8 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
 
 
     def test_resource_capability_rejects_completed_without_full_delivery_evidence(self) -> None:
-        registry = SkillRegistry()
-        registry.import_soridormi_catalog(
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry,
             [
                 {
                     "skill_id": "acquire_and_deliver_resource",
@@ -758,12 +765,12 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
                 }
             ]
         )
-        provider = SoridormiMcpSkillProvider(_RecordingInvoker())
-        request = SkillRequest(
+        provider = SoridormiCapabilityProvider(_RecordingInvoker())
+        request = CapabilityRequest(
             request_id="resource-incomplete",
-            skill_id="soridormi.acquire_and_deliver_resource",
+            capability_id="soridormi.acquire_and_deliver_resource",
         )
-        definition = registry.get(request.skill_id)
+        definition = registry.get(request.capability_id)
 
         missing = provider._resource_completion_failure(
             request,
@@ -773,6 +780,11 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(missing)
         assert missing is not None
         self.assertEqual(missing.reason_code, "resource_outcome_missing")
+        self.assertNotIn("skill_id", missing.output)
+        self.assertEqual(
+            missing.output["capability_id"],
+            "soridormi.acquire_and_deliver_resource",
+        )
 
         incomplete = provider._resource_completion_failure(
             request,
@@ -789,10 +801,15 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(incomplete)
         assert incomplete is not None
         self.assertEqual(incomplete.reason_code, "resource_completion_incomplete")
+        self.assertNotIn("skill_id", incomplete.output)
+        self.assertEqual(
+            incomplete.output["capability_id"],
+            "soridormi.acquire_and_deliver_resource",
+        )
 
     def test_granular_resource_capability_uses_its_own_completion_contract(self) -> None:
-        registry = SkillRegistry()
-        registry.import_soridormi_catalog(
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry,
             [
                 {
                     "skill_id": "acquire_resource",
@@ -814,12 +831,12 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
                 }
             ]
         )
-        provider = SoridormiMcpSkillProvider(_RecordingInvoker())
-        request = SkillRequest(
+        provider = SoridormiCapabilityProvider(_RecordingInvoker())
+        request = CapabilityRequest(
             request_id="resource-acquire",
-            skill_id="soridormi.acquire_resource",
+            capability_id="soridormi.acquire_resource",
         )
-        definition = registry.get(request.skill_id)
+        definition = registry.get(request.capability_id)
 
         failure = provider._resource_completion_failure(
             request,
@@ -836,8 +853,8 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(failure)
 
     async def test_fetch_and_deliver_preserves_scope_and_complete_resource_evidence(self) -> None:
-        registry = SkillRegistry()
-        registry.import_soridormi_catalog(
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry,
             [
                 {
                     "skill_id": "acquire_and_deliver_resource",
@@ -906,15 +923,15 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
                 )
             }
         )
-        runtime = SkillRuntime(registry)
-        runtime.register_provider(SoridormiMcpSkillProvider(invoker))
+        runtime = CapabilityRuntime(registry)
+        runtime.register_provider(SoridormiCapabilityProvider(invoker))
         execution = await runtime.execute(
             InteractionResponse(
                 interaction_id="fetch-resource",
-                skills=[
+                capabilities=[
                     {
                         "request_id": "fetch-resource-1",
-                        "skill_id": "soridormi.acquire_and_deliver_resource",
+                        "capability_id": "soridormi.acquire_and_deliver_resource",
                         "args": {
                             "resource": {
                                 "kind": "physical_object",

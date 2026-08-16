@@ -26,7 +26,7 @@ _RESOURCE_IMPLEMENTATION_FIELDS = frozenset(
         "provider",
         "provider_id",
         "search_engine",
-        "skill_id",
+        "capability_id",
         "steps",
         "transport",
         "website",

@@ -3191,7 +3191,7 @@
     {
       "boolean": true,
       "category": "profile_constant",
-      "key": "ORCH_ENABLE_SORIDORMI_SKILLS",
+      "key": "ORCH_ENABLE_SORIDORMI_CAPABILITIES",
       "owners": [
         ".env.common",
         "env/modes/qualification.env",

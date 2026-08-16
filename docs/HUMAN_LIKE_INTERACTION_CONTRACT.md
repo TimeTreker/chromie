@@ -623,7 +623,7 @@ Chromie proposes physical actions. Soridormi owns execution, realtime safety,
 perception, final refusal, and final modification authority.
 
 For physical commands, Chromie should preserve the semantic intent, produce a
-proposal when the capability exists, and let SkillRuntime and Soridormi validate,
+proposal when the capability exists, and let CapabilityRuntime and Soridormi validate,
 bound, confirm, or refuse. LLM confidence is not execution authorization.
 
 Chromie must not say it has executed, will execute, or is sending a physical
@@ -763,13 +763,13 @@ when it would have caught the user-visible failure that motivated the change.
 Use this evidence hierarchy when making claims:
 
 1. **Live or retained trace evidence** - microphone/ASR text, route decision,
-   scheduled TTS text, interaction result, skill proposals, SkillRuntime result,
+   scheduled TTS text, interaction result, skill proposals, CapabilityRuntime result,
    and Soridormi/provider result from the same turn.
 2. **Black-box interaction tests** - a user utterance enters the same public
    boundary used by the orchestrator or scenario runner, and assertions inspect
    route, speech, skills, confirmation, and forbidden output.
 3. **Integrated component tests** - goal interpreter, orchestrator, agent runtime, and
-   SkillRuntime are connected with realistic catalog/provider fixtures.
+   CapabilityRuntime are connected with realistic catalog/provider fixtures.
 4. **Contract/unit tests** - schema coercion, prompt construction, helper
    functions, validators, and deterministic guards.
 

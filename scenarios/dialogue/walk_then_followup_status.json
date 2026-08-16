@@ -41,7 +41,7 @@
         }
       },
       "expect": {
-        "skills": ["soridormi.walk_velocity"],
+        "capabilities": ["soridormi.walk_velocity"],
         "requires_confirmation": true,
         "post_history_contains": ["Walk forward slowly."],
         "current_task_context_contains": ["Walk forward slowly after confirmation", "forward walking"]

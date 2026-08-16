@@ -20,7 +20,7 @@ Understand broadly -> propose honestly -> execute only catalog-backed skills
 The Goal Interpreter and deepthinking Agent may reason about human-like desired
 abilities, such as blinking, picking up an object, following a user, opening a
 door, or turning on a light. They must not claim those abilities are executable
-unless the current executable skill catalog supplies an exact skill and the
+unless the current executable capability catalog supplies an exact capability and the
 trusted runtime later validates it.
 
 ## Two Catalogs
@@ -30,10 +30,10 @@ Chromie uses two related but different ability surfaces.
 | Surface | Purpose | Execution authority |
 |---|---|---|
 | Ability ontology | Broad human-like ability IDs Chromie can understand, discuss, and learn toward. | No direct execution authority. |
-| Executable skill catalog | Exact `skill_id` entries currently available from Chromie, Agent, and Soridormi providers. | Can be proposed for runtime validation and execution. |
+| Executable capability catalog | Exact canonical `capability_id` entries currently available from Chromie, Agent, and Soridormi providers. | Can be proposed for runtime validation and execution. |
 
 The ability ontology may contain `known_missing` or `planned` entries. The
-executable skill catalog contains only concrete runtime skills such as
+executable capability catalog contains only concrete runtime capabilities such as
 `chromie.speak` or a Soridormi named skill that the provider declares.
 
 ## Status Model
@@ -56,7 +56,7 @@ execution from simulator or hardware identity.
 
 ## Fast Goal Interpretation Contract
 
-The quick Goal Interpreter receives the unlocked common compact skill catalog. It should:
+The quick Goal Interpreter receives the unlocked common compact capability catalog. It should:
 
 - infer the user's desired ability from meaning, context, memory, and catalog
   descriptions;
@@ -128,9 +128,9 @@ Example:
       "ability_id": "manipulation.pick_up_object",
       "intent": "pick up the bottle",
       "status": "missing_ability",
-      "matched_skill_id": null,
+      "matched_capability_id": null,
       "confidence": 0.93,
-      "reason": "No executable manipulation skill was supplied."
+      "reason": "No executable manipulation capability was supplied."
     }
   ],
   "quick_review": {

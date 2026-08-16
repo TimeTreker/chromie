@@ -24,7 +24,7 @@ class ConversationToolEvidenceTests(unittest.TestCase):
                         "evidence": [
                             {
                                 "evidence_id": "evidence-weather",
-                                "skill_id": "chromie.weather.lookup",
+                                "capability_id": "chromie.weather.lookup",
                                 "status": "completed",
                                 "metadata": {
                                     "request_args": {
@@ -118,7 +118,7 @@ class ConversationToolEvidenceTests(unittest.TestCase):
                         "evidence": [
                             {
                                 "evidence_id": "untrusted",
-                                "skill_id": "chromie.weather.lookup",
+                                "capability_id": "chromie.weather.lookup",
                                 "status": "completed",
                                 "observation": {
                                     "status": "available",

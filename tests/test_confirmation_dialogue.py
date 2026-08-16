@@ -13,10 +13,10 @@ from shared.chromie_contracts.interaction import InteractionResponse
 def _response() -> InteractionResponse:
     return InteractionResponse(
         interaction_id="interaction-confirm",
-        skills=[
+        capabilities=[
             {
                 "request_id": "nod-1",
-                "skill_id": "soridormi.nod_yes",
+                "capability_id": "soridormi.nod_yes",
                 "args": {"count": 2},
                 "requires_confirmation": True,
             }
@@ -164,7 +164,7 @@ class ConfirmationDialogueTests(unittest.TestCase):
             origin_session_id="sid-2",
             conversation_id="conversation-1",
         )
-        pending.response.skills[0].args["count"] = 3
+        pending.response.capabilities[0].args["count"] = 3
 
         self.assertEqual(dialogue.resolve("confirm").decision, "ambiguous")
 
@@ -187,8 +187,8 @@ class ConfirmationDialogueTests(unittest.TestCase):
 
     def test_fallback_prompt_is_natural_and_omits_runtime_internals(self) -> None:
         response = _response()
-        response.skills[0].args["access_token"] = "do-not-speak"
-        response.skills[0].args["nested"] = {
+        response.capabilities[0].args["access_token"] = "do-not-speak"
+        response.capabilities[0].args["nested"] = {
             "password": "also-do-not-speak",
         }
         dialogue = ConfirmationDialogue(clock=lambda: 100.0)

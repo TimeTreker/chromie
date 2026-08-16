@@ -67,7 +67,7 @@ def build_default_ability_registry(
 ) -> AbilityRegistry:
     """Build Chromie's static cognitive ability inventory.
 
-    Embodied skills are intentionally not activated here. Their availability,
+    Embodied capabilities are intentionally not activated here. Their availability,
     confirmation policy, and execution contract come from the live provider
     catalog and are validated by Trusted Capability Runtime. The static registry therefore
     cannot infer body capability from simulator, hardware, or dry-run settings.
@@ -394,11 +394,11 @@ def _base_abilities() -> dict[str, AbilitySpec]:
             implementation="missing_skill",
         ),
         AbilitySpec(
-            "task.execute_skill",
+            "task.execute_capability",
             "task",
             "Execute a trusted structured skill through the Trusted Capability Runtime.",
             status="available",
-            implementation="skill_runtime",
+            implementation="capability_runtime",
         ),
         AbilitySpec(
             "task.confirm_before_action",
@@ -419,7 +419,7 @@ def _base_abilities() -> dict[str, AbilitySpec]:
             "task",
             "Monitor action completion and failures.",
             status="available",
-            implementation="skill_runtime",
+            implementation="capability_runtime",
         ),
         AbilitySpec(
             "task.report_action_result",
@@ -440,7 +440,7 @@ def _base_abilities() -> dict[str, AbilitySpec]:
             "safety",
             "Check whether a physical motion is allowed.",
             status="available",
-            implementation="skill_runtime",
+            implementation="capability_runtime",
         ),
         AbilitySpec(
             "safety.refuse_unsafe_request",

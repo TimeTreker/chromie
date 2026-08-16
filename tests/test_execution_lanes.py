@@ -5,20 +5,23 @@ import time
 import unittest
 
 from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
-from orchestrator.runtime.skill_runtime import (
-    MockSkillProvider,
+from orchestrator.runtime.capability_runtime import (
+    MockCapabilityProvider,
     RuntimeAuthorization,
-    SkillDefinition,
-    SkillRegistry,
-    SkillResult,
-    SkillRuntime,
+    CapabilityDefinition,
+    CapabilityRegistry,
+    CapabilityResult,
+    CapabilityRuntime,
     local_speech_definition,
     vocal_performance_definition,
+)
+from orchestrator.runtime.soridormi_capability_provider import (
+    import_soridormi_capability_catalog,
 )
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
-    SkillRequest,
+    CapabilityRequest,
     VOCAL_PERFORMANCE_CAPABILITY_ID,
     VocalModeEvidence,
     VocalProviderArtifact,
@@ -49,9 +52,9 @@ def _definition(
     group: str,
     resources: list[str],
     safety_class: str = "physical_motion",
-) -> SkillDefinition:
-    return SkillDefinition(
-        skill_id=skill_id,
+) -> CapabilityDefinition:
+    return CapabilityDefinition(
+        capability_id=skill_id,
         version="1.0.0",
         provider_id=provider_id,
         description=skill_id,
@@ -78,7 +81,7 @@ def _definition(
     )
 
 
-class _GroupedBodyProvider(MockSkillProvider):
+class _GroupedBodyProvider(MockCapabilityProvider):
     def __init__(self, *, delay_s: float = 0.0) -> None:
         super().__init__("body", delay_s=delay_s)
         self.group_calls: list[list[str]] = []
@@ -88,10 +91,10 @@ class _GroupedBodyProvider(MockSkillProvider):
         if self.delay_s:
             await asyncio.sleep(self.delay_s)
         return [
-            SkillResult(
+            CapabilityResult(
                 request_id=request.request_id,
-                skill_id=request.skill_id,
-                skill_version=definition.version,
+                capability_id=request.capability_id,
+                capability_version=definition.version,
                 status="completed",
                 provider_id=self.provider_id,
                 output={"completed": True},
@@ -101,15 +104,15 @@ class _GroupedBodyProvider(MockSkillProvider):
 
 
 class _InteractionRuntimeView:
-    def __init__(self, definitions: list[SkillDefinition]) -> None:
-        self.definitions = {item.skill_id: item for item in definitions}
+    def __init__(self, definitions: list[CapabilityDefinition]) -> None:
+        self.definitions = {item.capability_id: item for item in definitions}
 
-    async def ensure_skill_definitions(self, skill_ids: list[str]) -> None:
-        for skill_id in skill_ids:
+    async def ensure_capability_definitions(self, capability_ids: list[str]) -> None:
+        for skill_id in capability_ids:
             if skill_id not in self.definitions:
                 raise ValueError(skill_id)
 
-    def skill_definition(self, skill_id: str) -> SkillDefinition:
+    def capability_definition(self, skill_id: str) -> CapabilityDefinition:
         return self.definitions[skill_id]
 
 
@@ -249,7 +252,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.speech[0].metadata["execution_lane"], "vocal")
         self.assertEqual(response.speech[0].metadata["coordination_id"], "together-1")
 
-        by_id = {item.skill_id: item for item in response.skills}
+        by_id = {item.capability_id: item for item in response.capabilities}
         self.assertEqual(set(by_id), {"soridormi.walk_forward"})
         self.assertEqual(
             by_id["soridormi.walk_forward"].metadata["execution_lane"],
@@ -399,7 +402,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
             context={},
         )
 
-        by_id = {item.capability_id: item for item in response.skills}
+        by_id = {item.capability_id: item for item in response.capabilities}
         self.assertEqual(
             by_id[VOCAL_PERFORMANCE_CAPABILITY_ID].metadata["execution_lane"],
             "vocal",
@@ -411,13 +414,13 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertTrue(by_id["soridormi.walk_forward"].metadata["parallel_with_vocal"])
 
-    async def test_skill_runtime_overlaps_speech_and_walk(self) -> None:
+    async def test_capability_runtime_overlaps_speech_and_walk(self) -> None:
         response, walk = await self._response()
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(local_speech_definition())
         registry.register(walk)
-        runtime = SkillRuntime(registry, max_concurrency=3)
-        speech_provider = MockSkillProvider(
+        runtime = CapabilityRuntime(registry, max_concurrency=3)
+        speech_provider = MockCapabilityProvider(
             local_speech_definition().provider_id,
             delay_s=0.08,
         )
@@ -443,8 +446,8 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
             speech_provider.calls[0].metadata["coordination_id"],
             "together-1",
         )
-        self.assertEqual(len(response.skills), 1)
-        self.assertEqual(response.skills[0].skill_id, "soridormi.walk_forward")
+        self.assertEqual(len(response.capabilities), 1)
+        self.assertEqual(response.capabilities[0].capability_id, "soridormi.walk_forward")
 
     async def test_parallel_runtime_rejects_two_personal_voice_owners(self) -> None:
         declaration = VocalProviderDeclaration(
@@ -482,12 +485,12 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
         speech_definition = local_speech_definition()
         vocal_definition = vocal_performance_definition(declaration)
-        registry = SkillRegistry()
+        registry = CapabilityRegistry()
         registry.register(speech_definition)
         registry.register(vocal_definition)
-        runtime = SkillRuntime(registry, max_concurrency=2)
-        runtime.register_provider(MockSkillProvider(speech_definition.provider_id))
-        runtime.register_provider(MockSkillProvider(vocal_definition.provider_id))
+        runtime = CapabilityRuntime(registry, max_concurrency=2)
+        runtime.register_provider(MockCapabilityProvider(speech_definition.provider_id))
+        runtime.register_provider(MockCapabilityProvider(vocal_definition.provider_id))
         response = InteractionResponse(
             interaction_id="two-personal-voices",
             speech=[
@@ -496,8 +499,8 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     timing="parallel",
                 )
             ],
-            skills=[
-                SkillRequest(
+            capabilities=[
+                CapabilityRequest(
                     request_id="sing-now",
                     capability_id=VOCAL_PERFORMANCE_CAPABILITY_ID,
                     args={"text": "La", "mode": "singing"},
@@ -510,8 +513,8 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
             await runtime.execute(response)
 
     def test_soridormi_import_preserves_provider_body_lanes(self) -> None:
-        registry = SkillRegistry()
-        registry.import_soridormi_catalog(
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry,
             [
                 {
                     "skill_id": "walk_forward",

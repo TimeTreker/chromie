@@ -22,7 +22,7 @@ from shared.chromie_contracts.response_composition import (
 )
 
 from .outcome_reconciliation import ExecutionOutcomeReconciler
-from .skill_runtime import SkillRuntimeResult
+from .capability_runtime import CapabilityRuntimeResult
 
 
 class CognitiveTurnClosure:
@@ -80,7 +80,7 @@ class CognitiveTurnClosure:
         self,
         *,
         response: InteractionResponse,
-        execution: SkillRuntimeResult,
+        execution: CapabilityRuntimeResult,
         session_id: str | None,
         provider_status: dict[str, Any] | None = None,
     ) -> ExecutionOutcomeBundle | None:
@@ -89,7 +89,7 @@ class CognitiveTurnClosure:
             return None
         if execution.interaction_id != response.interaction_id:
             raise ValueError(
-                "SkillRuntimeResult interaction_id does not match "
+                "CapabilityRuntimeResult interaction_id does not match "
                 "InteractionResponse"
             )
         turn_id = self._turn_id(response, session_id=session_id)
@@ -107,12 +107,12 @@ class CognitiveTurnClosure:
             turn_id=turn_id,
             plan=plan,
             interaction_id=response.interaction_id,
-            requests=response.skills,
+            requests=response.capabilities,
             results=execution.results,
             output_schemas=output_schemas,
             completion_evidence_policies=completion_policies,
             completion_evidence_gate_reasons=completion_policy_gate_reasons,
-            committed_auxiliary_result_skills=speech_result_bindings,
+            committed_auxiliary_result_capabilities=speech_result_bindings,
             traces=execution.traces,
             provider_postconditions=postconditions,
         )
@@ -165,7 +165,7 @@ class CognitiveTurnClosure:
     ) -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
         schemas: dict[str, dict[str, Any]] = {}
         reasons: dict[str, str] = {}
-        for request in response.skills:
+        for request in response.capabilities:
             if request.metadata.get("source") != "goal_driven_canonical_plan":
                 continue
             committed_digest = request.committed_output_schema_sha256
@@ -176,13 +176,13 @@ class CognitiveTurnClosure:
                 )
                 continue
             try:
-                definition = self.interaction_runtime.skill_definition(
-                    request.skill_id
+                definition = self.interaction_runtime.capability_definition(
+                    request.capability_id
                 )
             except Exception:
                 schemas[request.request_id] = {}
                 reasons[request.request_id] = (
-                    "current_skill_definition_unavailable"
+                    "current_capability_definition_unavailable"
                 )
                 continue
             schema = getattr(definition, "output_schema", None)
@@ -210,7 +210,7 @@ class CognitiveTurnClosure:
     ) -> tuple[dict[str, ClaimQualificationPolicy], dict[str, str]]:
         policies: dict[str, ClaimQualificationPolicy] = {}
         reasons: dict[str, str] = {}
-        for request in response.skills:
+        for request in response.capabilities:
             if request.metadata.get("source") != "goal_driven_canonical_plan":
                 continue
             committed_digest = request.committed_completion_evidence_sha256
@@ -220,12 +220,12 @@ class CognitiveTurnClosure:
                 )
                 continue
             try:
-                definition = self.interaction_runtime.skill_definition(
-                    request.skill_id
+                definition = self.interaction_runtime.capability_definition(
+                    request.capability_id
                 )
             except ValueError:
                 reasons[request.request_id] = (
-                    "current_skill_definition_unavailable"
+                    "current_capability_definition_unavailable"
                 )
                 continue
             policy = getattr(definition, "completion_evidence_policy", None)
@@ -286,7 +286,7 @@ class CognitiveTurnClosure:
         body_goal_set = {
             goal_id
             for step in plan.steps
-            if step.skill_id.startswith("soridormi.")
+            if step.capability_id.startswith("soridormi.")
             for goal_id in step.source_goal_ids
         }
         body_goal_ids = [

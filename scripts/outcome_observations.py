@@ -38,19 +38,19 @@ def load_behavior_map(path: str | Path = DEFAULT_BEHAVIOR_MAP) -> dict[str, dict
     if not isinstance(behaviors, dict):
         raise ValueError("observable behavior map requires behaviors object")
     return {
-        str(skill_id): dict(value)
-        for skill_id, value in behaviors.items()
+        str(capability_id): dict(value)
+        for capability_id, value in behaviors.items()
         if isinstance(value, dict)
     }
 
 
-def observation_type_for_skill(
-    skill_id: str,
+def observation_type_for_capability(
+    capability_id: str,
     behavior_map: dict[str, dict[str, Any]] | None = None,
 ) -> str:
     behavior_map = behavior_map or load_behavior_map()
-    definition = behavior_map.get(str(skill_id or ""), {})
-    return str(definition.get("type") or f"capability.{skill_id}")
+    definition = behavior_map.get(str(capability_id or ""), {})
+    return str(definition.get("type") or f"capability.{capability_id}")
 
 
 def collect_observations(
@@ -86,15 +86,15 @@ def collect_observations(
     fallback_order = len(execution_order)
 
     observations: list[dict[str, Any]] = []
-    for planned_sequence, skill in enumerate(response.get("skills") or []):
+    for planned_sequence, skill in enumerate(response.get("capabilities") or []):
         if not isinstance(skill, dict):
             continue
-        skill_id = str(
-            skill.get("capability_id") or skill.get("skill_id") or ""
+        capability_id = str(
+            skill.get("capability_id") or ""
         )
-        if not skill_id.startswith("soridormi."):
+        if not capability_id.startswith("soridormi."):
             continue
-        definition = behavior_map.get(skill_id, {})
+        definition = behavior_map.get(capability_id, {})
         metadata = skill.get("metadata") if isinstance(skill.get("metadata"), dict) else {}
         args = skill.get("args") if isinstance(skill.get("args"), dict) else {}
         arg_fields = definition.get("arg_fields")
@@ -117,18 +117,18 @@ def collect_observations(
                     request_id,
                     fallback_order + planned_sequence,
                 ),
-                "type": str(definition.get("type") or f"capability.{skill_id}"),
+                "type": str(definition.get("type") or f"capability.{capability_id}"),
                 "domain": str(definition.get("domain") or "capability"),
                 "status": status,
                 "interaction_role": role,
-                "capability_id": skill_id,
+                "capability_id": capability_id,
                 "args": observed_args,
                 "request_id": skill.get("request_id"),
                 "planned_sequence": planned_sequence,
             }
         )
 
-    skill_count = len(response.get("skills") or [])
+    capability_count = len(response.get("capabilities") or [])
     for planned_sequence, speech in enumerate(response.get("speech") or []):
         if not isinstance(speech, dict):
             continue
@@ -141,7 +141,7 @@ def collect_observations(
             {
                 "sequence": execution_order.get(
                     speech_id,
-                    fallback_order + skill_count + planned_sequence,
+                    fallback_order + capability_count + planned_sequence,
                 ),
                 "type": "speech.output",
                 "domain": "speech",

@@ -53,7 +53,7 @@
         }
       },
       "expect": {
-        "skills": [
+        "capabilities": [
           "soridormi.blink_eyes",
           "soridormi.nod_yes"
         ],

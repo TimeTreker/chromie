@@ -36,7 +36,7 @@
         }
       },
       "expect": {
-        "skills": ["soridormi.walk_velocity", "soridormi.nod_yes"],
+        "capabilities": ["soridormi.walk_velocity", "soridormi.nod_yes"],
         "requires_confirmation": true,
         "current_task_context_contains": ["small step forward", "nod"]
       }

@@ -202,10 +202,6 @@ def is_planner_step_capability(capability_id: str) -> bool:
     return str(capability_id or "").strip() not in RESPONSE_COMPOSER_OWNED_CAPABILITY_IDS
 
 
-def is_planner_step_skill(skill_id: str) -> bool:
-    """Bounded compatibility alias for pre-migration callers."""
-
-    return is_planner_step_capability(skill_id)
 
 
 class PlannerModelStep(CapabilityIdentityModel):
@@ -2504,7 +2500,7 @@ def validate_external_response_evidence_boundary(
         ).casefold()
         if outcome_status in completed_statuses:
             continue
-        planned = binding.get("planned_skills")
+        planned = binding.get("planned_capabilities")
         if not isinstance(planned, list):
             planned = []
         has_external_read = bool(binding.get("retryable_safe_read"))
@@ -2945,7 +2941,7 @@ def canonical_plan_response_schema(
     *,
     planner_tier: PlannerTier,
     expected_goal_ids: list[str],
-    allowed_skill_ids: list[str],
+    allowed_capability_ids: list[str],
     capability_input_schemas: dict[str, dict[str, Any]] | None = None,
     response_only: bool = False,
     requires_execution: bool = False,
@@ -2968,7 +2964,7 @@ def canonical_plan_response_schema(
     if planner_tier == "fast":
         schema = fast_multi_goal_response_schema(
             expected_goal_ids=expected_goal_ids,
-            allowed_skill_ids=allowed_skill_ids,
+            allowed_capability_ids=allowed_capability_ids,
             capability_input_schemas=capability_input_schemas,
             response_only=response_only,
             requires_execution=requires_execution,
@@ -3036,7 +3032,7 @@ def canonical_plan_response_schema(
         )
 
     allowed_goals = list(dict.fromkeys(expected_goal_ids))
-    allowed_skills = list(dict.fromkeys(allowed_skill_ids))
+    allowed_capabilities = list(dict.fromkeys(allowed_capability_ids))
     response_goal_set = set(response_goal_ids or []).intersection(allowed_goals)
     provider_vocal_goal_set = set(provider_required_vocal_goal_ids or []).intersection(
         allowed_goals
@@ -3046,7 +3042,7 @@ def canonical_plan_response_schema(
         for goal_id, operation in (provider_required_media_goal_operations or {}).items()
         if goal_id in allowed_goals and operation in MEDIA_CAPABILITY_IDS
     }
-    vocal_capability_available = VOCAL_PERFORMANCE_CAPABILITY_ID in allowed_skills
+    vocal_capability_available = VOCAL_PERFORMANCE_CAPABILITY_ID in allowed_capabilities
 
     if requires_execution and not response_goal_set:
         planner_response_text = properties.get("response_text")
@@ -3202,8 +3198,8 @@ def canonical_plan_response_schema(
                 if isinstance(goal_id, dict) and allowed_goals:
                     goal_id["enum"] = allowed_goals
                 capability_id = node_properties.get("capability_id")
-                if isinstance(capability_id, dict) and allowed_skills:
-                    capability_id["enum"] = allowed_skills
+                if isinstance(capability_id, dict) and allowed_capabilities:
+                    capability_id["enum"] = allowed_capabilities
                 for field_name in goal_list_fields:
                     field = node_properties.get(field_name)
                     if isinstance(field, dict) and allowed_goals:
@@ -3371,7 +3367,7 @@ def canonical_plan_response_schema(
                     exact_media_capability = MEDIA_CAPABILITY_IDS[
                         provider_media_goal_operations[goal_id]
                     ]
-                    media_capability_available = exact_media_capability in allowed_skills
+                    media_capability_available = exact_media_capability in allowed_capabilities
                     disposition_field = specialized_properties.get("disposition")
                     if isinstance(disposition_field, dict):
                         disposition_field["enum"] = (
@@ -3497,7 +3493,7 @@ def canonical_plan_response_schema(
                 step_required.append(field_name)
         _constrain_planner_step_args(
             step_schema,
-            allowed_skills=allowed_skills,
+            allowed_capabilities=allowed_capabilities,
             capability_input_schemas=capability_input_schemas,
         )
     _constrain_terminal_unresolved(schema)
@@ -3507,7 +3503,7 @@ def canonical_plan_response_schema(
 def fast_multi_goal_response_schema(
     *,
     expected_goal_ids: list[str],
-    allowed_skill_ids: list[str],
+    allowed_capability_ids: list[str],
     capability_input_schemas: dict[str, dict[str, Any]] | None = None,
     response_only: bool = False,
     requires_execution: bool = False,
@@ -3562,7 +3558,7 @@ def fast_multi_goal_response_schema(
         )
 
     allowed_goals = list(dict.fromkeys(expected_goal_ids))
-    allowed_skills = list(dict.fromkeys(allowed_skill_ids))
+    allowed_capabilities = list(dict.fromkeys(allowed_capability_ids))
     response_goal_set = set(response_goal_ids or []).intersection(allowed_goals)
 
     def bound_text(
@@ -3607,7 +3603,7 @@ def fast_multi_goal_response_schema(
         # goals: at most one executable step per authoritative goal.  Besides
         # documenting that boundary, the decoder limit prevents a malformed
         # model response from repeating one physical step until num_predict is
-        # exhausted.  A goal that needs multiple skills belongs in Deep
+        # exhausted.  A goal that needs multiple capabilities belongs in Deep
         # Planning through a model-authored semantic escalation.
         steps["maxItems"] = len(allowed_goals)
         steps["description"] = (
@@ -3778,8 +3774,8 @@ def fast_multi_goal_response_schema(
             node_properties = node.get("properties")
             if isinstance(node_properties, dict):
                 capability_id = node_properties.get("capability_id")
-                if isinstance(capability_id, dict) and allowed_skills:
-                    capability_id["enum"] = allowed_skills
+                if isinstance(capability_id, dict) and allowed_capabilities:
+                    capability_id["enum"] = allowed_capabilities
                 for field_name in goal_list_fields:
                     field = node_properties.get(field_name)
                     if isinstance(field, dict) and allowed_goals:
@@ -3800,7 +3796,7 @@ def fast_multi_goal_response_schema(
     if isinstance(step_schema, dict):
         _constrain_planner_step_args(
             step_schema,
-            allowed_skills=allowed_skills,
+            allowed_capabilities=allowed_capabilities,
             capability_input_schemas=capability_input_schemas,
         )
 
@@ -4061,7 +4057,7 @@ def fast_multi_goal_response_schema(
 def _constrain_planner_step_args(
     step_schema: dict[str, Any],
     *,
-    allowed_skills: list[str],
+    allowed_capabilities: list[str],
     capability_input_schemas: dict[str, dict[str, Any]] | None,
 ) -> None:
     """Bind each model-selected capability to its exact provider arg schema."""
@@ -4075,7 +4071,7 @@ def _constrain_planner_step_args(
         str(item) for item in step_schema.get("required", []) if str(item).strip()
     ]
     branches: list[dict[str, Any]] = []
-    for capability_id in allowed_skills:
+    for capability_id in allowed_capabilities:
         input_schema = capability_input_schemas.get(capability_id)
         if not isinstance(input_schema, dict):
             continue
@@ -4261,7 +4257,7 @@ def planner_contract_diagnostics(
                     goal_id = " ".join(str(source_goal_id or "").strip().split())
                     if goal_id:
                         step_sources.setdefault(step_id, set()).add(goal_id)
-        elif item.get("capability_id") or item.get("skill_id"):
+        elif item.get("capability_id"):
             add(
                 ["steps", index, "step_id"],
                 "executable planner step requires step_id",

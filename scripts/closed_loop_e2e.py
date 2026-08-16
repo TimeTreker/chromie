@@ -953,7 +953,7 @@ def configure_workflow_environment(args: argparse.Namespace, case_dir: Path) -> 
     os.environ["TTS_URL"] = args.tts_url
     os.environ["ORCH_ENABLE_AGENT"] = "1"
     os.environ["ORCH_ENABLE_INTERACTION_RESPONSE"] = "1"
-    os.environ["ORCH_ENABLE_SORIDORMI_SKILLS"] = "0"
+    os.environ["ORCH_ENABLE_SORIDORMI_CAPABILITIES"] = "0"
     os.environ["ORCH_AUDIO_INPUT_MODE"] = "stdin"
     os.environ["ORCH_AUDIO_OUTPUT_MODE"] = "device"
     os.environ["ORCH_DISCARD_PLAYBACK_REALTIME"] = "0"
