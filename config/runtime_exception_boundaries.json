@@ -826,30 +826,6 @@
     },
     {
       "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._apply_reflex_cancellation",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "ca6aa6aa01f26c20f75a45ee9b1afdab955660d2319594ef2e1c62b15c137a43",
-      "failure_signals": []
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._apply_reflex_cancellation",
-      "ordinal": 2,
-      "classification": "fail_closed_boundary",
-      "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "9b53d7d67af521265e6868237630f3e01b7f44fb347a5987eb8b71b29407fde3",
-      "failure_signals": [
-        "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant._audio_device_monitor.collect_pipewire_changes",
       "ordinal": 1,
       "classification": "typed_failure_mapping",
@@ -2371,8 +2347,114 @@
       "failure_signals": [
         "state_update"
       ]
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._apply_reflex_cancellation",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "If Runtime ownership observation cannot be read, retain the existing host cancellation scope, record diagnostics, and never broaden authority from guessed state.",
+      "review_status": "reviewed",
+      "body_sha256": "849ff71a11c69e98a540619e9cb8001703d2ba0f9f7fe5ad9f836d2e70cbbb34",
+      "failure_signals": [
+        "diagnostic"
+      ]
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._apply_reflex_cancellation",
+      "ordinal": 2,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime cancellation boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "ca6aa6aa01f26c20f75a45ee9b1afdab955660d2319594ef2e1c62b15c137a43",
+      "failure_signals": []
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._apply_reflex_cancellation",
+      "ordinal": 3,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime cancellation boundary and preserve an observable state update when cancellation-side state cleanup fails.",
+      "review_status": "reviewed",
+      "body_sha256": "9b53d7d67af521265e6868237630f3e01b7f44fb347a5987eb8b71b29407fde3",
+      "failure_signals": [
+        "state_update"
+      ]
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._compose_incremental_terminal_result_response",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Map Tool Result Interpreter failure to no incremental response with diagnostics; never speak an unvalidated provider result.",
+      "review_status": "reviewed",
+      "body_sha256": "3b00d662c81eaecadef2f708e5ff074dd04b56444e79d18d8c960758918697cc",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._consume_detached_cognitive_dispatch",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Map detached terminal-join failure to a failed Runtime result with diagnostics so execution closure remains explicit and cannot become success by omission.",
+      "review_status": "reviewed",
+      "body_sha256": "46702a6b2bff6d80c67e4dde6ca1768c31867133c82e7f997771f1d4d92128a6",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
+      ]
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._dispatch_detached_cognitive_interaction",
+      "ordinal": 1,
+      "classification": "narrow_reraise",
+      "owner": "orchestrator",
+      "contract": "Record dispatch failure evidence and re-raise so foreground submission failure remains explicit and no detached result consumer is created.",
+      "review_status": "reviewed",
+      "body_sha256": "9933b5e6b7f1db261f8eb66ee2ad50700b16a35c012400c1983f96aa33ebc51d",
+      "failure_signals": [
+        "bare_reraise"
+      ]
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._reenter_cognition_for_terminal_capability",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Reject malformed incremental terminal Evidence, retain diagnostic context, and leave final aggregate closure as the authoritative fallback rather than inventing result meaning.",
+      "review_status": "reviewed",
+      "body_sha256": "181e6b9a184b2cb0c330d282bd1b276ea6ce3c31db48e7a2b3bf11bc9f271bee",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._reenter_cognition_for_terminal_capability",
+      "ordinal": 2,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Reject failed incremental result interpretation, retain diagnostics, and emit no ungrounded speech; final aggregate closure remains available.",
+      "review_status": "reviewed",
+      "body_sha256": "348186d30a2bd32e910ddd965a6ea6ce2b8ebd909418acc5a5780b0f0092ce4b",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     }
   ],
-  "reviewed_at": "2026-08-14",
+  "reviewed_at": "2026-08-16",
   "review_contract": "Classification and normalized source handler body reviewed; any handler body or failure-signal change requires re-audit."
 }

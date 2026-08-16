@@ -1247,6 +1247,80 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
                         )
                     )
 
+    coordinator_path = root / "orchestrator/runtime/interaction_coordinator.py"
+    if coordinator_path.is_file():
+        coordinator_tree, parse_findings = _parse_python(coordinator_path, root)
+        findings.extend(parse_findings)
+        if coordinator_tree is not None:
+            coordinator_class = next(
+                (
+                    node
+                    for node in ast.walk(coordinator_tree)
+                    if isinstance(node, ast.ClassDef)
+                    and node.name == "InteractionRuntimeCoordinator"
+                ),
+                None,
+            )
+            coordinator_methods = {
+                node.name
+                for node in (coordinator_class.body if coordinator_class else [])
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            }
+            for required_method in (
+                "submit_cognitive_response",
+                "wait_cognitive_dispatch",
+            ):
+                if required_method not in coordinator_methods:
+                    findings.append(
+                        _source_policy_finding(
+                            root=root,
+                            path="orchestrator/runtime/interaction_coordinator.py",
+                            rule_id=RULE_CANONICAL_CAPABILITY_ID,
+                            symbol=f"InteractionRuntimeCoordinator.{required_method}",
+                            message=(
+                                "cognitive capability execution must keep dispatch separate "
+                                "from final aggregate closure"
+                            ),
+                        )
+                    )
+
+    orchestrator_path = root / "orchestrator/orchestrator.py"
+    if orchestrator_path.is_file():
+        orchestrator_tree, parse_findings = _parse_python(orchestrator_path, root)
+        findings.extend(parse_findings)
+        if orchestrator_tree is not None:
+            assistant_class = next(
+                (
+                    node
+                    for node in ast.walk(orchestrator_tree)
+                    if isinstance(node, ast.ClassDef) and node.name == "VoiceAssistant"
+                ),
+                None,
+            )
+            assistant_methods = {
+                node.name
+                for node in (assistant_class.body if assistant_class else [])
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            }
+            for required_method in (
+                "_dispatch_detached_cognitive_interaction",
+                "_consume_detached_cognitive_dispatch",
+                "_reenter_cognition_for_terminal_capability",
+            ):
+                if required_method not in assistant_methods:
+                    findings.append(
+                        _source_policy_finding(
+                            root=root,
+                            path="orchestrator/orchestrator.py",
+                            rule_id=RULE_CANONICAL_CAPABILITY_ID,
+                            symbol=f"VoiceAssistant.{required_method}",
+                            message=(
+                                "cognitive Capability lifetime must remain detached from "
+                                "the foreground interaction call stack"
+                            ),
+                        )
+                    )
+
     retired_runtime_paths = (
         "orchestrator/runtime/skill_runtime.py",
         "orchestrator/runtime/skill_adapters.py",

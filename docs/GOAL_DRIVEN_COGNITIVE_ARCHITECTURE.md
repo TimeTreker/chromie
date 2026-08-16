@@ -2783,11 +2783,31 @@ Chromie dependency. Durable retry never grants physical-effect authority: effect
 non-idempotent work must revalidate current Goal/Plan/provider state and trusted evidence
 before any redispatch.
 
-Interaction lifetime and Capability lifetime are intentionally different. One user turn
-may finish its immediate conversational work while several capability requests remain
-active; each terminal result can create a new cognitive opportunity without resuming the
-original Python call stack. This is the execution foundation for many simultaneous
-Capabilities without turning concurrency mechanics into semantic intelligence.
+Interaction lifetime and Capability lifetime are intentionally different. The maintained
+cognitive-effectful path calls `submit_cognitive_response(...)` and ends the foreground
+interaction task after Runtime acceptance; a separately tracked, Runtime-correlated result
+consumer observes lifecycle events until terminal closure. That consumer is not a second
+execution manager: it owns no request identity, scheduling, semantic routing, or completion
+truth. It converts an exact terminal Runtime result through the existing deterministic closure
+into `ExecutionEvidence`, creates an internal `CognitiveOpportunity`, and may invoke the
+existing Tool Result Interpreter when current Goal responsibility is still relevant. Result
+arrival is never encoded as a synthetic user message and never resumes the original Python
+call stack.
+
+Planner-authored speech timed `after_capabilities` is not dispatched on this detached path.
+Before terminal Evidence exists it is only prospective wording and therefore cannot own a
+completion claim. Result wording is generated from terminal Evidence instead. When an early
+sibling result is already delivered, final aggregate closure filters that evidence from later
+result interpretation; when every completed fact has already been delivered, final speech is
+suppressed while the aggregate `ExecutionOutcomeBundle` is still recorded as whole-scope
+terminal truth. A newer overlapping turn suppresses early result speech rather than allowing
+an old result to interrupt it. Runtime open-interaction ownership remains visible to scoped
+cancellation even after the foreground interaction task has been cleaned up. Hardened Goal
+supersession, Plan-version invalidation, and late-result authority are defined by the following
+cancellation/supersession Issue rather than by this lifecycle split.
+
+This is the execution foundation for many simultaneous Capabilities without turning
+concurrency mechanics into semantic intelligence.
 
 ## 15. Response architecture
 

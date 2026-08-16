@@ -293,6 +293,47 @@ class RepositoryEngineeringPolicyTests(unittest.TestCase):
             findings,
         )
 
+    def test_detached_cognitive_capability_boundary_is_required(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            coordinator = root / "orchestrator" / "runtime" / "interaction_coordinator.py"
+            coordinator.parent.mkdir(parents=True)
+            coordinator.write_text(
+                "class InteractionRuntimeCoordinator:\n"
+                "    async def execute(self): pass\n",
+                encoding="utf-8",
+            )
+            orchestrator = root / "orchestrator" / "orchestrator.py"
+            orchestrator.write_text(
+                "class VoiceAssistant:\n"
+                "    async def execute_interaction_response(self): pass\n",
+                encoding="utf-8",
+            )
+
+            findings = policies.audit_canonical_capability_identity(root)
+
+        symbols = {item.symbol for item in findings}
+        self.assertIn(
+            "InteractionRuntimeCoordinator.submit_cognitive_response",
+            symbols,
+        )
+        self.assertIn(
+            "InteractionRuntimeCoordinator.wait_cognitive_dispatch",
+            symbols,
+        )
+        self.assertIn(
+            "VoiceAssistant._dispatch_detached_cognitive_interaction",
+            symbols,
+        )
+        self.assertIn(
+            "VoiceAssistant._consume_detached_cognitive_dispatch",
+            symbols,
+        )
+        self.assertIn(
+            "VoiceAssistant._reenter_cognition_for_terminal_capability",
+            symbols,
+        )
+
     def test_parallel_capability_event_manager_authority_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

@@ -124,8 +124,10 @@ from shared.chromie_contracts.interaction import (
 )
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.execution_outcome import (
+    ExecutionEvidence,
     goal_completion_qualification_summary,
 )
+from shared.chromie_contracts.situation import CognitiveOpportunity
 from shared.chromie_contracts.tool_result import (
     ToolExecutionRequest,
     ToolExecutionResponse,
@@ -505,6 +507,9 @@ class VoiceAssistant:
             asyncio.Task,
             str,
         ] = {}
+        # Detached provider work is not an active foreground interaction task.
+        # These tasks consume Runtime lifecycle/Evidence after submit() returned.
+        self.active_capability_result_tasks: dict[asyncio.Task, str] = {}
         self.task_continuity_report_tasks: set[asyncio.Task] = set()
         self.goal_association_report_tasks: set[asyncio.Task] = set()
         self.fast_planner_report_tasks: set[asyncio.Task] = set()
@@ -7220,6 +7225,40 @@ class VoiceAssistant:
             )
             return "waiting_for_recovery_confirmation"
 
+        delivered_incremental_evidence = {
+            str(item).strip()
+            for item in response.metadata.get(
+                "incremental_result_delivery_evidence_ids",
+                [],
+            )
+            if str(item).strip()
+        }
+        completed_evidence_ids = {
+            item.evidence_id
+            for item in bundle.evidence
+            if item.status == "completed"
+        }
+        if (
+            bundle.aggregate_status == "completed"
+            and completed_evidence_ids
+            and completed_evidence_ids.issubset(delivered_incremental_evidence)
+        ):
+            self.session_log(
+                session_id,
+                "cognitive_outcome_response_suppressed: "
+                "reason=incremental_result_already_delivered evidence=%s",
+                len(completed_evidence_ids),
+            )
+            self._record_cognitive_outcome_evidence(
+                bundle,
+                session_id=session_id,
+                final_response=None,
+                delivery_status="incremental_result_delivery_completed",
+                suppression_reason="incremental_result_already_delivered",
+                goal_state_results=goal_state_results,
+            )
+            return "incremental_result_delivery_completed"
+
         try:
             final_response = await self._compose_evidence_bound_tool_result_response(
                 source_response=response,
@@ -7468,6 +7507,302 @@ class VoiceAssistant:
                 return text[:max_chars].rstrip()
         return ""
 
+    async def _reenter_cognition_for_terminal_capability(
+        self,
+        *,
+        response: InteractionResponse,
+        result: CapabilityResult,
+        session_id: str | None,
+        generation: int,
+    ) -> None:
+        """Turn one exact terminal Runtime result into an internal cognitive event.
+
+        The result is never encoded as a user message. Runtime owns the lifecycle
+        fact, deterministic closure creates terminal Evidence, and the existing
+        Tool Result Interpreter may decide whether one grounded spoken update is
+        useful while sibling work continues.
+        """
+
+        try:
+            evidence = self._cognitive_turn_closure_adapter().build_terminal_evidence(
+                response=response,
+                result=result,
+                session_id=session_id,
+            )
+        except Exception as exc:
+            self.session_log(
+                session_id,
+                "incremental_terminal_evidence_rejected: request_id=%s "
+                "error_type=%s error=%s",
+                result.request_id,
+                type(exc).__name__,
+                exc,
+            )
+            return
+        if evidence is None:
+            return
+
+        reason_codes = [
+            value
+            for value in (
+                evidence.reason_code,
+                f"execution_{evidence.status}",
+            )
+            if value
+        ]
+        opportunity = CognitiveOpportunity.create(
+            trigger="execution_outcome",
+            goal_ids=list(evidence.source_goal_ids),
+            evidence_refs=[evidence.evidence_id],
+            reason_codes=reason_codes[:8],
+            recommended_cognition=(
+                "fast" if evidence.status == "completed" else "slow"
+            ),
+        )
+        response.metadata.setdefault(
+            "incremental_cognitive_opportunities",
+            [],
+        ).append(opportunity.prompt_projection())
+        self.session_log(
+            session_id,
+            "incremental_cognitive_opportunity: opportunity_id=%s request_id=%s "
+            "goals=%s status=%s",
+            opportunity.opportunity_id,
+            evidence.request_id,
+            ",".join(evidence.source_goal_ids),
+            evidence.status,
+        )
+
+        if not self._terminal_evidence_is_currently_relevant(evidence):
+            self.session_log(
+                session_id,
+                "incremental_cognitive_reentry_suppressed: request_id=%s reason=goal_not_open",
+                evidence.request_id,
+            )
+            return
+        if self._outcome_response_is_stale(
+            generation=generation,
+            session_id=session_id,
+        ):
+            # Ordinary overlap delivery is resolved by the final outcome path;
+            # never interrupt a newer user turn with an early sibling result.
+            self.session_log(
+                session_id,
+                "incremental_cognitive_reentry_deferred: request_id=%s reason=turn_overlap",
+                evidence.request_id,
+            )
+            return
+        if evidence.status != "completed":
+            return
+        observation = evidence.observation
+        if (
+            observation is None
+            or observation.status != "available"
+            or not observation.schema_validated
+            or not observation.data
+        ):
+            return
+
+        try:
+            result_response = await self._compose_incremental_terminal_result_response(
+                source_response=response,
+                evidence=evidence,
+                opportunity=opportunity,
+                session_id=session_id,
+            )
+        except Exception as exc:
+            self.session_log(
+                session_id,
+                "incremental_tool_result_interpretation_rejected: request_id=%s "
+                "error_type=%s error=%s",
+                evidence.request_id,
+                type(exc).__name__,
+                exc,
+            )
+            return
+        if result_response is None:
+            return
+
+        delivery_status = await self._execute_cognitive_outcome_response(
+            result_response,
+            session_id=session_id,
+            detached_delivery=True,
+        )
+        if delivery_status == "speech_runtime_completed":
+            delivered = response.metadata.setdefault(
+                "incremental_result_delivery_evidence_ids",
+                [],
+            )
+            if evidence.evidence_id not in delivered:
+                delivered.append(evidence.evidence_id)
+        self.session_log(
+            session_id,
+            "incremental_cognitive_reentry_done: request_id=%s evidence_id=%s delivery=%s",
+            evidence.request_id,
+            evidence.evidence_id,
+            delivery_status,
+        )
+
+    def _terminal_evidence_is_currently_relevant(
+        self,
+        evidence: ExecutionEvidence,
+    ) -> bool:
+        active = {
+            str(item.get("goal_id") or "").strip(): item
+            for item in self.conversation_state.active_goal_snapshots()
+            if str(item.get("goal_id") or "").strip()
+        }
+        return any(
+            goal_id in active
+            and str(active[goal_id].get("responsibility_status") or "") == "open"
+            for goal_id in evidence.source_goal_ids
+        )
+
+    async def _compose_incremental_terminal_result_response(
+        self,
+        *,
+        source_response: InteractionResponse,
+        evidence: ExecutionEvidence,
+        opportunity: CognitiveOpportunity,
+        session_id: str | None,
+    ) -> InteractionResponse | None:
+        observation = evidence.observation
+        if (
+            observation is None
+            or observation.status != "available"
+            or not observation.schema_validated
+            or not observation.data
+        ):
+            return None
+        metadata = (
+            source_response.metadata
+            if isinstance(source_response.metadata, dict)
+            else {}
+        )
+        envelope = metadata.get("user_turn_envelope")
+        normalized_input = (
+            envelope.get("normalized_input")
+            if isinstance(envelope, dict)
+            else None
+        )
+        user_request = (
+            str(normalized_input.get("text") or "").strip()
+            if isinstance(normalized_input, dict)
+            else ""
+        )
+        if not user_request:
+            return None
+        language = str(
+            metadata.get("language")
+            or (
+                normalized_input.get("language")
+                if isinstance(normalized_input, dict)
+                else ""
+            )
+            or "en-US"
+        )
+        bounded_evidence = ToolResultEvidence(
+            evidence_id=evidence.evidence_id,
+            tool_id=evidence.capability_id,
+            status=evidence.status,
+            data=observation.data,
+            output_sha256=canonical_value_sha256(observation.data),
+        )
+        normal_char_budget = 72 if language.lower().startswith("zh") else 200
+        interpretation_request = ToolResultInterpretationRequest(
+            sid=str(session_id or ""),
+            user_request=user_request,
+            language=language,
+            evidence=[bounded_evidence],
+            fallback_response=self._trusted_tool_result_fallback(
+                [bounded_evidence],
+                max_chars=normal_char_budget,
+            ),
+            max_spoken_chars=normal_char_budget,
+            detailed_max_spoken_chars=(
+                260 if language.lower().startswith("zh") else 620
+            ),
+            max_sentences=2,
+            detailed_max_sentences=5,
+            context={
+                "incremental_terminal_evidence": True,
+                "terminal_request_id": evidence.request_id,
+                "terminal_capability_id": evidence.capability_id,
+                "terminal_status": evidence.status,
+                "source_goal_ids": list(evidence.source_goal_ids),
+                "cognitive_opportunity": opportunity.prompt_projection(),
+                "canonical_plan": metadata.get("canonical_plan") or {},
+            },
+        )
+        try:
+            session = await self.get_http_session()
+            interpretation = await self.agent_client.interpret_tool_result(
+                session,
+                request=interpretation_request,
+                timeout_ms=self.tool_result_interpreter_timeout_ms,
+            )
+        except Exception as exc:
+            self.session_log(
+                session_id,
+                "incremental_tool_result_interpretation_failed: request_id=%s "
+                "error_type=%s error=%s",
+                evidence.request_id,
+                type(exc).__name__,
+                exc,
+            )
+            return None
+        if interpretation.status not in {"resolved", "fallback"}:
+            return None
+        for reference in interpretation.selected_facts:
+            if reference.evidence_id != evidence.evidence_id:
+                raise ValueError(
+                    "incremental tool result interpretation references unknown evidence"
+                )
+            self._resolve_tool_result_pointer(
+                observation.data,
+                reference.json_pointer,
+            )
+        return InteractionResponse(
+            interaction_id=(
+                f"result_reentry_{evidence.evidence_id}"[:160]
+            ),
+            status="ok",
+            speech=[
+                InteractionSpeech(
+                    id=f"speech_result_reentry_{evidence.evidence_id}"[:160],
+                    text=interpretation.spoken_response,
+                    timing="immediate",
+                    style="brief",
+                    priority="normal",
+                    interruptible=True,
+                    metadata={
+                        "source": "evidence_bound_incremental_result_interpretation",
+                        "phase": "capability_result_reentry",
+                        "wait_for_playback_start": True,
+                        "playback_start_required_for_delivery": True,
+                        "source_goal_ids": list(evidence.source_goal_ids),
+                        "evidence_refs": [evidence.evidence_id],
+                        "selected_facts": [
+                            item.model_dump(mode="json")
+                            for item in interpretation.selected_facts
+                        ],
+                    },
+                )
+            ],
+            capabilities=[],
+            requires_confirmation=False,
+            metadata={
+                "source": "evidence_bound_incremental_result_interpretation",
+                "phase": "capability_result_reentry",
+                "language": language,
+                "source_interaction_id": source_response.interaction_id,
+                "source_goal_ids": list(evidence.source_goal_ids),
+                "evidence_refs": [evidence.evidence_id],
+                "cognitive_opportunity": opportunity.prompt_projection(),
+                "interpretation": interpretation.model_dump(mode="json"),
+            },
+        )
+
     async def _compose_evidence_bound_tool_result_response(
         self,
         *,
@@ -7504,8 +7839,18 @@ class VoiceAssistant:
         ):
             return compose_outcome_response(bundle, plan, language)
 
+        delivered_incremental_evidence = {
+            str(item).strip()
+            for item in metadata.get(
+                "incremental_result_delivery_evidence_ids",
+                [],
+            )
+            if str(item).strip()
+        }
         evidence: list[ToolResultEvidence] = []
         for item in bundle.evidence:
+            if item.evidence_id in delivered_incremental_evidence:
+                continue
             observation = item.observation
             if (
                 observation is None
@@ -7705,6 +8050,26 @@ class VoiceAssistant:
         reset_playback: bool = True,
         mark_session_done: bool = True,
     ) -> None:
+        if self._uses_detached_cognitive_capability_runtime(response):
+            task = asyncio.create_task(
+                self._dispatch_detached_cognitive_interaction(
+                    response,
+                    session_id,
+                    confirmed_request_ids=confirmed_request_ids,
+                    reset_playback=reset_playback,
+                    mark_session_done=mark_session_done,
+                )
+            )
+            active_tasks = getattr(self, "active_interaction_tasks", None)
+            if not isinstance(active_tasks, dict):
+                active_tasks = {}
+                self.active_interaction_tasks = active_tasks
+            active_tasks[task] = response.interaction_id
+            self.active_interaction_task = task
+            self.active_interaction_id = response.interaction_id
+            task.add_done_callback(self._interaction_task_done)
+            return
+
         reserve = getattr(
             getattr(self, "interaction_runtime", None),
             "reserve_interaction",
@@ -7751,6 +8116,310 @@ class VoiceAssistant:
         self.active_interaction_task = task
         self.active_interaction_id = response.interaction_id
         task.add_done_callback(self._interaction_task_done)
+
+    @staticmethod
+    def _uses_detached_cognitive_capability_runtime(
+        response: InteractionResponse,
+    ) -> bool:
+        metadata = response.metadata if isinstance(response.metadata, dict) else {}
+        return bool(
+            metadata.get("cognitive_runtime_apply") is True
+            and isinstance(metadata.get("canonical_plan"), dict)
+            and response.capabilities
+        )
+
+    async def _dispatch_detached_cognitive_interaction(
+        self,
+        response: InteractionResponse,
+        session_id: str | None,
+        *,
+        confirmed_request_ids: set[str] | None,
+        reset_playback: bool,
+        mark_session_done: bool,
+    ) -> Any:
+        """Submit trusted provider work and end the foreground Python task.
+
+        Terminal work is consumed by a separate result task. The Capability
+        Runtime, not this foreground call stack, keeps request ownership alive.
+        """
+
+        if reset_playback:
+            await self.reset_playback_ordering()
+        generation = int(getattr(self, "playback_generation", 0))
+        started_ms = now_ms()
+        try:
+            dispatch = await self.interaction_runtime.submit_cognitive_response(
+                response,
+                session_id=session_id,
+                confirmed_request_ids=confirmed_request_ids,
+            )
+        except Exception as exc:
+            record_session_workflow_stage(
+                self,
+                session_id,
+                stage="trusted_capability_runtime_dispatch",
+                started_monotonic_ms=started_ms,
+                finished_monotonic_ms=now_ms(),
+                status="failed",
+                input_payload={"interaction_response": response},
+                output_payload=None,
+                errors=[{"error_type": type(exc).__name__, "error": str(exc)}],
+                metadata=summarize_provider_start_evidence(response),
+            )
+            raise
+
+        receipt = dispatch.receipt
+        record_session_workflow_stage(
+            self,
+            session_id,
+            stage="trusted_capability_runtime_dispatch",
+            started_monotonic_ms=started_ms,
+            finished_monotonic_ms=now_ms(),
+            status="accepted" if receipt is not None else "terminal_before_dispatch",
+            input_payload={"interaction_response": dispatch.source_response},
+            output_payload=(
+                receipt
+                if receipt is not None
+                else dispatch.immediate_execution
+            ),
+            errors=[],
+            metadata=summarize_provider_start_evidence(dispatch.source_response),
+        )
+        self.session_log(
+            session_id,
+            "capability_runtime_detached: interaction_id=%s dispatch_id=%s requests=%s",
+            dispatch.source_response.interaction_id,
+            receipt.dispatch_id if receipt is not None else "none",
+            len(receipt.request_ids) if receipt is not None else 0,
+        )
+
+        result_task = asyncio.create_task(
+            self._consume_detached_cognitive_dispatch(
+                dispatch,
+                session_id=session_id,
+                generation=generation,
+                confirmed_request_ids=confirmed_request_ids,
+            ),
+            name=(
+                "capability-result-reentry:"
+                f"{dispatch.source_response.interaction_id}:"
+                f"{receipt.dispatch_id if receipt is not None else 'immediate'}"
+            ),
+        )
+        result_tasks = getattr(self, "active_capability_result_tasks", None)
+        if not isinstance(result_tasks, dict):
+            result_tasks = {}
+            self.active_capability_result_tasks = result_tasks
+        result_tasks[result_task] = dispatch.source_response.interaction_id
+        result_task.add_done_callback(self._capability_result_task_done)
+
+        if mark_session_done:
+            state = self.sessions.state.get(session_id or "")
+            if state is not None:
+                state["llm_done"] = True
+                state["response_chars"] = state.get("response_chars", 0) + sum(
+                    len(item.text)
+                    for item in dispatch.runtime_response.speech
+                )
+            self.maybe_session_done(session_id)
+        return receipt
+
+    def _capability_result_task_done(self, task: asyncio.Task) -> None:
+        result_tasks = getattr(self, "active_capability_result_tasks", None)
+        if isinstance(result_tasks, dict):
+            result_tasks.pop(task, None)
+        if task.cancelled():
+            return
+        error = task.exception()
+        if error is not None:
+            logger.error(
+                "Detached capability result task failed: %s",
+                error,
+                exc_info=error,
+            )
+
+    async def _consume_detached_cognitive_dispatch(
+        self,
+        dispatch: Any,
+        *,
+        session_id: str | None,
+        generation: int,
+        confirmed_request_ids: set[str] | None,
+    ) -> CapabilityRuntimeResult:
+        """Consume Runtime events after the originating foreground task ended."""
+
+        response = dispatch.source_response
+        receipt = dispatch.receipt
+        started_ms = now_ms()
+        source_capability_request_ids = {
+            request.request_id for request in response.capabilities
+        }
+        runtime_capability_request_ids = {
+            request.request_id
+            for request in dispatch.runtime_response.capabilities
+        }
+        terminal_capability_ids: set[str] = set()
+
+        preexecuted_capability_results = [
+            result
+            for result in dispatch.preexecuted_results
+            if result.request_id in source_capability_request_ids
+        ]
+        for result in preexecuted_capability_results:
+            terminal_capability_ids.add(result.request_id)
+            if runtime_capability_request_ids:
+                await self._reenter_cognition_for_terminal_capability(
+                    response=response,
+                    result=result,
+                    session_id=session_id,
+                    generation=generation,
+                )
+
+        if receipt is not None:
+            cursor = receipt.event_cursor
+            runtime_terminal_ids: set[str] = set()
+            while len(runtime_terminal_ids) < len(runtime_capability_request_ids):
+                event = await self.interaction_runtime.runtime.wait_runtime_event(
+                    cursor,
+                    dispatch_id=receipt.dispatch_id,
+                )
+                cursor = event.sequence
+                if (
+                    not event.terminal
+                    or event.result is None
+                    or event.request_id not in runtime_capability_request_ids
+                    or event.request_id in runtime_terminal_ids
+                ):
+                    continue
+                runtime_terminal_ids.add(event.request_id)
+                terminal_capability_ids.add(event.request_id)
+                self.session_log(
+                    session_id,
+                    "capability_terminal_reentry_event: dispatch_id=%s request_id=%s "
+                    "capability_id=%s status=%s remaining=%s",
+                    receipt.dispatch_id,
+                    event.request_id,
+                    event.capability_id,
+                    event.type,
+                    max(
+                        0,
+                        len(source_capability_request_ids)
+                        - len(terminal_capability_ids),
+                    ),
+                )
+                if len(terminal_capability_ids) < len(source_capability_request_ids):
+                    await self._reenter_cognition_for_terminal_capability(
+                        response=response,
+                        result=event.result,
+                        session_id=session_id,
+                        generation=generation,
+                    )
+
+        try:
+            execution = await self.interaction_runtime.wait_cognitive_dispatch(
+                dispatch
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            self.session_log(
+                session_id,
+                "detached_capability_completion_failed: interaction_id=%s "
+                "error_type=%s error=%s",
+                response.interaction_id,
+                type(exc).__name__,
+                exc,
+            )
+            execution = CapabilityRuntimeResult(
+                interaction_id=response.interaction_id,
+                status="failed",
+            )
+
+        record_session_workflow_stage(
+            self,
+            session_id,
+            stage="trusted_capability_runtime_completion",
+            started_monotonic_ms=started_ms,
+            finished_monotonic_ms=now_ms(),
+            status=execution.status,
+            input_payload={
+                "interaction_id": response.interaction_id,
+                "dispatch_id": receipt.dispatch_id if receipt is not None else "",
+            },
+            output_payload=execution,
+            errors=[
+                {
+                    "request_id": result.request_id,
+                    "capability_id": result.capability_id,
+                    "status": result.status,
+                    "reason_code": result.reason_code,
+                    "message": result.message,
+                }
+                for result in execution.results
+                if result.status not in {"completed", "success"}
+            ],
+            metadata=summarize_provider_start_evidence(response, execution),
+        )
+        self.session_log(
+            session_id,
+            "detached_capability_runtime_done: interaction_id=%s status=%s "
+            "results=%s runtime_ms=%.1f",
+            response.interaction_id,
+            execution.status,
+            len(execution.results),
+            now_ms() - started_ms,
+        )
+        for result in execution.results:
+            self.conversation_state.update_pending_task_status_for_request_id(
+                request_id=result.request_id,
+                status=result.status,
+            )
+
+        has_soridormi_request = any(
+            request.capability_id.startswith("soridormi.")
+            for request in response.capabilities
+        )
+        provider_status = (
+            await self._record_soridormi_post_status(session_id)
+            if has_soridormi_request
+            else None
+        )
+        completed_request_ids = {
+            result.request_id for result in execution.results
+        }
+        if execution.status != "completed":
+            for request in response.capabilities:
+                if request.request_id in completed_request_ids:
+                    continue
+                self.conversation_state.update_pending_task_status_for_request_id(
+                    request_id=request.request_id,
+                    status="not_run",
+                )
+        recovery_confirmation_staged = (
+            await self._maybe_stage_body_recovery_confirmation(
+                response,
+                execution,
+                session_id,
+            )
+            if execution.status != "completed"
+            else False
+        )
+        closure_status = await self._close_cognitive_execution(
+            response=response,
+            execution=execution,
+            session_id=session_id,
+            generation=generation,
+            provider_status=provider_status,
+            recovery_confirmation_staged=recovery_confirmation_staged,
+        )
+        response.metadata["cognitive_turn_closure_status"] = closure_status
+        self._record_execution_experience_safely(
+            response=response,
+            execution=execution,
+            session_id=session_id,
+            confirmed_request_ids=confirmed_request_ids,
+        )
+        return execution
 
     def _interaction_task_done(self, task: asyncio.Task) -> None:
         reservations = getattr(
@@ -8535,13 +9204,38 @@ class VoiceAssistant:
                 active_host_interactions.append(
                     (active_task, legacy_interaction_id)
                 )
+        runtime_open_interaction_ids: list[str] = []
+        runtime = getattr(
+            getattr(self, "interaction_runtime", None),
+            "runtime",
+            None,
+        )
+        observe_execution = getattr(runtime, "execution_observation", None)
+        if callable(observe_execution):
+            try:
+                observation = await observe_execution()
+                runtime_open_interaction_ids = [
+                    str(item).strip()
+                    for item in observation.open_interaction_ids
+                    if str(item).strip()
+                ]
+            except Exception as exc:
+                logger.warning(
+                    "Runtime execution observation failed during cancellation: %s",
+                    exc,
+                )
+        if not active_interaction_id and runtime_open_interaction_ids:
+            # Detached capability work intentionally outlives the foreground
+            # interaction task. Runtime ownership is therefore the authoritative
+            # fallback for current-interaction cancellation scope.
+            active_interaction_id = runtime_open_interaction_ids[-1]
         if scope == "global_emergency":
             host_scope_interaction_ids = tuple(
                 sorted(
                     {
                         interaction_id
                         for _, interaction_id in active_host_interactions
-                    }
+                    }.union(runtime_open_interaction_ids)
                 )
             )
         elif (

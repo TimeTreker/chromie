@@ -34,6 +34,7 @@ from shared.chromie_contracts.reflex import (
 )
 
 from .capability_runtime import (
+    CapabilityDispatchReceipt,
     LocalSpeechCapabilityProvider,
     MediaPlaybackCapabilityProvider,
     RuntimeAuthorization,
@@ -112,6 +113,24 @@ class ReadyPlannerVocalExecution:
     interaction_id: str
     speech: InteractionSpeech
     task: asyncio.Task[CapabilityRuntimeResult]
+
+
+@dataclass
+class CognitiveCapabilityDispatch:
+    """Detached cognitive Capability dispatch owned by the trusted Runtime.
+
+    This is a bounded Host integration handle, not a second execution owner.
+    ``receipt`` remains the CapabilityRuntime authority for live provider work;
+    ``source_response`` retains the immutable cognitive Plan/request commitments
+    needed for later Evidence reconciliation and cognitive re-entry.
+    """
+
+    source_response: InteractionResponse
+    runtime_response: InteractionResponse
+    receipt: CapabilityDispatchReceipt | None
+    immediate_execution: CapabilityRuntimeResult | None
+    preexecuted_results: list[CapabilityResult]
+    preexecuted_traces: list[CapabilityTrace]
 
 
 @dataclass
@@ -351,6 +370,253 @@ class InteractionRuntimeCoordinator:
             ),
             consumed_results,
             consumed_traces,
+        )
+
+    async def submit_cognitive_response(
+        self,
+        response: InteractionResponse,
+        *,
+        session_id: str | None,
+        confirmed_request_ids: set[str] | None = None,
+    ) -> CognitiveCapabilityDispatch:
+        """Dispatch one effectful cognitive response without joining providers.
+
+        The foreground caller may return as soon as this method returns. Runtime
+        ownership then lives behind ``CapabilityDispatchReceipt`` until the
+        submission becomes terminal. Planner-authored ``after_capabilities``
+        speech is deliberately excluded here: once provider work exists, final
+        user-facing claims must be produced from terminal Evidence rather than a
+        pre-authored sentence that could become false while execution is running.
+        """
+
+        if not self._is_cognitive_effectful(response):
+            raise ValueError(
+                "submit_cognitive_response requires an effectful cognitive response"
+            )
+
+        raw_body_requests = [
+            request
+            for request in response.capabilities
+            if request.capability_id.startswith("soridormi.")
+        ]
+        if raw_body_requests:
+            try:
+                await self._ensure_soridormi_catalog(
+                    required_capability_ids=(
+                        request.capability_id for request in raw_body_requests
+                    ),
+                )
+            except RuntimeError as exc:
+                failed = await self._body_setup_failure(
+                    response,
+                    raw_body_requests,
+                    session_id=session_id,
+                    reason_code=(
+                        "provider_disabled"
+                        if self.soridormi_invoker is None
+                        else "catalog_unavailable"
+                    ),
+                    message=str(exc),
+                    suppress_speech=True,
+                )
+                return CognitiveCapabilityDispatch(
+                    source_response=response,
+                    runtime_response=response.model_copy(
+                        deep=True,
+                        update={"speech": []},
+                    ),
+                    receipt=None,
+                    immediate_execution=failed,
+                    preexecuted_results=[],
+                    preexecuted_traces=[],
+                )
+
+        prepared = self.prepare_response(
+            response,
+            session_id=session_id,
+            confirmed_request_ids=confirmed_request_ids,
+        )
+        if self.interaction_ledger is not None:
+            envelope = prepared.metadata.get("user_turn_envelope")
+            turn_id = (
+                str(envelope.get("turn_id") or "").strip()
+                if isinstance(envelope, dict)
+                else ""
+            ) or prepared.interaction_id
+            self.interaction_ledger.record_committed_requests(
+                session_id=str(session_id or turn_id),
+                turn_id=turn_id,
+                interaction_id=prepared.interaction_id,
+                requests=prepared.capabilities,
+            )
+
+        if prepared.status == "error" and not prepared.capabilities and not prepared.speech:
+            return CognitiveCapabilityDispatch(
+                source_response=prepared,
+                runtime_response=prepared,
+                receipt=None,
+                immediate_execution=CapabilityRuntimeResult(
+                    interaction_id=prepared.interaction_id,
+                    status="failed",
+                ),
+                preexecuted_results=[],
+                preexecuted_traces=[],
+            )
+
+        body_requests = [
+            request
+            for request in prepared.capabilities
+            if request.capability_id.startswith("soridormi.")
+        ]
+        task_graph_requests = [
+            request
+            for request in prepared.capabilities
+            if request.capability_id == _TASK_GRAPH_SKILL_ID
+        ]
+        if task_graph_requests and not self._task_graph_enabled:
+            failed = await self._body_setup_failure(
+                prepared,
+                task_graph_requests,
+                session_id=session_id,
+                reason_code="task_graph_execution_disabled",
+                message=(
+                    "InteractionResponse requested a TaskGraph, but host "
+                    "TaskGraph execution is disabled"
+                ),
+                suppress_speech=True,
+            )
+            return CognitiveCapabilityDispatch(
+                source_response=prepared,
+                runtime_response=prepared.model_copy(deep=True, update={"speech": []}),
+                receipt=None,
+                immediate_execution=failed,
+                preexecuted_results=[],
+                preexecuted_traces=[],
+            )
+        if body_requests:
+            unavailable = [
+                request
+                for request in body_requests
+                if not self.registry.get(request.capability_id).available
+            ]
+            if unavailable:
+                definition = self.registry.get(unavailable[0].capability_id)
+                failed = await self._body_setup_failure(
+                    prepared,
+                    body_requests,
+                    session_id=session_id,
+                    reason_code="capability_unavailable",
+                    message=definition.unavailable_reason or "unavailable",
+                    suppress_speech=True,
+                )
+                return CognitiveCapabilityDispatch(
+                    source_response=prepared,
+                    runtime_response=prepared.model_copy(
+                        deep=True,
+                        update={"speech": []},
+                    ),
+                    receipt=None,
+                    immediate_execution=failed,
+                    preexecuted_results=[],
+                    preexecuted_traces=[],
+                )
+
+        # Result-dependent speech cannot be truthful before terminal Evidence.
+        # Keep immediate/progress speech, but remove planner-authored terminal
+        # wording from the live Runtime scope. The later result re-entry owns it.
+        deferred_speech_ids = [
+            speech.id
+            for speech in prepared.speech
+            if speech.timing == "after_capabilities"
+        ]
+        runtime_response = prepared.model_copy(
+            deep=True,
+            update={
+                "speech": [
+                    speech
+                    for speech in prepared.speech
+                    if speech.timing != "after_capabilities"
+                ],
+                "metadata": {
+                    **prepared.metadata,
+                    **(
+                        {
+                            "result_deferred_speech_ids": deferred_speech_ids,
+                            "result_deferred_speech_reason": (
+                                "terminal_evidence_owns_result_wording"
+                            ),
+                        }
+                        if deferred_speech_ids
+                        else {}
+                    ),
+                },
+            },
+        )
+        runtime_response, preexecuted_results, preexecuted_traces = (
+            self._consume_preexecuted(runtime_response)
+        )
+        if not runtime_response.capabilities and not runtime_response.speech:
+            merged = CapabilityRuntimeResult(
+                interaction_id=prepared.interaction_id,
+                status=(
+                    "completed"
+                    if preexecuted_results
+                    and all(item.status == "completed" for item in preexecuted_results)
+                    else "failed"
+                ),
+                results=list(preexecuted_results),
+                traces=list(preexecuted_traces),
+            )
+            return CognitiveCapabilityDispatch(
+                source_response=prepared,
+                runtime_response=runtime_response,
+                receipt=None,
+                immediate_execution=merged,
+                preexecuted_results=[],
+                preexecuted_traces=[],
+            )
+
+        receipt = await self.runtime.submit(
+            runtime_response,
+            authorization=RuntimeAuthorization(
+                confirmed_request_ids=set(confirmed_request_ids or ()),
+            ),
+        )
+        return CognitiveCapabilityDispatch(
+            source_response=prepared,
+            runtime_response=runtime_response,
+            receipt=receipt,
+            immediate_execution=None,
+            preexecuted_results=preexecuted_results,
+            preexecuted_traces=preexecuted_traces,
+        )
+
+    async def wait_cognitive_dispatch(
+        self,
+        dispatch: CognitiveCapabilityDispatch,
+    ) -> CapabilityRuntimeResult:
+        """Join one detached cognitive dispatch for final aggregate closure only."""
+
+        if dispatch.immediate_execution is not None:
+            return dispatch.immediate_execution
+        if dispatch.receipt is None:
+            raise RuntimeError("cognitive capability dispatch has no Runtime receipt")
+        execution = await self.runtime.wait_terminal(dispatch.receipt)
+        if not dispatch.preexecuted_results:
+            return execution
+        merged_results = [*dispatch.preexecuted_results, *execution.results]
+        merged_traces = [*dispatch.preexecuted_traces, *execution.traces]
+        return execution.model_copy(
+            update={
+                "results": merged_results,
+                "traces": merged_traces,
+                "status": (
+                    "completed"
+                    if merged_results
+                    and all(item.status == "completed" for item in merged_results)
+                    else execution.status
+                ),
+            }
         )
 
     async def _dispatch_to_terminal(

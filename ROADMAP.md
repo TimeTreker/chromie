@@ -153,8 +153,8 @@ and submission-task creation; provider terminal completion is an explicit
 `wait_terminal(receipt)` join rather than the dispatch API. No
 `CapabilityRuntime.execute(...)` aggregate compatibility API remains. Accepted, running,
 progress, and terminal events are published per exact Runtime-owned request without waiting
-for sibling completion. The remaining target is incremental terminal Evidence reconciliation
-and cognitive re-entry without creating a second Work/Result/Event manager or semantic
+for sibling completion. Incremental terminal Evidence reconciliation and detached cognitive
+re-entry are now maintained without creating a second Work/Result/Event manager or semantic
 agent. Provider transport and durable-execution backend remain below the Capability contract.
 
 Implement this line as separate focused Issues and separate patches:
@@ -191,10 +191,17 @@ Implement this line as separate focused Issues and separate patches:
   `not_run`/`missing_result`; the terminal request receives the same stable `evidence_id` used
   by final aggregate reconciliation. `ExecutionOutcomeBundle` remains final terminal truth,
   not a live scheduler snapshot, and no duplicate completion store is introduced.
-- **Issue — Decouple interaction lifetime from capability lifetime.** Remove the
-  assumption that one interaction Python task remains alive until every provider finishes.
-  Terminal Capability events create bounded cognitive opportunities/result interpretation
-  against current Goal/Plan relevance instead of resuming the original call stack.
+- **Issue — Decouple interaction lifetime from capability lifetime — source implementation complete.**
+  Cognitive effectful turns now submit through `submit_cognitive_response(...)`; the foreground
+  interaction task ends after Runtime acceptance while a Runtime-correlated result consumer owns
+  lifecycle observation until terminal closure. Each non-final terminal Capability result may
+  become exact incremental `ExecutionEvidence`, then an internal `CognitiveOpportunity`, then the
+  existing evidence-bound Tool Result Interpreter when current Goal responsibility is still open.
+  Result arrival is never fabricated as a user turn. Planner-authored `after_capabilities` terminal
+  wording is excluded from detached execution because completion language belongs to terminal
+  Evidence. Final aggregate closure remains available for whole-scope truth and filters evidence
+  already delivered incrementally so facts are not spoken twice. Runtime open-interaction ownership
+  also remains visible to scoped cancellation after the foreground Python task has exited.
 - **Issue — Harden cancellation, supersession, and late-result semantics.** Ensure scoped
   cancel/preempt, Goal replacement, stale Plan bindings, and late provider completion cannot
   resurrect obsolete work or force obsolete speech while preserving historical execution

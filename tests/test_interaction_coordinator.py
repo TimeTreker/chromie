@@ -1681,6 +1681,101 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
 
+    async def test_detached_cognitive_submit_returns_before_provider_terminal(
+        self,
+    ) -> None:
+        started = asyncio.Event()
+        release = asyncio.Event()
+
+        async def slow_speech(_args: dict[str, Any]) -> dict[str, Any]:
+            started.set()
+            await release.wait()
+            return {"scheduled": True, "playback_started": True}
+
+        coordinator = InteractionRuntimeCoordinator(slow_speech)
+        response = InteractionResponse(
+            interaction_id="interaction-detached",
+            capabilities=[
+                CapabilityRequest(
+                    request_id="request-slow",
+                    capability_id="chromie.speak",
+                    args={"text": "Working."},
+                    metadata={"source_goal_ids": ["goal-detached"]},
+                )
+            ],
+            metadata={
+                "cognitive_runtime_apply": True,
+                "canonical_plan": {"plan_id": "plan-detached"},
+            },
+        )
+
+        dispatch = await coordinator.submit_cognitive_response(
+            response,
+            session_id="sid-detached",
+        )
+
+        self.assertIsNotNone(dispatch.receipt)
+        await asyncio.wait_for(started.wait(), timeout=1.0)
+        observation = await coordinator.runtime.execution_observation()
+        self.assertIn("interaction-detached", observation.open_interaction_ids)
+        self.assertTrue(
+            any(
+                item.request_id == "request-slow" and item.provider_started
+                for item in observation.requests
+            )
+        )
+
+        release.set()
+        execution = await coordinator.wait_cognitive_dispatch(dispatch)
+        self.assertEqual(execution.status, "completed")
+        self.assertEqual(execution.results[0].request_id, "request-slow")
+
+    async def test_detached_cognitive_submit_defers_pre_authored_result_speech(
+        self,
+    ) -> None:
+        coordinator = InteractionRuntimeCoordinator(
+            lambda _args: {"scheduled": True, "playback_started": True}
+        )
+        response = InteractionResponse(
+            interaction_id="interaction-result-wording",
+            capabilities=[
+                CapabilityRequest(
+                    request_id="request-work",
+                    capability_id="chromie.speak",
+                    args={"text": "Working."},
+                    metadata={"source_goal_ids": ["goal-work"]},
+                )
+            ],
+            speech=[
+                {
+                    "id": "speech-unverified-result",
+                    "text": "It definitely succeeded.",
+                    "timing": "after_capabilities",
+                }
+            ],
+            metadata={
+                "cognitive_runtime_apply": True,
+                "canonical_plan": {"plan_id": "plan-result-wording"},
+            },
+        )
+
+        dispatch = await coordinator.submit_cognitive_response(
+            response,
+            session_id="sid-result-wording",
+        )
+
+        self.assertEqual(dispatch.runtime_response.speech, [])
+        self.assertEqual(
+            dispatch.runtime_response.metadata["result_deferred_speech_ids"],
+            ["speech-unverified-result"],
+        )
+        self.assertNotIn(
+            "speech-unverified-result",
+            dispatch.receipt.request_ids,
+        )
+        execution = await coordinator.wait_cognitive_dispatch(dispatch)
+        self.assertEqual(execution.status, "completed")
+
 
 
 if __name__ == "__main__":
