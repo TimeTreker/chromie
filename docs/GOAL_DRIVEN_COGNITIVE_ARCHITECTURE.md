@@ -2779,9 +2779,14 @@ Action, local Python, and future provider protocols sit behind provider adapters
 liveness is isolated behind the small `CapabilityRuntimeBackend` SPI; the maintained default is
 `InProcessAsyncioBackend`. Backend handles are opaque Runtime-internal references and are never
 projected into dispatch receipts, lifecycle events, provider contracts, Goal/Plan/request identity,
-or cognitive context. A DBOS backend may be qualified later for durable, read-only or idempotent
-work without changing the Chromie contract. Temporal is a useful durable-execution reference, not a required
-Chromie dependency. Durable retry never grants physical-effect authority: effectful or
+or cognitive context. The DBOS qualification boundary now accepts only a serializable durable
+submission and only when the canonical Capability explicitly opts in while remaining idempotent,
+side-effect-free, and safe-read. Weather is the first such qualification target. The DBOS workflow
+ID remains backend-local and never becomes a Goal, Plan, request, or Capability identity. Source
+qualification deliberately does **not** enable DBOS as the production Runtime backend yet: process
+restart also requires Host startup to rehydrate Runtime request ownership and restart terminal-event
+consumers before recovered results may re-enter cognition. Temporal remains a useful durable-execution
+reference, not a required Chromie dependency. Durable retry never grants physical-effect authority: effectful or
 non-idempotent work must revalidate current Goal/Plan/provider state and trusted evidence
 before any redispatch.
 

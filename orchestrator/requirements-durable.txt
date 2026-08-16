@@ -1,0 +1,3 @@
+# Optional durable Capability Runtime qualification dependency.
+# The default Chromie runtime does not import or require DBOS.
+dbos==2.29.0

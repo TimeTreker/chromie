@@ -729,6 +729,7 @@ def chromie_manifests(
                     timeout_s=8.0,
                     idempotent=True,
                     side_effect_free=True,
+                    durable_runtime_eligible=True,
                 ),
                 default_failure_policy=FailurePolicy(strategy="stop_and_report"),
                 llm_hints={

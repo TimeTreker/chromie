@@ -143,6 +143,7 @@ class CapabilityDefinition(CapabilityIdentityModel):
     exclusive_group: str | None = None
     timeout_ms: int = Field(default=30000, ge=1, le=120000)
     idempotent: bool = False
+    durable_runtime_eligible: bool = False
     requires_safety_monitor: bool = False
     cancellation_domains: tuple[CancellationDomain, ...] = ()
     metadata: dict[str, Any] = Field(default_factory=dict)

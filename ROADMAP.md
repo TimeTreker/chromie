@@ -215,11 +215,15 @@ Implement this line as separate focused Issues and separate patches:
   Runtime-internal references: they are absent from `CapabilityDispatchReceipt`, lifecycle events,
   provider contracts, Goal/Plan/request identity, and cognitive context. Validation, scheduling,
   cancellation scope, event publication, and terminal truth remain owned by `CapabilityRuntime`.
-- **Issue — Qualify a DBOS durable backend with read-only/idempotent work.** Use weather
-  or another safe information Capability to prove non-blocking submission, concurrent work,
-  process restart, result delivery, cancel, and recovery. DBOS remains an optional backend,
-  not a Cognitive Core dependency; no physical effect is automatically retried because a
-  durable engine can retry execution.
+- **Issue — Qualify a DBOS durable backend with read-only/idempotent work — source qualification complete; production activation intentionally gated.**
+  `DBOSCapabilityRuntimeBackend` now defines a serializable durable carrier and a lazy optional
+  DBOS adapter. Durable execution requires explicit `durable_runtime_eligible` opt-in plus
+  canonical idempotence and side-effect-free/safe-read metadata; the weather lookup is the first
+  opted-in Capability. Physical/effectful work fails closed. Repository tests prove durable-ID
+  retrieval across fresh backend instances and backend cancellation without leaking workflow IDs
+  into Chromie identity. Real DBOS crash/restart qualification is not claimed in this source tree:
+  production activation additionally needs startup rehydration of CapabilityRuntime ownership and
+  terminal-result consumers, and must be exercised with the optional DBOS dependency before enablement.
 - **Issue — Migrate long-running Soridormi work to asynchronous provider lifecycle.** Reuse
   its submit/status/event/cancel boundary so embodiment can report progress/terminal events
   without making Chromie wait. Physical feasibility, stop/recovery, and retry authority stay

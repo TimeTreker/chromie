@@ -93,6 +93,7 @@ def local_agent_tool_definitions(
                 exclusive_group=tool.execution.exclusive_group,
                 timeout_ms=max(1, int(float(tool.execution.timeout_s or 30.0) * 1000)),
                 idempotent=tool.execution.idempotent,
+                durable_runtime_eligible=tool.execution.durable_runtime_eligible,
                 requires_safety_monitor=False,
                 metadata={
                     "agent_id": tool.agent_id,
