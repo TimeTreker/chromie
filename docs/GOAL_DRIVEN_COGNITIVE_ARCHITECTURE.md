@@ -2802,9 +2802,12 @@ result interpretation; when every completed fact has already been delivered, fin
 suppressed while the aggregate `ExecutionOutcomeBundle` is still recorded as whole-scope
 terminal truth. A newer overlapping turn suppresses early result speech rather than allowing
 an old result to interrupt it. Runtime open-interaction ownership remains visible to scoped
-cancellation even after the foreground interaction task has been cleaned up. Hardened Goal
-supersession, Plan-version invalidation, and late-result authority are defined by the following
-cancellation/supersession Issue rather than by this lifecycle split.
+cancellation even after the foreground interaction task has been cleaned up. Late-result re-entry
+then applies a stricter Host-owned relevance gate: every source Goal must still have open
+Responsibility, the Goal's current canonical Plan ID/fingerprint must exactly match the dispatch
+binding, and the exact request ID must still belong to that Goal binding. A cancelled or superseded
+Goal, replacement Plan, or rebound request can retain the terminal result as historical Evidence but
+cannot authorize obsolete speech or action. Provider completion never reopens terminal Goal state.
 
 This is the execution foundation for many simultaneous Capabilities without turning
 concurrency mechanics into semantic intelligence.

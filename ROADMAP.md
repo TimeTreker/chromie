@@ -202,10 +202,13 @@ Implement this line as separate focused Issues and separate patches:
   Evidence. Final aggregate closure remains available for whole-scope truth and filters evidence
   already delivered incrementally so facts are not spoken twice. Runtime open-interaction ownership
   also remains visible to scoped cancellation after the foreground Python task has exited.
-- **Issue — Harden cancellation, supersession, and late-result semantics.** Ensure scoped
-  cancel/preempt, Goal replacement, stale Plan bindings, and late provider completion cannot
-  resurrect obsolete work or force obsolete speech while preserving historical execution
-  Evidence.
+- **Issue — Harden cancellation, supersession, and late-result semantics — source implementation complete.**
+  Late terminal Evidence remains valid execution history, but cognitive re-entry now fails closed
+  unless every source Goal still has open Responsibility and the Host-owned current binding matches
+  the exact canonical Plan ID/fingerprint and request ID that originally dispatched the work. Goal
+  cancellation, Goal supersession, replanning, or request rebinding therefore suppress obsolete
+  result speech/action without discarding the terminal Evidence. Existing exact cancellation receipts
+  continue to own provider stop truth; a late provider completion cannot reopen terminal Goal state.
 - **Issue — Introduce a Capability Runtime backend boundary.** Keep an in-process
   `asyncio` backend as the maintained default, with provider adapters for MCP/HTTP/gRPC/ROS
   2/local implementations. Backend IDs remain opaque and cannot replace Chromie request

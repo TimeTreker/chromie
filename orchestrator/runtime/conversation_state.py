@@ -1478,6 +1478,19 @@ class ConversationStateManager:
                 confirmation.get("request_ids")
                 or metadata.get("confirmation_request_ids")
             )
+            planned_request_ids = [
+                str(item.get("request_id") or "").strip()
+                for item in (metadata.get("planned_capabilities") or [])
+                if isinstance(item, dict) and str(item.get("request_id") or "").strip()
+            ]
+            bound_request_ids = sorted(
+                {
+                    *planned_request_ids,
+                    *remaining,
+                    *confirmation_request_ids,
+                    *self._string_list(metadata.get("request_ids")),
+                }
+            )
             status = str(context.get("status") or "open").strip().lower()
             interaction_id = str(metadata.get("interaction_id") or "").strip()
             plan_id = str(metadata.get("canonical_plan_id") or "").strip()
@@ -1510,6 +1523,9 @@ class ConversationStateManager:
                     "task_id": str(context.get("task_id") or ""),
                     "found": True,
                     "status": status,
+                    "responsibility_status": self._goal_responsibility_status(context),
+                    "plan_version": max(0, int(context.get("plan_version") or 0)),
+                    "request_ids": bound_request_ids,
                     "remaining_request_ids": remaining,
                     "interaction_id": interaction_id,
                     "canonical_plan_id": plan_id,

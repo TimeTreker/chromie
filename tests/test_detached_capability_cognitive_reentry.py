@@ -79,17 +79,39 @@ class _ConversationState:
     def __init__(self) -> None:
         self.recorded_agent_results: list[InteractionResponse] = []
         self.status_updates: list[tuple[str, str]] = []
+        response = _response()
+        self.plan_id = str(response.metadata["canonical_plan_id"])
+        self.plan_fingerprint = str(response.metadata["canonical_plan_fingerprint"])
+        self.goal_status = {
+            "goal-first": "open",
+            "goal-second": "open",
+        }
+        self.goal_request_ids = {
+            "goal-first": ["request-first"],
+            "goal-second": ["request-second"],
+        }
 
     def active_goal_snapshots(self):
         return [
             {
-                "goal_id": "goal-first",
-                "responsibility_status": "open",
-            },
+                "goal_id": goal_id,
+                "responsibility_status": status,
+            }
+            for goal_id, status in self.goal_status.items()
+            if status == "open"
+        ]
+
+    def goal_cancellation_bindings(self, goal_ids):
+        return [
             {
-                "goal_id": "goal-second",
-                "responsibility_status": "open",
-            },
+                "goal_id": goal_id,
+                "found": goal_id in self.goal_status,
+                "responsibility_status": self.goal_status.get(goal_id, ""),
+                "canonical_plan_id": self.plan_id,
+                "canonical_plan_fingerprint": self.plan_fingerprint,
+                "request_ids": list(self.goal_request_ids.get(goal_id, [])),
+            }
+            for goal_id in goal_ids
         ]
 
     def update_pending_task_status_for_request_id(self, *, request_id: str, status: str):
@@ -354,6 +376,99 @@ async def test_current_interaction_runtime_ownership_survives_foreground_cleanup
     assert observation.open_interaction_ids == ["interaction-detached-reentry"]
 
     provider.release_first.set()
+    provider.release_second.set()
+    result_task = next(iter(assistant.active_capability_result_tasks))
+    await asyncio.wait_for(asyncio.shield(result_task), timeout=1.0)
+
+
+@pytest.mark.asyncio
+async def test_late_result_from_superseded_plan_keeps_evidence_but_cannot_speak():
+    spoken: list[str] = []
+
+    async def schedule_speech(args: dict[str, Any]) -> dict[str, Any]:
+        spoken.append(str(args["text"]))
+        return {"scheduled": True, "playback_started": True}
+
+    coordinator = InteractionRuntimeCoordinator(schedule_speech)
+    provider = _TwoResultProvider()
+    for capability_id in ("chromie.test.first", "chromie.test.second"):
+        coordinator.registry.register(
+            CapabilityDefinition(
+                capability_id=capability_id,
+                provider_id=provider.provider_id,
+                output_schema=_SCHEMA,
+                can_run_parallel=True,
+            )
+        )
+    coordinator.runtime.register_provider(provider)
+    assistant = _assistant(coordinator)
+    response = _response()
+
+    assistant._launch_interaction(response, "sid-detached", reset_playback=False)
+    foreground = assistant.active_interaction_task
+    assert foreground is not None
+    await asyncio.wait_for(provider.first_started.wait(), timeout=1.0)
+    await asyncio.wait_for(provider.second_started.wait(), timeout=1.0)
+    await asyncio.wait_for(asyncio.shield(foreground), timeout=1.0)
+
+    # The same Goal remains open, but Host state has committed a replacement plan.
+    assistant.conversation_state.plan_id = "plan-replacement"
+    assistant.conversation_state.plan_fingerprint = "f" * 64
+    provider.release_first.set()
+    for _ in range(100):
+        prepared = next(iter(assistant.active_capability_result_tasks), None)
+        if prepared is not None and response.metadata.get("suppressed_terminal_reentry"):
+            break
+        await asyncio.sleep(0.01)
+
+    assert spoken == []
+    assert assistant.agent_client.requests == []
+
+    provider.release_second.set()
+    result_task = next(iter(assistant.active_capability_result_tasks))
+    await asyncio.wait_for(asyncio.shield(result_task), timeout=1.0)
+
+
+@pytest.mark.asyncio
+async def test_late_result_after_goal_cancellation_cannot_reenter_speech():
+    spoken: list[str] = []
+
+    async def schedule_speech(args: dict[str, Any]) -> dict[str, Any]:
+        spoken.append(str(args["text"]))
+        return {"scheduled": True, "playback_started": True}
+
+    coordinator = InteractionRuntimeCoordinator(schedule_speech)
+    provider = _TwoResultProvider()
+    for capability_id in ("chromie.test.first", "chromie.test.second"):
+        coordinator.registry.register(
+            CapabilityDefinition(
+                capability_id=capability_id,
+                provider_id=provider.provider_id,
+                output_schema=_SCHEMA,
+                can_run_parallel=True,
+            )
+        )
+    coordinator.runtime.register_provider(provider)
+    assistant = _assistant(coordinator)
+    response = _response()
+
+    assistant._launch_interaction(response, "sid-detached", reset_playback=False)
+    foreground = assistant.active_interaction_task
+    assert foreground is not None
+    await asyncio.wait_for(provider.first_started.wait(), timeout=1.0)
+    await asyncio.wait_for(provider.second_started.wait(), timeout=1.0)
+    await asyncio.wait_for(asyncio.shield(foreground), timeout=1.0)
+
+    assistant.conversation_state.goal_status["goal-first"] = "cancelled"
+    provider.release_first.set()
+    for _ in range(100):
+        if response.metadata.get("suppressed_terminal_reentry"):
+            break
+        await asyncio.sleep(0.01)
+
+    assert spoken == []
+    assert assistant.agent_client.requests == []
+
     provider.release_second.set()
     result_task = next(iter(assistant.active_capability_result_tasks))
     await asyncio.wait_for(asyncio.shield(result_task), timeout=1.0)

@@ -7573,11 +7573,27 @@ class VoiceAssistant:
             evidence.status,
         )
 
-        if not self._terminal_evidence_is_currently_relevant(evidence):
+        relevant, relevance_reason = self._terminal_evidence_is_currently_relevant(
+            source_response=response,
+            evidence=evidence,
+        )
+        if not relevant:
             self.session_log(
                 session_id,
-                "incremental_cognitive_reentry_suppressed: request_id=%s reason=goal_not_open",
+                "incremental_cognitive_reentry_suppressed: request_id=%s reason=%s",
                 evidence.request_id,
+                relevance_reason,
+            )
+            suppressed = response.metadata.setdefault(
+                "suppressed_terminal_reentry",
+                [],
+            )
+            suppressed.append(
+                {
+                    "request_id": evidence.request_id,
+                    "evidence_id": evidence.evidence_id,
+                    "reason": relevance_reason,
+                }
             )
             return
         if self._outcome_response_is_stale(
@@ -7645,18 +7661,61 @@ class VoiceAssistant:
 
     def _terminal_evidence_is_currently_relevant(
         self,
+        *,
+        source_response: InteractionResponse,
         evidence: ExecutionEvidence,
-    ) -> bool:
-        active = {
+    ) -> tuple[bool, str]:
+        """Fail closed when terminal Evidence belongs to obsolete responsibility.
+
+        Evidence remains valid history even after a Goal is cancelled, superseded,
+        or replanned.  What becomes invalid is using that old result to authorize
+        new user-facing speech/action.  Re-entry therefore requires the exact
+        Host-owned Goal/plan/request binding that originally dispatched the work
+        to still be current.
+        """
+
+        metadata = (
+            source_response.metadata
+            if isinstance(source_response.metadata, dict)
+            else {}
+        )
+        expected_plan_id = str(metadata.get("canonical_plan_id") or "").strip()
+        expected_fingerprint = str(
+            metadata.get("canonical_plan_fingerprint") or ""
+        ).strip()
+        if not expected_plan_id or not expected_fingerprint:
+            return False, "source_plan_binding_missing"
+
+        bindings = {
             str(item.get("goal_id") or "").strip(): item
-            for item in self.conversation_state.active_goal_snapshots()
+            for item in self.conversation_state.goal_cancellation_bindings(
+                evidence.source_goal_ids
+            )
             if str(item.get("goal_id") or "").strip()
         }
-        return any(
-            goal_id in active
-            and str(active[goal_id].get("responsibility_status") or "") == "open"
-            for goal_id in evidence.source_goal_ids
-        )
+        if not evidence.source_goal_ids:
+            return False, "source_goal_binding_missing"
+        for goal_id in evidence.source_goal_ids:
+            binding = bindings.get(goal_id)
+            if not binding or binding.get("found") is not True:
+                return False, "goal_binding_missing"
+            if str(binding.get("responsibility_status") or "") != "open":
+                return False, "goal_responsibility_terminal"
+            if str(binding.get("canonical_plan_id") or "") != expected_plan_id:
+                return False, "canonical_plan_superseded"
+            if (
+                str(binding.get("canonical_plan_fingerprint") or "")
+                != expected_fingerprint
+            ):
+                return False, "canonical_plan_superseded"
+            request_ids = {
+                str(item).strip()
+                for item in binding.get("request_ids") or ()
+                if str(item).strip()
+            }
+            if evidence.request_id not in request_ids:
+                return False, "request_binding_superseded"
+        return True, "current"
 
     async def _compose_incremental_terminal_result_response(
         self,
