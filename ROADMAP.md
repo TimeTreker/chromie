@@ -224,10 +224,16 @@ Implement this line as separate focused Issues and separate patches:
   into Chromie identity. Real DBOS crash/restart qualification is not claimed in this source tree:
   production activation additionally needs startup rehydration of CapabilityRuntime ownership and
   terminal-result consumers, and must be exercised with the optional DBOS dependency before enablement.
-- **Issue — Migrate long-running Soridormi work to asynchronous provider lifecycle.** Reuse
-  its submit/status/event/cancel boundary so embodiment can report progress/terminal events
-  without making Chromie wait. Physical feasibility, stop/recovery, and retry authority stay
-  provider/trusted-runtime owned.
+- **Issue — Migrate long-running Soridormi work to asynchronous provider lifecycle — source implementation complete for provider activities.**
+  Soridormi body-activity execution may now acknowledge `running`/non-terminal state; the adapter
+  retains the provider-owned `compiled_activity_id`, polls `soridormi.activity.status`, and projects
+  each non-terminal snapshot through `CapabilityExecutionContext.publish_progress(...)` into generic
+  `CapabilityRuntimeEvent(progress)` observations. Terminal member evidence is produced only after
+  Soridormi reports terminal activity state. Runtime timeout/cancellation still invokes the existing
+  provider-local `soridormi.activity.cancel` path. Chromie never interprets provider status as a new
+  cognitive plan and never exposes Soridormi activity identity as canonical Capability identity.
+  Single named-skill calls keep their existing wire execution path because the checked-in provider
+  contract exposes no named-skill status/event endpoint; no fake polling API is invented.
 - **Issue — Delete remaining foreground aggregate-wait behavior.** The old
   `CapabilityRuntime.execute(...)` compatibility API is already deleted. Once lifecycle
   events, incremental Evidence, and cognitive re-entry are maintained, remove foreground

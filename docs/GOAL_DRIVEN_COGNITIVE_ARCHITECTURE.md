@@ -2801,6 +2801,15 @@ existing Tool Result Interpreter when current Goal responsibility is still relev
 arrival is never encoded as a synthetic user message and never resumes the original Python
 call stack.
 
+Soridormi's embodiment boundary follows the same generic lifecycle without becoming a second Runtime.
+For provider-compiled body activities, `soridormi.activity.execute` may return a non-terminal running
+acknowledgement. The adapter then polls the provider's read-only `soridormi.activity.status` surface and
+projects those snapshots through `CapabilityExecutionContext.publish_progress(...)`; CapabilityRuntime
+publishes the corresponding correlated progress events. Only Soridormi terminal activity/member state can
+become terminal Capability results. Runtime cancellation continues to invoke provider-local activity cancel
+using the provider activity ID, while canonical request/capability/Goal identity remains Host-owned. The
+current named-skill wire protocol has no status/event surface, so Chromie does not invent one.
+
 Planner-authored speech timed `after_capabilities` is not dispatched on this detached path.
 Before terminal Evidence exists it is only prospective wording and therefore cannot own a
 completion claim. Result wording is generated from terminal Evidence instead. When an early

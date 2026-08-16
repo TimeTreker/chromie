@@ -17,7 +17,9 @@ published by Soridormi through ``soridormi.skill.list`` and then imported into
 Chromie's ``CapabilityRegistry`` dynamically.
 """
 
+import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from typing import Any, Protocol
 
 from agent.app.tool_invocation import (
@@ -256,8 +258,18 @@ class SoridormiCapabilityProvider:
 
     provider_id = "soridormi.mcp"
 
-    def __init__(self, invoker: SoridormiInvoker) -> None:
+    def __init__(
+        self,
+        invoker: SoridormiInvoker,
+        *,
+        activity_poll_interval_s: float = 0.1,
+        sleep: Callable[[float], Awaitable[None]] | None = None,
+    ) -> None:
+        if activity_poll_interval_s < 0:
+            raise ValueError("activity_poll_interval_s must be >= 0")
         self.invoker = invoker
+        self._activity_poll_interval_s = activity_poll_interval_s
+        self._sleep = sleep or asyncio.sleep
 
     async def execute(
         self,
@@ -537,12 +549,115 @@ class SoridormiCapabilityProvider:
         )
         if execute_failure is not None:
             return execute_failure
-        return self._member_results_from_activity(
+        terminal_output = await self._monitor_activity_until_terminal(
             items,
             executed.output,
             activity_id=activity_id,
             coordination_id=coordination_id,
         )
+        return self._member_results_from_activity(
+            items,
+            terminal_output,
+            activity_id=activity_id,
+            coordination_id=coordination_id,
+        )
+
+    async def _monitor_activity_until_terminal(
+        self,
+        items: list[
+            tuple[CapabilityRequest, CapabilityDefinition, CapabilityExecutionContext]
+        ],
+        initial_output: dict[str, Any],
+        *,
+        activity_id: str,
+        coordination_id: str,
+    ) -> dict[str, Any]:
+        """Map Soridormi activity status into generic Runtime progress.
+
+        ``activity.execute`` may acknowledge a long-running provider activity
+        before it is terminal.  Chromie's provider task remains alive behind the
+        already-detached CapabilityRuntime submission, while status snapshots are
+        published as mechanical progress events.  Soridormi remains the owner of
+        physical feasibility, execution, recovery, and stop truth.
+        """
+
+        output = dict(initial_output)
+        while True:
+            reported_activity_id = str(
+                output.get("compiled_activity_id") or output.get("plan_id") or activity_id
+            ).strip()
+            if reported_activity_id != activity_id:
+                raise RuntimeError(
+                    "Soridormi activity status identity mismatch: "
+                    f"expected={activity_id!r} actual={reported_activity_id!r}"
+                )
+            status = str(output.get("status") or "").strip().lower()
+            terminal = bool(output.get("terminal")) or status in {
+                "completed",
+                "completed_with_degradation",
+                "cancelled",
+                "failed",
+            }
+            if terminal:
+                return output
+
+            progress = {
+                "provider_activity_id": activity_id,
+                "coordination_id": coordination_id,
+                "status": status or "running",
+                "terminal": False,
+            }
+            if output.get("estimated_duration_s") is not None:
+                progress["estimated_duration_s"] = output.get("estimated_duration_s")
+            member_results = output.get("member_results")
+            if isinstance(member_results, dict):
+                progress["member_status"] = {
+                    str(member_id): str(
+                        member.get("status") or ""
+                    )
+                    for member_id, member in member_results.items()
+                    if isinstance(member, dict)
+                }
+            for _, _, context in items:
+                await context.publish_progress(
+                    progress,
+                    message=f"Soridormi activity {status or 'running'}",
+                )
+
+            if self._activity_poll_interval_s > 0:
+                await self._sleep(self._activity_poll_interval_s)
+            status_outcome = await self.invoker.invoke(
+                "soridormi.activity.status",
+                {"compiled_activity_id": activity_id},
+            )
+            failure = self._group_failure_results(
+                items,
+                status_outcome,
+                stage="status",
+            )
+            if failure is not None:
+                # Runtime/provider contracts require one terminal result per
+                # request.  Convert the failed status observation to one
+                # aggregate-shaped terminal snapshot so the existing exact-member
+                # reconciler fails closed for every member.
+                return {
+                    "compiled_activity_id": activity_id,
+                    "coordination_id": coordination_id,
+                    "status": "failed",
+                    "terminal": True,
+                    "summary": status_outcome.error or "Soridormi activity status failed",
+                    "member_results": {
+                        request.request_id: {
+                            "status": "failed",
+                            "completed": False,
+                            "reason_code": "activity_status_failed",
+                            "summary": status_outcome.error
+                            or "Soridormi activity status failed",
+                        }
+                        for request, _, _ in items
+                    },
+                }
+            output = dict(status_outcome.output)
 
     @staticmethod
     def _optional_auxiliary_member(request: CapabilityRequest) -> bool:

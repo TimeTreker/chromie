@@ -114,6 +114,67 @@ class _ActivityInvoker:
         return ToolCallOutcome.failed(f"unknown tool: {tool_name}")
 
 
+class _AsyncActivityInvoker(_ActivityInvoker):
+    def __init__(self) -> None:
+        super().__init__()
+        self.status_polls = 0
+
+    async def invoke(
+        self,
+        tool_name: str,
+        args: dict[str, Any],
+        *,
+        context: ToolInvocationContext | None = None,
+    ) -> ToolCallOutcome:
+        if tool_name != "soridormi.activity.status":
+            if tool_name == "soridormi.activity.execute":
+                self.calls.append((tool_name, args, context))
+                return ToolCallOutcome.success(
+                    {
+                        "compiled_activity_id": "activity-1",
+                        "status": "running",
+                        "terminal": False,
+                        "estimated_duration_s": 1.0,
+                    }
+                )
+            return await super().invoke(tool_name, args, context=context)
+        self.calls.append((tool_name, args, context))
+        self.status_polls += 1
+        if self.status_polls == 1:
+            return ToolCallOutcome.success(
+                {
+                    "compiled_activity_id": "activity-1",
+                    "status": "running",
+                    "terminal": False,
+                    "member_results": {
+                        "walk-request": {"status": "running"},
+                        "blink-request": {"status": "running"},
+                    },
+                }
+            )
+        return ToolCallOutcome.success(
+            {
+                "compiled_activity_id": "activity-1",
+                "status": "completed",
+                "terminal": True,
+                "mode": "sim",
+                "member_results": {
+                    "walk-request": {
+                        "status": "completed",
+                        "completed": True,
+                        "summary": "walk completed",
+                    },
+                    "blink-request": {
+                        "status": "completed",
+                        "completed": True,
+                        "summary": "blink completed",
+                        "optional": True,
+                    },
+                },
+            }
+        )
+
+
 class _CatalogInvoker:
     async def invoke(self, tool_name: str, args: dict[str, Any]) -> ToolCallOutcome:
         if tool_name != "soridormi.skill.list":
@@ -140,7 +201,12 @@ class _CatalogInvoker:
 
 
 class SoridormiActivityCompilationTests(unittest.IsolatedAsyncioTestCase):
-    def _runtime(self, invoker: _ActivityInvoker) -> CapabilityRuntime:
+    def _runtime(
+        self,
+        invoker: _ActivityInvoker,
+        *,
+        activity_poll_interval_s: float = 0.1,
+    ) -> CapabilityRuntime:
         registry = CapabilityRegistry()
         import_soridormi_capability_catalog(registry,
             [
@@ -159,7 +225,12 @@ class SoridormiActivityCompilationTests(unittest.IsolatedAsyncioTestCase):
             ]
         )
         runtime = CapabilityRuntime(registry, max_concurrency=3)
-        runtime.register_provider(SoridormiCapabilityProvider(invoker))
+        runtime.register_provider(
+            SoridormiCapabilityProvider(
+                invoker,
+                activity_poll_interval_s=activity_poll_interval_s,
+            )
+        )
         return runtime
 
     async def test_registry_preserves_nested_provider_contract_exactly(self) -> None:
@@ -285,6 +356,61 @@ class SoridormiActivityCompilationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             result.traces[1].events[-1].data["provider_activity_id"],
             "activity-1",
+        )
+
+
+    async def test_long_running_activity_publishes_progress_until_provider_terminal(self) -> None:
+        invoker = _AsyncActivityInvoker()
+        # Poll immediately in the test; production retains a bounded sleep and
+        # CapabilityRuntime owns the overall request timeout.
+        runtime = self._runtime(invoker, activity_poll_interval_s=0.0)
+        response = InteractionResponse(
+            interaction_id="async-activity-interaction",
+            capabilities=[
+                CapabilityRequest(
+                    request_id="walk-request",
+                    capability_id="soridormi.walk_forward",
+                    timing="parallel",
+                    metadata={
+                        "coordination_id": "together-async",
+                        "source": "goal_driven_canonical_plan",
+                        "source_goal_ids": ["goal-walk"],
+                    },
+                ),
+                CapabilityRequest(
+                    request_id="blink-request",
+                    capability_id="soridormi.blink_eyes",
+                    timing="parallel",
+                    metadata={
+                        "coordination_id": "together-async",
+                        "source": "social_attention_plan",
+                        "auxiliary_social_attention": True,
+                    },
+                ),
+            ],
+        )
+
+        receipt = await runtime.submit(
+            response,
+            authorization=RuntimeAuthorization(safety_monitor_active=True),
+        )
+        cursor = receipt.event_cursor
+        progress = None
+        while progress is None:
+            event = await runtime.wait_runtime_event(cursor, dispatch_id=receipt.dispatch_id)
+            cursor = event.sequence
+            if event.type == "progress":
+                progress = event
+        self.assertEqual(progress.progress["provider_activity_id"], "activity-1")
+        self.assertEqual(progress.progress["status"], "running")
+        self.assertFalse(progress.progress["terminal"])
+
+        result = await runtime.wait_terminal(receipt)
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(invoker.status_polls, 2)
+        self.assertGreaterEqual(
+            [tool for tool, _, _ in invoker.calls].count("soridormi.activity.status"),
+            2,
         )
 
     async def test_activity_cancel_uses_compiled_activity_identity(self) -> None:
