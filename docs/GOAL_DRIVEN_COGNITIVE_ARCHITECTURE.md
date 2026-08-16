@@ -2775,10 +2775,12 @@ conditions are satisfied. The Runtime therefore separates **dispatch acceptance*
 **provider start** and both from **terminal completion**.
 
 The Runtime is transport- and durability-backend independent. MCP, HTTP, gRPC, ROS 2
-Action, local Python, and future provider protocols sit behind provider adapters. The
-first maintained backend remains an in-process `asyncio` implementation; a DBOS backend
-may be qualified later for durable, read-only or idempotent work without changing the
-Chromie contract. Temporal is a useful durable-execution reference, not a required
+Action, local Python, and future provider protocols sit behind provider adapters. Submission
+liveness is isolated behind the small `CapabilityRuntimeBackend` SPI; the maintained default is
+`InProcessAsyncioBackend`. Backend handles are opaque Runtime-internal references and are never
+projected into dispatch receipts, lifecycle events, provider contracts, Goal/Plan/request identity,
+or cognitive context. A DBOS backend may be qualified later for durable, read-only or idempotent
+work without changing the Chromie contract. Temporal is a useful durable-execution reference, not a required
 Chromie dependency. Durable retry never grants physical-effect authority: effectful or
 non-idempotent work must revalidate current Goal/Plan/provider state and trusted evidence
 before any redispatch.

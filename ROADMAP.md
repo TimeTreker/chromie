@@ -209,10 +209,12 @@ Implement this line as separate focused Issues and separate patches:
   cancellation, Goal supersession, replanning, or request rebinding therefore suppress obsolete
   result speech/action without discarding the terminal Evidence. Existing exact cancellation receipts
   continue to own provider stop truth; a late provider completion cannot reopen terminal Goal state.
-- **Issue — Introduce a Capability Runtime backend boundary.** Keep an in-process
-  `asyncio` backend as the maintained default, with provider adapters for MCP/HTTP/gRPC/ROS
-  2/local implementations. Backend IDs remain opaque and cannot replace Chromie request
-  identity.
+- **Issue — Introduce a Capability Runtime backend boundary — source implementation complete.**
+  `CapabilityRuntimeBackend` now isolates submission-liveness mechanics from canonical Runtime
+  semantics. `InProcessAsyncioBackend` is the maintained default. Backend handles are opaque
+  Runtime-internal references: they are absent from `CapabilityDispatchReceipt`, lifecycle events,
+  provider contracts, Goal/Plan/request identity, and cognitive context. Validation, scheduling,
+  cancellation scope, event publication, and terminal truth remain owned by `CapabilityRuntime`.
 - **Issue — Qualify a DBOS durable backend with read-only/idempotent work.** Use weather
   or another safe information Capability to prove non-blocking submission, concurrent work,
   process restart, result delivery, cancel, and recovery. DBOS remains an optional backend,

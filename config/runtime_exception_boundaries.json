@@ -1617,7 +1617,7 @@
       "owner": "orchestrator",
       "contract": "Roll back canonical scheduling/execution ownership if Runtime dispatch task creation or registration fails before a receipt is returned.",
       "review_status": "reviewed",
-      "body_sha256": "2788f4dc0cf6a57a3890f1496cb076afda96658c7e74163c5b54639739aa73e7",
+      "body_sha256": "2f8a096366c2307189542eb59c4f9410c1245ae546fb7f7629d854464ed675bc",
       "failure_signals": [
         "bare_reraise"
       ]
