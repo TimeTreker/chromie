@@ -118,7 +118,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         parsed["responsibilities"][0]["local_ref"] = "r1"
         _reject_canonical_goal_identity_refs(request, parsed)
 
-    def test_system_prompt_names_goal_interpreter_role_and_context_boundaries(self) -> None:
+    def test_system_prompt_names_goal_interpreter_what_only_boundary(self) -> None:
         interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
@@ -128,56 +128,25 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
 
         prompt = interpreter.load_system_prompt()
 
-        self.assertIn("fast Goal Interpretation model", prompt)
-        self.assertIn("Prompt Architecture", prompt)
-        self.assertIn("Global Context Group", prompt)
-        self.assertIn("Current Turn Group", prompt)
-        self.assertIn("Session Context Group", prompt)
-        self.assertIn("Current Job", prompt)
-        self.assertIn("Task Context", prompt)
-        self.assertIn("Output Contract", prompt)
-        self.assertLess(prompt.index("Global Context Group"), prompt.index("Current Job"))
-        self.assertLess(prompt.index("Current Job"), prompt.index("Task Context"))
-        self.assertIn("Generalization-first principle", prompt)
-        self.assertIn("Responsibility Before Framing", prompt)
-        self.assertIn("Semantic Fidelity", prompt)
-        self.assertIn("Severity, intensity, magnitude, threshold", prompt)
-        self.assertIn("provider-neutral responsibilities", prompt)
-        self.assertIn("Responsibility evidence for downstream cognition", prompt)
-        self.assertIn("Fast Planner is the first HOW owner", prompt)
-        self.assertIn("Goal Association alone owns canonical Goal continuity", prompt)
-        self.assertIn("local_ref is only a turn-local semantic proposal reference", prompt)
+        self.assertIn("Goal Interpretation model", prompt)
+        self.assertIn("only authority is to understand WHAT", prompt)
+        self.assertIn("Fast and Deep Goal Interpretation use the same output authority", prompt)
+        self.assertIn("provider-neutral Responsibility evidence", prompt)
         self.assertIn("completion_requires_fresh_evidence", prompt)
-        self.assertIn("Ability Awareness, Not Planning", prompt)
-        self.assertIn("not a Fast-GI selection or Activity-definition surface", prompt)
-        self.assertIn("Exact Work/Activity decomposition and Capability selection are Planner-owned", prompt)
-        self.assertIn("Always return fast_speech=null and progress=[]", prompt)
-        self.assertIn("Fast Planner receives the authoritative user input plus Responsibility evidence", prompt)
-        self.assertIn("Current external facts", prompt)
-        self.assertIn("provider-neutral information responsibility", prompt)
-        self.assertIn("Uncertainty Boundary", prompt)
-        self.assertIn("Capability Inquiry And Execution", prompt)
-        self.assertIn("Availability questions stay chat", prompt)
-        self.assertIn("Do not output routes[]", prompt)
-        self.assertIn("Activity/Work/Plan contracts", prompt)
-        self.assertIn("Never author Work, Primary Activities, response wording, Plan steps", prompt)
-        self.assertIn("Missing abilities may appear only as non-executable metadata", prompt)
-        self.assertIn(
-            "return compact JSON with required route, intent, confidence, responsibilities, fast_speech, progress",
-            prompt,
-        )
-        self.assertIn("requires fast_speech=null and progress=[]", prompt)
-        self.assertIn("Do not output routes[]", prompt)
-        self.assertIn("or intent=capability:<id>", prompt)
-        self.assertIn("hidden reasoning", prompt)
-        self.assertNotIn("Tool And Affordance Proposal", prompt)
-        self.assertNotIn("CapabilityAgent", prompt)
-        self.assertNotIn("intent=weather_query", prompt)
-        self.assertNotIn("robot-brain", prompt)
+        self.assertIn("Semantic fidelity is mandatory", prompt)
+        self.assertIn("ability catalog is intentionally not supplied", prompt)
+        self.assertIn("Capability availability and executable identity belong to Planner", prompt)
+        self.assertIn("Never invent the external result", prompt)
+        self.assertIn("route or intent labels", prompt)
+        self.assertIn("speech/progress/acknowledgement contracts", prompt)
+        self.assertIn("No markdown", prompt)
+        self.assertNotIn("Route Taxonomy", prompt)
+        self.assertNotIn("Compatibility Framing", prompt)
+        self.assertNotIn("fast_speech", prompt)
         self.assertLess(len(prompt), 6000)
 
 
-    def test_goal_interpreter_observability_profiles_prompt_and_raw_tool_output(self) -> None:
+    def test_goal_interpreter_prompt_omits_capability_catalog_and_route_contract(self) -> None:
         interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
@@ -194,37 +163,65 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
                         "capability_id": "soridormi.blink_eyes",
                         "description": "Blink the robot eyes.",
                         "route": "robot_action",
-                        "prompt_tier": "common",
-                        "interaction_executable": True,
                     }
                 ]
             },
         )
 
-        payload = interpreter.build_payload(request)
+        payload = interpreter.build_interpretation_payload(request)
         system_text, user_text, all_text = _payload_message_texts(payload)
-        flags = _prompt_feature_flags(all_text)
-        catalog_profile = _catalog_observability_profile(request)
-        raw_summary = _raw_interpreter_output_summary(
-            '{"route":"tool","intent":"weather_query","confidence":0.9,'
-            '"fast_speech":{"text":"好的，我查一下重庆今天的天气。"},'
-            '"metadata":{"tool_name":"weather","weather_query":{"location":"重庆","date":"today"}}}'
-        )
+        schema = payload["format"]
 
-        self.assertIn("Ability Awareness, Not Planning", system_text)
         self.assertIn("今天重庆天气怎么样？", user_text)
-        self.assertTrue(flags["has_fast_speech_contract"])
-        self.assertTrue(flags["has_tool_route_contract"])
-        self.assertTrue(flags["has_external_lookup_guidance"])
-        self.assertTrue(flags["has_no_topic_mapping_guidance"])
-        self.assertEqual(catalog_profile["common_ability_count"], 1)
-        self.assertEqual(raw_summary["raw_route"], "tool")
-        self.assertEqual(raw_summary["raw_intent"], "weather_query")
-        self.assertTrue(raw_summary["raw_fast_speech_present"])
-        self.assertTrue(raw_summary["raw_weather_query_present"])
+        self.assertIn("provider-neutral", system_text)
+        self.assertNotIn("soridormi.blink_eyes", all_text)
+        self.assertNotIn("Common Ability Catalog", all_text)
+        self.assertEqual(
+            set(schema["properties"]),
+            {"confidence", "responsibilities", "unresolved"},
+        )
+        self.assertNotIn("route", schema["properties"])
+        self.assertNotIn("intent", schema["properties"])
+        self.assertNotIn("fast_speech", schema["properties"])
+        self.assertNotIn("progress", schema["properties"])
 
 
-    def test_interpreter_prompt_semantically_separates_capability_inquiry_from_execution(self) -> None:
+    def test_what_only_repair_does_not_replay_rejected_capability_identity(self) -> None:
+        interpreter = OllamaGoalInterpreter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            sid="water-sid",
+            text="500米外有一瓶水，帮我拿回来。",
+            language="zh-CN",
+            context={
+                "prompt_capabilities_common": [
+                    {"capability_id": "soridormi.acquire_and_deliver_resource"}
+                ]
+            },
+        )
+        payload = interpreter.build_interpretation_repair_payload(
+            request,
+            previous_content=(
+                '{"intent":"soridormi.acquire_and_deliver_resource",'
+                '"responsibilities":[]}'
+            ),
+            validation_error=ValueError(
+                "soridormi.acquire_and_deliver_resource is forbidden"
+            ),
+        )
+        _, user_text, all_text = _payload_message_texts(payload)
+
+        self.assertIn("500米外有一瓶水", user_text)
+        self.assertNotIn("soridormi.acquire_and_deliver_resource", all_text)
+        self.assertNotIn("Previous invalid output", all_text)
+        self.assertNotIn("Validation errors", all_text)
+        self.assertIn("Regenerate from the authoritative user meaning", user_text)
+
+    def test_interpreter_prompt_keeps_capability_selection_outside_goal_interpretation(self) -> None:
         interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
@@ -232,13 +229,12 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
             confidence_threshold=0.55,
         )
         system = interpreter.load_system_prompt()
-        self.assertIn("Capability Inquiry And Execution", system)
-        self.assertIn("Availability questions stay chat", system)
-        self.assertIn("robot_action/tool are compatibility framing only, never Activity/execution contracts", system)
-        self.assertIn("Exact Work/Activity decomposition and Capability selection are Planner-owned", system)
-        self.assertIn("Generalization-first principle", system)
-        self.assertIn("technical discussion about another system", system)
-        self.assertIn("Addressedness", system)
+        self.assertIn("ability catalog is intentionally not supplied", system)
+        self.assertIn("Capability availability and executable identity belong to Planner", system)
+        self.assertIn("Never choose or name HOW", system)
+        self.assertIn("route or intent labels", system)
+        self.assertIn("Capability, Skill, Tool, provider", system)
+
 
     def test_common_capability_projection_exposes_semantic_scope_and_negative_boundary(self) -> None:
         projected = _compact_prompt_capabilities(
@@ -1738,7 +1734,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
 
 
 
-    def test_primary_prompt_hands_conversational_activity_wording_to_fast_planner(self) -> None:
+    def test_primary_prompt_hands_only_responsibility_to_downstream_cognition(self) -> None:
         interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
@@ -1752,20 +1748,18 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         )
 
         system_prompt = interpreter.load_system_prompt()
-        user_prompt = interpreter.build_user_prompt(request)
+        user_prompt = interpreter.build_interpretation_user_prompt(request)
 
-        for rendered in (system_prompt, user_prompt):
-            self.assertIn("Responsibility", rendered)
-            self.assertIn("Fast Planner", rendered)
-            self.assertIn("fast_speech=null", rendered)
-            self.assertIn("progress=[]", rendered)
-        self.assertIn("does not author conversational Activities", system_prompt)
-        self.assertIn("Do not decide how to acknowledge, clarify, or respond", user_prompt)
-        self.assertIn("Fast Planner owns those Activities", user_prompt)
-        self.assertIn("external truth check", user_prompt)
-        self.assertIn("before evidence", user_prompt)
-        self.assertIn("Preserve every material qualifier", user_prompt)
-        self.assertIn("never generalize it away", user_prompt)
+        self.assertIn("Responsibility", system_prompt)
+        self.assertIn("WHAT", system_prompt)
+        self.assertIn("responsibilities", user_prompt)
+        self.assertIn("Interpret only WHAT", user_prompt)
+        self.assertIn("No route, intent, response wording", user_prompt)
+        self.assertNotIn("Common Ability Catalog", user_prompt)
+        self.assertNotIn("capability_id", user_prompt)
+        self.assertNotIn("fast_speech", user_prompt)
+        self.assertNotIn("progress=[]", user_prompt)
+
 
     def test_model_facing_schema_forbids_goal_interpreter_speech_authorship(self) -> None:
         schema = OllamaGoalInterpreter._route_response_schema()

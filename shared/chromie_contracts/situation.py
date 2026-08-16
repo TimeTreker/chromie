@@ -56,22 +56,19 @@ class SituationProjection(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: Literal[1] = 1
+    schema_version: Literal[2] = 2
     turn_id: str = Field(min_length=1, max_length=160)
     revision: int = Field(default=1, ge=1)
-    lane: str = Field(default="unknown", min_length=1, max_length=120)
-    intent: str = Field(default="unknown", min_length=1, max_length=240)
     focus_goal_ids: list[str] = Field(default_factory=list, max_length=8)
     discourse_focus_ids: list[str] = Field(default_factory=list, max_length=8)
     unresolved_conditions: list[SituationConditionRef] = Field(
         default_factory=list,
         max_length=12,
     )
-    progress_candidate_ids: list[str] = Field(default_factory=list, max_length=8)
     evidence_refs: list[SituationEvidenceRef] = Field(default_factory=list, max_length=8)
     digest: str = Field(min_length=64, max_length=64)
 
-    @field_validator("turn_id", "lane", "intent", mode="before")
+    @field_validator("turn_id", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> str:
         return " ".join(str(value or "").strip().split())
@@ -79,7 +76,6 @@ class SituationProjection(BaseModel):
     @field_validator(
         "focus_goal_ids",
         "discourse_focus_ids",
-        "progress_candidate_ids",
         mode="before",
     )
     @classmethod

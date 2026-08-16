@@ -3879,8 +3879,7 @@ class VoiceAssistant:
         user_text: str,
         session_id: str,
         context: dict[str, Any],
-        decision: RouteDecision,
-        core_interpretation: CoreInterpretationResult | None = None,
+        core_interpretation: CoreInterpretationResult,
         record_evidence: bool = True,
         turn_envelope: UserTurnEnvelope | None = None,
     ) -> CognitiveRuntimeResolution:
@@ -3889,7 +3888,7 @@ class VoiceAssistant:
             resolution = CognitiveRuntimeResolution(
                 mode=self.cognitive_runtime_mode,
                 status="error",
-                lane=self._cognitive_lane_from_route(decision),
+                lane="unsupported",
                 timings_ms={"total": round(now_ms() - started_ms, 1)},
                 fallback_reason="missing_admitted_user_turn_envelope",
                 metadata={
@@ -3918,7 +3917,7 @@ class VoiceAssistant:
         )
         resolved_text = user_text
         resolved_session_id = session_id
-        resolved_language = decision.language or (
+        resolved_language = core_interpretation.language or (
             "zh-CN" if self._looks_zh(user_text) else "en-US"
         )
         resolved_history = authority_context.get("history", [])
@@ -3940,9 +3939,6 @@ class VoiceAssistant:
                     session,
                     text=resolved_text,
                     sid=resolved_session_id,
-                    route_decision=(
-                        decision if core_interpretation is None else None
-                    ),
                     core_interpretation=core_interpretation,
                     context=authority_context,
                     history=resolved_history,
@@ -3957,7 +3953,7 @@ class VoiceAssistant:
             resolution = CognitiveRuntimeResolution(
                 mode=self.cognitive_runtime_mode,
                 status=status,
-                lane=self._cognitive_lane_from_route(decision),
+                lane="unsupported",
                 turn_envelope=turn_envelope,
                 timings_ms={"total": round(now_ms() - started_ms, 1)},
                 fallback_reason=f"{type(exc).__name__}: {str(exc)[:500]}",
@@ -4147,7 +4143,7 @@ class VoiceAssistant:
         *,
         session_id: str,
         user_text: str,
-        decision: RouteDecision,
+        language: str,
     ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         """Bridge the Core's semantic target to trusted cancellation closure."""
 
@@ -4158,7 +4154,7 @@ class VoiceAssistant:
             resolution=resolution,
             session_id=session_id,
             user_text=user_text,
-            decision=decision,
+            language=language,
         )
 
     def _apply_cognitive_goal_state(
@@ -4167,7 +4163,6 @@ class VoiceAssistant:
         *,
         session_id: str,
         user_text: str,
-        decision: RouteDecision,
     ) -> list[dict[str, Any]]:
         association = resolution.goal_association
         if association is None:
@@ -4236,8 +4231,8 @@ class VoiceAssistant:
             association,
             sid=session_id,
             user_text=user_text,
-            route=decision.route,
-            intent=decision.intent,
+            route=None,
+            intent=None,
             source="goal_driven_cognitive_runtime",
             atomic=True,
         )
@@ -4333,109 +4328,19 @@ class VoiceAssistant:
         user_text: str,
         session_id: str,
         context: dict[str, Any],
-        decision: RouteDecision,
-        core_interpretation: CoreInterpretationResult | None = None,
+        core_interpretation: CoreInterpretationResult,
         core_interpretation_latency_ms: float,
         turn_envelope: UserTurnEnvelope | None = None,
-    ) -> tuple[bool, RouteDecision]:
-        cognitive_lane = self._cognitive_lane_from_route(decision)
+    ) -> bool:
         if (
             self.cognitive_runtime_mode != "apply"
             or not self.enable_agent
             or not self.enable_interaction_response
-            or decision.interrupt_current
-            or decision.route in {"interrupt", "ignore"}
         ):
-            return False, decision
+            return False
 
-        apply_lanes = getattr(
-            self,
-            "cognitive_apply_lanes",
-            frozenset({"chat", "memory", "robot_action", "tool"}),
-        )
-        if cognitive_lane not in apply_lanes:
-            resolution = CognitiveRuntimeResolution(
-                mode="apply",
-                status="error",
-                lane=(
-                    cognitive_lane
-                    if cognitive_lane in {"chat", "memory", "robot_action", "tool"}
-                    else "unsupported"
-                ),
-                fallback_reason="mapped_lane_not_enabled_for_apply",
-                metadata={
-                    "failure_stage": "authority_boundary",
-                    "failure_class": "mapped_lane_not_enabled_for_apply",
-                    "failure_domain": "cognitive_runtime",
-                    "architecture_attribution": "host_runtime",
-                    "retryable": False,
-                    "mapped_lane": cognitive_lane,
-                    "configured_apply_lanes": sorted(apply_lanes),
-                },
-            )
-            summary = self._cognitive_resolution_summary(resolution)
-            metadata = dict(decision.metadata or {})
-            metadata["cognitive_runtime_resolution"] = summary
-            metadata["cognitive_runtime_mode"] = "apply"
-            decision = decision.model_copy(update={"metadata": metadata})
-            safe_response = self._agent_exception_safe_response(
-                decision, user_text=user_text
-            )
-            record_session_workflow_stage(
-                self,
-                session_id,
-                stage="fallback_speech",
-                started_monotonic_ms=now_ms(),
-                finished_monotonic_ms=now_ms(),
-                status="selected",
-                input_payload={
-                    "failure_stage": "authority_boundary",
-                    "fallback_reason": resolution.fallback_reason,
-                    "user_text": user_text,
-                },
-                output_payload=safe_response,
-                errors=[],
-            )
-            self.conversation_state.record_user_turn(
-                session_id,
-                user_text,
-                route=decision.route,
-                intent=decision.intent,
-                metadata=self._metadata_with_turn_envelope(
-                    {
-                        "source": "goal_driven_cognitive_runtime",
-                        "semantic_task_resolution_authoritative": True,
-                        "cognitive_runtime_resolution": summary,
-                        "semantic_status": "failed",
-                        "semantic_failure_stage": str(
-                            resolution.metadata.get("failure_stage")
-                            or "cognitive_runtime"
-                        ),
-                        "semantic_failure_class": str(
-                            resolution.metadata.get("failure_class")
-                            or resolution.status
-                        ),
-                        "canonical_goal_committed": (
-                            resolution.metadata.get("goal_state_commit_stage")
-                            == "goal_association"
-                        ),
-                    },
-                    turn_envelope,
-                ),
-            )
-            self.conversation_state.record_agent_result(session_id, safe_response)
-            self._record_cognitive_runtime_evidence(
-                resolution, session_id=session_id, user_text=user_text
-            )
-            self._launch_interaction(safe_response, session_id)
-            return True, decision
-
-        # Maintained apply mode gives the first HOW/wording decision to Fast
-        # Planner. Goal Interpretation contributes Responsibility evidence only, so
-        # its legacy fast_speech/native_response compatibility fields must not race
-        # the planner and become a second semantic writer. The cognitive runtime
-        # starts any planner-authored immediate Vocal Activity itself, allowing it
-        # to overlap Goal Association/deeper planning when continuation is needed.
+        # Maintained apply mode gives the first HOW/wording decision to Fast Planner.
+        # Goal Interpretation contributes Responsibility evidence only.
         fast_first_hedge = None
         runtime_context = dict(context)
         self.session_log(
@@ -4447,7 +4352,6 @@ class VoiceAssistant:
             user_text=user_text,
             session_id=session_id,
             context=runtime_context,
-            decision=decision,
             core_interpretation=core_interpretation,
             record_evidence=False,
             turn_envelope=turn_envelope,
@@ -4462,42 +4366,19 @@ class VoiceAssistant:
             and resolution.fast_advance.continuations
         )
         summary = self._cognitive_resolution_summary(resolution)
-        metadata = dict(decision.metadata or {})
-        metadata["cognitive_runtime_resolution"] = summary
-        metadata["cognitive_runtime_mode"] = "apply"
-        decision = decision.model_copy(update={"metadata": metadata})
-
         if resolution.status != "applied" or resolution.interaction_response is None:
             fallback_started_ms = now_ms()
-            hedge_scheduled = await self._settle_fast_first_audio_hedge(
-                fast_first_hedge,
-                decision=decision,
-                session_id=session_id,
+            fast_first_scheduled = fast_planner_vocal_scheduled
+            text = (
+                "我听懂了，可是这次没能把这些事情安排好，所以先停下了。"
+                if self._looks_zh(user_text)
+                else "I understood, but I could not arrange those things correctly this time, so I stopped."
             )
-            fast_first_scheduled = (
-                fast_planner_vocal_scheduled or hedge_scheduled
+            safe_response = self._host_speech_response(
+                text,
+                style="warning",
+                source="host_cognitive_runtime_fail_closed",
             )
-            safe_response = await self._compose_cognitive_failure_response(
-                resolution,
-                decision,
-                user_text=user_text,
-                session_id=session_id,
-            )
-            if safe_response is None:
-                safe_response = self._agent_exception_safe_response(
-                    decision, user_text=user_text
-                )
-            if safe_response is None:
-                text = (
-                    "我听懂了，可是这次没能把这些事情安排好，所以先停下了。"
-                    if self._looks_zh(user_text)
-                    else "I understood, but I could not arrange those things correctly this time, so I stopped."
-                )
-                safe_response = self._host_speech_response(
-                    text,
-                    style="warning",
-                    source="host_cognitive_runtime_fail_closed",
-                )
             record_session_workflow_stage(
                 self,
                 session_id,
@@ -4517,8 +4398,8 @@ class VoiceAssistant:
             self.conversation_state.record_user_turn(
                 session_id,
                 user_text,
-                route=decision.route,
-                intent=decision.intent,
+                route=None,
+                intent=None,
                 metadata=self._metadata_with_turn_envelope(
                     {
                         "source": "goal_driven_cognitive_runtime",
@@ -4551,24 +4432,25 @@ class VoiceAssistant:
                 session_id,
                 reset_playback=not fast_first_scheduled,
             )
-            return True, decision
+            return True
 
         response = resolution.interaction_response.model_copy(deep=True)
         try:
             response_metadata = self._metadata_with_turn_envelope(
                 {
                     **response.metadata,
-                    "language": decision.language,
-                    **self._route_proposal_metadata(decision),
+                    "language": core_interpretation.language,
                     "cognitive_runtime_resolution": summary,
-                    "experience_context": self._experience_context(
-                        user_text=user_text,
-                        decision=decision,
-                        core_interpretation_latency_ms=core_interpretation_latency_ms,
-                        agent_latency_ms=float(
+                    "goal_interpretation": core_interpretation.model_dump(mode="json"),
+                    "experience_context": {
+                        "user_text": user_text,
+                        "goal_interpretation_confidence": core_interpretation.confidence,
+                        "goal_interpretation_unresolved": list(core_interpretation.unresolved),
+                        "goal_interpretation_latency_ms": core_interpretation_latency_ms,
+                        "cognitive_runtime_latency_ms": float(
                             resolution.timings_ms.get("total", 0.0)
                         ),
-                    ),
+                    },
                 },
                 turn_envelope,
             )
@@ -4589,7 +4471,7 @@ class VoiceAssistant:
                         resolution=resolution,
                         session_id=session_id,
                         user_text=user_text,
-                        decision=decision,
+                        language=core_interpretation.language,
                     )
                 )
                 response = self.interaction_runtime.prepare_response(
@@ -4612,7 +4494,7 @@ class VoiceAssistant:
                         resolution,
                         session_id=session_id,
                         user_text=user_text,
-                        decision=decision,
+                        language=core_interpretation.language,
                     )
                 )
                 zh = self._looks_zh(user_text)
@@ -4691,7 +4573,6 @@ class VoiceAssistant:
                         resolution,
                         session_id=session_id,
                         user_text=user_text,
-                        decision=decision,
                     )
                 response.metadata = {
                     **response.metadata,
@@ -4717,14 +4598,7 @@ class VoiceAssistant:
                 type(exc).__name__,
                 exc,
             )
-            hedge_scheduled = await self._settle_fast_first_audio_hedge(
-                fast_first_hedge,
-                decision=decision,
-                session_id=session_id,
-            )
-            fast_first_scheduled = (
-                fast_planner_vocal_scheduled or hedge_scheduled
-            )
+            fast_first_scheduled = fast_planner_vocal_scheduled
             resolution = resolution.model_copy(
                 deep=True,
                 update={
@@ -4738,15 +4612,8 @@ class VoiceAssistant:
                 },
             )
             summary = self._cognitive_resolution_summary(resolution)
-            metadata = dict(decision.metadata or {})
-            metadata["cognitive_runtime_resolution"] = summary
-            metadata["cognitive_runtime_mode"] = "apply"
-            decision = decision.model_copy(update={"metadata": metadata})
             safe_response = (
                 cancellation_failure_response
-                or self._agent_exception_safe_response(
-                    decision, user_text=user_text
-                )
                 or self._host_speech_response(
                     "这次计划没有通过执行验证，所以我没有继续。"
                     if self._looks_zh(user_text)
@@ -4778,8 +4645,8 @@ class VoiceAssistant:
             self.conversation_state.record_user_turn(
                 session_id,
                 user_text,
-                route=decision.route,
-                intent=decision.intent,
+                route=None,
+                intent=None,
                 metadata=self._metadata_with_turn_envelope(
                     {
                         "source": "goal_driven_cognitive_runtime",
@@ -4796,17 +4663,17 @@ class VoiceAssistant:
             self._launch_interaction(
                 safe_response, session_id, reset_playback=not fast_first_scheduled
             )
-            return True, decision
+            return True
 
         self.conversation_state.record_user_turn(
             session_id,
             user_text,
-            route=decision.route,
-            intent=decision.intent,
+            route=None,
+            intent=None,
             metadata=self._metadata_with_turn_envelope(
                 {
                     "source": "goal_driven_cognitive_runtime",
-                    "confidence": decision.confidence,
+                    "confidence": core_interpretation.confidence,
                     "semantic_task_resolution_authoritative": True,
                     "cognitive_runtime_resolution": summary,
                     **(
@@ -4842,24 +4709,19 @@ class VoiceAssistant:
                 request.requires_confirmation,
                 json.dumps(request.args, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
             )
-        hedge_scheduled = await self._settle_fast_first_audio_hedge(
-            fast_first_hedge,
-            decision=decision,
-            session_id=session_id,
-        )
-        fast_first_scheduled = fast_planner_vocal_scheduled or hedge_scheduled
+        fast_first_scheduled = fast_planner_vocal_scheduled
         if await self._stage_interaction_confirmation(
             response,
             session_id,
-            language=decision.language,
+            language=core_interpretation.language,
             reset_playback=not fast_first_scheduled,
         ):
-            return True, decision
+            return True
         self.conversation_state.record_agent_result(session_id, response)
         self._launch_interaction(
             response, session_id, reset_playback=not fast_first_scheduled
         )
-        return True, decision
+        return True
 
     async def _run_response_composer_report(
         self,
@@ -5568,24 +5430,15 @@ class VoiceAssistant:
                 turn_envelope=turn_envelope,
                 context_snapshot=context_snapshot,
             )
-            decision = RouteDecision.model_validate(
-                core_interpretation.route_decision_projection().model_dump(
-                    mode="json"
-                )
-            )
             core_interpretation_latency_ms = now_ms() - core_start_ms
             self.session_log(
                 session_id,
-                "cognitive_core_done: core_ms=%.1f lane=%s agents=%s intent=%s confidence=%.2f interrupt=%s needs_agent=%s authority=%s projection=%s",
+                "cognitive_core_done: core_ms=%.1f responsibilities=%s confidence=%.2f unresolved=%s authority=%s",
                 core_interpretation_latency_ms,
-                core_interpretation.lane,
-                ",".join(decision.agents),
-                core_interpretation.intent,
+                len(core_interpretation.responsibilities),
                 core_interpretation.confidence,
-                decision.interrupt_current,
-                decision.needs_agent,
+                len(core_interpretation.unresolved),
                 core_interpretation.authority,
-                core_interpretation.projection_digest[:12],
             )
             record_session_workflow_stage(
                 self,
@@ -5600,7 +5453,6 @@ class VoiceAssistant:
                 },
                 output_payload={
                     "core_interpretation": core_interpretation,
-                    "route_decision": decision,
                 },
                 errors=[],
             )
@@ -5630,8 +5482,8 @@ class VoiceAssistant:
             self.conversation_state.record_user_turn(
                 session_id,
                 user_text,
-                route="safe_fallback",
-                intent="cognitive_core_exception",
+                route=None,
+                intent=None,
                 metadata=self._metadata_with_turn_envelope(
                     {
                         "source": "cognitive_core_exception",
@@ -5670,299 +5522,50 @@ class VoiceAssistant:
             self._launch_interaction(safe_response, session_id)
             return
 
-        if self.cognitive_runtime_mode == "apply":
-            handled, decision = await self._try_apply_cognitive_runtime(
-                session,
-                user_text=user_text,
-                session_id=session_id,
-                context=context,
-                decision=decision,
-                core_interpretation=core_interpretation,
-                core_interpretation_latency_ms=core_interpretation_latency_ms,
-                turn_envelope=turn_envelope,
-            )
-            if handled:
-                return
-        elif self.cognitive_runtime_mode == "report_only":
-            decision = self._schedule_cognitive_runtime_report(
-                session,
-                user_text=user_text,
-                session_id=session_id,
-                context=context,
-                decision=decision,
-                turn_envelope=turn_envelope,
-            )
+        handled = await self._try_apply_cognitive_runtime(
+            session,
+            user_text=user_text,
+            session_id=session_id,
+            context=context,
+            core_interpretation=core_interpretation,
+            core_interpretation_latency_ms=core_interpretation_latency_ms,
+            turn_envelope=turn_envelope,
+        )
+        if handled:
+            return
 
-        # Compatibility observation paths may continue below, but ordinary
-        # semantic/deep-thinking delegation remains owned by the Cognitive Core.
-        if self.cognitive_runtime_mode == "off":
-            decision = self._schedule_goal_association_report(
-                session,
-                user_text=user_text,
-                session_id=session_id,
-                context=context,
-                decision=decision,
-            )
-            decision = self._schedule_fast_planner_report(
-                session,
-                user_text=user_text,
-                session_id=session_id,
-                context=context,
-                decision=decision,
-            )
-            decision = await self._review_task_continuity(
-                session,
-                user_text=user_text,
-                session_id=session_id,
-                context=context,
-                decision=decision,
-            )
-
-        turn_metadata = {
-            "source": decision.source,
-            "confidence": decision.confidence,
-        }
-        if isinstance(decision.metadata, dict):
-            for key in (
-                "goal_association_resolution",
-                "goal_association_mode",
-                "cognitive_runtime_resolution",
-                "cognitive_runtime_mode",
-                "task_relation",
-                "target_task_id",
-                "task_context_patch",
-                "semantic_task_operations",
-                "task_operations",
-                "semantic_task_operation",
-                "semantic_task_resolution_authoritative",
-                "task_continuity_resolution",
-                "task_continuity_mode",
-                "response_plan",
-                "orchestrator_deepthinking_delegation",
-                "orchestrator_original_route",
-            ):
-                if key in decision.metadata:
-                    turn_metadata[key] = decision.metadata[key]
-
-        turn_metadata = self._metadata_with_turn_envelope(
-            turn_metadata,
-            turn_envelope,
+        # The maintained architecture has no compatibility fallback. Once Goal
+        # Interpretation has produced Responsibility evidence, execution may only
+        # continue through the goal-driven Cognitive Runtime. A disabled or
+        # unavailable runtime therefore fails closed instead of reconstructing a
+        # legacy RouteDecision or entering the old Agent routing pipeline.
+        safe_response = self._host_speech_response(
+            "我听懂了，但现在不能继续安排这件事，所以先停下了。"
+            if self._looks_zh(user_text)
+            else "I understood, but I cannot continue arranging this right now, so I stopped.",
+            style="warning",
+            source="host_cognitive_runtime_unavailable",
         )
         self.conversation_state.record_user_turn(
             session_id,
             user_text,
-            route=decision.route,
-            intent=decision.intent,
-            metadata=turn_metadata,
+            route=None,
+            intent=None,
+            metadata=self._metadata_with_turn_envelope(
+                {
+                    "source": "goal_driven_cognitive_runtime",
+                    "semantic_status": "failed",
+                    "semantic_failure_stage": "cognitive_runtime_entry",
+                    "semantic_failure_class": "runtime_unavailable",
+                    "canonical_goal_committed": False,
+                    "goal_interpretation": core_interpretation.model_dump(mode="json"),
+                },
+                turn_envelope,
+            ),
         )
-        # Semantic task operations are advisory Cognitive Core interpretation output, but the
-        # ConversationStateManager applies and versions them deterministically.
-        # Rebuild the bounded context so downstream planning sees the accepted
-        # task/goal state from this same turn rather than the pre-route snapshot.
-        context = self.build_context(session_id)
-
-        if decision.interrupt_current or decision.route == "interrupt":
-            await self.interrupt(new_session_id=session_id)
-            state = self.sessions.state.get(session_id)
-            if state is not None:
-                state["llm_done"] = True
-            self.maybe_session_done(session_id)
-            return
-
-        if decision.route == "ignore":
-            self.session_log(session_id, "goal_interpretation_ignore: intent=%s reason=%s", decision.intent, decision.reason)
-            state = self.sessions.state.get(session_id)
-            if state is not None:
-                state["llm_done"] = True
-            self.maybe_session_done(session_id)
-            return
-
-        if not self.enable_agent or not decision.needs_agent:
-            self._launch_direct_llm_compatibility_or_fail_closed(
-                decision=decision,
-                user_text=user_text,
-                session_id=session_id,
-                fallback_reason="agent_disabled_or_not_needed",
-            )
-            return
-
-        fast_first_scheduled, fast_first_hedge = (
-            await _start_fast_first_delivery(
-                self,
-                decision,
-                user_text,
-                session_id,
-            )
-        )
-        fast_first_context = _context_with_scheduled_fast_speech(
-            context,
-            decision,
-            scheduled=fast_first_scheduled,
-        )
-        agent_context = self._legacy_agent_authority_context(
-            fast_first_context,
-            session_id=session_id,
-            decision=decision,
-            reason=f"orchestrator_{self.cognitive_runtime_mode}_agent_path",
-        )
-        agent_start_ms = now_ms()
-        self.session_log(session_id, "agent_start: route=%s agents=%s intent=%s", decision.route, ",".join(decision.agents), decision.intent)
-        try:
-            if self.enable_interaction_response:
-                response = await self.agent_client.run_interaction(
-                    session,
-                    text=user_text,
-                    route_decision=decision,
-                    sid=session_id,
-                    context=agent_context,
-                    history=agent_context.get("history", []),
-                )
-                agent_latency_ms = now_ms() - agent_start_ms
-                response = response.model_copy(
-                    deep=True,
-                    update={
-                        "metadata": {
-                            **response.metadata,
-                            "language": decision.language,
-                            **self._route_proposal_metadata(decision),
-                            "experience_context": self._experience_context(
-                                user_text=user_text,
-                                decision=decision,
-                                core_interpretation_latency_ms=core_interpretation_latency_ms,
-                                agent_latency_ms=agent_latency_ms,
-                            ),
-                        }
-                    },
-                )
-                response = self.interaction_runtime.prepare_response(
-                    response,
-                    session_id=session_id,
-                )
-                self.session_log(
-                    session_id,
-                    "interaction_done: agent_ms=%.1f speech=%s skills=%s requires_confirmation=%s",
-                    agent_latency_ms,
-                    len(response.speech),
-                    len(response.skills),
-                    response.requires_confirmation,
-                )
-                for request in response.skills:
-                    self.session_log(
-                        session_id,
-                        "skill_proposed: request_id=%s skill_id=%s timing=%s "
-                        "cancellable=%s requires_confirmation=%s args=%s",
-                        request.request_id,
-                        request.skill_id,
-                        request.timing,
-                        request.cancellable,
-                        request.requires_confirmation,
-                        json.dumps(request.args, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
-                    )
-                hedge_scheduled = await self._settle_fast_first_audio_hedge(
-                    fast_first_hedge,
-                    decision=decision,
-                    session_id=session_id,
-                )
-                fast_first_scheduled = fast_first_scheduled or hedge_scheduled
-                if await self._stage_interaction_confirmation(
-                    response,
-                    session_id,
-                    language=decision.language,
-                    reset_playback=not fast_first_scheduled,
-                ):
-                    return
-
-                self.conversation_state.record_agent_result(session_id, response)
-                self._launch_interaction(
-                    response,
-                    session_id,
-                    reset_playback=not fast_first_scheduled,
-                )
-                return
-
-            result = await self.agent_client.run(
-                session,
-                text=user_text,
-                route_decision=decision,
-                sid=session_id,
-                context=agent_context,
-                history=agent_context.get("history", []),
-            )
-            self.session_log(
-                session_id,
-                "agent_done: agent_ms=%.1f speak_immediate=%s actions=%s task_graphs=%s speak_after=%s requires_confirmation=%s",
-                now_ms() - agent_start_ms,
-                len(result.speak_immediate),
-                len(result.actions),
-                len(result.task_graphs),
-                len(result.speak_after),
-                result.requires_confirmation,
-            )
-            hedge_scheduled = await self._settle_fast_first_audio_hedge(
-                fast_first_hedge,
-                decision=decision,
-                session_id=session_id,
-            )
-            fast_first_scheduled = fast_first_scheduled or hedge_scheduled
-            if result.actions:
-                locked_actions = []
-                locked_ids = []
-                for action in result.actions:
-                    locked_ids.append(action.id)
-                    locked_actions.append(
-                        action.model_copy(
-                            deep=True,
-                            update={
-                                "requires_confirmation": True,
-                                "metadata": {
-                                    **action.metadata,
-                                    "post_interrupt_physical_resume_lock": True,
-                                    "post_interrupt_resume_policy": "requires_fresh_confirmation",
-                                },
-                            },
-                        )
-                    )
-                result.actions = locked_actions
-                result.requires_confirmation = True
-                self.session_log(
-                    session_id,
-                    "post_interrupt_legacy_physical_resume_locked: action_ids=%s",
-                    ",".join(locked_ids),
-                )
-            self.conversation_state.record_agent_result(session_id, result)
-            await self.execute_agent_result(
-                result,
-                session_id,
-                reset_playback=not fast_first_scheduled,
-            )
-        except Exception as exc:
-            hedge_scheduled = await self._settle_fast_first_audio_hedge(
-                fast_first_hedge,
-                decision=decision,
-                session_id=session_id,
-            )
-            fast_first_scheduled = fast_first_scheduled or hedge_scheduled
-            self.session_log(session_id, "agent_exception: agent_ms=%.1f error=%s", now_ms() - agent_start_ms, exc)
-            logger.warning("Agent failed; selecting fail-closed fallback policy: %s", exc, exc_info=True)
-            safe_response = self._agent_exception_safe_response(
-                decision,
-                user_text=user_text,
-            )
-            if safe_response is not None:
-                self.conversation_state.record_agent_result(session_id, safe_response)
-                self._launch_interaction(
-                    safe_response,
-                    session_id,
-                    reset_playback=not fast_first_scheduled,
-                )
-                return
-            self._launch_direct_llm_compatibility_or_fail_closed(
-                decision=decision,
-                user_text=user_text,
-                session_id=session_id,
-                fallback_reason="agent_exception",
-                reset_playback=not fast_first_scheduled,
-            )
+        self.conversation_state.record_agent_result(session_id, safe_response)
+        self._launch_interaction(safe_response, session_id)
+        return
 
 
     async def _stage_interaction_confirmation(

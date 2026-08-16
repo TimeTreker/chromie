@@ -251,6 +251,42 @@ class FastResponsibilityProposal(BaseModel):
         return self
 
 
+class GoalInterpretationDecision(BaseModel):
+    """Current Fast/Deep Goal Interpretation contract: WHAT only.
+
+    No route/intent label, response Activity, Work, Capability, provider, or
+    execution contract is part of Goal Interpretation authority.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    responsibilities: list[FastResponsibilityProposal] = Field(min_length=1)
+    unresolved: list[str] = Field(default_factory=list, max_length=12)
+
+    @field_validator("unresolved", mode="before")
+    @classmethod
+    def normalize_unresolved(cls, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, list):
+            raise ValueError("unresolved must be an array")
+        return [
+            text
+            for item in value
+            if (text := " ".join(str(item or "").strip().split()))
+        ]
+
+    @model_validator(mode="after")
+    def validate_local_refs(self) -> "GoalInterpretationDecision":
+        refs = [item.local_ref for item in self.responsibilities]
+        if len(refs) != len(set(refs)):
+            raise ValueError("responsibility local_ref values must be unique")
+        return self
+
+
 class FastProgressProposal(BaseModel):
     """Legacy compatibility shape for pre-Planner conversational progress.
 

@@ -21,7 +21,10 @@ from .planner_contract import (
     evidence_bound_dialogue,
     goal_association_prompt_projection,
 )
-from .schema import AgentRunRequest
+try:
+    from chromie_contracts.core_interpretation import CognitiveWorkRequest
+except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 
 try:
     from chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
@@ -134,7 +137,7 @@ class ResponseComposerResolver:
         self.num_ctx = max(2048, int(num_ctx))
         self.num_predict = max(128, int(num_predict))
 
-    async def resolve(self, request: AgentRunRequest) -> ResponseCompositionResolution:
+    async def resolve(self, request: CognitiveWorkRequest) -> ResponseCompositionResolution:
         trace_scope = runtime_tracer.continue_from_context(request.context)
         if not trace_scope.enabled:
             return await self._resolve(request)
@@ -160,7 +163,7 @@ class ResponseComposerResolver:
         runtime_tracer.attach_fragment(result.metadata, trace_scope)
         return result
 
-    async def _resolve(self, request: AgentRunRequest) -> ResponseCompositionResolution:
+    async def _resolve(self, request: CognitiveWorkRequest) -> ResponseCompositionResolution:
         plan = self._canonical_plan(request.context)
         if plan is None:
             direct_association = self._direct_goal_association(request.context)
@@ -457,7 +460,7 @@ class ResponseComposerResolver:
     def _primary_activity_fail_soft_composition(
         cls,
         *,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         plan: CanonicalPlan,
         composition_id: str,
         failure: Exception,
@@ -489,7 +492,6 @@ class ResponseComposerResolver:
         ):
             return None
         safe_read = cls._is_safe_read_plan(plan, request.context)
-        core_fast_speech_used = False
         if safe_read:
             response_plan = cls._pure_safe_read_response_plan(
                 plan=plan,
@@ -521,19 +523,7 @@ class ResponseComposerResolver:
                     )
                 )
             else:
-                core_fast_speech = cls._unplayed_core_fast_speech(request)
-                if core_fast_speech is None:
-                    return None
-                core_fast_speech_used = True
-                response_plan = ResponsePlan(
-                    pre_action=ResponseStage(
-                        text=core_fast_speech["text"],
-                        speech_act=core_fast_speech["purpose"],
-                        commitment_state="none",
-                        must_not_claim_completion=True,
-                        covers_goal_ids=list(plan.goal_ids),
-                    )
-                )
+                return None
         cls._validate_reused_turn_speech(
             response_plan,
             context=request.context,
@@ -573,7 +563,6 @@ class ResponseComposerResolver:
                         response_plan.pre_action,
                     )
                 ),
-                "core_authored_fast_speech_used": core_fast_speech_used,
                 "safe_read_speech_optional": safe_read,
                 "pure_safe_read_fast_act_reference_only": safe_read,
                 "original_failure_type": type(failure).__name__,
@@ -606,46 +595,6 @@ class ResponseComposerResolver:
                 "original_failure_type": type(failure).__name__,
             },
         )
-
-    @staticmethod
-    def _unplayed_core_fast_speech(
-        request: AgentRunRequest,
-    ) -> dict[str, str] | None:
-        """Return an unscheduled, typed Core acknowledgement without reauthoring it.
-
-        The compatibility RouteDecision preserves the Cognitive Core's reviewed
-        FastSpeech DTO for direct runtime callers. Mechanical contract checks are
-        intentionally strict: this path cannot infer wording, recover a bare
-        ``speak_first`` string, or replay an event the Host already marked scheduled.
-        """
-
-        decision = request.route_decision
-        if str(decision.route or "").strip() != "robot_action":
-            return None
-        metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
-        fast_first = metadata.get("fast_first_response")
-        if metadata.get("fast_first_response_scheduled") is True or (
-            isinstance(fast_first, dict) and fast_first.get("scheduled") is True
-        ):
-            return None
-        speech = decision.fast_speech
-        if speech is None:
-            return None
-        text = " ".join(str(speech.text or "").strip().split())
-        if not text or not any(character.isalnum() for character in text):
-            return None
-        purpose = " ".join(str(speech.purpose or "").strip().split())
-        commitment = " ".join(str(speech.commitment or "").strip().split())
-        if (
-            purpose != "acknowledge"
-            or commitment != "prelude_only"
-            or speech.claim_state != "none"
-            or speech.claimed_capability_ids
-            or speech.claimed_goal_ids
-            or speech.must_not_claim_completion is not True
-        ):
-            return None
-        return {"text": text, "purpose": purpose}
 
     @staticmethod
     def _validation_error_json(exc: Exception) -> str:
@@ -1336,7 +1285,7 @@ class ResponseComposerResolver:
     def _validate_spoken_language(
         response_plan: ResponsePlan,
         *,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
     ) -> None:
         language = str(request.language or "").strip().lower()
         if language in {"", "auto"}:
@@ -1690,7 +1639,7 @@ class ResponseComposerResolver:
 
     @staticmethod
     def _direct_composition_id(
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         association: GoalAssociationResolution,
     ) -> str:
         digest = hashlib.sha256(
@@ -1703,7 +1652,7 @@ class ResponseComposerResolver:
 
     async def _resolve_direct(
         self,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         association: GoalAssociationResolution,
     ) -> ResponseCompositionResolution:
         goal_ids = self._direct_goal_ids(association)
@@ -1894,7 +1843,7 @@ class ResponseComposerResolver:
 
     def _direct_prompt(
         self,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         association: GoalAssociationResolution,
         *,
         previous_raw: Any = None,
@@ -1951,7 +1900,7 @@ class ResponseComposerResolver:
 
     def _layered_direct_prompt(
         self,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         association: GoalAssociationResolution,
         *,
         previous_raw: Any = None,
@@ -2001,7 +1950,7 @@ class ResponseComposerResolver:
         return None
 
     @staticmethod
-    def _composition_id(request: AgentRunRequest, plan: CanonicalPlan) -> str:
+    def _composition_id(request: CognitiveWorkRequest, plan: CanonicalPlan) -> str:
         digest = hashlib.sha256(
             f"{request.sid or 'turn'}|{plan.plan_id}|response-composition".encode()
         ).hexdigest()[:20]
@@ -2272,7 +2221,7 @@ class ResponseComposerResolver:
 
     def _prompt(
         self,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         plan: CanonicalPlan,
         *,
         previous_raw: Any = None,
@@ -2328,7 +2277,7 @@ class ResponseComposerResolver:
 
     def _layered_prompt(
         self,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         plan: CanonicalPlan,
         *,
         previous_raw: Any = None,
@@ -2365,7 +2314,7 @@ class ResponseComposerResolver:
     async def _run_response_truth_audit(
         self,
         *,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         plan: CanonicalPlan,
         candidate: ResponseComposerModelOutput,
     ) -> ResponseTruthAudit:
@@ -2406,7 +2355,7 @@ class ResponseComposerResolver:
     def _response_truth_audit_prompt(
         self,
         *,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         plan: CanonicalPlan,
         candidate: ResponseComposerModelOutput,
     ) -> str:

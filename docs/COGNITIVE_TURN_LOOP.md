@@ -339,20 +339,18 @@ Required fields:
 
 The envelope deliberately excludes:
 
-- ordinary intent;
-- goal meaning or goal IDs;
-- a compatibility route;
+- ordinary Goal meaning or Goal IDs;
+- Goal-Interpretation route/intent labels;
 - selected Agents, tools, skills, or capabilities;
 - a plan or authorization;
 - an execution claim;
 - response text.
 
-The current compatibility adapter projects only an admitted envelope into the
-existing Core call shape and preserves the envelope and correlation IDs in
-context and response metadata. `RouteDecision` remains an advisory
-source-effect and rollout-lane bound, not the primary cognitive object.
-Suppressed, unusable, and reflex-only envelopes cannot be projected into
-ordinary Core cognition.
+An admitted envelope enters Goal Interpretation directly. The resulting
+`CoreInterpretationResult` carries Responsibility evidence only and is converted into a
+typed `CognitiveWorkRequest` for downstream HOW owners. No `RouteDecision` projection is
+created or reconstructed on the maintained path. Suppressed, unusable, and reflex-only
+envelopes cannot enter ordinary Core cognition.
 
 ## 5. Goal understanding and planning
 

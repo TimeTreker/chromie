@@ -9,7 +9,6 @@ from scripts.control_plane_smoke import (
     build_fast_plan_request,
 )
 from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
-from shared.chromie_contracts.route import RouteDecision
 
 
 class ControlPlaneSmokeContractTests(unittest.TestCase):
@@ -29,24 +28,27 @@ class ControlPlaneSmokeContractTests(unittest.TestCase):
 
     def test_projects_core_result_into_fast_planner_contract(self) -> None:
         core_request = build_core_request()
-        decision = RouteDecision(
-            route="chat",
-            agents=["conversation_agent", "speaker_agent"],
-            intent="greeting",
+        interpretation = CoreInterpretationResult(
+            turn_id=core_request.turn_envelope.turn_id,
+            session_id=core_request.turn_envelope.session_id,
             confidence=0.99,
             language="en-US",
-            needs_agent=True,
-            should_speak=True,
-            source="llm",
-        )
-        interpretation = CoreInterpretationResult.from_route_decision(
-            envelope=core_request.turn_envelope,
-            decision=decision,
+            responsibilities=[
+                {
+                    "local_ref": "r1",
+                    "outcome": "socially reciprocate the user's greeting",
+                    "bindings": {},
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.99,
+                }
+            ],
         )
 
         request = build_fast_plan_request(interpretation)
 
-        self.assertEqual(request.route_decision.route, "chat")
+        self.assertEqual(len(request.responsibilities), 1)
+        self.assertEqual(request.responsibilities[0].local_ref, "r1")
         self.assertEqual(
             request.context["goal_association_resolution"]["new_goals"][0]["goal_id"],
             DEFAULT_GOAL_ID,

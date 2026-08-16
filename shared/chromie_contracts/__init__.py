@@ -28,8 +28,8 @@ from .agent_skill import (
 )
 from .route import MemoryUpdateProposal, RouteDecision, RouteItem, RouteRequest
 from .core_interpretation import (
-    CognitiveProgressCandidate,
     CognitiveResponsibilityProposal,
+    CognitiveWorkRequest,
     CoreInterpretationResult,
     CoreInterpretationUnavailable,
 )

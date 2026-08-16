@@ -19,7 +19,10 @@ from .cognitive_identity import (
     bounded_identity_json,
     bounded_personality_json,
 )
-from .schema import AgentRunRequest
+try:
+    from chromie_contracts.core_interpretation import CognitiveWorkRequest
+except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 
 try:
     from chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
@@ -99,7 +102,7 @@ class DeepPlannerResolver:
         self.max_contract_repairs = max(0, min(1, int(max_contract_repairs)))
         self.min_goal_satisfaction = max(0.0, min(1.0, float(min_goal_satisfaction)))
 
-    async def resolve(self, request: AgentRunRequest) -> CanonicalPlan:
+    async def resolve(self, request: CognitiveWorkRequest) -> CanonicalPlan:
         trace_scope = runtime_tracer.continue_from_context(request.context)
         if not trace_scope.enabled:
             return await self._resolve(request)
@@ -129,7 +132,7 @@ class DeepPlannerResolver:
         runtime_tracer.attach_fragment(result.metadata, trace_scope)
         return result
 
-    async def _resolve(self, request: AgentRunRequest) -> CanonicalPlan:
+    async def _resolve(self, request: CognitiveWorkRequest) -> CanonicalPlan:
         plan_id = self._plan_id(request)
         context = request.context if isinstance(request.context, dict) else {}
         expected_goal_ids_for_turn = expected_goal_ids(context)
@@ -752,7 +755,7 @@ class DeepPlannerResolver:
         }
 
     @staticmethod
-    def _plan_id(request: AgentRunRequest) -> str:
+    def _plan_id(request: CognitiveWorkRequest) -> str:
         digest = hashlib.sha256(
             f"{request.sid or 'turn'}|deep|{request.text}".encode()
         ).hexdigest()[:20]
@@ -1135,7 +1138,7 @@ class DeepPlannerResolver:
 
     def _prompt(
         self,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         capabilities: list[dict[str, Any]],
         *,
         feedback: list[dict[str, Any]],
@@ -1237,7 +1240,7 @@ class DeepPlannerResolver:
 
     def _layered_prompt(
         self,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         capabilities: list[dict[str, Any]],
         *,
         feedback: list[dict[str, Any]],
@@ -1401,7 +1404,7 @@ class DeepPlannerResolver:
         self,
         raw: dict[str, Any],
         *,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         plan_id: str,
         expected_goal_ids_for_turn: list[str],
         capability_payload: list[dict[str, Any]] | None = None,
@@ -1461,7 +1464,7 @@ class DeepPlannerResolver:
         capabilities: list[dict[str, Any]],
         *,
         expected_goal_ids: list[str],
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
     ) -> list[dict[str, Any]]:
         allowed = {item["capability_id"]: item for item in capabilities}
         errors: list[dict[str, Any]] = []
@@ -1586,7 +1589,7 @@ class DeepPlannerResolver:
     def _unavailable(
         self,
         plan_id: str,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         reason: str,
         *,
         unresolved: list[str] | None = None,
@@ -1639,7 +1642,7 @@ class DeepPlannerResolver:
     def _clarify(
         self,
         plan_id: str,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         reason: str,
         *,
         unresolved: list[str] | None = None,

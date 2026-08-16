@@ -21,6 +21,7 @@ from .model_interpreter import (
 )
 from .rules import route_by_priority_rules
 from .schema import (
+    GoalInterpretationDecision,
     RouteDecision,
     RouteRequest,
     annotate_pipeline_stage_outputs,
@@ -1159,6 +1160,17 @@ def _attach_stage_context(
             },
         },
     }
+
+
+
+async def interpret_goal(request: RouteRequest) -> GoalInterpretationDecision:
+    """Maintained Goal Interpretation entry point: provider-neutral WHAT only."""
+
+    request.text = request.text.strip()
+    if not request.text:
+        raise InterpretationUnavailableError("empty admitted input cannot be interpreted")
+    return await goal_interpreter.interpret_goal(request)
+
 
 
 

@@ -28,9 +28,10 @@ unavailable, or failed review admits the turn.
 `POST /cognitive-core/interpret` accepts only a schema-valid admitted
 `CoreTurnRequest`. Bare text, a suppressed envelope, mismatched context identity,
 or a context digest mismatch is rejected before Goal Interpretation. The result
-is a `CoreInterpretationResult` bound to the turn and a SHA-256 digest of its
-internal `RouteDecision` compatibility projection. It is advisory cognitive
-evidence and does not authorize side effects. The Orchestrator still
+is a `CoreInterpretationResult` bound to the turn. It contains only
+provider-neutral Responsibility evidence, bounded confidence/language, and unresolved
+meaning. It has no `route`, `intent`, Capability identity, response wording, or
+compatibility projection and does not authorize side effects. The Orchestrator still
 validates schemas, authorization, confirmation, resource conflicts, commitment,
 and trusted execution evidence before any effectful request runs.
 
@@ -145,16 +146,19 @@ caller-supplied disclosure context is removed before trusted injection.
 | `POST` | `/tools/execute` | Trusted execution boundary for exact local safe-read capability requests already selected by the Goal-driven planner. |
 | `POST` | `/tool-result/interpret` | Interpret complete bounded tool evidence for the user request without exposing the raw payload. |
 
-The interaction, goal-association, and task-continuity endpoints accept the same request shape:
+The maintained Goal-driven planning endpoints (`/fast-advance`, `/goal-association`,
+`/fast-plan`, `/deep-plan`, `/reflection`, `/compose-response-plan`) accept a typed
+`CognitiveWorkRequest`: `sid`, original `text`, optional `language`, first-class
+`responsibilities`, interpretation confidence/unresolved meaning, bounded `context`, and
+`history`. They do not accept a Goal-Interpreter `route_decision`.
 
-- `sid`
-- `text`
-- `route_decision`
-- optional `language`
-- `context`
-- `history`
-
-The maintained Cognitive Core interpretation result contains first-class `responsibilities` as provider-neutral Goal-Interpretation evidence: a local reference, human outcome, material semantic bindings, whether more work is required, and whether fresh evidence is required. Responsibility evidence is the authoritative WHAT handoff for downstream cognition; it is not a Goal, Plan, or Goal-Association-only DTO. Capability IDs, executable args/actions, provider identity, execution methods, Activities, and response wording are forbidden. `progress_candidates`, Goal-Interpreter `native_response`, and Goal-Interpreter `fast_speech` remain compatibility surfaces only and are empty/non-authoritative in maintained cognitive apply.
+The maintained Cognitive Core interpretation result contains first-class
+`responsibilities` as provider-neutral Goal-Interpretation evidence: a local reference,
+human outcome, material semantic bindings, whether more work is required, and whether
+fresh evidence is required. Responsibility evidence is the authoritative WHAT handoff
+for downstream cognition; it is not a Goal, Plan, or Goal-Association-only DTO.
+Capability IDs, executable args/actions, provider identity, execution methods,
+Activities, response wording, `route`, and `intent` are forbidden.
 
 `POST /fast-advance` is the maintained pre-Goal Fast Planner phase. It consumes the authoritative user turn plus Responsibility evidence and returns `FastPlannerAdvance`: exact Responsibility refs covered, at most one immediately-ready provider-free conversational Activity, and typed continuation dispositions for `goal_association` and/or `deep_planner`. This endpoint does not emit executable Capability steps, mutate Goal state, invoke another semantic owner, or authorize effects. The Core mechanically follows its continuations. A simple greeting may terminate at this phase; a fresh-evidence/effectful turn requests Goal Association, and HOW that exceeds the fast budget may additionally request Deep Planner.
 

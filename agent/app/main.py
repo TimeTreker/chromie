@@ -35,10 +35,10 @@ try:
         AgentSkillSelectionResolution,
     )
     from chromie_contracts.core_interpretation import (
+        CognitiveWorkRequest,
         CoreInterpretationResult,
         CoreInterpretationUnavailable,
     )
-    from chromie_contracts.route import RouteDecision as SharedRouteDecision
     from chromie_contracts.social_attention import SocialAttentionPlan, SocialAttentionRequest
     from chromie_contracts.tool_result import (
         ToolExecutionRequest,
@@ -59,10 +59,10 @@ except ImportError:  # pragma: no cover
         AgentSkillSelectionResolution,
     )
     from shared.chromie_contracts.core_interpretation import (
+        CognitiveWorkRequest,
         CoreInterpretationResult,
         CoreInterpretationUnavailable,
     )
-    from shared.chromie_contracts.route import RouteDecision as SharedRouteDecision
     from shared.chromie_contracts.social_attention import SocialAttentionPlan, SocialAttentionRequest
     from shared.chromie_contracts.tool_result import (
         ToolExecutionRequest,
@@ -92,6 +92,7 @@ from .cognitive_core.goal_interpreter import (
     RouteDecision as CoreRouteDecision,
     RouteRequest as CoreRouteRequest,
     initialize_goal_interpreter,
+    interpret_goal,
     interpret_turn,
 )
 from .cognitive_core.goal_interpreter.fallback import InterpretationUnavailableError
@@ -678,7 +679,7 @@ async def interpret_cognitive_turn(
     )
     context["gateway_admission_complete"] = True
     try:
-        decision = await interpret_turn(
+        interpretation = await interpret_goal(
             CoreRouteRequest(
                 sid=envelope.session_id,
                 text=envelope.normalized_input.text,
@@ -698,26 +699,20 @@ async def interpret_cognitive_turn(
             status_code=503,
             content=unavailable.model_dump(mode="json"),
         )
-    responsibility_proposals = [
-        item.model_dump(mode="json", exclude_none=True)
-        for item in decision.responsibilities
-    ]
-    # Maintained Goal Interpretation owns WHAT only. Conversational Activity
-    # wording belongs to Fast Planner, so legacy GI progress is not promoted into
-    # the Core interpretation handoff.
-    progress_proposals: list[dict[str, object]] = []
-    projection = SharedRouteDecision.model_validate(
-        decision.model_dump(mode="json", exclude={"progress", "responsibilities"})
-    )
-    return CoreInterpretationResult.from_route_decision(
-        envelope=envelope,
-        decision=projection,
-        responsibility_proposals=responsibility_proposals,
-        progress_proposals=progress_proposals,
+    return CoreInterpretationResult(
+        turn_id=envelope.turn_id,
+        session_id=envelope.session_id,
+        confidence=interpretation.confidence,
+        language=envelope.normalized_input.language or "auto",
+        responsibilities=[
+            item.model_dump(mode="json", exclude_none=True)
+            for item in interpretation.responsibilities
+        ],
+        unresolved=list(interpretation.unresolved),
     )
 
 @app.post("/fast-advance")
-async def resolve_fast_advance(request: AgentRunRequest):
+async def resolve_fast_advance(request: CognitiveWorkRequest):
     if fast_planner_resolver is None:
         raise HTTPException(status_code=503, detail="Fast planner is disabled")
     # This is the same Fast Planner before canonical Goal binding.  Agent Skill
@@ -728,7 +723,7 @@ async def resolve_fast_advance(request: AgentRunRequest):
 
 
 @app.post("/fast-plan")
-async def resolve_fast_plan(request: AgentRunRequest):
+async def resolve_fast_plan(request: CognitiveWorkRequest):
     if fast_planner_resolver is None:
         raise HTTPException(status_code=503, detail="Fast planner is disabled")
     prepared, disclosure = await agent_skill_progressive_disclosure.prepare_agent_request(
@@ -740,7 +735,7 @@ async def resolve_fast_plan(request: AgentRunRequest):
 
 
 @app.post("/deep-plan")
-async def resolve_deep_plan(request: AgentRunRequest):
+async def resolve_deep_plan(request: CognitiveWorkRequest):
     if deep_planner_resolver is None:
         raise HTTPException(status_code=503, detail="Deep planner is disabled")
     prepared, disclosure = await agent_skill_progressive_disclosure.prepare_agent_request(
@@ -758,7 +753,7 @@ async def resolve_deep_plan(request: AgentRunRequest):
 
 
 @app.post("/reflection")
-async def resolve_reflection(request: AgentRunRequest):
+async def resolve_reflection(request: CognitiveWorkRequest):
     if reflection_resolver is None:
         raise HTTPException(status_code=503, detail="Reflection is disabled")
     return await reflection_resolver.resolve(request)
@@ -779,7 +774,7 @@ async def plan_social_attention(request: SocialAttentionRequest) -> SocialAttent
 
 
 @app.post("/compose-response-plan")
-async def compose_response_plan(request: AgentRunRequest):
+async def compose_response_plan(request: CognitiveWorkRequest):
     if response_composer_resolver is None:
         raise HTTPException(status_code=503, detail="Response composer is disabled")
     prepared, disclosure = await agent_skill_progressive_disclosure.prepare_agent_request(
@@ -808,7 +803,7 @@ async def interpret_tool_result(request: ToolResultInterpretationRequest):
 
 
 @app.post("/goal-association")
-async def resolve_goal_association(request: AgentRunRequest):
+async def resolve_goal_association(request: CognitiveWorkRequest):
     if goal_association_resolver is None:
         raise HTTPException(status_code=503, detail="Goal association resolver is disabled")
     prepared, disclosure = await agent_skill_progressive_disclosure.prepare_agent_request(

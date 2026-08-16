@@ -73,9 +73,6 @@ def build_situation_projection(
     *,
     context: dict[str, Any] | None,
     turn_id: str,
-    lane: str,
-    intent: str,
-    progress_candidate_ids: Iterable[str] = (),
     focus_goal_ids: Iterable[str] | None = None,
     revision: int = 1,
 ) -> SituationProjection:
@@ -139,12 +136,9 @@ def build_situation_projection(
     return SituationProjection.create(
         turn_id=_normalized(turn_id),
         revision=max(1, int(revision)),
-        lane=_normalized(lane) or "unknown",
-        intent=_normalized(intent) or "unknown",
         focus_goal_ids=selected_goals,
         discourse_focus_ids=_unique(discourse_focus[-8:], limit=8),
         unresolved_conditions=conditions,
-        progress_candidate_ids=_unique(progress_candidate_ids, limit=8),
         evidence_refs=evidence_refs,
     )
 

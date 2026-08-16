@@ -7,8 +7,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .interaction import reject_forbidden_low_level_fields
-from .route import RouteDecision, RouteName
-from .user_turn import UserTurnEnvelope, normalize_turn_text
+from .user_turn import normalize_turn_text
 
 
 _PLANNER_OWNED_BINDING_FIELDS = frozenset({
@@ -48,15 +47,11 @@ def _reject_planner_owned_bindings(value: Any, *, path: str = "bindings") -> Any
 
 
 class CoreInterpretationUnavailable(BaseModel):
-    """Typed non-semantic outcome when the Core cannot interpret a turn.
-
-    This result deliberately carries no lane, intent, plan, or compatibility
-    projection.  Callers must not reinterpret it as ordinary chat.
-    """
+    """Typed non-semantic outcome when Goal Interpretation is unavailable."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: Literal[1] = 1
+    schema_version: Literal[2] = 2
     status: Literal["interpretation_unavailable"] = "interpretation_unavailable"
     turn_id: str = Field(min_length=1, max_length=160)
     session_id: str = Field(min_length=1, max_length=160)
@@ -72,14 +67,11 @@ class CoreInterpretationUnavailable(BaseModel):
 
 
 class CognitiveResponsibilityProposal(BaseModel):
-    """Core-owned provider-neutral interpretation of one human responsibility.
+    """Provider-neutral WHAT understood by Goal Interpretation.
 
-    This is the authoritative WHAT handoff from Goal Interpretation to downstream
-    cognition. Fast Planner is the first HOW owner when meaning is sufficient, while
-    Goal Association remains the only stage that can create or mutate canonical Goals.
-    The proposal deliberately carries no response wording, Work/Primary-Activity
-    contract, Capability identity, plan step, execution lane, realization, or
-    execution method.
+    This is the entire maintained handoff from Goal Interpretation.  It contains
+    no route, intent label, Activity/Work contract, Capability identity, provider,
+    execution lane, realization, response wording, or canonical Goal identity.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -114,16 +106,16 @@ class CognitiveResponsibilityProposal(BaseModel):
 
 
 class CognitiveProgressCandidate(BaseModel):
-    """Legacy compatibility shape for GI-authored pre-Goal speech.
+    """Runtime-only prospective vocal candidate.
 
-    Maintained Goal Interpretation now emits Responsibility evidence only. Fast Planner
-    owns the first HOW decision and any immediately-ready conversational Activity. This
-    type remains temporarily for older direct compatibility callers and retained traces.
+    This type is not part of Goal Interpretation output and carries no route or
+    Capability authority. New maintained turns use FastPlannerAdvance directly;
+    the type remains for runtime-owned prospective vocal scheduling artifacts.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: Literal[1] = 1
+    schema_version: Literal[2] = 2
     candidate_id: str = Field(min_length=1, max_length=160)
     kind: Literal["native_response"] = "native_response"
     response_text: str = Field(min_length=1, max_length=600)
@@ -132,11 +124,7 @@ class CognitiveProgressCandidate(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
 
     @field_validator(
-        "candidate_id",
-        "response_text",
-        "speech_act",
-        "intent",
-        mode="before",
+        "candidate_id", "response_text", "speech_act", "intent", mode="before"
     )
     @classmethod
     def normalize_candidate_text(cls, value: str) -> str:
@@ -159,153 +147,84 @@ class CognitiveProgressCandidate(BaseModel):
             ensure_ascii=False,
             sort_keys=True,
             separators=(",", ":"),
-            default=str,
         ).encode("utf-8")
         return f"progress_{hashlib.sha256(payload).hexdigest()[:20]}"
 
 
 class CoreInterpretationResult(BaseModel):
-    """Core-owned semantic interpretation with an isolated legacy projection.
+    """Goal Interpretation result in the current architecture.
 
-    ``compatibility_projection`` exists only while downstream planner contracts
-    still consume ``RouteDecision``.  The projection is digest-bound and must
-    agree with the Core-owned lane/intent identity; it is not a Gateway output.
+    Goal Interpretation answers only WHAT the human means.  Fast/Deep depth may
+    change how much cognition is used, but not this authority boundary.  There is
+    deliberately no compatibility RouteDecision projection and no GI-authored
+    response/progress Activity.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: Literal[1] = 1
+    schema_version: Literal[2] = 2
     turn_id: str = Field(min_length=1, max_length=160)
     session_id: str = Field(min_length=1, max_length=160)
-    authority: Literal["goal_driven_cognitive_core"] = "goal_driven_cognitive_core"
-    lane: RouteName
-    intent: str = Field(default="unknown", min_length=1, max_length=200)
+    authority: Literal["goal_interpretation"] = "goal_interpretation"
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     language: str = Field(default="auto", min_length=1, max_length=64)
-    responsibilities: list[CognitiveResponsibilityProposal] = Field(default_factory=list)
-    progress_candidates: list[CognitiveProgressCandidate] = Field(default_factory=list)
-    projection_schema: Literal["route_decision_v1_compatibility"] = (
-        "route_decision_v1_compatibility"
-    )
-    compatibility_projection: RouteDecision
-    projection_digest: str = Field(min_length=64, max_length=64)
+    responsibilities: list[CognitiveResponsibilityProposal] = Field(min_length=1)
+    unresolved: list[str] = Field(default_factory=list, max_length=12)
 
-    @field_validator("turn_id", "session_id", "intent", "language", mode="before")
+    @field_validator("turn_id", "session_id", "language", mode="before")
     @classmethod
     def normalize_text_fields(cls, value: str) -> str:
         return normalize_turn_text(str(value or ""))
 
-    @staticmethod
-    def digest_projection(decision: RouteDecision) -> str:
-        payload = decision.model_dump(mode="json", exclude_none=True)
-        encoded = json.dumps(
-            payload,
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
-        return hashlib.sha256(encoded).hexdigest()
-
-    @model_validator(mode="after")
-    def validate_progress_candidates(self) -> "CoreInterpretationResult":
-        ids = [item.candidate_id for item in self.progress_candidates]
-        if len(ids) != len(set(ids)):
-            raise ValueError("Core progress candidate IDs must be unique")
-        return self
-
-    @model_validator(mode="after")
-    def validate_projection_identity(self) -> "CoreInterpretationResult":
-        decision = self.compatibility_projection
-        if decision.route != self.lane:
-            raise ValueError("Core interpretation lane does not match compatibility projection")
-        if normalize_turn_text(decision.intent) != self.intent:
-            raise ValueError("Core interpretation intent does not match compatibility projection")
-        if abs(float(decision.confidence) - float(self.confidence)) > 1e-9:
-            raise ValueError(
-                "Core interpretation confidence does not match compatibility projection"
-            )
-        if normalize_turn_text(decision.language or "auto") != self.language:
-            raise ValueError(
-                "Core interpretation language does not match compatibility projection"
-            )
-        if self.projection_digest != self.digest_projection(decision):
-            raise ValueError("Core interpretation compatibility projection digest mismatch")
-        return self
-
+    @field_validator("unresolved", mode="before")
     @classmethod
-    def from_route_decision(
-        cls,
-        *,
-        envelope: UserTurnEnvelope,
-        decision: RouteDecision,
-        responsibility_proposals: list[dict[str, Any]] | None = None,
-        progress_proposals: list[dict[str, Any]] | None = None,
-    ) -> "CoreInterpretationResult":
-        responsibilities: list[CognitiveResponsibilityProposal] = []
-        seen_refs: set[str] = set()
-        for raw in responsibility_proposals or []:
-            if not isinstance(raw, dict):
-                continue
-            try:
-                proposal = CognitiveResponsibilityProposal.model_validate(raw)
-            except (ValueError, TypeError):
-                continue
-            if proposal.local_ref in seen_refs:
-                continue
-            seen_refs.add(proposal.local_ref)
-            responsibilities.append(proposal)
+    def normalize_unresolved(cls, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, list):
+            raise ValueError("unresolved must be an array")
+        return [
+            text
+            for item in value
+            if (text := normalize_turn_text(str(item or "")))
+        ]
 
-        progress_candidates: list[CognitiveProgressCandidate] = []
-        seen_progress_ids: set[str] = set()
-        conversational_scope = decision.route == "chat" or any(
-            item.route == "chat" for item in decision.routes
-        )
-        for raw in progress_proposals or []:
-            if not isinstance(raw, dict):
-                continue
-            kind = normalize_turn_text(str(raw.get("kind") or ""))
-            if kind != "native_response":
-                continue
-            response_text = normalize_turn_text(str(raw.get("response_text") or ""))
-            speech_act = normalize_turn_text(raw.get("speech_act") or "inform") or "inform"
-            if not conversational_scope or not response_text:
-                continue
-            intent = normalize_turn_text(raw.get("intent") or decision.intent or "unknown") or "unknown"
-            try:
-                confidence = float(raw.get("confidence", decision.confidence))
-            except (TypeError, ValueError):
-                continue
-            candidate_id = CognitiveProgressCandidate.stable_id(
-                turn_id=envelope.turn_id,
-                response_text=response_text,
-                speech_act=speech_act,
-            )
-            candidate = CognitiveProgressCandidate(
-                candidate_id=candidate_id,
-                response_text=response_text,
-                speech_act=speech_act,
-                intent=intent,
-                confidence=confidence,
-            )
-            if candidate.candidate_id in seen_progress_ids:
-                continue
-            seen_progress_ids.add(candidate.candidate_id)
-            progress_candidates.append(candidate)
-        return cls(
-            turn_id=envelope.turn_id,
-            session_id=envelope.session_id,
-            lane=decision.route,
-            intent=normalize_turn_text(decision.intent or "unknown") or "unknown",
-            confidence=decision.confidence,
-            language=normalize_turn_text(decision.language or "auto") or "auto",
-            responsibilities=responsibilities,
-            progress_candidates=progress_candidates,
-            compatibility_projection=decision,
-            projection_digest=cls.digest_projection(decision),
-        )
+    @model_validator(mode="after")
+    def validate_responsibility_refs(self) -> "CoreInterpretationResult":
+        refs = [item.local_ref for item in self.responsibilities]
+        if len(refs) != len(set(refs)):
+            raise ValueError("Goal Interpretation responsibility local_ref values must be unique")
+        return self
 
 
-    def route_decision_projection(self) -> RouteDecision:
-        """Return a defensive copy for compatibility-only downstream adapters."""
+class CognitiveWorkRequest(BaseModel):
+    """Typed WHAT→HOW handoff used by maintained cognitive work endpoints.
 
-        return self.compatibility_projection.model_copy(deep=True)
+    This replaces RouteDecision-shaped requests in the Goal-driven runtime.  The
+    request carries Goal Interpretation responsibilities explicitly; canonical
+    Goal state and later Plan/Capability state remain in their own typed contracts.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[1] = 1
+    sid: str | None = None
+    text: str = ""
+    language: str | None = None
+    responsibilities: list[CognitiveResponsibilityProposal] = Field(min_length=1)
+    interpretation_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    interpretation_unresolved: list[str] = Field(default_factory=list, max_length=12)
+    context: dict[str, Any] = Field(default_factory=dict)
+    history: list[dict[str, Any]] = Field(default_factory=list)
+
+    @field_validator("text", mode="before")
+    @classmethod
+    def normalize_text(cls, value: str) -> str:
+        return normalize_turn_text(str(value or ""))
+
+    @field_validator("interpretation_unresolved", mode="before")
+    @classmethod
+    def normalize_interpretation_unresolved(cls, value: Any) -> list[str]:
+        return CoreInterpretationResult.normalize_unresolved(value)

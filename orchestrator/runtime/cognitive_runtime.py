@@ -14,9 +14,9 @@ from typing import Any, Awaitable, Callable, Literal, Protocol
 from agent.app.capabilities.validator import validate_args_for_schema
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from orchestrator.schemas.route import RouteDecision as CompatibilityRouteDecision
 from shared.chromie_contracts.core_interpretation import (
     CognitiveProgressCandidate,
+    CognitiveWorkRequest,
     CoreInterpretationResult,
 )
 from shared.chromie_contracts.execution_outcome import (
@@ -314,11 +314,6 @@ class CognitiveEvidenceRecorder:
             "metadata": resolution.metadata,
             "core_interpretation": (
                 resolution.metadata.get("core_interpretation")
-                if isinstance(resolution.metadata, dict)
-                else None
-            ),
-            "core_interpretation_projection_digest": (
-                resolution.metadata.get("core_interpretation_projection_digest")
                 if isinstance(resolution.metadata, dict)
                 else None
             ),
@@ -3094,7 +3089,7 @@ class GoalDrivenRuntimeCoordinator:
             primary_activity=primary_activity,
             text=text,
             language=language,
-            intent=intent or "unknown",
+            intent="responsibility",
             context=social_context,
             history=[dict(item) for item in history[-6:] if isinstance(item, dict)],
         )
@@ -3159,83 +3154,6 @@ class GoalDrivenRuntimeCoordinator:
         return execution_outcome
 
     @staticmethod
-    def _is_terminal_missing_ability_decision(route_decision: Any) -> bool:
-        return bool(
-            str(getattr(route_decision, "route", "") or "").strip() == "clarify"
-            and str(getattr(route_decision, "intent", "") or "").strip()
-            == "missing_or_unsupported_ability"
-        )
-
-    @staticmethod
-    def _terminal_missing_ability_interaction(
-        route_decision: Any,
-        *,
-        sid: str,
-        language: str,
-        context: dict[str, Any],
-    ) -> InteractionResponse:
-        text = " ".join(str(getattr(route_decision, "speak_first", "") or "").strip().split())
-        if not text:
-            raise ValueError(
-                "terminal missing-ability decision requires model-authored speak_first"
-            )
-        route_metadata = getattr(route_decision, "metadata", {})
-        if not isinstance(route_metadata, dict):
-            route_metadata = {}
-        desired_abilities = route_metadata.get("desired_abilities")
-        task_proposals = route_metadata.get("task_proposals")
-        metadata: dict[str, Any] = {
-            "source": "goal_driven_cognitive_runtime",
-            "cognitive_runtime_apply": True,
-            "language": language,
-            "planning_result": "terminal_missing_ability",
-            "capability_decision": "unavailable",
-            "goal_understood": True,
-            "capability_state": "unavailable",
-            "execution_state": "not_attempted",
-            "result_state": "not_observed",
-            "execution_attempted": False,
-            "operational_speech_authority": "goal_interpreter_model",
-            "missing_ability_terminal": True,
-            "desired_abilities": (
-                list(desired_abilities) if isinstance(desired_abilities, list) else []
-            ),
-            "task_proposals": (list(task_proposals) if isinstance(task_proposals, list) else []),
-        }
-        if isinstance(context.get("user_turn_envelope"), dict):
-            metadata["user_turn_envelope"] = context["user_turn_envelope"]
-        return InteractionResponse(
-            interaction_id=f"cognitive_{sid}",
-            status="clarify",
-            reason="missing_or_unsupported_ability",
-            speech=[
-                InteractionSpeech(
-                    text=text,
-                    timing="immediate",
-                    style="brief",
-                    metadata={
-                        "source": "goal_interpreter_missing_ability",
-                        "phase": "final",
-                        "speech_act": "capability_limitation",
-                        "commitment_state": "completed",
-                        "must_not_claim_completion": True,
-                        "claims": [
-                            "goal_understood",
-                            "capability_unavailable",
-                            "execution_not_attempted",
-                            "result_not_observed",
-                        ],
-                        "wait_for_playback_start": True,
-                        "playback_start_required_for_delivery": True,
-                    },
-                )
-            ],
-            skills=[],
-            requires_confirmation=False,
-            metadata=metadata,
-        )
-
-    @staticmethod
     def _fast_plan_path(plan: CanonicalPlan | None) -> str:
         if plan is None:
             return ""
@@ -3260,44 +3178,22 @@ class GoalDrivenRuntimeCoordinator:
         *,
         text: str,
         sid: str,
-        route_decision: Any | None = None,
-        core_interpretation: CoreInterpretationResult | None = None,
+        core_interpretation: CoreInterpretationResult,
         context: dict[str, Any],
         history: list[dict[str, Any]],
         language: str,
         turn_envelope: UserTurnEnvelope | None = None,
     ) -> CognitiveRuntimeResolution:
-        if core_interpretation is not None:
-            if turn_envelope is None:
-                raise ValueError("Core interpretation requires its admitted UserTurnEnvelope")
-            if core_interpretation.turn_id != turn_envelope.turn_id:
-                raise ValueError("Core interpretation turn does not match UserTurnEnvelope")
-            if core_interpretation.session_id != turn_envelope.session_id:
-                raise ValueError("Core interpretation session does not match UserTurnEnvelope")
-            route_decision = CompatibilityRouteDecision.model_validate(
-                core_interpretation.route_decision_projection().model_dump(mode="json")
-            )
-            context = {
-                **context,
-                "core_interpretation": core_interpretation.model_dump(
-                    mode="json",
-                    exclude={"compatibility_projection"},
-                ),
-                "core_interpretation_projection_digest": (core_interpretation.projection_digest),
-                "responsibility_proposals": [
-                    item.model_dump(mode="json", exclude_none=True)
-                    for item in core_interpretation.responsibilities
-                ],
-                "progress_candidates": [
-                    item.model_dump(mode="json", exclude_none=True)
-                    for item in core_interpretation.progress_candidates
-                ],
-            }
-        if route_decision is None:
-            raise ValueError(
-                "Goal-driven Runtime requires a Core interpretation or explicit "
-                "compatibility RouteDecision"
-            )
+        if turn_envelope is None:
+            raise ValueError("Core interpretation requires its admitted UserTurnEnvelope")
+        if core_interpretation.turn_id != turn_envelope.turn_id:
+            raise ValueError("Core interpretation turn does not match UserTurnEnvelope")
+        if core_interpretation.session_id != turn_envelope.session_id:
+            raise ValueError("Core interpretation session does not match UserTurnEnvelope")
+        context = {
+            **context,
+            "core_interpretation": core_interpretation.model_dump(mode="json"),
+        }
 
         if turn_envelope is not None:
             if turn_envelope.admission not in {"admit", "reflex_and_admit"}:
@@ -3332,8 +3228,16 @@ class GoalDrivenRuntimeCoordinator:
             context.get("interaction_id") or experience.get("interaction_id") or sid
         )
         turn_index = context.get("turn_index") or experience.get("turn_index")
-        route = str(getattr(route_decision, "route", "") or "")
-        intent = str(getattr(route_decision, "intent", "") or "")
+        work_request = CognitiveWorkRequest(
+            sid=sid,
+            text=text,
+            language=language,
+            responsibilities=list(core_interpretation.responsibilities),
+            interpretation_confidence=core_interpretation.confidence,
+            interpretation_unresolved=list(core_interpretation.unresolved),
+            context=context,
+            history=history,
+        )
 
         def attach_core_identity(
             resolution: CognitiveRuntimeResolution,
@@ -3342,11 +3246,7 @@ class GoalDrivenRuntimeCoordinator:
                 return resolution
             metadata = dict(resolution.metadata)
             metadata["core_interpretation"] = core_interpretation.model_dump(
-                mode="json",
-                exclude={"compatibility_projection"},
-            )
-            metadata["core_interpretation_projection_digest"] = (
-                core_interpretation.projection_digest
+                mode="json"
             )
             return resolution.model_copy(update={"metadata": metadata})
 
@@ -3380,7 +3280,7 @@ class GoalDrivenRuntimeCoordinator:
                     sid=sid,
                     turn_id=resolved_turn_id,
                     language=language,
-                    intent=intent or "unknown",
+                    intent="responsibility",
                     context=social_context,
                     history=history,
                 )
@@ -3394,8 +3294,8 @@ class GoalDrivenRuntimeCoordinator:
             },
             attributes={
                 "runtime_mode": self.policy.mode,
-                "route": route,
-                "intent": intent,
+                "responsibility_count": len(work_request.responsibilities),
+                "interpretation_confidence": work_request.interpretation_confidence,
                 "language": language,
                 "text_chars": len(text or ""),
             },
@@ -3404,12 +3304,7 @@ class GoalDrivenRuntimeCoordinator:
         if not trace_scope.enabled:
             resolution = await self._resolve(
                 session,
-                text=text,
-                sid=sid,
-                route_decision=route_decision,
-                context=context,
-                history=history,
-                language=language,
+                work_request=work_request,
             )
             if turn_envelope is not None:
                 resolution = resolution.model_copy(update={"turn_envelope": turn_envelope})
@@ -3426,12 +3321,7 @@ class GoalDrivenRuntimeCoordinator:
                 ) as span:
                     resolution = await self._resolve(
                         session,
-                        text=text,
-                        sid=sid,
-                        route_decision=route_decision,
-                        context=context,
-                        history=history,
-                        language=language,
+                        work_request=work_request,
                     )
                     if turn_envelope is not None:
                         resolution = resolution.model_copy(update={"turn_envelope": turn_envelope})
@@ -3467,15 +3357,14 @@ class GoalDrivenRuntimeCoordinator:
         self,
         session: Any,
         *,
-        text: str,
-        sid: str,
-        route_decision: Any,
-        context: dict[str, Any],
-        history: list[dict[str, Any]],
-        language: str,
+        work_request: CognitiveWorkRequest,
     ) -> CognitiveRuntimeResolution:
         started = time.perf_counter()
-        context = dict(context)
+        text = work_request.text
+        sid = str(work_request.sid or "")
+        language = work_request.language or "auto"
+        history = list(work_request.history)
+        context = dict(work_request.context)
         context["interaction_context"] = self._interaction_context(
             sid=sid,
             context=context,
@@ -3492,13 +3381,9 @@ class GoalDrivenRuntimeCoordinator:
         stage_diagnostics: list[dict[str, Any]] = []
         fast_planner_path = ""
         deep_planner_invocation_reasons: list[str] = []
-        source_lane = str(getattr(route_decision, "route", "") or "")
-        lane: CognitiveLane = (
-            source_lane
-            if source_lane in {"chat", "robot_action", "tool", "memory"}
-            else "unsupported"
-        )
-        progress_candidates = self._progress_candidates_from_context(context)
+        lane: CognitiveLane = "unsupported"
+        # Goal Interpretation no longer authors prospective speech/progress.
+        progress_candidates: dict[str, CognitiveProgressCandidate] = {}
         ready_handles: dict[str, Any] = {}
         ready_start_task: asyncio.Task[dict[str, Any]] | None = None
         ready_bound_count = 0
@@ -3570,79 +3455,12 @@ class GoalDrivenRuntimeCoordinator:
                 "ready_result_bound_count": ready_bound_count,
             }
 
-        if self._is_terminal_missing_ability_decision(route_decision):
-            lane = "chat"
-            fast_planner_path = "terminal_missing_ability"
-            terminal_metadata = {
-                "stage_diagnostics": stage_diagnostics,
-                "architecture_attribution": "not_evaluated",
-                "terminal_goal_interpretation": True,
-                **path_metadata(),
-            }
-            if self.policy.mode == "apply":
-                if not self.policy.lane_enabled(lane):
-                    return self._finish(
-                        mode="apply",
-                        status="error",
-                        lane=lane,
-                        association=None,
-                        fast_plan=None,
-                        terminal_plan=None,
-                        composition=None,
-                        timings=timings,
-                        started=started,
-                        fallback_reason="missing_ability_lane_not_enabled_for_apply",
-                        metadata={
-                            **terminal_metadata,
-                            "failure_stage": "authority_boundary",
-                            "failure_class": "terminal_missing_ability_lane_mismatch",
-                            "failure_domain": "cognitive_runtime",
-                            "retryable": False,
-                        },
-                    )
-                interaction = self._terminal_missing_ability_interaction(
-                    route_decision,
-                    sid=sid,
-                    language=language,
-                    context=context,
-                )
-                return self._finish(
-                    mode="apply",
-                    status="applied",
-                    lane=lane,
-                    association=None,
-                    fast_plan=None,
-                    terminal_plan=None,
-                    composition=None,
-                    interaction=interaction,
-                    timings=timings,
-                    started=started,
-                    metadata=terminal_metadata,
-                )
-            return self._finish(
-                mode="report_only",
-                status="report_only",
-                lane=lane,
-                association=None,
-                fast_plan=None,
-                terminal_plan=None,
-                composition=None,
-                timings=timings,
-                started=started,
-                metadata=terminal_metadata,
-            )
-
         try:
             turn_id = self._context_turn_id(context, sid)
 
-            responsibility_proposals = context.get("responsibility_proposals") or []
+            responsibility_proposals = list(work_request.responsibilities)
             needs_goal_association = True
             if responsibility_proposals:
-                # Maintained Goal Interpretation owns WHAT only. Ignore retained
-                # compatibility progress/native_response candidates so they cannot
-                # race the Fast Planner and become a second wording owner.
-                progress_candidates = {}
-                context["progress_candidates"] = []
                 # Fast Planner is the first HOW owner after Goal Interpretation.  Run a
                 # bounded pre-Goal advancement pass before Goal Association so a simple
                 # conversational responsibility can complete immediately and useful
@@ -3653,10 +3471,10 @@ class GoalDrivenRuntimeCoordinator:
                     stage="fast_planner_advance",
                     input_payload={
                         "user_text": text,
-                        "route_decision": route_decision,
-                        "responsibility_proposals": context.get(
-                            "responsibility_proposals", []
-                        ),
+                        "responsibilities": [
+                            item.model_dump(mode="json", exclude_none=True)
+                            for item in responsibility_proposals
+                        ],
                         "active_goal_snapshots": context.get(
                             "active_goal_snapshots", []
                         ),
@@ -3666,11 +3484,13 @@ class GoalDrivenRuntimeCoordinator:
                     },
                     operation=self.agent_client.resolve_fast_advance(
                         session,
-                        text=text,
-                        route_decision=route_decision,
-                        sid=turn_id,
-                        context=context,
-                        history=history,
+                        request=work_request.model_copy(
+                            update={
+                                "sid": turn_id,
+                                "context": context,
+                                "history": history,
+                            }
+                        ),
                         timeout_ms=self.policy.fast_planner_timeout_ms,
                     ),
                 )
@@ -3755,7 +3575,7 @@ class GoalDrivenRuntimeCoordinator:
 
                 if (
                     self.policy.mode == "apply"
-                    and self.policy.lane_enabled(lane)
+                    and self.policy.lane_enabled("chat")
                     and fast_advance.immediate_vocal_activity is not None
                 ):
                     await self.adapter.interaction_runtime.start_fast_planner_vocal_activity(
@@ -3764,14 +3584,6 @@ class GoalDrivenRuntimeCoordinator:
                         turn_id=turn_id,
                         language=language,
                     )
-
-            else:
-                # Compatibility-only callers that provide no Core Responsibility
-                # evidence keep the older canonical path. Maintained admitted turns
-                # always arrive with Responsibility evidence and therefore use the
-                # Fast-Planner-first path above.
-                needs_goal_association = True
-                needs_deep_planner = False
 
             if (
                 self.policy.mode == "apply"
@@ -3795,7 +3607,7 @@ class GoalDrivenRuntimeCoordinator:
                 sid=sid,
                 turn_id=turn_id,
                 language=language,
-                intent=str(getattr(route_decision, "intent", "") or "unknown"),
+                intent="responsibility",
                 context=context,
                 history=history,
             )
@@ -3811,11 +3623,6 @@ class GoalDrivenRuntimeCoordinator:
                 situation = build_situation_projection(
                     context=context,
                     turn_id=turn_id,
-                    lane=str(getattr(route_decision, "route", "") or "unknown"),
-                    intent=str(getattr(route_decision, "intent", "") or "unknown"),
-                    progress_candidate_ids=[
-                        item.candidate_id for item in progress_candidates.values()
-                    ],
                     revision=1,
                 )
                 context = {**context, "situation": situation.prompt_projection()}
@@ -3825,18 +3632,22 @@ class GoalDrivenRuntimeCoordinator:
                     stage="goal_association",
                     input_payload={
                         "user_text": text,
-                        "route_decision": route_decision,
+                        "responsibilities": [
+                            item.model_dump(mode="json", exclude_none=True)
+                            for item in work_request.responsibilities
+                        ],
                         "active_goal_snapshots": context.get("active_goal_snapshots", []),
                         "situation_digest": situation.digest,
                         "history_turn_count": len(history),
                     },
                     operation=self.agent_client.resolve_goal_association(
                         session,
-                        text=text,
-                        route_decision=route_decision,
-                        sid=sid,
-                        context=context,
-                        history=history,
+                        request=work_request.model_copy(
+                            update={
+                                "context": context,
+                                "history": history,
+                            }
+                        ),
                         timeout_ms=self.policy.goal_association_timeout_ms,
                     ),
                 )
@@ -3905,8 +3716,8 @@ class GoalDrivenRuntimeCoordinator:
                                 association,
                                 sid=sid,
                                 user_text=text,
-                                route=route_decision.route,
-                                intent=route_decision.intent,
+                                route=None,
+                                intent=None,
                                 source=("goal_driven_cognitive_runtime_goal_association"),
                             )
                         except Exception as exc:
@@ -3981,9 +3792,6 @@ class GoalDrivenRuntimeCoordinator:
             planning_situation = build_situation_projection(
                 context=context,
                 turn_id=turn_id,
-                lane=str(getattr(route_decision, "route", "") or "unknown"),
-                intent=str(getattr(route_decision, "intent", "") or "unknown"),
-                progress_candidate_ids=[item.candidate_id for item in progress_candidates.values()],
                 focus_goal_ids=association_goal_ids or situation.focus_goal_ids,
                 revision=situation.revision + 1,
             )
@@ -4185,11 +3993,12 @@ class GoalDrivenRuntimeCoordinator:
                         },
                         operation=self.agent_client.compose_response_plan(
                             session,
-                            text=text,
-                            route_decision=route_decision,
-                            sid=sid,
-                            context=composition_context,
-                            history=history,
+                            request=work_request.model_copy(
+                                update={
+                                    "context": composition_context,
+                                    "history": history,
+                                }
+                            ),
                             timeout_ms=(self.policy.response_composer_timeout_ms),
                         ),
                     )
@@ -4300,11 +4109,12 @@ class GoalDrivenRuntimeCoordinator:
                         },
                         operation=self.agent_client.resolve_deep_plan(
                             session,
-                            text=text,
-                            route_decision=route_decision,
-                            sid=sid,
-                            context=deep_context,
-                            history=history,
+                            request=work_request.model_copy(
+                                update={
+                                    "context": deep_context,
+                                    "history": history,
+                                }
+                            ),
                             timeout_ms=self.policy.deep_planner_timeout_ms,
                         ),
                     )
@@ -4324,7 +4134,6 @@ class GoalDrivenRuntimeCoordinator:
                         stage="fast_planner",
                         input_payload={
                             "user_text": text,
-                            "route_decision": route_decision,
                             "goal_association": association,
                             "interaction_context": planning_context.get(
                                 "interaction_context", {}
@@ -4332,11 +4141,12 @@ class GoalDrivenRuntimeCoordinator:
                         },
                         operation=self.agent_client.resolve_fast_plan(
                             session,
-                            text=text,
-                            route_decision=route_decision,
-                            sid=sid,
-                            context=planning_context,
-                            history=history,
+                            request=work_request.model_copy(
+                                update={
+                                    "context": planning_context,
+                                    "history": history,
+                                }
+                            ),
                             timeout_ms=self.policy.fast_planner_timeout_ms,
                         ),
                     )
@@ -4395,11 +4205,12 @@ class GoalDrivenRuntimeCoordinator:
                             },
                             operation=self.agent_client.resolve_deep_plan(
                                 session,
-                                text=text,
-                                route_decision=route_decision,
-                                sid=sid,
-                                context=deep_context,
-                                history=history,
+                                request=work_request.model_copy(
+                                    update={
+                                        "context": deep_context,
+                                        "history": history,
+                                    }
+                                ),
                                 timeout_ms=self.policy.deep_planner_timeout_ms,
                             ),
                         )
@@ -4412,12 +4223,9 @@ class GoalDrivenRuntimeCoordinator:
                         if deep_failure is not None:
                             raise CognitiveStageFailure("deep_planner", deep_failure)
 
-            # The Fast Goal Interpreter's legacy route is diagnostic compatibility
-            # evidence only.  It must not grant or suppress effects after Goal
-            # Association and Planner have established the canonical responsibility
-            # and Plan.  Runtime authority starts from that validated Plan and is
-            # bounded here by the registered capability, authorization, confirmation,
-            # resource, and provider-safety contracts below.
+            # Runtime authority starts from the validated canonical Plan and is
+            # bounded by registered Capability, authorization, confirmation, resource,
+            # and provider-safety contracts below. Goal Interpretation contributes WHAT only.
             lane = self.adapter.lane_for_plan(terminal_plan)
             runtime_errors = await self._observe_workflow_stage(
                 sid=sid,
@@ -4613,11 +4421,12 @@ class GoalDrivenRuntimeCoordinator:
                 },
                 operation=self.agent_client.compose_response_plan(
                     session,
-                    text=text,
-                    route_decision=route_decision,
-                    sid=sid,
-                    context=composition_context,
-                    history=history,
+                    request=work_request.model_copy(
+                        update={
+                            "context": composition_context,
+                            "history": history,
+                        }
+                    ),
                     timeout_ms=self.policy.response_composer_timeout_ms,
                 ),
             )

@@ -16,7 +16,6 @@ from shared.chromie_contracts.core_interpretation import (
     CognitiveResponsibilityProposal,
     CoreInterpretationResult,
 )
-from shared.chromie_contracts.route import RouteDecision
 from shared.chromie_contracts.user_turn import (
     AttentionReviewResult,
     CoreTurnRequest,
@@ -281,56 +280,35 @@ class CognitiveGatewayModuleTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "context digest"):
             gateway.admit_attention(capture, snapshot, review)
 
-    def test_core_interpretation_binds_compatibility_projection(self) -> None:
-        gateway = CognitiveGateway(clock=self.clock)
-        capture = gateway.capture(
-            "Hello",
-            session_id="turn-core",
-            conversation_id="conversation-core",
-            channel="text",
-        )
-        snapshot = gateway.assemble_context(capture, {})
-        envelope = gateway.admit_attention(
-            capture,
-            snapshot,
-            AttentionReviewResult(
-                turn_id=capture.turn_id,
-                session_id=capture.session_id,
-                context_digest=snapshot.digest,
-                disposition="admit",
-                speech_act="greeting",
-                confidence=0.99,
-                source="test",
-                reason="direct greeting",
-            ),
-        )
-        decision = RouteDecision(
-            route="chat",
-            intent="greeting",
+    def test_core_interpretation_is_responsibility_only(self) -> None:
+        interpretation = CoreInterpretationResult(
+            turn_id="turn-core",
+            session_id="session-core",
             confidence=0.93,
             language="en-US",
-            source="llm",
-        )
-
-        interpretation = CoreInterpretationResult.from_route_decision(
-            envelope=envelope,
-            decision=decision,
-        )
-
-        self.assertEqual(interpretation.authority, "goal_driven_cognitive_core")
-        self.assertEqual(interpretation.lane, "chat")
-        self.assertEqual(
-            interpretation.route_decision_projection().intent,
-            "greeting",
-        )
-        with self.assertRaisesRegex(ValueError, "digest mismatch"):
-            interpretation.model_copy(
-                update={"projection_digest": "0" * 64}
-            ).model_validate(
+            responsibilities=[
                 {
-                    **interpretation.model_dump(mode="json"),
-                    "projection_digest": "0" * 64,
+                    "local_ref": "r1",
+                    "outcome": "socially reciprocate the greeting",
+                    "bindings": {},
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.93,
                 }
+            ],
+        )
+
+        self.assertEqual(interpretation.authority, "goal_interpretation")
+        dumped = interpretation.model_dump(mode="json")
+        self.assertNotIn("route", dumped)
+        self.assertNotIn("intent", dumped)
+        self.assertNotIn("compatibility_projection", dumped)
+        self.assertNotIn("projection_digest", dumped)
+        self.assertNotIn("progress_candidates", dumped)
+
+        with self.assertRaisesRegex(ValueError, "Extra inputs are not permitted"):
+            CoreInterpretationResult.model_validate(
+                {**dumped, "route": "chat", "intent": "greeting"}
             )
 
 
@@ -351,40 +329,12 @@ class CognitiveGatewayModuleTests(unittest.TestCase):
             )
 
     def test_core_interpretation_keeps_responsibility_evidence_provider_neutral(self) -> None:
-        gateway = CognitiveGateway(clock=self.clock)
-        capture = gateway.capture(
-            "Look up the reference status, then move forward.",
-            session_id="turn-progress",
-            conversation_id="conversation-progress",
-            channel="text",
-        )
-        snapshot = gateway.assemble_context(capture, {})
-        envelope = gateway.admit_attention(
-            capture,
-            snapshot,
-            AttentionReviewResult(
-                turn_id=capture.turn_id,
-                session_id=capture.session_id,
-                context_digest=snapshot.digest,
-                disposition="admit",
-                speech_act="request",
-                confidence=0.99,
-                source="test",
-                reason="direct request",
-            ),
-        )
-        decision = RouteDecision(
-            route="robot_action",
-            intent="compound_request",
+        interpretation = CoreInterpretationResult(
+            turn_id="turn-progress",
+            session_id="session-progress",
             confidence=0.98,
             language="en-US",
-            source="llm",
-        )
-
-        interpretation = CoreInterpretationResult.from_route_decision(
-            envelope=envelope,
-            decision=decision,
-            responsibility_proposals=[
+            responsibilities=[
                 {
                     "local_ref": "r1",
                     "outcome": "provide current reference status",
@@ -402,16 +352,8 @@ class CognitiveGatewayModuleTests(unittest.TestCase):
                     "confidence": 0.96,
                 },
             ],
-            progress_proposals=[
-                {
-                    "kind": "capability",
-                    "capability_id": "chromie.reference.lookup",
-                    "args": {"query": "current status"},
-                }
-            ],
         )
 
-        self.assertEqual(interpretation.progress_candidates, [])
         self.assertEqual(len(interpretation.responsibilities), 2)
         self.assertEqual(interpretation.responsibilities[0].local_ref, "r1")
         self.assertEqual(
@@ -421,106 +363,57 @@ class CognitiveGatewayModuleTests(unittest.TestCase):
         dumped = interpretation.model_dump(mode="json")
         self.assertNotIn("capability_id", dumped["responsibilities"][0])
         self.assertNotIn("args", dumped["responsibilities"][0])
+        self.assertNotIn("progress_candidates", dumped)
 
-    def test_core_interpretation_materializes_native_conversation_progress(self) -> None:
-        gateway = CognitiveGateway(clock=self.clock)
-        capture = gateway.capture(
-            "What is your name?",
-            session_id="turn-native",
-            conversation_id="conversation-native",
-            channel="text",
-        )
-        snapshot = gateway.assemble_context(capture, {})
-        envelope = gateway.admit_attention(
-            capture,
-            snapshot,
-            AttentionReviewResult(
-                turn_id=capture.turn_id,
-                session_id=capture.session_id,
-                context_digest=snapshot.digest,
-                disposition="admit",
-                speech_act="question",
-                confidence=0.99,
-                source="test",
-                reason="direct question",
-            ),
-        )
-        decision = RouteDecision(
-            route="chat",
-            intent="identity_question",
-            confidence=0.97,
-            language="en-US",
-            source="llm",
-        )
-
-        interpretation = CoreInterpretationResult.from_route_decision(
-            envelope=envelope,
-            decision=decision,
-            progress_proposals=[
+    def test_core_interpretation_does_not_author_native_progress(self) -> None:
+        payload = {
+            "turn_id": "turn-native",
+            "session_id": "session-native",
+            "confidence": 0.97,
+            "language": "en-US",
+            "responsibilities": [
+                {
+                    "local_ref": "r1",
+                    "outcome": "answer the user's identity question",
+                    "bindings": {},
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.97,
+                }
+            ],
+            "progress_candidates": [
                 {
                     "kind": "native_response",
                     "response_text": "I'm Chromie!",
-                    "speech_act": "answer",
-                    "intent": "identity_question",
-                    "confidence": 0.98,
                 }
             ],
-        )
+        }
 
-        self.assertEqual(len(interpretation.progress_candidates), 1)
-        candidate = interpretation.progress_candidates[0]
-        self.assertEqual(candidate.kind, "native_response")
-        self.assertEqual(candidate.response_text, "I'm Chromie!")
-        self.assertEqual(candidate.speech_act, "answer")
-        dumped = candidate.model_dump(mode="json")
-        self.assertNotIn("capability_id", dumped)
-        self.assertNotIn("args", dumped)
+        with self.assertRaisesRegex(ValueError, "Extra inputs are not permitted"):
+            CoreInterpretationResult.model_validate(payload)
 
-    def test_native_response_progress_requires_conversational_scope(self) -> None:
-        gateway = CognitiveGateway(clock=self.clock)
-        capture = gateway.capture(
-            "Move forward.",
-            session_id="turn-native-reject",
-            conversation_id="conversation-native-reject",
-            channel="text",
-        )
-        snapshot = gateway.assemble_context(capture, {})
-        envelope = gateway.admit_attention(
-            capture,
-            snapshot,
-            AttentionReviewResult(
-                turn_id=capture.turn_id,
-                session_id=capture.session_id,
-                context_digest=snapshot.digest,
-                disposition="admit",
-                speech_act="request",
-                confidence=0.99,
-                source="test",
-                reason="direct request",
-            ),
-        )
-        decision = RouteDecision(
-            route="robot_action",
-            intent="move",
-            confidence=0.97,
-            language="en-US",
-            source="llm",
-        )
-
-        interpretation = CoreInterpretationResult.from_route_decision(
-            envelope=envelope,
-            decision=decision,
-            progress_proposals=[
+    def test_core_interpretation_does_not_accept_route_or_intent(self) -> None:
+        payload = {
+            "turn_id": "turn-no-route",
+            "session_id": "session-no-route",
+            "confidence": 0.97,
+            "language": "en-US",
+            "responsibilities": [
                 {
-                    "kind": "native_response",
-                    "response_text": "Sure, I moved.",
-                    "speech_act": "answer",
-                    "confidence": 0.98,
+                    "local_ref": "r1",
+                    "outcome": "move forward",
+                    "bindings": {},
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.97,
                 }
             ],
-        )
+            "route": "robot_action",
+            "intent": "move",
+        }
 
-        self.assertEqual(interpretation.progress_candidates, [])
+        with self.assertRaisesRegex(ValueError, "Extra inputs are not permitted"):
+            CoreInterpretationResult.model_validate(payload)
 
     def test_core_request_requires_an_admitted_envelope(self) -> None:
         gateway = CognitiveGateway(clock=self.clock)

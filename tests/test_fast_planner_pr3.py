@@ -11,9 +11,8 @@ from agent.app.planner_contract import (
     validate_goal_responsibility_outcomes,
     validate_planner_model_output,
 )
-from agent.app.schema import AgentRunRequest, RouteDecision
 from agent.app.capabilities.catalog import CatalogCapability
-from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, CognitiveWorkRequest
 from shared.chromie_contracts.plan import (
     CanonicalPlan,
     FastPlannerAdvance,
@@ -190,6 +189,31 @@ class CompleteResourceCatalog(FakeCatalog):
         return self.items
 
 
+
+def _work_request(**kwargs):
+    context = dict(kwargs.pop("context", {}) or {})
+    responsibilities = kwargs.pop("responsibilities", None)
+    if responsibilities is None:
+        responsibilities = context.pop("responsibility_proposals", None)
+    if not responsibilities:
+        text = str(kwargs.get("text") or "")
+        responsibilities = [
+            {
+                "local_ref": "r1",
+                "outcome": text or "satisfy the current user outcome",
+                "bindings": {},
+                "completion_requires_work": True,
+                "completion_requires_fresh_evidence": False,
+                "confidence": 0.9,
+            }
+        ]
+    return CognitiveWorkRequest(
+        **kwargs,
+        responsibilities=responsibilities,
+        interpretation_confidence=0.9,
+        context=context,
+    )
+
 def request(text: str, route="robot_action", *, goal_ids=None, goal_metadata=None):
     goal_ids = list(goal_ids or [])
     new_goals = [
@@ -203,11 +227,21 @@ def request(text: str, route="robot_action", *, goal_ids=None, goal_metadata=Non
         }
         for goal_id in goal_ids
     ]
-    return AgentRunRequest(
+    return CognitiveWorkRequest(
         sid="sid-pr3",
         text=text,
         language="zh-CN",
-        route_decision=RouteDecision(route=route, intent="test", confidence=0.9, source="llm"),
+        responsibilities=[
+            {
+                "local_ref": "r1",
+                "outcome": text,
+                "bindings": {},
+                "completion_requires_work": True,
+                "completion_requires_fresh_evidence": False,
+                "confidence": 0.9,
+            }
+        ],
+        interpretation_confidence=0.9,
         context={
             "active_goal_snapshots": [],
             "goal_association_resolution": {
@@ -985,13 +1019,10 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "reason_summary": "Clear harmless greeting can be completed now.",
             }
         )
-        run_request = AgentRunRequest(
+        run_request = _work_request(
             sid="turn-greeting",
             text="你好",
             language="zh-CN",
-            route_decision=RouteDecision(
-                route="chat", intent="greeting", confidence=0.98, source="llm"
-            ),
             context={
                 "responsibility_proposals": [
                     {
@@ -1034,13 +1065,10 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "reason_summary": "Clear harmless greeting can be completed now.",
             }
         )
-        run_request = AgentRunRequest(
+        run_request = _work_request(
             sid="turn-greeting-profile-context",
             text="你好",
             language="zh-CN",
-            route_decision=RouteDecision(
-                route="chat", intent="greeting", confidence=0.98, source="llm"
-            ),
             context={
                 "responsibility_proposals": [
                     {
@@ -1082,13 +1110,10 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "reason_summary": "Clear harmless greeting can be completed now.",
             }
         )
-        run_request = AgentRunRequest(
+        run_request = _work_request(
             sid="turn-greeting-no-catalog",
             text="你好",
             language="zh-CN",
-            route_decision=RouteDecision(
-                route="chat", intent="greeting", confidence=0.98, source="llm"
-            ),
             context={
                 "responsibility_proposals": [
                     {
@@ -1129,13 +1154,10 @@ class FastPlannerResolverTests(unittest.TestCase):
             "completion_requires_fresh_evidence": True,
             "confidence": 0.95,
         }
-        run_request = AgentRunRequest(
+        run_request = _work_request(
             sid="turn-weather-budget",
             text="你好，今天重庆晚上有没有雨啊？",
             language="zh-CN",
-            route_decision=RouteDecision(
-                route="tool", intent="weather_lookup", confidence=0.95, source="llm"
-            ),
             context={
                 "responsibility_proposals": [responsibility],
                 "active_goal_snapshots": [],
@@ -1236,13 +1258,10 @@ class FastPlannerResolverTests(unittest.TestCase):
                 }
             }
         )
-        run_request = AgentRunRequest(
+        run_request = _work_request(
             sid="turn-weather-invalid-advance",
             text="今天重庆晚上会不会下大雨？",
             language="zh-CN",
-            route_decision=RouteDecision(
-                route="chat", intent="weather_query", confidence=0.96, source="llm"
-            ),
             context={
                 "responsibility_proposals": [
                     {
@@ -1290,13 +1309,10 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "reason_summary": "Fresh weather evidence is still required.",
             }
         )
-        run_request = AgentRunRequest(
+        run_request = _work_request(
             sid="turn-weather-progress",
             text="今天重庆晚上会不会下大雨？",
             language="zh-CN",
-            route_decision=RouteDecision(
-                route="chat", intent="weather_query", confidence=0.96, source="llm"
-            ),
             context={
                 "responsibility_proposals": [
                     {

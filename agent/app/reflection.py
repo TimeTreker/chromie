@@ -6,7 +6,10 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .clients.ollama_client import OllamaClient
-from .schema import AgentRunRequest
+try:
+    from chromie_contracts.core_interpretation import CognitiveWorkRequest
+except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 
 try:
     from chromie_contracts.reflection import (
@@ -69,7 +72,7 @@ class ReflectionResolver:
         self.num_ctx = max(2048, int(num_ctx))
         self.num_predict = max(128, int(num_predict))
 
-    async def resolve(self, request: AgentRunRequest) -> ReflectionResolution:
+    async def resolve(self, request: CognitiveWorkRequest) -> ReflectionResolution:
         context = request.context if isinstance(request.context, dict) else {}
         opportunity = CognitiveOpportunity.model_validate(
             context.get("cognitive_opportunity")
@@ -144,7 +147,7 @@ class ReflectionResolver:
 
     def _prompt(
         self,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         opportunity: CognitiveOpportunity,
     ) -> str:
         context = request.context if isinstance(request.context, dict) else {}

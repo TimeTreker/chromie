@@ -59,7 +59,10 @@ from .planner_contract import (
     validate_goal_responsibility_outcomes,
     validate_planner_model_output,
 )
-from .schema import AgentRunRequest
+try:
+    from chromie_contracts.core_interpretation import CognitiveWorkRequest
+except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 
 try:
     from chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
@@ -141,7 +144,7 @@ class FastPlannerResolver:
         self.max_capabilities = max(1, min(64, int(max_capabilities)))
         self.max_contract_repairs = max(0, min(1, int(max_contract_repairs)))
 
-    async def resolve_advance(self, request: AgentRunRequest) -> FastPlannerAdvance:
+    async def resolve_advance(self, request: CognitiveWorkRequest) -> FastPlannerAdvance:
         """Advance authoritative Responsibility evidence before canonical Goal binding.
 
         This is the same Fast Planner at an earlier lifecycle point, not another
@@ -151,17 +154,10 @@ class FastPlannerResolver:
         """
 
         context = request.context if isinstance(request.context, dict) else {}
-        raw_responsibilities = context.get("responsibility_proposals") or []
-        responsibilities: list[CognitiveResponsibilityProposal] = []
-        for raw in raw_responsibilities:
-            try:
-                responsibilities.append(CognitiveResponsibilityProposal.model_validate(raw))
-            except (ValidationError, ValueError, TypeError):
-                continue
-        if not responsibilities:
-            raise ValueError(
-                "Fast Planner advance requires authoritative Responsibility evidence"
-            )
+        responsibilities = [
+            CognitiveResponsibilityProposal.model_validate(item.model_dump(mode="json"))
+            for item in request.responsibilities
+        ]
 
         responsibility_refs = [item.local_ref for item in responsibilities]
         # Pre-Goal advancement cannot select or emit Capability steps.  Pulling the
@@ -223,17 +219,11 @@ class FastPlannerResolver:
             )
 
         continuation_set = set(output.continuations)
-        route = str(request.route_decision.route or "").strip()
         if any(item.completion_requires_fresh_evidence for item in responsibilities):
             if "goal_association" not in continuation_set:
                 return contract_fail(
                     "fresh-evidence Responsibilities require Goal Association continuity"
                 )
-        if route not in {"chat", "clarify"} and "goal_association" not in continuation_set:
-            return contract_fail(
-                "non-conversational/effect-bearing compatibility framing requires "
-                "Goal Association before canonical execution planning"
-            )
         if "deep_planner" in continuation_set and "goal_association" not in continuation_set:
             return contract_fail(
                 "Deep Planner continuation requires Goal Association so deeper planning "
@@ -291,7 +281,7 @@ class FastPlannerResolver:
 
     @staticmethod
     def _advance_fail_safe(
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         *,
         responsibility_refs: list[str],
         error: Exception,
@@ -344,7 +334,7 @@ class FastPlannerResolver:
             },
         )
 
-    async def resolve(self, request: AgentRunRequest) -> CanonicalPlan:
+    async def resolve(self, request: CognitiveWorkRequest) -> CanonicalPlan:
         trace_scope = runtime_tracer.continue_from_context(request.context)
         if not trace_scope.enabled:
             return await self._resolve(request)
@@ -376,7 +366,7 @@ class FastPlannerResolver:
         runtime_tracer.attach_fragment(result.metadata, trace_scope)
         return result
 
-    async def _resolve(self, request: AgentRunRequest) -> CanonicalPlan:
+    async def _resolve(self, request: CognitiveWorkRequest) -> CanonicalPlan:
         plan_id = self._plan_id(request)
         context = request.context if isinstance(request.context, dict) else {}
         expected_goal_ids_for_turn = expected_goal_ids(context)
@@ -985,7 +975,7 @@ class FastPlannerResolver:
         return errors
 
     @staticmethod
-    def _plan_id(request: AgentRunRequest) -> str:
+    def _plan_id(request: CognitiveWorkRequest) -> str:
         digest = hashlib.sha256(
             f"{request.sid or 'turn'}|fast|{request.text}".encode()
         ).hexdigest()[:20]
@@ -1004,7 +994,7 @@ class FastPlannerResolver:
 
     def _prompt(
         self,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         capabilities: list[dict[str, Any]],
         *,
         response_schema: dict[str, Any],
@@ -1184,7 +1174,7 @@ class FastPlannerResolver:
 
     def _advance_layered_prompt(
         self,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         *,
         responsibilities: list[CognitiveResponsibilityProposal],
     ) -> LayeredPrompt:
@@ -1260,7 +1250,7 @@ class FastPlannerResolver:
 
     def _layered_prompt(
         self,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         capabilities: list[dict[str, Any]],
         *,
         response_schema: dict[str, Any],
@@ -1320,7 +1310,7 @@ class FastPlannerResolver:
         self,
         raw: dict[str, Any],
         *,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         plan_id: str,
         expected_goal_ids_for_turn: list[str],
     ) -> dict[str, Any]:
@@ -1361,7 +1351,7 @@ class FastPlannerResolver:
         self,
         raw: dict[str, Any],
         *,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         plan_id: str,
         expected_goal_ids_for_turn: list[str],
     ) -> dict[str, Any]:
@@ -1413,7 +1403,7 @@ class FastPlannerResolver:
         plan: CanonicalPlan,
         *,
         capability_payload: list[dict[str, Any]],
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         expected_goal_ids_for_turn: list[str],
     ) -> CanonicalPlan:
         allowed = {item["capability_id"]: item for item in capability_payload}
@@ -1563,7 +1553,7 @@ class FastPlannerResolver:
     def _escalation(
         self,
         plan_id: str,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         reason: str,
         *,
         response_text: str = "",

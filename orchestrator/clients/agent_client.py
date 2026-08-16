@@ -6,7 +6,10 @@ from typing import Any
 from urllib.parse import quote
 
 import aiohttp
-from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
+from shared.chromie_contracts.core_interpretation import (
+    CognitiveWorkRequest,
+    CoreInterpretationResult,
+)
 from shared.chromie_contracts.interaction import InteractionResponse
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.plan import CanonicalPlan, FastPlannerAdvance
@@ -173,11 +176,7 @@ class AgentClient:
         self,
         session: aiohttp.ClientSession,
         *,
-        text: str,
-        route_decision: RouteDecision,
-        sid: str | None = None,
-        context: dict[str, Any] | None = None,
-        history: list[dict[str, Any]] | None = None,
+        request: CognitiveWorkRequest,
         timeout_ms: int | None = None,
     ) -> FastPlannerAdvance:
         effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
@@ -187,12 +186,10 @@ class AgentClient:
             kind="tool_call",
             attributes={"endpoint": "/fast-advance", "timeout_ms": effective_timeout_ms},
         ) as span:
-            req = AgentRequest(
-                sid=sid,
-                text=text,
-                route_decision=route_decision,
-                context=runtime_tracer.inject_carrier(context or {}),
-                history=history or [],
+            req = request.model_copy(
+                update={
+                    "context": runtime_tracer.inject_carrier(request.context),
+                }
             )
             timeout = aiohttp.ClientTimeout(total=effective_timeout_ms / 1000.0)
             async with session.post(
@@ -218,11 +215,7 @@ class AgentClient:
         self,
         session: aiohttp.ClientSession,
         *,
-        text: str,
-        route_decision: RouteDecision,
-        sid: str | None = None,
-        context: dict[str, Any] | None = None,
-        history: list[dict[str, Any]] | None = None,
+        request: CognitiveWorkRequest,
         timeout_ms: int | None = None,
     ) -> CanonicalPlan:
         effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
@@ -232,12 +225,10 @@ class AgentClient:
             kind="tool_call",
             attributes={"endpoint": "/fast-plan", "timeout_ms": effective_timeout_ms},
         ) as span:
-            req = AgentRequest(
-                sid=sid,
-                text=text,
-                route_decision=route_decision,
-                context=runtime_tracer.inject_carrier(context or {}),
-                history=history or [],
+            req = request.model_copy(
+                update={
+                    "context": runtime_tracer.inject_carrier(request.context),
+                }
             )
             timeout = aiohttp.ClientTimeout(total=effective_timeout_ms / 1000.0)
             async with session.post(
@@ -261,11 +252,7 @@ class AgentClient:
         self,
         session: aiohttp.ClientSession,
         *,
-        text: str,
-        route_decision: RouteDecision,
-        sid: str | None = None,
-        context: dict[str, Any] | None = None,
-        history: list[dict[str, Any]] | None = None,
+        request: CognitiveWorkRequest,
         timeout_ms: int | None = None,
     ) -> CanonicalPlan:
         effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
@@ -275,12 +262,10 @@ class AgentClient:
             kind="tool_call",
             attributes={"endpoint": "/deep-plan", "timeout_ms": effective_timeout_ms},
         ) as span:
-            req = AgentRequest(
-                sid=sid,
-                text=text,
-                route_decision=route_decision,
-                context=runtime_tracer.inject_carrier(context or {}),
-                history=history or [],
+            req = request.model_copy(
+                update={
+                    "context": runtime_tracer.inject_carrier(request.context),
+                }
             )
             timeout = aiohttp.ClientTimeout(total=effective_timeout_ms / 1000.0)
             async with session.post(
@@ -304,11 +289,7 @@ class AgentClient:
         self,
         session: aiohttp.ClientSession,
         *,
-        text: str,
-        route_decision: RouteDecision,
-        sid: str | None = None,
-        context: dict[str, Any] | None = None,
-        history: list[dict[str, Any]] | None = None,
+        request: CognitiveWorkRequest,
         timeout_ms: int | None = None,
     ) -> ReflectionResolution:
         effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
@@ -318,12 +299,10 @@ class AgentClient:
             kind="tool_call",
             attributes={"endpoint": "/reflection", "timeout_ms": effective_timeout_ms},
         ) as span:
-            req = AgentRequest(
-                sid=sid,
-                text=text,
-                route_decision=route_decision,
-                context=runtime_tracer.inject_carrier(context or {}),
-                history=history or [],
+            req = request.model_copy(
+                update={
+                    "context": runtime_tracer.inject_carrier(request.context),
+                }
             )
             timeout = aiohttp.ClientTimeout(total=effective_timeout_ms / 1000.0)
             async with session.post(
@@ -345,11 +324,7 @@ class AgentClient:
         self,
         session: aiohttp.ClientSession,
         *,
-        text: str,
-        route_decision: RouteDecision,
-        sid: str | None = None,
-        context: dict[str, Any] | None = None,
-        history: list[dict[str, Any]] | None = None,
+        request: CognitiveWorkRequest,
         timeout_ms: int | None = None,
     ) -> ResponseCompositionResolution:
         effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
@@ -362,12 +337,10 @@ class AgentClient:
                 "timeout_ms": effective_timeout_ms,
             },
         ) as span:
-            req = AgentRequest(
-                sid=sid,
-                text=text,
-                route_decision=route_decision,
-                context=runtime_tracer.inject_carrier(context or {}),
-                history=history or [],
+            req = request.model_copy(
+                update={
+                    "context": runtime_tracer.inject_carrier(request.context),
+                }
             )
             timeout = aiohttp.ClientTimeout(total=effective_timeout_ms / 1000.0)
             async with session.post(
@@ -494,11 +467,7 @@ class AgentClient:
         self,
         session: aiohttp.ClientSession,
         *,
-        text: str,
-        route_decision: RouteDecision,
-        sid: str | None = None,
-        context: dict[str, Any] | None = None,
-        history: list[dict[str, Any]] | None = None,
+        request: CognitiveWorkRequest,
         timeout_ms: int | None = None,
     ) -> GoalAssociationResolution:
         effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
@@ -511,12 +480,10 @@ class AgentClient:
                 "timeout_ms": effective_timeout_ms,
             },
         ) as span:
-            req = AgentRequest(
-                sid=sid,
-                text=text,
-                route_decision=route_decision,
-                context=runtime_tracer.inject_carrier(context or {}),
-                history=history or [],
+            req = request.model_copy(
+                update={
+                    "context": runtime_tracer.inject_carrier(request.context),
+                }
             )
             timeout = aiohttp.ClientTimeout(total=effective_timeout_ms / 1000.0)
             async with session.post(

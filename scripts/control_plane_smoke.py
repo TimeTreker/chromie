@@ -15,9 +15,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from agent.app.schema import AgentRunRequest
 from orchestrator.runtime.cognitive_gateway import CognitiveGateway
 from shared.chromie_contracts.core_interpretation import (
+    CognitiveWorkRequest,
     CoreInterpretationResult,
     CoreInterpretationUnavailable,
 )
@@ -75,14 +75,16 @@ def build_fast_plan_request(
     *,
     text: str = DEFAULT_TEXT,
     goal_id: str = DEFAULT_GOAL_ID,
-) -> AgentRunRequest:
-    """Project the Core result into the current planner request contract."""
+) -> CognitiveWorkRequest:
+    """Build the maintained Responsibility→Planner work request."""
 
-    return AgentRunRequest(
+    return CognitiveWorkRequest(
         sid=interpretation.session_id,
         text=text,
         language=interpretation.language,
-        route_decision=interpretation.route_decision_projection().model_dump(mode="json"),
+        responsibilities=interpretation.responsibilities,
+        interpretation_confidence=interpretation.confidence,
+        interpretation_unresolved=interpretation.unresolved,
         context={
             "active_goal_snapshots": [],
             "goal_association_resolution": {
@@ -140,13 +142,14 @@ def run(base_url: str, *, timeout_s: float) -> dict[str, Any]:
         raise RuntimeError(f"Core endpoint returned HTTP {status}: {core_payload!r}")
 
     interpretation = CoreInterpretationResult.model_validate(core_payload)
-    if interpretation.lane != "chat":
+    if len(interpretation.responsibilities) != 1:
         raise AssertionError(
-            f"smoke greeting must remain in chat lane, got {interpretation.lane!r}"
+            "smoke greeting must produce exactly one Responsibility, got "
+            f"{len(interpretation.responsibilities)}"
         )
-    projection = interpretation.route_decision_projection()
-    if projection.actions:
-        raise AssertionError(f"chat smoke turn produced physical actions: {projection.actions!r}")
+    responsibility = interpretation.responsibilities[0]
+    if not responsibility.completion_requires_work:
+        raise AssertionError("greeting Responsibility must still require conversational work")
 
     planner_request = build_fast_plan_request(interpretation)
     status, plan_payload = _post_json(
@@ -169,9 +172,9 @@ def run(base_url: str, *, timeout_s: float) -> dict[str, Any]:
     return {
         "core": {
             "turn_id": interpretation.turn_id,
-            "lane": interpretation.lane,
-            "intent": interpretation.intent,
-            "projection_digest": interpretation.projection_digest,
+            "responsibility_count": len(interpretation.responsibilities),
+            "confidence": interpretation.confidence,
+            "unresolved": list(interpretation.unresolved),
         },
         "fast_plan": {
             "plan_id": plan.plan_id,

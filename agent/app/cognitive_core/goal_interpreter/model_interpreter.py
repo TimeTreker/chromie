@@ -31,8 +31,14 @@ except ImportError:  # pragma: no cover - repository development path
     )
     from shared.chromie_runtime.log_colors import colorize_for_cli
 
-from .fallback import fallback_decision
-from .schema import FastProgressProposal, RouteDecision, RouteRequest, finalize_decision
+from .fallback import InterpretationUnavailableError, fallback_decision
+from .schema import (
+    FastProgressProposal,
+    GoalInterpretationDecision,
+    RouteDecision,
+    RouteRequest,
+    finalize_decision,
+)
 
 
 def _raise_if_llm_budget_failure(exc: Exception) -> None:
@@ -1306,6 +1312,179 @@ class OllamaGoalInterpreter:
                 "You are Chromie's routing classifier. Return only a JSON object "
                 "matching the provided schema."
             )
+
+    def build_interpretation_user_prompt(self, request: RouteRequest) -> str:
+        """Build the maintained WHAT-only Goal Interpretation prompt.
+
+        Exact Capability identity and executable schemas are intentionally absent.
+        Semantic continuity is retained without canonical lifecycle/execution IDs.
+        """
+
+        mind = request.context.get("mind", {})
+        session_context = _without_goal_interpretation_authority(
+            _goal_interpretation_prompt_context(request.context)
+        )
+        context_json = _bounded_json(session_context, max_chars=900)
+        interaction_context_json = _bounded_json(
+            _without_goal_interpretation_authority(
+                request.context.get("interaction_context") or {}
+            ),
+            max_chars=2400,
+        )
+        recent_dialogue_json = _bounded_json_array(
+            _without_goal_interpretation_authority(
+                _compact_recent_dialogue(request.context)
+            ),
+            max_chars=1800,
+        )
+        active_tasks_json = _bounded_json_array(
+            _without_goal_interpretation_authority(
+                _compact_active_task_snapshots(request.context)
+            ),
+            max_chars=1400,
+        )
+        active_goals_json = _bounded_json_array(
+            _without_goal_interpretation_authority(
+                _compact_active_goal_snapshots(request.context)
+            ),
+            max_chars=1400,
+        )
+        return (
+            "Current Turn:\n"
+            f"Latest user input: {request.text}\n"
+            f"language={request.language or 'auto'} sid={request.sid or ''}\n\n"
+            "Bounded Identity Context:\n"
+            f"{_goal_interpretation_fast_context_section(mind)}\n\n"
+            "Semantic Continuity Context:\n"
+            f"Bounded session/world context JSON:{context_json}\n"
+            f"Interaction context JSON:{interaction_context_json}\n"
+            f"Recent accepted dialogue JSON:{recent_dialogue_json}\n"
+            f"Active Goal semantics without canonical identity JSON:{active_goals_json}\n"
+            f"Active Task/progress semantics without lifecycle identity JSON:{active_tasks_json}\n\n"
+            "Interpret only WHAT the human means. Return responsibilities, confidence, "
+            "and unresolved semantic uncertainty. No route, intent, response wording, "
+            "Activity, Work, Plan, Capability, Tool, provider, executable args, or IDs."
+        )
+
+    @staticmethod
+    def _goal_interpretation_response_schema() -> dict[str, Any]:
+        schema = GoalInterpretationDecision.model_json_schema()
+        schema["additionalProperties"] = False
+        return schema
+
+    def build_interpretation_payload(self, request: RouteRequest) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "model": self.model,
+            "stream": False,
+            "think": False,
+            "messages": [
+                {"role": "system", "content": self.load_system_prompt()},
+                {
+                    "role": "user",
+                    "content": self.build_interpretation_user_prompt(request),
+                },
+            ],
+            "options": {
+                "temperature": 0,
+                "top_p": 0.9,
+                "num_ctx": self.num_ctx,
+                "num_predict": min(self.num_predict, 768),
+            },
+            "format": self._goal_interpretation_response_schema(),
+        }
+        if self.keep_alive:
+            payload["keep_alive"] = self.keep_alive
+        return payload
+
+    def build_interpretation_repair_payload(
+        self,
+        request: RouteRequest,
+        *,
+        previous_content: str,
+        validation_error: Exception,
+    ) -> dict[str, Any]:
+        del previous_content, validation_error
+        payload = self.build_interpretation_payload(request)
+        payload["messages"] = [
+            {
+                "role": "system",
+                "content": (
+                    self.load_system_prompt()
+                    + "\n\nDTO Repair: return one corrected WHAT-only Goal Interpretation JSON object. "
+                    "Remove every field outside the schema. Never translate an invalid "
+                    "route/intent/Capability/Activity/Work/Plan/provider field into another "
+                    "implementation hint. Preserve only the human outcome, material semantic "
+                    "bindings, work/fresh-evidence requirements, confidence, and genuine "
+                    "semantic uncertainty. Return JSON only."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    self.build_interpretation_user_prompt(request)
+                    + "\n\nThe previous output violated the WHAT-only typed contract. "
+                    "Regenerate from the authoritative user meaning and bounded semantic "
+                    "context above. Do not copy any field, identifier, wording, or "
+                    "implementation hint from the rejected output. Return only the new "
+                    "schema object."
+                ),
+            },
+        ]
+        return payload
+
+    async def interpret_goal(
+        self, request: RouteRequest
+    ) -> GoalInterpretationDecision:
+        """Run the maintained Goal Interpretation contract with one DTO repair."""
+
+        try:
+            data = await self._chat_logged(
+                self.build_interpretation_payload(request),
+                stage="goal_interpretation",
+                request=request,
+            )
+        except Exception as exc:
+            _raise_if_llm_budget_failure(exc)
+            raise InterpretationUnavailableError(
+                f"goal_interpreter_error:{type(exc).__name__}: {exc}"
+            ) from exc
+
+        content = str(data.get("message", {}).get("content") or "")
+        try:
+            parsed = _extract_json_object(content)
+            _reject_canonical_goal_identity_refs(request, parsed)
+            _reject_planner_shaped_fast_output(request, parsed)
+            return GoalInterpretationDecision.model_validate(parsed)
+        except (_GoalInterpretationAuthorityViolation, ValueError, ValidationError) as exc:
+            logger.warning(
+                "Invalid WHAT-only Goal Interpretation DTO sid=%s error=%s content=%r",
+                request.sid,
+                exc,
+                content[:500],
+            )
+            try:
+                repaired = await self._chat_logged(
+                    self.build_interpretation_repair_payload(
+                        request,
+                        previous_content=content,
+                        validation_error=exc,
+                    ),
+                    stage="goal_interpretation_contract_repair",
+                    request=request,
+                )
+                repaired_content = str(
+                    repaired.get("message", {}).get("content") or ""
+                )
+                parsed = _extract_json_object(repaired_content)
+                _reject_canonical_goal_identity_refs(request, parsed)
+                _reject_planner_shaped_fast_output(request, parsed)
+                return GoalInterpretationDecision.model_validate(parsed)
+            except Exception as repair_exc:
+                _raise_if_llm_budget_failure(repair_exc)
+                raise InterpretationUnavailableError(
+                    "invalid_goal_interpretation_after_one_dto_repair: "
+                    f"{type(repair_exc).__name__}: {repair_exc}"
+                ) from repair_exc
 
     def build_user_prompt(self, request: RouteRequest) -> str:
         prompt_capabilities = request.context.get("common_ability_catalog", [])

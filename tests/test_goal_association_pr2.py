@@ -13,8 +13,8 @@ from agent.app.goal_association import (
     GoalResponsibilityCoverageCertificate,
     GoalSegmentationModelOutput,
 )
-from agent.app.schema import AgentRunRequest, RouteDecision
 from shared.chromie_contracts.goal import GoalAssociationResolution
+from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, CognitiveWorkRequest
 from shared.chromie_contracts.resource import (
     AcquireAndDeliverResource,
     ResourceDescriptor,
@@ -156,6 +156,10 @@ def certificate(*items: dict) -> dict:
     }
 
 
+
+def typed_responsibilities(*items: dict) -> list[CognitiveResponsibilityProposal]:
+    return [CognitiveResponsibilityProposal.model_validate(item) for item in items]
+
 def request(
     text: str,
     *,
@@ -165,17 +169,23 @@ def request(
     intent: str = "conversation",
     discourse_referents=None,
     progress_candidates=None,
-) -> AgentRunRequest:
-    return AgentRunRequest(
+) -> CognitiveWorkRequest:
+    del route, intent
+    return CognitiveWorkRequest(
         sid="sid-pr2",
         text=text,
         language=language,
-        route_decision=RouteDecision(
-            route=route,
-            intent=intent,
-            confidence=0.9,
-            source="llm",
-        ),
+        responsibilities=[
+            {
+                "local_ref": "r1",
+                "outcome": text,
+                "bindings": {},
+                "completion_requires_work": True,
+                "completion_requires_fresh_evidence": False,
+                "confidence": 0.9,
+            }
+        ],
+        interpretation_confidence=0.9,
         context={
             "active_goal_snapshots": active_goals or [],
             "recent_goal_snapshots": [],
@@ -751,18 +761,18 @@ class GoalExecutionContractTests(unittest.TestCase):
         req = request("今天晚上有大雨吗？")
         req = req.model_copy(
             update={
+                "responsibilities": typed_responsibilities(
+{
+                        "local_ref": "weather_1",
+                        "outcome": "确认今晚是否有大雨",
+                        "bindings": {"precipitation_severity": "heavy"},
+                        "completion_requires_work": True,
+                        "completion_requires_fresh_evidence": True,
+                        "confidence": 0.95,
+                    }
+                ),
                 "context": {
                     **req.context,
-                    "responsibility_proposals": [
-                        {
-                            "local_ref": "weather_1",
-                            "outcome": "确认今晚是否有大雨",
-                            "bindings": {"precipitation_severity": "heavy"},
-                            "completion_requires_work": True,
-                            "completion_requires_fresh_evidence": True,
-                            "confidence": 0.95,
-                        }
-                    ],
                     "fast_planner_advance": {
                         "covered_responsibility_refs": ["weather_1"],
                         "continuations": ["goal_association"],
@@ -793,23 +803,21 @@ class GoalExecutionContractTests(unittest.TestCase):
         req = request("你能往前走个100米，那边有个水瓶，帮我拿杯水可以吗？")
         req = req.model_copy(
             update={
-                "context": {
-                    **req.context,
-                    "responsibility_proposals": [
-                        {
-                            "local_ref": "responsibility-1",
-                            "outcome": "拿一杯水",
-                            "bindings": {
-                                "resource": "水",
-                                "source": "水瓶",
-                                "recipient": "我",
-                            },
-                            "completion_requires_work": True,
-                            "completion_requires_fresh_evidence": True,
-                            "confidence": 0.95,
-                        }
-                    ],
-                }
+                "responsibilities": typed_responsibilities(
+{
+                        "local_ref": "responsibility-1",
+                        "outcome": "拿一杯水",
+                        "bindings": {
+                            "resource": "水",
+                            "source": "水瓶",
+                            "recipient": "我",
+                        },
+                        "completion_requires_work": True,
+                        "completion_requires_fresh_evidence": True,
+                        "confidence": 0.95,
+                    }
+                ),
+                "context": dict(req.context),
             }
         )
         prompt = GoalAssociationResolver(FakeOllama({}))._build_fresh_interpretation_prompt(
@@ -837,7 +845,7 @@ class GoalExecutionContractTests(unittest.TestCase):
 
 
 class GoalAssociationTransactionTests(unittest.TestCase):
-    def _resolve(self, ollama, req: AgentRunRequest) -> GoalAssociationResolution:
+    def _resolve(self, ollama, req: CognitiveWorkRequest) -> GoalAssociationResolution:
         return asyncio.run(GoalAssociationResolver(ollama).resolve(req))
 
     def assert_transaction(
@@ -863,20 +871,20 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         req = request("你好，我在重庆，今天晚上有大雨吗？", intent="weather_lookup")
         req = req.model_copy(
             update={
+                "responsibilities": typed_responsibilities(
+{
+                        "local_ref": "weather_1",
+                        # Simulate the retained live GI defect: the fast proposal
+                        # generalized 大雨 to rain. GA coverage must not commit it.
+                        "outcome": "确认重庆今晚是否下雨",
+                        "bindings": {"location": "重庆", "time": "tonight"},
+                        "completion_requires_work": True,
+                        "completion_requires_fresh_evidence": True,
+                        "confidence": 0.95,
+                    }
+                ),
                 "context": {
                     **req.context,
-                    "responsibility_proposals": [
-                        {
-                            "local_ref": "weather_1",
-                            # Simulate the retained live GI defect: the fast proposal
-                            # generalized 大雨 to rain. GA coverage must not commit it.
-                            "outcome": "确认重庆今晚是否下雨",
-                            "bindings": {"location": "重庆", "time": "tonight"},
-                            "completion_requires_work": True,
-                            "completion_requires_fresh_evidence": True,
-                            "confidence": 0.95,
-                        }
-                    ],
                     "fast_planner_advance": {
                         "covered_responsibility_refs": ["weather_1"],
                         "continuations": ["goal_association"],

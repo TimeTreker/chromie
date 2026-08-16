@@ -14,9 +14,10 @@ implemented. Exact immutable plan/request/result reconciliation, per-goal
 as defined by the [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md). The upstream
 boundary migration is also implemented: five explicit Cognitive Gateway modules
 complete admission before ordinary Goal Interpretation, the frozen version 1
-`UserTurnEnvelope` is required at Core entry, and a Core-owned interpretation
-result isolates the digest-bound compatibility route projection. Retained
-source-bound live-text and MuJoCo evidence remains open.
+`UserTurnEnvelope` is required at Core entry, and a Core-owned interpretation result now carries only provider-neutral
+Responsibility evidence plus bounded confidence/unresolved meaning. No route/intent
+compatibility projection exists on the maintained Core handoff. Retained source-bound
+live-text and MuJoCo evidence remains open.
 
 The direct no-planner `spoken_response` branch and independently scheduled
 validated response stages described below are accepted post-evidence contract
@@ -48,8 +49,8 @@ arbitration. See
 Chromie has migrated its maintained semantic-planning path from a skill-routed
 interaction system to a goal-driven cognitive runtime. This document defines
 the Goal-Driven Cognitive Core and the principles and contracts that current and
-future Gateway, Goal Interpreter-compatibility, Agent, memory, planning, social
-interaction, and execution work must follow.
+future Gateway, Goal Interpretation, Agent, memory, planning, social interaction,
+and execution work must follow.
 
 The central change is simple:
 
@@ -68,15 +69,13 @@ control evidence, but it does not own user-goal meaning, decomposition,
 planning, semantic agent coordination, outcome synthesis, or response
 composition. Those belong to the Goal-Driven Cognitive Core.
 
-The fast Goal Interpreter is an Agent-owned compatibility stage inside the
-Goal-Driven Cognitive Core. It receives only an admitted `UserTurnEnvelope`
-projection and emits provider-neutral Responsibility evidence, material semantic
-bindings, bounded confidence/work requirements, and optional immediate
-conversational progress. Legacy `route`/`intent` fields may remain as compatibility
-or diagnostic projections, but they are not a source-effect envelope and may not
-grant, suppress, filter, or narrow Planner Capability access. It does not own
-Gateway normalization, protective reflex, attention, admission, Goal state,
-Capability selection, execution shape, or authorization.
+Goal Interpretation is an Agent-owned WHAT stage inside the Goal-Driven Cognitive
+Core. It receives an admitted `UserTurnEnvelope` projection and emits only
+provider-neutral Responsibility evidence, material semantic bindings, bounded
+confidence, and unresolved meaning. It does not emit `route`, `intent`, response
+wording, Activity/Work/Plan contracts, Capability/provider identity, executable
+arguments, or authorization. Fast Planner is the first HOW owner; Goal Association
+alone owns canonical Goal continuity when that continuation is required.
 
 The executable state machine that carries one admitted turn through specialist
 delegation, trusted observations, per-goal reconciliation, and a final response
@@ -3338,32 +3337,29 @@ Exit criteria:
 - no automated test is reported as live provider, simulator, microphone, or
   physical-robot evidence.
 
-## 20. Retained compatibility and evolution rules
+## 20. Architecture evolution rules
 
-Routes, route items, semantic tasks, and task-proposal ledgers may remain only as
-bounded, versioned compatibility or evidence surfaces around the maintained
-Goal-driven Runtime.
+The maintained Goal-driven Runtime has no Goal-Interpretation route/intent compatibility
+projection and no fallback into a second legacy semantic pipeline. Historical APIs or
+retained evidence may exist outside the maintained turn path, but they cannot be adapter
+inputs to current Goal Interpretation, Goal Association, or planning.
 
 Evolution rules:
 
-- preserve deterministic safety, authorization, cancellation, and evidence
-  boundaries;
-- keep Cognitive Gateway normalization, protective reflex, attention, context,
-  and admission distinct from Core semantics;
-- keep goal meaning, association, decomposition, affordance grounding, planning,
-  semantic coordination, outcome synthesis, and response composition inside one
-  Goal-Driven Cognitive Core authority;
-- treat `RouteDecision` route/intent/action/proposal fields as digest-bound
-  compatibility evidence only, never as a service, canonical Plan, execution grant,
-  or Planner capability filter;
-- use `report_only` only for explicit observation or rollout diagnosis, not as
-  the maintained authority mode;
-- compare complete Goal coverage and committed capabilities before widening an
-  apply lane;
-- after Core authority is acquired, fail closed rather than falling through to a
-  second semantic planner;
-- remove remaining compatibility aliases only through an explicit contract
-  version change with retained regression and target evidence.
+- preserve deterministic safety, authorization, cancellation, and evidence boundaries;
+- keep Cognitive Gateway normalization, protective reflex, attention, context, and
+  admission distinct from Core semantics;
+- keep Goal Interpretation WHAT-only: Responsibility meaning, material bindings,
+  confidence, fresh-evidence need, and unresolved meaning;
+- make `CognitiveWorkRequest` the typed WHAT-to-HOW handoff; do not tunnel semantic
+  authority through anonymous context dictionaries;
+- keep Fast Planner as the first HOW owner and Goal Association as the sole canonical
+  Goal-continuity owner;
+- expose exact Capability identity only after applicable canonical Goal grounding;
+- after Core authority is acquired, fail closed rather than falling through to an older
+  route/intent or Agent semantic path;
+- remove obsolete compatibility surfaces rather than preserving dual authorities when a
+  maintained caller has migrated.
 
 ## 21. Observability
 

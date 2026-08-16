@@ -6,9 +6,53 @@ import unittest
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.cognitive_gateway import CognitiveGateway
 from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
-from orchestrator.schemas.route import RouteDecision
 from shared.chromie_contracts.goal import GoalAssociationResolution
+from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
+from shared.chromie_contracts.user_turn import AttentionReviewResult
 from shared.chromie_contracts.interaction import InteractionResponse
+
+
+def _core_and_envelope(text: str, *, sid: str, language: str = "en-US"):
+    gateway = CognitiveGateway()
+    capture = gateway.capture(
+        text,
+        session_id=sid,
+        conversation_id=f"conversation-{sid}",
+        channel="text",
+        language=language,
+    )
+    snapshot = gateway.assemble_context(capture, {})
+    envelope = gateway.admit_attention(
+        capture,
+        snapshot,
+        AttentionReviewResult(
+            turn_id=capture.turn_id,
+            session_id=capture.session_id,
+            context_digest=snapshot.digest,
+            disposition="admit",
+            speech_act="request",
+            confidence=1.0,
+            source="test",
+            reason="orchestrator runtime test input",
+        ),
+    )
+    core = CoreInterpretationResult(
+        turn_id=envelope.turn_id,
+        session_id=envelope.session_id,
+        confidence=0.95,
+        language=language,
+        responsibilities=[
+            {
+                "local_ref": "r1",
+                "outcome": text,
+                "bindings": {},
+                "completion_requires_work": True,
+                "completion_requires_fresh_evidence": False,
+                "confidence": 0.95,
+            }
+        ],
+    )
+    return core, envelope
 
 
 class _State:
@@ -83,38 +127,19 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
             timings_ms={"total": 12.0},
         )
         assistant = self._assistant(resolution)
-        decision = RouteDecision(
-            route="chat",
-            intent="greeting",
-            confidence=0.9,
-            source="llm",
-            language="zh-CN",
-        )
-        gateway = CognitiveGateway()
-        capture = gateway.capture(
-            "你好。",
-            session_id="sid",
-            conversation_id="conversation-test",
-            channel="text",
-        )
-        turn_envelope = gateway.for_core_review(
-            capture,
-            context={"history": []},
-            decision=decision,
-        )
+        core, turn_envelope = _core_and_envelope("你好。", sid="sid", language="zh-CN")
 
         async def run():
-            handled, returned = await assistant._try_apply_cognitive_runtime(
+            handled = await assistant._try_apply_cognitive_runtime(
                 object(),
                 user_text="你好。",
                 session_id="sid",
                 context={"history": []},
-                decision=decision,
+                core_interpretation=core,
                 core_interpretation_latency_ms=10.0,
                 turn_envelope=turn_envelope,
             )
             self.assertTrue(handled)
-            self.assertEqual(returned.route, "chat")
 
         asyncio.run(run())
         self.assertEqual(len(assistant.interaction_runtime.prepared), 1)
@@ -139,7 +164,7 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
             "sid",
         )
 
-    def test_apply_bypasses_goal_interpreter_speech_and_defers_fast_response_to_planner(self):
+    def test_apply_uses_responsibility_only_core_and_defers_first_wording_to_planner(self):
         response = InteractionResponse(
             speech=[{"text": "北京今天没有雨。", "timing": "after_skills"}],
             metadata={"source": "goal_driven_cognitive_runtime"},
@@ -157,7 +182,7 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
 
         async def schedule_fast_first(*args, **kwargs):
             del args, kwargs
-            events.append("acknowledgement_scheduled")
+            events.append("legacy_fast_response_scheduled")
             return True
 
         async def run_pipeline(*args, **kwargs):
@@ -167,33 +192,38 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
 
         assistant._schedule_fast_first_response = schedule_fast_first
         assistant._run_cognitive_runtime_pipeline = run_pipeline
-        decision = RouteDecision(
-            route="tool",
-            intent="capability:chromie.weather.lookup",
-            confidence=0.95,
-            source="llm",
-            language="zh-CN",
-            fast_speech={
-                "text": "我看看北京今天会不会下雨。",
-                "purpose": "acknowledge_and_check",
-                "commitment": "checking_only",
-                "must_not_claim_completion": True,
-            },
+        core, envelope = _core_and_envelope(
+            "今天北京下雨了没有？", sid="sid-weather", language="zh-CN"
+        )
+        core = CoreInterpretationResult.model_validate(
+            {
+                **core.model_dump(mode="json"),
+                "responsibilities": [
+                    {
+                        "local_ref": "weather",
+                        "outcome": "Tell whether it is raining in Beijing today.",
+                        "bindings": {"location": "北京", "time": "today"},
+                        "completion_requires_work": True,
+                        "completion_requires_fresh_evidence": True,
+                        "confidence": 0.95,
+                    }
+                ],
+            }
         )
 
         async def run():
-            handled, _ = await assistant._try_apply_cognitive_runtime(
+            handled = await assistant._try_apply_cognitive_runtime(
                 object(),
                 user_text="今天北京下雨了没有？",
                 session_id="sid-weather",
                 context={"history": []},
-                decision=decision,
+                core_interpretation=core,
                 core_interpretation_latency_ms=1400.0,
+                turn_envelope=envelope,
             )
             self.assertTrue(handled)
 
         asyncio.run(run())
-
         self.assertEqual(events, ["runtime_started"])
         self.assertTrue(assistant._launch_interaction_calls[0][1]["reset_playback"])
 
@@ -240,13 +270,6 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
                 confidence=0.95,
             ),
         )
-        decision = RouteDecision(
-            route="chat",
-            intent="cancel_goal",
-            confidence=0.9,
-            source="llm",
-        )
-
         with self.assertRaisesRegex(
             ValueError,
             "active_goal_cancellation_requires_runtime_dispatch",
@@ -255,7 +278,6 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
                 resolution,
                 session_id="sid-cancel",
                 user_text="Cancel the delivery.",
-                decision=decision,
             )
         self.assertEqual(assistant.conversation_state.apply_calls, 0)
 
@@ -314,26 +336,19 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         state = State()
         assistant.conversation_state = state
         del assistant._apply_cognitive_goal_state
-        decision = RouteDecision(
-            route="chat",
-            intent="cancel_goal",
-            confidence=0.9,
-            source="llm",
-            language="en-US",
-        )
-        returned_decisions = []
+        core, envelope = _core_and_envelope("Cancel the delivery.", sid="sid-cancel")
 
         async def run():
-            handled, returned = await assistant._try_apply_cognitive_runtime(
+            handled = await assistant._try_apply_cognitive_runtime(
                 object(),
                 user_text="Cancel the delivery.",
                 session_id="sid-cancel",
                 context={"history": []},
-                decision=decision,
+                core_interpretation=core,
                 core_interpretation_latency_ms=10.0,
+                turn_envelope=envelope,
             )
             self.assertTrue(handled)
-            returned_decisions.append(returned)
 
         asyncio.run(run())
 
@@ -354,50 +369,35 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
             recorded_resolution["metadata"]["host_commit_status"],
             "rejected",
         )
-        self.assertEqual(
-            returned_decisions[0].metadata[
-                "cognitive_runtime_resolution"
-            ]["metadata"]["host_commit_status"],
-            "rejected",
+
+    def test_chat_apply_needs_no_pre_goal_route_label(self):
+        response = InteractionResponse(
+            speech=[{"text": "Could you clarify?", "timing": "immediate"}],
+            metadata={"source": "goal_driven_cognitive_runtime"},
+        )
+        resolution = CognitiveRuntimeResolution(
+            mode="apply", status="applied", lane="chat", interaction_response=response
+        )
+        assistant = self._assistant(resolution)
+        assistant.cognitive_apply_lanes = frozenset({"chat"})
+        core, envelope = _core_and_envelope(
+            "Please help me work this out.", sid="sid-chat"
         )
 
-    def test_chat_lane_includes_clarify_and_deep_thought_routes(self):
-        for route in ("clarify", "deep_thought"):
-            with self.subTest(route=route):
-                response = InteractionResponse(
-                    speech=[{"text": "Could you clarify?", "timing": "immediate"}],
-                    metadata={"source": "goal_driven_cognitive_runtime"},
-                )
-                resolution = CognitiveRuntimeResolution(
-                    mode="apply",
-                    status="applied",
-                    lane="chat",
-                    interaction_response=response,
-                    timings_ms={"total": 12.0},
-                )
-                assistant = self._assistant(resolution)
-                assistant.cognitive_apply_lanes = frozenset({"chat"})
-                decision = RouteDecision(
-                    route=route,
-                    intent=route,
-                    confidence=0.5,
-                    source="llm",
-                    language="en-US",
-                )
+        async def run():
+            handled = await assistant._try_apply_cognitive_runtime(
+                object(),
+                user_text="Please help me work this out.",
+                session_id="sid-chat",
+                context={"history": []},
+                core_interpretation=core,
+                core_interpretation_latency_ms=10.0,
+                turn_envelope=envelope,
+            )
+            self.assertTrue(handled)
 
-                async def run():
-                    handled, _ = await assistant._try_apply_cognitive_runtime(
-                        object(),
-                        user_text="Please help me work this out.",
-                        session_id=f"sid-{route}",
-                        context={"history": []},
-                        decision=decision,
-                        core_interpretation_latency_ms=10.0,
-                    )
-                    self.assertTrue(handled)
-
-                asyncio.run(run())
-                self.assertEqual(len(assistant.interaction_runtime.prepared), 1)
+        asyncio.run(run())
+        self.assertEqual(len(assistant.interaction_runtime.prepared), 1)
 
     def test_cognitive_failure_is_handled_without_legacy_reentry(self):
         resolution = CognitiveRuntimeResolution(
@@ -413,100 +413,25 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
             return True
 
         assistant._settle_fast_first_audio_hedge = settle
-        decision = RouteDecision(
-            route="robot_action",
-            intent="capability:soridormi.blink_eyes",
-            confidence=0.9,
-            source="llm",
-            language="zh-CN",
-        )
+        core, envelope = _core_and_envelope("眨眼。", sid="sid", language="zh-CN")
 
         async def run():
-            handled, returned = await assistant._try_apply_cognitive_runtime(
+            handled = await assistant._try_apply_cognitive_runtime(
                 object(),
                 user_text="眨眼。",
                 session_id="sid",
                 context={"history": []},
-                decision=decision,
+                core_interpretation=core,
                 core_interpretation_latency_ms=10.0,
+                turn_envelope=envelope,
             )
             self.assertTrue(handled)
-            self.assertEqual(
-                returned.metadata["cognitive_runtime_resolution"]["status"],
-                "error",
-            )
 
         asyncio.run(run())
         self.assertEqual(len(assistant.conversation_state.user_turns), 1)
         self.assertEqual(len(assistant.conversation_state.agent_results), 1)
         self.assertEqual(len(assistant._launch_interaction_calls), 1)
 
-    def test_report_only_schedules_without_mutating_route(self):
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant.cognitive_runtime_mode = "report_only"
-        assistant.enable_agent = True
-        assistant.cognitive_runtime_report_tasks = set()
-        assistant.session_log = lambda *args, **kwargs: None
-        completed = asyncio.Event()
-
-        async def report(*args, **kwargs):
-            completed.set()
-
-        assistant._run_cognitive_runtime_report = report
-        decision = RouteDecision(
-            route="chat", intent="greeting", confidence=0.9, source="llm"
-        )
-
-        async def run():
-            updated = assistant._schedule_cognitive_runtime_report(
-                object(),
-                user_text="hello",
-                session_id="sid",
-                context={"active_goal_snapshots": []},
-                decision=decision,
-            )
-            await asyncio.wait_for(completed.wait(), timeout=1.0)
-            self.assertEqual(updated.route, decision.route)
-            self.assertEqual(
-                updated.metadata["cognitive_runtime_resolution"]["status"],
-                "scheduled",
-            )
-
-        asyncio.run(run())
-
-    def test_report_only_observes_routes_outside_apply_allowlist(self):
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant.cognitive_runtime_mode = "report_only"
-        assistant.enable_agent = True
-        assistant.cognitive_apply_lanes = frozenset({"chat", "robot_action"})
-        assistant.cognitive_runtime_report_tasks = set()
-        assistant.session_log = lambda *args, **kwargs: None
-        completed = asyncio.Event()
-
-        async def report(*args, **kwargs):
-            completed.set()
-
-        assistant._run_cognitive_runtime_report = report
-        decision = RouteDecision(
-            route="tool", intent="weather", confidence=0.9, source="llm"
-        )
-
-        async def run():
-            updated = assistant._schedule_cognitive_runtime_report(
-                object(),
-                user_text="What is the weather?",
-                session_id="sid",
-                context={"active_goal_snapshots": []},
-                decision=decision,
-            )
-            await asyncio.wait_for(completed.wait(), timeout=1.0)
-            self.assertEqual(updated.route, "tool")
-            self.assertEqual(
-                updated.metadata["cognitive_runtime_resolution"]["status"],
-                "scheduled",
-            )
-
-        asyncio.run(run())
 
 
 if __name__ == "__main__":

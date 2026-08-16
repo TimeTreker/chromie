@@ -8,6 +8,7 @@ import unittest
 from unittest import mock
 from pathlib import Path
 
+from orchestrator.runtime.cognitive_gateway import CognitiveGateway
 from orchestrator.runtime.cognitive_runtime import (
     CanonicalPlanRuntimeAdapter,
     CognitiveEvidenceRecorder,
@@ -28,13 +29,17 @@ from shared.chromie_contracts.execution_outcome import (
     claim_qualification_policy_sha256,
 )
 from shared.chromie_contracts.goal import GoalAssociationResolution
+from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
+from shared.chromie_contracts.user_turn import AttentionReviewResult
 from shared.chromie_contracts.interaction import output_schema_sha256
 from shared.chromie_contracts.mind import default_mind_profile
 from shared.chromie_contracts.plan import CanonicalPlan, FastPlannerAdvance, FastPlannerVocalActivity
 from shared.chromie_contracts.response_composition import (
     CoordinatedResponsePlan,
+    DirectResponseComposition,
     ResponseCompositionResolution,
     canonical_plan_fingerprint,
+    goal_association_fingerprint,
 )
 from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage, SemanticGoal
 from shared.chromie_contracts.task_proposal import TaskProposalLedger
@@ -46,6 +51,56 @@ TEST_SKILL_OUTPUT_SCHEMA = {
     "required": ["completed"],
     "additionalProperties": False,
 }
+
+
+def admitted_core(
+    text: str,
+    *,
+    sid: str,
+    language: str,
+    responsibilities: list[dict] | None = None,
+):
+    gateway = CognitiveGateway()
+    capture = gateway.capture(
+        text,
+        session_id=sid,
+        conversation_id=f"conversation-{sid}",
+        channel="text",
+        language=language,
+    )
+    snapshot = gateway.assemble_context(capture, {})
+    envelope = gateway.admit_attention(
+        capture,
+        snapshot,
+        AttentionReviewResult(
+            turn_id=capture.turn_id,
+            session_id=capture.session_id,
+            context_digest=snapshot.digest,
+            disposition="admit",
+            speech_act="request",
+            confidence=1.0,
+            source="test",
+            reason="runtime test input",
+        ),
+    )
+    rows = responsibilities or [
+        {
+            "local_ref": "r1",
+            "outcome": text,
+            "bindings": {},
+            "completion_requires_work": True,
+            "completion_requires_fresh_evidence": False,
+            "confidence": 0.95,
+        }
+    ]
+    core = CoreInterpretationResult(
+        turn_id=envelope.turn_id,
+        session_id=envelope.session_id,
+        confidence=min(float(item.get("confidence", 0.95)) for item in rows),
+        language=language,
+        responsibilities=rows,
+    )
+    return core, envelope
 
 
 class FakeRuntime:
@@ -92,7 +147,19 @@ class ScriptedClient:
         self.association = association
         self.fast_plans = list(fast_plans)
         self.deep_plans = list(deep_plans or [])
-        self.fast_advances = list(fast_advances or [])
+        self.fast_advances = list(
+            fast_advances
+            if fast_advances is not None
+            else [
+                FastPlannerAdvance(
+                    turn_id="test-fast-advance",
+                    covered_responsibility_refs=["r1"],
+                    continuations=["goal_association"],
+                    confidence=0.95,
+                    reason_summary="Continue through canonical Goal Association.",
+                )
+            ]
+        )
         self.composition_status = composition_status
         self.deep_contexts: list[dict] = []
         self.compose_contexts: list[dict] = []
@@ -114,26 +181,50 @@ class ScriptedClient:
 
     async def resolve_deep_plan(self, *args, **kwargs):
         self.calls.append("deep")
-        self.deep_contexts.append(dict(kwargs.get("context") or {}))
+        request = kwargs.get("request")
+        self.deep_contexts.append(dict(getattr(request, "context", {}) or {}))
         return self.deep_plans.pop(0)
 
     async def compose_response_plan(self, *args, **kwargs):
         self.calls.append("compose")
-        self.compose_contexts.append(dict(kwargs.get("context") or {}))
+        request = kwargs.get("request")
+        request_context = dict(getattr(request, "context", {}) or {})
+        self.compose_contexts.append(request_context)
         if self.composition_status != "resolved":
             return ResponseCompositionResolution(
                 status="model_unavailable",
                 reason_summary="composer unavailable",
             )
+        if "direct_goal_association_resolution" in request_context:
+            goal_ids = [goal.goal_id for goal in self.association.new_goals]
+            direct = DirectResponseComposition(
+                composition_id="composition-direct-test",
+                goal_association_fingerprint=goal_association_fingerprint(self.association),
+                goal_association=self.association,
+                response_plan=ResponsePlan(
+                    final=ResponseStage(
+                        text="你好。",
+                        speech_act="inform",
+                        commitment_state="completed",
+                        must_not_claim_completion=False,
+                        covers_goal_ids=goal_ids,
+                    )
+                ),
+                confidence=0.91,
+            )
+            return ResponseCompositionResolution(
+                status="resolved",
+                composition=direct,
+            )
         plan = CanonicalPlan.model_validate(
-            kwargs["context"]["canonical_plan_resolution"]
+            request_context["canonical_plan_resolution"]
         )
         if plan.disposition == "execute":
             confirmation_required = bool(
                 plan.metadata.get("user_confirmation_required")
             ) or any(
                 item.get("requires_confirmation") is True
-                for item in kwargs["context"].get("execution_capabilities", [])
+                for item in request_context.get("execution_capabilities", [])
             )
             response_plan = ResponsePlan(
                 pre_action=ResponseStage(
@@ -214,6 +305,12 @@ def new_goal_association(goal_id: str = "goal-1") -> GoalAssociationResolution:
                 goal_id=goal_id,
                 description="Respond to the user.",
                 source_text="hello",
+                metadata={
+                    "responsibility_kind": "vocal_output",
+                    "execution_lane": "vocal",
+                    "output_mode": "speech",
+                    "provider_required": False,
+                },
             )
         ],
         confidence=0.95,
@@ -480,28 +577,23 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         route="chat",
         intent=None,
     ):
-        resolved_intent = intent or (
-            "capability:soridormi.motion" if route == "robot_action" else "conversation"
+        del route, intent
+        core, envelope = admitted_core(
+            text, sid="sid-pr7", language="zh-CN"
         )
         return asyncio.run(
             coordinator.resolve(
                 object(),
                 text=text,
                 sid="sid-pr7",
-                route_decision=type(
-                    "Decision",
-                    (),
-                    {
-                        "route": route,
-                        "intent": resolved_intent,
-                        "language": "zh-CN",
-                    },
-                )(),
+                core_interpretation=core,
                 context={"history": [], "active_goal_snapshots": []},
                 history=[],
                 language="zh-CN",
+                turn_envelope=envelope,
             )
         )
+
 
 
     def test_fast_planner_progress_starts_before_goal_association(self):
@@ -553,32 +645,29 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             adapter=CanonicalPlanRuntimeAdapter(runtime),
             policy=CognitiveRuntimePolicy(mode="apply", apply_lanes=frozenset({"chat", "tool"})),
         )
-        route = type(
-            "Decision",
-            (),
-            {"route": "tool", "intent": "weather_query", "language": "zh-CN"},
-        )()
-
+        core, envelope = admitted_core(
+            "今天下午重庆会下雨吗？",
+            sid="turn-weather",
+            language="zh-CN",
+            responsibilities=[
+                {
+                    "local_ref": "weather",
+                    "outcome": "Tell the user whether it will rain in Chongqing this afternoon.",
+                    "bindings": {"location": "重庆", "day_part": "afternoon"},
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.96,
+                }
+            ],
+        )
         result = asyncio.run(
             coordinator.resolve(
                 object(),
                 text="今天下午重庆会下雨吗？",
                 sid="turn-weather",
-                route_decision=route,
-                context={
-                    "history": [],
-                    "active_goal_snapshots": [],
-                    "responsibility_proposals": [
-                        {
-                            "local_ref": "weather",
-                            "outcome": "Tell the user whether it will rain in Chongqing this afternoon.",
-                            "bindings": {"location": "重庆", "day_part": "afternoon"},
-                            "completion_requires_work": True,
-                            "completion_requires_fresh_evidence": True,
-                            "confidence": 0.96,
-                        }
-                    ],
-                },
+                core_interpretation=core,
+                turn_envelope=envelope,
+                context={"history": [], "active_goal_snapshots": []},
                 history=[],
                 language="zh-CN",
             )
@@ -587,7 +676,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(result.status, "applied")
         self.assertEqual(events[:3], ["advance", "vocal_activity_started", "association"])
         self.assertEqual(runtime.started_fast_activities[0][1], "我看看今天下午重庆会不会下雨～")
-        self.assertEqual(client.calls[:3], ["advance", "association", "fast"])
+        self.assertEqual(client.calls[:3], ["advance", "association", "compose"])
 
     def test_fast_planner_complexity_disposition_skips_second_fast_plan_after_goal_binding(self):
         advance = FastPlannerAdvance(
@@ -604,45 +693,42 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             confidence=0.91,
             reason_summary="Meaning is clear but HOW needs deeper planning.",
         )
-        deep = respond_plan().model_copy(update={"planner_tier": "deep"})
+        deep = execute_plan().model_copy(update={"planner_tier": "deep"})
         client = ScriptedClient(
-            association=new_goal_association(),
+            association=body_goal_association(),
             fast_plans=[],
             deep_plans=[deep],
             fast_advances=[advance],
         )
-        runtime = FastAdvanceRuntime()
+        runtime = FastAdvanceRuntime([blink_definition()])
         coordinator = GoalDrivenRuntimeCoordinator(
             agent_client=client,
             adapter=CanonicalPlanRuntimeAdapter(runtime),
             policy=CognitiveRuntimePolicy(mode="apply", apply_lanes=frozenset({"chat", "robot_action"})),
         )
-        route = type(
-            "Decision",
-            (),
-            {"route": "robot_action", "intent": "fetch_water", "language": "zh-CN"},
-        )()
-
+        core, envelope = admitted_core(
+            "去那边把水拿回来给我。",
+            sid="turn-complex",
+            language="zh-CN",
+            responsibilities=[
+                {
+                    "local_ref": "fetch-water",
+                    "outcome": "Obtain the referenced water and bring it back to the requester.",
+                    "bindings": {},
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.94,
+                }
+            ],
+        )
         result = asyncio.run(
             coordinator.resolve(
                 object(),
                 text="去那边把水拿回来给我。",
                 sid="turn-complex",
-                route_decision=route,
-                context={
-                    "history": [],
-                    "active_goal_snapshots": [],
-                    "responsibility_proposals": [
-                        {
-                            "local_ref": "fetch-water",
-                            "outcome": "Obtain the referenced water and bring it back to the requester.",
-                            "bindings": {},
-                            "completion_requires_work": True,
-                            "completion_requires_fresh_evidence": False,
-                            "confidence": 0.94,
-                        }
-                    ],
-                },
+                core_interpretation=core,
+                turn_envelope=envelope,
+                context={"history": [], "active_goal_snapshots": []},
                 history=[],
                 language="zh-CN",
             )
@@ -656,12 +742,12 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
     def test_runtime_trace_profiles_actual_goal_driven_modules(self):
         client = ScriptedClient(
-            association=new_goal_association(),
-            fast_plans=[respond_plan()],
+            association=body_goal_association(),
+            fast_plans=[execute_plan().model_copy(update={"planner_tier": "fast"})],
         )
         coordinator = GoalDrivenRuntimeCoordinator(
             agent_client=client,
-            adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
+            adapter=CanonicalPlanRuntimeAdapter(FakeRuntime([blink_definition()])),
             policy=CognitiveRuntimePolicy(mode="report_only"),
         )
         with mock.patch.dict(
@@ -678,7 +764,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         summary = result.metadata["runtime_trace_summary"]
         self.assertTrue(trace["trace_id"].startswith("trace_"))
         self.assertEqual(trace["state"], "complete")
-        self.assertGreaterEqual(summary["item_count"], 2)
+        self.assertGreaterEqual(summary["item_count"], 1)
         modules = {
             item["module"]["name"]
             for item in summary["module_aggregates"]
@@ -715,9 +801,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(
             stage_names,
             [
+                "fast_planner_advance",
                 "goal_association",
-                "fast_planner",
-                "canonical_plan_validation",
                 "response_composer",
                 "runtime_adapter",
             ],
@@ -746,27 +831,29 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         class ContextClient(ScriptedClient):
             def __init__(self):
                 super().__init__(
-                    association=new_goal_association(),
-                    fast_plans=[respond_plan()],
+                    association=body_goal_association(),
+                    fast_plans=[execute_plan().model_copy(update={"planner_tier": "fast"})],
                 )
                 self.association_contexts: list[dict] = []
                 self.fast_contexts: list[dict] = []
 
             async def resolve_goal_association(self, *args, **kwargs):
+                request = kwargs.get("request")
                 self.association_contexts.append(
-                    dict(kwargs.get("context") or {})
+                    dict(getattr(request, "context", {}) or {})
                 )
                 return await super().resolve_goal_association(*args, **kwargs)
 
             async def resolve_fast_plan(self, *args, **kwargs):
-                self.fast_contexts.append(dict(kwargs.get("context") or {}))
+                request = kwargs.get("request")
+                self.fast_contexts.append(dict(getattr(request, "context", {}) or {}))
                 return await super().resolve_fast_plan(*args, **kwargs)
 
         client = ContextClient()
         coordinator = GoalDrivenRuntimeCoordinator(
             agent_client=client,
             adapter=CanonicalPlanRuntimeAdapter(
-                FakeRuntime(),
+                FakeRuntime([blink_definition()]),
             ),
             policy=CognitiveRuntimePolicy(mode="apply"),
             interaction_ledger=ledger,
@@ -841,7 +928,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             self.assertTrue((payload_root / "trace.json").is_file())
             self.assertTrue((payload_root / "trace-summary.json").is_file())
 
-    def test_apply_terminal_missing_ability_skips_goal_and_planner_stages(self):
+    def test_goal_interpretation_cannot_short_circuit_missing_ability_before_goal_state(self):
         client = ScriptedClient(
             association=new_goal_association(),
             fast_plans=[],
@@ -854,113 +941,50 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 apply_lanes=frozenset({"chat"}),
             ),
         )
-        route = type(
-            "Decision",
-            (),
-            {
-                "route": "clarify",
-                "intent": "missing_or_unsupported_ability",
-                "language": "zh-CN",
-                "speak_first": (
-                    "我明白你想找附近好吃的餐厅，不过我现在还没有餐厅搜索和推荐能力，所以这次不能给你可靠的推荐。"
-                ),
-                "metadata": {
-                    "desired_abilities": [
-                        {
-                            "ability_id": "local.restaurant_recommendation",
-                            "intent": "查找并推荐用户附近的优质餐厅",
-                            "status": "missing_ability",
-                            "confidence": 1.0,
-                            "reason": "当前能力目录没有餐厅搜索能力。",
-                        }
-                    ],
-                    "task_proposals": [
-                        {
-                            "id": (
-                                "quick_intent:ability:0:"
-                                "local.restaurant_recommendation"
-                            ),
-                            "source": "quick_intent",
-                            "proposal_kind": "ability",
-                            "task_type": "ability.requested",
-                            "state": "missing_ability",
-                            "reason": "当前能力目录没有餐厅搜索能力。",
-                            "effectful": False,
-                            "priority": "normal",
-                            "sequence": 0,
-                            "ability_id": "local.restaurant_recommendation",
-                            "metadata": {
-                                "route": "clarify",
-                                "intent": "查找并推荐用户附近的优质餐厅",
-                                "status": "missing_ability",
-                                "confidence": 1.0,
-                            },
-                        }
-                    ],
-                },
-            },
-        )()
 
+        core, envelope = admitted_core(
+            "附近有啥好吃的？",
+            sid="sid-missing-restaurant",
+            language="zh-CN",
+            responsibilities=[
+                {
+                    "local_ref": "restaurant",
+                    "outcome": "recommend good nearby restaurants",
+                    "bindings": {"proximity": "nearby"},
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.95,
+                }
+            ],
+        )
+        client.fast_advances = [
+            FastPlannerAdvance(
+                turn_id=envelope.turn_id,
+                covered_responsibility_refs=["restaurant"],
+                continuations=["goal_association"],
+                confidence=0.95,
+                reason_summary="Capability availability is decided after canonical Goal binding.",
+            )
+        ]
         result = asyncio.run(
             coordinator.resolve(
                 object(),
                 text="附近有啥好吃的？",
                 sid="sid-missing-restaurant",
-                route_decision=route,
+                core_interpretation=core,
                 context={"history": [], "active_goal_snapshots": []},
                 history=[],
                 language="zh-CN",
+                turn_envelope=envelope,
             )
         )
 
         self.assertEqual(result.status, "applied")
-        self.assertEqual(result.lane, "chat")
-        self.assertEqual(client.calls, [])
-        self.assertIsNone(result.goal_association)
-        self.assertIsNone(result.terminal_plan)
-        self.assertTrue(result.metadata["deep_planner_avoided"])
-        self.assertEqual(
-            result.metadata["fast_planner_path"],
+        self.assertEqual(client.calls[:2], ["advance", "association"])
+        self.assertNotEqual(
+            result.metadata.get("fast_planner_path"),
             "terminal_missing_ability",
         )
-        interaction = result.interaction_response
-        self.assertIsNotNone(interaction)
-        assert interaction is not None
-        self.assertEqual(interaction.status, "clarify")
-        self.assertEqual(interaction.skills, [])
-        self.assertIn("餐厅搜索和推荐能力", interaction.speech[0].text)
-        self.assertEqual(
-            interaction.metadata["desired_abilities"][0]["ability_id"],
-            "local.restaurant_recommendation",
-        )
-        self.assertEqual(
-            interaction.metadata["task_proposals"][0]["state"],
-            "missing_ability",
-        )
-        self.assertTrue(interaction.metadata["goal_understood"])
-        self.assertEqual(interaction.metadata["capability_state"], "unavailable")
-        self.assertEqual(interaction.metadata["execution_state"], "not_attempted")
-        self.assertEqual(interaction.metadata["result_state"], "not_observed")
-        self.assertFalse(interaction.metadata["execution_attempted"])
-        self.assertIn(
-            "capability_unavailable",
-            interaction.speech[0].metadata["claims"],
-        )
-        audited = annotate_task_proposal_ledger(interaction)
-        ledger = TaskProposalLedger.model_validate(
-            audited.metadata["task_proposal_ledger"]
-        )
-        missing = [
-            proposal
-            for proposal in ledger.proposals
-            if proposal.state == "missing_ability"
-        ]
-        self.assertEqual(len(missing), 1)
-        self.assertEqual(
-            missing[0].ability_id,
-            "local.restaurant_recommendation",
-        )
-        self.assertEqual(ledger.summary.effectful_proposal_count, 0)
 
     def test_report_only_builds_terminal_plan_without_interaction(self):
         client = ScriptedClient(
@@ -975,8 +999,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         result = self.run_resolution(coordinator, client)
         self.assertEqual(result.status, "report_only")
         self.assertIsNone(result.interaction_response)
-        self.assertEqual(client.calls, ["association", "fast", "compose"])
-        self.assertEqual(result.metadata["architecture_attribution"], "not_evaluated")
+        self.assertEqual(client.calls, ["advance", "association", "compose"])
 
     def test_response_composer_receives_playback_started_current_turn_speech(self):
         client = ScriptedClient(
@@ -1065,7 +1088,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         self.assertEqual(result.status, "error")
         self.assertEqual(result.metadata["failure_stage"], "goal_association")
-        self.assertEqual(client.calls, ["association"])
+        self.assertEqual(client.calls, ["advance", "association"])
 
     def test_goal_association_clarification_skips_planners_and_composes_directly(self):
         association = GoalAssociationResolution(
@@ -1087,7 +1110,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(result.status, "applied")
         self.assertEqual(result.terminal_plan.disposition, "clarify")
         self.assertEqual(result.interaction_response.speech[0].text, "Which direction should I move?")
-        self.assertEqual(client.calls, ["association", "compose"])
+        self.assertEqual(client.calls, ["advance", "association", "compose"])
 
     def test_resolved_empty_goal_set_fails_closed_before_planning(self):
         association = GoalAssociationResolution(
@@ -1114,7 +1137,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         self.assertEqual(result.status, "error")
         self.assertEqual(result.metadata["failure_class"], "empty_canonical_goal_set")
-        self.assertEqual(client.calls, ["association"])
+        self.assertEqual(client.calls, ["advance", "association"])
 
     def test_apply_chat_returns_speech_only_interaction(self):
         client = ScriptedClient(
@@ -1131,7 +1154,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(result.lane, "chat")
         self.assertEqual(result.interaction_response.skills, [])
         self.assertEqual(result.interaction_response.speech[0].text, "你好。")
-        self.assertEqual(result.metadata["fast_planner_path"], "terminal")
+        self.assertEqual(result.metadata["fast_planner_path"], "direct_vocal_output")
         self.assertFalse(result.metadata["deep_planner_invoked"])
         self.assertTrue(result.metadata["deep_planner_avoided"])
 
@@ -1208,7 +1231,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(goal_context["plan_status"], "failed")
         self.assertNotEqual(goal_context["status"], "done")
 
-    def test_compatibility_chat_route_cannot_suppress_canonical_robot_action(self):
+    def test_canonical_robot_action_lane_comes_from_goal_state_not_pre_goal_label(self):
         fast = execute_plan(plan_id="fast-canonical-body").model_copy(
             update={
                 "planner_tier": "fast",
@@ -1238,7 +1261,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         self.assertEqual(result.status, "applied")
         self.assertEqual(result.lane, "robot_action")
-        self.assertEqual(client.calls, ["association", "fast", "compose"])
+        self.assertEqual(client.calls, ["advance", "association", "fast", "compose"])
         self.assertIsNotNone(result.interaction_response)
         self.assertEqual(
             [item.capability_id for item in result.interaction_response.skills],
@@ -1974,7 +1997,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(result.status, "applied")
-        self.assertEqual(client.calls, ["association", "fast", "compose"])
+        self.assertEqual(client.calls, ["advance", "association", "fast", "compose"])
         self.assertEqual(result.terminal_plan.planner_tier, "fast")
         self.assertEqual(result.metadata["fast_planner_path"], "terminal")
         self.assertFalse(result.metadata["deep_planner_invoked"])
@@ -1994,7 +2017,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             metadata={"path_classification": "semantic_escalation"},
         )
         client = ScriptedClient(
-            association=new_goal_association(),
+            association=body_goal_association(),
             fast_plans=[fast],
             deep_plans=[execute_plan()],
         )
@@ -2045,7 +2068,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             },
         )
         client = ScriptedClient(
-            association=new_goal_association(),
+            association=body_goal_association(),
             fast_plans=[fast],
             deep_plans=[execute_plan()],
         )
@@ -2088,7 +2111,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             },
         )
         client = ScriptedClient(
-            association=new_goal_association(),
+            association=body_goal_association(),
             fast_plans=[fast],
             deep_plans=[execute_plan()],
         )
@@ -2115,7 +2138,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
     def test_apply_robot_action_uses_runtime_confirmation_contract(self):
         client = ScriptedClient(
-            association=new_goal_association(),
+            association=body_goal_association(),
             fast_plans=[
                 CanonicalPlan(
                     plan_id="fast-escalate",
@@ -2184,7 +2207,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
     def test_disabled_apply_lane_fails_closed(self):
         client = ScriptedClient(
-            association=new_goal_association(),
+            association=body_goal_association(),
             fast_plans=[
                 CanonicalPlan(
                     plan_id="fast-escalate",
@@ -2331,7 +2354,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             },
         )
         client = ScriptedClient(
-            association=new_goal_association(),
+            association=body_goal_association(),
             fast_plans=[fast],
             deep_plans=[invalid, revised],
         )
@@ -2416,7 +2439,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             [
                 {
                     "source": "goal_driven_cognitive_runtime_goal_association",
-                    "client_calls": ["association"],
+                    "client_calls": ["advance", "association"],
                 }
             ],
         )
@@ -2431,8 +2454,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         class BlockingPlannerClient(ScriptedClient):
             def __init__(self):
                 super().__init__(
-                    association=new_goal_association("goal-weather"),
-                    fast_plans=[respond_plan("goal-weather")],
+                    association=body_goal_association("goal-weather"),
+                    fast_plans=[execute_plan(goal_id="goal-weather").model_copy(update={"planner_tier": "fast"})],
                 )
                 self.planner_started = asyncio.Event()
                 self.release_planner = asyncio.Event()
@@ -2447,26 +2470,22 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         client = BlockingPlannerClient()
         coordinator = GoalDrivenRuntimeCoordinator(
             agent_client=client,
-            adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
+            adapter=CanonicalPlanRuntimeAdapter(FakeRuntime([blink_definition()])),
             policy=CognitiveRuntimePolicy(mode="apply"),
             goal_state_apply=manager.apply_goal_association_resolution,
         )
 
         async def run():
+            core, envelope = admitted_core(
+                "check the weather", sid="sid-weather", language="en-US"
+            )
             task = asyncio.create_task(
                 coordinator.resolve(
                     object(),
                     text="check the weather",
                     sid="sid-weather",
-                    route_decision=type(
-                        "Decision",
-                        (),
-                        {
-                            "route": "chat",
-                            "intent": "conversation",
-                            "language": "en-US",
-                        },
-                    )(),
+                    core_interpretation=core,
+                    turn_envelope=envelope,
                     context={"history": [], "active_goal_snapshots": []},
                     history=[],
                     language="en-US",
@@ -2485,7 +2504,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         result = asyncio.run(run())
         self.assertEqual(result.status, "applied")
-        self.assertEqual(client.calls, ["association", "fast", "compose"])
+        self.assertEqual(client.calls, ["advance", "association", "fast", "compose"])
 
     def test_named_cancellation_is_not_committed_before_runtime_closure(self):
         association = GoalAssociationResolution(
@@ -2631,16 +2650,16 @@ class CognitiveEvidenceTests(unittest.TestCase):
                 adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
                 policy=CognitiveRuntimePolicy(mode="report_only"),
             )
+            core, envelope = admitted_core(
+                "private text", sid="sid-evidence", language="en-US"
+            )
             result = asyncio.run(
                 coordinator.resolve(
                     object(),
                     text="private text",
                     sid="sid-evidence",
-                    route_decision=type(
-                        "Decision",
-                        (),
-                        {"route": "chat", "intent": "conversation", "language": "en-US"},
-                    )(),
+                    core_interpretation=core,
+                    turn_envelope=envelope,
                     context={"history": []},
                     history=[],
                     language="en-US",

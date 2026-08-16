@@ -10,7 +10,6 @@ from orchestrator.runtime.confirmation import (
     PendingConfirmation,
 )
 from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
-from orchestrator.schemas.route import RouteDecision
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
@@ -404,7 +403,7 @@ async def _dispatch_goal_work_stop(
     resolution: CognitiveRuntimeResolution,
     session_id: str,
     user_text: str,
-    decision: RouteDecision,
+    language: str,
     target_goal_ids: set[str],
     target_responsibility_status: str,
     dispatch_reason: str,
@@ -464,7 +463,7 @@ async def _dispatch_goal_work_stop(
             _build_confirmation_remainder(
                 confirmation_dialogue=confirmation_dialogue,
                 target_goal_ids=target_goal_ids,
-                language=decision.language,
+                language=language,
             )
         )
     except ValueError as exc:
@@ -588,8 +587,8 @@ async def _dispatch_goal_work_stop(
             "confirmation_transition": confirmation_transition,
             "sid": session_id,
             "user_text": user_text,
-            "route": decision.route,
-            "intent": decision.intent,
+            "route": None,
+            "intent": None,
             "source": source,
         }
         goal_state_results = reconcile_fn(association, **reconcile_kwargs)
@@ -673,7 +672,7 @@ async def dispatch_named_goal_cancellation(
     resolution: CognitiveRuntimeResolution,
     session_id: str,
     user_text: str,
-    decision: RouteDecision,
+    language: str,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     return await _dispatch_goal_work_stop(
         conversation_state=conversation_state,
@@ -682,7 +681,7 @@ async def dispatch_named_goal_cancellation(
         resolution=resolution,
         session_id=session_id,
         user_text=user_text,
-        decision=decision,
+        language=language,
         target_goal_ids=cancellation_target_goal_ids(resolution),
         target_responsibility_status="cancelled",
         dispatch_reason="Core-resolved named Goal cancellation",
@@ -698,7 +697,7 @@ async def dispatch_goal_replacement(
     resolution: CognitiveRuntimeResolution,
     session_id: str,
     user_text: str,
-    decision: RouteDecision,
+    language: str,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     return await _dispatch_goal_work_stop(
         conversation_state=conversation_state,
@@ -707,7 +706,7 @@ async def dispatch_goal_replacement(
         resolution=resolution,
         session_id=session_id,
         user_text=user_text,
-        decision=decision,
+        language=language,
         target_goal_ids=replacement_target_goal_ids(resolution),
         target_responsibility_status="superseded",
         dispatch_reason="Core-resolved Goal replacement Work stop",

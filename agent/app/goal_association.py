@@ -23,7 +23,10 @@ from .cognitive_identity import (
     bounded_identity_json,
     bounded_personality_json,
 )
-from .schema import AgentRunRequest
+try:
+    from chromie_contracts.core_interpretation import CognitiveWorkRequest
+except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 
 try:
     from chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
@@ -999,7 +1002,7 @@ class GoalAssociationResolver:
         self.num_ctx = max(2048, int(num_ctx))
         self.num_predict = max(128, int(num_predict))
 
-    async def resolve(self, request: AgentRunRequest) -> GoalAssociationResolution:
+    async def resolve(self, request: CognitiveWorkRequest) -> GoalAssociationResolution:
         trace_scope = runtime_tracer.continue_from_context(request.context)
         if not trace_scope.enabled:
             return await self._resolve(request)
@@ -1028,7 +1031,7 @@ class GoalAssociationResolver:
         runtime_tracer.attach_fragment(result.metadata, trace_scope)
         return result
 
-    async def _resolve(self, request: AgentRunRequest) -> GoalAssociationResolution:
+    async def _resolve(self, request: CognitiveWorkRequest) -> GoalAssociationResolution:
         """Resolve one turn through the bounded Goal semantic transaction."""
 
         candidate_goals = self._candidate_goals(request)
@@ -1432,7 +1435,7 @@ class GoalAssociationResolver:
         self,
         raw: dict[str, Any],
         *,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         turn_id: str,
         output_type: (
             type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
@@ -1649,7 +1652,7 @@ class GoalAssociationResolver:
     def _non_verbatim_explicit_location_bindings(
         model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
         *,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
     ) -> list[str]:
         """Reject ungrounded rewrites of directly named locations.
 
@@ -2035,7 +2038,7 @@ class GoalAssociationResolver:
             )
         return schema
 
-    def _candidate_goals(self, request: AgentRunRequest) -> list[dict[str, Any]]:
+    def _candidate_goals(self, request: CognitiveWorkRequest) -> list[dict[str, Any]]:
         context = request.context if isinstance(request.context, dict) else {}
         active = context.get("active_goal_snapshots")
         recent = context.get("recent_goal_snapshots")
@@ -2070,7 +2073,7 @@ class GoalAssociationResolver:
                 continue
         return out
 
-    def _discourse_referents(self, request: AgentRunRequest) -> list[dict[str, Any]]:
+    def _discourse_referents(self, request: CognitiveWorkRequest) -> list[dict[str, Any]]:
         context = request.context if isinstance(request.context, dict) else {}
         raw = context.get("discourse_referents")
         if not isinstance(raw, list):
@@ -2096,7 +2099,7 @@ class GoalAssociationResolver:
         return out
 
     @staticmethod
-    def _situation_projection(request: AgentRunRequest) -> dict[str, Any]:
+    def _situation_projection(request: CognitiveWorkRequest) -> dict[str, Any]:
         context = request.context if isinstance(request.context, dict) else {}
         raw = context.get("situation")
         if not isinstance(raw, dict):
@@ -2108,7 +2111,7 @@ class GoalAssociationResolver:
             return {}
 
     @staticmethod
-    def _turn_id(request: AgentRunRequest) -> str:
+    def _turn_id(request: CognitiveWorkRequest) -> str:
         seed = f"{request.sid or 'turn'}|{request.text}"
         return f"turn_{hashlib.sha256(seed.encode('utf-8')).hexdigest()[:20]}"
 
@@ -2162,7 +2165,7 @@ class GoalAssociationResolver:
 
     def _build_prompt(
         self,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         candidate_goals: list[dict[str, Any]],
         *,
         output_type: (
@@ -2203,8 +2206,8 @@ class GoalAssociationResolver:
             )
         return (
             state_instructions
-            + "The supplied pre-association route and intent are advisory only. "
-            "They must not force a clarification branch or attach the turn to an existing Goal. "
+            + "Goal Association receives provider-neutral Responsibility evidence, not a route or intent classification. "
+            "No compatibility label may force a clarification branch or attach the turn to an existing Goal. "
             "Create or associate a Goal only when the human-level owed outcome is semantically defined. A material entity or parameter that determines what Chromie owes the user belongs to Goal meaning, not to Planner execution detail; if that material meaning remains unresolved after the authoritative user turn, discourse, retained-Goal bindings, and Situation context, return clarification instead of inventing a value or deferring it to planning. The Planner owns only execution information needed to realize an already-defined outcome. "
             + "The model-facing contract is deliberately small. "
             "The host owns all IDs, versions, source text, constraints, metadata, persistence fields, and canonical object construction. "
@@ -2241,11 +2244,9 @@ class GoalAssociationResolver:
             + "Bounded active goals JSON:\n"
             f"{self._bounded_json(candidate_goals, 6500)}\n\n"
             "Responsibility evidence JSON (Core-authored provider-neutral semantic handoff from Goal Interpretation. These are not canonical Goals. Preserve the WHAT and material bindings; use the authoritative user turn, discourse, retained Goal state, and Situation only to associate continuity or identify a real representation mismatch, never to silently rewrite the Responsibility. Goal Association alone decides create/continue/modify/supersede canonical Goal state. Never infer a Capability, provider, execution method, executable argument, or response wording here):\n"
-            f"{self._bounded_json(context.get('responsibility_proposals') or [], 4200)}\n\n"
+            f"{self._bounded_json([item.model_dump(mode='json', exclude_none=True) for item in request.responsibilities], 4200)}\n\n"
             "Pre-Goal Fast Planner continuity markers JSON (same Fast Planner, earlier lifecycle phase. Response wording is intentionally absent because Planner HOW is not Goal Association input. An immediate Activity is not a Goal, not human Responsibility evidence, and must never become or justify a sibling Goal. Associate only the underlying Responsibility evidence to canonical Goal state):\n"
             f"{self._bounded_json(self._fast_planner_advance_goal_projection(context), 1800)}\n\n"
-            "Legacy current-turn progress candidates JSON (compatibility-only; maintained Goal Interpretation leaves this empty because Fast Planner owns conversational Activities):\n"
-            f"{self._bounded_json(context.get('progress_candidates') or [], 1800)}\n\n"
             "Bounded active task/progress snapshots JSON:\n"
             f"{self._bounded_json(context.get('active_task_snapshots') or [], 5200)}\n\n"
             f"{goal_progress_communication_prompt('Goal Association')}\n\n"
@@ -2269,7 +2270,7 @@ class GoalAssociationResolver:
     def _build_repair_prompt(
         self,
         *,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         candidate_goals: list[dict[str, Any]],
         turn_id: str,
         output_type: (
@@ -2354,7 +2355,7 @@ class GoalAssociationResolver:
 
     def _layered_prompt(
         self,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         candidate_goals: list[dict[str, Any]],
         *,
         output_type: (
@@ -2386,7 +2387,7 @@ class GoalAssociationResolver:
     def _layered_repair_prompt(
         self,
         *,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         candidate_goals: list[dict[str, Any]],
         turn_id: str,
         output_type: (
@@ -2434,7 +2435,7 @@ class GoalAssociationResolver:
     def _responsibility_coverage_required(
         model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
         *,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
     ) -> bool:
         """Audit every newly proposed Goal set and no non-creation branch.
 
@@ -2596,7 +2597,7 @@ class GoalAssociationResolver:
         cls,
         raw: Any,
         *,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         goal_count: int,
     ) -> GoalResponsibilityCoverageCertificate:
         if not isinstance(raw, dict):
@@ -2708,7 +2709,7 @@ class GoalAssociationResolver:
     def _build_fresh_interpretation_prompt(
         self,
         *,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         candidate_goals: list[dict[str, Any]],
         output_type: (
             type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
@@ -2787,7 +2788,7 @@ class GoalAssociationResolver:
     def _build_responsibility_coverage_prompt(
         self,
         *,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         raw: dict[str, Any],
     ) -> str:
         context = request.context if isinstance(request.context, dict) else {}
@@ -2988,7 +2989,7 @@ class GoalAssociationResolver:
         self,
         model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
         *,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         turn_id: str,
     ) -> GoalAssociationResolution:
         candidate_goals = self._candidate_goals(request)
@@ -3425,7 +3426,7 @@ class GoalAssociationResolver:
         resolution: GoalAssociationResolution,
         *,
         candidate_goals: list[dict[str, Any]],
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
     ) -> GoalAssociationResolution:
         candidate_ids = {
             str(item.get("goal_id") or "") for item in candidate_goals
@@ -3489,7 +3490,7 @@ class GoalAssociationResolver:
 
     @staticmethod
     def _safe_clarification(
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         *,
         has_candidate_goals: bool,
     ) -> str:

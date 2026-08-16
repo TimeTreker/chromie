@@ -27,6 +27,7 @@ try:
     )
     from chromie_contracts.tool_result import ToolResultInterpretationRequest
     from chromie_contracts.plan import CanonicalPlan
+    from chromie_contracts.core_interpretation import CognitiveWorkRequest
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.agent_skill import (
         AgentSkillDisclosureFailure,
@@ -43,6 +44,7 @@ except ImportError:  # pragma: no cover - repository development path
     )
     from shared.chromie_contracts.tool_result import ToolResultInterpretationRequest
     from shared.chromie_contracts.plan import CanonicalPlan
+    from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 
 from ..schema import AgentRunRequest
 
@@ -408,15 +410,28 @@ def _strip_untrusted_disclosure_context(context: dict[str, Any] | None) -> tuple
     return clean, removed
 
 def build_agent_skill_selection_request(
-    request: AgentRunRequest,
+    request: AgentRunRequest | CognitiveWorkRequest,
     *,
     agent_role: AgentSkillProjectionName,
 ) -> AgentSkillSelectionRequest:
     context = request.context if isinstance(request.context, dict) else {}
     sid = str(request.sid or context.get("session_id") or "agent-turn")
-    summary = [f"route={request.route_decision.route}"]
-    if request.route_decision.intent:
-        summary.append(f"intent={request.route_decision.intent}")
+    if isinstance(request, CognitiveWorkRequest):
+        summary = [
+            "responsibilities="
+            + "; ".join(
+                item.outcome[:160] for item in request.responsibilities[:4]
+            )
+        ]
+        if request.interpretation_unresolved:
+            summary.append(
+                "unresolved="
+                + "; ".join(request.interpretation_unresolved[:4])
+            )
+    else:
+        summary = [f"route={request.route_decision.route}"]
+        if request.route_decision.intent:
+            summary.append(f"intent={request.route_decision.intent}")
     current_goal_ids = _association_goal_ids(context)
     allowed_goal_ids = current_goal_ids if current_goal_ids else None
     # Goal Association has not yet decided which canonical Goal(s) the current
@@ -745,7 +760,7 @@ def _canonical_plan_from_context(context: dict[str, Any]) -> CanonicalPlan | Non
 
 def _planner_selection_for_role(
     *,
-    request: AgentRunRequest,
+    request: AgentRunRequest | CognitiveWorkRequest,
     agent_role: AgentSkillProjectionName,
     registry: AgentSkillRegistry,
 ) -> AgentSkillSelectionResolution | None:
@@ -868,9 +883,9 @@ class AgentSkillProgressiveDisclosureCoordinator:
 
     async def prepare_agent_request(
         self,
-        request: AgentRunRequest,
+        request: CognitiveWorkRequest,
         agent_role: AgentSkillProjectionName,
-    ) -> tuple[AgentRunRequest, AgentSkillDisclosureResolution]:
+    ) -> tuple[CognitiveWorkRequest, AgentSkillDisclosureResolution]:
         clean_context, removed_untrusted = _strip_untrusted_disclosure_context(
             request.context
         )
