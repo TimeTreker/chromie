@@ -84,13 +84,10 @@ STANDARD_CALLS = (
 )
 STATUS_CALL = "soridormi.robot.get_status"
 CANCEL_CALLS = (*STANDARD_CALLS, "soridormi.motion.cancel")
-GENERIC_FAILURE = ("I could not complete that movement safely.",)
-TIMEOUT_FAILURE = (
-    "The movement timed out, and I could not confirm it completed safely.",
-)
-SAFETY_FAILURE = (
-    "The safety check did not pass, so I did not perform that movement.",
-)
+NO_HOST_SEMANTIC_SPEECH: tuple[str, ...] = ()
+GENERIC_FAILURE = NO_HOST_SEMANTIC_SPEECH
+TIMEOUT_FAILURE = NO_HOST_SEMANTIC_SPEECH
+SAFETY_FAILURE = NO_HOST_SEMANTIC_SPEECH
 
 SCENARIOS = (
     FaultScenario(
@@ -98,7 +95,7 @@ SCENARIOS = (
         "completed",
         "completed",
         None,
-        ("Done.",),
+        NO_HOST_SEMANTIC_SPEECH,
         (*STANDARD_CALLS, STATUS_CALL),
     ),
     FaultScenario(
@@ -113,7 +110,7 @@ SCENARIOS = (
         "skill_unavailable",
         "failed",
         "failed",
-        "skill_unavailable",
+        "capability_unavailable",
         GENERIC_FAILURE,
         ("soridormi.skill.list", STATUS_CALL),
     ),
@@ -122,7 +119,7 @@ SCENARIOS = (
         "completed",
         "completed",
         None,
-        ("Done.",),
+        NO_HOST_SEMANTIC_SPEECH,
         (*STANDARD_CALLS, STATUS_CALL),
     ),
     FaultScenario(
@@ -185,7 +182,7 @@ SCENARIOS = (
         "execute_skill_mismatch",
         "failed",
         "failed",
-        "execution_skill_mismatch",
+        "execution_capability_mismatch",
         GENERIC_FAILURE,
         (*STANDARD_CALLS, STATUS_CALL),
     ),
@@ -218,7 +215,7 @@ SCENARIOS = (
         "operator_cancel",
         "cancelled",
         "cancelled",
-        "cancelled",
+        "cancelled_current_interaction",
         ("Starting.",),
         (*CANCEL_CALLS, STATUS_CALL),
         operator_cancel=True,
@@ -253,9 +250,9 @@ class ScenarioInvoker:
             return ToolCallOutcome.success(
                 {
                     "mode": "sim",
-                    "capabilities": [
+                    "skills": [
                         {
-                            "capability_id": "nod_yes",
+                            "skill_id": "nod_yes",
                             "available": available,
                             "unavailable_reason": (
                                 None
@@ -289,7 +286,7 @@ class ScenarioInvoker:
                     retryable=True,
                 )
             if scenario_id == "malformed_plan":
-                return ToolCallOutcome.success({"capability_id": "nod_yes"})
+                return ToolCallOutcome.success({"skill_id": "nod_yes"})
             return ToolCallOutcome.success({"plan_id": "plan-fault-matrix"})
         if tool_name == "soridormi.safety.monitor_motion":
             if scenario_id == "monitor_refused":
@@ -314,11 +311,11 @@ class ScenarioInvoker:
                 await asyncio.sleep(5)
             if scenario_id == "execute_incomplete":
                 return ToolCallOutcome.success(
-                    {"completed": False, "capability_id": "nod_yes"}
+                    {"completed": False, "skill_id": "nod_yes"}
                 )
             if scenario_id == "execute_skill_mismatch":
                 return ToolCallOutcome.success(
-                    {"completed": True, "capability_id": "wave_hand"}
+                    {"completed": True, "skill_id": "wave_hand"}
                 )
             if scenario_id == "execute_timeout":
                 return ToolCallOutcome(
@@ -331,7 +328,7 @@ class ScenarioInvoker:
                     retryable=True,
                 )
             return ToolCallOutcome.success(
-                {"completed": True, "capability_id": "nod_yes"}
+                {"completed": True, "skill_id": "nod_yes"}
             )
         if tool_name == "soridormi.motion.cancel":
             return ToolCallOutcome.success({"cancelled": True})
@@ -476,13 +473,14 @@ async def run_scenario(
         ],
         metadata={"language": "en-US", "fault_scenario": scenario.scenario_id},
     )
-    task = asyncio.create_task(
-        coordinator.execute(response, session_id=f"fault-{scenario.scenario_id}")
+    dispatch = await coordinator.submit_response(
+        response, session_id=f"fault-{scenario.scenario_id}"
     )
+    task = asyncio.create_task(coordinator.wait_dispatch(dispatch))
     if scenario.operator_cancel:
         await asyncio.wait_for(invoker.execute_started.wait(), timeout=1)
         invoker.execute_started_at = time.perf_counter()
-        task.cancel()
+        await coordinator.runtime.cancel_interaction(response.interaction_id)
     execution = await task
     execution_finished_at = time.perf_counter()
     terminal_latency_ms = (

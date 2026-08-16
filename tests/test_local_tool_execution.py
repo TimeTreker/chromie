@@ -173,7 +173,7 @@ class LocalToolExecutionTests(unittest.IsolatedAsyncioTestCase):
             lambda args: {"spoken": True},
             agent_tool_handler=handler,
         )
-        result = await coordinator.execute(
+        dispatch = await coordinator.submit_response(
             InteractionResponse(
                 interaction_id="interaction-weather",
                 capabilities=[
@@ -192,6 +192,7 @@ class LocalToolExecutionTests(unittest.IsolatedAsyncioTestCase):
             ),
             session_id="sid-weather",
         )
+        result = await coordinator.wait_dispatch(dispatch)
 
         self.assertEqual(result.status, "completed")
         self.assertEqual(result.results[0].status, "completed")

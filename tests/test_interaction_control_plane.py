@@ -143,7 +143,7 @@ class _RichTaskPlanner:
 
 
 class InteractionControlPlaneTests(unittest.IsolatedAsyncioTestCase):
-    async def test_text_nod_reaches_named_skill_runtime(self) -> None:
+    async def test_text_nod_reaches_named_capability_runtime(self) -> None:
         route_request = RouteRequest(sid="interaction-nod", text="nod")
         decision = _nod_route(route_request)
 
@@ -162,14 +162,16 @@ class InteractionControlPlaneTests(unittest.IsolatedAsyncioTestCase):
         )
         spoken: list[str] = []
         invoker = _NamedSkillInvoker()
-        execution = await InteractionRuntimeCoordinator(
+        coordinator = InteractionRuntimeCoordinator(
             lambda args: spoken.append(str(args["text"])) or {"scheduled": True},
             soridormi_invoker=invoker,
-        ).execute(
+        )
+        dispatch = await coordinator.submit_response(
             response,
             session_id=route_request.sid,
             confirmed_request_ids={response.capabilities[0].request_id},
         )
+        execution = await coordinator.wait_dispatch(dispatch)
 
         self.assertEqual(execution.status, "completed")
         self.assertEqual(response.capabilities[0].capability_id, "soridormi.nod_yes")
@@ -230,20 +232,19 @@ class InteractionControlPlaneTests(unittest.IsolatedAsyncioTestCase):
             }
 
         spoken: list[str] = []
-        execution = await InteractionRuntimeCoordinator(
+        coordinator = InteractionRuntimeCoordinator(
             lambda args: spoken.append(str(args["text"])) or {"scheduled": True},
             task_graph_handler=execute_graph,
-        ).execute(response, session_id="rich-task")
+        )
+        dispatch = await coordinator.submit_response(response, session_id="rich-task")
+        execution = await coordinator.wait_dispatch(dispatch)
 
         self.assertEqual(response.capabilities[0].capability_id, "chromie.task_graph.execute")
         self.assertEqual(graphs[0]["graph_id"], "rich-body-task")
         self.assertEqual(execution.status, "failed")
         self.assertEqual(execution.results[0].capability_id, "chromie.task_graph.execute")
         self.assertNotIn("Arrived.", spoken)
-        self.assertEqual(
-            spoken,
-            ["I could not complete that task safely."],
-        )
+        self.assertEqual(spoken, [])
 
 
 if __name__ == "__main__":

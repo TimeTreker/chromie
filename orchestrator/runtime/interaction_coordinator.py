@@ -68,10 +68,6 @@ from .conversation_memory_provider import (
     ConversationMemoryCapabilityProvider,
     host_runtime_memory_definitions,
 )
-from .body_recovery import (
-    build_body_recovery_confirmation,
-    conservative_body_failure_message,
-)
 from .interaction_preflight import annotate_preflight_validation
 from .task_proposals import annotate_task_proposal_ledger
 
@@ -80,7 +76,7 @@ SpeechCancelScheduler = Callable[
     [CapabilityRequest, dict[str, Any]],
     None | Awaitable[None],
 ]
-_TASK_GRAPH_SKILL_ID = "chromie.task_graph.execute"
+_TASK_GRAPH_CAPABILITY_ID = "chromie.task_graph.execute"
 
 
 def _float_env(name: str, default: float, *, minimum: float = 0.0) -> float:
@@ -116,7 +112,7 @@ class ReadyPlannerVocalExecution:
 
 
 @dataclass
-class CognitiveCapabilityDispatch:
+class CapabilityInteractionDispatch:
     """Detached cognitive Capability dispatch owned by the trusted Runtime.
 
     This is a bounded Host integration handle, not a second execution owner.
@@ -152,8 +148,6 @@ class InteractionRuntimeCoordinator:
         capability_manifest_paths: str | None = None,
         max_concurrency: int | None = None,
         catalog_refresh_ttl_s: float | None = None,
-        body_recovery_max_attempts: int | None = None,
-        body_recovery_confirmation_ttl_s: float | None = None,
         interaction_ledger: Any | None = None,
     ) -> None:
         self.registry = CapabilityRegistry()
@@ -216,20 +210,6 @@ class InteractionRuntimeCoordinator:
             else _float_env(
                 "ORCH_SORIDORMI_CATALOG_REFRESH_TTL_S",
                 30.0,
-            )
-        )
-        self.body_recovery_max_attempts = (
-            max(0, int(body_recovery_max_attempts))
-            if body_recovery_max_attempts is not None
-            else _int_env("ORCH_BODY_RECOVERY_MAX_ATTEMPTS", 1)
-        )
-        self.body_recovery_confirmation_ttl_s = (
-            max(1.0, float(body_recovery_confirmation_ttl_s))
-            if body_recovery_confirmation_ttl_s is not None
-            else _float_env(
-                "ORCH_BODY_RECOVERY_CONFIRMATION_TTL_S",
-                10.0,
-                minimum=1.0,
             )
         )
         self._catalog_lock = asyncio.Lock()
@@ -372,27 +352,21 @@ class InteractionRuntimeCoordinator:
             consumed_traces,
         )
 
-    async def submit_cognitive_response(
+    async def submit_response(
         self,
         response: InteractionResponse,
         *,
         session_id: str | None,
         confirmed_request_ids: set[str] | None = None,
-    ) -> CognitiveCapabilityDispatch:
-        """Dispatch one effectful cognitive response without joining providers.
+    ) -> CapabilityInteractionDispatch:
+        """Prepare and submit one InteractionResponse without joining providers.
 
-        The foreground caller may return as soon as this method returns. Runtime
-        ownership then lives behind ``CapabilityDispatchReceipt`` until the
-        submission becomes terminal. Planner-authored ``after_capabilities``
-        speech is deliberately excluded here: once provider work exists, final
-        user-facing claims must be produced from terminal Evidence rather than a
-        pre-authored sentence that could become false while execution is running.
+        This is the only maintained coordinator dispatch boundary.  It returns
+        after Runtime acceptance; callers that genuinely need terminal delivery
+        must join explicitly with :meth:`wait_dispatch`.  Cognitive effectful
+        responses additionally defer planner-authored terminal wording until
+        terminal Evidence exists.
         """
-
-        if not self._is_cognitive_effectful(response):
-            raise ValueError(
-                "submit_cognitive_response requires an effectful cognitive response"
-            )
 
         raw_body_requests = [
             request
@@ -417,9 +391,8 @@ class InteractionRuntimeCoordinator:
                         else "catalog_unavailable"
                     ),
                     message=str(exc),
-                    suppress_speech=True,
                 )
-                return CognitiveCapabilityDispatch(
+                return CapabilityInteractionDispatch(
                     source_response=response,
                     runtime_response=response.model_copy(
                         deep=True,
@@ -451,7 +424,7 @@ class InteractionRuntimeCoordinator:
             )
 
         if prepared.status == "error" and not prepared.capabilities and not prepared.speech:
-            return CognitiveCapabilityDispatch(
+            return CapabilityInteractionDispatch(
                 source_response=prepared,
                 runtime_response=prepared,
                 receipt=None,
@@ -471,7 +444,7 @@ class InteractionRuntimeCoordinator:
         task_graph_requests = [
             request
             for request in prepared.capabilities
-            if request.capability_id == _TASK_GRAPH_SKILL_ID
+            if request.capability_id == _TASK_GRAPH_CAPABILITY_ID
         ]
         if task_graph_requests and not self._task_graph_enabled:
             failed = await self._body_setup_failure(
@@ -483,9 +456,8 @@ class InteractionRuntimeCoordinator:
                     "InteractionResponse requested a TaskGraph, but host "
                     "TaskGraph execution is disabled"
                 ),
-                suppress_speech=True,
             )
-            return CognitiveCapabilityDispatch(
+            return CapabilityInteractionDispatch(
                 source_response=prepared,
                 runtime_response=prepared.model_copy(deep=True, update={"speech": []}),
                 receipt=None,
@@ -507,9 +479,8 @@ class InteractionRuntimeCoordinator:
                     session_id=session_id,
                     reason_code="capability_unavailable",
                     message=definition.unavailable_reason or "unavailable",
-                    suppress_speech=True,
                 )
-                return CognitiveCapabilityDispatch(
+                return CapabilityInteractionDispatch(
                     source_response=prepared,
                     runtime_response=prepared.model_copy(
                         deep=True,
@@ -521,21 +492,24 @@ class InteractionRuntimeCoordinator:
                     preexecuted_traces=[],
                 )
 
-        # Result-dependent speech cannot be truthful before terminal Evidence.
-        # Keep immediate/progress speech, but remove planner-authored terminal
-        # wording from the live Runtime scope. The later result re-entry owns it.
+        # Result-dependent completion speech cannot be truthful before terminal
+        # Evidence.  Any response that also dispatches capabilities therefore
+        # drops pre-authored ``after_capabilities`` wording from the executable
+        # response. Cognitive result re-entry may compose grounded follow-up;
+        # non-cognitive/internal dispatch stays silent rather than inventing a
+        # completion claim.
         deferred_speech_ids = [
             speech.id
             for speech in prepared.speech
             if speech.timing == "after_capabilities"
-        ]
+        ] if prepared.capabilities else []
         runtime_response = prepared.model_copy(
             deep=True,
             update={
                 "speech": [
                     speech
                     for speech in prepared.speech
-                    if speech.timing != "after_capabilities"
+                    if speech.id not in set(deferred_speech_ids)
                 ],
                 "metadata": {
                     **prepared.metadata,
@@ -560,14 +534,19 @@ class InteractionRuntimeCoordinator:
                 interaction_id=prepared.interaction_id,
                 status=(
                     "completed"
-                    if preexecuted_results
-                    and all(item.status == "completed" for item in preexecuted_results)
+                    if (
+                        not preexecuted_results
+                        or all(
+                            item.status == "completed"
+                            for item in preexecuted_results
+                        )
+                    )
                     else "failed"
                 ),
                 results=list(preexecuted_results),
                 traces=list(preexecuted_traces),
             )
-            return CognitiveCapabilityDispatch(
+            return CapabilityInteractionDispatch(
                 source_response=prepared,
                 runtime_response=runtime_response,
                 receipt=None,
@@ -582,7 +561,7 @@ class InteractionRuntimeCoordinator:
                 confirmed_request_ids=set(confirmed_request_ids or ()),
             ),
         )
-        return CognitiveCapabilityDispatch(
+        return CapabilityInteractionDispatch(
             source_response=prepared,
             runtime_response=runtime_response,
             receipt=receipt,
@@ -591,16 +570,16 @@ class InteractionRuntimeCoordinator:
             preexecuted_traces=preexecuted_traces,
         )
 
-    async def wait_cognitive_dispatch(
+    async def wait_dispatch(
         self,
-        dispatch: CognitiveCapabilityDispatch,
+        dispatch: CapabilityInteractionDispatch,
     ) -> CapabilityRuntimeResult:
-        """Join one detached cognitive dispatch for final aggregate closure only."""
+        """Explicitly join one accepted coordinator dispatch when terminal truth is required."""
 
         if dispatch.immediate_execution is not None:
             return dispatch.immediate_execution
         if dispatch.receipt is None:
-            raise RuntimeError("cognitive capability dispatch has no Runtime receipt")
+            raise RuntimeError("capability interaction dispatch has no Runtime receipt")
         execution = await self.runtime.wait_terminal(dispatch.receipt)
         if not dispatch.preexecuted_results:
             return execution
@@ -625,272 +604,10 @@ class InteractionRuntimeCoordinator:
         *,
         authorization: RuntimeAuthorization | None = None,
     ) -> CapabilityRuntimeResult:
+        """Private explicit join for bounded internal delivery/acceptance paths."""
+
         receipt = await self.runtime.submit(response, authorization=authorization)
         return await self.runtime.wait_terminal(receipt)
-
-    async def execute(
-        self,
-        response: InteractionResponse,
-        *,
-        session_id: str | None,
-        confirmed_request_ids: set[str] | None = None,
-    ) -> CapabilityRuntimeResult:
-        opened = self.runtime.begin_interaction(response.interaction_id)
-        try:
-            return await self._execute_open_interaction(
-                response,
-                session_id=session_id,
-                confirmed_request_ids=confirmed_request_ids,
-            )
-        finally:
-            if opened:
-                self.runtime.end_interaction(response.interaction_id)
-
-    def reserve_interaction(self, interaction_id: str) -> None:
-        """Synchronously expose a launch before any awaitable preflight."""
-
-        if not self.runtime.begin_interaction(interaction_id):
-            raise ValueError(f"cannot reserve an already-open interaction_id={interaction_id!r}")
-
-    def release_interaction(self, interaction_id: str) -> None:
-        self.runtime.end_interaction(interaction_id)
-
-    async def _execute_open_interaction(
-        self,
-        response: InteractionResponse,
-        *,
-        session_id: str | None,
-        confirmed_request_ids: set[str] | None = None,
-    ) -> CapabilityRuntimeResult:
-        raw_body_requests = [
-            request for request in response.capabilities if request.capability_id.startswith("soridormi.")
-        ]
-        suppress_body_failure_speech = self._suppress_body_failure_speech(response)
-        if raw_body_requests:
-            if self.soridormi_invoker is None:
-                try:
-                    await self._ensure_soridormi_catalog(
-                        required_capability_ids=(request.capability_id for request in raw_body_requests),
-                    )
-                except RuntimeError as exc:
-                    if suppress_body_failure_speech:
-                        return await self._body_setup_failure(
-                            response,
-                            raw_body_requests,
-                            session_id=session_id,
-                            reason_code="provider_disabled",
-                            message=str(exc),
-                            suppress_speech=True,
-                        )
-                    raise
-            try:
-                await self._ensure_soridormi_catalog(
-                    required_capability_ids=(request.capability_id for request in raw_body_requests),
-                )
-            except RuntimeError as exc:
-                return await self._body_setup_failure(
-                    response,
-                    raw_body_requests,
-                    session_id=session_id,
-                    reason_code="catalog_unavailable",
-                    message=str(exc),
-                    suppress_speech=suppress_body_failure_speech,
-                )
-
-        prepared = self.prepare_response(
-            response,
-            session_id=session_id,
-            confirmed_request_ids=confirmed_request_ids,
-        )
-        if self.interaction_ledger is not None:
-            envelope = prepared.metadata.get("user_turn_envelope")
-            turn_id = (
-                str(envelope.get("turn_id") or "").strip()
-                if isinstance(envelope, dict)
-                else ""
-            ) or prepared.interaction_id
-            self.interaction_ledger.record_committed_requests(
-                session_id=str(session_id or turn_id),
-                turn_id=turn_id,
-                interaction_id=prepared.interaction_id,
-                requests=prepared.capabilities,
-            )
-        if prepared.status == "error" and not prepared.capabilities and not prepared.speech:
-            return CapabilityRuntimeResult(
-                interaction_id=prepared.interaction_id,
-                status="failed",
-            )
-        suppress_body_failure_speech = self._suppress_body_failure_speech(prepared)
-        body_requests = [
-            request for request in prepared.capabilities if request.capability_id.startswith("soridormi.")
-        ]
-        task_graph_requests = [
-            request for request in prepared.capabilities if request.capability_id == _TASK_GRAPH_SKILL_ID
-        ]
-        gated_requests = [*body_requests, *task_graph_requests]
-        if task_graph_requests and not self._task_graph_enabled:
-            return await self._body_setup_failure(
-                prepared,
-                task_graph_requests,
-                session_id=session_id,
-                reason_code="task_graph_execution_disabled",
-                message=(
-                    "InteractionResponse requested a TaskGraph, but host "
-                    "TaskGraph execution is disabled"
-                ),
-                suppress_speech=suppress_body_failure_speech,
-            )
-        if body_requests:
-            unavailable = [
-                request
-                for request in body_requests
-                if not self.registry.get(request.capability_id).available
-            ]
-            if unavailable:
-                definition = self.registry.get(unavailable[0].capability_id)
-                return await self._body_setup_failure(
-                    prepared,
-                    body_requests,
-                    session_id=session_id,
-                    reason_code="skill_unavailable",
-                    message=definition.unavailable_reason or "unavailable",
-                    suppress_speech=suppress_body_failure_speech,
-                )
-
-        authorized_request_ids = set(confirmed_request_ids or ())
-        after_capabilities_speech = [
-            speech for speech in prepared.speech if speech.timing == "after_capabilities"
-        ]
-        primary = (
-            prepared.model_copy(
-                deep=True,
-                update={
-                    "speech": [
-                        speech for speech in prepared.speech if speech.timing != "after_capabilities"
-                    ]
-                },
-            )
-            if gated_requests and after_capabilities_speech
-            else prepared
-        )
-        primary, preexecuted_results, preexecuted_traces = self._consume_preexecuted(
-            primary
-        )
-        if primary.capabilities or primary.speech:
-            execution = await self._dispatch_to_terminal(
-                primary,
-                authorization=RuntimeAuthorization(
-                    confirmed_request_ids=authorized_request_ids,
-                ),
-            )
-        else:
-            execution = CapabilityRuntimeResult(
-                interaction_id=prepared.interaction_id,
-                status="completed",
-            )
-        if preexecuted_results:
-            merged_results = [*preexecuted_results, *execution.results]
-            merged_traces = [*preexecuted_traces, *execution.traces]
-            execution = execution.model_copy(
-                update={
-                    "results": merged_results,
-                    "traces": merged_traces,
-                    "status": (
-                        "completed"
-                        if merged_results
-                        and all(item.status == "completed" for item in merged_results)
-                        else execution.status
-                    ),
-                }
-            )
-        if not gated_requests:
-            return execution
-
-        gated_request_ids = {request.request_id for request in gated_requests}
-        body_results = [
-            result for result in execution.results if result.request_id in gated_request_ids
-        ]
-        failed_body_results = [
-            result
-            for result in body_results
-            if result.status in {"failed", "refused", "timed_out", "cancelled"}
-        ]
-        if execution.status == "cancelled":
-            return execution
-        if failed_body_results:
-            if suppress_body_failure_speech:
-                return execution
-            recovery_confirmation = build_body_recovery_confirmation(
-                prepared,
-                body_results,
-                max_attempts=self.body_recovery_max_attempts,
-                timeout_s=self.body_recovery_confirmation_ttl_s,
-                language=str(prepared.metadata.get("language") or ""),
-            )
-            if recovery_confirmation is not None:
-                return execution
-            fallback = InteractionResponse(
-                interaction_id=prepared.interaction_id,
-                speech=[
-                    {
-                        "text": self._body_failure_message(
-                            failed_body_results,
-                            language=str(prepared.metadata.get("language") or ""),
-                        ),
-                        "timing": "sequential",
-                        "style": "warning",
-                        "priority": "high",
-                        "interruptible": True,
-                        "metadata": {
-                            "source": "host_body_failure_fallback",
-                            "failed_request_ids": [
-                                result.request_id for result in failed_body_results
-                            ],
-                            "session_id": session_id,
-                        },
-                    }
-                ],
-                metadata={"source": "host_body_failure_fallback"},
-            )
-            fallback_execution = await self._dispatch_to_terminal(fallback)
-            return self._merge_executions(
-                execution,
-                fallback_execution,
-                status="failed",
-            )
-
-        if after_capabilities_speech:
-            followup = InteractionResponse(
-                interaction_id=prepared.interaction_id,
-                speech=after_capabilities_speech,
-                metadata=prepared.metadata,
-            )
-            followup_execution = await self._dispatch_to_terminal(followup)
-            return self._merge_executions(
-                execution,
-                followup_execution,
-                status=("completed" if followup_execution.status == "completed" else "failed"),
-            )
-        return execution
-
-    @classmethod
-    def _suppress_body_failure_speech(
-        cls,
-        response: InteractionResponse,
-    ) -> bool:
-        return bool(
-            cls._is_cognitive_effectful(response)
-            or response.metadata.get("suppress_body_failure_speech") is True
-        )
-
-    @staticmethod
-    def _is_cognitive_effectful(response: InteractionResponse) -> bool:
-        metadata = response.metadata
-        return bool(
-            metadata.get("cognitive_runtime_apply") is True
-            and isinstance(metadata.get("canonical_plan"), dict)
-            and response.capabilities
-        )
 
     def prepare_response(
         self,
@@ -961,105 +678,30 @@ class InteractionRuntimeCoordinator:
         session_id: str | None,
         reason_code: str,
         message: str,
-        suppress_speech: bool = False,
     ) -> CapabilityRuntimeResult:
-        body_results = [
-            CapabilityResult(
-                request_id=request.request_id,
-                capability_id=request.capability_id,
-                capability_version=request.capability_version,
-                status="failed",
-                provider_id="soridormi.mcp",
-                reason_code=reason_code,
-                message=message,
-            )
-            for request in body_requests
-        ]
-        failed = CapabilityRuntimeResult(
-            interaction_id=response.interaction_id,
-            status="failed",
-            results=body_results,
-        )
-        if suppress_speech:
-            return failed
-        fallback = InteractionResponse(
-            interaction_id=response.interaction_id,
-            speech=[
-                {
-                    "text": self._body_failure_message(
-                        body_results,
-                        language=str(response.metadata.get("language") or ""),
-                    ),
-                    "timing": "sequential",
-                    "style": "warning",
-                    "priority": "high",
-                    "interruptible": True,
-                    "metadata": {
-                        "source": "host_body_setup_failure_fallback",
-                        "failed_request_ids": [result.request_id for result in body_results],
-                        "session_id": session_id,
-                    },
-                }
-            ],
-            metadata={"source": "host_body_setup_failure_fallback"},
-        )
-        fallback_execution = await self._dispatch_to_terminal(fallback)
-        return self._merge_executions(
-            failed,
-            fallback_execution,
-            status="failed",
-        )
+        """Return terminal provider-setup Evidence without inventing speech.
 
-    def _body_failure_message(
-        self,
-        results: list[CapabilityResult],
-        *,
-        language: str,
-    ) -> str:
-        zh = language.lower().startswith("zh")
-        if any(result.capability_id == _TASK_GRAPH_SKILL_ID for result in results):
-            if any(result.status == "cancelled" for result in results):
-                return (
-                    "任务已取消，我没有继续执行。"
-                    if zh
-                    else "The task was cancelled, so I did not continue."
-                )
-            if any(result.status == "timed_out" for result in results):
-                return (
-                    "任务执行超时，我无法确认它已安全完成。"
-                    if zh
-                    else "The task timed out, and I could not confirm it completed safely."
-                )
-            return "我无法安全完成这个任务。" if zh else "I could not complete that task safely."
-        if any(result.status == "refused" for result in results):
-            return (
-                "安全检查未通过，我没有执行这个动作。"
-                if zh
-                else "The safety check did not pass, so I did not perform that movement."
-            )
-        if any(result.status == "timed_out" for result in results):
-            return (
-                "动作执行超时，我无法确认它已安全完成。"
-                if zh
-                else "The movement timed out, and I could not confirm it completed safely."
-            )
-        conservative = conservative_body_failure_message(results, language=language)
-        if conservative:
-            return conservative
-        return "我无法安全完成这个动作。" if zh else "I could not complete that movement safely."
+        The trusted coordinator owns lifecycle truth, not semantic recovery
+        wording.  Cognitive result interpretation may decide what to say after
+        this failure becomes canonical Evidence.
+        """
 
-    def _merge_executions(
-        self,
-        first: CapabilityRuntimeResult,
-        second: CapabilityRuntimeResult,
-        *,
-        status: str,
-    ) -> CapabilityRuntimeResult:
+        del session_id
         return CapabilityRuntimeResult(
-            interaction_id=first.interaction_id,
-            status=status,
-            results=[*first.results, *second.results],
-            traces=[*first.traces, *second.traces],
+            interaction_id=response.interaction_id,
+            status="failed",
+            results=[
+                CapabilityResult(
+                    request_id=request.request_id,
+                    capability_id=request.capability_id,
+                    capability_version=request.capability_version,
+                    status="failed",
+                    provider_id="soridormi.mcp",
+                    reason_code=reason_code,
+                    message=message,
+                )
+                for request in body_requests
+            ],
         )
 
     async def confirmation_request_ids(
@@ -1363,7 +1005,7 @@ class InteractionRuntimeCoordinator:
             # chromie.* read-only tools as physical effects by name alone.
             if not metadata and (
                 request.capability_id.startswith("soridormi.")
-                or request.capability_id == _TASK_GRAPH_SKILL_ID
+                or request.capability_id == _TASK_GRAPH_CAPABILITY_ID
                 or request.capability_id == "session.interrupt"
             ):
                 return True

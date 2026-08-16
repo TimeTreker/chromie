@@ -52,7 +52,7 @@ Options:
                              robot_action, tool, memory, clarify, interrupt,
                              or ignore
   --expect-no-skills         Post-run assertion for no Soridormi skill emission
-  --expect-capability SKILL_ID    Post-run assertion for the exact planned skill sequence
+  --expect-capability CAPABILITY_ID    Post-run assertion for the exact planned skill sequence
   --expect-arg I:KEY=VALUE   Post-run assertion for an emitted skill argument
   --reject-internal-speech   Fail if spoken output leaks planner labels or
                              model-facing skill IDs

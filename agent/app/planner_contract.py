@@ -195,7 +195,6 @@ class PlannerCommunicationReview(BaseModel):
 # a ``respond`` outcome. Executable outcomes may also carry prospective
 # ``response_text``; that speech never authorizes or proves the effect.
 RESPONSE_COMPOSER_OWNED_CAPABILITY_IDS = frozenset({"chromie.speak"})
-RESPONSE_COMPOSER_OWNED_SKILL_IDS = RESPONSE_COMPOSER_OWNED_CAPABILITY_IDS
 
 
 def is_planner_step_capability(capability_id: str) -> bool:

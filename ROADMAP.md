@@ -192,7 +192,7 @@ Implement this line as separate focused Issues and separate patches:
   by final aggregate reconciliation. `ExecutionOutcomeBundle` remains final terminal truth,
   not a live scheduler snapshot, and no duplicate completion store is introduced.
 - **Issue — Decouple interaction lifetime from capability lifetime — source implementation complete.**
-  Cognitive effectful turns now submit through `submit_cognitive_response(...)`; the foreground
+  All maintained interaction responses now submit through `submit_response(...)`; the foreground
   interaction task ends after Runtime acceptance while a Runtime-correlated result consumer owns
   lifecycle observation until terminal closure. Each non-final terminal Capability result may
   become exact incremental `ExecutionEvidence`, then an internal `CognitiveOpportunity`, then the
@@ -234,11 +234,15 @@ Implement this line as separate focused Issues and separate patches:
   cognitive plan and never exposes Soridormi activity identity as canonical Capability identity.
   Single named-skill calls keep their existing wire execution path because the checked-in provider
   contract exposes no named-skill status/event endpoint; no fake polling API is invented.
-- **Issue — Delete remaining foreground aggregate-wait behavior.** The old
-  `CapabilityRuntime.execute(...)` compatibility API is already deleted. Once lifecycle
-  events, incremental Evidence, and cognitive re-entry are maintained, remove foreground
-  coordinator joins that still wait for a whole response scope before interaction closure,
-  plus any stale aggregate-only tests/docs. Do not reintroduce a second execution API.
+- **Issue — Delete remaining foreground aggregate-wait behavior — source implementation complete.**
+  The old `CapabilityRuntime.execute(...)`, `InteractionRuntimeCoordinator.execute(...)`, and
+  `VoiceAssistant.execute_interaction_response(...)` aggregate APIs are deleted. Every maintained
+  foreground interaction now dispatches through `submit_response(...)` and returns after Runtime
+  acceptance; terminal joining is explicit only in result consumers or bounded internal call sites
+  that genuinely require terminal truth. Planner-authored `after_capabilities` completion wording
+  is never executed before terminal Evidence, and the coordinator no longer invents semantic failure
+  speech. Repository policy forbids reintroducing the removed aggregate APIs or bypassing detached
+  result consumers.
 
 Each Issue must preserve the central authority invariant: Runtime owns execution lifecycle;
 LLM/Core owns meaning. Framework choice must not turn transport, queues, workflows, or

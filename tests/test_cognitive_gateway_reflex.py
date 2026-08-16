@@ -925,17 +925,18 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
             "newer": asyncio.Event(),
         }
 
-        async def execute_interaction_response(
+        async def dispatch_detached_interaction(
             self: VoiceAssistant,
             response: InteractionResponse,
             session_id: str | None,
             **kwargs: Any,
         ) -> None:
+            del self, session_id, kwargs
             started[response.interaction_id].set()
             await release[response.interaction_id].wait()
 
-        assistant.execute_interaction_response = MethodType(
-            execute_interaction_response,
+        assistant._dispatch_detached_interaction = MethodType(
+            dispatch_detached_interaction,
             assistant,
         )
         assistant.session_log = MethodType(
@@ -1012,7 +1013,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
                 capabilities=[
                     {
                         "request_id": "unknown-request",
-                        "capability_id": "unknown.pending.skill",
+                        "capability_id": "unknown.pending.capability",
                     }
                 ],
             ),
@@ -1022,8 +1023,8 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         )
 
         class _Registry:
-            def get(self, skill_id: str) -> Any:
-                raise ValueError(f"unknown skill {skill_id}")
+            def get(self, capability_id: str) -> Any:
+                raise ValueError(f"unknown capability {capability_id}")
 
         assistant.interaction_runtime = type(
             "Runtime",
@@ -1076,8 +1077,8 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
                 self.cancellation_domains = domains
 
         class _Registry:
-            def get(self, skill_id: str) -> Any:
-                if skill_id == "soridormi.walk":
+            def get(self, capability_id: str) -> Any:
+                if capability_id == "soridormi.walk":
                     return _Definition("embodied_motion")
                 return _Definition()
 
@@ -1291,7 +1292,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         )
         await asyncio.sleep(0)
 
-    async def test_launch_reservation_blocks_preflight_execution_after_stop(
+    async def test_foreground_dispatch_cancellation_blocks_provider_before_submit(
         self,
     ) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
@@ -1328,7 +1329,6 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         assistant.active_interaction_task = None
         assistant.active_interaction_id = None
         assistant.active_interaction_tasks = {}
-        assistant.active_interaction_reservations = {}
         assistant.reset_playback_ordering = MethodType(
             reset_playback_ordering,
             assistant,
@@ -1357,11 +1357,6 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         interaction_task = assistant.active_interaction_task
         assert interaction_task is not None
         await asyncio.wait_for(reset_started.wait(), timeout=1.0)
-        self.assertIn(
-            interaction_id,
-            coordinator.runtime._open_interactions,
-        )
-
         receipt = await assistant._apply_reflex_cancellation(
             ReflexFilter().evaluate("Stop."),
             source_turn_id="sid-stop-reserved",

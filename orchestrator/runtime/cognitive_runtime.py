@@ -1053,10 +1053,11 @@ class CanonicalPlanRuntimeAdapter:
             capabilities=requests,
             metadata=response_metadata,
         )
-        execution = await self.interaction_runtime.execute(
+        dispatch = await self.interaction_runtime.submit_response(
             response,
             session_id=session_id,
         )
+        execution = await self.interaction_runtime.wait_dispatch(dispatch)
         return {
             "status": execution.status,
             "decision": plan.decision,

@@ -1266,9 +1266,22 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
                 for node in (coordinator_class.body if coordinator_class else [])
                 if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
             }
+            if "execute" in coordinator_methods:
+                findings.append(
+                    _source_policy_finding(
+                        root=root,
+                        path="orchestrator/runtime/interaction_coordinator.py",
+                        rule_id=RULE_CANONICAL_CAPABILITY_ID,
+                        symbol="InteractionRuntimeCoordinator.execute",
+                        message=(
+                            "retired aggregate coordinator execute API must not be "
+                            "reintroduced; use submit_response() and explicit consumers"
+                        ),
+                    )
+                )
             for required_method in (
-                "submit_cognitive_response",
-                "wait_cognitive_dispatch",
+                "submit_response",
+                "wait_dispatch",
             ):
                 if required_method not in coordinator_methods:
                     findings.append(
@@ -1278,8 +1291,8 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
                             rule_id=RULE_CANONICAL_CAPABILITY_ID,
                             symbol=f"InteractionRuntimeCoordinator.{required_method}",
                             message=(
-                                "cognitive capability execution must keep dispatch separate "
-                                "from final aggregate closure"
+                                "capability execution must keep dispatch separate from "
+                                "terminal consumers"
                             ),
                         )
                     )
@@ -1302,8 +1315,22 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
                 for node in (assistant_class.body if assistant_class else [])
                 if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
             }
+            if "execute_interaction_response" in assistant_methods:
+                findings.append(
+                    _source_policy_finding(
+                        root=root,
+                        path="orchestrator/orchestrator.py",
+                        rule_id=RULE_CANONICAL_CAPABILITY_ID,
+                        symbol="VoiceAssistant.execute_interaction_response",
+                        message=(
+                            "retired foreground aggregate interaction API must not be "
+                            "reintroduced; all launches use detached Runtime dispatch"
+                        ),
+                    )
+                )
             for required_method in (
-                "_dispatch_detached_cognitive_interaction",
+                "_dispatch_detached_interaction",
+                "_consume_detached_non_cognitive_dispatch",
                 "_consume_detached_cognitive_dispatch",
                 "_reenter_cognition_for_terminal_capability",
             ):

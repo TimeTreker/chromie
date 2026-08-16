@@ -31,7 +31,10 @@ from agent.app.schema import AgentResult, AgentRunRequest
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.cognitive_gateway import CognitiveGateway
 from orchestrator.runtime.conversation_state import ConversationStateManager
-from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
+from orchestrator.runtime.interaction_coordinator import (
+    CapabilityInteractionDispatch,
+    InteractionRuntimeCoordinator,
+)
 from orchestrator.runtime.cognitive_runtime import (
     CanonicalPlanRuntimeAdapter,
     CognitiveRuntimePolicy,
@@ -44,6 +47,7 @@ from orchestrator.runtime.capability_runtime import (
     CapabilityRegistry,
     CapabilityRuntime,
     CapabilityRuntimeResult,
+    RuntimeAuthorization,
     local_speech_definition,
 )
 from orchestrator.runtime.soridormi_capability_provider import (
@@ -474,15 +478,10 @@ class _CognitiveTurnScenarioRuntime:
             if self.runtime is not None:
                 self.runtime.registry.upsert(updated)
 
-    async def execute(
+    def _scripted_terminal_result(
         self,
         response: InteractionResponse,
-        *,
-        session_id: str | None,
-        confirmed_request_ids: set[str] | None = None,
     ) -> CapabilityRuntimeResult:
-        del session_id
-        self.calls.append(response)
         plan_requests = [
             request
             for request in response.capabilities
@@ -505,17 +504,10 @@ class _CognitiveTurnScenarioRuntime:
                 ],
             )
         if self.mode == "provider_exception_before_results":
-            raise RuntimeError(
-                str(
-                    self.stub.get("provider_exception")
-                    or "scenario provider failed before returning results"
-                )
+            return CapabilityRuntimeResult(
+                interaction_id=response.interaction_id,
+                status="failed",
             )
-        if self.mode == "active_cancel":
-            if self.runtime is None:  # pragma: no cover - construction guard
-                raise AssertionError("active-cancel runtime was not initialized")
-            receipt = await self.runtime.submit(response, authorization=None)
-            return await self.runtime.wait_terminal(receipt)
 
         requests_by_step = {
             str(request.metadata.get("step_id") or ""): request
@@ -562,6 +554,58 @@ class _CognitiveTurnScenarioRuntime:
         if self.on_effectful_done is not None:
             self.on_effectful_done()
         return execution
+
+    async def submit_response(
+        self,
+        response: InteractionResponse,
+        *,
+        session_id: str | None,
+        confirmed_request_ids: set[str] | None = None,
+    ) -> CapabilityInteractionDispatch:
+        del session_id
+        self.calls.append(response)
+        plan_requests = [
+            request
+            for request in response.capabilities
+            if request.metadata.get("source")
+            == "goal_driven_canonical_plan"
+        ]
+        if self.mode == "active_cancel" and plan_requests:
+            if self.runtime is None:  # pragma: no cover - construction guard
+                raise AssertionError("active-cancel runtime was not initialized")
+            receipt = await self.runtime.submit(
+                response,
+                authorization=RuntimeAuthorization(
+                    confirmed_request_ids=set(confirmed_request_ids or ())
+                ),
+            )
+            return CapabilityInteractionDispatch(
+                source_response=response,
+                runtime_response=response,
+                receipt=receipt,
+                immediate_execution=None,
+                preexecuted_results=[],
+                preexecuted_traces=[],
+            )
+        execution = self._scripted_terminal_result(response)
+        return CapabilityInteractionDispatch(
+            source_response=response,
+            runtime_response=response,
+            receipt=None,
+            immediate_execution=execution,
+            preexecuted_results=[],
+            preexecuted_traces=[],
+        )
+
+    async def wait_dispatch(
+        self,
+        dispatch: CapabilityInteractionDispatch,
+    ) -> CapabilityRuntimeResult:
+        if dispatch.immediate_execution is not None:
+            return dispatch.immediate_execution
+        if self.runtime is None or dispatch.receipt is None:
+            raise RuntimeError("scenario dispatch has no Runtime receipt")
+        return await self.runtime.wait_terminal(dispatch.receipt)
 
     async def cancel_all(self) -> None:
         if self.runtime is not None:
@@ -2280,14 +2324,25 @@ async def evaluate_cognitive_turn_loop_scenario(
             assistant.playback_generation + 1,
         )
 
-    if runtime.mode == "active_cancel":
-        execution_task = asyncio.create_task(
-            assistant.execute_interaction_response(
-                response,
-                session_id,
-                reset_playback=False,
-            )
+    async def launch_detached_result_task() -> asyncio.Task[CapabilityRuntimeResult]:
+        before = set(getattr(assistant, "active_capability_result_tasks", {}))
+        await assistant._dispatch_detached_interaction(
+            response,
+            session_id,
+            confirmed_request_ids=None,
+            reset_playback=False,
+            mark_session_done=False,
         )
+        current = getattr(assistant, "active_capability_result_tasks", {})
+        created = [task for task in current if task not in before]
+        if len(created) != 1:
+            raise AssertionError(
+                f"expected one detached result task, found {len(created)}"
+            )
+        return created[0]
+
+    execution_task = await launch_detached_result_task()
+    if runtime.mode == "active_cancel":
         await asyncio.wait_for(runtime.provider_started.wait(), timeout=1.0)
         stop_text = str(stub.get("stop_text") or "Stop now.")
         stop_capture = gateway.capture(
@@ -2309,13 +2364,7 @@ async def evaluate_cognitive_turn_loop_scenario(
                 reason=stop_envelope.reflex.reason,
             )
         )
-        execution = await execution_task
-    else:
-        execution = await assistant.execute_interaction_response(
-            response,
-            session_id,
-            reset_playback=False,
-        )
+    execution = await execution_task
 
     if len(evidence.outcomes) != 1:
         raise AssertionError(

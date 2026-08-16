@@ -21,7 +21,7 @@ from shared.chromie_contracts.response_composition import (
 logger = logging.getLogger("chromie.orchestrator.body_recovery")
 
 
-_TASK_GRAPH_SKILL_ID = "chromie.task_graph.execute"
+_TASK_GRAPH_CAPABILITY_ID = "chromie.task_graph.execute"
 _RECOVERABLE_FAILURE_CLASSES = frozenset(
     {
         "recoverable",
@@ -123,7 +123,7 @@ def build_body_recovery_confirmation(
             if cognitive_response
             else (
                 request.capability_id.startswith("soridormi.")
-                or request.capability_id == _TASK_GRAPH_SKILL_ID
+                or request.capability_id == _TASK_GRAPH_CAPABILITY_ID
             )
         )
     }

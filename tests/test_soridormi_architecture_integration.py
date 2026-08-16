@@ -85,14 +85,14 @@ class _ArchitectureInvoker:
 
 
 class SoridormiArchitectureIntegrationTests(unittest.IsolatedAsyncioTestCase):
-    async def test_dynamic_catalog_skill_runs_through_named_skill_adapter(self) -> None:
+    async def test_dynamic_catalog_capability_runs_through_named_skill_adapter(self) -> None:
         invoker = _ArchitectureInvoker()
         coordinator = InteractionRuntimeCoordinator(
             lambda args: {"scheduled": True},
             soridormi_invoker=invoker,
         )
 
-        result = await coordinator.execute(
+        dispatch = await coordinator.submit_response(
             InteractionResponse(
                 interaction_id="interaction-dynamic-wave",
                 capabilities=[
@@ -110,6 +110,7 @@ class SoridormiArchitectureIntegrationTests(unittest.IsolatedAsyncioTestCase):
             ),
             session_id="sid-wave",
         )
+        result = await coordinator.wait_dispatch(dispatch)
 
         self.assertEqual(result.status, "completed")
         call_names = [call[0] for call in invoker.calls]
@@ -145,7 +146,7 @@ class SoridormiArchitectureIntegrationTests(unittest.IsolatedAsyncioTestCase):
             soridormi_invoker=invoker,
         )
 
-        result = await coordinator.execute(
+        dispatch = await coordinator.submit_response(
             InteractionResponse(
                 capabilities=[
                     {
@@ -165,6 +166,7 @@ class SoridormiArchitectureIntegrationTests(unittest.IsolatedAsyncioTestCase):
             ),
             session_id="sid-inspect",
         )
+        result = await coordinator.wait_dispatch(dispatch)
 
         self.assertEqual(result.status, "completed")
         chromie_intent = invoker.calls[1][1]["chromie_intent"]

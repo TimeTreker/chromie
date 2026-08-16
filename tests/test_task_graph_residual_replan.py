@@ -161,7 +161,7 @@ class TaskGraphResidualCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             task_graph_handler=execute_graph,
         )
 
-        result = await coordinator.execute(
+        dispatch = await coordinator.submit_response(
             InteractionResponse(
                 capabilities=[
                     {
@@ -174,9 +174,10 @@ class TaskGraphResidualCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             ),
             session_id="sid-residual",
         )
+        result = await coordinator.wait_dispatch(dispatch)
 
         self.assertEqual(result.status, "failed")
-        self.assertEqual(spoken, ["I could not complete that task safely."])
+        self.assertEqual(spoken, [])
         residual = result.results[0].output["residual_replan"]
         self.assertEqual(residual["failed_step"]["node_id"], "search")
         self.assertEqual(residual["failure_code"], "object_not_found")

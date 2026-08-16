@@ -293,7 +293,7 @@ class RepositoryEngineeringPolicyTests(unittest.TestCase):
             findings,
         )
 
-    def test_detached_cognitive_capability_boundary_is_required(self) -> None:
+    def test_detached_capability_boundary_and_retired_aggregate_apis_are_enforced(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             coordinator = root / "orchestrator" / "runtime" / "interaction_coordinator.py"
@@ -313,16 +313,18 @@ class RepositoryEngineeringPolicyTests(unittest.TestCase):
             findings = policies.audit_canonical_capability_identity(root)
 
         symbols = {item.symbol for item in findings}
+        self.assertIn("InteractionRuntimeCoordinator.execute", symbols)
+        self.assertIn("VoiceAssistant.execute_interaction_response", symbols)
         self.assertIn(
-            "InteractionRuntimeCoordinator.submit_cognitive_response",
+            "InteractionRuntimeCoordinator.submit_response",
             symbols,
         )
         self.assertIn(
-            "InteractionRuntimeCoordinator.wait_cognitive_dispatch",
+            "InteractionRuntimeCoordinator.wait_dispatch",
             symbols,
         )
         self.assertIn(
-            "VoiceAssistant._dispatch_detached_cognitive_interaction",
+            "VoiceAssistant._dispatch_detached_interaction",
             symbols,
         )
         self.assertIn(

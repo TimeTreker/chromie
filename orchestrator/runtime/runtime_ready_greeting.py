@@ -45,7 +45,7 @@ async def execute_default_runtime_ready_orientation(
     """
 
     if not enable_soridormi_capabilities:
-        return {"status": "skipped", "reason": "soridormi_skills_disabled"}
+        return {"status": "skipped", "reason": "soridormi_capabilities_disabled"}
 
     candidates = (
         (
@@ -98,10 +98,11 @@ async def execute_default_runtime_ready_orientation(
                     "suppress_body_failure_speech": True,
                 },
             )
-            execution = await interaction_runtime.execute(
+            dispatch = await interaction_runtime.submit_response(
                 response,
                 session_id=None,
             )
+            execution = await interaction_runtime.wait_dispatch(dispatch)
             return {
                 "status": execution.status,
                 "capability_id": capability_id,

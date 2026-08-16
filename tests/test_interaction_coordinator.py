@@ -13,6 +13,16 @@ from shared.chromie_contracts.interaction import InteractionResponse, Capability
 from shared.chromie_contracts.reflex import CancellationDirective
 
 
+
+async def _execute_to_terminal(coordinator, response, *, session_id, confirmed_request_ids=None):
+    dispatch = await coordinator.submit_response(
+        response,
+        session_id=session_id,
+        confirmed_request_ids=confirmed_request_ids,
+    )
+    return await coordinator.wait_dispatch(dispatch)
+
+
 class _SoridormiInvoker:
     def __init__(
         self,
@@ -181,7 +191,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             lambda args: scheduled.append(args) or {"scheduled": True}
         )
 
-        result = await coordinator.execute(
+        result = await _execute_to_terminal(coordinator,
             InteractionResponse(speech=[{"text": "Hello."}]),
             session_id="sid-1",
         )
@@ -216,7 +226,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             },
         )
 
-        result = await coordinator.execute(response, session_id="sid-1")
+        result = await _execute_to_terminal(coordinator, response, session_id="sid-1")
 
         self.assertEqual(result.status, "completed")
         context = ledger.context("sid-1", goal_ids=["goal-greet"])
@@ -253,7 +263,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             },
         )
 
-        result = await coordinator.execute(response, session_id="sid-1")
+        result = await _execute_to_terminal(coordinator, response, session_id="sid-1")
 
         self.assertEqual(result.status, "completed")
         self.assertEqual(ledger.events("sid-1"), [])
@@ -266,7 +276,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             lambda args: scheduled.append(args) or {"scheduled": True}
         )
 
-        result = await coordinator.execute(
+        result = await _execute_to_terminal(coordinator,
             InteractionResponse(
                 speech=[{"text": "Moving now."}],
                 metadata={
@@ -557,7 +567,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             lambda args: scheduled.append(args) or {"scheduled": True}
         )
 
-        result = await coordinator.execute(
+        result = await _execute_to_terminal(coordinator,
             InteractionResponse(
                 capabilities=[
                     {
@@ -585,7 +595,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             soridormi_invoker=invoker,
         )
 
-        result = await coordinator.execute(
+        result = await _execute_to_terminal(coordinator,
             InteractionResponse(
                 capabilities=[
                     {
@@ -618,7 +628,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
 
         for request_id in ["nod-1", "nod-2"]:
-            result = await coordinator.execute(
+            result = await _execute_to_terminal(coordinator,
                 InteractionResponse(
                     capabilities=[
                         {
@@ -683,11 +693,11 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             soridormi_invoker=invoker,
         )
 
-        first = await coordinator.execute(
+        first = await _execute_to_terminal(coordinator,
             InteractionResponse(capabilities=[{"capability_id": "soridormi.nod_yes"}]),
             session_id="sid-nod",
         )
-        second = await coordinator.execute(
+        second = await _execute_to_terminal(coordinator,
             InteractionResponse(capabilities=[{"capability_id": "soridormi.wave_hand"}]),
             session_id="sid-wave",
         )
@@ -738,7 +748,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         coordinator._catalog_refresh_ttl_s = 0.0
 
         for request_id in ["nod-1", "nod-2"]:
-            result = await coordinator.execute(
+            result = await _execute_to_terminal(coordinator,
                 InteractionResponse(
                     capabilities=[
                         {
@@ -803,7 +813,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             soridormi_invoker=invoker,
         )
 
-        first = await coordinator.execute(
+        first = await _execute_to_terminal(coordinator,
             InteractionResponse(capabilities=[{"capability_id": "soridormi.wave_hand"}]),
             session_id="sid-wave-1",
         )
@@ -813,7 +823,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             .metadata["catalog_absent"]
         )
 
-        second = await coordinator.execute(
+        second = await _execute_to_terminal(coordinator,
             InteractionResponse(capabilities=[{"capability_id": "soridormi.wave_hand"}]),
             session_id="sid-wave-2",
         )
@@ -870,20 +880,23 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             {"nod-alternative"},
         )
 
-    async def test_body_skill_fails_closed_when_provider_is_disabled(self) -> None:
+    async def test_body_capability_fails_closed_when_provider_is_disabled(self) -> None:
         coordinator = InteractionRuntimeCoordinator(
             lambda args: {"scheduled": True}
         )
 
-        with self.assertRaisesRegex(RuntimeError, "disabled"):
-            await coordinator.execute(
-                InteractionResponse(
-                    capabilities=[{"capability_id": "soridormi.nod_yes"}]
-                ),
-                session_id="sid-1",
-            )
+        result = await _execute_to_terminal(
+            coordinator,
+            InteractionResponse(
+                capabilities=[{"capability_id": "soridormi.nod_yes"}]
+            ),
+            session_id="sid-1",
+        )
 
-    async def test_catalog_failure_becomes_terminal_safe_fallback(self) -> None:
+        self.assertEqual(result.status, "failed")
+        self.assertEqual(result.results[0].reason_code, "provider_disabled")
+
+    async def test_catalog_failure_becomes_terminal_evidence_without_host_speech(self) -> None:
         class CatalogFailureInvoker(_SoridormiInvoker):
             async def invoke(self, tool_name, args, *, context=None):  # type: ignore[no-untyped-def]
                 self.calls.append((tool_name, args, context))
@@ -900,7 +913,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             soridormi_invoker=CatalogFailureInvoker(),
         )
 
-        result = await coordinator.execute(
+        result = await _execute_to_terminal(coordinator,
             InteractionResponse(
                 capabilities=[
                     {
@@ -914,12 +927,9 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.status, "failed")
         self.assertEqual(result.results[0].reason_code, "catalog_unavailable")
-        self.assertEqual(
-            spoken,
-            ["I could not complete that movement safely."],
-        )
+        self.assertEqual(spoken, [])
 
-    async def test_legacy_optional_cue_metadata_cannot_suppress_failure_speech(self) -> None:
+    async def test_legacy_optional_cue_metadata_cannot_hide_terminal_failure(self) -> None:
         class CatalogFailureInvoker(_SoridormiInvoker):
             async def invoke(self, tool_name, args, *, context=None):  # type: ignore[no-untyped-def]
                 self.calls.append((tool_name, args, context))
@@ -936,7 +946,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             soridormi_invoker=CatalogFailureInvoker(),
         )
 
-        result = await coordinator.execute(
+        result = await _execute_to_terminal(coordinator,
             InteractionResponse(
                 capabilities=[
                     {
@@ -951,7 +961,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.status, "failed")
         self.assertEqual(result.results[0].reason_code, "catalog_unavailable")
-        self.assertEqual(spoken, ["I could not complete that movement safely."])
+        self.assertEqual(spoken, [])
 
     async def test_legacy_optional_cue_metadata_cannot_bypass_confirmation(self) -> None:
         class AttentionInvoker(_SoridormiInvoker):
@@ -980,7 +990,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with self.assertRaisesRegex(ValueError, "requires confirmation"):
-            await coordinator.execute(
+            await _execute_to_terminal(coordinator,
                 InteractionResponse(
                     capabilities=[
                         {
@@ -996,7 +1006,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(spoken, [])
 
-    async def test_unavailable_catalog_skill_becomes_terminal_safe_fallback(
+    async def test_unavailable_catalog_capability_becomes_terminal_failure(
         self,
     ) -> None:
         class UnavailableSkillInvoker(_SoridormiInvoker):
@@ -1025,7 +1035,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             soridormi_invoker=invoker,
         )
 
-        result = await coordinator.execute(
+        result = await _execute_to_terminal(coordinator,
             InteractionResponse(
                 capabilities=[
                     {
@@ -1038,11 +1048,8 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(result.status, "failed")
-        self.assertEqual(result.results[0].reason_code, "skill_unavailable")
-        self.assertEqual(
-            spoken,
-            ["I could not complete that movement safely."],
-        )
+        self.assertEqual(result.results[0].reason_code, "capability_unavailable")
+        self.assertEqual(spoken, [])
         self.assertEqual(
             [call[0] for call in invoker.calls],
             ["soridormi.skill.list"],
@@ -1068,9 +1075,9 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(request_ids, {"nod-1"})
 
         with self.assertRaisesRegex(ValueError, "requires confirmation"):
-            await coordinator.execute(response, session_id="sid-1")
+            await _execute_to_terminal(coordinator, response, session_id="sid-1")
 
-        result = await coordinator.execute(
+        result = await _execute_to_terminal(coordinator,
             response,
             session_id="sid-2",
             confirmed_request_ids=request_ids,
@@ -1079,7 +1086,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status, "completed")
         self.assertTrue(invoker.calls[-1][2].confirmed)
 
-    async def test_failed_body_skill_replaces_completion_speech_with_safe_fallback(
+    async def test_failed_body_capability_suppresses_unverified_completion_speech(
         self,
     ) -> None:
         spoken: list[dict[str, Any]] = []
@@ -1093,7 +1100,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             soridormi_invoker=invoker,
         )
 
-        result = await coordinator.execute(
+        result = await _execute_to_terminal(coordinator,
             InteractionResponse(
                 speech=[
                     {"text": "Starting.", "timing": "immediate"},
@@ -1111,14 +1118,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(result.status, "failed")
-        self.assertEqual(
-            [item["text"] for item in spoken],
-            ["Starting.", "I could not complete that movement safely."],
-        )
-        self.assertEqual(
-            spoken[-1]["metadata"]["source"],
-            "host_body_failure_fallback",
-        )
+        self.assertEqual([item["text"] for item in spoken], ["Starting."])
         self.assertNotIn("Done.", [item["text"] for item in spoken])
 
     async def test_cognitive_body_failure_defers_terminal_speech_to_turn_closure(
@@ -1134,7 +1134,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             ),
         )
 
-        result = await coordinator.execute(
+        result = await _execute_to_terminal(coordinator,
             InteractionResponse(
                 speech=[
                     {"text": "Starting.", "timing": "immediate"},
@@ -1165,7 +1165,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             )
         )
 
-    async def test_timed_out_body_skill_uses_language_matched_fallback(self) -> None:
+    async def test_timed_out_body_capability_returns_terminal_evidence_without_host_speech(self) -> None:
         spoken: list[str] = []
         coordinator = InteractionRuntimeCoordinator(
             lambda args: spoken.append(str(args["text"])) or {"scheduled": True},
@@ -1177,7 +1177,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             ),
         )
 
-        result = await coordinator.execute(
+        result = await _execute_to_terminal(coordinator,
             InteractionResponse(
                 capabilities=[{"capability_id": "soridormi.nod_yes"}],
                 metadata={"language": "zh-CN"},
@@ -1186,13 +1186,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(result.status, "failed")
-        self.assertEqual(
-            spoken,
-            ["动作执行超时，我无法确认它已安全完成。"],
-        )
+        self.assertEqual(spoken, [])
         self.assertEqual(result.results[0].status, "timed_out")
 
-    async def test_refused_body_skill_reports_failed_safety_check(self) -> None:
+    async def test_refused_body_capability_reports_terminal_refusal_without_host_speech(self) -> None:
         spoken: list[str] = []
         coordinator = InteractionRuntimeCoordinator(
             lambda args: spoken.append(str(args["text"])) or {"scheduled": True},
@@ -1203,7 +1200,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             ),
         )
 
-        result = await coordinator.execute(
+        result = await _execute_to_terminal(coordinator,
             InteractionResponse(
                 capabilities=[{"capability_id": "soridormi.nod_yes"}],
                 metadata={"language": "en-US"},
@@ -1213,21 +1210,16 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.status, "failed")
         self.assertEqual(result.results[0].status, "refused")
-        self.assertEqual(
-            spoken,
-            [
-                "The safety check did not pass, so I did not perform that movement."
-            ],
-        )
+        self.assertEqual(spoken, [])
 
-    async def test_successful_body_skill_keeps_after_capabilities_speech(self) -> None:
+    async def test_successful_body_capability_still_defers_completion_wording_to_evidence(self) -> None:
         spoken: list[str] = []
         coordinator = InteractionRuntimeCoordinator(
             lambda args: spoken.append(str(args["text"])) or {"scheduled": True},
             soridormi_invoker=_SoridormiInvoker(),
         )
 
-        result = await coordinator.execute(
+        result = await _execute_to_terminal(coordinator,
             InteractionResponse(
                 speech=[{"text": "Done.", "timing": "after_capabilities"}],
                 capabilities=[{"capability_id": "soridormi.nod_yes"}],
@@ -1236,9 +1228,9 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(result.status, "completed")
-        self.assertEqual(spoken, ["Done."])
+        self.assertEqual(spoken, [])
 
-    async def test_task_graph_skill_executes_planning_handler_and_keeps_success_speech(
+    async def test_task_graph_capability_executes_handler_and_defers_completion_wording(
         self,
     ) -> None:
         spoken: list[str] = []
@@ -1259,7 +1251,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             task_graph_handler=execute_graph,
         )
 
-        result = await coordinator.execute(
+        result = await _execute_to_terminal(coordinator,
             InteractionResponse(
                 speech=[{"text": "Done.", "timing": "after_capabilities"}],
                 capabilities=[
@@ -1276,11 +1268,11 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.status, "completed")
         self.assertEqual(graphs, [{"graph_id": "nav", "nodes": []}])
-        self.assertEqual(spoken, ["Done."])
+        self.assertEqual(spoken, [])
         self.assertEqual(result.results[0].capability_id, "chromie.task_graph.execute")
         self.assertEqual(result.results[0].status, "completed")
 
-    async def test_failed_task_graph_suppresses_completion_speech_and_falls_back(
+    async def test_failed_task_graph_suppresses_unverified_completion_speech(
         self,
     ) -> None:
         spoken: list[str] = []
@@ -1302,7 +1294,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             task_graph_handler=execute_graph,
         )
 
-        result = await coordinator.execute(
+        result = await _execute_to_terminal(coordinator,
             InteractionResponse(
                 speech=[{"text": "Done.", "timing": "after_capabilities"}],
                 capabilities=[
@@ -1322,7 +1314,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.results[0].status, "failed")
         self.assertEqual(result.results[0].reason_code, "task_graph_failed")
         self.assertIn("missing_navigation_pipeline", result.results[0].message)
-        self.assertEqual(spoken, ["I could not complete that task safely."])
+        self.assertEqual(spoken, [])
 
     async def test_non_terminal_task_graph_result_fails_closed(self) -> None:
         for graph_status, expected_reason in (
@@ -1351,7 +1343,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                     or {"scheduled": True},
                     task_graph_handler=execute_graph,
                 )
-                result = await coordinator.execute(
+                result = await _execute_to_terminal(coordinator,
                     InteractionResponse(
                         capabilities=[
                             {
@@ -1371,12 +1363,9 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(result.status, "failed")
                 self.assertEqual(result.results[0].status, "failed")
                 self.assertEqual(result.results[0].reason_code, expected_reason)
-                self.assertEqual(
-                    spoken,
-                    ["I could not complete that task safely."],
-                )
+                self.assertEqual(spoken, [])
 
-    async def test_cancelled_task_graph_suppresses_completion_speech_and_falls_back(
+    async def test_cancelled_task_graph_suppresses_unverified_completion_speech(
         self,
     ) -> None:
         spoken: list[str] = []
@@ -1395,7 +1384,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             task_graph_handler=execute_graph,
         )
 
-        result = await coordinator.execute(
+        result = await _execute_to_terminal(coordinator,
             InteractionResponse(
                 speech=[{"text": "Done.", "timing": "after_capabilities"}],
                 capabilities=[
@@ -1414,7 +1403,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status, "failed")
         self.assertEqual(result.results[0].status, "cancelled")
         self.assertEqual(result.results[0].reason_code, "task_graph_cancelled")
-        self.assertEqual(spoken, ["The task was cancelled, so I did not continue."])
+        self.assertEqual(spoken, [])
 
     async def test_scoped_task_graph_cancel_uses_authoritative_endpoint(
         self,
@@ -1440,7 +1429,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             task_graph_cancel_handler=cancel_graph,
         )
         execution_task = asyncio.create_task(
-            coordinator.execute(
+            _execute_to_terminal(coordinator,
                 InteractionResponse(
                     interaction_id="interaction-task-graph-cancel",
                     capabilities=[
@@ -1498,7 +1487,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             task_graph_handler=execute_graph,
         )
         execution_task = asyncio.create_task(
-            coordinator.execute(
+            _execute_to_terminal(coordinator,
                 InteractionResponse(
                     interaction_id="interaction-task-graph-no-cancel",
                     capabilities=[
@@ -1540,7 +1529,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             "cancellation_failed_embodied_motion",
         )
 
-    async def test_task_graph_skill_fails_closed_when_handler_is_disabled(
+    async def test_task_graph_capability_fails_closed_when_handler_is_disabled(
         self,
     ) -> None:
         spoken: list[str] = []
@@ -1548,7 +1537,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             lambda args: spoken.append(str(args["text"])) or {"scheduled": True},
         )
 
-        result = await coordinator.execute(
+        result = await _execute_to_terminal(coordinator,
             InteractionResponse(
                 capabilities=[
                     {
@@ -1565,9 +1554,9 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.status, "failed")
         self.assertEqual(result.results[0].reason_code, "task_graph_execution_disabled")
-        self.assertEqual(spoken, ["I could not complete that task safely."])
+        self.assertEqual(spoken, [])
 
-    async def test_cancelled_body_skill_suppresses_all_terminal_speech(self) -> None:
+    async def test_cancelled_body_capability_suppresses_all_terminal_speech(self) -> None:
         spoken: list[str] = []
         invoker = _SoridormiInvoker(execute_delay_s=5)
         coordinator = InteractionRuntimeCoordinator(
@@ -1575,7 +1564,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             soridormi_invoker=invoker,
         )
         task = asyncio.create_task(
-            coordinator.execute(
+            _execute_to_terminal(coordinator,
                 InteractionResponse(
                     speech=[
                         {"text": "Starting.", "timing": "immediate"},
@@ -1597,7 +1586,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status, "cancelled")
         self.assertEqual(spoken, ["Starting."])
 
-    async def test_recoverable_body_failure_defers_to_recovery_confirmation(
+    async def test_recoverable_body_failure_returns_evidence_without_host_recovery_speech(
         self,
     ) -> None:
         spoken: list[dict[str, Any]] = []
@@ -1616,7 +1605,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             soridormi_invoker=invoker,
         )
 
-        result = await coordinator.execute(
+        result = await _execute_to_terminal(coordinator,
             InteractionResponse(
                 speech=[
                     {"text": "Starting.", "timing": "immediate"},
@@ -1640,7 +1629,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(body_results[0].status, "failed")
         self.assertEqual([item["text"] for item in spoken], ["Starting."])
 
-    async def test_recoverable_body_failure_stops_after_retry_budget(
+    async def test_recoverable_retry_failure_returns_evidence_without_host_speech(
         self,
     ) -> None:
         spoken: list[str] = []
@@ -1659,7 +1648,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             soridormi_invoker=invoker,
         )
 
-        result = await coordinator.execute(
+        result = await _execute_to_terminal(coordinator,
             InteractionResponse(
                 capabilities=[
                     {
@@ -1674,12 +1663,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(result.status, "failed")
-        self.assertEqual(
-            spoken,
-            [
-                "The movement hit a recoverable issue again, so I will not keep retrying. I have stayed in the safer fallback state."
-            ],
-        )
+        self.assertEqual(spoken, [])
 
     async def test_detached_cognitive_submit_returns_before_provider_terminal(
         self,
@@ -1709,7 +1693,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             },
         )
 
-        dispatch = await coordinator.submit_cognitive_response(
+        dispatch = await coordinator.submit_response(
             response,
             session_id="sid-detached",
         )
@@ -1726,7 +1710,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
 
         release.set()
-        execution = await coordinator.wait_cognitive_dispatch(dispatch)
+        execution = await coordinator.wait_dispatch(dispatch)
         self.assertEqual(execution.status, "completed")
         self.assertEqual(execution.results[0].request_id, "request-slow")
 
@@ -1759,7 +1743,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             },
         )
 
-        dispatch = await coordinator.submit_cognitive_response(
+        dispatch = await coordinator.submit_response(
             response,
             session_id="sid-result-wording",
         )
@@ -1773,7 +1757,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             "speech-unverified-result",
             dispatch.receipt.request_ids,
         )
-        execution = await coordinator.wait_cognitive_dispatch(dispatch)
+        execution = await coordinator.wait_dispatch(dispatch)
         self.assertEqual(execution.status, "completed")
 
 

@@ -503,10 +503,6 @@ class VoiceAssistant:
         self.active_interaction_task: asyncio.Task | None = None
         self.active_interaction_id: str | None = None
         self.active_interaction_tasks: dict[asyncio.Task, str] = {}
-        self.active_interaction_reservations: dict[
-            asyncio.Task,
-            str,
-        ] = {}
         # Detached provider work is not an active foreground interaction task.
         # These tasks consume Runtime lifecycle/Evidence after submit() returned.
         self.active_capability_result_tasks: dict[asyncio.Task, str] = {}
@@ -6728,10 +6724,11 @@ class VoiceAssistant:
         detached_delivery: bool = False,
     ) -> str:
         try:
-            execution = await self.interaction_runtime.execute(
+            dispatch = await self.interaction_runtime.submit_response(
                 response,
                 session_id=None if detached_delivery else session_id,
             )
+            execution = await self.interaction_runtime.wait_dispatch(dispatch)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -8109,69 +8106,22 @@ class VoiceAssistant:
         reset_playback: bool = True,
         mark_session_done: bool = True,
     ) -> None:
-        if self._uses_detached_cognitive_capability_runtime(response):
-            task = asyncio.create_task(
-                self._dispatch_detached_cognitive_interaction(
-                    response,
-                    session_id,
-                    confirmed_request_ids=confirmed_request_ids,
-                    reset_playback=reset_playback,
-                    mark_session_done=mark_session_done,
-                )
-            )
-            active_tasks = getattr(self, "active_interaction_tasks", None)
-            if not isinstance(active_tasks, dict):
-                active_tasks = {}
-                self.active_interaction_tasks = active_tasks
-            active_tasks[task] = response.interaction_id
-            self.active_interaction_task = task
-            self.active_interaction_id = response.interaction_id
-            task.add_done_callback(self._interaction_task_done)
-            return
+        """Launch every InteractionResponse through the non-blocking dispatch boundary."""
 
-        reserve = getattr(
-            getattr(self, "interaction_runtime", None),
-            "reserve_interaction",
-            None,
-        )
-        release = getattr(
-            getattr(self, "interaction_runtime", None),
-            "release_interaction",
-            None,
-        )
-        reserved = False
-        if callable(reserve):
-            reserve(response.interaction_id)
-            reserved = True
-        try:
-            task = asyncio.create_task(
-                self.execute_interaction_response(
-                    response,
-                    session_id,
-                    confirmed_request_ids=confirmed_request_ids,
-                    reset_playback=reset_playback,
-                    mark_session_done=mark_session_done,
-                )
+        task = asyncio.create_task(
+            self._dispatch_detached_interaction(
+                response,
+                session_id,
+                confirmed_request_ids=confirmed_request_ids,
+                reset_playback=reset_playback,
+                mark_session_done=mark_session_done,
             )
-        except BaseException:
-            if reserved and callable(release):
-                release(response.interaction_id)
-            raise
+        )
         active_tasks = getattr(self, "active_interaction_tasks", None)
         if not isinstance(active_tasks, dict):
             active_tasks = {}
             self.active_interaction_tasks = active_tasks
         active_tasks[task] = response.interaction_id
-        if reserved:
-            reservations = getattr(
-                self,
-                "active_interaction_reservations",
-                None,
-            )
-            if not isinstance(reservations, dict):
-                reservations = {}
-                self.active_interaction_reservations = reservations
-            reservations[task] = response.interaction_id
         self.active_interaction_task = task
         self.active_interaction_id = response.interaction_id
         task.add_done_callback(self._interaction_task_done)
@@ -8187,7 +8137,7 @@ class VoiceAssistant:
             and response.capabilities
         )
 
-    async def _dispatch_detached_cognitive_interaction(
+    async def _dispatch_detached_interaction(
         self,
         response: InteractionResponse,
         session_id: str | None,
@@ -8207,7 +8157,7 @@ class VoiceAssistant:
         generation = int(getattr(self, "playback_generation", 0))
         started_ms = now_ms()
         try:
-            dispatch = await self.interaction_runtime.submit_cognitive_response(
+            dispatch = await self.interaction_runtime.submit_response(
                 response,
                 session_id=session_id,
                 confirmed_request_ids=confirmed_request_ids,
@@ -8252,8 +8202,13 @@ class VoiceAssistant:
             len(receipt.request_ids) if receipt is not None else 0,
         )
 
+        result_consumer = (
+            self._consume_detached_cognitive_dispatch
+            if self._uses_detached_cognitive_capability_runtime(response)
+            else self._consume_detached_non_cognitive_dispatch
+        )
         result_task = asyncio.create_task(
-            self._consume_detached_cognitive_dispatch(
+            result_consumer(
                 dispatch,
                 session_id=session_id,
                 generation=generation,
@@ -8296,6 +8251,33 @@ class VoiceAssistant:
                 error,
                 exc_info=error,
             )
+
+    async def _consume_detached_non_cognitive_dispatch(
+        self,
+        dispatch: Any,
+        *,
+        session_id: str | None,
+        generation: int,
+        confirmed_request_ids: set[str] | None,
+    ) -> CapabilityRuntimeResult:
+        """Consume a non-cognitive dispatch without reopening the foreground turn."""
+
+        execution = await self.interaction_runtime.wait_dispatch(dispatch)
+        response = dispatch.source_response
+        for result in execution.results:
+            self.conversation_state.update_pending_task_status_for_request_id(
+                request_id=result.request_id, status=result.status
+            )
+        if response.metadata.get("history_after_successful_delivery") is True:
+            self._record_successfully_delivered_speech(
+                response, execution, session_id=session_id,
+                log_event="interaction_history_after_delivery",
+            )
+        self._record_execution_experience_safely(
+            response=response, execution=execution, session_id=session_id,
+            confirmed_request_ids=confirmed_request_ids,
+        )
+        return execution
 
     async def _consume_detached_cognitive_dispatch(
         self,
@@ -8375,7 +8357,7 @@ class VoiceAssistant:
                     )
 
         try:
-            execution = await self.interaction_runtime.wait_cognitive_dispatch(
+            execution = await self.interaction_runtime.wait_dispatch(
                 dispatch
             )
         except asyncio.CancelledError:
@@ -8481,24 +8463,6 @@ class VoiceAssistant:
         return execution
 
     def _interaction_task_done(self, task: asyncio.Task) -> None:
-        reservations = getattr(
-            self,
-            "active_interaction_reservations",
-            None,
-        )
-        reserved_interaction_id = (
-            reservations.pop(task, None)
-            if isinstance(reservations, dict)
-            else None
-        )
-        if reserved_interaction_id:
-            release = getattr(
-                getattr(self, "interaction_runtime", None),
-                "release_interaction",
-                None,
-            )
-            if callable(release):
-                release(reserved_interaction_id)
         active_tasks = getattr(self, "active_interaction_tasks", None)
         if isinstance(active_tasks, dict):
             active_tasks.pop(task, None)
@@ -8528,392 +8492,6 @@ class VoiceAssistant:
                 error,
                 exc_info=error,
             )
-
-    async def execute_interaction_response(
-        self,
-        response: InteractionResponse,
-        session_id: str | None,
-        *,
-        confirmed_request_ids: set[str] | None = None,
-        reset_playback: bool = True,
-        mark_session_done: bool = True,
-    ) -> CapabilityRuntimeResult:
-        if reset_playback:
-            await self.reset_playback_ordering()
-        execution_generation = int(
-            getattr(self, "playback_generation", 0)
-        )
-        started_ms = now_ms()
-        has_soridormi_request = any(
-            request.capability_id.startswith("soridormi.") for request in response.capabilities
-        )
-        execution: CapabilityRuntimeResult | None = None
-        provider_status: dict[str, Any] | None = None
-        cognitive_closure_attempted = False
-        try:
-            runtime_input = {
-                "interaction_response": response,
-                "confirmed_request_ids": sorted(confirmed_request_ids or []),
-                "execution_generation": execution_generation,
-            }
-            try:
-                execution = await self.interaction_runtime.execute(
-                    response,
-                    session_id=session_id,
-                    confirmed_request_ids=confirmed_request_ids,
-                )
-            except asyncio.CancelledError:
-                record_session_workflow_stage(
-                    self,
-                    session_id,
-                    stage="trusted_capability_runtime",
-                    started_monotonic_ms=started_ms,
-                    finished_monotonic_ms=now_ms(),
-                    status="cancelled",
-                    input_payload=runtime_input,
-                    output_payload=None,
-                    errors=[{"reason": "interaction_cancelled"}],
-                    metadata=summarize_provider_start_evidence(response),
-                )
-                raise
-            except Exception as exc:
-                record_session_workflow_stage(
-                    self,
-                    session_id,
-                    stage="trusted_capability_runtime",
-                    started_monotonic_ms=started_ms,
-                    finished_monotonic_ms=now_ms(),
-                    status="failed",
-                    input_payload=runtime_input,
-                    output_payload=None,
-                    errors=[
-                        {"error_type": type(exc).__name__, "error": str(exc)}
-                    ],
-                    metadata=summarize_provider_start_evidence(response),
-                )
-                raise
-            record_session_workflow_stage(
-                self,
-                session_id,
-                stage="trusted_capability_runtime",
-                started_monotonic_ms=started_ms,
-                finished_monotonic_ms=now_ms(),
-                status=execution.status,
-                input_payload=runtime_input,
-                output_payload=execution,
-                errors=[
-                    {
-                        "request_id": result.request_id,
-                        "capability_id": result.capability_id,
-                        "status": result.status,
-                        "reason_code": result.reason_code,
-                        "message": result.message,
-                    }
-                    for result in execution.results
-                    if result.status not in {"completed", "success"}
-                ],
-                metadata=summarize_provider_start_evidence(response, execution),
-            )
-            self.session_log(
-                session_id,
-                "capability_runtime_done: status=%s results=%s traces=%s runtime_ms=%.1f",
-                execution.status,
-                len(execution.results),
-                len(execution.traces),
-                now_ms() - started_ms,
-            )
-            for result in execution.results:
-                self.session_log(
-                    session_id,
-                    "capability_result: request_id=%s capability_id=%s status=%s reason=%s message=%s",
-                    result.request_id,
-                    result.capability_id,
-                    result.status,
-                    result.reason_code,
-                    result.message,
-                )
-                self.conversation_state.update_pending_task_status_for_request_id(
-                    request_id=result.request_id,
-                    status=result.status,
-                )
-            if response.metadata.get(
-                "history_after_successful_delivery"
-            ) is True:
-                self._record_successfully_delivered_speech(
-                    response,
-                    execution,
-                    session_id=session_id,
-                    log_event="interaction_history_after_delivery",
-                )
-            if has_soridormi_request:
-                provider_status = await self._record_soridormi_post_status(
-                    session_id
-                )
-            completed_request_ids = {result.request_id for result in execution.results}
-            recovery_confirmation_staged = False
-            if execution.status != "completed":
-                is_cognitive_effectful = bool(
-                    response.metadata.get("cognitive_runtime_apply") is True
-                    and response.metadata.get("canonical_plan")
-                    and response.capabilities
-                )
-                for request in response.capabilities:
-                    if request.request_id in completed_request_ids:
-                        continue
-                    self.conversation_state.update_pending_task_status_for_request_id(
-                        request_id=request.request_id,
-                        status=(
-                            "not_run"
-                            if is_cognitive_effectful
-                            else execution.status
-                        ),
-                    )
-                for speech in response.speech:
-                    if speech.id in completed_request_ids:
-                        continue
-                    self.conversation_state.update_pending_task_status_for_request_id(
-                        request_id=speech.id,
-                        status=execution.status,
-                    )
-                recovery_confirmation_staged = (
-                    await self._maybe_stage_body_recovery_confirmation(
-                        response,
-                        execution,
-                        session_id,
-                    )
-                )
-            cognitive_closure_attempted = True
-            closure_status = await self._close_cognitive_execution(
-                response=response,
-                execution=execution,
-                session_id=session_id,
-                generation=execution_generation,
-                provider_status=provider_status,
-                recovery_confirmation_staged=recovery_confirmation_staged,
-            )
-            if closure_status != "not_applicable":
-                response.metadata["cognitive_turn_closure_status"] = (
-                    closure_status
-                )
-            self._record_execution_experience_safely(
-                response=response,
-                execution=execution,
-                session_id=session_id,
-                confirmed_request_ids=confirmed_request_ids,
-            )
-            return execution
-        except asyncio.CancelledError:
-            self.session_log(
-                session_id,
-                "capability_runtime_cancelled: runtime_ms=%.1f",
-                now_ms() - started_ms,
-            )
-            cancelled_execution = (
-                self._cancelled_execution_with_unknown_request_results(
-                    response,
-                    execution,
-                )
-            )
-            completed_by_request = {
-                result.request_id: result
-                for result in cancelled_execution.results
-            }
-            for request in response.capabilities:
-                result = completed_by_request.get(request.request_id)
-                self.conversation_state.update_pending_task_status_for_request_id(
-                    request_id=request.request_id,
-                    status=result.status if result is not None else "not_run",
-                )
-            for speech in response.speech:
-                result = completed_by_request.get(speech.id)
-                self.conversation_state.update_pending_task_status_for_request_id(
-                    request_id=speech.id,
-                    status=result.status if result is not None else "cancelled",
-                )
-            if has_soridormi_request:
-                provider_status = await asyncio.shield(
-                    self._record_soridormi_post_status(session_id)
-                )
-
-            try:
-                cognitive_plan = (
-                    self._cognitive_turn_closure_adapter().canonical_plan(
-                        response
-                    )
-                )
-            except Exception:
-                cognitive_plan = None
-            if cognitive_plan is not None:
-                outcome_execution = cancelled_execution
-                closure_status = await asyncio.shield(
-                    self._close_cognitive_execution(
-                        response=response,
-                        execution=outcome_execution,
-                        session_id=session_id,
-                        generation=execution_generation,
-                        provider_status=provider_status,
-                        recovery_confirmation_staged=False,
-                        # A stop/interruption must never emit a late terminal
-                        # utterance, even if playback generation is unchanged
-                        # in a synthetic or test caller.
-                        suppress_final_reason="interaction_cancelled",
-                    )
-                )
-                response.metadata["cognitive_turn_closure_status"] = (
-                    closure_status
-                )
-                self._record_execution_experience_safely(
-                    response=response,
-                    execution=outcome_execution,
-                    session_id=session_id,
-                    confirmed_request_ids=confirmed_request_ids,
-                    errors=["interaction_cancelled"],
-                )
-                return outcome_execution
-            raise
-        except Exception as exc:
-            self.session_log(
-                session_id,
-                "capability_runtime_exception: runtime_ms=%.1f error=%s",
-                now_ms() - started_ms,
-                exc,
-            )
-            try:
-                cognitive_plan = (
-                    self._cognitive_turn_closure_adapter().canonical_plan(
-                        response
-                    )
-                )
-            except Exception:
-                cognitive_plan = None
-            if cognitive_plan is not None:
-                outcome_execution = execution or CapabilityRuntimeResult(
-                    interaction_id=response.interaction_id,
-                    status="failed",
-                )
-                if execution is None and has_soridormi_request:
-                    provider_status = (
-                        await self._record_soridormi_post_status(session_id)
-                    )
-                if execution is None:
-                    for request in response.capabilities:
-                        self.conversation_state.update_pending_task_status_for_request_id(
-                            request_id=request.request_id,
-                            status="not_run",
-                        )
-                    for speech in response.speech:
-                        self.conversation_state.update_pending_task_status_for_request_id(
-                            request_id=speech.id,
-                            status="failed",
-                        )
-                if cognitive_closure_attempted:
-                    closure_status = str(
-                        response.metadata.get(
-                            "cognitive_turn_closure_status",
-                            "closure_already_attempted",
-                        )
-                    )
-                    response.metadata[
-                        "cognitive_turn_closure_followup_error"
-                    ] = type(exc).__name__
-                else:
-                    cognitive_closure_attempted = True
-                    closure_status = await self._close_cognitive_execution(
-                        response=response,
-                        execution=outcome_execution,
-                        session_id=session_id,
-                        generation=execution_generation,
-                        provider_status=provider_status,
-                        recovery_confirmation_staged=False,
-                    )
-                response.metadata["cognitive_turn_closure_status"] = (
-                    closure_status
-                )
-                self._record_execution_experience_safely(
-                    response=response,
-                    execution=outcome_execution,
-                    session_id=session_id,
-                    confirmed_request_ids=confirmed_request_ids,
-                    errors=[str(exc) or exc.__class__.__name__],
-                )
-                return outcome_execution
-            for request_id in [
-                *(request.request_id for request in response.capabilities),
-                *(speech.id for speech in response.speech),
-            ]:
-                self.conversation_state.update_pending_task_status_for_request_id(
-                    request_id=request_id,
-                    status="failed",
-                )
-            self._record_execution_experience_safely(
-                response=response,
-                execution=execution,
-                session_id=session_id,
-                confirmed_request_ids=confirmed_request_ids,
-                errors=[str(exc) or exc.__class__.__name__],
-            )
-            raise
-        finally:
-            if mark_session_done:
-                state = self.sessions.state.get(session_id or "")
-                if state is not None:
-                    state["llm_done"] = True
-                    state["response_chars"] = state.get(
-                        "response_chars",
-                        0,
-                    ) + sum(len(item.text) for item in response.speech)
-                self.maybe_session_done(session_id)
-
-    @staticmethod
-    def _cancelled_execution_with_unknown_request_results(
-        response: InteractionResponse,
-        execution: CapabilityRuntimeResult | None,
-    ) -> CapabilityRuntimeResult:
-        """Conservatively retain cancellation when terminal evidence is lost.
-
-        When cancellation propagates through a coordinator, the host cannot
-        prove that a request with no returned result never started. Marking it
-        ``not_run`` would be an unsafe assertion for physical work, so every
-        committed request lacking terminal evidence is retained as cancelled
-        with an explicit unknown-start diagnostic.
-        """
-
-        existing_results = list(execution.results if execution else [])
-        existing_by_request = {
-            result.request_id: result for result in existing_results
-        }
-        merged_results: list[CapabilityResult] = []
-        committed_request_ids: set[str] = set()
-        for request in response.capabilities:
-            committed_request_ids.add(request.request_id)
-            result = existing_by_request.get(request.request_id)
-            if result is None:
-                result = CapabilityResult(
-                    request_id=request.request_id,
-                    capability_id=request.capability_id,
-                    capability_version=request.capability_version,
-                    status="cancelled",
-                    reason_code=(
-                        "interaction_cancelled_terminal_result_unavailable"
-                    ),
-                    message=(
-                        "Interaction cancellation propagated before terminal "
-                        "per-request evidence was returned; start state is "
-                        "unknown."
-                    ),
-                )
-            merged_results.append(result)
-        merged_results.extend(
-            result
-            for result in existing_results
-            if result.request_id not in committed_request_ids
-        )
-        return CapabilityRuntimeResult(
-            interaction_id=response.interaction_id,
-            status="cancelled",
-            results=merged_results,
-            traces=list(execution.traces if execution else []),
-        )
 
     async def _record_soridormi_post_status(
         self,
@@ -9035,10 +8613,11 @@ class VoiceAssistant:
             style="confirm",
             source="host_body_recovery_confirmation",
         )
-        prompt_execution = await self.interaction_runtime.execute(
+        prompt_dispatch = await self.interaction_runtime.submit_response(
             prompt_response,
             session_id=session_id,
         )
+        prompt_execution = await self.interaction_runtime.wait_dispatch(prompt_dispatch)
         self._record_successfully_delivered_speech(
             prompt_response,
             prompt_execution,

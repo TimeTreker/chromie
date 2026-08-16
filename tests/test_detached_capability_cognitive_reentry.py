@@ -257,7 +257,6 @@ def _assistant(coordinator: InteractionRuntimeCoordinator) -> VoiceAssistant:
     assistant.active_interaction_task = None
     assistant.active_interaction_id = None
     assistant.active_interaction_tasks = {}
-    assistant.active_interaction_reservations = {}
     assistant.active_capability_result_tasks = {}
     assistant.cognitive_turn_closure = None
     assistant.session_log = lambda *_args, **_kwargs: None

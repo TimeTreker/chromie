@@ -22,6 +22,7 @@ if "scipy" not in sys.modules:
 from orchestrator.orchestrator import VoiceAssistant
 import orchestrator.orchestrator as orchestrator_module
 from orchestrator.runtime.conversation_state import ConversationStateManager
+from orchestrator.runtime.interaction_coordinator import CapabilityInteractionDispatch
 from orchestrator.runtime.host_settings import HostSettingsSnapshot
 from orchestrator.runtime.mind import MindManager
 from orchestrator.runtime.session import SessionTracker
@@ -2027,35 +2028,63 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             done_calls += 1
 
         class _Runtime:
-            async def execute(
+            async def submit_response(
                 self,
                 response: InteractionResponse,
                 *,
                 session_id: str | None,
                 confirmed_request_ids: set[str] | None = None,
-            ) -> CapabilityRuntimeResult:
+            ) -> CapabilityInteractionDispatch:
                 del session_id, confirmed_request_ids
-                return CapabilityRuntimeResult(
+                execution = CapabilityRuntimeResult(
                     interaction_id=response.interaction_id,
                     status="completed",
                 )
+                return CapabilityInteractionDispatch(
+                    source_response=response,
+                    runtime_response=response,
+                    receipt=None,
+                    immediate_execution=execution,
+                    preexecuted_results=[],
+                    preexecuted_traces=[],
+                )
+
+            async def wait_dispatch(
+                self,
+                dispatch: CapabilityInteractionDispatch,
+            ) -> CapabilityRuntimeResult:
+                assert dispatch.immediate_execution is not None
+                return dispatch.immediate_execution
+
+        async def consume_non_cognitive(
+            self: VoiceAssistant,
+            dispatch: CapabilityInteractionDispatch,
+            **kwargs: Any,
+        ) -> CapabilityRuntimeResult:
+            del kwargs
+            return await self.interaction_runtime.wait_dispatch(dispatch)
 
         assistant.reset_playback_ordering = MethodType(reset_playback_ordering, assistant)
         assistant.session_log = MethodType(session_log, assistant)
         assistant.maybe_session_done = MethodType(maybe_session_done, assistant)
         assistant.interaction_runtime = _Runtime()
+        assistant.playback_generation = 0
+        assistant.active_capability_result_tasks = {}
+        assistant._consume_detached_non_cognitive_dispatch = MethodType(
+            consume_non_cognitive, assistant
+        )
         response = InteractionResponse(speech=[{"text": "Here is the plan."}])
 
-        await assistant.execute_interaction_response(
-            response,
-            session_id,
-            reset_playback=False,
+        await assistant._dispatch_detached_interaction(
+            response, session_id, confirmed_request_ids=None,
+            reset_playback=False, mark_session_done=True,
         )
-        await assistant.execute_interaction_response(
-            response,
-            session_id,
-            reset_playback=True,
+        await asyncio.gather(*list(assistant.active_capability_result_tasks))
+        await assistant._dispatch_detached_interaction(
+            response, session_id, confirmed_request_ids=None,
+            reset_playback=True, mark_session_done=True,
         )
+        await asyncio.gather(*list(assistant.active_capability_result_tasks))
 
         self.assertEqual(reset_calls, 1)
         self.assertEqual(done_calls, 2)
@@ -2074,271 +2103,57 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             done_calls += 1
 
         class _Runtime:
-            async def execute(
+            async def submit_response(
                 self,
                 response: InteractionResponse,
                 *,
                 session_id: str | None,
                 confirmed_request_ids: set[str] | None = None,
-            ) -> CapabilityRuntimeResult:
+            ) -> CapabilityInteractionDispatch:
                 del session_id, confirmed_request_ids
-                return CapabilityRuntimeResult(
+                execution = CapabilityRuntimeResult(
                     interaction_id=response.interaction_id,
                     status="completed",
                 )
+                return CapabilityInteractionDispatch(
+                    source_response=response, runtime_response=response, receipt=None,
+                    immediate_execution=execution, preexecuted_results=[], preexecuted_traces=[],
+                )
+
+            async def wait_dispatch(
+                self, dispatch: CapabilityInteractionDispatch
+            ) -> CapabilityRuntimeResult:
+                assert dispatch.immediate_execution is not None
+                return dispatch.immediate_execution
+
+        async def consume_non_cognitive(
+            self: VoiceAssistant, dispatch: CapabilityInteractionDispatch, **kwargs: Any
+        ) -> CapabilityRuntimeResult:
+            del kwargs
+            return await self.interaction_runtime.wait_dispatch(dispatch)
 
         assistant.session_log = MethodType(session_log, assistant)
         assistant.maybe_session_done = MethodType(maybe_session_done, assistant)
         assistant.interaction_runtime = _Runtime()
+        assistant.playback_generation = 0
+        assistant.active_capability_result_tasks = {}
+        assistant._consume_detached_non_cognitive_dispatch = MethodType(
+            consume_non_cognitive, assistant
+        )
 
-        await assistant.execute_interaction_response(
+        await assistant._dispatch_detached_interaction(
             InteractionResponse(
                 capabilities=[{"capability_id": "soridormi.express_attention"}],
             ),
             session_id,
+            confirmed_request_ids=None,
             reset_playback=False,
             mark_session_done=False,
         )
+        await asyncio.gather(*list(assistant.active_capability_result_tasks))
 
         self.assertEqual(done_calls, 0)
         self.assertFalse(assistant.sessions.state[session_id]["llm_done"])
-
-    async def test_cancelled_interaction_closes_missing_skill_requests(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant.sessions = SessionTracker(enabled=True)
-        session_id = assistant.sessions.create()
-        closed: list[tuple[str | None, str]] = []
-
-        async def reset_playback_ordering(self: VoiceAssistant) -> None:
-            return None
-
-        def session_log(self: VoiceAssistant, sid: str | None, message: str, *args: Any) -> None:
-            self.sessions.log(sid, message, *args)
-
-        def maybe_session_done(self: VoiceAssistant, sid: str | None) -> None:
-            return None
-
-        def record_experience(
-            self: VoiceAssistant,
-            *,
-            response: InteractionResponse,
-            execution: CapabilityRuntimeResult | None,
-            session_id: str | None,
-        ) -> None:
-            return None
-
-        class _ConversationState:
-            def update_pending_task_status_for_request_id(
-                self,
-                *,
-                request_id: str | None,
-                status: str,
-            ) -> bool:
-                closed.append((request_id, status))
-                return True
-
-        class _Runtime:
-            async def execute(
-                self,
-                response: InteractionResponse,
-                *,
-                session_id: str | None,
-                confirmed_request_ids: set[str] | None = None,
-            ) -> CapabilityRuntimeResult:
-                del confirmed_request_ids
-                return CapabilityRuntimeResult(
-                    interaction_id=response.interaction_id,
-                    status="cancelled",
-                    results=[
-                        {
-                            "request_id": "speech-1",
-                            "capability_id": "chromie.speak",
-                            "status": "completed",
-                        }
-                    ],
-                )
-
-        assistant.reset_playback_ordering = MethodType(reset_playback_ordering, assistant)
-        assistant.session_log = MethodType(session_log, assistant)
-        assistant.maybe_session_done = MethodType(maybe_session_done, assistant)
-        assistant._record_experience = MethodType(record_experience, assistant)
-        assistant.conversation_state = _ConversationState()
-        assistant.interaction_runtime = _Runtime()
-
-        await assistant.execute_interaction_response(
-            InteractionResponse(
-                speech=[{"id": "speech-1", "text": "Moving."}],
-                capabilities=[
-                    {"request_id": "walk-1", "capability_id": "soridormi.walk_forward"},
-                    {"request_id": "turn-1", "capability_id": "soridormi.turn_left"},
-                ],
-            ),
-            session_id,
-        )
-
-        self.assertEqual(
-            closed,
-            [
-                ("speech-1", "completed"),
-                ("walk-1", "cancelled"),
-                ("turn-1", "cancelled"),
-            ],
-        )
-
-
-    async def test_recoverable_body_failure_stages_confirmation_retry(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant.sessions = SessionTracker(enabled=True)
-        session_id = assistant.sessions.create()
-        assistant.confirmation_dialogue = orchestrator_module.ConfirmationDialogue(
-            ttl_s=20.0
-        )
-        assistant.body_recovery_max_attempts = 1
-        assistant.body_recovery_confirmation_ttl_s = 7.0
-        execute_calls: list[InteractionResponse] = []
-        pending_records: list[dict[str, Any]] = []
-        agent_records: list[InteractionResponse] = []
-
-        async def reset_playback_ordering(self: VoiceAssistant) -> None:
-            return None
-
-        def session_log(self: VoiceAssistant, sid: str | None, message: str, *args: Any) -> None:
-            self.sessions.log(sid, message, *args)
-
-        def maybe_session_done(self: VoiceAssistant, sid: str | None) -> None:
-            return None
-
-        def record_experience(
-            self: VoiceAssistant,
-            *,
-            response: InteractionResponse,
-            execution: CapabilityRuntimeResult | None,
-            session_id: str | None,
-            errors: list[str] | None = None,
-        ) -> None:
-            return None
-
-        class _ConversationState:
-            conversation_id = "conv-recovery"
-
-            def update_pending_task_status_for_request_id(
-                self,
-                *,
-                request_id: str | None,
-                status: str,
-            ) -> bool:
-                return True
-
-            def record_agent_result(
-                self,
-                sid: str | None,
-                response: InteractionResponse,
-            ) -> None:
-                agent_records.append(response)
-
-            def record_pending_task(
-                self,
-                *,
-                sid: str | None,
-                task_type: str,
-                status: str,
-                summary: str,
-                metadata: dict[str, Any],
-            ) -> None:
-                pending_records.append(
-                    {
-                        "sid": sid,
-                        "task_type": task_type,
-                        "status": status,
-                        "summary": summary,
-                        "metadata": metadata,
-                    }
-                )
-
-        class _Runtime:
-            async def execute(
-                self,
-                response: InteractionResponse,
-                *,
-                session_id: str | None,
-                confirmed_request_ids: set[str] | None = None,
-            ) -> CapabilityRuntimeResult:
-                del session_id, confirmed_request_ids
-                execute_calls.append(response)
-                if len(execute_calls) == 1:
-                    return CapabilityRuntimeResult(
-                        interaction_id=response.interaction_id,
-                        status="failed",
-                        results=[
-                            CapabilityResult(
-                                request_id="grasp-1",
-                                capability_id="soridormi.grasp_object",
-                                status="failed",
-                                reason_code="execution_incomplete",
-                                output={
-                                    "completed": False,
-                                    "recoverable": True,
-                                    "user_message": "The object slipped.",
-                                },
-                            )
-                        ],
-                    )
-                return CapabilityRuntimeResult(
-                    interaction_id=response.interaction_id,
-                    status="completed",
-                    results=[
-                        CapabilityResult(
-                            request_id=response.speech[0].id,
-                            capability_id="chromie.speak",
-                            status="completed",
-                            output={"playback_started": True},
-                        )
-                    ],
-                )
-
-        assistant.reset_playback_ordering = MethodType(reset_playback_ordering, assistant)
-        assistant.session_log = MethodType(session_log, assistant)
-        assistant.maybe_session_done = MethodType(maybe_session_done, assistant)
-        assistant._record_experience = MethodType(record_experience, assistant)
-        assistant.conversation_state = _ConversationState()
-        assistant.interaction_runtime = _Runtime()
-
-        await assistant.execute_interaction_response(
-            InteractionResponse(
-                interaction_id="interaction-grasp",
-                capabilities=[
-                    {
-                        "request_id": "grasp-1",
-                        "capability_id": "soridormi.grasp_object",
-                        "args": {"object": "cup"},
-                    }
-                ],
-                metadata={"language": "en-US"},
-            ),
-            session_id,
-            reset_playback=False,
-        )
-
-        pending = assistant.confirmation_dialogue.pending
-        assert pending is not None
-        self.assertIn("recoverable movement issue", pending.prompt)
-        self.assertIn("The object slipped", pending.prompt)
-        self.assertEqual(
-            pending.confirmed_request_ids,
-            frozenset({"grasp-1_recovery1"}),
-        )
-        self.assertEqual(
-            pending.response.capabilities[0].metadata["body_recovery_attempt"],
-            1,
-        )
-        self.assertEqual(pending_records[0]["task_type"], "body_recovery_confirmation")
-        self.assertEqual(
-            pending_records[0]["metadata"]["retry_request_ids"],
-            ["grasp-1_recovery1"],
-        )
-        self.assertEqual(agent_records[-1].metadata["source"], "host_body_recovery_confirmation")
-        self.assertEqual(len(execute_calls), 2)
-        self.assertEqual(execute_calls[-1].speech[0].metadata["source"], "host_body_recovery_confirmation")
 
     async def test_scheduled_confirmation_without_playback_is_not_history(
         self,

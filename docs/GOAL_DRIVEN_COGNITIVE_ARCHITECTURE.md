@@ -2790,16 +2790,20 @@ reference, not a required Chromie dependency. Durable retry never grants physica
 non-idempotent work must revalidate current Goal/Plan/provider state and trusted evidence
 before any redispatch.
 
-Interaction lifetime and Capability lifetime are intentionally different. The maintained
-cognitive-effectful path calls `submit_cognitive_response(...)` and ends the foreground
-interaction task after Runtime acceptance; a separately tracked, Runtime-correlated result
+Interaction lifetime and Capability lifetime are intentionally different. Every maintained
+foreground interaction path calls `submit_response(...)` and ends the foreground interaction
+task after Runtime acceptance; a separately tracked, Runtime-correlated result
 consumer observes lifecycle events until terminal closure. That consumer is not a second
 execution manager: it owns no request identity, scheduling, semantic routing, or completion
 truth. It converts an exact terminal Runtime result through the existing deterministic closure
 into `ExecutionEvidence`, creates an internal `CognitiveOpportunity`, and may invoke the
 existing Tool Result Interpreter when current Goal responsibility is still relevant. Result
 arrival is never encoded as a synthetic user message and never resumes the original Python
-call stack.
+call stack. The legacy aggregate entry points `CapabilityRuntime.execute(...)`,
+`InteractionRuntimeCoordinator.execute(...)`, and `VoiceAssistant.execute_interaction_response(...)`
+are intentionally absent. Terminal joins remain explicit implementation details of result consumers
+or bounded internal flows that require terminal truth; they are not a foreground interaction contract.
+Repository governance rejects reintroduction of those old aggregate APIs.
 
 Soridormi's embodiment boundary follows the same generic lifecycle without becoming a second Runtime.
 For provider-compiled body activities, `soridormi.activity.execute` may return a non-terminal running
@@ -2810,7 +2814,7 @@ become terminal Capability results. Runtime cancellation continues to invoke pro
 using the provider activity ID, while canonical request/capability/Goal identity remains Host-owned. The
 current named-skill wire protocol has no status/event surface, so Chromie does not invent one.
 
-Planner-authored speech timed `after_capabilities` is not dispatched on this detached path.
+Planner-authored speech timed `after_capabilities` is not dispatched before terminal Evidence on detached execution paths.
 Before terminal Evidence exists it is only prospective wording and therefore cannot own a
 completion claim. Result wording is generated from terminal Evidence instead. When an early
 sibling result is already delivered, final aggregate closure filters that evidence from later

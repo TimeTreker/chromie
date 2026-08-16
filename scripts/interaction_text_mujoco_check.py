@@ -1259,15 +1259,31 @@ async def run_check(
                 sid=sid,
                 confirmed_request_ids=confirmed,
             )
-            if args.interrupt_text:
-                assistant._launch_interaction(
-                    response,
-                    sid,
-                    confirmed_request_ids=confirmed,
+            before_result_tasks = set(
+                getattr(assistant, "active_capability_result_tasks", {})
+            )
+            await assistant._dispatch_detached_interaction(
+                response,
+                sid,
+                confirmed_request_ids=confirmed,
+                reset_playback=True,
+                mark_session_done=True,
+            )
+            current_result_tasks = getattr(
+                assistant, "active_capability_result_tasks", {}
+            )
+            created_result_tasks = [
+                task
+                for task in current_result_tasks
+                if task not in before_result_tasks
+            ]
+            if len(created_result_tasks) != 1:
+                raise RuntimeError(
+                    "detached interaction did not register exactly one result task"
                 )
-                execution_task = assistant.active_interaction_task
-                if execution_task is None:
-                    raise RuntimeError("interaction task was not registered")
+            execution_task = created_result_tasks[0]
+
+            if args.interrupt_text:
                 provider_observation = await wait_for_provider_started(
                     assistant.interaction_runtime,
                     interaction_id=response.interaction_id,
@@ -1286,10 +1302,6 @@ async def run_check(
                     interrupt_sid,
                     timeout_s=args.timeout_s,
                 )
-                execution = await asyncio.wait_for(
-                    asyncio.shield(execution_task),
-                    timeout=args.timeout_s,
-                )
                 interrupt_payload = {
                     "text": args.interrupt_text,
                     "text_sha256": hashlib.sha256(
@@ -1303,12 +1315,10 @@ async def run_check(
                     "session_state": assistant.sessions.state.get(interrupt_sid),
                 }
                 _write_json(evidence_dir / "interrupt.json", interrupt_payload)
-            else:
-                execution = await assistant.execute_interaction_response(
-                    response,
-                    sid,
-                    confirmed_request_ids=confirmed,
-                )
+            execution = await asyncio.wait_for(
+                asyncio.shield(execution_task),
+                timeout=args.timeout_s,
+            )
             timings_ms["execution_ms"] = (
                 time.perf_counter() - execution_start
             ) * 1000.0

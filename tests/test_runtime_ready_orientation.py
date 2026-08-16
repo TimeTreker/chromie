@@ -17,9 +17,9 @@ class _OrientationRuntime:
     async def ensure_capability_definitions(self, capability_ids) -> None:
         self.requested.extend(list(capability_ids))
 
-    def capability_definition(self, skill_id: str) -> CapabilityDefinition:
+    def capability_definition(self, capability_id: str) -> CapabilityDefinition:
         return CapabilityDefinition(
-            capability_id=skill_id,
+            capability_id=capability_id,
             provider_id="soridormi.mcp",
             description="Untargeted startup attention.",
             input_schema={
@@ -44,8 +44,12 @@ class _OrientationRuntime:
             metadata={"behavior_domains": ["posture_expression"]},
         )
 
-    async def execute(self, response, *, session_id):
+    async def submit_response(self, response, *, session_id):
         self.executed.append((response, session_id))
+        return SimpleNamespace(interaction_id="startup-orientation")
+
+    async def wait_dispatch(self, dispatch):
+        self.dispatch = dispatch
         return SimpleNamespace(status="completed")
 
 

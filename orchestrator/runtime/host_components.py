@@ -147,9 +147,5 @@ def build_interaction_runtime(
         capability_manifest_paths=cognition.capability_manifest_paths,
         max_concurrency=settings.interaction.skill_max_concurrency,
         catalog_refresh_ttl_s=settings.interaction.catalog_refresh_ttl_s,
-        body_recovery_max_attempts=session.body_recovery_max_attempts,
-        body_recovery_confirmation_ttl_s=(
-            session.body_recovery_confirmation_ttl_s
-        ),
         interaction_ledger=interaction_ledger,
     )

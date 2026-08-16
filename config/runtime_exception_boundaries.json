@@ -1091,19 +1091,6 @@
     },
     {
       "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._launch_interaction",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "484717dfb7ba8dfdebec792e6fe2b549639799c63d5948b4418a9f56bd917955",
-      "failure_signals": [
-        "bare_reraise"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant._reconcile_reflex_cancellation_receipt",
       "ordinal": 1,
       "classification": "typed_failure_mapping",
@@ -1417,61 +1404,6 @@
       "body_sha256": "6e483ebc0d1955b64cb812da8ee6400b020e5ba4f00155a72d5781aadb893f48",
       "failure_signals": [
         "diagnostic"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant.execute_interaction_response",
-      "ordinal": 1,
-      "classification": "narrow_reraise",
-      "owner": "orchestrator",
-      "contract": "Retain the Trusted Capability Runtime failure as workflow evidence, then re-raise it unchanged to the existing fail-closed owner.",
-      "review_status": "reviewed",
-      "body_sha256": "6ad968b48ac94c07cfe9426edada75a74059e12be66e90d93f28fe883e7b3d9c",
-      "failure_signals": [
-        "bare_reraise"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant.execute_interaction_response",
-      "ordinal": 2,
-      "classification": "fail_closed_boundary",
-      "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "efa642f5b371085a93d3f418e5414b83a9c76bb89a2ba506bee17c57f2ccef00",
-      "failure_signals": [
-        "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant.execute_interaction_response",
-      "ordinal": 3,
-      "classification": "fail_closed_boundary",
-      "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "c35895286f584adfadb2ca780432ce2034928199508c27c44adf66bfa911de5f",
-      "failure_signals": [
-        "bare_reraise",
-        "diagnostic",
-        "return",
-        "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant.execute_interaction_response",
-      "ordinal": 4,
-      "classification": "fail_closed_boundary",
-      "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "efa642f5b371085a93d3f418e5414b83a9c76bb89a2ba506bee17c57f2ccef00",
-      "failure_signals": [
-        "state_update"
       ]
     },
     {
@@ -2415,19 +2347,6 @@
     },
     {
       "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._dispatch_detached_cognitive_interaction",
-      "ordinal": 1,
-      "classification": "narrow_reraise",
-      "owner": "orchestrator",
-      "contract": "Record dispatch failure evidence and re-raise so foreground submission failure remains explicit and no detached result consumer is created.",
-      "review_status": "reviewed",
-      "body_sha256": "9933b5e6b7f1db261f8eb66ee2ad50700b16a35c012400c1983f96aa33ebc51d",
-      "failure_signals": [
-        "bare_reraise"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant._reenter_cognition_for_terminal_capability",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
@@ -2452,6 +2371,19 @@
       "failure_signals": [
         "diagnostic",
         "return"
+      ]
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._dispatch_detached_interaction",
+      "ordinal": 1,
+      "classification": "narrow_reraise",
+      "owner": "orchestrator",
+      "contract": "Record dispatch failure evidence and re-raise so foreground submission failure remains explicit and no detached result consumer is created.",
+      "review_status": "reviewed",
+      "body_sha256": "9933b5e6b7f1db261f8eb66ee2ad50700b16a35c012400c1983f96aa33ebc51d",
+      "failure_signals": [
+        "bare_reraise"
       ]
     }
   ],
