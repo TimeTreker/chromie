@@ -217,6 +217,125 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
                 unresolved_step_ids=["step-failed", "step-timeout"],
             )
 
+    def test_incremental_terminal_evidence_reconciles_only_exact_request(self) -> None:
+        plan = two_goal_plan()
+        weather_request = request_for_step(plan, "lookup-weather")
+        calendar_request = request_for_step(plan, "lookup-calendar")
+        weather_result = CapabilityResult(
+            request_id=weather_request.request_id,
+            capability_id=weather_request.capability_id,
+            status="completed",
+            provider_id="mock.weather",
+            output={"summary": "sunny"},
+        )
+        calendar_result = CapabilityResult(
+            request_id=calendar_request.request_id,
+            capability_id=calendar_request.capability_id,
+            status="completed",
+            provider_id="mock.calendar",
+            output={"summary": "free"},
+        )
+        reconciler = ExecutionOutcomeReconciler()
+
+        evidence = reconciler.reconcile_terminal_result(
+            turn_id="turn-two",
+            plan=plan,
+            interaction_id="interaction-two",
+            requests=[weather_request, calendar_request],
+            result=weather_result,
+        )
+
+        self.assertEqual(evidence.request_id, weather_request.request_id)
+        self.assertEqual(evidence.step_id, "lookup-weather")
+        self.assertEqual(evidence.status, "completed")
+        self.assertFalse(evidence.missing_result)
+        self.assertNotEqual(evidence.status, "not_run")
+
+        final_bundle = reconciler.build(
+            turn_id="turn-two",
+            plan=plan,
+            interaction_id="interaction-two",
+            requests=[weather_request, calendar_request],
+            results=[weather_result, calendar_result],
+        )
+        final_weather = next(
+            item
+            for item in final_bundle.evidence
+            if item.request_id == weather_request.request_id
+        )
+        self.assertEqual(evidence.evidence_id, final_weather.evidence_id)
+        self.assertEqual(evidence.model_dump(mode="json"), final_weather.model_dump(mode="json"))
+
+    def test_incremental_terminal_evidence_does_not_mark_running_sibling_not_run(self) -> None:
+        plan = two_goal_plan()
+        weather_request = request_for_step(plan, "lookup-weather")
+        calendar_request = request_for_step(plan, "lookup-calendar")
+        weather_result = CapabilityResult(
+            request_id=weather_request.request_id,
+            capability_id=weather_request.capability_id,
+            status="completed",
+            provider_id="mock.weather",
+        )
+        reconciler = ExecutionOutcomeReconciler()
+
+        evidence = reconciler.reconcile_terminal_result(
+            turn_id="turn-partial-runtime",
+            plan=plan,
+            interaction_id="interaction-partial-runtime",
+            requests=[weather_request, calendar_request],
+            result=weather_result,
+        )
+        legacy_partial_bundle = reconciler.build(
+            turn_id="turn-partial-runtime",
+            plan=plan,
+            interaction_id="interaction-partial-runtime",
+            requests=[weather_request, calendar_request],
+            results=[weather_result],
+        )
+
+        self.assertEqual(evidence.request_id, weather_request.request_id)
+        self.assertFalse(evidence.missing_result)
+        calendar_evidence = next(
+            item
+            for item in legacy_partial_bundle.evidence
+            if item.request_id == calendar_request.request_id
+        )
+        self.assertEqual(calendar_evidence.status, "not_run")
+        self.assertTrue(calendar_evidence.missing_result)
+        # Incremental reconciliation deliberately returns no sibling evidence at all.
+        self.assertNotEqual(evidence.request_id, calendar_evidence.request_id)
+
+    def test_incremental_evidence_rejects_non_terminal_or_uncommitted_result(self) -> None:
+        plan = single_plan()
+        request = request_for_step(plan, "lookup")
+        reconciler = ExecutionOutcomeReconciler()
+
+        with self.assertRaisesRegex(ValueError, "requires a terminal CapabilityResult"):
+            reconciler.reconcile_terminal_result(
+                turn_id="turn-weather",
+                plan=plan,
+                interaction_id="interaction-weather",
+                requests=[request],
+                result=CapabilityResult(
+                    request_id=request.request_id,
+                    capability_id=request.capability_id,
+                    status="running",
+                ),
+            )
+
+        with self.assertRaisesRegex(ValueError, "committed canonical plan request"):
+            reconciler.reconcile_terminal_result(
+                turn_id="turn-weather",
+                plan=plan,
+                interaction_id="interaction-weather",
+                requests=[request],
+                result=CapabilityResult(
+                    request_id="unknown-request",
+                    capability_id=request.capability_id,
+                    status="completed",
+                ),
+            )
+
     def test_committed_request_must_match_plan_args_and_timing(self) -> None:
         plan = single_plan()
         request = request_for_step(plan, "lookup")

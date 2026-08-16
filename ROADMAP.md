@@ -182,10 +182,15 @@ Implement this line as separate focused Issues and separate patches:
   non-terminal `accepted`/`running` result. Each request publishes its terminal event as soon
   as it becomes terminal, even while a parallel sibling is still running. Runtime events are
   lifecycle observations, not terminal Evidence.
-- **Issue — Reconcile terminal Evidence incrementally.** Feed terminal events into the
-  existing execution/evidence owners without treating still-accepted/running siblings as
-  `not_run`. Keep `ExecutionOutcomeBundle` immutable terminal truth; introduce no duplicate
-  completion store.
+- **Issue — Reconcile terminal Evidence incrementally — source implementation complete.**
+  `ExecutionOutcomeReconciler.reconcile_terminal_result(...)` validates the full committed
+  request set against the immutable Plan but emits canonical `ExecutionEvidence` only for the
+  exact terminal request. `CognitiveTurnClosure.build_terminal_evidence(...)` applies the same
+  committed output-schema and completion-evidence gates used by final closure. A sibling with
+  no terminal result is absent from incremental Evidence rather than fabricated as
+  `not_run`/`missing_result`; the terminal request receives the same stable `evidence_id` used
+  by final aggregate reconciliation. `ExecutionOutcomeBundle` remains final terminal truth,
+  not a live scheduler snapshot, and no duplicate completion store is introduced.
 - **Issue — Decouple interaction lifetime from capability lifetime.** Remove the
   assumption that one interaction Python task remains alive until every provider finishes.
   Terminal Capability events create bounded cognitive opportunities/result interpretation

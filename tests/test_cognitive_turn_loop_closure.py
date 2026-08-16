@@ -363,6 +363,58 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
                 session_id="session-turn-closure",
             )
 
+    def test_incremental_turn_closure_emits_exact_terminal_evidence_with_stable_identity(self) -> None:
+        plan = _plan()
+        response = _response(plan)
+        first_result = CapabilityResult(
+            request_id="request-first",
+            capability_id="chromie.test.first",
+            provider_id="test.provider",
+            status="completed",
+            output={"user_summary": "first"},
+        )
+        second_result = CapabilityResult(
+            request_id="request-second",
+            capability_id="chromie.test.second",
+            provider_id="test.provider",
+            status="completed",
+            output={"user_summary": "second"},
+        )
+        execution = CapabilityRuntimeResult(
+            interaction_id=response.interaction_id,
+            status="completed",
+            results=[first_result, second_result],
+        )
+        closure = CognitiveTurnClosure(_Runtime(execution))
+
+        evidence = closure.build_terminal_evidence(
+            response=response,
+            result=first_result,
+            session_id="session-turn-closure",
+        )
+        bundle = closure.build(
+            response=response,
+            execution=execution,
+            session_id="session-turn-closure",
+        )
+
+        self.assertIsNotNone(evidence)
+        self.assertIsNotNone(bundle)
+        assert evidence is not None
+        assert bundle is not None
+        self.assertEqual(evidence.request_id, "request-first")
+        self.assertEqual(evidence.status, "completed")
+        self.assertFalse(evidence.missing_result)
+        self.assertNotIn("request-second", evidence.model_dump_json())
+        final_first = next(
+            item for item in bundle.evidence if item.request_id == "request-first"
+        )
+        self.assertEqual(evidence.evidence_id, final_first.evidence_id)
+        self.assertEqual(evidence.request_id, final_first.request_id)
+        self.assertEqual(evidence.step_id, final_first.step_id)
+        self.assertEqual(evidence.status, final_first.status)
+        self.assertEqual(evidence.observation, final_first.observation)
+
     def test_completion_evidence_policy_digest_mismatch_fails_qualification_closed(self) -> None:
         plan = _plan()
         response = _response(plan)

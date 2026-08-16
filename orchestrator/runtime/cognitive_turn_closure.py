@@ -7,11 +7,14 @@ from typing import Any
 
 from shared.chromie_contracts.execution_outcome import (
     ClaimQualificationPolicy,
+    ExecutionEvidence,
     ExecutionOutcomeBundle,
     ProviderPostconditionEvidence,
     claim_qualification_policy_sha256,
 )
 from shared.chromie_contracts.interaction import (
+    CapabilityResult,
+    CapabilityTrace,
     InteractionResponse,
     output_schema_sha256,
     validate_output_schema_declaration,
@@ -119,6 +122,62 @@ class CognitiveTurnClosure:
         return self._record_schema_gate_reasons(
             bundle,
             schema_gate_reasons=schema_gate_reasons,
+        )
+
+    def build_terminal_evidence(
+        self,
+        *,
+        response: InteractionResponse,
+        result: CapabilityResult,
+        session_id: str | None,
+        trace: CapabilityTrace | None = None,
+        provider_status: dict[str, Any] | None = None,
+    ) -> ExecutionEvidence | None:
+        """Build canonical Evidence for one terminal request only.
+
+        This method deliberately does not construct an ``ExecutionOutcomeBundle``.
+        Absence of sibling terminal results means those siblings are still unknown
+        to this incremental closure, not ``not_run``. Final aggregate closure remains
+        owned by :meth:`build` once the relevant execution scope is terminal.
+        """
+
+        plan = self.canonical_plan(response)
+        if plan is None:
+            return None
+        if result.status not in {
+            "completed",
+            "failed",
+            "refused",
+            "cancelled",
+            "timed_out",
+        }:
+            raise ValueError(
+                "incremental turn closure requires a terminal CapabilityResult"
+            )
+        turn_id = self._turn_id(response, session_id=session_id)
+        output_schemas, schema_gate_reasons = self._output_schemas(response)
+        (
+            completion_policies,
+            completion_policy_gate_reasons,
+        ) = self._completion_evidence_policies(response)
+        evidence = self.reconciler.reconcile_terminal_result(
+            turn_id=turn_id,
+            plan=plan,
+            interaction_id=response.interaction_id,
+            requests=response.capabilities,
+            result=result,
+            output_schemas=output_schemas,
+            completion_evidence_policies=completion_policies,
+            completion_evidence_gate_reasons=completion_policy_gate_reasons,
+            traces=[] if trace is None else [trace],
+            provider_postconditions=self._provider_postconditions(
+                plan,
+                provider_status=provider_status,
+            ),
+        )
+        return self._record_evidence_schema_gate_reason(
+            evidence,
+            reason=schema_gate_reasons.get(result.request_id),
         )
 
     @staticmethod
@@ -248,6 +307,23 @@ class CognitiveTurnClosure:
                 continue
             policies[request.request_id] = policy
         return policies, reasons
+
+    @staticmethod
+    def _record_evidence_schema_gate_reason(
+        evidence: ExecutionEvidence,
+        *,
+        reason: str | None,
+    ) -> ExecutionEvidence:
+        if reason is None or evidence.observation.status != "schema_unavailable":
+            return evidence
+        bounded_reason = reason[:160]
+        raw = evidence.model_dump(mode="json")
+        raw["observation"]["validation_errors"] = [bounded_reason]
+        raw["metadata"] = {
+            **raw.get("metadata", {}),
+            "output_schema_gate_reason": bounded_reason,
+        }
+        return ExecutionEvidence.model_validate(raw)
 
     @staticmethod
     def _record_schema_gate_reasons(

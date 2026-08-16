@@ -163,22 +163,15 @@ class ExecutionOutcomeReconciler:
             ProviderPostconditionEvidence
         ] = (),
     ) -> ExecutionOutcomeBundle:
-        normalized_turn_id = " ".join(str(turn_id or "").strip().split())
-        normalized_interaction_id = " ".join(
-            str(interaction_id or "").strip().split()
-        )
-        if not normalized_turn_id:
-            raise ValueError("turn_id is required")
-        if not normalized_interaction_id:
-            raise ValueError("interaction_id is required")
-
-        fingerprint = canonical_plan_fingerprint(plan)
-        outcome_id = _stable_id(
-            "outcome",
+        (
             normalized_turn_id,
             normalized_interaction_id,
-            plan.plan_id,
             fingerprint,
+            outcome_id,
+        ) = self._outcome_identity(
+            turn_id=turn_id,
+            interaction_id=interaction_id,
+            plan=plan,
         )
         (
             planned_requests,
@@ -205,7 +198,7 @@ class ExecutionOutcomeReconciler:
             planned_request_ids=planned_request_ids,
         )
         # Closure binds schemas and claim-sufficiency policy to committed request
-        # IDs. The skill-ID schema fallback preserves the lower-level builder API
+        # IDs. The capability-ID schema fallback preserves the lower-level builder API
         # used by direct contract tests; qualification policy never falls back by
         # capability ID because the exact committed request owns that boundary.
         schemas = output_schemas or {}
@@ -282,148 +275,32 @@ class ExecutionOutcomeReconciler:
                     )
                 )
                 continue
-            if result.capability_id != request.capability_id:
-                raise ValueError(
-                    "CapabilityResult capability_id does not match committed request"
-                )
-            if (
-                result.capability_version
-                and request.capability_version
-                and result.capability_version != request.capability_version
-            ):
-                raise ValueError(
-                    "CapabilityResult capability_version does not match committed "
-                    "request"
-                )
-
-            status, normalization_reason = self._result_status(result.status)
-            reason_code = result.reason_code or normalization_reason
-            output_schema = schemas.get(
-                request.request_id,
-                schemas.get(step.capability_id),
-            )
-            observation = self.build_model_observation(
-                result.output,
-                output_schema=output_schema,
+            result_evidence, observation_bytes = self._build_result_evidence(
+                normalized_interaction_id=normalized_interaction_id,
+                outcome_id=outcome_id,
+                step=step,
+                request=request,
+                result=result,
+                trace=trace,
+                output_schema=schemas.get(
+                    request.request_id,
+                    schemas.get(step.capability_id),
+                ),
+                qualification_policy=qualification_policies.get(
+                    request.request_id
+                ),
+                qualification_gate_reason=qualification_gate_reasons.get(
+                    request.request_id, ""
+                ),
+                provider_postconditions=postconditions,
+                evaluated_at=evaluated_at,
                 remaining_total_bytes=max(
                     0,
-                    self.max_total_observation_bytes
-                    - observation_bytes_used,
+                    self.max_total_observation_bytes - observation_bytes_used,
                 ),
             )
-            if observation.status == "available":
-                observation_bytes_used += observation.output_size_bytes
-            if (
-                status == "completed"
-                and isinstance(output_schema, dict)
-                and bool(output_schema)
-                and observation.status in {"schema_unavailable", "schema_invalid"}
-            ):
-                status = "failed"
-                reason_code = "completion_observation_not_trusted"
-
-            started_at = result.started_at
-            finished_at = result.finished_at
-            trace_id = result.trace_id
-            provider_id = result.provider_id
-            if trace is not None:
-                if trace.interaction_id != normalized_interaction_id:
-                    raise ValueError(
-                        "CapabilityTrace interaction_id does not match outcome "
-                        "interaction"
-                    )
-                if trace.capability_id != step.capability_id:
-                    raise ValueError(
-                        "CapabilityTrace capability_id does not match planned step"
-                    )
-                if trace.status != result.status:
-                    raise ValueError(
-                        "CapabilityTrace status does not match CapabilityResult"
-                    )
-                if provider_id and provider_id != trace.provider_id:
-                    raise ValueError(
-                        "CapabilityTrace provider_id does not match CapabilityResult"
-                    )
-                if trace_id and trace_id != trace.trace_id:
-                    raise ValueError(
-                        "CapabilityResult trace_id does not match CapabilityTrace"
-                    )
-                provider_id = provider_id or trace.provider_id
-                trace_id = trace_id or trace.trace_id
-                started_at = started_at or trace.started_at
-                finished_at = finished_at or trace.finished_at
-
-            trust_domain = " ".join(
-                str(
-                    result.metadata.get("evidence_trust_domain")
-                    or provider_id
-                    or ""
-                ).strip().split()
-            )
-            policy = qualification_policies.get(request.request_id)
-            qualification = (
-                self.qualify_completion_claim(
-                    policy=policy,
-                    evidence_id=evidence_id,
-                    execution_status=status,
-                    execution_observation=observation,
-                    execution_output=result.output,
-                    execution_trust_domain=trust_domain,
-                    execution_finished_at=finished_at,
-                    source_goal_ids=step.source_goal_ids,
-                    provider_postconditions=postconditions,
-                    evaluated_at=evaluated_at,
-                    missing_result=False,
-                )
-                if policy is not None
-                else None
-            )
-            gate_reason = qualification_gate_reasons.get(request.request_id, "")
-
-            evidence.append(
-                ExecutionEvidence(
-                    evidence_id=evidence_id,
-                    request_id=request.request_id,
-                    step_id=step.step_id,
-                    capability_id=step.capability_id,
-                    source_goal_ids=step.source_goal_ids,
-                    status=status,
-                    reported_status=result.status,
-                    provider_id=provider_id,
-                    trust_domain=trust_domain,
-                    observation=observation,
-                    completion_qualification=qualification,
-                    reason_code=reason_code,
-                    message=result.message,
-                    trace_id=trace_id,
-                    started_at=started_at,
-                    finished_at=finished_at,
-                    missing_result=False,
-                    metadata={
-                        "correlation": "plan_step_request_and_capability_result",
-                        "request_args": dict(request.args),
-                        "provider_execution": dict(result.metadata),
-                        "reported_provider_completion": (
-                            str(result.status).strip().casefold() == "completed"
-                        ),
-                        "completion_observation_status": observation.status,
-                        "safety_class": str(
-                            request.metadata.get("safety_class") or ""
-                        ),
-                        "effects": list(request.metadata.get("effects") or []),
-                        "execution_lane": str(
-                            request.metadata.get("execution_lane") or "activity"
-                        ),
-                        "retryable_safe_read": (
-                            request.metadata.get("retryable_safe_read") is True
-                        ),
-                        "completion_qualification_required": bool(
-                            policy is not None or gate_reason
-                        ),
-                        "completion_evidence_gate_reason": gate_reason,
-                    },
-                )
-            )
+            observation_bytes_used += observation_bytes
+            evidence.append(result_evidence)
 
         evidence_by_step = {item.step_id: item for item in evidence}
         executable_goal_ids = {
@@ -805,6 +682,287 @@ class ExecutionOutcomeReconciler:
             ),
             coverage=coverage,
             evaluated_at=evaluated_at,
+        )
+
+    @staticmethod
+    def _outcome_identity(
+        *,
+        turn_id: str,
+        interaction_id: str,
+        plan: CanonicalPlan,
+    ) -> tuple[str, str, str, str]:
+        normalized_turn_id = " ".join(str(turn_id or "").strip().split())
+        normalized_interaction_id = " ".join(
+            str(interaction_id or "").strip().split()
+        )
+        if not normalized_turn_id:
+            raise ValueError("turn_id is required")
+        if not normalized_interaction_id:
+            raise ValueError("interaction_id is required")
+        fingerprint = canonical_plan_fingerprint(plan)
+        outcome_id = _stable_id(
+            "outcome",
+            normalized_turn_id,
+            normalized_interaction_id,
+            plan.plan_id,
+            fingerprint,
+        )
+        return (
+            normalized_turn_id,
+            normalized_interaction_id,
+            fingerprint,
+            outcome_id,
+        )
+
+    def reconcile_terminal_result(
+        self,
+        *,
+        turn_id: str,
+        plan: CanonicalPlan,
+        interaction_id: str,
+        requests: Iterable[CapabilityRequest],
+        result: CapabilityResult,
+        output_schemas: Mapping[str, dict[str, Any]] | None = None,
+        completion_evidence_policies: Mapping[
+            str, ClaimQualificationPolicy
+        ] | None = None,
+        completion_evidence_gate_reasons: Mapping[str, str] | None = None,
+        traces: Iterable[CapabilityTrace] = (),
+        provider_postconditions: Iterable[
+            ProviderPostconditionEvidence
+        ] = (),
+    ) -> ExecutionEvidence:
+        """Reconcile one exact terminal result without closing sibling requests.
+
+        This is the incremental Evidence boundary for asynchronous Runtime
+        lifecycle. It validates the complete committed request set against the
+        immutable plan, then emits Evidence only for ``result.request_id``. A
+        sibling with no terminal result is deliberately absent rather than
+        represented as ``not_run`` or ``missing_result``. The resulting
+        ``evidence_id`` is the same stable identity used by final aggregate
+        :meth:`build` reconciliation.
+        """
+
+        if result.status not in {
+            "completed",
+            "failed",
+            "refused",
+            "cancelled",
+            "timed_out",
+        }:
+            raise ValueError(
+                "incremental execution evidence requires a terminal CapabilityResult"
+            )
+        (
+            _normalized_turn_id,
+            normalized_interaction_id,
+            fingerprint,
+            outcome_id,
+        ) = self._outcome_identity(
+            turn_id=turn_id,
+            interaction_id=interaction_id,
+            plan=plan,
+        )
+        planned_requests, _auxiliary_requests, _ignored = self._planned_requests(
+            plan,
+            fingerprint=fingerprint,
+            requests=list(requests),
+        )
+        step_by_request_id = {
+            request.request_id: step_id
+            for step_id, request in planned_requests.items()
+        }
+        step_id = step_by_request_id.get(result.request_id)
+        if step_id is None:
+            raise ValueError(
+                "terminal CapabilityResult does not reference a committed canonical plan request"
+            )
+        request = planned_requests[step_id]
+        step = next(item for item in plan.steps if item.step_id == step_id)
+        traces_by_request = self._traces_by_request(
+            list(traces),
+            planned_request_ids={item.request_id for item in planned_requests.values()},
+        )
+        schemas = output_schemas or {}
+        policies = completion_evidence_policies or {}
+        gate_reasons = completion_evidence_gate_reasons or {}
+        evidence, _observation_bytes = self._build_result_evidence(
+            normalized_interaction_id=normalized_interaction_id,
+            outcome_id=outcome_id,
+            step=step,
+            request=request,
+            result=result,
+            trace=traces_by_request.get(result.request_id),
+            output_schema=schemas.get(
+                request.request_id,
+                schemas.get(step.capability_id),
+            ),
+            qualification_policy=policies.get(request.request_id),
+            qualification_gate_reason=gate_reasons.get(request.request_id, ""),
+            provider_postconditions=list(provider_postconditions),
+            evaluated_at=datetime.now(timezone.utc),
+            remaining_total_bytes=self.max_total_observation_bytes,
+        )
+        return evidence
+
+    def _build_result_evidence(
+        self,
+        *,
+        normalized_interaction_id: str,
+        outcome_id: str,
+        step: Any,
+        request: CapabilityRequest,
+        result: CapabilityResult,
+        trace: CapabilityTrace | None,
+        output_schema: dict[str, Any] | None,
+        qualification_policy: ClaimQualificationPolicy | None,
+        qualification_gate_reason: str,
+        provider_postconditions: list[ProviderPostconditionEvidence],
+        evaluated_at: datetime,
+        remaining_total_bytes: int,
+    ) -> tuple[ExecutionEvidence, int]:
+        if result.request_id != request.request_id:
+            raise ValueError(
+                "CapabilityResult request_id does not match committed request"
+            )
+        if result.capability_id != request.capability_id:
+            raise ValueError(
+                "CapabilityResult capability_id does not match committed request"
+            )
+        if (
+            result.capability_version
+            and request.capability_version
+            and result.capability_version != request.capability_version
+        ):
+            raise ValueError(
+                "CapabilityResult capability_version does not match committed request"
+            )
+
+        evidence_id = _stable_id(
+            "evidence",
+            outcome_id,
+            step.step_id,
+            request.request_id,
+        )
+        status, normalization_reason = self._result_status(result.status)
+        reason_code = result.reason_code or normalization_reason
+        observation = self.build_model_observation(
+            result.output,
+            output_schema=output_schema,
+            remaining_total_bytes=remaining_total_bytes,
+        )
+        observation_bytes = (
+            observation.output_size_bytes if observation.status == "available" else 0
+        )
+        if (
+            status == "completed"
+            and isinstance(output_schema, dict)
+            and bool(output_schema)
+            and observation.status in {"schema_unavailable", "schema_invalid"}
+        ):
+            status = "failed"
+            reason_code = "completion_observation_not_trusted"
+
+        started_at = result.started_at
+        finished_at = result.finished_at
+        trace_id = result.trace_id
+        provider_id = result.provider_id
+        if trace is not None:
+            if trace.interaction_id != normalized_interaction_id:
+                raise ValueError(
+                    "CapabilityTrace interaction_id does not match outcome interaction"
+                )
+            if trace.capability_id != step.capability_id:
+                raise ValueError(
+                    "CapabilityTrace capability_id does not match planned step"
+                )
+            if trace.status != result.status:
+                raise ValueError(
+                    "CapabilityTrace status does not match CapabilityResult"
+                )
+            if provider_id and provider_id != trace.provider_id:
+                raise ValueError(
+                    "CapabilityTrace provider_id does not match CapabilityResult"
+                )
+            if trace_id and trace_id != trace.trace_id:
+                raise ValueError(
+                    "CapabilityResult trace_id does not match CapabilityTrace"
+                )
+            provider_id = provider_id or trace.provider_id
+            trace_id = trace_id or trace.trace_id
+            started_at = started_at or trace.started_at
+            finished_at = finished_at or trace.finished_at
+
+        trust_domain = " ".join(
+            str(
+                result.metadata.get("evidence_trust_domain")
+                or provider_id
+                or ""
+            ).strip().split()
+        )
+        qualification = (
+            self.qualify_completion_claim(
+                policy=qualification_policy,
+                evidence_id=evidence_id,
+                execution_status=status,
+                execution_observation=observation,
+                execution_output=result.output,
+                execution_trust_domain=trust_domain,
+                execution_finished_at=finished_at,
+                source_goal_ids=step.source_goal_ids,
+                provider_postconditions=provider_postconditions,
+                evaluated_at=evaluated_at,
+                missing_result=False,
+            )
+            if qualification_policy is not None
+            else None
+        )
+
+        return (
+            ExecutionEvidence(
+                evidence_id=evidence_id,
+                request_id=request.request_id,
+                step_id=step.step_id,
+                capability_id=step.capability_id,
+                source_goal_ids=step.source_goal_ids,
+                status=status,
+                reported_status=result.status,
+                provider_id=provider_id,
+                trust_domain=trust_domain,
+                observation=observation,
+                completion_qualification=qualification,
+                reason_code=reason_code,
+                message=result.message,
+                trace_id=trace_id,
+                started_at=started_at,
+                finished_at=finished_at,
+                missing_result=False,
+                metadata={
+                    "correlation": "plan_step_request_and_capability_result",
+                    "request_args": dict(request.args),
+                    "provider_execution": dict(result.metadata),
+                    "reported_provider_completion": (
+                        str(result.status).strip().casefold() == "completed"
+                    ),
+                    "completion_observation_status": observation.status,
+                    "safety_class": str(
+                        request.metadata.get("safety_class") or ""
+                    ),
+                    "effects": list(request.metadata.get("effects") or []),
+                    "execution_lane": str(
+                        request.metadata.get("execution_lane") or "activity"
+                    ),
+                    "retryable_safe_read": (
+                        request.metadata.get("retryable_safe_read") is True
+                    ),
+                    "completion_qualification_required": bool(
+                        qualification_policy is not None
+                        or qualification_gate_reason
+                    ),
+                    "completion_evidence_gate_reason": qualification_gate_reason,
+                },
+            ),
+            observation_bytes,
         )
 
     def build_model_observation(
