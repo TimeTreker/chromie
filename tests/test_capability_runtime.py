@@ -8,7 +8,7 @@ import unittest
 
 from shared.chromie_contracts.agent import AgentResult, SpeechItem
 from shared.chromie_contracts.action import ActionCommand
-from shared.chromie_contracts.interaction import InteractionResponse
+from shared.chromie_contracts.interaction import CapabilityResult, InteractionResponse
 from shared.chromie_contracts.reflex import CancellationDirective
 
 from orchestrator.runtime.capability_adapters import AgentResultInteractionAdapter
@@ -184,6 +184,300 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         release.set()
         terminal = await runtime.wait_terminal(first)
         self.assertEqual(terminal.status, "completed")
+
+    async def test_runtime_events_publish_accepted_running_progress_and_terminal(self) -> None:
+        class ProgressProvider(MockCapabilityProvider):
+            async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
+                self.calls.append(request)
+                await context.publish_progress({"fraction": 0.5}, message="halfway")
+                return CapabilityResult(
+                    request_id=request.request_id,
+                    capability_id=request.capability_id,
+                    capability_version=definition.version,
+                    status="completed",
+                    provider_id=self.provider_id,
+                    output={"done": True},
+                )
+
+        registry = CapabilityRegistry()
+        registry.register(_tool_definition(capability_id="chromie.progress"))
+        provider = ProgressProvider("mock.tool")
+        runtime = CapabilityRuntime(registry)
+        runtime.register_provider(provider)
+
+        receipt = await runtime.submit(
+            InteractionResponse(
+                interaction_id="progress-events",
+                capabilities=[
+                    {
+                        "request_id": "progress-1",
+                        "capability_id": "chromie.progress",
+                    }
+                ],
+            )
+        )
+        terminal = await runtime.wait_terminal(receipt)
+        events = await runtime.runtime_events_after(
+            receipt.event_cursor,
+            dispatch_id=receipt.dispatch_id,
+        )
+
+        self.assertEqual(terminal.status, "completed")
+        self.assertEqual(
+            [event.type for event in events],
+            ["accepted", "running", "progress", "completed"],
+        )
+        self.assertEqual(events[2].progress, {"fraction": 0.5})
+        self.assertEqual(events[2].message, "halfway")
+        self.assertTrue(events[-1].terminal)
+        self.assertEqual(events[-1].request_id, "progress-1")
+        self.assertEqual(events[-1].capability_id, "chromie.progress")
+        self.assertEqual(events[-1].provider_id, "mock.tool")
+        self.assertEqual(events[-1].result.status, "completed")
+
+    async def test_parallel_terminal_event_is_visible_before_slow_sibling_finishes(self) -> None:
+        slow_started = asyncio.Event()
+        release_slow = asyncio.Event()
+
+        class SplitProvider(MockCapabilityProvider):
+            async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
+                self.calls.append(request)
+                if request.capability_id == "chromie.slow":
+                    slow_started.set()
+                    await release_slow.wait()
+                return CapabilityResult(
+                    request_id=request.request_id,
+                    capability_id=request.capability_id,
+                    capability_version=definition.version,
+                    status="completed",
+                    provider_id=self.provider_id,
+                    output={"capability": request.capability_id},
+                )
+
+        registry = CapabilityRegistry()
+        registry.register(_tool_definition(capability_id="chromie.fast"))
+        registry.register(_tool_definition(capability_id="chromie.slow"))
+        provider = SplitProvider("mock.tool")
+        runtime = CapabilityRuntime(registry, max_concurrency=2)
+        runtime.register_provider(provider)
+        receipt = await runtime.submit(
+            InteractionResponse(
+                interaction_id="independent-events",
+                capabilities=[
+                    {
+                        "request_id": "fast-1",
+                        "capability_id": "chromie.fast",
+                        "timing": "parallel",
+                    },
+                    {
+                        "request_id": "slow-1",
+                        "capability_id": "chromie.slow",
+                        "timing": "parallel",
+                    },
+                ],
+            )
+        )
+        await slow_started.wait()
+
+        cursor = receipt.event_cursor
+        fast_terminal = None
+        while fast_terminal is None:
+            event = await runtime.wait_runtime_event(
+                cursor,
+                dispatch_id=receipt.dispatch_id,
+            )
+            cursor = event.sequence
+            if event.request_id == "fast-1" and event.terminal:
+                fast_terminal = event
+
+        observed = await runtime.runtime_events_after(
+            receipt.event_cursor,
+            dispatch_id=receipt.dispatch_id,
+        )
+        self.assertEqual(fast_terminal.type, "completed")
+        self.assertFalse(
+            any(event.request_id == "slow-1" and event.terminal for event in observed),
+            observed,
+        )
+        observation = await runtime.execution_observation()
+        self.assertTrue(
+            any(item.request_id == "slow-1" for item in observation.requests),
+            observation,
+        )
+
+        release_slow.set()
+        terminal = await runtime.wait_terminal(receipt)
+        self.assertEqual(terminal.status, "completed")
+
+    async def test_provider_result_identity_mismatch_fails_closed_and_event_stays_canonical(
+        self,
+    ) -> None:
+        class SpoofingProvider(MockCapabilityProvider):
+            async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
+                self.calls.append(request)
+                return CapabilityResult(
+                    request_id="provider-spoofed-request",
+                    capability_id="provider.spoofed.capability",
+                    capability_version="9.9.9",
+                    status="completed",
+                    provider_id="provider.spoofed",
+                    output={"done": True},
+                )
+
+        registry = CapabilityRegistry()
+        registry.register(_tool_definition(capability_id="chromie.identity"))
+        runtime = CapabilityRuntime(registry)
+        runtime.register_provider(SpoofingProvider("mock.tool"))
+        receipt = await runtime.submit(
+            InteractionResponse(
+                interaction_id="identity-authority",
+                capabilities=[
+                    {
+                        "request_id": "canonical-request",
+                        "capability_id": "chromie.identity",
+                    }
+                ],
+            )
+        )
+        terminal = await runtime.wait_terminal(receipt)
+        events = await runtime.runtime_events_after(
+            receipt.event_cursor,
+            dispatch_id=receipt.dispatch_id,
+        )
+        terminal_event = next(event for event in events if event.terminal)
+
+        self.assertEqual(terminal.status, "failed")
+        self.assertEqual(terminal.results[0].request_id, "canonical-request")
+        self.assertEqual(terminal.results[0].capability_id, "chromie.identity")
+        self.assertEqual(terminal.results[0].provider_id, "mock.tool")
+        self.assertEqual(terminal.results[0].reason_code, "provider_identity_mismatch")
+        self.assertEqual(terminal_event.request_id, "canonical-request")
+        self.assertEqual(terminal_event.capability_id, "chromie.identity")
+        self.assertEqual(terminal_event.provider_id, "mock.tool")
+        self.assertEqual(terminal_event.type, "failed")
+
+    async def test_provider_execute_non_terminal_result_fails_closed(self) -> None:
+        class NonTerminalProvider(MockCapabilityProvider):
+            async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
+                self.calls.append(request)
+                return CapabilityResult(
+                    request_id=request.request_id,
+                    capability_id=request.capability_id,
+                    capability_version=definition.version,
+                    status="running",
+                    provider_id=self.provider_id,
+                    output={"provider_state": "still_running"},
+                )
+
+        registry = CapabilityRegistry()
+        registry.register(_tool_definition(capability_id="chromie.non_terminal"))
+        runtime = CapabilityRuntime(registry)
+        runtime.register_provider(NonTerminalProvider("mock.tool"))
+        receipt = await runtime.submit(
+            InteractionResponse(
+                interaction_id="non-terminal-result",
+                capabilities=[
+                    {
+                        "request_id": "non-terminal-request",
+                        "capability_id": "chromie.non_terminal",
+                    }
+                ],
+            )
+        )
+
+        terminal = await runtime.wait_terminal(receipt)
+        events = await runtime.runtime_events_after(
+            receipt.event_cursor,
+            dispatch_id=receipt.dispatch_id,
+        )
+        terminal_event = next(event for event in events if event.terminal)
+
+        self.assertEqual(terminal.status, "failed")
+        self.assertEqual(terminal.results[0].status, "failed")
+        self.assertEqual(terminal.results[0].reason_code, "provider_non_terminal_result")
+        self.assertEqual(terminal.results[0].metadata["provider_reported_status"], "running")
+        self.assertEqual(terminal_event.type, "failed")
+        self.assertEqual(terminal_event.request_id, "non-terminal-request")
+
+    async def test_cancellation_publishes_terminal_runtime_event(self) -> None:
+        started = asyncio.Event()
+
+        class BlockingProvider(MockCapabilityProvider):
+            async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
+                self.calls.append(request)
+                started.set()
+                await asyncio.Event().wait()
+                raise AssertionError("cancelled capability resumed")
+
+        registry = CapabilityRegistry()
+        registry.register(_body_definition())
+        runtime = CapabilityRuntime(registry)
+        runtime.register_provider(BlockingProvider("mock.body"))
+        receipt = await runtime.submit(
+            InteractionResponse(
+                interaction_id="cancel-event",
+                capabilities=[
+                    {
+                        "request_id": "cancel-me",
+                        "capability_id": "soridormi.nod_yes",
+                    }
+                ],
+            )
+        )
+        await started.wait()
+        await runtime.cancel_scope(
+            CancellationDirective(
+                source_turn_id="turn-cancel-event",
+                requested_scope="current_interaction",
+                foreground_interaction_id="cancel-event",
+            )
+        )
+        terminal = await runtime.wait_terminal(receipt)
+        events = await runtime.runtime_events_after(
+            receipt.event_cursor,
+            dispatch_id=receipt.dispatch_id,
+        )
+
+        self.assertEqual(terminal.status, "cancelled")
+        self.assertTrue(
+            any(
+                event.request_id == "cancel-me"
+                and event.type == "cancelled"
+                and event.result is not None
+                for event in events
+            ),
+            events,
+        )
+
+    async def test_runtime_event_cursors_are_non_destructive_for_multiple_consumers(self) -> None:
+        registry = CapabilityRegistry()
+        registry.register(_tool_definition(capability_id="chromie.cursor"))
+        runtime = CapabilityRuntime(registry)
+        runtime.register_provider(MockCapabilityProvider("mock.tool"))
+        receipt = await runtime.submit(
+            InteractionResponse(
+                interaction_id="cursor-events",
+                capabilities=[
+                    {
+                        "request_id": "cursor-1",
+                        "capability_id": "chromie.cursor",
+                    }
+                ],
+            )
+        )
+        await runtime.wait_terminal(receipt)
+
+        first = await runtime.runtime_events_after(
+            receipt.event_cursor, dispatch_id=receipt.dispatch_id
+        )
+        second = await runtime.runtime_events_after(
+            receipt.event_cursor, dispatch_id=receipt.dispatch_id
+        )
+        self.assertEqual(
+            [event.event_id for event in first],
+            [event.event_id for event in second],
+        )
+        self.assertEqual([event.type for event in first], ["accepted", "running", "completed"])
 
     async def test_submit_validation_failure_does_not_leave_runtime_ownership(self) -> None:
         runtime = CapabilityRuntime(CapabilityRegistry())

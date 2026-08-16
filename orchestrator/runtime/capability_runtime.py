@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
+from collections import deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -241,7 +242,22 @@ class CapabilityExecutionContext(BaseModel):
     cancellation_scope: CancellationScope = "none"
     cancellation_reason_code: str = "cancelled"
     provider_state: dict[str, Any] = Field(default_factory=dict)
+    progress_publisher: Callable[[dict[str, Any], str | None], Awaitable[None]] | None = Field(
+        default=None,
+        exclude=True,
+        repr=False,
+    )
     trace: CapabilityTrace
+
+    async def publish_progress(
+        self,
+        progress: dict[str, Any] | None = None,
+        *,
+        message: str | None = None,
+    ) -> None:
+        if self.progress_publisher is None:
+            return
+        await self.progress_publisher(dict(progress or {}), message)
 
 
 class CapabilityProvider(Protocol):
@@ -267,11 +283,42 @@ class RuntimeAuthorization(BaseModel):
     safety_monitor_active: bool = False
 
 
+CapabilityRuntimeEventType = Literal[
+    "accepted",
+    "running",
+    "progress",
+    "completed",
+    "failed",
+    "refused",
+    "cancelled",
+    "timed_out",
+]
+
+
+class CapabilityRuntimeEvent(CapabilityIdentityModel):
+    sequence: int = Field(ge=1)
+    event_id: str = Field(default_factory=lambda: uuid4().hex, min_length=1)
+    dispatch_id: str = Field(min_length=1)
+    interaction_id: str = Field(min_length=1)
+    request_id: str = Field(min_length=1)
+    provider_id: str = Field(min_length=1)
+    type: CapabilityRuntimeEventType
+    occurred_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    message: str | None = None
+    progress: dict[str, Any] = Field(default_factory=dict)
+    result: CapabilityResult | None = None
+
+    @property
+    def terminal(self) -> bool:
+        return self.type in {"completed", "failed", "refused", "cancelled", "timed_out"}
+
+
 class CapabilityDispatchReceipt(BaseModel):
     dispatch_id: str
     interaction_id: str
     status: Literal["accepted"] = "accepted"
     request_ids: list[str] = Field(default_factory=list)
+    event_cursor: int = Field(default=0, ge=0)
     accepted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -338,6 +385,10 @@ class CapabilityRuntime:
         self._executing_interactions: set[str] = set()
         self._submissions: dict[str, asyncio.Task[CapabilityRuntimeResult]] = {}
         self._dispatch_interactions: dict[str, str] = {}
+        self._interaction_dispatch_ids: dict[str, str] = {}
+        self._event_sequence = 0
+        self._event_history: deque[CapabilityRuntimeEvent] = deque(maxlen=4096)
+        self._event_condition = asyncio.Condition()
         self._scheduled: dict[
             str,
             dict[str, tuple[CapabilityRequest, CapabilityDefinition]],
@@ -406,6 +457,120 @@ class CapabilityRuntime:
         self._scheduled.pop(interaction_id, None)
         self._cancellation_rules.pop(interaction_id, None)
 
+    async def runtime_events_after(
+        self,
+        after_sequence: int = 0,
+        *,
+        dispatch_id: str | None = None,
+        limit: int = 256,
+    ) -> list[CapabilityRuntimeEvent]:
+        """Return retained lifecycle events after one consumer-owned cursor.
+
+        Event history is observational Runtime state, not terminal Evidence. Multiple
+        consumers may keep independent cursors without destructively consuming a queue.
+        """
+
+        if after_sequence < 0:
+            raise ValueError("after_sequence must be non-negative")
+        if limit < 1:
+            raise ValueError("limit must be positive")
+        async with self._event_condition:
+            self._assert_event_cursor_available(after_sequence)
+            events = [
+                event
+                for event in self._event_history
+                if event.sequence > after_sequence
+                and (dispatch_id is None or event.dispatch_id == dispatch_id)
+            ]
+            return events[:limit]
+
+    async def wait_runtime_event(
+        self,
+        after_sequence: int = 0,
+        *,
+        dispatch_id: str | None = None,
+    ) -> CapabilityRuntimeEvent:
+        """Wait for the next lifecycle event after a consumer-owned cursor."""
+
+        if after_sequence < 0:
+            raise ValueError("after_sequence must be non-negative")
+        async with self._event_condition:
+            while True:
+                self._assert_event_cursor_available(after_sequence)
+                for event in self._event_history:
+                    if event.sequence <= after_sequence:
+                        continue
+                    if dispatch_id is None or event.dispatch_id == dispatch_id:
+                        return event
+                await self._event_condition.wait()
+
+    def _assert_event_cursor_available(self, after_sequence: int) -> None:
+        if not self._event_history:
+            return
+        oldest_sequence = self._event_history[0].sequence
+        if after_sequence < oldest_sequence - 1:
+            raise RuntimeError(
+                "capability runtime event cursor expired: "
+                f"cursor={after_sequence} oldest_retained={oldest_sequence}"
+            )
+
+    async def _publish_request_event(
+        self,
+        *,
+        dispatch_id: str,
+        interaction_id: str,
+        request: CapabilityRequest,
+        definition: CapabilityDefinition,
+        event_type: CapabilityRuntimeEventType,
+        message: str | None = None,
+        progress: dict[str, Any] | None = None,
+        result: CapabilityResult | None = None,
+    ) -> CapabilityRuntimeEvent:
+        async with self._event_condition:
+            self._event_sequence += 1
+            event = CapabilityRuntimeEvent(
+                sequence=self._event_sequence,
+                dispatch_id=dispatch_id,
+                interaction_id=interaction_id,
+                request_id=request.request_id,
+                capability_id=request.capability_id,
+                provider_id=definition.provider_id,
+                type=event_type,
+                message=message,
+                progress=dict(progress or {}),
+                result=result.model_copy(deep=True) if result is not None else None,
+            )
+            self._event_history.append(event)
+            self._event_condition.notify_all()
+            return event
+
+    def _dispatch_id_for_interaction(self, interaction_id: str) -> str:
+        try:
+            return self._interaction_dispatch_ids[interaction_id]
+        except KeyError as exc:
+            raise RuntimeError(
+                f"no active dispatch ownership for interaction_id={interaction_id!r}"
+            ) from exc
+
+    def _progress_publisher(
+        self,
+        interaction_id: str,
+        request: CapabilityRequest,
+        definition: CapabilityDefinition,
+    ) -> Callable[[dict[str, Any], str | None], Awaitable[None]]:
+        async def publish(progress: dict[str, Any], message: str | None) -> None:
+            await self._publish_request_event(
+                dispatch_id=self._dispatch_id_for_interaction(interaction_id),
+                interaction_id=interaction_id,
+                request=request,
+                definition=definition,
+                event_type="progress",
+                message=message,
+                progress=progress,
+            )
+
+        return publish
+
     async def submit(
         self,
         response: InteractionResponse,
@@ -431,7 +596,10 @@ class CapabilityRuntime:
             raise
 
         dispatch_id = uuid4().hex
+        event_cursor = self._event_sequence
         execution_registered = False
+        start_gate = asyncio.Event()
+        task: asyncio.Task[CapabilityRuntimeResult] | None = None
         try:
             async with self._active_lock:
                 if response.interaction_id in self._executing_interactions:
@@ -440,6 +608,7 @@ class CapabilityRuntime:
                         f"interaction_id={response.interaction_id!r}"
                     )
                 self._executing_interactions.add(response.interaction_id)
+                self._interaction_dispatch_ids[response.interaction_id] = dispatch_id
                 execution_registered = True
                 interaction_scheduled = self._scheduled.setdefault(
                     response.interaction_id,
@@ -454,16 +623,34 @@ class CapabilityRuntime:
                         validated,
                         authorization,
                         auto_managed=auto_managed,
+                        start_gate=start_gate,
                     ),
                     name=f"capability-dispatch:{response.interaction_id}:{dispatch_id}",
                 )
                 self._submissions[dispatch_id] = task
                 self._dispatch_interactions[dispatch_id] = response.interaction_id
+
+            for request, definition in validated:
+                await self._publish_request_event(
+                    dispatch_id=dispatch_id,
+                    interaction_id=response.interaction_id,
+                    request=request,
+                    definition=definition,
+                    event_type="accepted",
+                )
+            start_gate.set()
         except BaseException:
+            if task is not None:
+                task.cancel()
+                start_gate.set()
             if execution_registered:
                 async with self._active_lock:
                     self._scheduled.pop(response.interaction_id, None)
                     self._executing_interactions.discard(response.interaction_id)
+                    if self._interaction_dispatch_ids.get(response.interaction_id) == dispatch_id:
+                        self._interaction_dispatch_ids.pop(response.interaction_id, None)
+                    self._submissions.pop(dispatch_id, None)
+                    self._dispatch_interactions.pop(dispatch_id, None)
             if auto_managed:
                 self.end_interaction(response.interaction_id)
             raise
@@ -472,6 +659,7 @@ class CapabilityRuntime:
             dispatch_id=dispatch_id,
             interaction_id=response.interaction_id,
             request_ids=[request.request_id for request, _ in validated],
+            event_cursor=event_cursor,
         )
 
     async def wait_terminal(
@@ -506,10 +694,12 @@ class CapabilityRuntime:
         authorization: RuntimeAuthorization,
         *,
         auto_managed: bool,
+        start_gate: asyncio.Event,
     ) -> CapabilityRuntimeResult:
         results: list[CapabilityResult] = []
         traces: list[CapabilityTrace] = []
         try:
+            await start_gate.wait()
             try:
                 pending_parallel: list[tuple[CapabilityRequest, CapabilityDefinition]] = []
                 for request, definition in validated:
@@ -614,6 +804,7 @@ class CapabilityRuntime:
             async with self._active_lock:
                 self._scheduled.pop(interaction_id, None)
                 self._executing_interactions.discard(interaction_id)
+                self._interaction_dispatch_ids.pop(interaction_id, None)
             if auto_managed:
                 self.end_interaction(interaction_id)
 
@@ -1569,6 +1760,9 @@ class CapabilityRuntime:
                 confirmed=request.request_id in authorization.confirmed_request_ids,
                 safety_monitor_active=authorization.safety_monitor_active,
                 provider_state=shared_state,
+                progress_publisher=self._progress_publisher(
+                    interaction_id, request, _definition
+                ),
                 trace=trace,
             )
             traces.append(trace)
@@ -1582,6 +1776,7 @@ class CapabilityRuntime:
         for context in contexts[1:]:
             context.provider_state = shared_state
 
+        prestart_pairs: list[tuple[CapabilityResult, CapabilityTrace]] | None = None
         async with self._active_lock:
             cancellation_rules = [
                 rule
@@ -1604,7 +1799,7 @@ class CapabilityRuntime:
                 if interaction_scheduled is not None:
                     for request, _ in items:
                         interaction_scheduled.pop(request.request_id, None)
-                return [
+                prestart_pairs = [
                     self._cancelled_pair(
                         interaction_id,
                         request,
@@ -1618,6 +1813,21 @@ class CapabilityRuntime:
                     )
                     for request, definition in items
                 ]
+        if prestart_pairs is not None:
+            dispatch_id = self._dispatch_id_for_interaction(interaction_id)
+            for (request, definition), (result, _trace) in zip(
+                items, prestart_pairs, strict=True
+            ):
+                await self._publish_request_event(
+                    dispatch_id=dispatch_id,
+                    interaction_id=interaction_id,
+                    request=request,
+                    definition=definition,
+                    event_type="cancelled",
+                    message=result.message or None,
+                    result=result,
+                )
+            return prestart_pairs
 
         async def invoke() -> list[CapabilityResult]:
             async with self._resource_arbiter.claim(
@@ -1628,6 +1838,15 @@ class CapabilityRuntime:
                     for trace, context in zip(traces, contexts, strict=True):
                         context.provider_started = True
                         trace.events.append(CapabilityTraceEvent(type="started"))
+                dispatch_id = self._dispatch_id_for_interaction(interaction_id)
+                for request, definition in items:
+                    await self._publish_request_event(
+                        dispatch_id=dispatch_id,
+                        interaction_id=interaction_id,
+                        request=request,
+                        definition=definition,
+                        event_type="running",
+                    )
                 return await execute_group(
                     [
                         (request, definition, context)
@@ -1747,7 +1966,8 @@ class CapabilityRuntime:
         results = self._normalize_group_results(items, results)
         finished_at = datetime.now(timezone.utc)
         pairs: list[tuple[CapabilityResult, CapabilityTrace]] = []
-        for result, trace, (request, _definition) in zip(
+        dispatch_id = self._dispatch_id_for_interaction(interaction_id)
+        for result, trace, (request, definition) in zip(
             results,
             traces,
             items,
@@ -1773,6 +1993,15 @@ class CapabilityRuntime:
                         ),
                     },
                 )
+            )
+            await self._publish_request_event(
+                dispatch_id=dispatch_id,
+                interaction_id=interaction_id,
+                request=request,
+                definition=definition,
+                event_type=result.status,
+                message=result.message or None,
+                result=result,
             )
             pairs.append((result, trace))
         return pairs
@@ -1811,10 +2040,20 @@ class CapabilityRuntime:
                 reason_code="invalid_group_result",
                 message="provider-local execution group did not return a result list",
             )
+        expected_request_ids = {request.request_id for request, _ in items}
         by_request_id: dict[str, CapabilityResult] = {}
         for result in results:
             if not isinstance(result, CapabilityResult):
                 continue
+            if result.request_id not in expected_request_ids:
+                return cls._group_terminal_results(
+                    items,
+                    status="failed",
+                    reason_code="provider_identity_mismatch",
+                    message=(
+                        "provider-local execution group returned an unknown request identity"
+                    ),
+                )
             if result.request_id in by_request_id:
                 return cls._group_terminal_results(
                     items,
@@ -1836,8 +2075,58 @@ class CapabilityRuntime:
                     reason_code="member_result_missing",
                     message=("provider-local body activity omitted evidence for this member"),
                 )
-            normalized.append(result)
+            normalized.append(cls._canonicalize_provider_result(request, definition, result))
         return normalized
+
+    @staticmethod
+    def _canonicalize_provider_result(
+        request: CapabilityRequest,
+        definition: CapabilityDefinition,
+        result: CapabilityResult,
+    ) -> CapabilityResult:
+        mismatches: dict[str, Any] = {}
+        if result.request_id != request.request_id:
+            mismatches["request_id"] = result.request_id
+        if result.capability_id != request.capability_id:
+            mismatches["capability_id"] = result.capability_id
+        if result.provider_id not in {None, definition.provider_id}:
+            mismatches["provider_id"] = result.provider_id
+        if result.capability_version not in {None, definition.version}:
+            mismatches["capability_version"] = result.capability_version
+        if mismatches:
+            return CapabilityResult(
+                request_id=request.request_id,
+                capability_id=request.capability_id,
+                capability_version=definition.version,
+                status="failed",
+                provider_id=definition.provider_id,
+                reason_code="provider_identity_mismatch",
+                message="provider result identity did not match Runtime-owned request identity",
+                metadata={"provider_reported_identity": mismatches},
+            )
+        if result.status not in {"completed", "refused", "failed", "cancelled", "timed_out"}:
+            return CapabilityResult(
+                request_id=request.request_id,
+                capability_id=request.capability_id,
+                capability_version=definition.version,
+                status="failed",
+                provider_id=definition.provider_id,
+                reason_code="provider_non_terminal_result",
+                message=(
+                    "provider execute() returned a non-terminal status; terminal provider "
+                    "completion must be represented by a terminal CapabilityResult"
+                ),
+                metadata={"provider_reported_status": result.status},
+            )
+        return result.model_copy(
+            deep=True,
+            update={
+                "request_id": request.request_id,
+                "capability_id": request.capability_id,
+                "capability_version": definition.version,
+                "provider_id": definition.provider_id,
+            },
+        )
 
     @staticmethod
     def _bind_result_authority(
@@ -1881,6 +2170,9 @@ class CapabilityRuntime:
             interaction_id=interaction_id,
             confirmed=request.request_id in authorization.confirmed_request_ids,
             safety_monitor_active=authorization.safety_monitor_active,
+            progress_publisher=self._progress_publisher(
+                interaction_id, request, definition
+            ),
             trace=trace,
         )
         timeout_s = (request.timeout_ms or definition.timeout_ms) / 1000.0
@@ -1893,9 +2185,17 @@ class CapabilityRuntime:
                 async with self._active_lock:
                     context.provider_started = True
                     trace.events.append(CapabilityTraceEvent(type="started"))
+                await self._publish_request_event(
+                    dispatch_id=self._dispatch_id_for_interaction(interaction_id),
+                    interaction_id=interaction_id,
+                    request=request,
+                    definition=definition,
+                    event_type="running",
+                )
                 return await provider.execute(request, definition, context)
 
         active_key = (interaction_id, request.request_id)
+        prestart_result: CapabilityResult | None = None
         async with self._active_lock:
             cancellation_rule = self._matching_cancellation_rule(
                 interaction_id,
@@ -1907,7 +2207,7 @@ class CapabilityRuntime:
                 if interaction_scheduled is not None:
                     interaction_scheduled.pop(request.request_id, None)
                 finished_at = datetime.now(timezone.utc)
-                result = CapabilityResult(
+                prestart_result = CapabilityResult(
                     request_id=request.request_id,
                     capability_id=request.capability_id,
                     capability_version=definition.version,
@@ -1927,16 +2227,27 @@ class CapabilityRuntime:
                 trace.events.append(
                     CapabilityTraceEvent(
                         type="cancelled",
-                        message=result.message,
+                        message=prestart_result.message,
                         data={
                             "reason_code": "cancelled_before_start",
                             "cancellation_scope": (cancellation_rule.effective_scope),
                         },
                     )
                 )
-                return result, trace
-            task = asyncio.create_task(invoke())
-            self._active[active_key] = (task, request, definition, context)
+            else:
+                task = asyncio.create_task(invoke())
+                self._active[active_key] = (task, request, definition, context)
+        if prestart_result is not None:
+            await self._publish_request_event(
+                dispatch_id=self._dispatch_id_for_interaction(interaction_id),
+                interaction_id=interaction_id,
+                request=request,
+                definition=definition,
+                event_type="cancelled",
+                message=prestart_result.message or None,
+                result=prestart_result,
+            )
+            return prestart_result, trace
         try:
             result = await asyncio.wait_for(task, timeout=timeout_s)
             if context.cancellation_scope != "none":
@@ -2061,6 +2372,7 @@ class CapabilityRuntime:
                 if interaction_scheduled is not None:
                     interaction_scheduled.pop(request.request_id, None)
 
+        result = self._canonicalize_provider_result(request, definition, result)
         self._bind_result_authority(request, result)
         result.trace_id = trace.trace_id
         trace.status = result.status
@@ -2075,6 +2387,15 @@ class CapabilityRuntime:
                 message=result.message,
                 data={"reason_code": result.reason_code},
             )
+        )
+        await self._publish_request_event(
+            dispatch_id=self._dispatch_id_for_interaction(interaction_id),
+            interaction_id=interaction_id,
+            request=request,
+            definition=definition,
+            event_type=result.status,
+            message=result.message or None,
+            result=result,
         )
         return result, trace
 

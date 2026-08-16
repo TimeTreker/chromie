@@ -1115,6 +1115,9 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
             "EpisodeCapabilityRequestRecord": "CapabilityIdentityModel",
             "EpisodeCapabilityResultRecord": "CapabilityIdentityModel",
         },
+        "orchestrator/runtime/capability_runtime.py": {
+            "CapabilityRuntimeEvent": "CapabilityIdentityModel",
+        },
     }
     findings: list[PolicyFinding] = []
     for relative, classes in targets.items():
@@ -1200,7 +1203,12 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
                             ),
                         )
                     )
-                for required_method in ("submit", "wait_terminal"):
+                for required_method in (
+                    "submit",
+                    "wait_terminal",
+                    "runtime_events_after",
+                    "wait_runtime_event",
+                ):
                     if required_method not in method_names:
                         findings.append(
                             _source_policy_finding(
@@ -1213,6 +1221,31 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
                                 ),
                             )
                         )
+
+            retired_manager_names = {
+                "WorkManager",
+                "AsyncManager",
+                "ResultManager",
+                "EventManager",
+                "ResultAgent",
+                "AsyncAgent",
+            }
+            for class_node in (
+                node for node in ast.walk(runtime_tree) if isinstance(node, ast.ClassDef)
+            ):
+                if class_node.name in retired_manager_names:
+                    findings.append(
+                        PolicyFinding(
+                            rule_id=RULE_CANONICAL_CAPABILITY_ID,
+                            path="orchestrator/runtime/capability_runtime.py",
+                            line=class_node.lineno,
+                            symbol=class_node.name,
+                            message=(
+                                "Capability Runtime lifecycle/events must remain Runtime-owned; "
+                                "do not reintroduce a parallel manager/agent authority"
+                            ),
+                        )
+                    )
 
     retired_runtime_paths = (
         "orchestrator/runtime/skill_runtime.py",

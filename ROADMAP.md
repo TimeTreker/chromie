@@ -146,14 +146,16 @@ adding a manager because a useful explanatory term exists.
 
 The Trusted Capability Runtime now has an approved target architecture. Current source
 has request identity, validation, resource arbitration, cancellation, provider execution,
-bounded internal concurrency, and a non-blocking `CapabilityRuntime.submit(...)` dispatch
-boundary. `submit()` returns a `CapabilityDispatchReceipt` after Host validation, Runtime
-ownership registration, and submission-task creation; provider terminal completion is an
-explicit `wait_terminal(receipt)` join rather than the dispatch API. No
-`CapabilityRuntime.execute(...)` aggregate compatibility API remains. The remaining target
-is independent request lifecycle events, terminal Evidence reconciliation, and cognitive
-re-entry without creating a second Work/Result manager or semantic agent. Provider transport
-and durable-execution backend remain below the Capability contract.
+bounded internal concurrency, a non-blocking `CapabilityRuntime.submit(...)` dispatch
+boundary, and a correlated in-process `CapabilityRuntimeEvent` lifecycle surface. `submit()`
+returns a `CapabilityDispatchReceipt` after Host validation, Runtime ownership registration,
+and submission-task creation; provider terminal completion is an explicit
+`wait_terminal(receipt)` join rather than the dispatch API. No
+`CapabilityRuntime.execute(...)` aggregate compatibility API remains. Accepted, running,
+progress, and terminal events are published per exact Runtime-owned request without waiting
+for sibling completion. The remaining target is incremental terminal Evidence reconciliation
+and cognitive re-entry without creating a second Work/Result/Event manager or semantic
+agent. Provider transport and durable-execution backend remain below the Capability contract.
 
 Implement this line as separate focused Issues and separate patches:
 
@@ -171,11 +173,15 @@ Implement this line as separate focused Issues and separate patches:
   the old `CapabilityRuntime.execute(...)` API was deleted rather than retained as a
   compatibility wrapper. Existing sequential dependencies, provider grouping, cancellation,
   and resource barriers remain Runtime-owned.
-- **Issue — Publish correlated capability lifecycle events.** Add one mechanical
-  `CapabilityRuntimeEvent` stream for accepted/running/progress/terminal state using
-  Host-owned request correlation. Provider-returned IDs are observations, never identity
-  authority. Deliver independent request results as they arrive rather than after a whole
-  parallel batch completes.
+- **Issue — Publish correlated capability lifecycle events — source implementation complete.**
+  `CapabilityRuntime` now retains one bounded, cursor-addressable mechanical
+  `CapabilityRuntimeEvent` history for accepted/running/progress/terminal state using
+  Host-owned request correlation. Consumers keep independent cursors rather than destructively
+  competing for one queue. Provider-returned IDs are checked against Runtime ownership and
+  identity mismatches fail closed; provider `execute()` cannot close a request with a
+  non-terminal `accepted`/`running` result. Each request publishes its terminal event as soon
+  as it becomes terminal, even while a parallel sibling is still running. Runtime events are
+  lifecycle observations, not terminal Evidence.
 - **Issue — Reconcile terminal Evidence incrementally.** Feed terminal events into the
   existing execution/evidence owners without treating still-accepted/running siblings as
   `not_run`. Keep `ExecutionOutcomeBundle` immutable terminal truth; introduce no duplicate

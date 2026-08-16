@@ -293,6 +293,30 @@ class RepositoryEngineeringPolicyTests(unittest.TestCase):
             findings,
         )
 
+    def test_parallel_capability_event_manager_authority_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            path = root / "orchestrator" / "runtime" / "capability_runtime.py"
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                "class CapabilityIdentityModel: pass\n"
+                "class CapabilityRuntimeEvent(CapabilityIdentityModel): pass\n"
+                "class CapabilityRuntime:\n"
+                "    async def submit(self): pass\n"
+                "    async def wait_terminal(self): pass\n"
+                "    async def runtime_events_after(self): pass\n"
+                "    async def wait_runtime_event(self): pass\n"
+                "class EventManager: pass\n",
+                encoding="utf-8",
+            )
+
+            findings = policies.audit_canonical_capability_identity(root)
+
+        self.assertTrue(
+            any(item.symbol == "EventManager" for item in findings),
+            findings,
+        )
+
     def test_reviewed_exception_is_exact_and_stale_exception_fails(self) -> None:
         finding = policies.PolicyFinding(
             rule_id=policies.RULE_PRODUCTION_ASSERT,
