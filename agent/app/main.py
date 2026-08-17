@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import logging
 import secrets
-import time
 
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse, ORJSONResponse
 
 from .settings import Settings, agent_service_settings as settings
-from .agents import AgentServices
 from .capabilities.catalog import CapabilityCatalog, CapabilitySearchRequest, CapabilitySearchResult
 from .capabilities.loader import build_configured_registry, parse_manifest_paths
 from .agent_skills import (
@@ -74,12 +72,6 @@ except ImportError:  # pragma: no cover
         AttentionReviewResult,
         CoreTurnRequest,
     )
-from .interaction import (
-    AgentResultInteractionAdapter,
-    InteractionOutputCoordinator,
-    NativeInteractionOutputError,
-)
-from .runtime import AgentRuntime, InteractionRuntime
 from .goal_association import GoalAssociationResolver
 from .fast_planner import FastPlannerResolver
 from .deep_planner import DeepPlannerResolver
@@ -91,7 +83,7 @@ from .social_attention import (
 )
 from .response_composer import ResponseComposerResolver
 from .tool_result_interpreter import ToolResultInterpreter
-from .schema import AgentResult, AgentRunRequest, HealthResponse
+from .schema import HealthResponse
 from .cognitive_core.goal_interpreter import (
     RouteDecision as CoreRouteDecision,
     RouteRequest as CoreRouteRequest,
@@ -117,10 +109,8 @@ from .task_graph import (
 from .tool_invocation import McpStreamableHttpInvoker
 
 try:
-    from chromie_contracts.interaction import InteractionResponse
     from chromie_contracts.semantic_authority import semantic_authority_route_matrix
 except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.interaction import InteractionResponse
     from shared.chromie_contracts.semantic_authority import semantic_authority_route_matrix
 
 
@@ -151,17 +141,6 @@ external_information_client = (
     else None
 )
 
-response_reviewer_client = (
-    OllamaClient(
-        settings.ollama_url,
-        settings.response_review_model,
-        timeout_ms=settings.response_review_timeout_ms,
-        purpose="response_review",
-        service_settings=settings,
-    )
-    if settings.use_llm and settings.response_review_enabled
-    else None
-)
 social_attention_client = (
     OllamaClient(
         settings.ollama_url,
@@ -294,38 +273,6 @@ tool_result_interpreter = (
     )
     if tool_result_interpreter_client is not None
     else None
-)
-services = AgentServices(
-    ollama=ollama_client,
-    response_reviewer=response_reviewer_client,
-    response_review_mode=settings.response_review_mode,
-    use_llm=settings.use_llm,
-    max_speak_chars=settings.max_speak_chars,
-    expressive_body_cues=settings.expressive_body_cues,
-    social_attention_mode=settings.social_attention_mode,
-    social_attention_ollama=social_attention_client,
-    social_attention_num_ctx=settings.social_attention_num_ctx,
-    social_attention_num_predict=settings.social_attention_num_predict,
-    social_attention_max_behaviors=settings.social_attention_max_behaviors,
-    social_attention_wait_after_response_ms=settings.social_attention_wait_after_response_ms,
-    social_attention_capability_ids=settings.social_attention_capability_ids,
-    require_capability_plan_review=settings.require_capability_plan_review,
-    legacy_capability_fallback_enabled=settings.legacy_capability_fallback_enabled,
-    task_graph_planner=task_graph_planner,
-    capability_catalog=capability_catalog,
-    capability_match_limit=settings.capability_match_limit,
-    local_tool_executor=local_tool_executor,
-    tool_result_interpreter=tool_result_interpreter,
-)
-runtime = AgentRuntime(services)
-interaction_runtime = InteractionRuntime(services)
-interaction_adapter = AgentResultInteractionAdapter()
-interaction_output = InteractionOutputCoordinator(
-    interaction_runtime,
-    runtime,
-    mode=settings.interaction_output_mode,
-    fallback_to_legacy=settings.native_interaction_fallback,
-    adapter=interaction_adapter,
 )
 read_only_invoker = (
     McpStreamableHttpInvoker(capability_registry)
@@ -548,7 +495,6 @@ async def health() -> HealthResponse:
         model=settings.model,
         ollama_url=settings.ollama_url,
         use_llm=settings.use_llm,
-        available_agents=runtime.available_agents(),
         capability_sources=configured_registry.sources,
         capability_manifest_files=configured_registry.manifest_files,
         agent_skill_roots=list(configured_agent_skill_registry.roots),
@@ -584,9 +530,6 @@ async def health() -> HealthResponse:
         physical_task_graph_execution_enabled=(
             guarded_invoker is not None and settings.enable_physical_task_graph_execution
         ),
-        interaction_output_mode=settings.interaction_output_mode,
-        native_interaction_fallback_enabled=settings.native_interaction_fallback,
-        legacy_capability_fallback_enabled=settings.legacy_capability_fallback_enabled,
         capability_catalog_enabled=True,
         capability_catalog_version=capability_catalog.version,
         goal_association_enabled=goal_association_resolver is not None,
@@ -618,24 +561,8 @@ async def semantic_authority() -> dict[str, object]:
         "matching_turn_authority_required": True,
         "claim_is_caller_authentication": False,
         "claim_is_single_use_replay_protection": False,
-        "legacy_capability_fallback_enabled": (
-            settings.legacy_capability_fallback_enabled
-        ),
         "route_matrix": semantic_authority_route_matrix(),
     }
-
-
-@app.get("/agents")
-async def agents() -> dict:
-    return {
-        "agents": runtime.available_agents(),
-        "notes": {
-            "speaker_agent": "decides wording/style only; it does not access audio devices",
-            "safety_agent": "validates and clamps risky actions",
-        },
-    }
-
-
 
 
 @app.post(
@@ -984,56 +911,6 @@ async def get_task_graph_scheduler_status(
     return task_graph_service.scheduler_status()
 
 
-@app.post("/run", response_model=AgentResult)
-async def run_agent(request: AgentRunRequest) -> AgentResult:
-    start = time.perf_counter()
-    result = await runtime.run(request)
-    elapsed_ms = (time.perf_counter() - start) * 1000.0
-    logger.info(
-        "agent sid=%s route=%s intent=%s status=%s agents=%s actions=%d speak_immediate=%d speak_after=%d ms=%.1f",
-        request.sid,
-        request.route_decision.route,
-        request.route_decision.intent,
-        result.status,
-        ",".join(result.handled_by),
-        len(result.actions),
-        len(result.speak_immediate),
-        len(result.speak_after),
-        elapsed_ms,
-    )
-    result.trace.append(f"runtime: total_ms={elapsed_ms:.1f}")
-    return result
-
-
-@app.post("/interaction", response_model=InteractionResponse)
-async def run_interaction(request: AgentRunRequest) -> InteractionResponse:
-    start = time.perf_counter()
-    try:
-        response = await interaction_output.run(request)
-    except NativeInteractionOutputError as exc:
-        logger.exception(
-            "native_interaction_validation_failed sid=%s route=%s intent=%s fallback=%s",
-            request.sid,
-            request.route_decision.route,
-            request.route_decision.intent,
-            settings.native_interaction_fallback,
-        )
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-    elapsed_ms = (time.perf_counter() - start) * 1000.0
-    response.metadata["runtime_ms"] = round(elapsed_ms, 1)
-    logger.info(
-        "interaction sid=%s route=%s intent=%s status=%s output_mode=%s speech=%d capabilities=%d confirmation=%s ms=%.1f",
-        request.sid,
-        request.route_decision.route,
-        request.route_decision.intent,
-        response.status,
-        response.metadata.get("interaction_output_mode"),
-        len(response.speech),
-        len(response.capabilities),
-        response.requires_confirmation,
-        elapsed_ms,
-    )
-    return response
 
 
 if __name__ == "__main__":

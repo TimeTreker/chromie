@@ -836,8 +836,6 @@ def verify_bundle(
     required_overrides = {
         "ORCH_ENABLE_INTERACTION_RESPONSE": "1",
         "ORCH_ENABLE_SORIDORMI_CAPABILITIES": "0" if live_voice_profile else "1",
-        "AGENT_INTERACTION_OUTPUT_MODE": "native",
-        "AGENT_NATIVE_INTERACTION_FALLBACK": "0",
     }
     required_semantic_overrides = {
         "ORCH_COGNITIVE_RUNTIME_MODE": "apply",

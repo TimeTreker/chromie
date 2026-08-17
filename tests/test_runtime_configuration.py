@@ -114,12 +114,9 @@ class RuntimeConfigurationTests(unittest.TestCase):
 
     def test_capability_planner_has_json_output_budget(self) -> None:
         values = _common_env()
-        self.assertEqual(values["AGENT_RESPONSE_REVIEW_ENABLED"], "0")
         self.assertEqual(values["AGENT_CAPABILITY_NUM_CTX"], "24576")
         self.assertEqual(values["AGENT_CAPABILITY_NUM_PREDICT"], "512")
         self.assertEqual(values["AGENT_CAPABILITY_REVIEW_NUM_PREDICT"], "160")
-        self.assertEqual(values["AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW"], "0")
-        self.assertEqual(values["AGENT_EXPRESSIVE_BODY_CUES"], "off")
         self.assertEqual(values["AGENT_SOCIAL_ATTENTION_MODE"], "on")
         self.assertFalse(
             any(name.startswith("AGENT_SOCIAL_ATTENTION_FALLBACK_") for name in values)
@@ -156,7 +153,6 @@ class RuntimeConfigurationTests(unittest.TestCase):
 
     def test_agent_conversation_and_deepthinking_have_context_budgets(self) -> None:
         values = _common_env()
-        self.assertEqual(values["AGENT_MAX_SPEAK_CHARS"], "140")
         self.assertEqual(values["AGENT_CONVERSATION_NUM_CTX"], "2048")
         self.assertEqual(values["AGENT_CONVERSATION_NUM_PREDICT"], "64")
         self.assertEqual(values["AGENT_DEEPTHINKING_NUM_CTX"], "8192")
@@ -298,7 +294,6 @@ class RuntimeConfigurationTests(unittest.TestCase):
             encoding="utf-8"
         )
         values = _common_env()
-        self.assertEqual(values["AGENT_RESPONSE_REVIEW_MODEL"], "gemma4:e2b")
         self.assertIn('mapfile -t WARM_MODELS < <(./scripts/list_runtime_ollama_models.sh)', source)
         self.assertIn('Active profile models: ${WARM_MODELS[*]}', source)
         self.assertIn('./scripts/warm_ollama.sh "${WARM_MODELS[@]}"', source)

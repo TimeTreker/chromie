@@ -456,7 +456,6 @@ def check_configuration_reference(errors: list[str]) -> None:
         "ORCH_RESPONSE_COMPOSER_MODE",
         "ORCH_COGNITIVE_RUNTIME_MODE",
         "ORCH_COGNITIVE_APPLY_LANES",
-        "AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED",
         "ORCH_AGENT_TIMEOUT_MS",
     )
     for name in safety_default_names:

@@ -35,7 +35,6 @@ MODEL_PLAN_KEYS = (
     "AGENT_RESPONSE_COMPOSER_MODEL",
     "AGENT_TOOL_RESULT_INTERPRETER_MODEL",
     "AGENT_SOCIAL_ATTENTION_MODEL",
-    "AGENT_RESPONSE_REVIEW_MODEL",
 )
 
 COGNITIVE_BUDGET_KEYS = (
@@ -465,8 +464,6 @@ def active_models(values: Mapping[str, str]) -> list[str]:
         append(values.get("AGENT_TOOL_RESULT_INTERPRETER_MODEL"))
     if values.get("AGENT_SOCIAL_ATTENTION_MODE", "off") != "off":
         append(values.get("AGENT_SOCIAL_ATTENTION_MODEL"))
-    if enabled(values.get("AGENT_RESPONSE_REVIEW_ENABLED")):
-        append(values.get("AGENT_RESPONSE_REVIEW_MODEL"))
     return models
 
 

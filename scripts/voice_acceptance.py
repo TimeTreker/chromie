@@ -3021,8 +3021,6 @@ def write_override_file(
         "ORCH_EVENT_LOG_PATH": str(event_path),
         "ORCH_SAVE_AUDIO": "true",
         "RECORDINGS_DIR": str(recordings_dir),
-        "AGENT_INTERACTION_OUTPUT_MODE": "native",
-        "AGENT_NATIVE_INTERACTION_FALLBACK": "0",
     }
     if runtime_identity_path is not None:
         values["ORCH_COGNITIVE_RUN_IDENTITY_PATH"] = str(runtime_identity_path)

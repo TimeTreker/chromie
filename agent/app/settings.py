@@ -32,41 +32,13 @@ class Settings(BaseModel):
     ollama_url: str = Field(default_factory=lambda: os.getenv("AGENT_OLLAMA_URL") or os.getenv("OLLAMA_URL") or "http://chromie-llm:11434")
     model: str = Field(default_factory=lambda: os.getenv("AGENT_MODEL") or os.getenv("OLLAMA_MODEL") or "gemma4:e2b")
     timeout_ms: int = Field(default_factory=lambda: int(os.getenv("AGENT_TIMEOUT_MS") or os.getenv("OLLAMA_TIMEOUT_MS") or "30000"))
-    response_review_enabled: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_RESPONSE_REVIEW_ENABLED", "0").strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
-    response_review_model: str = Field(
-        default_factory=lambda: os.getenv("AGENT_RESPONSE_REVIEW_MODEL", "gemma4:e2b")
-    )
-    response_review_timeout_ms: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_RESPONSE_REVIEW_TIMEOUT_MS", "4000"))
-    )
-    response_review_mode: str = Field(
-        default_factory=lambda: os.getenv("AGENT_RESPONSE_REVIEW_MODE", "auto")
-    )
     use_llm: bool = Field(
         default_factory=lambda: os.getenv("AGENT_USE_LLM", "1").strip().lower()
         not in {"0", "false", "no", "off"}
     )
-    max_speak_chars: int = Field(default_factory=lambda: int(os.getenv("AGENT_MAX_SPEAK_CHARS", "140")))
-    expressive_body_cues: Literal["off", "on"] = Field(
-        default_factory=lambda: (
-            "on"
-            if normalize_social_attention_mode(
-                os.getenv("AGENT_EXPRESSIVE_BODY_CUES", "off"),
-                default="off",
-            )
-            == "on"
-            else "off"
-        )
-    )
     social_attention_mode: SocialAttentionMode = Field(
         default_factory=lambda: normalize_social_attention_mode(
-            os.getenv(
-                "AGENT_SOCIAL_ATTENTION_MODE",
-                os.getenv("AGENT_EXPRESSIVE_BODY_CUES", "on"),
-            ),
+            os.getenv("AGENT_SOCIAL_ATTENTION_MODE", "on"),
             default="on",
         )
     )
@@ -109,27 +81,6 @@ class Settings(BaseModel):
             ).split(",")
             if item.strip()
         )
-    )
-    require_capability_plan_review: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW", "0").strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
-    interaction_output_mode: Literal["native", "legacy-adapter"] = Field(
-        default_factory=lambda: os.getenv("AGENT_INTERACTION_OUTPUT_MODE", "native")
-    )
-    native_interaction_fallback: bool = Field(
-        default_factory=lambda: os.getenv(
-            "AGENT_NATIVE_INTERACTION_FALLBACK",
-            "0",
-        ).strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
-    legacy_capability_fallback_enabled: bool = Field(
-        default_factory=lambda: os.getenv(
-            "AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED",
-            "0",
-        ).strip().lower()
-        not in {"0", "false", "no", "off"}
     )
     enable_task_graph_planning: bool = Field(
         default_factory=lambda: os.getenv("AGENT_ENABLE_TASK_GRAPH_PLANNING", "0").strip().lower()

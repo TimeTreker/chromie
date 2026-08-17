@@ -50,9 +50,6 @@ callers:
 
 ```env
 ORCH_COGNITIVE_RUNTIME_MODE=off
-AGENT_INTERACTION_OUTPUT_MODE=legacy-adapter
-AGENT_NATIVE_INTERACTION_FALLBACK=0
-AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED=0
 ```
 
 Do not enable validation fallback as a permanent compatibility mode; use the

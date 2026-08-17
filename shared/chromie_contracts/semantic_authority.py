@@ -6,12 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 SEMANTIC_AUTHORITY_CONTEXT_KEY = "semantic_authority"
 
-SemanticAuthorityOwner = Literal[
-    "goal_driven_runtime",
-    "legacy_capability_fallback",
-    "goal_interpretation_action_adapter",
-    "legacy_agent_pipeline",
-]
+SemanticAuthorityOwner = Literal["goal_driven_runtime"]
 SemanticAuthorityRole = Literal["authoritative", "observer", "adapter"]
 
 
@@ -47,16 +42,6 @@ class SemanticAuthorityClaim(BaseModel):
             "observer",
         }:
             raise ValueError("goal_driven_runtime must be authoritative or observer")
-        if self.owner == "legacy_capability_fallback":
-            if self.role != "authoritative" or not self.emergency_fallback:
-                raise ValueError(
-                    "legacy_capability_fallback requires authoritative role and "
-                    "emergency_fallback=true"
-                )
-        if self.owner == "goal_interpretation_action_adapter" and self.role != "adapter":
-            raise ValueError("goal_interpretation_action_adapter must use adapter role")
-        if self.owner == "legacy_agent_pipeline" and self.role != "authoritative":
-            raise ValueError("legacy_agent_pipeline must use authoritative role")
         return self
 
 
@@ -81,43 +66,17 @@ def context_with_semantic_authority(
 
 
 def semantic_authority_route_matrix() -> list[dict[str, Any]]:
-    """Machine-readable ownership map for service diagnostics and tests."""
+    """Machine-readable ownership map for the maintained cognitive entrypoint."""
 
     return [
         {
-            "entrypoint": (
-                "orchestrator.handle_routed_text/apply "
-                "(mapped lane allowlisted)"
-            ),
+            "entrypoint": "orchestrator.handle_routed_text/apply",
             "owner": "goal_driven_runtime",
             "role": "authoritative",
-            "selection": (
-                "mapped route lane is in ORCH_COGNITIVE_APPLY_LANES and the "
-                "apply preconditions pass"
-            ),
             "planner_path": (
-                "Goal Interpretation emits provider-neutral Responsibility evidence; Fast "
-                "Planner is the first HOW owner and may author one immediate safe conversational "
-                "Activity plus typed Goal-Association/Deep-Planner continuations. Simple terminal "
-                "conversation needs no persistent Goal. When continuity is requested, Goal "
-                "Association alone mutates canonical Goal state; canonical Fast/Deep Planner then "
-                "selects exact Capability work before trusted execution. Background Social "
-                "Attention is separately anchored to semantic primary human-observable Activities"
-            ),
-            "fallback": "fail_closed_after_authority_acquisition",
-        },
-        {
-            "entrypoint": (
-                "orchestrator.handle_routed_text/apply "
-                "(mapped lane excluded)"
-            ),
-            "owner": "goal_driven_runtime",
-            "role": "authoritative",
-            "selection": (
-                "mapped route lane is not in ORCH_COGNITIVE_APPLY_LANES"
-            ),
-            "planner_path": (
-                "no planner is entered; the Host emits a typed fail-closed response"
+                "Goal Interpretation owns WHAT; Goal Association owns persistent Goal "
+                "identity and continuity; Fast/Deep Planner own HOW; CapabilityRuntime "
+                "owns trusted execution lifecycle; Evidence owns reality"
             ),
             "fallback": "fail_closed_without_legacy_reentry",
         },
@@ -125,24 +84,7 @@ def semantic_authority_route_matrix() -> list[dict[str, Any]]:
             "entrypoint": "orchestrator.handle_routed_text/report_only",
             "owner": "goal_driven_runtime",
             "role": "observer",
-            "planner_path": (
-                "same Goal semantics and planner fallback, but no readiness execution "
-                "or other effect authorization; evidence only"
-            ),
-            "fallback": "legacy_agent_pipeline_remains_the_only_authority",
-        },
-        {
-            "entrypoint": "agent./interaction with deprecated exact actions compatibility input",
-            "owner": "goal_interpretation_action_adapter",
-            "role": "adapter",
-            "planner_path": "schema validation and CapabilityRequest materialization only",
+            "planner_path": "same cognitive authority without effect authorization",
             "fallback": "none",
-        },
-        {
-            "entrypoint": "agent./interaction or /run emergency compatibility",
-            "owner": "legacy_capability_fallback",
-            "role": "authoritative",
-            "planner_path": "legacy CapabilityAgent semantic planner",
-            "fallback": "requires explicit service enablement and per-turn claim",
         },
     ]

@@ -315,7 +315,6 @@ class HealthResponse(BaseModel):
     model: str | None = None
     ollama_url: str | None = None
     use_llm: bool = True
-    available_agents: list[str] = Field(default_factory=list)
     capability_sources: list[str] = Field(default_factory=list)
     capability_manifest_files: list[str] = Field(default_factory=list)
     agent_skill_roots: list[str] = Field(default_factory=list)
@@ -339,9 +338,6 @@ class HealthResponse(BaseModel):
     active_task_graph_ids: list[str] = Field(default_factory=list)
     guarded_task_graph_execution_enabled: bool = False
     physical_task_graph_execution_enabled: bool = False
-    interaction_output_mode: str = "native"
-    native_interaction_fallback_enabled: bool = False
-    legacy_capability_fallback_enabled: bool = False
     capability_catalog_enabled: bool = False
     capability_catalog_version: int = 0
     goal_association_enabled: bool = False

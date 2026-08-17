@@ -122,9 +122,7 @@ A successfully queued fast response is projected into downstream Response Compos
 | `ORCH_TTS_CJK_CHUNK_CHARS` | `36` | Smaller chunk target for CJK speech so long Chinese weather/status responses can begin playback while later chunks are still synthesized. |
 | `ORCH_TTS_CJK_MIN_CHUNK_CHARS` | `8` | Minimum CJK clause size used when grouping punctuation-bounded fragments. |
 | `ORCH_CONFIRMATION_TTL_SEC` | `20` | Expiry in seconds for one pending spoken, request-bound confirmation. |
-| `AGENT_INTERACTION_OUTPUT_MODE` | `native` | Use native structured output for `/interaction`; set `legacy-adapter` only for rollback. |
 | `AGENT_SOCIAL_ATTENTION_MODE` | `on` | Embodiment-independent auxiliary interaction policy. Supported values are `off`, `report_only`, and `on`. A legacy simulator-scoped value is migrated to `on`; Soridormi/provider remains responsible for simulator-versus-physical backend selection and all body safety. |
-| `AGENT_NATIVE_INTERACTION_FALLBACK` | `0` | Opt in to legacy adapter fallback after native schema validation fails. Default-off preserves fail-closed behavior. |
 | `AGENT_ENABLE_TASK_GRAPH_PLANNING` | `0` | Let tool routes ask the LLM for a validated TaskGraph. |
 | `AGENT_ENABLE_READ_ONLY_TASK_GRAPH_EXECUTION` | `0` | Enable the read-only execution endpoint. |
 | `AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION` | `0` | Enable safe reads plus stateful `planning_only` execution. |
@@ -381,7 +379,6 @@ canonical plan copy, and its fingerprint remain host-owned.
 |---|---|
 | `ORCH_COGNITIVE_RUNTIME_MODE` | `apply` in `.env.common` and the maintained launcher. `off` bypasses the Goal-driven Runtime, `report_only` runs it as a non-authoritative observer, and `apply` makes eligible lanes authoritative through the Trusted Capability Runtime. Code fallback is `apply`. |
 | `ORCH_COGNITIVE_APPLY_LANES` | `chat,memory,tool` in the common safe base. `tool` is limited to explicitly registered, schema-validated, safe read-only local providers. `scripts/start_chromie.sh` additionally enables `robot_action` after registering the trusted Soridormi provider, yielding `chat,memory,robot_action,tool`. The pre-association compatibility route is used only to decide whether the Goal-driven runtime is configured for that broad ingress lane; after Goal Association, the terminal Plan lane is independently rechecked against this allowlist. This is Host deployment policy, not Fast Goal Interpreter semantic/effect authority: a compatibility route cannot grant, suppress, filter, or narrow Planner Capability access. Every executable step still requires a trusted registered provider plus its authorization, confirmation, resource, and safety contracts. Disabled terminal lanes fail closed without entering the legacy planner. |
-| `AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED` | `0`; Agent-side emergency gate. The legacy CapabilityAgent LLM planner additionally requires a `legacy_capability_fallback` claim with a non-empty `turn_id` exactly matching the request `sid`. Empty or cross-turn claims fail closed before an LLM call. The claim is internal routing metadata, not caller authentication or a single-use replay token. Exact Goal Interpreter actions remain structured advisory inputs and do not require this gate. |
 | `ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS` | `25000`; total host budget for Goal Association, Fast-to-Deep planning, response composition, and runtime adaptation. Trusted Host rejection is terminal and does not reopen semantic planning. |
 | `ORCH_COGNITIVE_EVIDENCE_ENABLED` | `1`; writes append-only operational resolution evidence. It does not by itself prove simulator or physical execution. |
 | `ORCH_COGNITIVE_EVIDENCE_INCLUDE_TEXT` | `0`; stores only text length and a short SHA-256 digest by default, including in completed/abandoned Session workflow reports. Enable raw text only under an explicit privacy decision. |
@@ -604,11 +601,6 @@ retained. See
 | `AGENT_TIMEOUT_MS` | Agent-to-Ollama timeout; profile-specific. |
 | `ORCH_AGENT_TIMEOUT_MS` | Host-to-Agent timeout; common default `9000`; must exceed `AGENT_TIMEOUT_MS`. |
 | `AGENT_USE_LLM` | Enable LLM-backed conversation/planning; default `1`. |
-| `AGENT_RESPONSE_REVIEW_ENABLED` | Enable model-based semantic review of spoken Agent replies; common low-latency default `0`. |
-| `AGENT_RESPONSE_REVIEW_MODEL` | Ollama model used to accept or rewrite weak spoken replies; default `gemma4:e2b`, matching the main Agent model. |
-| `AGENT_RESPONSE_REVIEW_TIMEOUT_MS` | Timeout for the semantic response-review model call; default `4000`. |
-| `AGENT_RESPONSE_REVIEW_MODE` | `auto` skips the extra spoken-response review for clearly low-risk chat replies; `always` reviews every spoken reply. Capability-plan review for executable robot actions remains controlled by `AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW`. |
-| `AGENT_MAX_SPEAK_CHARS` | Trim Agent speech before TTS; common default `140`. |
 | `AGENT_CONVERSATION_NUM_CTX` | Ollama context window for normal conversation prompts; common default `2048`. |
 | `AGENT_CONVERSATION_NUM_PREDICT` | Output token budget for normal conversation replies; common default `64`. |
 | `AGENT_DEEPTHINKING_NUM_CTX` | Ollama context window for deep-thinking prompts with session memory; default `8192`. |
@@ -621,9 +613,7 @@ retained. See
 | `AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS` | Deprecated compatibility input retained for diagnostics; default `0`. The runtime never awaits Social Attention after the primary response, and reports an effective wait of `0`. |
 | `AGENT_SOCIAL_ATTENTION_MAX_BEHAVIORS` | Maximum model-authored auxiliary behaviors per turn; default `2`. |
 | `AGENT_SOCIAL_ATTENTION_CAPABILITIES` | Optional comma-separated exact catalog IDs added to behavior-domain discovery. Default empty. Normal candidates are available interaction-executable entries tagged `social_attention`; provider backend metadata is ignored. |
-| `AGENT_EXPRESSIVE_BODY_CUES` | Deprecated compatibility alias. The main Social Attention mode takes precedence. |
 
-| `AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW` | Common low-latency default `0`; set to `1` for stricter review where executable `robot_action` plans fail closed when semantic capability-plan review is unavailable or invalid. If Goal Interpretation selected an exact capability and the Agent proposes a different skill, review must revise the plan rather than merely accept it. |
 | `AGENT_CAPABILITY_MANIFESTS` | Comma-separated files/directories. Common host env leaves this empty for safe imports; the Agent container defaults to `/app/capabilities/soridormi.json`. |
 | `AGENT_SKILL_ROOTS` | Comma-separated explicitly approved read-only Agent Skill roots. The maintained Agent container defaults to `/app/agent-skills`, mounted from repository `agent-skills/` with `:ro`. Startup loads bounded metadata summaries only and fails closed on unsafe, unapproved, duplicate, digest-mismatched, or path-escaping packages. |
 | `AGENT_SKILL_SELECTION_ENABLED` | Enable model-authored Agent Skill selection; default `1`. `/agent-skills/select` exposes the independent contract, and maintained Agent boundaries use the same service when progressive disclosure is enabled. If disabled, selection degrades to optional no-Skill. |
@@ -666,8 +656,6 @@ administrative context. If none match, the tool returns typed
 | `AGENT_CAPABILITY_NUM_PREDICT` | Output token budget for LLM capability-selection JSON; common default `512`. |
 | `AGENT_CAPABILITY_REVIEW_NUM_PREDICT` | Output token budget for semantic capability-plan review JSON; common default `160`. |
 | `AGENT_CAPABILITY_PARAMETER_REPAIR_NUM_PREDICT` | Output token budget for the semantic parameter-resolution retry; common default `384`. This retry runs only when a model-authored capability plan is schema-invalid. |
-| `AGENT_INTERACTION_OUTPUT_MODE` | `native` by default; `legacy-adapter` is the explicit rollback path for `/interaction`. |
-| `AGENT_NATIVE_INTERACTION_FALLBACK` | Default `0`; when enabled, only native contract-validation failures use the compatibility adapter. |
 | `AGENT_TASK_GRAPH_MAX_CONCURRENCY` | Process-local TaskGraph bound; default `4`, range 1–64. |
 | `AGENT_TASK_GRAPH_EXECUTION_TOKEN` | Secret bearer token for grants, guarded execution, and cancellation. |
 | `AGENT_TASK_GRAPH_DIAGNOSTICS_TOKEN` | Bearer token for dry-run, trace, and scheduler diagnostics. A blank value falls back to `AGENT_TASK_GRAPH_EXECUTION_TOKEN`; when both are blank, those endpoints return 503. |

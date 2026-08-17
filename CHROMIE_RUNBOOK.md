@@ -240,8 +240,6 @@ services:
     environment:
       AGENT_CAPABILITY_MANIFESTS: /app/capabilities/soridormi.json
       SORIDORMI_MCP_URL: http://host.docker.internal:8000/mcp
-      AGENT_INTERACTION_OUTPUT_MODE: native
-      AGENT_NATIVE_INTERACTION_FALLBACK: "0"
 EOF
 CHROMIE_COMPOSE_OVERRIDE_FILES=.chromie/text-mujoco/compose.soridormi.yaml \
   ./scripts/start_services.sh

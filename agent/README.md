@@ -31,9 +31,7 @@ final `AgentResult`. The serialized result is validated again against the strict
 shared contract before it is returned.
 
 `AgentResultInteractionAdapter` remains available for rollback through
-`AGENT_INTERACTION_OUTPUT_MODE=legacy-adapter`. Native validation fallback is
 separate and default-off; enable it only with
-`AGENT_NATIVE_INTERACTION_FALLBACK=1`.
 
 ## Specialized agents
 
@@ -120,24 +118,15 @@ execution authority.
 
 | Variable | Default | Effect |
 |---|---:|---|
-| `AGENT_RESPONSE_REVIEW_ENABLED` | `0` | Use a model critic to accept or rewrite spoken replies. Enable for stricter review; leave off for realtime latency. |
-| `AGENT_RESPONSE_REVIEW_MODEL` | `gemma4:e2b` | Semantic reviewer model; defaults to the main Agent model so weak replies are judged with enough context. |
-| `AGENT_RESPONSE_REVIEW_TIMEOUT_MS` | `4000` | Timeout for the semantic response-review call. |
-| `AGENT_RESPONSE_REVIEW_MODE` | `auto` | In `auto`, skip the extra spoken-response review for clearly low-risk chat replies while still reviewing task/capability/action-risk replies. Use `always` for diagnostics. |
 | `AGENT_SOCIAL_ATTENTION_MODE` | `on` | Embodiment-independent auxiliary interaction gate: `off`, `report_only`, or `on`. It never selects a simulator or physical backend; Soridormi/provider owns backend selection and body safety. See [Social Attention Behavior Domain](../docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md). |
 | `AGENT_SOCIAL_ATTENTION_MODEL` | `qwen3:4b` | Dedicated model for structured `SocialAttentionPlan` output. |
 | `AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS` | `0` | Deprecated compatibility input retained for diagnostics. Social Attention is never awaited after the primary response; the effective wait is always `0`. |
 | `AGENT_SOCIAL_ATTENTION_CAPABILITIES` | social named capabilities | Exact catalog IDs eligible for semantic selection; this list does not force any gesture. |
-| `AGENT_EXPRESSIVE_BODY_CUES` | `off` | Deprecated compatibility alias. The main Social Attention mode takes precedence. |
 
-| `AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW` | `0` | When `1`, require semantic review for executable robot-action plans and fail closed if that optional reviewer is unavailable; exact Goal Interpretation capability substitutions also require a reviewer revision. At the default `0`, this extra review gate is skipped. |
 | `AGENT_CONVERSATION_NUM_CTX` | `2048` | Context window for normal conversation prompts. |
 | `AGENT_CONVERSATION_NUM_PREDICT` | `64` | Output budget for normal conversation replies. |
 | `AGENT_DEEPTHINKING_NUM_CTX` | `8192` | Context window for deep-thinking prompts with session memory. |
 | `AGENT_DEEPTHINKING_NUM_PREDICT` | `384` | Output budget for deep-thinking replies. |
-| `AGENT_INTERACTION_OUTPUT_MODE` | `native` | Select `native` or explicit `legacy-adapter` output for `/interaction`. |
-| `AGENT_NATIVE_INTERACTION_FALLBACK` | `0` | On native contract-validation failure, opt in to legacy adapter fallback instead of failing closed. |
-| `AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED` | `0` | Emergency-only gate for the old CapabilityAgent semantic planner. It also requires a `legacy_capability_fallback` authority claim whose non-empty `turn_id` exactly matches the request `sid`; exact Goal Interpretation actions are always adapter-only. |
 | `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | `30` | Refresh live named capabilities while keeping the last known-good catalog. |
 | `AGENT_CAPABILITY_MATCH_LIMIT` | `8` | Bound the model-neutral catalog preview attached at the native interaction boundary; it does not score user language. |
 | `AGENT_CAPABILITY_NUM_CTX` | `24576` | Verification-mode context window for LLM capability selection prompts. Optimize downward only after feasibility and latency evidence are both acceptable. |
