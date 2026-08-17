@@ -6306,13 +6306,35 @@ class VoiceAssistant:
             if self._uses_detached_cognitive_capability_runtime(response)
             else self._consume_detached_non_cognitive_dispatch
         )
+
+        async def consume_and_finalize_session() -> CapabilityRuntimeResult:
+            try:
+                return await result_consumer(
+                    dispatch,
+                    session_id=session_id,
+                    generation=generation,
+                    confirmed_request_ids=confirmed_request_ids,
+                )
+            finally:
+                # A dispatch receipt transfers provider ownership but does not prove
+                # that response speech was even scheduled.  Closing the session at
+                # receipt time lets the next voice turn invalidate that still-pending
+                # speech as stale.  Finalize only after Runtime has consumed the
+                # detached response (including its playback-start barrier).
+                if mark_session_done:
+                    state = self.sessions.state.get(session_id or "")
+                    if state is not None:
+                        state["llm_done"] = True
+                        state["response_chars"] = state.get(
+                            "response_chars", 0
+                        ) + sum(
+                            len(item.text)
+                            for item in dispatch.runtime_response.speech
+                        )
+                    self.maybe_session_done(session_id)
+
         result_task = asyncio.create_task(
-            result_consumer(
-                dispatch,
-                session_id=session_id,
-                generation=generation,
-                confirmed_request_ids=confirmed_request_ids,
-            ),
+            consume_and_finalize_session(),
             name=(
                 "capability-result-reentry:"
                 f"{dispatch.source_response.interaction_id}:"
@@ -6326,15 +6348,6 @@ class VoiceAssistant:
         result_tasks[result_task] = dispatch.source_response.interaction_id
         result_task.add_done_callback(self._capability_result_task_done)
 
-        if mark_session_done:
-            state = self.sessions.state.get(session_id or "")
-            if state is not None:
-                state["llm_done"] = True
-                state["response_chars"] = state.get("response_chars", 0) + sum(
-                    len(item.text)
-                    for item in dispatch.runtime_response.speech
-                )
-            self.maybe_session_done(session_id)
         return receipt
 
     def _capability_result_task_done(self, task: asyncio.Task) -> None:

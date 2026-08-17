@@ -146,16 +146,16 @@ def render_fast_planner_vocal_activity(
     zh = str(language or "").strip().casefold().startswith("zh")
     if zh:
         return {
-            "acknowledge_work": "好，我来处理。",
-            "check_information": "好，我查一下。",
-            "perform_action": "好，我来做。",
-            "think": "好，我想一想。",
+            "acknowledge_work": "好，我先想想。",
+            "check_information": "我先看看能不能查到。",
+            "perform_action": "我先看看能不能做到。",
+            "think": "我想一想。",
         }[activity.progress_kind]
     return {
-        "acknowledge_work": "Okay, I'll handle it.",
-        "check_information": "Okay, I'll check.",
-        "perform_action": "Okay, I'll do it.",
-        "think": "Okay, I'll think about it.",
+        "acknowledge_work": "Okay, let me think about that.",
+        "check_information": "Let me see what I can check.",
+        "perform_action": "Let me see what I can do.",
+        "think": "Let me think about it.",
     }[activity.progress_kind]
 
 

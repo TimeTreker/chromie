@@ -30,6 +30,7 @@ import subprocess
 import sys
 import tarfile
 import time
+import urllib.request
 import uuid
 import wave
 from typing import Any, Iterable, Sequence
@@ -1396,6 +1397,33 @@ def start_services() -> None:
     subprocess.run([str(ROOT / "scripts" / "start_services.sh")], cwd=ROOT, check=True)
 
 
+def wait_for_agent_health(
+    agent_url: str,
+    *,
+    timeout_s: float,
+) -> dict[str, Any]:
+    """Wait until the started Agent can accept qualification traffic."""
+
+    health_url = f"{agent_url.rstrip('/')}/health"
+    deadline = time.monotonic() + timeout_s
+    last_error: Exception | None = None
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(health_url, timeout=5.0) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+            if payload.get("ok") is True:
+                return payload
+            last_error = RuntimeError(
+                f"Agent health did not report ok=true: {payload!r}"
+            )
+        except Exception as exc:  # readiness failures are retried until the deadline
+            last_error = exc
+        time.sleep(1.0)
+    raise RuntimeError(
+        f"Timed out after {timeout_s:.1f}s waiting for {health_url}: {last_error}"
+    )
+
+
 def stop_services() -> None:
     subprocess.run(
         [
@@ -1673,6 +1701,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         raise SystemExit("--transport-only and --workflow-only are mutually exclusive")
     if args.start_services:
         start_services()
+        if not args.transport_only:
+            wait_for_agent_health(
+                args.agent_url,
+                timeout_s=args.workflow_timeout,
+            )
     try:
         payload = asyncio.run(run(args))
     finally:

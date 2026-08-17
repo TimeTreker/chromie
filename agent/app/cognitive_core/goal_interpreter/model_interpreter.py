@@ -318,6 +318,56 @@ def _reject_unprovenanced_location_bindings(
         )
 
 
+def _reject_runtime_identity_bindings(
+    request: GoalInterpretationRequest,
+    parsed: dict[str, Any],
+) -> None:
+    """Reject runtime correlation identity copied into human-semantic bindings.
+
+    Correlation IDs are present so logs and requests can be joined. They are not
+    semantic context. This gate compares only model-authored scalar values with
+    exact runtime-owned identities; it does not infer or repair user meaning.
+    """
+
+    runtime_identities = {
+        " ".join(str(request.sid or "").strip().split()).casefold(),
+    }
+    envelope = request.context.get("user_turn_envelope")
+    if isinstance(envelope, dict):
+        for key in ("turn_id", "session_id"):
+            value = " ".join(str(envelope.get(key) or "").strip().split())
+            if value:
+                runtime_identities.add(value.casefold())
+    runtime_identities.discard("")
+    if not runtime_identities:
+        return
+
+    responsibilities = parsed.get("responsibilities")
+    if not isinstance(responsibilities, list):
+        return
+    for responsibility_index, item in enumerate(responsibilities):
+        if not isinstance(item, dict):
+            continue
+        bindings = item.get("bindings")
+        if not isinstance(bindings, dict):
+            continue
+        for binding_name, value in bindings.items():
+            values = value if isinstance(value, list) else [value]
+            for value_index, scalar in enumerate(values):
+                if not isinstance(scalar, str):
+                    continue
+                normalized = " ".join(scalar.strip().split()).casefold()
+                if normalized not in runtime_identities:
+                    continue
+                suffix = f"[{value_index}]" if isinstance(value, list) else ""
+                raise _GoalInterpretationAuthorityViolation(
+                    "Goal Interpretation binding copied runtime correlation identity: "
+                    f"responsibilities[{responsibility_index}].bindings."
+                    f"{binding_name}{suffix}. Runtime/session IDs are not human "
+                    "semantic evidence."
+                )
+
+
 def _bounded_json(value: Any, *, max_chars: int = 4000) -> str:
     try:
         text = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
@@ -635,6 +685,19 @@ class OllamaGoalInterpreter:
     def _goal_interpretation_response_schema() -> dict[str, Any]:
         schema = GoalInterpretationDecision.model_json_schema()
         schema["additionalProperties"] = False
+        schema["required"] = ["confidence", "responsibilities", "unresolved"]
+        responsibility = schema.get("$defs", {}).get(
+            "CognitiveResponsibilityProposal"
+        )
+        if isinstance(responsibility, dict):
+            responsibility["required"] = [
+                "local_ref",
+                "outcome",
+                "bindings",
+                "completion_requires_work",
+                "completion_requires_fresh_evidence",
+                "confidence",
+            ]
         return schema
 
     def build_interpretation_payload(
@@ -720,6 +783,7 @@ class OllamaGoalInterpreter:
             _reject_planner_shaped_goal_interpretation(parsed)
             _reject_canonical_goal_identity_refs(request, parsed)
             _reject_unprovenanced_location_bindings(request, parsed)
+            _reject_runtime_identity_bindings(request, parsed)
             return GoalInterpretationDecision.model_validate(parsed)
         except (_GoalInterpretationAuthorityViolation, ValueError, ValidationError) as exc:
             logger.warning(
@@ -742,6 +806,7 @@ class OllamaGoalInterpreter:
                 _reject_planner_shaped_goal_interpretation(parsed)
                 _reject_canonical_goal_identity_refs(request, parsed)
                 _reject_unprovenanced_location_bindings(request, parsed)
+                _reject_runtime_identity_bindings(request, parsed)
                 return GoalInterpretationDecision.model_validate(parsed)
             except Exception as repair_exc:
                 _raise_if_llm_budget_failure(repair_exc)

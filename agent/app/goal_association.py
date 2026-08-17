@@ -1049,6 +1049,7 @@ class GoalAssociationResolver:
         contract_repair_attempted = False
         semantic_reconsideration_attempted = False
         optional_referent_recovery: list[dict[str, Any]] = []
+        redundant_resource_binding_recovery: list[dict[str, Any]] = []
 
         async def invoke(
             prompt: Any,
@@ -1087,6 +1088,10 @@ class GoalAssociationResolver:
                 value
             )
             optional_referent_recovery.extend(recovered)
+            normalized, recovered = self._drop_inactive_resource_bindings(
+                normalized
+            )
+            redundant_resource_binding_recovery.extend(recovered)
             return normalized
 
         try:
@@ -1285,6 +1290,13 @@ class GoalAssociationResolver:
                     "dropped_count": len(optional_referent_recovery),
                     "entries": optional_referent_recovery,
                 }
+            if redundant_resource_binding_recovery:
+                metadata["mechanical_contract_recovery"] = {
+                    "field": "new_goals[].bindings",
+                    "strategy": "drop_inactive_resource_binding_branch",
+                    "dropped_count": len(redundant_resource_binding_recovery),
+                    "entries": redundant_resource_binding_recovery,
+                }
             resolution = resolution.model_copy(update={"metadata": metadata})
             return self._validate(
                 resolution,
@@ -1342,6 +1354,13 @@ class GoalAssociationResolver:
                     "strategy": "drop_invalid_unreferenced_introduce",
                     "dropped_count": len(optional_referent_recovery),
                     "entries": optional_referent_recovery,
+                }
+            if redundant_resource_binding_recovery:
+                metadata["mechanical_contract_recovery"] = {
+                    "field": "new_goals[].bindings",
+                    "strategy": "drop_inactive_resource_binding_branch",
+                    "dropped_count": len(redundant_resource_binding_recovery),
+                    "entries": redundant_resource_binding_recovery,
                 }
             return GoalAssociationResolution(
                 turn_id=turn_id,
@@ -1412,6 +1431,49 @@ class GoalAssociationResolver:
                 continue
             kept.append(item)
         normalized["referent_updates"] = kept
+        return normalized, dropped
+
+    @staticmethod
+    def _drop_inactive_resource_bindings(
+        raw: dict[str, Any],
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        """Remove model content from a resource Goal's inactive binding branch.
+
+        Resource Goals have one semantic owner: ``resource_responsibility``. Some
+        structured-output models nevertheless populate the mutually exclusive
+        top-level ``bindings`` branch. The decoder contract makes that branch empty,
+        so discarding it is mechanical DTO normalization, not semantic repair. The
+        independent source-grounded coverage certificate remains responsible for
+        rejecting any material user fact absent from the nested resource authority.
+        """
+
+        normalized = copy.deepcopy(raw)
+        goals = normalized.get("new_goals")
+        if not isinstance(goals, list):
+            return normalized, []
+
+        dropped: list[dict[str, Any]] = []
+        for index, goal in enumerate(goals):
+            if not isinstance(goal, dict):
+                continue
+            top_level = goal.get("bindings")
+            if not isinstance(top_level, list) or not top_level:
+                continue
+            resource = goal.get("resource_responsibility")
+            if not isinstance(resource, dict):
+                continue
+            kind = str(resource.get("kind") or "").strip()
+            if kind not in {"information", "physical_object"}:
+                continue
+            goal["bindings"] = []
+            dropped.append(
+                {
+                    "path": f"new_goals[{index}].bindings",
+                    "resource_kind": kind,
+                    "binding_count": len(top_level),
+                    "reason": "inactive_when_nested_resource_authority_is_present",
+                }
+            )
         return normalized, dropped
 
     async def _validate_contract_output(
@@ -2729,10 +2791,14 @@ class GoalAssociationResolver:
             "outcome Chromie owes, role=constraint for a modifier/prohibition/timing "
             "condition on such an outcome, role=context for reference/background that "
             "does not itself need completion, and role=framing for politeness or social "
-            "preamble attached to substantive work. Stated preferences, reasons, "
-            "candidate options, and background facts that merely constrain one requested "
-            "decision are context or constraints, not independent responsibilities, "
-            "unless the user separately asks for an observable outcome for each. A "
+            "preamble attached to substantive work. A stated preference, reason, "
+            "candidate option, or background fact that changes what counts as a valid decision "
+            "must be role=constraint and must map to the Goal whose result it constrains; "
+            "it cannot be downgraded to context merely because it is not an independent "
+            "outcome. Only incidental background that does not change valid completion is "
+            "role=context. These facts are not independent responsibilities unless the user "
+            "separately asks for an observable outcome for each. Stated preferences therefore "
+            "remain material constraints when the user asks for a choice between them. A "
             "manner, mood, persona, or social-"
             "presentation modifier attached to a requested effect is role=constraint "
             "on that effect; it is not a second responsibility merely because speech "

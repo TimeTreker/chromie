@@ -3,7 +3,10 @@ from __future__ import annotations
 import asyncio
 import unittest
 
-from agent.app.response_composer import ResponseComposerResolver
+from agent.app.response_composer import (
+    ResponseComposerModelOutput,
+    ResponseComposerResolver,
+)
 from tests.cognitive_work_test_support import cognitive_work_request
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.response_composition import (
@@ -1912,6 +1915,41 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertIn("Delivered evidence-bound dialogue JSON", prompt)
         self.assertIn("北京现在约28℃", prompt)
         self.assertIn("Preserve every measurement and condition", prompt)
+
+    def test_truth_audit_does_not_treat_progress_as_a_ban_on_final_content(self):
+        resolver = ResponseComposerResolver(FakeOllama({}))
+        canonical = plan(goals=["goal-chat"])
+        candidate = ResponseComposerModelOutput.model_validate(
+            {
+                "response_plan": {
+                    "final": {
+                        "text": "Let's choose noodles today and rice tomorrow.",
+                        "covers_goal_ids": ["goal-chat"],
+                    }
+                }
+            }
+        )
+        prompt = resolver._response_truth_audit_prompt(
+            request=request(
+                canonical,
+                context={
+                    "interaction_context": {
+                        "already_spoken": [
+                            {
+                                "text": "Let me think.",
+                                "status": "playback_started",
+                                "delivery_role": "progress",
+                            }
+                        ]
+                    }
+                },
+            ),
+            plan=canonical,
+            candidate=candidate,
+        )
+
+        self.assertIn("does not restrict later plan-authorized content", prompt)
+        self.assertIn("not unsupported_reality_claim", prompt)
 
 
 

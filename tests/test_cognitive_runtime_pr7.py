@@ -141,6 +141,24 @@ class FastAdvanceRuntime(FakeRuntime):
         return object()
 
 
+class FastPlannerProgressRenderingTests(unittest.TestCase):
+    def test_pre_capability_progress_does_not_promise_unknown_work(self):
+        activity = FastPlannerProgressActivity(
+            activity_id="status-progress",
+            progress_kind="check_information",
+            source_responsibility_refs=["status"],
+        )
+
+        self.assertEqual(
+            render_fast_planner_vocal_activity(activity, language="en-US"),
+            "Let me see what I can check.",
+        )
+        self.assertEqual(
+            render_fast_planner_vocal_activity(activity, language="zh-CN"),
+            "我先看看能不能查到。",
+        )
+
+
 class ScriptedClient:
     def __init__(
         self,
@@ -696,7 +714,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             events[:4],
             ["advance", "social_attention_queued", "vocal_activity_started", "association"],
         )
-        self.assertEqual(runtime.started_fast_activities[0][1], "好，我查一下。")
+        self.assertEqual(runtime.started_fast_activities[0][1], "我先看看能不能查到。")
         self.assertEqual(client.calls[:3], ["advance", "association", "compose"])
 
     def test_fast_planner_complexity_disposition_skips_second_fast_plan_after_goal_binding(self):

@@ -41,7 +41,7 @@ class GoalInterpretationDecision(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    confidence: float = Field(ge=0.0, le=1.0)
     responsibilities: list[CognitiveResponsibilityProposal] = Field(min_length=1)
     unresolved: list[str] = Field(default_factory=list, max_length=12)
 

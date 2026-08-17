@@ -146,6 +146,18 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("provider timezone", prompt)
         self.assertIn("never an unresolved WHAT question", prompt)
 
+    def test_system_prompt_preserves_requested_judgment_without_asserting_the_answer(self) -> None:
+        prompt = self._interpreter().load_system_prompt().casefold()
+        self.assertIn("preserve the requested judgment", prompt)
+        self.assertIn("whether the proposition is true", prompt)
+        self.assertIn("must not become an assertion", prompt)
+        self.assertIn("does not become unresolved merely because its answer is unknown", prompt)
+        self.assertIn("reasoning from facts already supplied by the user", prompt)
+
+    def test_decision_confidence_is_required_model_evidence(self) -> None:
+        schema = GoalInterpretationDecision.model_json_schema()
+        self.assertIn("confidence", schema["required"])
+
     def test_payload_omits_capability_catalog_and_route_contract(self) -> None:
         interpreter = self._interpreter()
         request = GoalInterpretationRequest(
@@ -171,6 +183,21 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertEqual(
             set(payload["format"]["properties"]),
             {"confidence", "responsibilities", "unresolved"},
+        )
+        self.assertEqual(
+            set(
+                payload["format"]["$defs"][
+                    "CognitiveResponsibilityProposal"
+                ]["required"]
+            ),
+            {
+                "local_ref",
+                "outcome",
+                "bindings",
+                "completion_requires_work",
+                "completion_requires_fresh_evidence",
+                "confidence",
+            },
         )
 
     def test_prompt_keeps_semantic_continuity_without_canonical_identity_or_route(self) -> None:
@@ -292,6 +319,50 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(result.responsibilities[0].bindings["location"], "Chongqing")
         self.assertEqual(interpreter._chat.await_count, 1)
+
+    async def test_runtime_session_identity_in_binding_gets_one_dto_repair(self) -> None:
+        interpreter = self._interpreter()
+        invalid = {
+            **_valid_output(),
+            "responsibilities": [
+                {
+                    **_valid_output()["responsibilities"][0],
+                    "outcome": "determine whether the washing machine finished",
+                    "bindings": {
+                        "device": "washing machine",
+                        "cycle": "turn-correlation-123",
+                    },
+                }
+            ],
+        }
+        corrected = {
+            **invalid,
+            "responsibilities": [
+                {
+                    **invalid["responsibilities"][0],
+                    "bindings": {"device": "washing machine"},
+                }
+            ],
+        }
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            side_effect=[
+                {"message": {"content": json.dumps(invalid)}},
+                {"message": {"content": json.dumps(corrected)}},
+            ]
+        )
+
+        result = await interpreter.interpret_goal(
+            GoalInterpretationRequest(
+                sid="turn-correlation-123",
+                text="Has the washing machine finished?",
+            )
+        )
+
+        self.assertEqual(
+            result.responsibilities[0].bindings,
+            {"device": "washing machine"},
+        )
+        self.assertEqual(interpreter._chat.await_count, 2)
 
     async def test_route_output_gets_one_mechanical_dto_repair(self) -> None:
         interpreter = self._interpreter()

@@ -76,10 +76,33 @@ class CognitiveResponsibilityProposal(BaseModel):
 
     schema_version: Literal[1] = 1
     local_ref: str = Field(min_length=1, max_length=80)
-    outcome: str = Field(min_length=1, max_length=500)
-    bindings: dict[str, Any] = Field(default_factory=dict)
-    completion_requires_work: bool = False
-    completion_requires_fresh_evidence: bool = False
+    outcome: str = Field(
+        min_length=1,
+        max_length=500,
+        description=(
+            "The provider-neutral human outcome Chromie still owes. Preserve the "
+            "requested answer or judgment and proposition polarity: a question about "
+            "whether P is true must not be rewritten as the assertion that P is true."
+        ),
+    )
+    bindings: dict[str, Any] = Field(
+        default_factory=dict,
+        description=(
+            "Material user-semantic facts from the authoritative turn or bounded "
+            "semantic context only; never runtime/session identifiers or HOW fields."
+        ),
+    )
+    completion_requires_work: bool = Field(
+        default=False,
+        description="Whether Chromie still owes work before this outcome is satisfied.",
+    )
+    completion_requires_fresh_evidence: bool = Field(
+        default=False,
+        description=(
+            "Whether correct completion needs evidence absent from trusted context. "
+            "Reasoning from facts already supplied by the user is not fresh evidence."
+        ),
+    )
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
 
     @field_validator("local_ref", "outcome", mode="before")

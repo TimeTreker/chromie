@@ -1228,6 +1228,73 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(reset_calls, 1)
         self.assertEqual(done_calls, 2)
 
+    async def test_session_completion_waits_for_detached_speech_delivery(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.sessions = SessionTracker(enabled=True)
+        session_id = assistant.sessions.create()
+        release_delivery = asyncio.Event()
+        consumer_started = asyncio.Event()
+
+        class _Runtime:
+            async def submit_response(
+                self,
+                response: InteractionResponse,
+                *,
+                session_id: str | None,
+                confirmed_request_ids: set[str] | None = None,
+            ) -> CapabilityInteractionDispatch:
+                del session_id, confirmed_request_ids
+                return CapabilityInteractionDispatch(
+                    source_response=response,
+                    runtime_response=response,
+                    receipt=None,
+                    immediate_execution=CapabilityRuntimeResult(
+                        interaction_id=response.interaction_id,
+                        status="completed",
+                    ),
+                    preexecuted_results=[],
+                    preexecuted_traces=[],
+                )
+
+        async def consume_non_cognitive(
+            self: VoiceAssistant,
+            dispatch: CapabilityInteractionDispatch,
+            **kwargs: Any,
+        ) -> CapabilityRuntimeResult:
+            del kwargs
+            consumer_started.set()
+            await release_delivery.wait()
+            assert dispatch.immediate_execution is not None
+            return dispatch.immediate_execution
+
+        assistant.interaction_runtime = _Runtime()
+        assistant.playback_generation = 0
+        assistant.active_capability_result_tasks = {}
+        assistant.reset_playback_ordering = MethodType(
+            lambda self: asyncio.sleep(0), assistant
+        )
+        assistant.session_log = MethodType(
+            lambda self, sid, message, *args: self.sessions.log(sid, message, *args),
+            assistant,
+        )
+        assistant._consume_detached_non_cognitive_dispatch = MethodType(
+            consume_non_cognitive, assistant
+        )
+
+        await assistant._dispatch_detached_interaction(
+            InteractionResponse(speech=[{"text": "Here is the answer."}]),
+            session_id,
+            confirmed_request_ids=None,
+            reset_playback=False,
+            mark_session_done=True,
+        )
+        await consumer_started.wait()
+
+        self.assertFalse(assistant.sessions.state[session_id]["llm_done"])
+        release_delivery.set()
+        await asyncio.gather(*list(assistant.active_capability_result_tasks))
+        self.assertTrue(assistant.sessions.state[session_id]["llm_done"])
+
     async def test_nonterminal_interaction_does_not_mark_session_done(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.sessions = SessionTracker(enabled=True)

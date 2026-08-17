@@ -872,10 +872,58 @@ class GoalExecutionContractTests(unittest.TestCase):
             raw=create_goals(goal("Choose lunch fairly.", "speech")),
         )
         self.assertIn("Stated preferences", prompt)
+        self.assertIn("changes what counts as a valid decision", prompt)
+        self.assertIn("must be role=constraint", prompt)
         self.assertIn("state mutation or deferred effect", prompt)
         self.assertIn("representation_mismatch", prompt)
         self.assertIn("drops or generalizes a material qualifier", prompt)
         self.assertIn("candidate_goal_indices must be empty", prompt)
+
+    def test_resource_binding_duplicates_are_mechanically_dropped(self):
+        resource = resource_responsibility(
+            kind="information",
+            description="package status",
+            attributes=[binding("tracking_number", "identifier", "ABC123")],
+            source_status="provider_resolved",
+        )
+        raw = create_goals(
+            goal(
+                "Check package status.",
+                "capability_work",
+                bindings=list(resource["query_scope"]),
+                resource=resource,
+            )
+        )
+
+        normalized, dropped = (
+            GoalAssociationResolver._drop_inactive_resource_bindings(raw)
+        )
+
+        self.assertEqual(normalized["new_goals"][0]["bindings"], [])
+        self.assertEqual(dropped[0]["path"], "new_goals[0].bindings")
+
+    def test_nonduplicate_inactive_resource_bindings_are_also_dropped(self):
+        resource = resource_responsibility(
+            kind="information",
+            description="package status",
+            attributes=[binding("tracking_number", "identifier", "ABC123")],
+            source_status="provider_resolved",
+        )
+        raw = create_goals(
+            goal(
+                "Check package status.",
+                "capability_work",
+                bindings=[binding("carrier", "organization", "ParcelCo")],
+                resource=resource,
+            )
+        )
+
+        normalized, dropped = (
+            GoalAssociationResolver._drop_inactive_resource_bindings(raw)
+        )
+
+        self.assertEqual(normalized["new_goals"][0]["bindings"], [])
+        self.assertEqual(dropped[0]["binding_count"], 1)
 
     def test_goal_prompts_distinguish_body_action_from_physical_resource(self):
         resolver = GoalAssociationResolver(FakeOllama({}))

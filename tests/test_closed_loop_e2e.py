@@ -20,11 +20,37 @@ from scripts.closed_loop_e2e import (
     resample_pcm16,
     transcript_metrics,
     trim_silence,
+    wait_for_agent_health,
     workflow_input_channel,
 )
 
 
 class ClosedLoopE2ETests(unittest.TestCase):
+    def test_agent_readiness_retries_until_health_is_confirmed(self) -> None:
+        class HealthResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb) -> None:
+                return None
+
+            def read(self) -> bytes:
+                return b'{"ok": true, "service": "chromie-agent"}'
+
+        with patch(
+            "scripts.closed_loop_e2e.urllib.request.urlopen",
+            side_effect=[ConnectionResetError("warming"), HealthResponse()],
+        ) as urlopen:
+            with patch("scripts.closed_loop_e2e.time.sleep") as sleep:
+                payload = wait_for_agent_health(
+                    "http://127.0.0.1:8092",
+                    timeout_s=5.0,
+                )
+
+        self.assertTrue(payload["ok"])
+        self.assertEqual(urlopen.call_count, 2)
+        sleep.assert_called_once_with(1.0)
+
     def test_manifest_supports_chinese_and_english_cases(self) -> None:
         payload = {
             "transport_cases": [

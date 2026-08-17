@@ -999,8 +999,6 @@
         ".env.common",
         "agent/app/settings.py",
         "docker-compose.yml",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
         "env/validation/architecture.env"
       ]
     },
@@ -1012,8 +1010,6 @@
         ".env.common",
         "agent/app/settings.py",
         "docker-compose.yml",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
         "env/validation/architecture.env"
       ]
     },
@@ -1025,8 +1021,6 @@
         ".env.common",
         "agent/app/settings.py",
         "docker-compose.yml",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
         "env/validation/architecture.env"
       ]
     },
