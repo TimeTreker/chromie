@@ -2910,8 +2910,8 @@ owners append only facts they are qualified to observe:
 | Trusted Capability Runtime (`CapabilityRuntime`) | Capability dispatch/lifecycle facts and correlated terminal results for Activity, provider-backed Vocal, or Social Attention decoration | Completion of an unrelated Goal or semantic meaning of a result |
 | Execution closure | Goal-scoped Activity or provider-backed Vocal terminal outcome with `ExecutionOutcomeBundle` evidence references | A stronger result than the referenced bundle proves |
 
-The Ledger neither edits nor replaces playback evidence,
-`TaskProposalLedger`, recent auxiliary-behavior evidence, Goal state, or
+The Ledger neither edits nor replaces playback evidence, recent auxiliary-behavior
+evidence, Goal state, the canonical Plan, static preflight diagnostics, or
 `ExecutionOutcomeBundle`. A repeated event identity must reproduce the same
 immutable content. A proposal, Plan, scheduled utterance, committed request, or
 provider postcondition never becomes completion merely because it appears in

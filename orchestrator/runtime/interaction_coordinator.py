@@ -69,7 +69,6 @@ from .conversation_memory_provider import (
     host_runtime_memory_definitions,
 )
 from .interaction_preflight import annotate_preflight_validation
-from .task_proposals import annotate_task_proposal_ledger
 
 SpeechScheduler = Callable[[dict[str, Any]], dict[str, Any] | Awaitable[dict[str, Any]]]
 SpeechCancelScheduler = Callable[
@@ -616,19 +615,14 @@ class InteractionRuntimeCoordinator:
         session_id: str | None,
         confirmed_request_ids: set[str] | None = None,
     ) -> InteractionResponse:
-        return annotate_task_proposal_ledger(
-            annotate_preflight_validation(
-                self._reconcile_truth(
-                    self._enforce_structured_planning_state(
-                        self._with_session_metadata(response, session_id)
-                    ),
-                    session_id=session_id,
-                ),
-                registry=self.registry,
-                provider_ids=self.runtime.provider_ids(),
-                confirmed_request_ids=confirmed_request_ids,
-                soridormi_catalog_loaded=self._catalog_loaded,
-            )
+        return annotate_preflight_validation(
+            self._enforce_structured_planning_state(
+                self._with_session_metadata(response, session_id)
+            ),
+            registry=self.registry,
+            provider_ids=self.runtime.provider_ids(),
+            confirmed_request_ids=confirmed_request_ids,
+            soridormi_catalog_loaded=self._catalog_loaded,
         )
 
     def _enforce_structured_planning_state(
@@ -891,125 +885,9 @@ class InteractionRuntimeCoordinator:
             },
         )
 
-    def _reconcile_truth(
-        self,
-        response: InteractionResponse,
-        *,
-        session_id: str | None,
-    ) -> InteractionResponse:
-        proposed = self._int_metadata(
-            response,
-            "deepthinking_proposed_effect_task_count",
-            fallback_key="deepthinking_proposed_action_count",
-        )
-        valid = self._int_metadata(
-            response,
-            "deepthinking_valid_effect_task_count",
-            fallback_key="deepthinking_valid_action_count",
-        )
-        if proposed <= 0 or valid > 0:
-            return response
-        if self._has_effectful_runtime_skill(response):
-            return response
-        reason = str(response.metadata.get("truth_reconciliation_reason") or "").strip()
-        if not reason:
-            reason = "deepthinking_effect_task_without_valid_skill"
-        metadata = {
-            **response.metadata,
-            "truth_reconciled": True,
-            "truth_reconciliation_reason": reason,
-        }
-        if self._has_typed_supersession_evidence(response):
-            metadata["truth_reconciliation_speech_source"] = "typed_superseded_proposal"
-            return response.model_copy(deep=True, update={"metadata": metadata})
 
-        metadata.update(
-            {
-                "truth_reconciliation_speech_source": "none_model_repair_required",
-                "truth_reconciliation_requires_model_repair": True,
-                "truth_reconciliation_session_id": session_id,
-            }
-        )
-        return response.model_copy(
-            deep=True,
-            update={
-                "speech": [],
-                "capabilities": [],
-                "status": "error",
-                "reason": "truth_reconciliation_requires_model_repair",
-                "metadata": metadata,
-            },
-        )
 
-    @staticmethod
-    def _has_typed_supersession_evidence(
-        response: InteractionResponse,
-    ) -> bool:
-        if not response.speech:
-            return False
-        reason = str(response.metadata.get("truth_reconciliation_reason") or "").strip()
-        superseded = response.metadata.get("superseded_task_proposals")
-        if not reason or not isinstance(superseded, list) or not superseded:
-            return False
-        return all(
-            isinstance(item, dict) and bool(str(item.get("superseded_by") or "").strip())
-            for item in superseded
-        )
 
-    @staticmethod
-    def _int_metadata(
-        response: InteractionResponse,
-        key: str,
-        *,
-        fallback_key: str | None = None,
-    ) -> int:
-        value = response.metadata.get(key)
-        if value is None and fallback_key:
-            value = response.metadata.get(fallback_key)
-        if isinstance(value, bool):
-            return 0
-        if isinstance(value, int):
-            return value
-        if isinstance(value, float):
-            return int(value)
-        if isinstance(value, str):
-            try:
-                return int(value)
-            except ValueError:
-                return 0
-        return 0
-
-    @staticmethod
-    def _has_effectful_runtime_skill(response: InteractionResponse) -> bool:
-        for request in response.capabilities:
-            if request.capability_id == "chromie.speak":
-                continue
-            metadata = request.metadata if isinstance(request.metadata, dict) else {}
-            if "effectful" in metadata:
-                if metadata.get("effectful") is True:
-                    return True
-                continue
-            safety_class = str(metadata.get("safety_class") or "")
-            effects = {str(item) for item in metadata.get("effects") or []}
-            if safety_class in {
-                "physical_motion",
-                "safety_critical",
-                "high_risk_action",
-                "guarded_operation",
-            }:
-                return True
-            if effects.intersection({"physical_motion", "safety_control", "emergency_stop"}):
-                return True
-            # Historical compatibility may lack capability metadata. Keep the
-            # old body/task safety surface, but never classify arbitrary
-            # chromie.* read-only tools as physical effects by name alone.
-            if not metadata and (
-                request.capability_id.startswith("soridormi.")
-                or request.capability_id == _TASK_GRAPH_CAPABILITY_ID
-                or request.capability_id == "session.interrupt"
-            ):
-                return True
-        return False
 
 
 def build_soridormi_invoker(

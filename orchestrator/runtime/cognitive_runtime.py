@@ -1949,10 +1949,6 @@ class CanonicalPlanRuntimeAdapter:
             ),
             "safe_read_parallel_execution": safe_read_parallel,
             "safe_read_speech_optional": safe_read_speech_optional,
-            "deepthinking_proposed_effect_task_count": primary_effectful_count,
-            "deepthinking_valid_effect_task_count": primary_effectful_count,
-            "deepthinking_proposed_action_count": primary_effectful_count,
-            "deepthinking_valid_action_count": primary_effectful_count,
         }
         runtime_context = context if isinstance(context, dict) else {}
         if isinstance(runtime_context.get("user_turn_envelope"), dict):

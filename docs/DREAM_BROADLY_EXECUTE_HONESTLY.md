@@ -144,17 +144,19 @@ Example:
 
 ## Orchestrator Contract
 
-The Orchestrator treats goal interpreter and deepthinking outputs as proposals until a
-final `InteractionResponse` contains committed speech or skills.
+The Orchestrator does not maintain a second proposal ledger beside the canonical
+Plan. Goal Interpretation supplies WHAT, the Planner authors HOW, static preflight
+checks only the committed Capability requests the Host can validate before runtime,
+and Capability Runtime / Evidence own execution truth.
 
-- `actions[]` and `tasks[]` can become committed only after Agent and Skill
-  Runtime validation.
-- `metadata.desired_abilities` and deepthinking `task_proposals[]` become
-  shared `TaskProposal` ledger entries with `state=missing_ability`.
-- Missing-ability proposals are never executable and are not forwarded to the
-  Trusted Capability Runtime.
-- Experience evaluation may mine these proposals into owner-review-only
-  ability backlog items or future scenario candidates.
+- unavailable desired abilities remain Goal/Planner semantics; the Orchestrator does
+  not invent executable substitutes or a parallel `TaskProposal` authority;
+- `preflight_validation` is diagnostic metadata for committed Capability requests,
+  not execution evidence and not a second Plan;
+- missing or unavailable capabilities must remain explicit in canonical planning or
+  terminal Evidence instead of being converted into executable work;
+- Experience may summarize preflight/runtime failures for owner review, but it does
+  not reconstruct semantic proposals from transcripts or compatibility metadata.
 
 ## Non-Goals
 

@@ -274,93 +274,9 @@ class ExperienceManagerTests(unittest.TestCase):
             self.assertFalse(proposal["auto_apply"])
             self.assertEqual(proposal["target"], "experience_tuned_strategy")
 
-    def test_missing_ability_is_retained_for_owner_review(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            manager = ExperienceManager(
-                enabled=True,
-                log_path=root / "experience.jsonl",
-                proposal_path=root / "proposals.jsonl",
-            )
-            profile = default_mind_profile()
-            response = InteractionResponse(
-                status="clarify",
-                reason="missing_or_unsupported_ability",
-                metadata={
-                    "experience_context": {
-                        "user_text": "附近有什么好吃的餐厅？",
-                        "route": "clarify",
-                        "intent": "missing_or_unsupported_ability",
-                    },
-                    "task_proposal_ledger": {
-                        "summary": {
-                            "proposal_count": 2,
-                            "effectful_proposal_count": 0,
-                            "states": {
-                                "missing_ability": 1,
-                                "committed": 1,
-                            },
-                        },
-                        "proposals": [
-                            {
-                                "id": "quick_intent:ability:0",
-                                "state": "missing_ability",
-                                "ability_id": "local.restaurant_recommendation",
-                                "reason": "No restaurant lookup capability is available.",
-                                "metadata": {
-                                    "intent": "Recommend good restaurants near the user",
-                                    "confidence": 1.0,
-                                },
-                            },
-                            {
-                                "id": "interaction_response:speech:0",
-                                "state": "committed",
-                                "args": {"must_not_store": "raw speech proposal"},
-                            },
-                        ],
-                    },
-                },
-                speech=[
-                    {
-                        "text": (
-                            "我明白你想找附近好吃的餐厅，不过我现在还没有这个能力。"
-                        )
-                    }
-                ],
-            )
-            execution = CapabilityRuntimeResult(
-                interaction_id=response.interaction_id,
-                status="completed",
-            )
 
-            record = manager.record_interaction(
-                response=response,
-                execution=execution,
-                session_id="sid-missing-restaurant",
-                mind_profile=profile,
-            )
 
-            self.assertIsNotNone(record)
-            assert record is not None
-            requests = record.metadata["missing_ability_requests"]
-            self.assertEqual(
-                requests[0]["ability_id"],
-                "local.restaurant_recommendation",
-            )
-            self.assertEqual(
-                requests[0]["intent"],
-                "Recommend good restaurants near the user",
-            )
-            self.assertNotIn("must_not_store", json.dumps(record.metadata))
-            proposal = json.loads(manager.proposal_path.read_text(encoding="utf-8"))
-            self.assertIn(
-                "local.restaurant_recommendation",
-                proposal["proposed_change"],
-            )
-            self.assertTrue(proposal["requires_owner_approval"])
-            self.assertFalse(proposal["auto_apply"])
-
-    def test_proposal_mismatch_creates_review_proposal_from_summaries(self) -> None:
+    def test_preflight_block_creates_review_proposal_from_summary(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             manager = ExperienceManager(
@@ -371,30 +287,10 @@ class ExperienceManagerTests(unittest.TestCase):
             profile = default_mind_profile()
             response = InteractionResponse(
                 metadata={
-                    "experience_context": {
-                        "user_text": "Look out!",
-                        "route": "deep_thought",
-                        "intent": "warning",
-                    },
-                    "truth_reconciled": True,
-                    "truth_reconciliation_reason": "quick_intent_misread_warning",
-                    "task_proposal_ledger": {
-                        "summary": {
-                            "proposal_count": 2,
-                            "not_committed_effectful_count": 1,
-                            "states": {"committed": 1, "not_committed": 1},
-                        },
-                        "proposals": [
-                            {
-                                "id": "quick:0",
-                                "state": "not_committed",
-                                "args": {"do_not_store": "raw proposal payload"},
-                            }
-                        ],
-                    },
+                    "experience_context": {"user_text": "Move carefully."},
                     "preflight_validation": {
                         "summary": {
-                            "checked_skill_count": 1,
+                            "checked_capability_count": 1,
                             "blocked_count": 1,
                             "statuses": {"blocked": 1},
                         },
@@ -406,7 +302,6 @@ class ExperienceManagerTests(unittest.TestCase):
                         ],
                     },
                 },
-                speech=[{"text": "Thanks for warning me. I will hold still."}],
             )
             execution = CapabilityRuntimeResult(
                 interaction_id=response.interaction_id,
@@ -416,20 +311,18 @@ class ExperienceManagerTests(unittest.TestCase):
             record = manager.record_interaction(
                 response=response,
                 execution=execution,
-                session_id="sid-look-out",
+                session_id="sid-preflight",
                 mind_profile=profile,
             )
 
             self.assertIsNotNone(record)
             log_payload = json.loads(manager.log_path.read_text(encoding="utf-8"))
-            self.assertIn("task_proposal_summary", log_payload["metadata"])
             self.assertIn("preflight_summary", log_payload["metadata"])
-            self.assertNotIn("proposals", json.dumps(log_payload["metadata"]))
             self.assertNotIn("items", json.dumps(log_payload["metadata"]))
             proposal = json.loads(manager.proposal_path.read_text(encoding="utf-8"))
             self.assertTrue(proposal["requires_owner_approval"])
             self.assertFalse(proposal["auto_apply"])
-            self.assertIn("proposal/preflight mismatch", proposal["proposed_change"])
+            self.assertIn("preflight/runtime mismatch", proposal["proposed_change"])
 
 
 if __name__ == "__main__":

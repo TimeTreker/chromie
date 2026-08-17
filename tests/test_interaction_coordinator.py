@@ -279,30 +279,6 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status, "completed")
         self.assertEqual(ledger.events("sid-1"), [])
 
-    async def test_unverified_deepthinking_action_promise_is_corrected_before_speech(
-        self,
-    ) -> None:
-        scheduled: list[dict[str, Any]] = []
-        coordinator = InteractionRuntimeCoordinator(
-            lambda args: scheduled.append(args) or {"scheduled": True}
-        )
-
-        result = await _execute_to_terminal(coordinator,
-            InteractionResponse(
-                speech=[{"text": "Moving now."}],
-                metadata={
-                    "language": "en-US",
-                    "deepthinking_output_mode": "capability_tasks",
-                    "deepthinking_proposed_effect_task_count": 1,
-                    "deepthinking_valid_effect_task_count": 0,
-                },
-            ),
-            session_id="sid-unverified-action",
-        )
-
-        self.assertEqual(result.status, "failed")
-        self.assertEqual(scheduled, [])
-        self.assertEqual(result.results, [])
 
     async def test_prepare_response_suppresses_effectful_skills_when_structured_planner_blocks(self) -> None:
         coordinator = InteractionRuntimeCoordinator(
@@ -367,126 +343,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
                 self.assertEqual(prepared.status, "ok")
                 self.assertEqual(prepared.speech[0].text, text)
-                self.assertFalse(prepared.metadata.get("truth_reconciled", False))
 
-    async def test_read_only_chromie_tool_is_not_classified_as_effectful_motion(self) -> None:
-        response = InteractionResponse(
-            capabilities=[
-                CapabilityRequest(
-                    request_id="weather-read",
-                    capability_id="chromie.weather.lookup",
-                    metadata={
-                        "effects": ["read_only", "external_read", "weather_lookup"],
-                        "safety_class": "safe_read",
-                        "effectful": False,
-                    },
-                )
-            ]
-        )
-        self.assertFalse(
-            InteractionRuntimeCoordinator._has_effectful_runtime_skill(response)
-        )
 
-    async def test_physical_skill_metadata_remains_effectful(self) -> None:
-        response = InteractionResponse(
-            capabilities=[
-                CapabilityRequest(
-                    request_id="walk",
-                    capability_id="soridormi.walk_velocity",
-                    metadata={
-                        "effects": ["physical_motion"],
-                        "safety_class": "physical_motion",
-                        "effectful": True,
-                    },
-                )
-            ]
-        )
-        self.assertTrue(
-            InteractionRuntimeCoordinator._has_effectful_runtime_skill(response)
-        )
 
-    async def test_prepare_response_exposes_truth_correction_and_proposal_ledger(
-        self,
-    ) -> None:
-        coordinator = InteractionRuntimeCoordinator(lambda args: {"scheduled": True})
 
-        prepared = coordinator.prepare_response(
-            InteractionResponse(
-                speech=[{"text": "Moving now."}],
-                metadata={
-                    "language": "en-US",
-                    "route_task_list": [
-                        {
-                            "id": "quick_intent:0:task.execute_capability",
-                            "source_stage": "quick_intent",
-                            "kind": "action",
-                            "task_type": "task.execute_capability",
-                            "capability_id": "walk_forward",
-                        }
-                    ],
-                    "deepthinking_output_mode": "capability_tasks",
-                    "deepthinking_proposed_effect_task_count": 1,
-                    "deepthinking_valid_effect_task_count": 0,
-                },
-            ),
-            session_id="sid-prepared",
-        )
-
-        self.assertEqual(prepared.status, "error")
-        self.assertEqual(prepared.reason, "truth_reconciliation_requires_model_repair")
-        self.assertEqual(prepared.speech, [])
-        self.assertTrue(prepared.metadata["truth_reconciliation_requires_model_repair"])
-        ledger = prepared.metadata["task_proposal_ledger"]
-        self.assertEqual(ledger["summary"]["not_committed_effectful_count"], 1)
-        self.assertEqual(ledger["proposals"][0]["state"], "not_committed")
-
-    async def test_warning_misread_uses_specific_truth_repair_speech(self) -> None:
-        coordinator = InteractionRuntimeCoordinator(lambda args: {"scheduled": True})
-
-        prepared = coordinator.prepare_response(
-            InteractionResponse(
-                speech=[
-                    {
-                        "text": "Sorry, I misunderstood that as a direction. Thanks for warning me. I will hold still."
-                    }
-                ],
-                metadata={
-                    "language": "en-US",
-                    "route_intent": "warning",
-                    "truth_reconciliation_reason": "quick_intent_misread_warning",
-                    "superseded_task_proposals": [
-                        {
-                            "id": "quick_intent:0:task.execute_capability:superseded",
-                            "source": "quick_intent",
-                            "proposal_kind": "action",
-                            "task_type": "task.execute_capability",
-                            "capability_id": "soridormi.look_at_window",
-                            "reason": "deepthinking interpreted Look out as a warning",
-                            "superseded_by": "deepthinking:0:speech.speak",
-                        }
-                    ],
-                    "deepthinking_output_mode": "capability_tasks",
-                    "deepthinking_proposed_effect_task_count": 1,
-                    "deepthinking_valid_effect_task_count": 0,
-                },
-            ),
-            session_id="sid-look-out",
-        )
-
-        self.assertEqual(
-            prepared.speech[0].text,
-            "Sorry, I misunderstood that as a direction. Thanks for warning me. I will hold still.",
-        )
-        self.assertEqual(
-            prepared.metadata["truth_reconciliation_reason"],
-            "quick_intent_misread_warning",
-        )
-        self.assertEqual(
-            prepared.metadata["truth_reconciliation_speech_source"],
-            "typed_superseded_proposal",
-        )
-        ledger = prepared.metadata["task_proposal_ledger"]
-        self.assertEqual(ledger["summary"]["superseded_count"], 1)
 
     async def test_prepare_response_adds_static_preflight_audit(self) -> None:
         coordinator = InteractionRuntimeCoordinator(lambda args: {"scheduled": True})
@@ -526,15 +386,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(preflight["summary"]["blocked_count"], 1)
         self.assertEqual(preflight["summary"]["deferred_count"], 1)
 
-        skill_proposals = [
-            proposal
-            for proposal in prepared.metadata["task_proposal_ledger"]["proposals"]
-            if proposal["proposal_kind"] == "capability"
-        ]
-        self.assertEqual(
-            [proposal["preflight"]["status"] for proposal in skill_proposals],
-            ["blocked", "deferred"],
-        )
+        self.assertNotIn("task_proposal_ledger", prepared.metadata)
 
     async def test_prepare_response_preflight_uses_loaded_catalog_and_confirmation(
         self,

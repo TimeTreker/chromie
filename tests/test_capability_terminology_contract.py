@@ -22,7 +22,6 @@ from shared.chromie_contracts import (
     ExecutionEvidence,
     InteractionResponse,
     SocialAttentionBehavior,
-    TaskProposal,
 )
 from shared.chromie_contracts.interaction import CapabilityTraceEvent
 
@@ -131,11 +130,6 @@ class CapabilityTerminologyContractTests(unittest.TestCase):
                 status="completed",
             ),
             SocialAttentionBehavior(capability_id="soridormi.blink_eyes"),
-            TaskProposal(
-                id="proposal-1",
-                state="advisory",
-                capability_id="chromie.weather.lookup",
-            ),
             EpisodeCapabilityRequestRecord(
                 request_id="request-episode",
                 capability_id="chromie.weather.lookup",

@@ -26,7 +26,6 @@ from orchestrator.runtime.capability_runtime import (
     CapabilityRuntime,
     local_speech_definition,
 )
-from orchestrator.runtime.task_proposals import annotate_task_proposal_ledger
 from shared.chromie_contracts.execution_outcome import (
     claim_qualification_policy_sha256,
 )
@@ -49,7 +48,6 @@ from shared.chromie_contracts.response_composition import (
     goal_association_fingerprint,
 )
 from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage, SemanticGoal
-from shared.chromie_contracts.task_proposal import TaskProposalLedger
 
 
 TEST_SKILL_OUTPUT_SCHEMA = {

@@ -372,8 +372,8 @@ Issue [#22](https://github.com/TimeTreker/chromie/issues/22) owns the append-onl
 Interaction Ledger and bounded Goal-scoped Interaction Context supplied to Goal
 Association, Fast Planner, Deep Planner, and Response Composer. The Ledger
 transports facts from existing owners; it does not replace or rewrite playback,
-`TaskProposalLedger`, Social Attention results, Goal state, or
-`ExecutionOutcomeBundle` evidence.
+Social Attention results, the canonical Plan, Goal state, static preflight
+diagnostics, or `ExecutionOutcomeBundle` evidence.
 
 Exit criteria:
 

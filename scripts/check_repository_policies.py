@@ -1081,9 +1081,6 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
         "shared/chromie_contracts/social_attention.py": {
             "SocialAttentionBehavior": "CapabilityIdentityModel",
         },
-        "shared/chromie_contracts/task_proposal.py": {
-            "TaskProposal": "OptionalCapabilityIdentityModel",
-        },
         "orchestrator/runtime/episode.py": {
             "EpisodeCapabilityRequestRecord": "CapabilityIdentityModel",
             "EpisodeCapabilityResultRecord": "CapabilityIdentityModel",
@@ -1093,6 +1090,23 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
         },
     }
     findings: list[PolicyFinding] = []
+    for retired_relative in (
+        "shared/chromie_contracts/task_proposal.py",
+        "orchestrator/runtime/task_proposals.py",
+    ):
+        if (root / retired_relative).exists():
+            findings.append(
+                _source_policy_finding(
+                    root=root,
+                    path=retired_relative,
+                    rule_id=RULE_CANONICAL_CAPABILITY_ID,
+                    message=(
+                        "retired TaskProposal compatibility contract must not be "
+                        "reintroduced; CanonicalPlan/preflight/CapabilityRuntime/Evidence "
+                        "are the maintained execution truth chain"
+                    ),
+                )
+            )
     for relative, classes in targets.items():
         path = root / relative
         tree, parse_findings = _parse_python(path, root)

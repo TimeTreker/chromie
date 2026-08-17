@@ -106,13 +106,10 @@ into the next turn.
 
 Interaction scenarios may set `stub.host_prepare_response=true` when they need
 to exercise the host `InteractionRuntimeCoordinator.prepare_response()` layer.
-That path attaches static preflight and `task_proposal_ledger` metadata without
-executing live TTS, simulator, or hardware work. Expectations can use
-`metadata_json_contains` and `metadata_json_forbid` for ledger-level evidence
-such as `not_committed`, `superseded`, `chromie.speak`, or rejected
-capabilities. The `look_out_warning_correction` scenario covers the correction
-case where a quick window-gaze proposal for "Look out!" is superseded by
-warning speech and no physical skill is emitted.
+That path attaches static `preflight_validation` metadata without executing live
+TTS, simulator, or hardware work. Expectations can use `metadata_json_contains`
+and `metadata_json_forbid` for preflight diagnostics. Preflight does not create a
+second proposal ledger and does not prove execution.
 
 The committed dialogue suite includes 300+ real-world conversation scenarios
 that score social recall, preference memory, clarification, safe refusal,

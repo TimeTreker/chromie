@@ -20,8 +20,8 @@ acceptance tools. It includes:
   reflex scopes remain separate from exact plan/fingerprint-bound goal cancellation,
   while both paths reconcile trusted receipts into canonical Goal state; dispatch,
   provider, and dedicated E-stop/safe-idle evidence remain separately represented;
-- shared `TaskProposal`, `TaskProposalLedger`, and preflight-summary contracts
-  for Goal Interpretation/Cognitive Core/Orchestrator proposal merge diagnostics;
+- canonical preflight diagnostics for committed Capability requests; preflight is
+  not a second Plan and does not establish execution truth;
 - Goal, Goal Association, semantic task-operation, and active-goal contracts;
 - immutable `CanonicalPlan`, goal-satisfaction, response-composition, and
   single-semantic-authority contracts;

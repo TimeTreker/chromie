@@ -110,12 +110,6 @@ from .semantic_authority import (
     semantic_authority_from_context,
     semantic_authority_route_matrix,
 )
-from .task_proposal import (
-    TaskProposal,
-    TaskProposalLedger,
-    TaskProposalPreflight,
-    TaskProposalSummary,
-)
 from .mind import (
     CorePrinciple,
     ExperienceRecord,
@@ -326,10 +320,6 @@ __all__ = [
     "context_with_semantic_authority",
     "semantic_authority_from_context",
     "semantic_authority_route_matrix",
-    "TaskProposal",
-    "TaskProposalLedger",
-    "TaskProposalPreflight",
-    "TaskProposalSummary",
     "CorePrinciple",
     "ExperienceRecord",
     "LongTermGoal",

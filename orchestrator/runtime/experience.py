@@ -119,7 +119,7 @@ class ExperienceManager:
             metadata={
                 "response_reason": response.reason,
                 "requires_confirmation": response.requires_confirmation,
-                **self._proposal_learning_metadata(response),
+                **self._runtime_learning_metadata(response),
             },
         )
         self._append_jsonl(self.log_path, record.model_dump(mode="json"))
@@ -133,44 +133,28 @@ class ExperienceManager:
         record: ExperienceRecord,
     ) -> MindUpdateProposal | None:
         failure_statuses = {"failed", "error", "timed_out", "cancelled", "refused"}
-        failed_skill = any(
+        failed_capability = any(
             str(result.get("status") or "").lower() in failure_statuses
             for result in record.capability_results
         )
         learning_signal = self._learning_signal_from_metadata(record.metadata)
         if (
             record.execution_status.lower() not in failure_statuses
-            and not failed_skill
+            and not failed_capability
             and not record.errors
             and not learning_signal
         ):
             return None
         proposed_change = (
             "Review the failed or uncertain interaction and consider updating "
-            "routing examples, skill-selection preferences, tests, or long-term "
+            "Goal/Planner contracts, Capability declarations, tests, or long-term "
             "goals. Do not change core principles without owner approval."
         )
         if learning_signal:
             proposed_change = (
-                "Review the proposal/preflight mismatch and consider updating "
-                "goal interpretation merge examples, deepthinking output contracts, scenario "
-                "coverage, or skill-selection preferences. Do not change core "
-                "principles or physical safety rules without owner approval."
-            )
-        missing_requests = record.metadata.get("missing_ability_requests")
-        if isinstance(missing_requests, list) and missing_requests:
-            ability_ids = [
-                str(item.get("ability_id") or "").strip()
-                for item in missing_requests
-                if isinstance(item, dict)
-            ]
-            ability_ids = [item for item in ability_ids if item]
-            requested = ", ".join(ability_ids[:4]) or "an understood missing ability"
-            proposed_change = (
-                f"Review the user-requested missing ability ({requested}) and decide whether "
-                "to add or prioritize a trusted Capability or Agent Skill. Preserve the "
-                "understood user outcome, require owner approval, and never substitute a "
-                "nearby capability or auto-apply the change."
+                "Review the preflight/runtime mismatch and consider updating "
+                "Planner validation, Capability declarations, or scenario coverage. "
+                "Do not change core principles or physical safety rules without owner approval."
             )
         return MindUpdateProposal(
             target="experience_tuned_strategy",
@@ -186,92 +170,27 @@ class ExperienceManager:
         )
 
     @classmethod
-    def _proposal_learning_metadata(
+    def _runtime_learning_metadata(
         cls,
         response: InteractionResponse,
     ) -> dict[str, Any]:
         metadata: dict[str, Any] = {}
-        ledger = response.metadata.get("task_proposal_ledger")
-        if isinstance(ledger, dict):
-            summary = cls._safe_summary(ledger.get("summary"))
-            if summary:
-                metadata["task_proposal_summary"] = summary
-            missing_requests = cls._missing_ability_requests(ledger.get("proposals"))
-            if missing_requests:
-                metadata["missing_ability_requests"] = missing_requests
         preflight = response.metadata.get("preflight_validation")
         if isinstance(preflight, dict):
             summary = cls._safe_summary(preflight.get("summary"))
             if summary:
                 metadata["preflight_summary"] = summary
-        if response.metadata.get("truth_reconciled") is True:
-            metadata["truth_reconciled"] = True
-            reason = str(response.metadata.get("truth_reconciliation_reason") or "").strip()
-            if reason:
-                metadata["truth_reconciliation_reason"] = reason[:160]
         return metadata
 
     @classmethod
     def _learning_signal_from_metadata(cls, metadata: dict[str, Any]) -> str:
-        proposal = metadata.get("task_proposal_summary")
         preflight = metadata.get("preflight_summary")
         signals: list[str] = []
-        if isinstance(proposal, dict):
-            not_committed = cls._int_from_summary(
-                proposal,
-                "not_committed_effectful_count",
-            )
-            rejected = cls._int_from_mapping(proposal.get("states"), "rejected")
-            superseded = cls._int_from_summary(proposal, "superseded_count")
-            missing_abilities = cls._int_from_mapping(
-                proposal.get("states"),
-                "missing_ability",
-            )
-            if not_committed > 0:
-                signals.append(f"{not_committed} effectful proposal(s) were not committed")
-            if rejected > 0:
-                signals.append(f"{rejected} proposal(s) were rejected")
-            if superseded > 0:
-                signals.append(f"{superseded} proposal(s) were superseded")
-            if missing_abilities > 0:
-                signals.append(
-                    f"{missing_abilities} missing ability request(s) were recorded"
-                )
         if isinstance(preflight, dict):
             blocked = cls._int_from_summary(preflight, "blocked_count")
             if blocked > 0:
-                signals.append(f"{blocked} committed skill(s) failed static preflight")
-        if metadata.get("truth_reconciled") is True:
-            signals.append("truth reconciliation corrected optimistic action speech")
+                signals.append(f"{blocked} committed capability request(s) failed static preflight")
         return "; ".join(signals)
-
-    @classmethod
-    def _missing_ability_requests(cls, value: Any) -> list[dict[str, Any]]:
-        if not isinstance(value, list):
-            return []
-        requests: list[dict[str, Any]] = []
-        for item in value:
-            if not isinstance(item, dict):
-                continue
-            if str(item.get("state") or "").strip() != "missing_ability":
-                continue
-            ability_id = str(item.get("ability_id") or "").strip()[:160]
-            if not ability_id:
-                continue
-            raw_metadata = item.get("metadata")
-            proposal_metadata = raw_metadata if isinstance(raw_metadata, dict) else {}
-            request: dict[str, Any] = {
-                "ability_id": ability_id,
-                "intent": str(proposal_metadata.get("intent") or "").strip()[:240],
-                "reason": str(item.get("reason") or "").strip()[:500],
-            }
-            confidence = proposal_metadata.get("confidence")
-            if isinstance(confidence, (int, float)) and not isinstance(confidence, bool):
-                request["confidence"] = max(0.0, min(1.0, float(confidence)))
-            requests.append(request)
-            if len(requests) >= 8:
-                break
-        return requests
 
     @staticmethod
     def _safe_summary(value: Any) -> dict[str, Any]:
@@ -304,12 +223,6 @@ class ExperienceManager:
             return int(str(value))
         except (TypeError, ValueError):
             return 0
-
-    @classmethod
-    def _int_from_mapping(cls, value: Any, key: str) -> int:
-        if not isinstance(value, dict):
-            return 0
-        return cls._int_from_summary(value, key)
 
     @staticmethod
     def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:
