@@ -489,7 +489,6 @@ class RuntimeConfigurationTests(unittest.TestCase):
             "Response Composer": "EFFECTIVE_RESPONSE_COMPOSER_MODEL",
             "Tool Result Interpreter": "EFFECTIVE_TOOL_RESULT_INTERPRETER_MODEL",
             "Social Attention": "EFFECTIVE_SOCIAL_ATTENTION_MODEL",
-            "Response Review": "EFFECTIVE_RESPONSE_REVIEW_MODEL",
         }
         for role, variable in expected_roles.items():
             with self.subTest(role=role):
@@ -502,14 +501,10 @@ class RuntimeConfigurationTests(unittest.TestCase):
             launcher,
         )
         self.assertIn("background social-decoration loop", launcher)
+        self.assertNotIn("EFFECTIVE_RESPONSE_REVIEW_MODEL", launcher)
+        self.assertNotIn("Response Review                    |", launcher)
         self.assertIn("skipped by pure ready reads", launcher)
         summary_index = launcher.index("Effective cognitive model roles:")
-        self.assertGreater(
-            summary_index,
-            launcher.index(
-                'EFFECTIVE_RESPONSE_REVIEW_MODEL="$COSYVOICE_BRAIN_MODEL"'
-            ),
-        )
         self.assertLess(summary_index, launcher.index('cat > "$SERVICE_OVERRIDE"'))
 
     def test_runtime_verifier_checks_timezone_environment_and_mount(self) -> None:
