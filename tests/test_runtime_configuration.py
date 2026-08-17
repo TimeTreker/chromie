@@ -507,6 +507,27 @@ class RuntimeConfigurationTests(unittest.TestCase):
         summary_index = launcher.index("Effective cognitive model roles:")
         self.assertLess(summary_index, launcher.index('cat > "$SERVICE_OVERRIDE"'))
 
+
+    def test_runtime_shell_entrypoints_parse_with_bash(self) -> None:
+        for relative in (
+            "scripts/start_chromie.sh",
+            "scripts/start_services.sh",
+            "scripts/start_orchestrator.sh",
+            "scripts/verify_runtime_profile.sh",
+        ):
+            with self.subTest(script=relative):
+                completed = subprocess.run(
+                    ["bash", "-n", str(ROOT / relative)],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(
+                    completed.returncode,
+                    0,
+                    msg=completed.stderr or completed.stdout,
+                )
+
     def test_runtime_verifier_checks_timezone_environment_and_mount(self) -> None:
         verifier = (ROOT / "scripts" / "verify_runtime_profile.sh").read_text(
             encoding="utf-8"
