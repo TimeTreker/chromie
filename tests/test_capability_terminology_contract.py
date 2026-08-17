@@ -5,7 +5,6 @@ import unittest
 
 from pydantic import ValidationError
 
-from agent.app.cognitive_core.goal_interpreter.schema import RouteItem as GoalInterpreterRouteItem
 from agent.app.schema import RouteItem as AgentRouteItem
 from orchestrator.runtime.episode import (
     EpisodeCapabilityRequestRecord,
@@ -136,7 +135,6 @@ class CapabilityTerminologyContractTests(unittest.TestCase):
             ),
             SharedRouteItem(route="tool", capability_id="chromie.weather.lookup"),
             AgentRouteItem(route="tool", capability_id="chromie.weather.lookup"),
-            GoalInterpreterRouteItem(route="tool", capability_id="chromie.weather.lookup"),
             OrchestratorRouteItem(route="tool", capability_id="chromie.weather.lookup"),
             SocialAttentionBehavior(capability_id="soridormi.blink_eyes"),
             TaskProposal(

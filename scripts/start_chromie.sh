@@ -486,7 +486,7 @@ cat <<EOF_MODEL_ROLES
 Role                               | Model                            | Maintained runtime use
 -----------------------------------+----------------------------------+----------------------------------------------
 Cognitive Gateway attention        | ${EFFECTIVE_COGNITIVE_GATEWAY_ATTENTION_MODEL} | ingress attention review
-Fast intent (Goal Interpreter)     | ${EFFECTIVE_AGENT_GOAL_INTERPRETER_MODEL} | fast understanding / readiness candidates
+Goal Interpretation     | ${EFFECTIVE_AGENT_GOAL_INTERPRETER_MODEL} | WHAT understanding / Responsibility candidates
 Goal Association                   | ${EFFECTIVE_GOAL_ASSOCIATION_MODEL} | Goal continuity and candidate binding
 Fast Planner                       | ${EFFECTIVE_FAST_PLANNER_MODEL} | fallback when readiness does not fully cover Goals
 Deep Planner                       | ${EFFECTIVE_DEEP_PLANNER_MODEL} | terminal planning escalation / one mechanical DTO regeneration max

@@ -76,51 +76,9 @@
       ]
     },
     {
-      "path": "agent/app/cognitive_core/goal_interpreter/capability_catalog.py",
-      "symbol": "CapabilityCatalogClient.search",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "8646e8ae1a8742263f94a23388d1aadf163f9e57f68b1d803764e53f62e98f7d",
-      "failure_signals": [
-        "diagnostic",
-        "return"
-      ]
-    },
-    {
-      "path": "agent/app/cognitive_core/goal_interpreter/capability_catalog.py",
-      "symbol": "CapabilityCatalogClient.snapshot",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "42ee73be3c595daf9400f1b49eedeb023345a1a7001104df7299f997ab51e36a",
-      "failure_signals": [
-        "diagnostic",
-        "return",
-        "state_update"
-      ]
-    },
-    {
       "path": "agent/app/cognitive_core/goal_interpreter/engine.py",
       "symbol": "initialize_goal_interpreter",
       "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "e1867c6dc27430ea6ba18b1504c0438295b3b362aec898d9b3ca6ff89dbc6f3b",
-      "failure_signals": [
-        "diagnostic"
-      ]
-    },
-    {
-      "path": "agent/app/cognitive_core/goal_interpreter/engine.py",
-      "symbol": "initialize_goal_interpreter",
-      "ordinal": 2,
       "classification": "fail_closed_boundary",
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
@@ -128,34 +86,6 @@
       "body_sha256": "6f8f29e0fc9fa8ca00bef6ad81b6443abeb2c2b60e937138b9b0bb1f6210c413",
       "failure_signals": [
         "diagnostic"
-      ]
-    },
-    {
-      "path": "agent/app/cognitive_core/goal_interpreter/engine.py",
-      "symbol": "interpret_turn",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "2224a743a721faf52551f80363c3c37b24f2586a2ef58479ee682409388a7af1",
-      "failure_signals": [
-        "diagnostic",
-        "state_update"
-      ]
-    },
-    {
-      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
-      "symbol": "OllamaGoalInterpreter._review_inactive_addressedness",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "5f487630825a1098bcc2db517027fb1638a537d398eb9e958c5e1b1f6ce31572",
-      "failure_signals": [
-        "diagnostic",
-        "return"
       ]
     },
     {
@@ -182,48 +112,6 @@
       "body_sha256": "b1353699afa12843ffe1fb72f282e66b385b009bcb718f65f609ea4b45314b62",
       "failure_signals": [
         "raise"
-      ]
-    },
-    {
-      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
-      "symbol": "OllamaGoalInterpreter.route",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "422c3b1bcf0487cb55a3361f9f98c844020ed268c15d5256b51ac84e9c49771e",
-      "failure_signals": [
-        "diagnostic",
-        "return"
-      ]
-    },
-    {
-      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
-      "symbol": "OllamaGoalInterpreter.route",
-      "ordinal": 2,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "50c043502e41c210cce506756a4b88c3eb531bf1f278c29fdca047ff3da9e4c2",
-      "failure_signals": [
-        "diagnostic",
-        "return"
-      ]
-    },
-    {
-      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
-      "symbol": "_raw_interpreter_output_summary",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "86542ba085f37a9915fdfbd51f14831c042328826bb5adce8c1c570f666b6dbd",
-      "failure_signals": [
-        "return",
-        "state_update"
       ]
     },
     {

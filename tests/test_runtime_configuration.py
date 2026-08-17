@@ -31,13 +31,12 @@ def _common_env() -> dict[str, str]:
 
 
 class RuntimeConfigurationTests(unittest.TestCase):
-    def test_goal_interpreter_safety_rules_cannot_be_disabled_by_environment(self) -> None:
-        with patch.dict(os.environ, {"AGENT_GOAL_INTERPRETER_RULES_FIRST": "0"}, clear=False):
-            self.assertTrue(GoalInterpreterSettings().rules_first)
+    def test_goal_interpreter_has_no_rules_or_catalog_compatibility_settings(self) -> None:
+        settings = GoalInterpreterSettings()
+        self.assertFalse(hasattr(settings, "rules_first"))
+        self.assertFalse(hasattr(settings, "capability_catalog_timeout_ms"))
 
     def test_standalone_service_fallbacks_match_documented_common_budgets(self) -> None:
-        with patch.dict(os.environ, {}, clear=True):
-            self.assertEqual(GoalInterpreterSettings().capability_catalog_timeout_ms, 400)
         asr_settings_source = (ROOT / "asr" / "settings.py").read_text(encoding="utf-8")
         settings = HostSettingsSnapshot.from_env(project_root=ROOT, environ={})
         self.assertIn('"SHERPA_ONNX_NUM_THREADS",\n                2,', asr_settings_source)
@@ -52,18 +51,15 @@ class RuntimeConfigurationTests(unittest.TestCase):
             dockerfile,
         )
 
-    def test_goal_interpreter_host_budget_exceeds_internal_budget(self) -> None:
+    def test_goal_interpreter_host_budget_exceeds_service_budget(self) -> None:
         values = _common_env()
         self.assertGreater(
-            int(values["ORCH_AGENT_TIMEOUT_MS"]),
-            int(values["AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS"])
-            + int(values["AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS"])
-            + int(values["AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_TIMEOUT_MS"]),
+            int(values["ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS"]),
+            int(values["AGENT_GOAL_INTERPRETER_TIMEOUT_MS"]),
         )
 
     def test_goal_interpreter_uses_fast_llm_by_default(self) -> None:
         values = _common_env()
-        self.assertEqual(values["AGENT_GOAL_INTERPRETER_USE_LLM"], "1")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_MODEL"], "qwen3:4b")
         self.assertEqual(
             values["AGENT_COGNITIVE_GATEWAY_ATTENTION_ENABLED"],
@@ -77,21 +73,34 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP"], "1")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS"], "60000")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_TIMEOUT_MS"], "5400")
-        self.assertEqual(values["AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS"], "5400")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_LLM_NUM_CTX"], "4096")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT"], "512")
-        self.assertEqual(values["AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS"], "2500")
-        self.assertEqual(values["AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_CACHE_TTL_MS"], "5000")
 
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         for name in (
-            "AGENT_GOAL_INTERPRETER_MODE",
-            "AGENT_GOAL_INTERPRETER_CONFIDENCE_THRESHOLD",
             "AGENT_GOAL_INTERPRETER_LOG_LEVEL",
             "CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_RAW",
             "CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_PROMPT",
         ):
             self.assertIn(f"{name}:", compose)
+        compose_keys = {
+            line.strip().split(":", 1)[0]
+            for line in compose.splitlines()
+            if line.startswith("      AGENT_") or line.startswith("      CHROMIE_AGENT_")
+        }
+        for stale in (
+            "AGENT_GOAL_INTERPRETER_MODE",
+            "AGENT_GOAL_INTERPRETER_USE_LLM",
+            "AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS",
+            "AGENT_GOAL_INTERPRETER_CONFIDENCE_THRESHOLD",
+        ):
+            self.assertNotIn(stale, compose_keys)
+        self.assertFalse(
+            any(
+                name.startswith("AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_")
+                for name in compose_keys
+            )
+        )
 
     def test_documented_weather_controls_reach_agent_container(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
@@ -473,7 +482,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
             "Cognitive Gateway attention": (
                 "EFFECTIVE_COGNITIVE_GATEWAY_ATTENTION_MODEL"
             ),
-            "Fast intent (Goal Interpreter)": "EFFECTIVE_AGENT_GOAL_INTERPRETER_MODEL",
+            "Goal Interpretation": "EFFECTIVE_AGENT_GOAL_INTERPRETER_MODEL",
             "Goal Association": "EFFECTIVE_GOAL_ASSOCIATION_MODEL",
             "Fast Planner": "EFFECTIVE_FAST_PLANNER_MODEL",
             "Deep Planner": "EFFECTIVE_DEEP_PLANNER_MODEL",

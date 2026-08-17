@@ -85,13 +85,11 @@ from .response_composer import ResponseComposerResolver
 from .tool_result_interpreter import ToolResultInterpreter
 from .schema import HealthResponse
 from .cognitive_core.goal_interpreter import (
-    RouteDecision as CoreRouteDecision,
-    RouteRequest as CoreRouteRequest,
+    GoalInterpretationRequest,
     initialize_goal_interpreter,
     interpret_goal,
-    interpret_turn,
 )
-from .cognitive_core.goal_interpreter.fallback import InterpretationUnavailableError
+from .cognitive_core.goal_interpreter.errors import InterpretationUnavailableError
 from .task_graph import (
     ExecutionTrace,
     TaskGraph,
@@ -587,7 +585,7 @@ async def interpret_cognitive_turn(
     context["gateway_admission_complete"] = True
     try:
         interpretation = await interpret_goal(
-            CoreRouteRequest(
+            GoalInterpretationRequest(
                 sid=envelope.session_id,
                 text=envelope.normalized_input.text,
                 language=envelope.normalized_input.language,

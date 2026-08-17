@@ -4,7 +4,7 @@ import unittest
 
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from agent.app.cognitive_core.goal_interpreter.model_interpreter import OllamaGoalInterpreter
-from agent.app.cognitive_core.goal_interpreter.schema import RouteRequest
+from agent.app.cognitive_core.goal_interpreter.schema import GoalInterpretationRequest
 from shared.chromie_contracts.semantic_task import (
     SemanticGoal,
     SemanticTaskOperation,
@@ -341,15 +341,14 @@ class ConversationSemanticTaskTests(unittest.TestCase):
 
 
 class InterpreterSemanticTaskPromptTests(unittest.TestCase):
-    def test_prompt_exposes_bounded_active_goal_and_semantic_operation_contract(self) -> None:
+    def test_prompt_exposes_semantic_continuity_without_task_identity(self) -> None:
         interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
-            confidence_threshold=0.55,
         )
-        prompt = interpreter.build_user_prompt(
-            RouteRequest(
+        prompt = interpreter.build_interpretation_user_prompt(
+            GoalInterpretationRequest(
                 sid="s2",
                 text="Make that coffee iced.",
                 context={
@@ -357,8 +356,6 @@ class InterpreterSemanticTaskPromptTests(unittest.TestCase):
                         {
                             "task_id": "task-coffee-001",
                             "status": "planning",
-                            "goal_version": 1,
-                            "plan_version": 0,
                             "semantic_goal": {
                                 "description": "Prepare or obtain coffee for the current user.",
                                 "source_text": "Bring me a coffee.",
@@ -373,6 +370,7 @@ class InterpreterSemanticTaskPromptTests(unittest.TestCase):
 
         self.assertNotIn("task-coffee-001", prompt)
         self.assertIn("Prepare or obtain coffee", prompt)
-        self.assertIn("Canonical Goal/Task/Plan identities", prompt)
-        self.assertIn("Goal Association alone owns canonical Goal continuity and identity", prompt)
-        self.assertIn("Fast Planner owns those Activities", prompt)
+        self.assertIn("without lifecycle identity", prompt)
+        self.assertIn("Interpret only WHAT", prompt)
+        self.assertNotIn('"route"', prompt)
+        self.assertNotIn('"intent"', prompt)

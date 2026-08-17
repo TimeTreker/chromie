@@ -62,7 +62,6 @@ class ComposeConfigurationTests(unittest.TestCase):
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         agent_block = compose.split("  chromie-agent:", 1)[1].split("\nnetworks:", 1)[0]
 
-        self.assertIn("AGENT_GOAL_INTERPRETER_USE_LLM: ${AGENT_GOAL_INTERPRETER_USE_LLM:-1}", agent_block)
         self.assertIn("AGENT_GOAL_INTERPRETER_MODEL: ${AGENT_GOAL_INTERPRETER_MODEL:-qwen3:4b}", agent_block)
         self.assertIn(
             "AGENT_COGNITIVE_GATEWAY_ATTENTION_ENABLED: "
@@ -78,10 +77,8 @@ class ComposeConfigurationTests(unittest.TestCase):
         self.assertIn("AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP: ${AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP:-1}", agent_block)
         self.assertIn("AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS: ${AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS:-60000}", agent_block)
         self.assertIn("AGENT_GOAL_INTERPRETER_TIMEOUT_MS: ${AGENT_GOAL_INTERPRETER_TIMEOUT_MS:-5400}", agent_block)
-        self.assertIn("AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS: ${AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS:-5400}", agent_block)
         self.assertIn("AGENT_GOAL_INTERPRETER_LLM_NUM_CTX: ${AGENT_GOAL_INTERPRETER_LLM_NUM_CTX:-4096}", agent_block)
         self.assertIn("AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT: ${AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT:-512}", agent_block)
-        self.assertIn("AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS: ${AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS:-2500}", agent_block)
         self.assertIn("OLLAMA_CONTEXT_LENGTH: ${OLLAMA_CONTEXT_LENGTH:-2048}", agent_block)
         self.assertIn("OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-2048}", agent_block)
         self.assertIn("OLLAMA_NUM_PREDICT: ${OLLAMA_NUM_PREDICT:-64}", agent_block)
@@ -93,9 +90,23 @@ class ComposeConfigurationTests(unittest.TestCase):
             "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS: ${AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS:-512}",
             agent_block,
         )
-        self.assertIn(
-            "AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_CACHE_TTL_MS: ${AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_CACHE_TTL_MS:-5000}",
-            agent_block,
+        environment_keys = {
+            line.strip().split(":", 1)[0]
+            for line in agent_block.splitlines()
+            if line.startswith("      AGENT_") or line.startswith("      CHROMIE_AGENT_")
+        }
+        for stale in (
+            "AGENT_GOAL_INTERPRETER_MODE",
+            "AGENT_GOAL_INTERPRETER_USE_LLM",
+            "AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS",
+            "AGENT_GOAL_INTERPRETER_CONFIDENCE_THRESHOLD",
+        ):
+            self.assertNotIn(stale, environment_keys)
+        self.assertFalse(
+            any(
+                name.startswith("AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_")
+                for name in environment_keys
+            )
         )
         self.assertNotIn("AGENT_GOAL_INTERPRETER_REVIEW_MODEL", agent_block)
         self.assertNotIn("AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED", agent_block)

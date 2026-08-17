@@ -28,13 +28,17 @@ class AgentSettingsTests(unittest.TestCase):
         self.assertEqual(settings.weather_timeout_s, 12.5)
         self.assertFalse(settings.weather_enabled)
 
-    def test_goal_interpreter_mode_factory_remains_typed(self) -> None:
+    def test_goal_interpreter_settings_have_single_model_path(self) -> None:
         with patch.dict(
             os.environ,
-            {"AGENT_GOAL_INTERPRETER_MODE": "llm_only"},
+            {"AGENT_GOAL_INTERPRETER_TIMEOUT_MS": "7777"},
             clear=False,
         ):
-            self.assertEqual(GoalInterpreterSettings().mode, "llm_only")
+            settings = GoalInterpreterSettings()
+        self.assertEqual(settings.timeout_ms, 7777)
+        self.assertFalse(hasattr(settings, "mode"))
+        self.assertFalse(hasattr(settings, "capability_catalog_url"))
+        self.assertFalse(hasattr(settings, "review_timeout_ms"))
 
     def test_agent_runtime_environment_reads_are_owned_by_settings(self) -> None:
         owner = ROOT / "agent" / "app" / "settings.py"

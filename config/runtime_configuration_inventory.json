@@ -642,53 +642,6 @@
       ]
     },
     {
-      "boolean": true,
-      "category": "profile_constant",
-      "key": "AGENT_GOAL_INTERPRETER_ALLOW_LEGACY_ROBOT_RULES",
-      "owners": [
-        ".env.common"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_CACHE_TTL_MS",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_TIMEOUT_MS",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_URL",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "AGENT_GOAL_INTERPRETER_CONFIDENCE_THRESHOLD",
-      "owners": [
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
       "boolean": false,
       "category": "service_internal",
       "key": "AGENT_GOAL_INTERPRETER_DEBUG_PROMPT",
@@ -742,30 +695,8 @@
     },
     {
       "boolean": false,
-      "category": "acceptance_override",
-      "key": "AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
-        "env/validation/architecture.env"
-      ]
-    },
-    {
-      "boolean": false,
       "category": "service_internal",
       "key": "AGENT_GOAL_INTERPRETER_LOG_LEVEL",
-      "owners": [
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "AGENT_GOAL_INTERPRETER_MODE",
       "owners": [
         "agent/app/settings.py",
         "docker-compose.yml"
@@ -803,19 +734,6 @@
     {
       "boolean": false,
       "category": "acceptance_override",
-      "key": "AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
-        "env/validation/architecture.env"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "acceptance_override",
       "key": "AGENT_GOAL_INTERPRETER_TIMEOUT_MS",
       "owners": [
         ".env.common",
@@ -824,19 +742,6 @@
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
         "env/validation/architecture.env"
-      ]
-    },
-    {
-      "boolean": true,
-      "category": "service_internal",
-      "key": "AGENT_GOAL_INTERPRETER_USE_LLM",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml",
-        "env/profiles/jetson_agx_orin.env",
-        "env/profiles/jetson_orin_nano_super.env",
-        "env/profiles/jetson_thor.env"
       ]
     },
     {
@@ -4553,14 +4458,14 @@
   "schema_version": "1.0",
   "summary": {
     "category_counts": {
-      "acceptance_override": 55,
+      "acceptance_override": 53,
       "bounded_compatibility_alias": 0,
-      "profile_constant": 142,
+      "profile_constant": 141,
       "public_choice": 9,
-      "service_internal": 226
+      "service_internal": 220
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 432
+    "total_keys": 423
   }
 }

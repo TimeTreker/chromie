@@ -252,36 +252,610 @@ uncertainty, malformed output, and model failure all fail open.
 
 ## Goal Interpretation inside Agent
 
+Goal Interpretation has one maintained model path and one authority: understand
+WHAT the already-admitted human turn means. Cognitive Gateway owns deterministic
+interrupt/suppression before Core entry. Goal Interpretation does not query the
+Capability Catalog, classify routes/intents, author progress speech, choose
+Capabilities, or delegate HOW.
+
 | Variable | Default or profile behavior |
 |---|---|
-| `AGENT_GOAL_INTERPRETER_MODE` | Explicit `rules_only`, `hybrid`, or `llm_only`. |
-| `AGENT_GOAL_INTERPRETER_USE_LLM` | `1`; selects `hybrid` when `AGENT_GOAL_INTERPRETER_MODE` is absent. This uses the fast Goal Interpreter model for semantic interpretation while the emergency filter remains deterministic. |
 | `AGENT_GOAL_INTERPRETER_MODEL` | `qwen3:4b` in common configuration. |
 | `AGENT_GOAL_INTERPRETER_OLLAMA_URL` | Goal-Interpreter-to-Ollama base URL inside the Agent deployment. |
-| `AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | `5400` in common low-latency configuration; kept aligned with the fast semantic interpretation budget. |
-| `AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS` | `5400` in common configuration for the compact fast Goal Interpreter model path. |
-| `AGENT_GOAL_INTERPRETER_LLM_NUM_CTX` | `4096`; explicit Goal Interpreter context budget. This prevents the approximately 10k-character quick prompt and common ability menu from being silently truncated by Ollama's smaller global context default. |
-| `AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT` | `512`; bounded JSON output budget for the fast Goal Interpreter model. This fits legitimate multi-action routing objects while still preventing unbounded generations from consuming the realtime route budget. |
-| `AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE` | `24h`; sent on Goal Interpreter Ollama calls so the warmed routing model remains resident. |
-| `AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP` | `1`; the Agent startup lifecycle warms the Goal Interpreter LLM during startup so the first live turn does not pay cold model load time. |
-| `AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS` | `60000`; startup warm budget for the Goal Interpreter model. The longer budget covers observed laptop-GPU cold loads without declaring a healthy warmup failed just before completion. Failure is logged and the service still starts. |
-| `AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS` | `2500` in common configuration for the focused inactive-addressedness review on the same Fast Goal Interpreter model. It is not a semantic repair budget. |
-| `AGENT_GOAL_INTERPRETER_CONFIDENCE_THRESHOLD` | `0.55`. Applies to routes whose uncertainty could change responsibility, external work, memory, or effects: low-confidence `tool`, `memory`, and `robot_action` delegate once to Deep Thinking. A schema-valid benign `chat` route remains fast; this is not a universal escalation threshold. |
-| `AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_URL` | Agent capability-catalog base URL; Compose default `http://chromie-agent:8092`. |
-| `AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_TIMEOUT_MS` | Goal Interpreter budget for one catalog snapshot; common default `400`. Catalog failure falls back safely and the Agent rechecks in-process. |
-| `AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_CACHE_TTL_MS` | `5000`; short Goal-Interpreter-side cache for the prompt catalog snapshot. The fast Goal Interpretation path uses this snapshot's unlocked common entries, not per-utterance search matches, and execution is revalidated downstream. |
+| `AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | `5400`; timeout for the single WHAT-only model invocation/DTO-repair transaction. |
+| `AGENT_GOAL_INTERPRETER_LLM_NUM_CTX` | `4096`; bounded context budget for user meaning plus semantic continuity. Capability catalog entries and canonical lifecycle IDs are excluded. |
+| `AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT` | `512`; bounded JSON output budget for `confidence`, `responsibilities`, and `unresolved`. |
+| `AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE` | `24h`; keeps the warmed interpretation model resident. |
+| `AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP` | `1`; warm the Goal Interpreter model during Agent startup. |
+| `AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS` | `60000`; startup warm budget. Warm failure is logged and does not create a fallback semantic authority. |
 | `AGENT_GOAL_INTERPRETER_LOG_LEVEL` / `LOG_LEVEL` | Component/global logging level. |
-| `CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_RAW` / `AGENT_GOAL_INTERPRETER_DEBUG_RAW` | `0`; when enabled, the embedded Goal Interpreter logs the full raw LLM JSON output after the default bounded raw-output summary. |
-| `CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_PROMPT` / `AGENT_GOAL_INTERPRETER_DEBUG_PROMPT` | `0`; when enabled, the embedded Goal Interpreter logs bounded system/user prompt text. Default logs only prompt hashes, sizes, feature flags, and catalog counts. |
-| `CHROMIE_CLI_COLOR` | `auto`; force Agent cognitive-model diagnostic color with `1`, disable with `0`. Falls back to terminal detection and respects `NO_COLOR`. |
+| `CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_RAW` / `AGENT_GOAL_INTERPRETER_DEBUG_RAW` | `0`; opt-in raw model-output diagnostics. |
+| `CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_PROMPT` / `AGENT_GOAL_INTERPRETER_DEBUG_PROMPT` | `0`; opt-in bounded prompt diagnostics. |
+| `CHROMIE_CLI_COLOR` | `auto`; cognitive-model diagnostic color policy. |
 
-Hard interrupt, stop, silence, and unusable-audio rules always run before model
-routing and cannot be disabled by environment configuration. Normal intent is
-not selected by phrase rules. Fast Goal Interpretation makes one primary semantic
-call and may make one mechanical DTO repair. A valid result below the confidence
-threshold delegates once to Deep Thinking from the authoritative admitted turn;
-semantic contradictions and a second malformed DTO fail closed rather than
-entering an online repair workflow.
+The maintained typed output is provider-neutral Responsibility evidence only.
+Fast/Deep cognition may differ in depth elsewhere in the architecture, but route,
+intent, Activity, Work, Plan, Capability, provider, response wording, and canonical
+Goal/Task/Plan identities are outside Goal Interpretation authority. A malformed
+DTO may receive one mechanical schema repair; semantic failure otherwise fails
+closed as `interpretation_unavailable`.
+
+## Mind, Principles, and Experience
+
+| Variable | Default or profile behavior |
+|---|---|
+| `ORCH_MIND_PROFILE_PATH` | `config/mind/chromie_default.json`; owner-editable JSON containing Chromie’s concrete identity, personality expression, principles, long-term goals, and social style. Relative paths resolve from the project root. Python defines only the schema and validation. |
+| `ORCH_SOCIAL_INTERACTION_STYLE_PRESET` | Optional owner/operator-selected preset: `courteous`, `neutral`, or `reserved`. It overrides only `MindProfile.social_interaction_style`; use `ORCH_MIND_PROFILE_PATH` with `preset=custom` for reviewed custom guidance. |
+| `ORCH_MIND_CONTEXT_MAX_CHARS` | `1600`; maximum prompt-summary size attached to Goal Interpretation and downstream Agent context. |
+| `ORCH_ENABLE_EXPERIENCE_JOURNAL` | `1`; append interaction outcomes to the local experience journal. |
+| `ORCH_EXPERIENCE_LOG_PATH` | `.chromie/experience/experience.jsonl`; relative paths resolve from the project root. |
+| `ORCH_MIND_PROPOSAL_LOG_PATH` | `.chromie/experience/mind_update_proposals.jsonl`; stores human-review-only proposed updates. |
+| `ORCH_ENABLE_EPISODE_RECORDING` | `1`; append dialogue/task episode snapshots for offline scoring and scenario mining. |
+| `ORCH_EPISODE_LOG_PATH` | `.chromie/experience/episodes.jsonl`; stores rolling conversation-thread snapshots keyed by `conversation_id`. |
+| `ORCH_EPISODE_MAX_TURNS` | `12`; maximum recent turns retained in one episode snapshot. |
+
+The maintained profile at `config/mind/chromie_default.json` carries the owner-approved structured self model. Concrete name, age, pronouns, self-description, identity-answer guidance, and personality expression are configuration, not Python defaults. One configured entity owns first-person speech, perception, action, and embodiment; language and reasoning models are internal components with bounded roles. The same owner-approved identity projection is included in Goal Interpretation, Goal Association, Fast and Deep Planning, Response Composition, conversation, and direct fallback prompts. The LLM decides from meaning whether identity facts are relevant; there is no identity-question branch, fixed reply, or phrase/regex map. Core
+principles require owner approval and are not changed by experience. The
+experience journal can support future prompt, test, strategy, and long-term-goal
+tuning, but proposals are never auto-applied. See
+[`chromie_mind.md`](chromie_mind.md).
+
+`episodes.jsonl` is an append-only observability artifact. The realtime Host
+writes it only after an interaction has produced a response/execution record; it
+is not loaded into Goal Interpretation, Goal Association, planning, response
+composition, conversation memory, or capability execution. The maintained reader
+is the explicit offline evaluator below, so deleting or disabling episode recording
+does not remove Chromie's live conversational memory or reasoning context.
+
+Episode snapshots can be scored and mined offline:
+
+```bash
+python scripts/evaluate_experience_episodes.py \
+  --episodes .chromie/experience/episodes.jsonl \
+  --output .chromie/experience/evaluations.jsonl \
+  --review-output .chromie/experience/offline_reviews.jsonl \
+  --proposal-output .chromie/experience/offline_review_proposals.jsonl \
+  --candidate-dir .chromie/scenario_candidates
+```
+
+`offline_reviews.jsonl` is the compact good/bad/needs-review case journal.
+`offline_review_proposals.jsonl` contains owner-review-only proposals derived
+from those reviews; it does not auto-apply prompt, memory, safety, or policy
+changes.
+
+
+**Internal truth, external humanity:** `personality_expression` is the positive first-person voice contract. The maintained profile lets Chromie experience herself as Chromie, a person and six-year-old girl, while robotic embodiment and internal model/runtime facts remain truthful background context. The LLM owns natural wording and relevance. Host code owns schema, grounding, timing, safety, and logging; it must not turn execution status, evidence labels, observation labels, or arbitrary tool fields into normal spoken prose.
+
+## Runtime observability
+
+Runtime Trace is default-off and independent of the current module graph. When
+enabled, each participating module declares a stable module descriptor and emits
+generic spans through the shared tracer. The Orchestrator and Agent services must
+use compatible trace modes for cross-service continuation; a service configured
+with `off` does not continue a received carrier. Existing stage-specific
+`timings_ms` fields remain available for compatibility.
+
+| Variable | Default or behavior |
+|---|---|
+| `CHROMIE_RUNTIME_TRACE_MODE` | `off`; accepted values are `off`, `basic`, and `debug`. `basic` records bounded operational timing and topology; `debug` permits additional bounded diagnostic attributes supplied by instrumented modules. |
+| `CHROMIE_RUNTIME_TRACE_MODULES` | Empty allowlist means every instrumented module may emit at the configured mode. A comma-separated list limits collection to exact stable module names such as `agent.fast_planner`. |
+| `CHROMIE_RUNTIME_TRACE_DEBUG_MODULES` | Optional comma-separated exact module names that may emit debug-level attributes while global mode is `basic`. |
+| `CHROMIE_RUNTIME_TRACE_MAX_ITEMS` | `1000`; maximum items retained in one trace, bounded to `16..10000`. Additional items are counted as dropped. |
+| `CHROMIE_RUNTIME_TRACE_MAX_ATTRIBUTES` | `32`; maximum attributes retained per trace object or item, bounded to `4..256`. |
+| `CHROMIE_RUNTIME_TRACE_MAX_ATTRIBUTE_CHARS` | `512`; maximum retained characters for one string attribute, bounded to `64..8192`. |
+| `CHROMIE_RUNTIME_TRACE_COVERAGE` | `partial`; truthful coverage label written into snapshots until all relevant runtime paths are instrumented. |
+| `CHROMIE_RUNTIME_TRACE_EMIT_EVENTS` | `0`; master gate for normal completed/abandoned trace Runtime Event packages. Retention thresholds and sampling are applied only when this gate is enabled. |
+| `CHROMIE_RUNTIME_TRACE_EVENT_SAMPLE_RATE` | `1.0`; deterministic trace-ID sampling rate in `0..1` after abandoned/latency-threshold rules. Set `0` to retain only threshold-selected or configured abandoned traces. |
+| `CHROMIE_RUNTIME_TRACE_EVENT_MIN_TOTAL_MS` | `0`; total-duration threshold for warning-level trace retention. `0` disables this threshold. |
+| `CHROMIE_RUNTIME_TRACE_EVENT_MIN_FIRST_OBSERVABLE_MS` | `0`; first user-observable latency threshold for warning-level retention. `0` disables this threshold. |
+| `CHROMIE_RUNTIME_TRACE_EVENT_ALWAYS_EMIT_ABANDONED` | `1`; retain abandoned traces when event emission is enabled, independently of normal sampling. |
+| `CHROMIE_RUNTIME_TRACE_RESOURCE_SAMPLING` | `off`; accepted values are `off`, `session`, and `periodic`. `session` samples lifecycle boundaries; `periodic` also samples active sessions from the idle sweeper. |
+| `CHROMIE_RUNTIME_TRACE_ACCELERATOR_SAMPLING` | `off`; accepted values are `off`, `session`, and `periodic`. Collection runs outside the realtime event loop and produces generic accelerator resource items. |
+| `CHROMIE_RUNTIME_TRACE_ACCELERATOR_PROVIDER` | `auto`; accepted values are `auto`, `nvidia_smi`, and `off`. The initial built-in provider uses a bounded no-units NVIDIA CSV query. |
+| `CHROMIE_RUNTIME_TRACE_ACCELERATOR_TIMEOUT_MS` | `1000`; provider collection timeout, bounded to `50..30000` milliseconds. |
+| `CHROMIE_RUNTIME_TRACE_ACCELERATOR_MIN_INTERVAL_S` | `5`; minimum refresh interval used to prevent redundant provider calls across concurrent sessions. |
+| `CHROMIE_RUNTIME_TRACE_CHECKPOINT_DIR` | Empty by default. When set, active voice-session traces are atomically checkpointed for process-restart recovery. |
+| `ORCH_DATA_LOOP_INTERACTION_SESSION_CAPTURE_POLICY_PATH` | Unset by default, which resolves to a typed disabled policy. When set, names one local JSON policy with ID `chromie.interaction_session_capture`; the Host validates it at startup. An enabled policy requires `CHROMIE_RUNTIME_EVENT_ROOT`. |
+| `CHROMIE_RUNTIME_EVENT_ROOT` | Optional durable Runtime Event root used by interaction-Session evidence, traces, incidents, episode snapshots, and scenario candidates. Packages, including immutable binary artifacts, are finalized under `ready/<event_id>/`. |
+| `CHROMIE_DATA_LOOP_TRIGGER_ROOT` | Optional external data-loop filesystem inbox. A trigger file confirms local handoff only; it does not prove cloud upload. |
+
+The interaction-Session policy is independent of trace retention, episode
+recording, scenario mining, incident capture, and aggregate telemetry; it is not
+a global Data Loop switch. Copy and review
+[`config/data_loop/interaction_session_capture.example.json`](../config/data_loop/interaction_session_capture.example.json)
+rather than editing the default-off example in place. Schema version 1 requires
+the exact policy ID, a non-empty version, evidence selections for user audio,
+RuntimeTrace, and Episode, plus `retention_profile_id` and `usage_purpose`.
+Supported local combinations are disabled with or without a Runtime Event root,
+or enabled with a writable Runtime Event root and optional trigger root. One
+effective snapshot is resolved at SID start; file changes apply only to the next
+SID. Invalid startup configuration fails clearly, while a failed later refresh
+keeps the last valid snapshot. A future signed/cloud-cached provider should
+replace the local path provider and retire this environment key without changing
+Session lifecycle or evidence-provider contracts. See
+[Chromie Data Loop](SCENARIO_CANDIDATE_DATA_LOOP.md).
+
+Current coverage includes the goal-driven cognitive/model path, detached voice
+sessions, VAD/ASR, execution/action providers, TTS/playback, first audible and
+provider-reported first-motion milestones, bounded CPU/memory/queue/event-loop
+resource samples, optional non-blocking accelerator telemetry, idle abandonment,
+active-trace checkpoint recovery, latency/sampling retention policy, and
+retained-trace latency report/gate tooling. Coverage remains partial until real
+simulator/hardware baselines and approved environment-specific thresholds are
+retained. See
+[Runtime Trace Contract](RUNTIME_OBSERVABILITY.md),
+[Runtime Trace Instrumentation Guide](RUNTIME_OBSERVABILITY_OPERATIONS.md), and
+[Accelerator Telemetry and Latency Evidence Gates](ACCELERATOR_LATENCY_EVIDENCE.md).
+
+## Agent and TaskGraph
+
+| Variable | Meaning |
+|---|---|
+| `AGENT_MODEL` | Ollama model selected by the hardware profile. |
+| `AGENT_OLLAMA_URL` | Container Ollama base URL. |
+| `AGENT_TIMEOUT_MS` | Agent-to-Ollama timeout; profile-specific. |
+| `ORCH_AGENT_TIMEOUT_MS` | Host-to-Agent timeout; common default `9000`; must exceed `AGENT_TIMEOUT_MS`. |
+| `AGENT_USE_LLM` | Enable LLM-backed conversation/planning; default `1`. |
+| `AGENT_CONVERSATION_NUM_CTX` | Ollama context window for normal conversation prompts; common default `2048`. |
+| `AGENT_CONVERSATION_NUM_PREDICT` | Output token budget for normal conversation replies; common default `64`. |
+| `AGENT_DEEPTHINKING_NUM_CTX` | Ollama context window for deep-thinking prompts with session memory; default `8192`. |
+| `AGENT_DEEPTHINKING_NUM_PREDICT` | Output token budget for deep-thinking replies; default `512`. |
+| `AGENT_SOCIAL_ATTENTION_MODE` | Embodiment-independent policy with values `off`, `report_only`, or `on`; maintained default `on`. Legacy simulator-scoped values are no longer accepted; maintained modes compose this service-owned policy explicitly. Soridormi/provider owns simulator-versus-physical selection. See [Social Attention Behavior Domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md). |
+| `AGENT_SOCIAL_ATTENTION_MODEL` | Dedicated Ollama model for optional `SocialAttentionPlan` generation; default `qwen3:4b`. |
+| `AGENT_SOCIAL_ATTENTION_TIMEOUT_MS` | Model-call timeout for social attention; default `2500`. The architecture-validation overlay raises it to `120000` so qualification tests model capability before latency tuning. |
+| `AGENT_SOCIAL_ATTENTION_NUM_CTX` | Context window for the compact social-attention prompt; default `8192`. |
+| `AGENT_SOCIAL_ATTENTION_NUM_PREDICT` | JSON output budget for social-attention planning; default `160`. |
+| `AGENT_SOCIAL_ATTENTION_MAX_BEHAVIORS` | Maximum model-authored auxiliary behaviors per turn; default `2`. |
+| `AGENT_SOCIAL_ATTENTION_CAPABILITIES` | Optional comma-separated exact catalog IDs added to behavior-domain discovery. Default empty. Normal candidates are available interaction-executable entries tagged `social_attention`; provider backend metadata is ignored. |
+
+| `AGENT_CAPABILITY_MANIFESTS` | Comma-separated files/directories. Common host env leaves this empty for safe imports; the Agent container defaults to `/app/capabilities/soridormi.json`. |
+| `AGENT_SKILL_ROOTS` | Comma-separated explicitly approved read-only Agent Skill roots. The maintained Agent container defaults to `/app/agent-skills`, mounted from repository `agent-skills/` with `:ro`. Startup loads bounded metadata summaries only and fails closed on unsafe, unapproved, duplicate, digest-mismatched, or path-escaping packages. |
+| `AGENT_SKILL_SELECTION_ENABLED` | Enable model-authored Agent Skill selection; default `1`. `/agent-skills/select` exposes the independent contract, and maintained Agent boundaries use the same service when progressive disclosure is enabled. If disabled, selection degrades to optional no-Skill. |
+| `AGENT_SKILL_SELECTION_MODEL` | Ollama model used by the responsible Agent-role selection boundary; default `qwen3:4b`. |
+| `AGENT_SKILL_SELECTION_TIMEOUT_MS` | Timeout for one Agent Skill selection or repair model call; default `10000`. |
+| `AGENT_SKILL_SELECTION_MAX_CANDIDATES` | Maximum approved projection-compatible summaries disclosed to one selection call; default `12`. Deterministic bounding is retrieval only, not semantic selection. |
+| `AGENT_SKILL_SELECTION_MAX_SELECTED` | Maximum Skills the model may select in one result; default `4`. |
+| `AGENT_SKILL_PROGRESSIVE_DISCLOSURE_ENABLED` | Enable role-specific selection plus trusted projection injection for Goal Association, Fast Planner, Deep Planner, Response Composer, and Tool Result Interpreter; default `1`. |
+| `AGENT_SKILL_PROJECTION_MAX_CHARS` | Maximum UTF-8 character count for one disclosed projection; default `3000`. Oversized content is omitted, never truncated. |
+| `AGENT_SKILL_PROJECTION_TOTAL_MAX_CHARS` | Maximum aggregate disclosed projection characters for one Agent boundary; default `6000`. |
+| `AGENT_SKILL_PROJECTION_COUNT_LIMIT` | Maximum selected projections disclosed to one Agent boundary; default `4`. |
+| `AGENT_SKILL_SELECTION_MIN_CONFIDENCE` | Minimum accepted overall and per-Skill confidence for a positive selection; default `0.55`. Explicit `no_skill` remains valid. |
+| `AGENT_SKILL_SELECTION_NUM_CTX` | Ollama context window for the bounded selection and one compact repair prompt; default `8192`. |
+| `AGENT_SKILL_SELECTION_NUM_PREDICT` | Structured output budget for selection and one repair; default `512`. |
+| `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | TTL for refreshing live Provider named capabilities through the trusted manifest transport; default `30`. |
+| `AGENT_CAPABILITY_PROMPT_TIER_PRESET` | Owner-editable initial common/rare prompt-tier preset. Common host env uses `capabilities/prompt_tiers.json`; Docker Compose defaults to `/app/capabilities/prompt_tiers.json`. |
+| `AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES` | Optional JSON overlay path for auditable experience-derived `prompt_tier` changes. The overlay can move unlocked skills between `common` and `rare`; safety-locked entries remain excluded from the fast common prompt. |
+| `AGENT_CAPABILITY_MATCH_LIMIT` | Maximum model-neutral catalog preview attached at the native interaction boundary; default `8`. It does not rank user language. |
+| `AGENT_WEATHER_ENABLED` | Enable the read-only weather lookup handled by `tool_agent`; default `1`. |
+| `AGENT_WEATHER_TIMEOUT_S` | HTTP timeout for Open-Meteo geocoding/forecast calls; default `8`. |
+| `AGENT_WEATHER_GEOCODING_URL` | Weather geocoding endpoint; default `https://geocoding-api.open-meteo.com/v1/search`. |
+| `AGENT_WEATHER_FORECAST_URL` | Weather forecast endpoint; default `https://api.open-meteo.com/v1/forecast`. |
+| `AGENT_EXTERNAL_INFORMATION_ENABLED` | Enable the provider-neutral read-only external-information adapter; default `0`. |
+| `AGENT_EXTERNAL_INFORMATION_URL` | Exact HTTP endpoint for grounded evidence retrieval. The provider performs web/source access and ranking; it must return the `chromie.external_information.retrieve` result schema. Blank means unavailable. |
+| `AGENT_EXTERNAL_INFORMATION_TOKEN` | Optional bearer token for the configured external-information endpoint. It is provider authentication, not model context or user-visible evidence. |
+| `AGENT_EXTERNAL_INFORMATION_TIMEOUT_MS` | Timeout for one external-information provider request; default `15000`. |
+
+`chromie.weather.lookup` keeps its required `location` argument equal to the
+canonical Goal binding. It also accepts optional `location_context` fields
+(`locality`, `admin1`, `country`, and `aliases`) when those fields were supplied
+or unambiguously resolved by the LLM. The Open-Meteo adapter queries the exact
+canonical string first, then bounded equivalent locality forms only for provider
+recognition; it never changes the conversational referent or Goal. For Chinese
+administrative names, the adapter also derives a compact lowercase Latin
+provider key such as `河南省内乡县` -> `neixiang` and tries that bare key before
+descriptive English forms. Candidates are qualified against available
+administrative context. If none match, the tool returns typed
+`location_not_found`.
+| `AGENT_CAPABILITY_NUM_CTX` | Ollama context window for LLM capability selection; common default `24576` while validating feasibility. Do not reduce this below the capability prompt size; truncated JSON plans fail closed. |
+| `AGENT_CAPABILITY_NUM_PREDICT` | Output token budget for LLM capability-selection JSON; common default `512`. |
+| `AGENT_CAPABILITY_REVIEW_NUM_PREDICT` | Output token budget for semantic capability-plan review JSON; common default `160`. |
+| `AGENT_CAPABILITY_PARAMETER_REPAIR_NUM_PREDICT` | Output token budget for the semantic parameter-resolution retry; common default `384`. This retry runs only when a model-authored capability plan is schema-invalid. |
+| `AGENT_TASK_GRAPH_MAX_CONCURRENCY` | Process-local TaskGraph bound; default `4`, range 1–64. |
+| `AGENT_TASK_GRAPH_EXECUTION_TOKEN` | Secret bearer token for grants, guarded execution, and cancellation. |
+| `AGENT_TASK_GRAPH_DIAGNOSTICS_TOKEN` | Bearer token for dry-run, trace, and scheduler diagnostics. A blank value falls back to `AGENT_TASK_GRAPH_EXECUTION_TOKEN`; when both are blank, those endpoints return 503. |
+| `AGENT_TASK_GRAPH_TRACE_MAX_ENTRIES` | Maximum in-memory retained traces; default `128`. Least-recently-used entries are evicted first. |
+| `AGENT_TASK_GRAPH_TRACE_TTL_SEC` | Retained-trace lifetime; default `900` seconds. |
+| `AGENT_TASK_GRAPH_GRANT_MAX_ENTRIES` | Maximum in-memory unconsumed confirmation grants; default `128`. Expired grants are purged before issue/consume. |
+| `AGENT_HOST`, `AGENT_PORT`, `AGENT_LOG_LEVEL` | Service bind/log settings. |
+
+Do not commit a real execution token. Manifest strings may use required
+`${VARIABLE}` substitutions; missing variables fail Agent startup.
+
+## Orchestrator service budgets and response shaping
+
+| Variable | Default or profile behavior |
+|---|---|
+| `ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | `9000` in common low-latency configuration. It must exceed `AGENT_GOAL_INTERPRETER_TIMEOUT_MS` so the service can return a WHAT-only result or typed unavailability before the Host timeout. |
+| `ORCH_AGENT_TIMEOUT_MS` | Host-to-Agent timeout; must exceed `AGENT_TIMEOUT_MS`. Hardware profiles set this value. |
+| `ORCH_ASR_TIMEOUT_MS` | Host wait for one final ASR response; common default `30000`. |
+| `ORCH_ACTION_TIMEOUT_MS` | Host timeout for one legacy hardware-daemon action; common default `5000`. |
+| `ORCH_SORIDORMI_CATALOG_REFRESH_TTL_S` | Seconds to keep the Orchestrator-side Soridormi named-skill catalog before reloading; code default `30`. Unknown requested `soridormi.*` skills force an immediate refresh even before this TTL expires. Set `0` to reload before every body-skill execution. |
+| `ORCH_BODY_RECOVERY_MAX_ATTEMPTS` | Maximum request-bound B-level recovery retries for recoverable Soridormi single-skill failures; code default `1`. Set `0` to disable recovery prompts and use terminal fallback speech. |
+| `ORCH_BODY_RECOVERY_CONFIRMATION_TTL_S` | Confirmation TTL for B-level recovery prompts; code default `10`. A user confirmation after expiry does not retry; approved retries still re-enter preflight/CapabilityRuntime/Soridormi validation. |
+
+Ordinary semantic escalation and deep-thinking delegation are authored by the
+Goal-driven Cognitive Core and its planner models. The Host has no
+confidence-, intent-, user-state-, or phrase-based deep-thinking policy,
+and there are no `ORCH_CONDITIONAL_DEEPTHINK_*` runtime controls.
+| `TTS_FLUSH_CHARS` | Streaming direct-LLM text threshold before scheduling a sentence for TTS; common default `80`, code default `160`. |
+| `ORCH_TTS_TEXT_CHUNKING` | Split complete Agent/interaction speech into ordered TTS chunks before synthesis; common default `true`. |
+| `ORCH_TTS_FIRST_CHUNK_CHARS` | Preferred first complete-speech chunk size; common and code default `16` so short complete openers such as `I'm doing well.`, `Not tired.`, or `Too fast.` can be synthesized before longer follow-up sections. Set `0` to use `ORCH_TTS_CHUNK_CHARS` for every chunk. |
+| `ORCH_TTS_CHUNK_CHARS` | Preferred upper size for complete-speech chunks; common and code default `120`. Complete speech is split on sentence and substantial clause boundaries first; tiny fragments may be grouped, and length splitting is only a fallback for text longer than `TTS_MAX_TEXT_CHARS`. |
+| `ORCH_TTS_MIN_CHUNK_CHARS` | Small-fragment aggregation threshold for complete-speech chunks; common and code default `20`. |
+| `ORCH_TTS_PLAYBACK_START_TIMEOUT_MS` | Maximum host wait for response speech that carries a playback-start delivery/effect barrier; code default `20000`. Failure prevents dependent body effects, marks the speech request failed, and invalidates every queued chunk of that utterance so late synthesis cannot speak after the failed barrier. |
+| `ORCH_RUNTIME_READY_GREETING_ENABLED` | `1`; runtime-ready lifecycle switch. In a live device session, Chromie may attempt one quiet, untargeted, provider-declared startup-orientation Activity before opening the microphone. This is baseline liveliness, not Social Attention because there is no interaction anchor yet. Missing, unavailable, confirmation-bound, or invalid orientation fails open and never produces failure speech. Stdin/discard acceptance modes skip the orientation. |
+| `ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED` | `0`; startup speech is disabled by default. Set to `1` only when the owner deliberately wants a spoken startup line. The non-verbal orientation remains independent. |
+| `ORCH_RUNTIME_READY_GREETING_TEXT` | Empty by default. When startup speech is explicitly enabled, a valid configured sentence is preferred. Leaving it empty allows the existing bounded generation compatibility path, but maintained profiles do not require or schedule that speech. |
+| `ORCH_RUNTIME_READY_GREETING_FALLBACK_TEXT` | Empty by default. A generation failure therefore remains silent rather than replacing it with a generic character slogan. |
+| `ORCH_RUNTIME_READY_GREETING_LANGUAGE` | `zh-CN`; authoritative language only when startup speech is explicitly enabled. |
+| `ORCH_RUNTIME_READY_GREETING_MODEL` | Empty by default; compatibility model selection used only by explicitly enabled generated startup speech. |
+| `ORCH_RUNTIME_READY_GREETING_NUM_PREDICT` | `32`; compatibility output budget for explicitly enabled generated startup speech. |
+| `ORCH_RUNTIME_READY_GREETING_GENERATION_TIMEOUT_MS` | `15000`; compatibility generation timeout for explicitly enabled startup speech. |
+| `ORCH_RUNTIME_READY_GREETING_TIMEOUT_MS` | `45000`; maximum startup speech playback wait. Non-verbal orientation uses a five-second bounded subset and always fails open. |
+| `ORCH_VOICE_SYSTEM_PROMPT` | Optional replacement for the direct-LLM voice brevity/style instruction. |
+
+## Orchestrator audio and VAD
+
+| Variable | Default |
+|---|---:|
+| `ORCH_INPUT_DEVICE`, `ORCH_OUTPUT_DEVICE` | Empty, `default`, or `auto` follows the operating system's current default for that direction at startup and while Chromie is running; an explicit index/name pins the operator-selected device. Every selected device is validated for channels/rate, and an invalid explicit device fails clearly instead of silently switching. |
+| `ORCH_INPUT_RATE`, `ORCH_OUTPUT_RATE` | Device default or `48000` in the example file. |
+| `ORCH_INPUT_CHANNELS`, `ORCH_OUTPUT_CHANNELS` | `1`, `2`. |
+| `ORCH_INPUT_BLOCK_MS`, `ORCH_OUTPUT_BLOCK_MS` | `30`, `30`. |
+| `ORCH_INPUT_BLOCKSIZE`, `ORCH_OUTPUT_BLOCKSIZE` | Calculated/driver default when `0`. |
+| `ORCH_INPUT_LATENCY`, `ORCH_OUTPUT_LATENCY` | `low`. |
+| `ORCH_INPUT_GAIN` | `1.0`; software gain applied to captured microphone audio before VAD and ASR conversion. Use only to compensate for a quiet host source, and prefer fixing OS mixer gain first. |
+| `ORCH_VAD_MODE` | `3`. |
+| `ORCH_VAD_SILENCE_MS` | `650`. |
+| `ORCH_MIN_AUDIO_MS` | `450`; accepts natural short replies when VAD and RMS gates pass. |
+| `ORCH_VAD_MAX_UTTERANCE_MS` | `20000`; force-closes and discards a continuously open VAD segment before it can become a multi-minute ASR request. |
+| `ORCH_MIN_RMS` | `120`. |
+| `ORCH_BARGE_IN_MIN_RMS` | `350`. |
+| `ORCH_PLAYBACK_CHUNK_MS` | `80`. |
+| `ORCH_TTS_CONCURRENCY` | Host-side concurrent TTS requests; maintained default `1` because CosyVoice exposes one singleton model worker. Raising host concurrency cannot create provider parallelism and only adds hidden queueing. Oute diagnostic profiles may use more workers when explicitly selected. |
+| `ORCH_TTS_WS_RETRIES` | `2`. |
+| `ORCH_TTS_WS_RETRY_DELAY_MS` | `300`. |
+| `ORCH_SESSION_TIMING_LOGS` | `true` in the host example. |
+| `ORCH_EVENT_LOG_PATH` | Empty by default; when set, append correlated session events as JSON Lines. |
+| `ORCH_SAVE_AUDIO` | `false`; operator/debug WAV retention only. It neither enables nor disables policy-governed Data Loop audio. |
+| `RECORDINGS_DIR` | `recordings`, resolved from repository root when relative. |
+
+Audio jack, USB, Bluetooth, and other external-device detection remains owned by
+the operating system. Chromie does not guess that a device is external from its
+name and does not change the system default, route, mute, or volume. Select the
+preferred plugged-in device in the OS and leave the corresponding variable
+empty/`default`/`auto`. The Host polls the portable PortAudio default and, when
+available, observes PipeWire default metadata read-only so a default node change
+hidden behind the same PortAudio `default` index is still detected. It closes and
+reopens only the affected stream. An input switch discards an unfinished
+cross-device VAD segment; an output switch takes effect between ordered playback
+items without replaying completed audio. Set an explicit device only when the OS
+default must not be followed. Startup logs record `selection=system_default` or
+`selection=configured`; later changes record the old and new resolved streams.
+
+The Orchestrator always resamples captured audio to 16 kHz before ASR. For
+speech output, complete Agent/interaction text is split into ordered chunks. The
+first chunk uses a smaller target so it can become audible while later chunks
+are still being generated.
+Playback remains serialized by order. The TTS service owns independent model
+workers when `TTS_WORKER_COUNT>1`; otherwise chunking is pipelined
+generation/playback over the single worker.
+When VAD reports credible speech start during playback, the Host immediately
+ducks the matching output session and generation before the utterance closes.
+This acoustic action records `cancel_cognitive_work=false`: it does not cancel
+Cognitive Core work, Goals, body work, or capability execution. The confirmation
+window is bounded by the existing maximum VAD utterance and ASR timeouts rather
+than another runtime switch. Short, quiet, empty, failed-ASR, or likely TTS-echo
+input releases the same generation at the next unplayed chunk, so completed
+audio is neither replayed nor duplicated. Confirmed external speech first closes
+the still-ducked output stream, then invalidates that output generation and
+creates the routed user session. ASR and the Cognitive Gateway remain the only
+owners of later output-only, motion, interaction, Goal, or emergency semantic
+cancellation scope.
+
+## Conversation state
+
+| Variable | Default |
+|---|---:|
+| `ORCH_ENABLE_CONVERSATION_STATE` | `1`. |
+| `ORCH_CONVERSATION_ID` | `local_default`. |
+| `ORCH_CONVERSATION_MAX_TURNS` | `12`. |
+| `ORCH_CONVERSATION_IDLE_TIMEOUT_SEC` | `180`; retained for compatibility and diagnostics. It does not trigger phrase-based topic or follow-up classification. |
+| `ORCH_CONVERSATION_HARD_IDLE_TIMEOUT_SEC` | `900`; deterministic context boundary when no active Goal or pending work exists. |
+| `ORCH_CONVERSATION_TURN_MAX_TEXT_CHARS` | `260`. |
+| `ORCH_CONVERSATION_MAX_CONTEXT_CHARS` | `2200`. |
+| `ORCH_CONVERSATION_MAX_PENDING_TASKS` | `8`. |
+| `ORCH_CONVERSATION_MAX_TOOL_EVIDENCE` | `8`; maximum recent schema-validated trusted tool observations retained in bounded session context for semantic follow-up reasoning. The Host records evidence but does not decide its meaning, relevance, or freshness. |
+| `ORCH_CONVERSATION_MAX_MEMORY_ENTRIES` | `24`; maximum process-local extracted memory entries retained in the current conversation. |
+| `ORCH_CONVERSATION_MAX_DISCOURSE_REFERENTS` | `24`; maximum scoped model-authored entity referents retained across conversation/task/Goal scopes. This is not a global location slot and does not represent robot physical state. |
+| `ORCH_CONVERSATION_MAX_DISCOURSE_FOCUS` | `8`; maximum ordered referent IDs in the LLM-authored discourse focus stack. |
+| `ORCH_CONVERSATION_COMPLETED_TASK_RETENTION_SEC` | `180`; recently completed task hints stay briefly available for follow-up questions. |
+| `ORCH_ENABLE_TASK_CONTEXT_STORE` | `0`; when enabled, compact unfinished task contexts are saved locally and restored as recoverable after restart. |
+| `ORCH_TASK_CONTEXT_STORE_PATH` | `.chromie/conversation/task_contexts.json`; relative paths resolve from the project root. |
+| `ORCH_ENABLE_DURABLE_PROFILE_MEMORY` | `0`; opt in to consent-bound profile memory. Disabled mode never creates or writes the profile store. |
+| `ORCH_DURABLE_PROFILE_MEMORY_PATH` | `.chromie/memory/profile.json`; owner-local JSON written atomically with mode `0600`. The store is not encrypted and must not hold secrets. |
+| `ORCH_DURABLE_PROFILE_MEMORY_MAX_ENTRIES` | `64`; bounded retained profile entries. Each durable remember requires model-authored explicit current-turn consent, a stable key, and `retention_days`; forget and clear also require retained current-turn consent evidence. |
+
+`ORCH_CONTEXT_MAX_TURNS`, `ORCH_CONTEXT_IDLE_TIMEOUT_SEC`,
+`ORCH_CONTEXT_MAX_AGE_SECONDS`, `ORCH_CONTEXT_MAX_TEXT_CHARS`, and
+`ORCH_CONTEXT_MAX_PENDING_TASKS` are compatibility aliases. New configuration
+should use the `ORCH_CONVERSATION_*` names.
+The Host starts an automatic conversation boundary only after hard-idle expiry
+with no active Goal or pending work. Natural-language reset, follow-up,
+correction, reference, and new-topic meaning remains Cognitive Core
+responsibility and is not configured through phrase lists.
+
+The task-context store never resumes physical work by itself; restored
+robot-action tasks are prompt-facing recoverable context and require fresh
+confirmation before any new action can run.
+
+Durable profile memory survives conversation boundaries, while session memory
+does not. The Host validates typed scope, policy, consent provenance, retention,
+and storage limits but does not infer what a user wants remembered.
+Durable entries are removed only by expiry or an explicitly consented forget or
+clear mutation.
+
+Goal Association resolves references before planning and emits typed Goal
+bindings plus scoped referent/focus updates. Tool-result contents are excluded
+from that boundary. Planners may reuse a prior verified result only by executing
+`chromie.memory.retrieve_verified_tool_result` with an exact evidence ID,
+original tool ID, and material arguments that match the resolved Goal bindings.
+See [Scoped Discourse Referents and Verified Tool Memory](DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md).
+
+## Trusted Capability Runtime and Soridormi
+
+| Variable | Default |
+|---|---:|
+| `ORCH_SKILL_MAX_CONCURRENCY` | `8`. |
+| `ORCH_SORIDORMI_MANIFEST` | `capabilities/soridormi.json`. |
+| `SORIDORMI_MCP_URL` | Required when the manifest is materialized and live calls are enabled. |
+| `SORIDORMI_REPO` | Optional checkout path recorded by live-text and voice/MuJoCo acceptance. Checkout revision and dirty state are diagnostic declarations only; endpoint-reported source identity is separate. |
+
+Trusted Capability Runtime uses a process-local scheduler. Imported Soridormi named
+skills share the exclusive group `soridormi.robot_motion`; Soridormi remains
+responsible for cross-process resource safety.
+
+## ASR
+
+Chromie supports one ASR runtime: sherpa-onnx SenseVoice with complete
+utterances and one final transcript. The Orchestrator owns VAD and utterance
+boundaries.
+
+| Variable | Purpose |
+|---|---|
+| `ASR_MODE` | ASR protocol mode; supported value `final`. Streaming partials are future work. |
+| `ASR_MODEL` | Local SenseVoice model directory inside the ASR container unless `SHERPA_ONNX_MODEL_FILE` is set. |
+| `ASR_MODEL_REVISION` | Immutable release/model provenance identifier paired with `ASR_MODEL`. |
+| `ASR_DEVICE` | Common default `cuda`; set `cpu` with `SHERPA_ONNX_PROVIDER=cpu` for CPU fallback. |
+| `ASR_LANGUAGE` | Empty for automatic language selection; also supplies the default for `SHERPA_ONNX_LANGUAGE`. |
+| `ASR_MAX_CONCURRENT_TRANSCRIPTIONS` | Bounded inference-worker count; common default `1`. Blocking recognition runs off the WebSocket event loop. |
+| `ASR_STARTUP_WARMUP_ENABLED` | Common default `true`; runs a synthetic final-ASR decode before the WebSocket server starts. |
+| `ASR_STARTUP_WARMUP_AUDIO_SECONDS` | Synthetic startup warm-up audio duration; common default `1.0`. |
+| `ASR_SAMPLE_RATE` | Server default `16000`. |
+| `ASR_HOST`, `ASR_PORT` | Service bind settings. |
+
+Maintained profiles use multilingual SenseVoice, so `SHERPA_ONNX_LANGUAGE=auto`
+can recognize English, Chinese, Japanese, Korean, and Cantonese utterances.
+
+| Variable | Purpose |
+|---|---|
+| `SHERPA_ONNX_MODEL_TYPE` | `sense_voice`; other sherpa-onnx model families are not wired. |
+| `SHERPA_ONNX_PROVIDER` | ONNX Runtime provider; maintained desktop default `cuda`, fallback `cpu`. |
+| `SHERPA_ONNX_NUM_THREADS` | Backend neural-network thread count. |
+| `SHERPA_ONNX_LANGUAGE` | SenseVoice language, usually `auto`; valid values include `zh`, `en`, `ja`, `ko`, and `yue`. |
+| `SHERPA_ONNX_USE_ITN` | Enable SenseVoice inverse text normalization. |
+| `SHERPA_ONNX_MODEL_FILE`, `SHERPA_ONNX_TOKENS_FILE` | Optional explicit local paths for `model.int8.onnx`/`model.onnx` and `tokens.txt`. |
+| `SHERPA_ONNX_DEBUG` | Enable sherpa-onnx debug logging for troubleshooting. |
+
+## TTS
+
+| Variable | Purpose |
+|---|---|
+| `CHROMIE_TTS_BACKEND` | Maintained backend selector. Default `cosyvoice3`; explicit alternatives: `oute`, `qwen3`. |
+| `TTS_PROVIDER` | Provider identity expected inside the selected image. Default `fun-cosyvoice3-0.5b`; provider/image mismatches fail closed. |
+| `TTS_VOICE_ROOT` | Host directory containing the validated multi-speaker catalog; default `assets/tts/voices`. |
+| `TTS_DEFAULT_SPEAKER` | Catalog fallback speaker; default `chromie_mixed`. Explicit `speaker_id=default` may still route by language. |
+| `COSYVOICE3_SOURCE_REVISION`, `COSYVOICE3_MODEL_ID`, `COSYVOICE3_MODEL_REVISION` | Immutable default runtime and model locks. |
+| `COSYVOICE3_FP16` | Load the default model in half precision; default `1`. |
+| `COSYVOICE3_PROMPT_PREFIX` | Trusted prompt prefix prepended before the exact reference transcript. |
+| `TTS_WORKER_STARTUP_TIMEOUT_SEC` | Initial or post-restart worker readiness budget; default `1200` for the large offline model load. |
+| `TTS_COSYVOICE_WARMUP_TIMEOUT_SEC` | `300`; per-profile no-playback synthesis budget used before microphone startup. |
+| `TTS_COSYVOICE_ZH_WARMUP_TEXT`, `TTS_COSYVOICE_EN_WARMUP_TEXT`, `TTS_COSYVOICE_MIXED_WARMUP_TEXT` | Short startup probes that explicitly prime every committed CosyVoice language/reference profile. |
+| `TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC` | Bounded drain before fail-closed worker restart after cancellation; default `3` seconds. |
+| `ORCH_TTS_CONCURRENCY` | `1` for the singleton CosyVoice worker. |
+| `TTS_COSYVOICE_COMPACT_COGNITION` | `1` by default; use one compact resident Ollama model while CosyVoice shares the GPU. |
+| `TTS_COSYVOICE_OLLAMA_MODEL` | Compact shared-GPU model; default `qwen3:4b`. |
+| `TTS_SPEAKER_ID` | `default` for CosyVoice/Qwen reference cloning. Oute may use installation-local profile IDs. |
+
+Promote the existing AI-generated voices once when creating the catalog:
+
+```bash
+python scripts/promote_builtin_tts_voices.py \
+  --source-dir .chromie/private/tts-voice
+git add assets/tts/voices
+```
+
+Each profile metadata file binds the complete WAV, exact prompt transcript,
+project provenance identifier, supported languages, and SHA-256 digest. A
+missing or inconsistent committed profile stops the default provider before it
+opens the WebSocket endpoint.
+
+Select alternatives explicitly:
+
+```bash
+./scripts/start_chromie.sh --tts-backend oute
+./scripts/start_chromie.sh --tts-backend qwen3
+```
+
+The Oute fallback retains the following active controls; they do not configure
+the default CosyVoice image:
+
+- `TTS_HOST`, `TTS_MODEL_SIZE`, `TTS_TOKENIZER_REPO`, and `TTS_TOKENIZER_REVISION`;
+- `TTS_GGUF_REPO`, `TTS_GGUF_REVISION`, `TTS_QUANTIZATION`,
+  `TTS_CONTEXT_SIZE`, and `TTS_MAX_LENGTH`;
+- `TTS_SAMPLE_RATE`, `TTS_TEMPERATURE`, `TTS_REPETITION_PENALTY`,
+  `TTS_WORKER_COUNT`, and `TTS_AUDIO_CODEC_DEVICE`;
+- `SPEAKER_DIR`, `TTS_SPEAKER_ALIGNMENT_DEVICE`, and
+  `TTS_SPEAKER_TRANSCRIPT_MIN_SIMILARITY`.
+
+Qwen3-TTS uses `QWEN3_TTS_SOURCE_REVISION`, `QWEN3_TTS_MODEL_ID`,
+`QWEN3_TTS_MODEL_REVISION`, `QWEN3_TTS_DEVICE`, `QWEN3_TTS_DTYPE`, and
+`QWEN3_TTS_ATTENTION`. It uses the committed `chromie_mixed` reference and the same transport contract.
+
+For a common isolated comparison:
+
+```bash
+python scripts/tts_provider_ab.py --check
+./scripts/run_tts_candidate_ab.sh
+```
+
+The workflow compares CosyVoice on port 5000 with Qwen3-TTS on port 5002 and
+restores the default services afterward. Objective metrics and ASR content
+checks do not replace blinded Mandarin listening.
+
+The default provider declares native streamed audio. The current WebSocket still
+accepts a complete text request rather than incremental model tokens, so
+end-to-end token-to-audio streaming is not claimed. Cancellation uses a bounded
+drain followed by worker restart when synchronous inference cannot stop.
+
+## Development/qualification cognitive budget integrity
+
+`num_ctx` and `num_predict` are independent budgets. `num_ctx` must hold the
+complete prompt, the complete generated output, and an explicit safety margin;
+raising only the context window does not prevent an output from stopping at
+`num_predict`. During development and source-bound qualification, the maintained
+RTX 5090 profile therefore prioritizes complete inference over latency:
+
+```text
+OLLAMA_CONTEXT_LENGTH=32768
+OLLAMA_NUM_CTX=32768
+AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE=2.0
+AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS=2048
+```
+
+Every active Qwen and Gemma cognitive stage uses that same 32K runner topology.
+This avoids Ollama creating or evicting separate runners for the same model at
+2K, 4K, 8K, and 32K. Output ceilings remain role-specific: narrow Gateway work
+stays small, Fast Planning may use 4096 tokens, and Deep Planning may use 8192.
+These values are ceilings, not required response lengths.
+
+Before inference, Chromie estimates prompt tokens from the complete user and
+system text, reserves the entire declared output budget and the configured
+safety margin, and emits `llm_prompt_budget_exceeded` when the request cannot
+fit. No HTTP request is sent in that case. After inference, the following are
+untrusted hard failures:
+
+- `done_reason=length` or another explicit generation-limit reason;
+- `eval_count` exhausting `num_predict` without a normal stop;
+- `prompt_eval_count` reaching the declared context window;
+- incomplete structured JSON caused by either budget boundary.
+
+These failures use `failure_domain=llm_budget`; they must not be translated into
+"the user was unclear" and cannot authorize planning or execution. The rare
+host direct-LLM fallback additionally uses
+checks completion diagnostics, and only then schedules TTS. A truncated stream
+is never partially spoken.
+
+The generated `.chromie/runtime_profile.json` retains the exact global and
+per-stage context/output budgets, estimator, safety margin, and timeouts.
+`scripts/verify_runtime_profile.sh` checks that the running Ollama and Agent
+containers received those values. Product optimization may reduce these budgets
+only after retained warm-run evidence establishes real prompt/output
+distributions and p95/p99 latency.
+
+Key controls:
+
+| Variable | Meaning |
+|---|---|
+| `OLLAMA_CONTEXT_LENGTH` / `OLLAMA_NUM_CTX` | Shared runner and request context topology. RTX 5090 development/qualification default: `32768`. |
+| `OLLAMA_NUM_PREDICT` | Global fallback output ceiling; stage-specific variables override it. |
+| `AGENT_*_NUM_CTX` | Per-stage context declaration; kept equal on RTX 5090 to prevent runner churn. |
+| `AGENT_*_NUM_PREDICT` | Per-stage maximum generated tokens. |
+| `AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE` | Conservative mixed-language preflight estimate; RTX 5090 uses `2.0`. |
+| `AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS` | Tokens held back beyond prompt plus maximum output; RTX 5090 uses `2048`. |
+
+## Ollama
+
+Important variables include `OLLAMA_MODEL`, `OLLAMA_KEEP_ALIVE`,
+`OLLAMA_LOAD_TIMEOUT`, `OLLAMA_MAX_LOADED_MODELS`, `OLLAMA_NUM_PARALLEL`, `OLLAMA_CONTEXT_LENGTH`,
+`OLLAMA_NUM_CTX`, `OLLAMA_NUM_PREDICT`, `OLLAMA_TEMPERATURE`, and
+`OLLAMA_TOP_P`. Hardware profiles own the normal model and context defaults.
+Common configuration keeps `OLLAMA_MAX_LOADED_MODELS=2` and
+`OLLAMA_NUM_PARALLEL=1`, which lets the fast Goal Interpreter model and larger Agent
+model stay resident together when memory allows without increasing per-model
+parallel KV-cache pressure. The RTX 4090 Laptop profile deliberately lowers the
+resident-runner limit to `1`: model roles remain distinct, but Qwen and Gemma are
+swapped rather than retained together while CosyVoice shares the 16 GB GPU.
+
+`scripts/warm_ollama.sh` performs a real `/api/generate` request for every model
+that must be ready before the microphone opens. If Ollama is reachable but the
+native `llama-server` runner crashes, warmup restarts `chromie-llm` once when
+`OLLAMA_AUTO_RESTART_ON_CRASH=1`, waits for `/api/tags`, and retries the same
+model. A second native crash fails fast with commands to restart the LLM service
+and check GPU visibility.
+
+Spoken generation paths set `think: false` and separate model reasoning from the
+user-visible speech contract. Normal cognition already uses typed response plans.
+The runtime wake-up greeting and rare Host direct-LLM fallback additionally require
+a structured `{"text": ...}` envelope. Only that validated field can reach TTS;
+raw prose, malformed JSON, truncated output, and any separate `thinking` field are
+retained only as bounded observability metadata and never spoken.
+
+Prompts ask the model to speak as Chromie, the owner-approved six-year-old person,
+rather than as a backend model. If the first draft uses a stock model disclaimer
+such as "as an AI" or "I do not have personal opinions", the Agent retries once
+and asks the model to choose the right natural answer mode: factual answer,
+Chromie's own preference, or brief honest uncertainty.
+
+## Legacy hardware daemon
+
+`HARDWARE_HOST`, `HARDWARE_PORT`, and `HARDWARE_DRIVER` are read by the daemon,
+but the current service constructs only `MockRobotDriver`. Serial port and baud
+variables are not a supported production-selection mechanism in this revision.
+
+## Acceptance-script controls
+
+- GPU smoke: `DRY_RUN`, `START_SERVICES`, `RUN_TTS_SYNTHESIS`,
+  `RUN_OLLAMA_GENERATE`, `SMOKE_TIMEOUT_SECONDS`, `TTS_SMOKE_TEXT`,
+  `TTS_SMOKE_SPEAKER`.
+- Supervised target acceptance: `SUPERVISED_ACCEPTANCE=1`, `TARGET_ACCEPTANCE_DRY_RUN`,
+  `TARGET_ACCEPTANCE_EVIDENCE_ROOT`, `TARGET_ACCEPTANCE_ID`, `TARGET_ACCEPTANCE_EVIDENCE_DIR`.
+- Voice acceptance uses CLI flags on `scripts/voice_acceptance.py`.
+  `--mode synthetic` is the fully automatic default; `--mode virtual-mic`
+  exercises a PulseAudio/PipeWire monitor source; `--mode acoustic` plays
+  generated speech through the host output and captures it through the
+  configured input; `--mode supervised` uses the real microphone and speaker
+  with operator verdicts. Automated modes also accept `--tts-url`,
+  `--tts-speaker-id`, and `--virtual-mic-sink`. The runner generates a
+  temporary `ORCH_RUNTIME_OVERRIDE_FILE`, enables `ORCH_EVENT_LOG_PATH`, and
+  writes below `.chromie/acceptance/voice/`. Use `--preflight-only` to check
+  Docker, the automatic runtime, audio backend, and required endpoints without
+  starting services or creating evidence. Its capability probe defaults to
+  `--probe-runtime container`, executing inside `chromie-agent`. Host-loopback
+  Soridormi URLs are translated to `host.docker.internal`; the Compose service
+  supplies the Linux `host-gateway` mapping. `--probe-runtime host` is an
+  explicit development fallback and requires `agent/requirements.txt`.
+- Release preparation uses CLI flags on `scripts/prepare_release.py`;
+  generated bundles live below `.chromie/releases/`.
+- Host dependency installation: `ORCH_AUTO_INSTALL_DEPS`,
+  `ORCH_FORCE_INSTALL_DEPS`, `ORCH_PIP_CHECK`, `ORCH_REQUIREMENTS_FILE`.
+
+### Voice-session trace idle finalization
+
+```text
+ORCH_SESSION_IDLE_TIMEOUT_MS=120000
+ORCH_SESSION_IDLE_SWEEP_S=5
+```
+
+`ORCH_SESSION_IDLE_TIMEOUT_MS` marks an unfinished voice-session trace as
+`abandoned` after the configured period without recorded session activity.
+`ORCH_SESSION_IDLE_SWEEP_S` controls how often the orchestrator checks for idle
+sessions. These settings do not change normal completed-session behavior.
+
+
+## Service-owned typed settings
+
+Generated `.env.runtime` remains the deployment authority. Services may copy that startup environment once into a validated, immutable service-owned settings snapshot. The first completed boundary is ASR; ownership and the follow-on migration map are documented in [Service Configuration Boundaries](SERVICE_CONFIGURATION_BOUNDARIES.md).
 
 ## Goal association before segmentation
 

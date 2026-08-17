@@ -877,6 +877,9 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
         "agent/app/cognitive_core/goal_interpreter/schema.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
             (
+                "class RouteItem",
+                "class RouteDecision",
+                "class RouteRequest",
                 'decision.speak_first = "你是指什么？"',
                 'decision.speak_first = "What do you mean?"',
                 "Core-authored process acknowledgement",
@@ -1101,9 +1104,6 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
             "RouteItem": "OptionalCapabilityIdentityModel",
         },
         "agent/app/schema.py": {"RouteItem": "OptionalCapabilityIdentityModel"},
-        "agent/app/cognitive_core/goal_interpreter/schema.py": {
-            "RouteItem": "OptionalCapabilityIdentityModel",
-        },
         "orchestrator/schemas/route.py": {
             "RouteItem": "OptionalCapabilityIdentityModel",
         },

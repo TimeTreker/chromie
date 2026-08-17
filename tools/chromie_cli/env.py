@@ -13,7 +13,6 @@ TRUE_VALUES = {"1", "true", "yes", "on"}
 FALSE_VALUES = {"0", "false", "no", "off"}
 
 BOOL_VARS = (
-    "AGENT_GOAL_INTERPRETER_USE_LLM",
     "AGENT_ENABLE_TASK_GRAPH_PLANNING",
     "AGENT_ENABLE_READ_ONLY_TASK_GRAPH_EXECUTION",
     "AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION",
@@ -30,9 +29,6 @@ BOOL_VARS = (
 
 POSITIVE_INT_VARS = (
     "AGENT_GOAL_INTERPRETER_TIMEOUT_MS",
-    "AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS",
-    "AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS",
-    "AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_TIMEOUT_MS",
     "AGENT_TASK_GRAPH_MAX_CONCURRENCY",
     "AGENT_TASK_GRAPH_TRACE_MAX_ENTRIES",
     "AGENT_TASK_GRAPH_TRACE_TTL_SEC",
@@ -77,7 +73,6 @@ POSITIVE_INT_VARS = (
 URL_VARS = (
     "AGENT_URL",
     "ACTION_EXECUTOR_URL",
-    "AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_URL",
     "ASR_URL",
     "TTS_URL",
     "LLM_URL",
@@ -298,18 +293,6 @@ def validate_config(snapshot: EnvSnapshot) -> list[Diagnostic]:
         values,
         host_name="ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS",
         service_name="AGENT_GOAL_INTERPRETER_TIMEOUT_MS",
-    )
-    _compare_timeout(
-        diagnostics,
-        values,
-        host_name="ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS",
-        service_name="AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS",
-    )
-    _compare_timeout(
-        diagnostics,
-        values,
-        host_name="ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS",
-        service_name="AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS",
     )
     _compare_timeout(
         diagnostics,

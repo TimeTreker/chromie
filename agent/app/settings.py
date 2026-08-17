@@ -17,15 +17,6 @@ except ImportError:  # pragma: no cover
     )
 
 
-def _goal_interpretation_mode_from_env() -> str:
-    explicit_mode = os.getenv("AGENT_GOAL_INTERPRETER_MODE")
-    if explicit_mode:
-        return explicit_mode.strip().lower()
-    use_llm = os.getenv("AGENT_GOAL_INTERPRETER_USE_LLM", "0").strip().lower() not in {
-        "0", "false", "no", "off"
-    }
-    return "hybrid" if use_llm else "rules_only"
-
 class Settings(BaseModel):
     host: str = Field(default_factory=lambda: os.getenv("AGENT_HOST", "0.0.0.0"))
     port: int = Field(default_factory=lambda: int(os.getenv("AGENT_PORT", "8092")))
@@ -431,17 +422,9 @@ class Settings(BaseModel):
     mode: Literal["runtime"] = "runtime"
 
 class GoalInterpreterSettings(BaseModel):
-    mode: Literal["rules_only", "llm_only", "hybrid"] = Field(
-        default_factory=_goal_interpretation_mode_from_env
-    )
-    # Deterministic interrupt, stop, silence, and unusable-audio handling is a
-    # safety invariant, not a deployment switch. Keep the health field for
-    # compatibility while making its effective value unambiguous.
-    rules_first: bool = True
     ollama_url: str = Field(default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_OLLAMA_URL", "http://chromie-llm:11434"))
     model: str = Field(default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_MODEL", "qwen3:4b"))
     timeout_ms: int = Field(default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_TIMEOUT_MS", "5400")))
-    llm_timeout_ms: int = Field(default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS", os.getenv("AGENT_GOAL_INTERPRETER_TIMEOUT_MS", "5400"))))
     llm_num_ctx: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_LLM_NUM_CTX", "4096")),
         ge=2048,
@@ -460,26 +443,6 @@ class GoalInterpreterSettings(BaseModel):
     )
     warm_llm_timeout_ms: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS", "60000"))
-    )
-    review_timeout_ms: int = Field(
-        default_factory=lambda: int(
-            os.getenv("AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS", "2500")
-        )
-    )
-    confidence_threshold: float = Field(
-        default_factory=lambda: float(os.getenv("AGENT_GOAL_INTERPRETER_CONFIDENCE_THRESHOLD", "0.55"))
-    )
-    capability_catalog_url: str = Field(
-        default_factory=lambda: os.getenv(
-            "AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_URL",
-            "http://chromie-agent:8092",
-        )
-    )
-    capability_catalog_timeout_ms: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_TIMEOUT_MS", "400"))
-    )
-    capability_catalog_cache_ttl_ms: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_CACHE_TTL_MS", "5000"))
     )
     log_level: str = Field(default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_LOG_LEVEL", os.getenv("LOG_LEVEL", "INFO")))
 

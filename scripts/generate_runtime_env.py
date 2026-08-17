@@ -445,8 +445,7 @@ def active_models(values: Mapping[str, str]) -> list[str]:
         if value and value not in models:
             models.append(value)
 
-    if enabled(values.get("AGENT_GOAL_INTERPRETER_USE_LLM")):
-        append(values.get("AGENT_GOAL_INTERPRETER_MODEL"))
+    append(values.get("AGENT_GOAL_INTERPRETER_MODEL"))
     if enabled(values.get("AGENT_COGNITIVE_GATEWAY_ATTENTION_ENABLED"), default=True):
         append(values.get("AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL"))
 
