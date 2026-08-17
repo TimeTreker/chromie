@@ -423,6 +423,15 @@ class GoalExecutionContractTests(unittest.TestCase):
             self.assertIn("kind", schema.get("required", []))
             self.assertNotIn("default", schema["properties"]["kind"])
 
+        physical_schema = (
+            GoalAssociationModelPhysicalResourceResponsibility.model_json_schema()
+        )
+        self.assertIn("delivery_mode", physical_schema.get("required", []))
+        self.assertNotIn(
+            "default",
+            physical_schema["properties"]["delivery_mode"],
+        )
+
     def test_resource_and_coverage_invariants_are_in_decoder_schemas(self):
         goal_schema = GoalAssociationResolver._response_schema(
             GoalSegmentationModelOutput,
@@ -458,6 +467,37 @@ class GoalExecutionContractTests(unittest.TestCase):
         ]
         self.assertTrue(list(goal_validator.iter_errors(weather)))
         weather["new_goals"][0]["bindings"] = []
+
+        bounded_goal_schema = GoalAssociationResolver._response_schema(
+            GoalSegmentationModelOutput,
+            [],
+            [],
+            responsibility_count=2,
+        )
+        bounded_goal_validator = Draft202012Validator(bounded_goal_schema)
+        two_body_actions = create_goals(
+            goal("Run forward for 15 seconds.", "body_action"),
+            goal("Blink.", "body_action"),
+        )
+        two_body_actions.update(
+            referent_updates=[],
+            resolved_references=[],
+            clarification="",
+        )
+        self.assertEqual(
+            list(bounded_goal_validator.iter_errors(two_body_actions)),
+            [],
+        )
+        three_goals = create_goals(
+            *two_body_actions["new_goals"],
+            goal("Say that the actions are being handled.", "speech"),
+        )
+        three_goals.update(
+            referent_updates=[],
+            resolved_references=[],
+            clarification="",
+        )
+        self.assertTrue(list(bounded_goal_validator.iter_errors(three_goals)))
 
         untyped_known_source = create_goals(
             goal(
@@ -837,6 +877,22 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertIn("drops or generalizes a material qualifier", prompt)
         self.assertIn("candidate_goal_indices must be empty", prompt)
 
+    def test_goal_prompts_distinguish_body_action_from_physical_resource(self):
+        resolver = GoalAssociationResolver(FakeOllama({}))
+        req = request("Run forward for 15 seconds, then blink.", language="en-US")
+        primary_prompt = resolver._build_prompt(
+            req,
+            [],
+            output_type=GoalSegmentationModelOutput,
+        )
+        coverage_system = resolver._responsibility_coverage_system_prompt()
+
+        self.assertIn("distinct concrete object", primary_prompt)
+        self.assertIn("non-resource body_action Goals", primary_prompt)
+        self.assertIn("Responsibility conservation is strict", primary_prompt)
+        self.assertIn("physical resource", coverage_system)
+        self.assertIn("coverage=representation_mismatch", coverage_system)
+
 
 
 class GoalAssociationTransactionTests(unittest.TestCase):
@@ -1027,6 +1083,109 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             families=[
                 "goal_association.primary",
                 "goal_association.responsibility_coverage",
+            ],
+        )
+
+    def test_body_actions_miscast_as_physical_resources_are_reconsidered(self):
+        req = request(
+            "Run forward for 15 seconds, then blink.",
+            language="en-US",
+        )
+        req = req.model_copy(
+            update={
+                "responsibilities": typed_responsibilities(
+                    {
+                        "local_ref": "r1",
+                        "outcome": "Run forward for 15 seconds.",
+                        "bindings": {
+                            "direction": "forward",
+                            "duration": "15 seconds",
+                        },
+                        "completion_requires_work": True,
+                        "completion_requires_fresh_evidence": True,
+                        "confidence": 0.95,
+                    },
+                    {
+                        "local_ref": "r2",
+                        "outcome": "Blink.",
+                        "bindings": {"action": "blink"},
+                        "completion_requires_work": True,
+                        "completion_requires_fresh_evidence": True,
+                        "confidence": 0.95,
+                    },
+                ),
+            }
+        )
+        mistaken = create_goals(
+            goal(
+                "Run forward for 15 seconds.",
+                "body_action",
+                resource=resource_responsibility(
+                    description="forward running motion",
+                    quantity="",
+                ),
+            ),
+            goal(
+                "Blink.",
+                "body_action",
+                resource=resource_responsibility(
+                    description="eye blinking motion",
+                    quantity="",
+                ),
+            ),
+        )
+        rejected = certificate(
+            coverage_item(
+                "Run forward for 15 seconds",
+                0,
+                coverage="representation_mismatch",
+            ),
+            coverage_item(
+                "blink",
+                1,
+                coverage="representation_mismatch",
+            ),
+        )
+        corrected = create_goals(
+            goal(
+                "Run forward for 15 seconds.",
+                "body_action",
+                bindings=[
+                    binding("direction", "direction", "forward"),
+                    binding("duration", "duration", "15 seconds"),
+                ],
+            ),
+            goal(
+                "Blink.",
+                "body_action",
+                bindings=[binding("action", "action", "blink")],
+            ),
+        )
+        accepted = certificate(
+            coverage_item("Run forward for 15 seconds", 0),
+            coverage_item("blink", 1),
+        )
+        ollama = ScriptedOllama([mistaken, rejected, corrected, accepted])
+
+        result = self._resolve(ollama, req)
+
+        self.assertEqual(len(result.new_goals), 2)
+        self.assertEqual(
+            [item.metadata["output_mode"] for item in result.new_goals],
+            ["body_action", "body_action"],
+        )
+        self.assertTrue(
+            all(item.resource_responsibility is None for item in result.new_goals)
+        )
+        self.assert_transaction(
+            result,
+            ollama,
+            terminal="resolved",
+            families=[
+                "goal_association.primary",
+                "goal_association.responsibility_coverage",
+                "goal_association.fresh_interpretation",
+                "goal_association.responsibility_coverage_final",
             ],
         )
 

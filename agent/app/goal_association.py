@@ -556,13 +556,20 @@ class GoalAssociationModelPhysicalResourceResponsibility(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["physical_object"]
-    description: str = Field(min_length=1)
+    description: str = Field(
+        min_length=1,
+        description=(
+            "A distinct concrete object/resource that must be acquired and handed "
+            "to a recipient. Body motion, locomotion, gaze, blinking, waving, "
+            "turning, posture, and gestures are not physical resources."
+        ),
+    )
     quantity: str = ""
     source: GoalAssociationModelPhysicalSource
     recipient: GoalAssociationModelResourceRecipient = Field(
         default_factory=GoalAssociationModelResourceRecipient
     )
-    delivery_mode: Literal["physical_handover"] = "physical_handover"
+    delivery_mode: Literal["physical_handover"]
 
     @field_validator("description", "quantity", mode="before")
     @classmethod
@@ -1026,6 +1033,7 @@ class GoalAssociationResolver:
             candidate_goals,
             self._discourse_referents(request),
             clarification_only=False,
+            responsibility_count=len(request.responsibilities),
         )
         generation_options = {
             "temperature": 0,
@@ -1194,6 +1202,7 @@ class GoalAssociationResolver:
                                     candidate_goals,
                                     self._discourse_referents(request),
                                     clarification_only=True,
+                                    responsibility_count=len(request.responsibilities),
                                 )
                                 if clarification_required
                                 else response_schema
@@ -1701,6 +1710,7 @@ class GoalAssociationResolver:
         discourse_referents: list[dict[str, Any]],
         *,
         clarification_only: bool = False,
+        responsibility_count: int | None = None,
     ) -> dict[str, Any]:
         schema = copy.deepcopy(output_type.model_json_schema())
         active_ids = [
@@ -1716,7 +1726,11 @@ class GoalAssociationResolver:
         properties = schema.get("properties", {})
         new_goals = properties.get("new_goals")
         if isinstance(new_goals, dict):
-            new_goals["maxItems"] = 8
+            new_goals["maxItems"] = (
+                8
+                if responsibility_count is None
+                else min(8, max(0, int(responsibility_count)))
+            )
         if not referent_ids:
             resolved_references = properties.get("resolved_references")
             if isinstance(resolved_references, dict):
@@ -2115,7 +2129,7 @@ class GoalAssociationResolver:
             + "The model-facing contract is deliberately small. "
             "The host owns all IDs, versions, source text, constraints, metadata, persistence fields, and canonical object construction. "
             "Never emit id, goal_id, association_id, turn_id, schema_version, source_text, constraints, object, metadata, success_criteria, capabilities, or plans. Referent IDs may only be copied from the supplied discourse context; new referent IDs are Host-generated.\n\n"
-            "Create one new goal for each independently satisfiable user responsibility. The authoritative user turn plus Responsibility evidence are the only sources of human Responsibility here; a pre-Goal Fast Planner Activity is HOW already authored downstream and must never become, justify, or be copied into a sibling Goal. Emit exactly one new_goals item containing description, typed bindings, and an optional provider-neutral resource_responsibility for each responsibility. "
+            "Create one new goal for each independently satisfiable user responsibility. The authoritative user turn plus Responsibility evidence are the only sources of human Responsibility here; a pre-Goal Fast Planner Activity is HOW already authored downstream and must never become, justify, or be copied into a sibling Goal. Responsibility conservation is strict: never create an extra Goal for acknowledgement, progress, response delivery, personality, or any other outcome that is absent from the authoritative Responsibility evidence. Emit exactly one new_goals item containing description, typed bindings, and an optional provider-neutral resource_responsibility for each responsibility. "
             "Every new Goal must declare one exact output_mode that describes the semantic work completing the human outcome. output_mode is the only model-authored execution discriminator. Responsibility kind, execution lane, and provider requirement are Host-derived projections and are not fields in the model schema. Media playback may also declare its exact media_operation; non-media Goals may omit media_operation and the Host supplies none. "
             f"{_EXECUTION_CONTRACT_PROMPT} "
             "The eventual spoken delivery of a capability result is part of that same capability_dependent Goal, never an additional vocal_output Goal. Persona, tone, wording, and answer delivery are not independent Goals. "
@@ -2124,7 +2138,7 @@ class GoalAssociationResolver:
             "A greeting or politeness preamble attached to a substantive request is conversational framing, not a separate Goal unless the user independently asks for a social response. Owner-approved identity and personality shape expression only; never create a Goal merely to mention age, identity, warmth, curiosity, or another style trait. "
             "A factual lookup and the user's requested interpretation of that same evidence are one Goal when one capability result can satisfy both, such as checking weather and judging whether it is hot. Multiple requested aspects of one information result, such as precipitation and whether the resulting temperature is cold, remain one information responsibility when the same result satisfies them. Do not split evidence acquisition, requested result aspects, or interpretation of that result into separate Goals. "
             "A physical action and a conversational answer or spoken performance are independent goals when the answer or performance is genuinely requested. Separate independently requested outcomes that can be accepted or rejected on their own. However, acquisition and delivery stages that together constitute one human responsibility are one Goal: navigating/searching, locating, grasping or retrieving, carrying, returning, and handing over are provider-owned stages of one physical resource delivery; external search, evidence retrieval, evaluation, and spoken explanation are stages of one information resource delivery. Do not split those implementation stages into separate Goals unless the user independently requests one stage as its own outcome. A simple acknowledgement, confirmation, willingness statement, or progress prelude for capability work is not a separate vocal_output Goal; it is prospective conversational output attached to the existing responsibility and every cognitive stage must use Interaction Context to avoid repeating an already fulfilled act. Before returning, verify that every independently satisfiable user responsibility appears in exactly one new_goals item: no merged unrelated outcomes and no duplicated responsibility across Goals. "
-            "For a responsibility whose human-level outcome is to obtain something and make it available to a recipient, include exactly one nested resource_responsibility. It is the sole writable resource authority and is discriminated by top-level kind. For kind=information, use output_mode=capability_work and write every requested query fact—location, time, requested aspect, comparison, threshold, or other answer-shaping scope—exactly once in query_scope. Its source object is intentionally narrow: source.status=provider_resolved delegates public/external source selection; source.status=unknown preserves an unavailable local/private/runtime source; source.status=known is only for a user- or discourse-named information source and then source_name is required. Never copy query_scope facts into source. For kind=physical_object, use output_mode=body_action and delivery_mode=physical_handover; identity and quantity live at resource_responsibility.description/quantity, while source.acquisition_bindings is the only writable location/distance/direction/route surface. Preserve explicit distance and direction separately; source.description is summary only and any numeric fact in it must also exist in acquisition_bindings. Resource Goals keep top-level bindings empty. No flat compatibility copy is created. resource_responsibility must never name or imply a Capability, provider implementation, website, search engine, coordinates, grasp pose, execution mode, or plan. Human-readable descriptions never override typed fields. "
+            "For a responsibility whose human-level outcome is to obtain something and make it available to a recipient, include exactly one nested resource_responsibility. It is the sole writable resource authority and is discriminated by top-level kind. A physical_object resource means a distinct concrete object that exists independently of Chromie's body motion and whose acquisition plus handover completes the human outcome. It is never a generic wrapper for embodied work: locomotion, body motion, gaze, blinking, waving, turning, posture, and gestures are non-resource body_action Goals, keep resource_responsibility absent, and preserve their material semantic parameters in top-level bindings. For kind=information, use output_mode=capability_work and write every requested query fact—location, time, requested aspect, comparison, threshold, or other answer-shaping scope—exactly once in query_scope. Its source object is intentionally narrow: source.status=provider_resolved delegates public/external source selection; source.status=unknown preserves an unavailable local/private/runtime source; source.status=known is only for a user- or discourse-named information source and then source_name is required. Never copy query_scope facts into source. For kind=physical_object, use output_mode=body_action and delivery_mode=physical_handover; identity and quantity live at resource_responsibility.description/quantity, while source.acquisition_bindings is the only writable location/distance/direction/route surface. Preserve explicit distance and direction separately; source.description is summary only and any numeric fact in it must also exist in acquisition_bindings. Resource Goals keep top-level bindings empty. No flat compatibility copy is created. resource_responsibility must never name or imply a Capability, provider implementation, website, search engine, coordinates, grasp pose, execution mode, or plan. Human-readable descriptions never override typed fields. "
             "Also preserve semantic qualifiers such as temporal scope, comparison period, and requested answer shape. When a local day part is semantically resolved, represent it provider-neutrally as entity_type=day_part with canonical value morning, afternoon, evening, or tonight; keep the user's natural wording in the Goal description rather than using a provider-specific token. This is semantic normalization, not Capability selection. Never silently rewrite annual, seasonal, historical, comparative, or otherwise broad scope into current, today, tomorrow, or another narrower scope. If the intended scope is materially ambiguous, return clarification instead of choosing a narrower interpretation. "
             "Resolve references, pronouns, demonstratives, ellipsis, and task mentions before planning. Authority order is: explicit current user meaning; foreground scoped discourse referents; candidate Goal bindings; recent dialogue. First identify every material indirect referring expression, then require a unique value from that authority order and preserve it in a typed binding or supplied referent. Imperative grammar and a plausible generic noun such as device, object, person, task, or setting are never reference evidence. If two or more contextual candidates remain plausible, or none is supplied, ask a narrow clarification. Phrases such as ‘the last task I told you’ may semantically associate with an active, recoverable, or retained recent terminal Goal, but the model must decide that relationship from the supplied Goal state and dialogue—not from a Host phrase table. Tool-result memory is not reference-resolution authority and must never decide what an unresolved expression refers to. "
             "When the user introduces or explicitly corrects a salient entity, emit referent_updates only when the required discourse-index provenance is available. Use operation=correct with non-empty target_referent_ids copied from supplied discourse context when a new value supersedes an earlier referent; never emit an unscoped correction when no target referent ID was supplied. The canonical Goal association and typed bindings still preserve a correction even when no discourse-index update can be authored. The old referent remains available in its own task scope but becomes background. Use operation=introduce for a new salient entity, and focus/background/retire only for supplied referent IDs. "
@@ -2217,6 +2231,7 @@ class GoalAssociationResolver:
             "return one corrected JSON object. Preserve valid semantic judgments, but revise every field needed to satisfy "
             "the schema and validation errors. Do not explain the correction and do not use synonym substitution rules.\n\n"
             + state_instructions
+            + "Responsibility conservation remains authoritative during repair. Never add a Goal whose human outcome is absent from the supplied Responsibility evidence. In particular, a pre-Goal progress acknowledgement or later response delivery is HOW around the existing Responsibility, not a sibling speech Goal. A physical_object resource is only a distinct concrete object whose acquisition and handover completes the responsibility; ordinary locomotion, body movement, gaze, blinking, waving, turning, posture, and gestures use output_mode=body_action with top-level semantic bindings and no resource_responsibility.\n\n"
             + f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
             + "\n\nResolved references are only for indirect references bound to a supplied discourse referent or active Goal binding. Direct explicit entity mentions belong in Goal bindings and salient referent updates, not resolved_references. For an indirect location binding, copy the supplied referent_id into both the location binding and resolved_references, copy the indirect user surface into resolved_references.surface_form, and retain the referent canonical value. Every resolved reference and referent update must include explicit confidence.\n\nOwner-approved Chromie identity JSON:\n"
@@ -2663,7 +2678,12 @@ class GoalAssociationResolver:
             "material responsibilities, constraints, context, and conversational "
             "framing without planning or selecting capabilities. Audit not only Goal "
             "ownership but whether the candidate represents the same kind of human "
-            "outcome. A future reminder, list mutation, state change, message delivery, "
+            "outcome. A physical-object resource represents acquisition and handover "
+            "of a distinct concrete object to a recipient. If a candidate wraps "
+            "locomotion, body movement, gaze, blinking, waving, turning, posture, or "
+            "another bodily gesture itself as a physical resource, use "
+            "coverage=representation_mismatch for that responsibility. A future "
+            "reminder, list mutation, state change, message delivery, "
             "or other persistent effect is not an information resource merely because "
             "words or data are involved. Conversely, an immediate judgment, choice, "
             "prioritization, or advice that needs no fresh external/private/runtime "
