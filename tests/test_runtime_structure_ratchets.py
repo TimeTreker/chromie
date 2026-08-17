@@ -16,7 +16,7 @@ class RuntimeStructureRatchetTests(unittest.TestCase):
         script = (ROOT / "scripts" / "run_tests.sh").read_text(encoding="utf-8")
         self.assertIn("python scripts/check_runtime_structure.py", script)
 
-    def test_direct_llm_call_has_one_explicit_compatibility_owner(self) -> None:
+    def test_legacy_direct_semantic_surface_is_forbidden(self) -> None:
         config = json.loads(CONFIG.read_text(encoding="utf-8"))["voice_assistant"]
         tree = ast.parse((ROOT / config["path"]).read_text(encoding="utf-8"))
         class_node = next(
@@ -24,20 +24,13 @@ class RuntimeStructureRatchetTests(unittest.TestCase):
             for node in tree.body
             if isinstance(node, ast.ClassDef) and node.name == config["class_name"]
         )
-        calls: list[str] = []
-        for function in class_node.body:
-            if not isinstance(function, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                continue
-            if any(
-                isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Attribute)
-                and isinstance(node.func.value, ast.Name)
-                and node.func.value.id == "self"
-                and node.func.attr == "process_llm_tts"
-                for node in ast.walk(function)
-            ):
-                calls.append(function.name)
-        self.assertEqual(calls, [config["direct_llm_compatibility_owner"]])
+        method_names = {
+            node.name
+            for node in class_node.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        self.assertTrue(set(config["forbidden_methods"]).isdisjoint(method_names))
+
 
     def test_lifecycle_aliases_are_not_initialized_on_composition_root(self) -> None:
         config = json.loads(CONFIG.read_text(encoding="utf-8"))["voice_assistant"]

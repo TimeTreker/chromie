@@ -125,7 +125,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "ORCH_COGNITIVE_RUNTIME_MODE",
             "ORCH_COGNITIVE_APPLY_LANES",
             "ORCH_ACTION_DRY_RUN",
-            "ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED",
         }
         modes = {}
         for path in sorted((ROOT / "env" / "modes").glob("*.env")):
@@ -140,9 +139,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
                 self.assertEqual(required - values.keys(), set())
                 self.assertEqual(values["CHROMIE_OPERATOR_MODE"], path.stem)
                 self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_MODE"], "apply")
-                self.assertEqual(
-                    values["ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED"], "0"
-                )
                 lanes = set(values["ORCH_COGNITIVE_APPLY_LANES"].split(","))
                 self.assertTrue({"chat", "tool"}.issubset(lanes))
                 self.assertEqual(
@@ -154,46 +150,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             {"qualification", "services", "speech", "voice_mujoco"},
         )
 
-    def test_operator_mode_rejects_legacy_direct_llm_fallback(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            root = self._minimal_root(directory)
-            mode_path = root / "env" / "modes" / "speech.env"
-            mode_path.write_text(
-                mode_path.read_text(encoding="utf-8").replace(
-                    "ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED=0",
-                    "ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED=1",
-                ),
-                encoding="utf-8",
-            )
-            system_info = root / "system.env"
-            self._system_info(
-                system_info,
-                gpu="NVIDIA GeForce RTX 5090",
-                compute="12.0",
-                memory="32607",
-                cuda_arch="120",
-            )
-            completed = subprocess.run(
-                [
-                    "python3",
-                    str(GENERATOR),
-                    "--root",
-                    str(root),
-                    "--system-info-file",
-                    str(system_info),
-                ],
-                cwd=root,
-                env=self._generator_env(),
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-        self.assertNotEqual(completed.returncode, 0)
-        self.assertIn(
-            "cannot enable legacy direct-LLM fallback",
-            completed.stderr + completed.stdout,
-        )
 
     def test_process_selected_operator_mode_is_applied_and_protected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -320,10 +276,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(
             manifest["cognitive_budgets"]["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"],
             "2048",
-        )
-        self.assertEqual(
-            manifest["cognitive_budgets"]["ORCH_DIRECT_LLM_REQUIRE_COMPLETE_OUTPUT"],
-            "1",
         )
 
     def test_rtx4090_laptop_is_detected_without_manual_profile_argument(self) -> None:

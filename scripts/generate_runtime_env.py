@@ -46,7 +46,6 @@ COGNITIVE_BUDGET_KEYS = (
     "OLLAMA_NUM_PREDICT",
     "AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE",
     "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS",
-    "ORCH_DIRECT_LLM_REQUIRE_COMPLETE_OUTPUT",
     "AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX",
     "AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_PREDICT",
     "AGENT_GOAL_INTERPRETER_LLM_NUM_CTX",
@@ -312,7 +311,6 @@ def validate_operator_mode(
         "ORCH_COGNITIVE_RUNTIME_MODE",
         "ORCH_COGNITIVE_APPLY_LANES",
         "ORCH_ACTION_DRY_RUN",
-        "ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED",
     }
     missing = sorted(required - set(mode))
     if missing:
@@ -323,7 +321,6 @@ def validate_operator_mode(
         raise ConfigurationError(
             f"operator mode {mode_name} must use ORCH_COGNITIVE_RUNTIME_MODE=apply"
         )
-    if enabled(mode.get("ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED")):
         raise ConfigurationError(
             f"operator mode {mode_name} cannot enable legacy direct-LLM fallback"
         )

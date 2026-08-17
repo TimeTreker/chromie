@@ -282,8 +282,6 @@ class CognitionSettings:
     task_continuity_timeout_ms: int
     runtime_mode: str
     apply_lanes: frozenset[str]
-    requested_fallback_policy: str
-    legacy_semantic_fallback_enabled: bool
     runtime_timeout_ms: int
     social_attention_mode: str
     capability_manifest_paths: str
@@ -294,13 +292,8 @@ class CognitionSettings:
 @dataclass(frozen=True)
 class ModelGenerationSettings:
     keep_alive: str
-    direct_num_ctx: int
-    direct_num_predict: int
-    direct_temperature: float
-    direct_top_p: float
     prompt_chars_per_token_estimate: float
     context_safety_margin_tokens: int
-    direct_require_complete_output: bool
     failure_response_num_ctx: int
     failure_response_num_predict: int
     failure_response_timeout_ms: int
@@ -727,15 +720,6 @@ class HostSettingsSnapshot:
                     {"off", "report_only", "apply"},
                 ),
                 apply_lanes=runtime_lanes,
-                requested_fallback_policy=_choice(
-                    values,
-                    "ORCH_COGNITIVE_FALLBACK_POLICY",
-                    "fail_closed",
-                    {"legacy", "fail_closed"},
-                ),
-                legacy_semantic_fallback_enabled=_bool(
-                    values, "ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED", False
-                ),
                 runtime_timeout_ms=_int(
                     values,
                     "ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS",
@@ -922,20 +906,6 @@ class HostSettingsSnapshot:
             ),
             model_generation=ModelGenerationSettings(
                 keep_alive=_text(values, "OLLAMA_KEEP_ALIVE", "24h") or "24h",
-                direct_num_ctx=ollama_num_ctx,
-                direct_num_predict=_int(
-                    values, "OLLAMA_NUM_PREDICT", 96, minimum=1
-                ),
-                direct_temperature=_float(
-                    values,
-                    "OLLAMA_TEMPERATURE",
-                    0.4,
-                    minimum=0.0,
-                    maximum=2.0,
-                ),
-                direct_top_p=_float(
-                    values, "OLLAMA_TOP_P", 0.9, minimum=0.0, maximum=1.0
-                ),
                 prompt_chars_per_token_estimate=_float(
                     values,
                     "AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE",
@@ -947,9 +917,6 @@ class HostSettingsSnapshot:
                     "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS",
                     512,
                     minimum=0,
-                ),
-                direct_require_complete_output=_bool(
-                    values, "ORCH_DIRECT_LLM_REQUIRE_COMPLETE_OUTPUT", True
                 ),
                 failure_response_num_ctx=_int(
                     values,

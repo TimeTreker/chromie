@@ -101,8 +101,15 @@ def check() -> list[str]:
             + ", ".join(forbidden)
         )
 
-    parent_functions = _parent_functions(class_node)
-    direct_calls: list[tuple[int, str]] = []
+    method_names = {node.name for node in methods}
+    forbidden_methods = sorted(set(rule.get("forbidden_methods", [])) & method_names)
+    if forbidden_methods:
+        errors.append(
+            "legacy semantic compatibility methods returned to VoiceAssistant: "
+            + ", ".join(forbidden_methods)
+        )
+
+    direct_calls: list[int] = []
     for node in ast.walk(class_node):
         if not isinstance(node, ast.Call):
             continue
@@ -113,14 +120,12 @@ def check() -> list[str]:
             and isinstance(function.value, ast.Name)
             and function.value.id == "self"
         ):
-            direct_calls.append((node.lineno, parent_functions.get(id(node), "<class>")))
-    owner = str(rule["direct_llm_compatibility_owner"])
-    for line, parent in direct_calls:
-        if parent != owner:
-            errors.append(
-                f"direct LLM compatibility call at {rule['path']}:{line} "
-                f"is owned by {parent}, expected {owner}"
-            )
+            direct_calls.append(node.lineno)
+    if direct_calls:
+        errors.append(
+            "legacy direct-LLM semantic calls returned at lines "
+            + ", ".join(str(line) for line in direct_calls)
+        )
 
     if errors:
         return errors

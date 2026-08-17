@@ -163,37 +163,6 @@ class SemanticAuthorityContractTests(unittest.TestCase):
             )
         )
 
-    def test_orchestrator_claims_are_mutually_exclusive(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant.legacy_semantic_fallback_enabled = True
-        direct = RouteDecision(
-            route="robot_action",
-            intent="compound_robot_action",
-            agents=["capability_agent"],
-            source="catalog",
-            actions=[{"capability_id": "soridormi.nod_yes", "args": {}}],
-        )
-        fallback = RouteDecision(
-            route="robot_action",
-            intent="robot_action",
-            agents=["capability_agent"],
-            source="llm",
-        )
-        direct_claim = semantic_authority_from_context(
-            assistant._legacy_agent_authority_context(
-                {}, session_id="direct", decision=direct, reason="test"
-            )
-        )
-        fallback_claim = semantic_authority_from_context(
-            assistant._legacy_agent_authority_context(
-                {}, session_id="fallback", decision=fallback, reason="test"
-            )
-        )
-        self.assertEqual((direct_claim.owner, direct_claim.role), ("goal_interpretation_action_adapter", "adapter"))
-        self.assertEqual(
-            (fallback_claim.owner, fallback_claim.role, fallback_claim.emergency_fallback),
-            ("legacy_capability_fallback", "authoritative", True),
-        )
 
     def test_default_configuration_has_one_authority_and_fail_closed_policy(self) -> None:
         common = Path(".env.common").read_text(encoding="utf-8")
@@ -201,12 +170,12 @@ class SemanticAuthorityContractTests(unittest.TestCase):
         launcher = Path("scripts/start_chromie.sh").read_text(encoding="utf-8")
         for text in (common, example):
             self.assertIn("ORCH_COGNITIVE_RUNTIME_MODE=apply", text)
-            self.assertIn("ORCH_COGNITIVE_FALLBACK_POLICY=fail_closed", text)
-            self.assertIn("ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED=0", text)
+            self.assertNotIn("ORCH_COGNITIVE_FALLBACK_POLICY", text)
+            self.assertNotIn("ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED", text)
             self.assertIn("AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED=0", text)
         self.assertIn("ORCH_COGNITIVE_RUNTIME_MODE=apply", launcher)
-        self.assertIn("ORCH_COGNITIVE_FALLBACK_POLICY=fail_closed", launcher)
-        self.assertIn("ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED=0", launcher)
+        self.assertNotIn("ORCH_COGNITIVE_FALLBACK_POLICY", launcher)
+        self.assertNotIn("ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED", launcher)
         self.assertIn("AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED=0", launcher)
 
     def test_goal_driven_runtime_never_emits_legacy_fallback(self) -> None:

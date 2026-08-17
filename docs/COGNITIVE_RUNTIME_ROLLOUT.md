@@ -207,7 +207,6 @@ meaning of user language.
 ## 5. Semantic authority and failure policy
 
 The effective technical failure policy is `fail_closed`.
-`ORCH_COGNITIVE_FALLBACK_POLICY` remains accepted as a deprecated compatibility
 input, but it cannot authorize same-turn fallback after the Goal-driven Runtime
 has acquired semantic authority.
 
@@ -522,7 +521,6 @@ Retain current compatibility behavior and known scenario results.
 
 ```env
 ORCH_COGNITIVE_RUNTIME_MODE=report_only
-ORCH_COGNITIVE_FALLBACK_POLICY=fail_closed
 ```
 
 Run representative multi-turn text cases:
@@ -551,7 +549,6 @@ Review:
 ```env
 ORCH_COGNITIVE_RUNTIME_MODE=apply
 ORCH_COGNITIVE_APPLY_LANES=chat,memory,tool
-ORCH_COGNITIVE_FALLBACK_POLICY=fail_closed
 ```
 
 Retain successful and failure cases before widening lanes.
@@ -561,7 +558,6 @@ Retain successful and failure cases before widening lanes.
 ```env
 ORCH_COGNITIVE_RUNTIME_MODE=apply
 ORCH_COGNITIVE_APPLY_LANES=chat,memory,robot_action,tool
-ORCH_COGNITIVE_FALLBACK_POLICY=fail_closed
 ```
 
 Do not enable this phase for physical hardware. Use the maintained simulator
@@ -621,7 +617,6 @@ The maintained profiles keep both legacy gates disabled. Emergency operation
 requires all of the following:
 
 ```env
-ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED=1
 AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED=1
 ```
 

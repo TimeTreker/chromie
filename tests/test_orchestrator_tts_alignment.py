@@ -141,11 +141,11 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
     def test_runtime_ready_greeting_prompt_is_a_human_like_wake_up(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.runtime_ready_greeting_language = "zh-CN"
-        assistant._direct_llm_identity_json = MethodType(
+        assistant._owner_identity_json = MethodType(
             lambda self: '{"name":"Chromie"}',
             assistant,
         )
-        assistant._direct_llm_mind_summary = MethodType(
+        assistant._owner_mind_summary = MethodType(
             lambda self: "warm, curious, and natural",
             assistant,
         )
@@ -181,11 +181,11 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
     def test_runtime_ready_greeting_prompt_changes_with_grounded_local_period(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.runtime_ready_greeting_language = "zh-CN"
-        assistant._direct_llm_identity_json = MethodType(
+        assistant._owner_identity_json = MethodType(
             lambda self: '{"name":"Chromie"}',
             assistant,
         )
-        assistant._direct_llm_mind_summary = MethodType(
+        assistant._owner_mind_summary = MethodType(
             lambda self: "warm, curious, and natural",
             assistant,
         )
@@ -286,11 +286,11 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             lambda self, text: bool(str(text).strip()),
             assistant,
         )
-        assistant._direct_llm_identity_json = MethodType(
+        assistant._owner_identity_json = MethodType(
             lambda self: '{"name":"Chromie"}',
             assistant,
         )
-        assistant._direct_llm_mind_summary = MethodType(
+        assistant._owner_mind_summary = MethodType(
             lambda self: "warm and curious",
             assistant,
         )
@@ -353,11 +353,11 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.runtime_ready_greeting_generation_timeout_ms = 1000
         assistant.ollama_model = "gemma4:12b"
         assistant.llm_url = "http://localhost:11434/api/generate"
-        assistant._direct_llm_identity_json = MethodType(
+        assistant._owner_identity_json = MethodType(
             lambda self: '{"name":"Chromie"}',
             assistant,
         )
-        assistant._direct_llm_mind_summary = MethodType(
+        assistant._owner_mind_summary = MethodType(
             lambda self: "warm and curious",
             assistant,
         )
@@ -409,11 +409,11 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.runtime_ready_greeting_generation_timeout_ms = 1000
         assistant.ollama_model = "gemma4:12b"
         assistant.llm_url = "http://localhost:11434/api/generate"
-        assistant._direct_llm_identity_json = MethodType(
+        assistant._owner_identity_json = MethodType(
             lambda self: '{"name":"Chromie"}',
             assistant,
         )
-        assistant._direct_llm_mind_summary = MethodType(
+        assistant._owner_mind_summary = MethodType(
             lambda self: "warm and curious",
             assistant,
         )
@@ -475,11 +475,11 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             lambda self, text: bool(str(text).strip()),
             assistant,
         )
-        assistant._direct_llm_identity_json = MethodType(
+        assistant._owner_identity_json = MethodType(
             lambda self: '{"name":"Chromie"}',
             assistant,
         )
-        assistant._direct_llm_mind_summary = MethodType(
+        assistant._owner_mind_summary = MethodType(
             lambda self: "warm and curious",
             assistant,
         )
@@ -532,11 +532,11 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             lambda self, text: bool(str(text).strip()),
             assistant,
         )
-        assistant._direct_llm_identity_json = MethodType(
+        assistant._owner_identity_json = MethodType(
             lambda self: '{"name":"Chromie"}',
             assistant,
         )
-        assistant._direct_llm_mind_summary = MethodType(
+        assistant._owner_mind_summary = MethodType(
             lambda self: "warm and curious",
             assistant,
         )
@@ -1908,46 +1908,6 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.metadata["effect_execution"], "not_authorized")
         self.assertFalse(response.metadata["semantic_fallback"])
 
-    def test_direct_llm_prompt_uses_chromie_social_self_model(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant.voice_system_prompt = "Answer briefly for spoken playback."
-        assistant.mind = MindManager(default_mind_profile())
-        assistant.conversation_state = ConversationStateManager(enabled=True)
-        assistant.conversation_state.record_user_turn(
-            "sid-prev",
-            "Hello, how are you?",
-            route="chat",
-            intent="small_talk",
-        )
-        assistant.conversation_state.record_assistant_turn(
-            "sid-prev",
-            "Hello. I am listening.",
-        )
-
-        prompt = assistant._build_direct_llm_prompt(
-            "Can you walk forward for 15 seconds?",
-            "sid-now",
-            fallback_reason="agent_exception",
-            route="robot_action",
-        )
-
-        self.assertIn("Use the supplied owner-approved identity and self model", prompt)
-        self.assertIn('"entity_id":"chromie"', prompt)
-        self.assertIn('"social_presentation"', prompt)
-        self.assertIn('"self_reference":"Chromie"', prompt)
-        self.assertIn('"kind":"human child"', prompt)
-        self.assertIn("Personality expression JSON", prompt)
-        self.assertIn('"answer_style"', prompt)
-        self.assertIn('"age_description":"6 years old"', prompt)
-        self.assertIn('"family_role":"the family\'s secretary"', prompt)
-        self.assertNotIn('"internal_components"', prompt)
-        self.assertIn("identity.identity_answer_guidance", prompt)
-        self.assertNotIn("Never say you are text-based", prompt)
-        self.assertIn("Direct fallback reason: agent_exception", prompt)
-        self.assertIn("Route hint: robot_action", prompt)
-        self.assertIn("Hello. I am listening.", prompt)
-        self.assertIn("no valid motion result was produced", prompt)
-        self.assertTrue(prompt.endswith("Chromie:"))
 
     async def test_input_barge_in_does_not_cancel_body_before_routing(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
@@ -1977,7 +1937,6 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.interaction_runtime = _Runtime()
         assistant.abort_output_stream = MethodType(abort_output_stream, assistant)
         assistant.session_log = MethodType(session_log, assistant)
-        assistant.active_llm_task = asyncio.create_task(asyncio.sleep(60))
         assistant.active_interaction_task = asyncio.create_task(asyncio.sleep(60))
         synthesis_task = asyncio.create_task(asyncio.sleep(60))
         assistant.active_synthesis_tasks.add(synthesis_task)
@@ -1993,17 +1952,14 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(assistant.next_playback_order, 0)
             self.assertEqual(assistant.synthesis_order, 0)
             self.assertEqual(aborts, 1)
-            self.assertTrue(assistant.active_llm_task.cancelled())
             self.assertTrue(synthesis_task.cancelled())
             self.assertFalse(assistant.active_interaction_task.cancelled())
             self.assertEqual(assistant.interaction_runtime.cancel_calls, 0)
             self.assertEqual(logs, ["interrupt_previous_audio_done: playback_generation=1"])
         finally:
-            assistant.active_llm_task.cancel()
             assistant.active_interaction_task.cancel()
             synthesis_task.cancel()
             await asyncio.gather(
-                assistant.active_llm_task,
                 assistant.active_interaction_task,
                 synthesis_task,
                 return_exceptions=True,

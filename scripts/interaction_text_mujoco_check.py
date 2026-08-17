@@ -617,7 +617,6 @@ def _configure_environment(args: argparse.Namespace, evidence_dir: Path) -> None
         os.environ["ORCH_COGNITIVE_RUN_IDENTITY_PATH"] = str(runtime_identity)
     if args.cognitive_runtime:
         os.environ["ORCH_COGNITIVE_APPLY_LANES"] = args.cognitive_apply_lanes
-        os.environ["ORCH_COGNITIVE_FALLBACK_POLICY"] = "fail_closed"
         os.environ["ORCH_COGNITIVE_EVIDENCE_ENABLED"] = "1"
         os.environ["ORCH_COGNITIVE_EVIDENCE_PATH"] = str(
             evidence_dir / "cognitive_runtime_events.jsonl"

@@ -936,8 +936,8 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
     def test_wake_up_prompt_uses_grounded_time_without_unverified_state(self) -> None:
         assistant = object.__new__(VoiceAssistant)
         assistant.runtime_ready_greeting_language = "zh-CN"
-        assistant._direct_llm_identity_json = lambda: "{}"  # type: ignore[method-assign]
-        assistant._direct_llm_mind_summary = lambda: "{}"  # type: ignore[method-assign]
+        assistant._owner_identity_json = lambda: "{}"  # type: ignore[method-assign]
+        assistant._owner_mind_summary = lambda: "{}"  # type: ignore[method-assign]
         prompt = assistant._runtime_ready_greeting_prompt()
 
         self.assertIn("Grounded local temporal context JSON", prompt)

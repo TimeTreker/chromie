@@ -87,7 +87,6 @@ class CognitiveGatewayRegressionTests(unittest.IsolatedAsyncioTestCase):
                     "conversation-ignore"
                 )
                 assistant.sessions = _Sessions(session_id)
-                assistant.active_llm_task = None
                 model_calls: list[str] = []
                 done_calls: list[str] = []
 
@@ -115,15 +114,6 @@ class CognitiveGatewayRegressionTests(unittest.IsolatedAsyncioTestCase):
                     del self, user_text, sid, kwargs
                     return False
 
-                async def process_llm_tts(
-                    self: VoiceAssistant,
-                    user_text: str,
-                    sid: str,
-                    **kwargs: Any,
-                ) -> None:
-                    del self, user_text, kwargs
-                    model_calls.append(sid)
-
                 def build_context(
                     self: VoiceAssistant,
                     sid: str,
@@ -150,10 +140,6 @@ class CognitiveGatewayRegressionTests(unittest.IsolatedAsyncioTestCase):
                     confirmation_reply,
                     assistant,
                 )
-                assistant.process_llm_tts = MethodType(
-                    process_llm_tts,
-                    assistant,
-                )
                 assistant.build_context = MethodType(build_context, assistant)
                 assistant.maybe_session_done = MethodType(
                     maybe_session_done,
@@ -172,7 +158,6 @@ class CognitiveGatewayRegressionTests(unittest.IsolatedAsyncioTestCase):
                 await asyncio.sleep(0)
 
                 self.assertEqual(model_calls, [])
-                self.assertIsNone(assistant.active_llm_task)
                 self.assertEqual(
                     assistant.sessions.state[session_id]["llm_done"],
                     True,

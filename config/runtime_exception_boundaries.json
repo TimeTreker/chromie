@@ -1044,90 +1044,6 @@
     },
     {
       "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._direct_llm_context_json",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "a4aba9e39e4a75d44baed625d7c75257f014e83aff1bc72fe37b10ec72dad03b",
-      "failure_signals": [
-        "diagnostic",
-        "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._direct_llm_identity_json",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "765ca9a1d2c8357b44c78e316e7e4a1d6e5069f637171aa1f2f07de5493addc0",
-      "failure_signals": [
-        "diagnostic",
-        "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._direct_llm_mind_summary",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "24dbceb84c6feee4a6f168098250b2f38dd4f34a86f907e90f26bf1a9729a9bf",
-      "failure_signals": [
-        "diagnostic",
-        "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._direct_llm_personality_json",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "38d540e9f32d0faf72958441538581b1d83f7c453fbef15550aafe0dd543ce0a",
-      "failure_signals": [
-        "diagnostic",
-        "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._direct_llm_self_model_json",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "6727e25a0c25804271fb68132a4696be1ab800ec45b3795b4b2802f251658786",
-      "failure_signals": [
-        "diagnostic",
-        "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._direct_llm_speaker_name",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "b50eadbe8673cb370ff47e93bca072f449a3dae38899728e51a49dada3fb0f38",
-      "failure_signals": [
-        "diagnostic",
-        "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant._dispatch_detached_interaction",
       "ordinal": 1,
       "classification": "narrow_reraise",
@@ -1162,6 +1078,34 @@
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
       "body_sha256": "d460378e1f5ffbce9dda8442afd7f0f23f9decee9555252eace3427214ffb320",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
+      ]
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._owner_identity_json",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "765ca9a1d2c8357b44c78e316e7e4a1d6e5069f637171aa1f2f07de5493addc0",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
+      ]
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._owner_mind_summary",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "24dbceb84c6feee4a6f168098250b2f38dd4f34a86f907e90f26bf1a9729a9bf",
       "failure_signals": [
         "diagnostic",
         "state_update"
@@ -1495,20 +1439,6 @@
       "failure_signals": [
         "diagnostic",
         "return",
-        "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant.process_llm_tts",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "b0c0832df0adbd20971f088920a7fa4e5a7fd767de0515b48318beb14421393e",
-      "failure_signals": [
-        "diagnostic",
         "state_update"
       ]
     },

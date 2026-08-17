@@ -111,7 +111,6 @@ emergency operation. In normal operation it is an adapter:
 2. A robot-action request without exact actions cannot invoke the old semantic
    planner by default.
 3. The old planner runs only when all three conditions are true:
-   - the Orchestrator has `ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED=1`;
    - the Agent has `AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED=1`;
    - the Orchestrator attaches a valid per-turn
      `legacy_capability_fallback` claim with `emergency_fallback=true` and a
@@ -124,14 +123,10 @@ single-use nonce: replaying the same valid claim with the same `sid` is not
 independently prevented here. Keep the endpoint on its trusted network boundary
 and keep both emergency gates off during normal operation.
 
-The maintained launcher and common profiles set both gates to `0`.
-
-The Host's older direct-LLM response path is governed by the Orchestrator gate
-as the same rollback class, but it is additionally blocked for any route already
-inside a maintained Goal-driven `apply` lane. Repository structure policy permits
-only one caller, `_launch_direct_llm_compatibility_or_fail_closed`; normal Agent
-failure uses bounded Host-owned failure facts and does not create a second
-semantic answer authority.
+The maintained launcher and common profiles keep the Agent emergency gate off.
+The Host has no direct-LLM semantic rollback surface: once Goal-driven authority
+is acquired, failures remain fail-closed and may only use bounded Host-owned
+failure facts rather than transferring semantic authority to another planner.
 
 ## Disabled lanes versus failed authoritative turns
 

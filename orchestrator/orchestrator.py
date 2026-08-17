@@ -403,20 +403,6 @@ class VoiceAssistant:
         )
         self.cognitive_runtime_mode = cognition_settings.runtime_mode
         self.cognitive_apply_lanes = cognition_settings.apply_lanes
-        requested_cognitive_fallback_policy = (
-            cognition_settings.requested_fallback_policy
-        )
-        # Once the goal-driven pipeline starts, it owns semantic resolution for
-        # the turn. A later legacy planner would be a second authority.
-        self.cognitive_fallback_policy = "fail_closed"
-        self.legacy_semantic_fallback_enabled = (
-            cognition_settings.legacy_semantic_fallback_enabled
-        )
-        if requested_cognitive_fallback_policy == "legacy":
-            logger.warning(
-                "ORCH_COGNITIVE_FALLBACK_POLICY=legacy is deprecated; "
-                "post-acquisition semantic fallback is forced to fail_closed"
-            )
         self.cognitive_runtime_timeout_ms = cognition_settings.runtime_timeout_ms
         self.cognitive_evidence_enabled = evidence_settings.cognitive_enabled
         self.cognitive_evidence_include_text = (
@@ -503,7 +489,6 @@ class VoiceAssistant:
             self.episode_recorder.log_path,
             self.episode_recorder.max_turns,
         )
-        self.active_llm_task: asyncio.Task | None = None
         self.active_interaction_task: asyncio.Task | None = None
         self.active_interaction_id: str | None = None
         self.active_interaction_tasks: dict[asyncio.Task, str] = {}
@@ -655,7 +640,7 @@ class VoiceAssistant:
         self.cognitive_runtime_policy = CognitiveRuntimePolicy(
             mode=self.cognitive_runtime_mode,
             apply_lanes=self.cognitive_apply_lanes,
-            fallback_policy=self.cognitive_fallback_policy,
+            fallback_policy="fail_closed",
             max_total_ms=self.cognitive_runtime_timeout_ms,
             goal_association_timeout_ms=self.goal_association_timeout_ms,
             fast_planner_timeout_ms=self.fast_planner_timeout_ms,
@@ -2417,439 +2402,11 @@ class VoiceAssistant:
                     break
         self.ensure_playback_worker()
 
-    async def process_llm_tts(
-        self,
-        user_text: str,
-        session_id: Optional[str],
-        *,
-        reset_playback: bool = True,
-        fallback_reason: str | None = None,
-        route: str | None = None,
-    ):
-        prompt = self._build_direct_llm_prompt(
-            user_text,
-            session_id,
-            fallback_reason=fallback_reason,
-            route=route,
-        )
-        direct_spoken_max_chars = 800
-        payload = {
-            "model": self.ollama_model,
-            "prompt": prompt,
-            "stream": True,
-            "think": False,
-            "format": self._spoken_text_response_schema(
-                max_chars=direct_spoken_max_chars
-            ),
-            "keep_alive": self.host_settings.model_generation.keep_alive,
-            "options": {
-                "num_ctx": self.host_settings.model_generation.direct_num_ctx,
-                "num_predict": self.host_settings.model_generation.direct_num_predict,
-                "temperature": self.host_settings.model_generation.direct_temperature,
-                "top_p": self.host_settings.model_generation.direct_top_p,
-            },
-        }
-        llm_call_id = new_llm_call_id("orchestrator_direct")
-        evidence_started = time.perf_counter()
-        evidence_recorded = False
-        response_buffer = ""
-
-        def record_llm_evidence(
-            *,
-            status: str,
-            response_payload: dict[str, Any] | None = None,
-            parsed_output: Any = None,
-            error: dict[str, Any] | None = None,
-        ) -> None:
-            nonlocal evidence_recorded
-            if evidence_recorded:
-                return
-            complete_response = dict(response_payload or {})
-            if response_buffer:
-                complete_response["response"] = response_buffer
-            log_llm_call_evidence(
-                logger,
-                call_id=llm_call_id,
-                purpose="orchestrator_direct_response",
-                stage="direct_voice_fallback",
-                transport="ollama.generate_stream",
-                request=payload,
-                response=complete_response,
-                status=status,
-                elapsed_ms=(time.perf_counter() - evidence_started) * 1000.0,
-                correlations={"session_id": session_id},
-                parsed_output=parsed_output,
-                error=error,
-            )
-            evidence_recorded = True
-
-        logger.info("[%s] LLM processing: %s", session_id, user_text)
-        if reset_playback:
-            await self.reset_playback_ordering()
-        suppressed_thinking_chars = 0
-        llm_start_ms = now_ms()
-        self.session_log(
-            session_id,
-            "llm_request_start: prompt_chars=%s input_chars=%s text=%r "
-            "fallback_reason=%s route=%s think=%s response_format=spoken_json "
-            "num_ctx=%s num_predict=%s",
-            len(prompt),
-            len(user_text),
-            user_text,
-            fallback_reason or "",
-            route or "",
-            payload.get("think"),
-            payload["options"]["num_ctx"],
-            payload["options"]["num_predict"],
-        )
-        preflight = ollama_prompt_preflight_diagnostics(
-            prompt_chars=len(prompt),
-            options=payload.get("options"),
-            chars_per_token=self.host_settings.model_generation.prompt_chars_per_token_estimate,
-            safety_margin_tokens=self.host_settings.model_generation.context_safety_margin_tokens,
-        )
-        for diagnostic in preflight:
-            self.session_log(session_id, "%s", diagnostic.render())
-        blocking_preflight = next(
-            (
-                item
-                for item in preflight
-                if item.event == "llm_prompt_budget_exceeded"
-                and item.level >= logging.ERROR
-            ),
-            None,
-        )
-        if blocking_preflight is not None:
-            state = self.sessions.state.get(session_id or "")
-            if state is not None:
-                state["llm_done"] = True
-            self.session_log(
-                session_id,
-                "llm_request_rejected: failure_class=prompt_budget_exceeded "
-                "failure_domain=llm_budget result_trusted=false detail=%s",
-                blocking_preflight.render(),
-            )
-            record_llm_evidence(
-                status="rejected_preflight",
-                error={
-                    "error_type": "PromptBudgetExceeded",
-                    "message": blocking_preflight.render(),
-                    "failure_class": "prompt_budget_exceeded",
-                    "failure_domain": "llm_budget",
-                },
-            )
-            self.maybe_session_done(session_id)
-            return
-
-        if not self.host_settings.model_generation.direct_require_complete_output:
-            self.session_log(
-                session_id,
-                "llm_unbuffered_speech_disabled: reason=spoken_json_contract",
-            )
-
-        try:
-            session = await self.get_http_session()
-            async with session.post(self.llm_url, json=payload) as resp:
-                if resp.status != 200:
-                    body = await resp.text()
-                    state = self.sessions.state.get(session_id or "")
-                    if state is not None:
-                        state["llm_done"] = True
-                    self.session_log(
-                        session_id,
-                        "llm_http_error: status=%s body=%s",
-                        resp.status,
-                        body,
-                    )
-                    record_llm_evidence(
-                        status="provider_error",
-                        response_payload={
-                            "status_code": resp.status,
-                            "error_body": body,
-                        },
-                        error={
-                            "error_type": "OllamaHttpError",
-                            "message": body,
-                            "failure_class": "http_error",
-                            "failure_domain": "inference_transport",
-                        },
-                    )
-                    self.maybe_session_done(session_id)
-                    return
-                async for line in resp.content:
-                    if session_id != self.session_id:
-                        self.session_log(
-                            session_id,
-                            "llm_drop_stale_stream: current_sid=%s",
-                            self.session_id,
-                        )
-                        record_llm_evidence(
-                            status="cancelled_stale_session",
-                            error={
-                                "error_type": "StaleSession",
-                                "message": "stream no longer belongs to the active session",
-                            },
-                        )
-                        return
-                    if not line:
-                        continue
-                    try:
-                        data = json.loads(line.decode())
-                    except json.JSONDecodeError:
-                        continue
-
-                    thinking_token = data.get("thinking", "")
-                    if isinstance(thinking_token, str) and thinking_token:
-                        suppressed_thinking_chars += len(thinking_token)
-
-                    token = data.get("response", "")
-                    if token:
-                        state = self.sessions.state.get(session_id or "")
-                        if state is not None:
-                            if not state.get("first_token_logged"):
-                                state["first_token_logged"] = True
-                                self.session_log(
-                                    session_id,
-                                    "llm_first_token: first_token_ms=%.1f",
-                                    now_ms() - llm_start_ms,
-                                )
-                            state["response_chars"] = int(
-                                state.get("response_chars", 0)
-                            ) + len(token)
-                        response_buffer += token
-
-                    if data.get("done"):
-                        completion = ollama_completion_diagnostics(
-                            options=payload.get("options"),
-                            data=data,
-                            prompt_chars=len(prompt),
-                        )
-                        for diagnostic in completion:
-                            self.session_log(session_id, "%s", diagnostic.render())
-                        blocking_completion = next(
-                            (
-                                item
-                                for item in completion
-                                if item.event
-                                in {"llm_output_truncated", "llm_prompt_truncated"}
-                                and item.level >= logging.ERROR
-                            ),
-                            None,
-                        )
-                        state = self.sessions.state.get(session_id or "")
-                        if blocking_completion is not None:
-                            if state is not None:
-                                state["llm_done"] = True
-                            self.session_log(
-                                session_id,
-                                "llm_completion_rejected: failure_class=%s "
-                                "failure_domain=llm_budget result_trusted=false detail=%s",
-                                "output_truncated"
-                                if blocking_completion.event == "llm_output_truncated"
-                                else "prompt_truncated",
-                                blocking_completion.render(),
-                            )
-                            record_llm_evidence(
-                                status="rejected_completion",
-                                response_payload={
-                                    **data,
-                                    "thinking": "",
-                                },
-                                error={
-                                    "error_type": "CompletionBudgetExceeded",
-                                    "message": blocking_completion.render(),
-                                    "failure_class": (
-                                        "output_truncated"
-                                        if blocking_completion.event
-                                        == "llm_output_truncated"
-                                        else "prompt_truncated"
-                                    ),
-                                    "failure_domain": "llm_budget",
-                                },
-                            )
-                            self.maybe_session_done(session_id)
-                            return
-
-                        if suppressed_thinking_chars:
-                            self.session_log(
-                                session_id,
-                                "llm_thinking_suppressed: chars=%s",
-                                suppressed_thinking_chars,
-                            )
-                        envelope_data = dict(data)
-                        envelope_data["response"] = response_buffer
-                        envelope_data["thinking"] = ""
-                        try:
-                            spoken_text = self._decode_spoken_text_envelope(
-                                envelope_data,
-                                purpose="direct LLM fallback",
-                                max_chars=direct_spoken_max_chars,
-                                suppressed_thinking_chars=suppressed_thinking_chars,
-                            )
-                        except RuntimeError as exc:
-                            if state is not None:
-                                state["llm_done"] = True
-                            self.session_log(
-                                session_id,
-                                "llm_spoken_output_rejected: result_trusted=false "
-                                "response_chars=%s thinking_chars=%s error=%s",
-                                len(response_buffer),
-                                suppressed_thinking_chars,
-                                exc,
-                            )
-                            record_llm_evidence(
-                                status="rejected_contract",
-                                response_payload=envelope_data,
-                                error={
-                                    "error_type": type(exc).__name__,
-                                    "message": str(exc),
-                                    "failure_class": "structured_output_validation",
-                                    "failure_domain": "model_contract",
-                                },
-                            )
-                            self.maybe_session_done(session_id)
-                            return
-
-                        remaining = spoken_text
-                        while True:
-                            chunk, remaining = self.pop_tts_chunk(remaining)
-                            if not chunk:
-                                break
-                            if self.is_valid_tts_text(chunk):
-                                self.session_log(
-                                    session_id,
-                                    "llm_verified_flush_to_tts: chars=%s text=%r",
-                                    len(chunk),
-                                    chunk,
-                                )
-                                await self.schedule_tts_sentence(chunk, session_id)
-                        final_text = self.normalize_tts_candidate(remaining)
-                        if self.is_valid_tts_text(final_text):
-                            self.session_log(
-                                session_id,
-                                "llm_final_flush_to_tts: chars=%s text=%r",
-                                len(final_text),
-                                final_text,
-                            )
-                            await self.schedule_tts_sentence(final_text, session_id)
-                        if state is not None:
-                            state["llm_done"] = True
-                        self.session_log(
-                            session_id,
-                            "llm_done: llm_ms=%.1f response_chars=%s "
-                            "spoken_chars=%s scheduled_tts=%s",
-                            now_ms() - llm_start_ms,
-                            state.get("response_chars", 0) if state else "unknown",
-                            len(spoken_text),
-                            state.get("scheduled_tts", 0) if state else "unknown",
-                        )
-                        self.session_log(
-                            session_id,
-                            "llm_done_raw: done_reason=%s total_duration=%s "
-                            "load_duration=%s prompt_eval_count=%s "
-                            "prompt_eval_duration=%s eval_count=%s eval_duration=%s",
-                            data.get("done_reason"),
-                            data.get("total_duration"),
-                            data.get("load_duration"),
-                            data.get("prompt_eval_count"),
-                            data.get("prompt_eval_duration"),
-                            data.get("eval_count"),
-                            data.get("eval_duration"),
-                        )
-                        record_llm_evidence(
-                            status="accepted",
-                            response_payload=envelope_data,
-                            parsed_output={"text": spoken_text},
-                        )
-                        self.maybe_session_done(session_id)
-                        return
-        except asyncio.CancelledError:
-            record_llm_evidence(
-                status="cancelled",
-                error={
-                    "error_type": "CancelledError",
-                    "message": "direct LLM request was cancelled",
-                },
-            )
-            raise
-        except Exception as exc:
-            state = self.sessions.state.get(session_id or "")
-            if state is not None:
-                state["llm_done"] = True
-            logger.error("LLM processing failed: %s", exc, exc_info=True)
-            self.session_log(session_id, "llm_exception: error=%s", exc)
-            record_llm_evidence(
-                status="failed",
-                error={
-                    "error_type": type(exc).__name__,
-                    "message": str(exc),
-                },
-            )
-            self.maybe_session_done(session_id)
-        if not evidence_recorded:
-            record_llm_evidence(
-                status="incomplete_stream",
-                error={
-                    "error_type": "IncompleteStream",
-                    "message": "Ollama stream ended without a terminal completion record",
-                },
-            )
-
-    def _build_direct_llm_prompt(
-        self,
-        user_text: str,
-        session_id: str | None,
-        *,
-        fallback_reason: str | None = None,
-        route: str | None = None,
-    ) -> str:
-        mind_summary = self._direct_llm_mind_summary()
-        identity_json = self._direct_llm_identity_json()
-        speaker_name = self._direct_llm_speaker_name()
-        self_model_json = self._direct_llm_self_model_json()
-        personality_json = self._direct_llm_personality_json()
-        context_json = self._direct_llm_context_json(session_id)
-        fallback_line = (
-            f"Direct fallback reason: {fallback_reason}."
-            if fallback_reason
-            else "Direct voice mode."
-        )
-        route_line = f"Route hint: {route}." if route else "Route hint: unknown."
-        return (
-            f"{self.voice_system_prompt}\n\n"
-            "Use the supplied owner-approved identity and self model as the ontology for the speaking entity.\n"
-            f"Owner-approved identity JSON: {identity_json}\n"
-            f"Self model JSON: {self_model_json}\n"
-            f"Personality expression JSON: {personality_json}\n"
-            "Owner-approved mind summary:\n"
-            f"{mind_summary}\n\n"
-            "Response contract:\n"
-            "- Generate first-person speech for self_model.speaker_entity.\n"
-            "- Follow self_model.social_presentation and every field in personality_expression as the owner-approved positive voice model. Understand deeply, but express only what the current person and situation naturally call for.\n"
-            "- When asked who you are, your name, your age, or for a self-introduction, use identity.name, identity.age_description, and identity.identity_answer_guidance from the owner-approved profile. Do not substitute a generic AI-assistant identity or call an internal language model the speaker. Do not volunteer age or body category in unrelated conversation.\n"
-            "- Treat implementation, embodiment, model, provider, and system metadata as operational context outside Chromie's self-concept. Never use it to rename or qualify the speaking person. Internal execution status, evidence labels, observation labels, and workflow narration belong in logs, not ordinary speech.\n"
-            "- Ground capability statements in the bounded runtime context and do not invent tool results or completed actions.\n"
-            "- Return one JSON object with exactly one field named text. Put only the final words Chromie should say aloud in text; do not expose reasoning, analysis, markdown, or internal tool names.\n"
-            "- Normally do not repeat, quote, or paraphrase the user's current words unless confirmation, clarification, or read-back is required.\n"
-            "- This direct fallback can speak only. If the user asked for body movement or another action, be honest that no valid motion result was produced; ask for a clearer command only when the request is actually ambiguous.\n\n"
-            f"{fallback_line}\n"
-            f"{route_line}\n"
-            f"Bounded runtime context JSON: {context_json}\n\n"
-            f"User: {user_text}\n"
-            f"{speaker_name}:"
-        )
 
 
-    def _direct_llm_speaker_name(self) -> str:
-        try:
-            identity = self.mind.profile.identity
-            name = str(identity.name or "").strip()
-        except Exception as exc:
-            logger.warning("direct_llm_speaker_name_failed: %s", exc)
-            name = ""
-        return name or "Assistant"
 
-    def _direct_llm_identity_json(self) -> str:
+
+    def _owner_identity_json(self) -> str:
         try:
             context = self.mind.context()
             identity = context.get("identity", {}) if isinstance(context, dict) else {}
@@ -2860,38 +2417,9 @@ class VoiceAssistant:
             identity = {}
         return json.dumps(identity, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
-    def _direct_llm_self_model_json(self) -> str:
-        try:
-            context = self.mind.context()
-            self_model = context.get("self_model", {}) if isinstance(context, dict) else {}
-        except Exception as exc:
-            logger.warning("direct_llm_self_model_failed: %s", exc)
-            self_model = {}
-        if not isinstance(self_model, dict):
-            self_model = {}
-        return json.dumps(self_model, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
-    def _direct_llm_personality_json(self) -> str:
-        try:
-            context = self.mind.context()
-            personality = (
-                context.get("personality_expression", {})
-                if isinstance(context, dict)
-                else {}
-            )
-        except Exception as exc:
-            logger.warning("direct_llm_personality_failed: %s", exc)
-            personality = {}
-        if not isinstance(personality, dict):
-            personality = {}
-        return json.dumps(
-            personality,
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        )
 
-    def _direct_llm_mind_summary(self) -> str:
+    def _owner_mind_summary(self) -> str:
         try:
             summary = self.mind.prompt_summary()
         except Exception as exc:
@@ -2904,31 +2432,6 @@ class VoiceAssistant:
             return summary[:1200].rstrip() + "..."
         return summary
 
-    def _direct_llm_context_json(self, session_id: str | None) -> str:
-        try:
-            conversation = self.conversation_state.snapshot()
-        except Exception as exc:
-            logger.warning("direct_llm_context_snapshot_failed: %s", exc)
-            conversation = {}
-        history = conversation.get("history")
-        if not isinstance(history, list):
-            history = []
-        session_memory = conversation.get("session_memory")
-        if not isinstance(session_memory, dict):
-            session_memory = {}
-        payload = {
-            "session_id": session_id,
-            "conversation_id": conversation.get("conversation_id"),
-            "memory_summary": session_memory.get("memory_summary"),
-            "extracted_memory": session_memory.get("extracted_memory") or [],
-            "recent_turn_fallback": history[-2:],
-            "active_pending_tasks": conversation.get("active_pending_tasks") or [],
-            "active_task_snapshots": conversation.get("active_task_snapshots") or [],
-            "current_task_context": conversation.get("current_task_context"),
-            "discourse_referents": conversation.get("discourse_referents") or [],
-            "discourse_focus": conversation.get("discourse_focus") or [],
-        }
-        return self._compact_json_for_prompt(payload, max_chars=1600)
 
     @staticmethod
     def _compact_json_for_prompt(value: Any, *, max_chars: int) -> str:
@@ -3837,41 +3340,6 @@ class VoiceAssistant:
             ),
         )
 
-    def _legacy_agent_authority_context(
-        self,
-        context: dict[str, Any],
-        *,
-        session_id: str,
-        decision: RouteDecision,
-        reason: str,
-    ) -> dict[str, Any]:
-        if decision.route == "robot_action" and decision.actions:
-            claim = SemanticAuthorityClaim(
-                owner="goal_interpretation_action_adapter",
-                role="adapter",
-                turn_id=session_id,
-                reason=reason,
-            )
-        elif (
-            decision.route == "robot_action"
-            and "capability_agent" in decision.agents
-            and getattr(self, "legacy_semantic_fallback_enabled", False)
-        ):
-            claim = SemanticAuthorityClaim(
-                owner="legacy_capability_fallback",
-                role="authoritative",
-                turn_id=session_id,
-                reason=reason,
-                emergency_fallback=True,
-            )
-        else:
-            claim = SemanticAuthorityClaim(
-                owner="legacy_agent_pipeline",
-                role="authoritative",
-                turn_id=session_id,
-                reason=reason,
-            )
-        return context_with_semantic_authority(context, claim)
 
     async def _run_cognitive_runtime_pipeline(
         self,
@@ -6042,8 +5510,8 @@ class VoiceAssistant:
             "Invite one retry only when user_action_required is true. Return only the "
             "schema-valid JSON object and repeat the supplied capability_state, execution_state, "
             "and result_state exactly alongside text.\n\n"
-            f"Owner-approved identity JSON: {self._direct_llm_identity_json()}\n"
-            f"Owner-approved mind summary: {self._direct_llm_mind_summary()}\n"
+            f"Owner-approved identity JSON: {self._owner_identity_json()}\n"
+            f"Owner-approved mind summary: {self._owner_mind_summary()}\n"
             "User-visible failure facts JSON (the internal audit record was "
             "intentionally withheld): "
             f"{json.dumps(user_visible_failure_facts, ensure_ascii=False, sort_keys=True)}\n"
@@ -6159,81 +5627,7 @@ class VoiceAssistant:
                 )
             return None
 
-    def _direct_llm_compatibility_allowed(
-        self,
-        decision: RouteDecision,
-    ) -> bool:
-        """Return whether the explicit legacy direct-LLM rollback is allowed.
 
-        Maintained Goal-driven apply lanes never transfer semantic authority to
-        the legacy direct model. The compatibility path is available only when
-        the operator explicitly enables it and the current route has not entered
-        an authoritative apply lane.
-        """
-
-        if not bool(getattr(self, "legacy_semantic_fallback_enabled", False)):
-            return False
-        runtime_mode = str(getattr(self, "cognitive_runtime_mode", "apply") or "apply")
-        apply_lanes = set(getattr(self, "cognitive_apply_lanes", set()) or set())
-        mapped_lane = self._cognitive_lane_from_route(decision)
-        return runtime_mode != "apply" or mapped_lane not in apply_lanes
-
-    def _launch_direct_llm_compatibility_or_fail_closed(
-        self,
-        *,
-        decision: RouteDecision,
-        user_text: str,
-        session_id: str,
-        fallback_reason: str,
-        reset_playback: bool = True,
-    ) -> None:
-        """Use the explicit rollback path or emit a bounded failure response."""
-
-        if self._direct_llm_compatibility_allowed(decision):
-            self.session_log(
-                session_id,
-                "direct_llm_compatibility_start: reason=%s route=%s",
-                fallback_reason,
-                decision.route,
-            )
-            self.active_llm_task = asyncio.create_task(
-                self.process_llm_tts(
-                    user_text,
-                    session_id,
-                    reset_playback=reset_playback,
-                    fallback_reason=fallback_reason,
-                    route=decision.route,
-                )
-            )
-            return
-
-        self.session_log(
-            session_id,
-            "direct_llm_compatibility_blocked: reason=%s route=%s runtime_mode=%s",
-            fallback_reason,
-            decision.route,
-            getattr(self, "cognitive_runtime_mode", "apply"),
-        )
-        safe_response = self._agent_exception_safe_response(
-            decision,
-            user_text=user_text,
-        )
-        safe_response = safe_response.model_copy(
-            deep=True,
-            update={
-                "metadata": {
-                    **safe_response.metadata,
-                    "fallback_reason": fallback_reason,
-                    "direct_llm_compatibility_blocked": True,
-                }
-            },
-        )
-        self.conversation_state.record_agent_result(session_id, safe_response)
-        self._launch_interaction(
-            safe_response,
-            session_id,
-            reset_playback=reset_playback,
-        )
 
     def _agent_exception_safe_response(
         self,
@@ -8432,13 +7826,6 @@ class VoiceAssistant:
             started=False,
             reason="interrupt",
         )
-        # ``active_llm_task`` is the legacy direct speech-stream producer. It
-        # must stop for every output interruption or it can enqueue fresh audio
-        # after the queues below have been invalidated. The broader routed turn
-        # is cancelled separately so output-only scope can preserve committed
-        # Capability Runtime work.
-        if self.active_llm_task and not self.active_llm_task.done():
-            self.active_llm_task.cancel()
         if cancel_cognitive_work:
             self._cancel_active_routed_turns(
                 excluding=asyncio.current_task(),
@@ -9214,8 +8601,8 @@ class VoiceAssistant:
         local_now: datetime | None = None,
     ) -> str:
         language = self.runtime_ready_greeting_language
-        identity_json = self._direct_llm_identity_json()
-        mind_summary = self._direct_llm_mind_summary()
+        identity_json = self._owner_identity_json()
+        mind_summary = self._owner_mind_summary()
         time_context = json.dumps(
             self._runtime_ready_greeting_time_context(local_now),
             ensure_ascii=False,
@@ -9464,8 +8851,6 @@ class VoiceAssistant:
                 audio_device_monitor,
                 return_exceptions=True,
             )
-        if self.active_llm_task and not self.active_llm_task.done():
-            self.active_llm_task.cancel()
         for task in list(self.active_synthesis_tasks):
             task.cancel()
         if self.active_asr_task and not self.active_asr_task.done():

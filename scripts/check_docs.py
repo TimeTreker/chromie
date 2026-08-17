@@ -457,8 +457,6 @@ def check_configuration_reference(errors: list[str]) -> None:
         "ORCH_TASK_CONTINUITY_MODE",
         "ORCH_COGNITIVE_RUNTIME_MODE",
         "ORCH_COGNITIVE_APPLY_LANES",
-        "ORCH_COGNITIVE_FALLBACK_POLICY",
-        "ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED",
         "AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED",
         "ORCH_AGENT_TIMEOUT_MS",
     )

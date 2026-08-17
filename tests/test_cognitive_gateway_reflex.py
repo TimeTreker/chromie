@@ -490,7 +490,6 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         )
         assistant._handle_confirmation_reply = MethodType(fail_confirmation, assistant)
         assistant.get_http_session = MethodType(fail_session, assistant)
-        assistant.process_llm_tts = MethodType(fail_model, assistant)
         assistant.session_log = MethodType(session_log, assistant)
         assistant.maybe_session_done = MethodType(maybe_session_done, assistant)
 

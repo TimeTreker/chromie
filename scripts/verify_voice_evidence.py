@@ -844,8 +844,6 @@ def verify_bundle(
         "ORCH_COGNITIVE_APPLY_LANES": (
             "chat,memory,tool" if live_voice_profile else "chat,memory,robot_action,tool"
         ),
-        "ORCH_COGNITIVE_FALLBACK_POLICY": "fail_closed",
-        "ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED": "0",
         "ORCH_COGNITIVE_EVIDENCE_ENABLED": "1",
     }
     if mode == "synthetic":

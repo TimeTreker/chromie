@@ -381,8 +381,6 @@ canonical plan copy, and its fingerprint remain host-owned.
 |---|---|
 | `ORCH_COGNITIVE_RUNTIME_MODE` | `apply` in `.env.common` and the maintained launcher. `off` bypasses the Goal-driven Runtime, `report_only` runs it as a non-authoritative observer, and `apply` makes eligible lanes authoritative through the Trusted Capability Runtime. Code fallback is `apply`. |
 | `ORCH_COGNITIVE_APPLY_LANES` | `chat,memory,tool` in the common safe base. `tool` is limited to explicitly registered, schema-validated, safe read-only local providers. `scripts/start_chromie.sh` additionally enables `robot_action` after registering the trusted Soridormi provider, yielding `chat,memory,robot_action,tool`. The pre-association compatibility route is used only to decide whether the Goal-driven runtime is configured for that broad ingress lane; after Goal Association, the terminal Plan lane is independently rechecked against this allowlist. This is Host deployment policy, not Fast Goal Interpreter semantic/effect authority: a compatibility route cannot grant, suppress, filter, or narrow Planner Capability access. Every executable step still requires a trusted registered provider plus its authorization, confirmation, resource, and safety contracts. Disabled terminal lanes fail closed without entering the legacy planner. |
-| `ORCH_COGNITIVE_FALLBACK_POLICY` | Deprecated compatibility input. The effective policy is always `fail_closed`: after Goal-driven authority is acquired, technical or validation failure returns truthful no-action speech and never enters another semantic planner in the same turn. |
-| `ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED` | `0`; explicit rollback-only direct-LLM/legacy CapabilityAgent compatibility gate. Every maintained operator mode sets `0`. Even when manually enabled, it cannot take authority for a route already inside a Goal-driven `apply` lane. |
 | `AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED` | `0`; Agent-side emergency gate. The legacy CapabilityAgent LLM planner additionally requires a `legacy_capability_fallback` claim with a non-empty `turn_id` exactly matching the request `sid`. Empty or cross-turn claims fail closed before an LLM call. The claim is internal routing metadata, not caller authentication or a single-use replay token. Exact Goal Interpreter actions remain structured advisory inputs and do not require this gate. |
 | `ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS` | `25000`; total host budget for Goal Association, Fast-to-Deep planning, response composition, and runtime adaptation. Trusted Host rejection is terminal and does not reopen semantic planning. |
 | `ORCH_COGNITIVE_EVIDENCE_ENABLED` | `1`; writes append-only operational resolution evidence. It does not by itself prove simulator or physical execution. |
@@ -982,7 +980,6 @@ untrusted hard failures:
 These failures use `failure_domain=llm_budget`; they must not be translated into
 "the user was unclear" and cannot authorize planning or execution. The rare
 host direct-LLM fallback additionally uses
-`ORCH_DIRECT_LLM_REQUIRE_COMPLETE_OUTPUT=1`: it buffers the full streamed text,
 checks completion diagnostics, and only then schedules TTS. A truncated stream
 is never partially spoken.
 
@@ -1003,7 +1000,6 @@ Key controls:
 | `AGENT_*_NUM_PREDICT` | Per-stage maximum generated tokens. |
 | `AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE` | Conservative mixed-language preflight estimate; RTX 5090 uses `2.0`. |
 | `AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS` | Tokens held back beyond prompt plus maximum output; RTX 5090 uses `2048`. |
-| `ORCH_DIRECT_LLM_REQUIRE_COMPLETE_OUTPUT` | Retained compatibility switch; direct fallback speech is now always buffered and decoded from a structured `{"text": ...}` envelope before TTS. Setting `0` no longer permits unverified streaming speech. |
 
 ## Ollama
 

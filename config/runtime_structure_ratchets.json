@@ -43,6 +43,12 @@
       "synthesis_order",
       "synthesis_semaphore"
     ],
-    "direct_llm_compatibility_owner": "_launch_direct_llm_compatibility_or_fail_closed"
+    "forbidden_methods": [
+      "process_llm_tts",
+      "_build_direct_llm_prompt",
+      "_direct_llm_compatibility_allowed",
+      "_launch_direct_llm_compatibility_or_fail_closed",
+      "_legacy_agent_authority_context"
+    ]
   }
 }

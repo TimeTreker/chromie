@@ -43,7 +43,6 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn('"SHERPA_ONNX_NUM_THREADS",\n                2,', asr_settings_source)
         self.assertEqual(settings.cognition.agent_timeout_ms, 9000)
         self.assertEqual(settings.model_generation.keep_alive, "24h")
-        self.assertEqual(settings.model_generation.direct_num_ctx, 2048)
 
     def test_asr_image_includes_every_standalone_server_module(self) -> None:
         dockerfile = (ROOT / "asr" / "Dockerfile").read_text(encoding="utf-8")
@@ -112,7 +111,6 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["OLLAMA_WARM_NUM_PREDICT"], "1")
         self.assertEqual(values["AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE"], "2.0")
         self.assertEqual(values["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"], "512")
-        self.assertEqual(values["ORCH_DIRECT_LLM_REQUIRE_COMPLETE_OUTPUT"], "1")
 
     def test_capability_planner_has_json_output_budget(self) -> None:
         values = _common_env()
