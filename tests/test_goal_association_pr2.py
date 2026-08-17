@@ -174,11 +174,8 @@ def request(
     *,
     active_goals=None,
     language: str = "zh-CN",
-    route: str = "chat",
-    intent: str = "conversation",
     discourse_referents=None,
 ) -> CognitiveWorkRequest:
-    del route, intent
     return CognitiveWorkRequest(
         sid="sid-pr2",
         text=text,
@@ -516,8 +513,6 @@ class GoalExecutionContractTests(unittest.TestCase):
             "I am in chongqing now, please help me check whether it will rain "
             "tonight and whether it it cold",
             language="en-US",
-            route="tool",
-            intent="capability:chromie.weather.lookup",
         )
 
         interpretation_prompt = resolver._build_prompt(
@@ -576,7 +571,6 @@ class GoalExecutionContractTests(unittest.TestCase):
             request(
                 "Set a reminder for later.",
                 language="en-US",
-                route="chat",
             ),
             [],
             output_type=GoalSegmentationModelOutput,
@@ -853,7 +847,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         )
 
     def test_weather_material_modifier_and_planner_progress_recover_to_one_goal(self):
-        req = request("你好，我在重庆，今天晚上有大雨吗？", intent="weather_lookup")
+        req = request("你好，我在重庆，今天晚上有大雨吗？")
         req = req.model_copy(
             update={
                 "responsibilities": typed_responsibilities(
@@ -1005,8 +999,6 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             request(
                 "Blink twice.",
                 language="en-US",
-                route="robot_action",
-                intent="blink",
             ),
         )
 
@@ -1030,7 +1022,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         )
         result = self._resolve(
             ollama,
-            request("Blink twice.", language="en-US", route="robot_action"),
+            request("Blink twice.", language="en-US"),
         )
 
         self.assertTrue(
@@ -1052,7 +1044,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         ollama = ScriptedOllama([invalid, invalid])
         result = self._resolve(
             ollama,
-            request("Blink twice.", language="en-US", route="robot_action"),
+            request("Blink twice.", language="en-US"),
         )
 
         self.assertEqual(result.new_goals, [])
@@ -1077,7 +1069,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         )
         result = self._resolve(
             ollama,
-            request("Blink twice.", language="en-US", route="robot_action"),
+            request("Blink twice.", language="en-US"),
         )
 
         self.assertEqual(result.new_goals, [])
@@ -1116,7 +1108,6 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             request(
                 "Walk, blink, and sing.",
                 language="en-US",
-                route="robot_action",
             ),
         )
 
@@ -1157,7 +1148,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         ollama = ScriptedOllama([initial, rejected, clarified])
         result = self._resolve(
             ollama,
-            request("Turn it off.", language="en-US", route="robot_action"),
+            request("Turn it off.", language="en-US"),
         )
 
         self.assertEqual(result.resolution_status, "needs_clarification")
@@ -1201,7 +1192,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         )
         result = self._resolve(
             ollama,
-            request("Walk and sing.", language="en-US", route="robot_action"),
+            request("Walk and sing.", language="en-US"),
         )
 
         self.assert_transaction(
@@ -1227,7 +1218,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         ollama = ScriptedOllama([first, rejected, invalid_fresh])
         result = self._resolve(
             ollama,
-            request("Walk and sing.", language="en-US", route="robot_action"),
+            request("Walk and sing.", language="en-US"),
         )
 
         self.assert_transaction(
@@ -1258,7 +1249,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         ollama = ScriptedOllama([first, rejected, corrected, still_rejected])
         result = self._resolve(
             ollama,
-            request("Walk and sing.", language="en-US", route="robot_action"),
+            request("Walk and sing.", language="en-US"),
         )
 
         self.assertEqual(result.new_goals, [])
@@ -1303,7 +1294,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         )
         result = self._resolve(
             ollama,
-            request("Bring me that cup.", language="en-US", route="robot_action"),
+            request("Bring me that cup.", language="en-US"),
         )
 
         self.assertEqual(result.resolution_status, "needs_clarification")
@@ -1342,8 +1333,6 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
             ],
             request(
                 "去往前走个100米，帮我拿杯水过来。",
-                route="robot_action",
-                intent="resource_delivery",
             ),
         )
 
@@ -1390,8 +1379,6 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
             request(
                 "bring me a bottle of water, the water is 100 meters ahead of you",
                 language="en-US",
-                route="robot_action",
-                intent="capability:soridormi.acquire_and_deliver_resource",
             ),
         )
 
@@ -1434,7 +1421,6 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
             request(
                 "Walk 100 meters for exercise, then bring the bottle from the table to me.",
                 language="en-US",
-                route="robot_action",
             ),
         )
 
@@ -1462,8 +1448,6 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
             ],
             request(
                 "帮我查重庆明天天气。",
-                route="tool",
-                intent="weather.lookup",
             ),
         )
 
@@ -1506,8 +1490,6 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
             request(
                 "I am in chongqing now, please help me check whether it will rain tonight and whether it it cold",
                 language="en-US",
-                route="tool",
-                intent="capability:chromie.weather.lookup",
             ),
         )
 
@@ -1535,8 +1517,6 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
             request(
                 "I am a litlle tired, can you tell me a joke?",
                 language="en-US",
-                route="chat",
-                intent="tell_a_joke",
             ),
         )
 

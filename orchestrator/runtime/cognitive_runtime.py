@@ -2796,8 +2796,6 @@ class GoalDrivenRuntimeCoordinator:
                         "candidate_id",
                         "step_id",
                         "capability_id",
-                        "capability_id",
-                        "intent",
                         "args",
                         "source_goal_ids",
                         "covers_goal_ids",

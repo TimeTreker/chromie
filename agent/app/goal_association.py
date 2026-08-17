@@ -2180,8 +2180,7 @@ class GoalAssociationResolver:
             "return one corrected JSON object. Preserve valid semantic judgments, but revise every field needed to satisfy "
             "the schema and validation errors. Do not explain the correction and do not use synonym substitution rules.\n\n"
             + state_instructions
-            + "The supplied pre-association route and intent are advisory only. Reconstruct semantic Goals from the authoritative user turn and bounded Goal state; do not preserve a clarification branch merely because an earlier stage selected route=clarify.\n\n"
-            f"{IDENTITY_SEMANTIC_CONTRACT}"
+            + f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
             + "\n\nResolved references are only for indirect references bound to a supplied discourse referent or active Goal binding. Direct explicit entity mentions belong in Goal bindings and salient referent updates, not resolved_references. For an indirect location binding, copy the supplied referent_id into both the location binding and resolved_references, copy the indirect user surface into resolved_references.surface_form, and retain the referent canonical value. Every resolved reference and referent update must include explicit confidence.\n\nOwner-approved Chromie identity JSON:\n"
             + identity_json
