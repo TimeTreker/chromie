@@ -23,8 +23,6 @@ from .cognitive_identity import (
     PERSONALITY_SEMANTIC_CONTRACT,
     bounded_identity_json,
     bounded_personality_json,
-    owner_approved_identity_context,
-    owner_approved_personality_context,
 )
 from .planner_contract import (
     EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
@@ -355,12 +353,12 @@ class FastPlannerResolver:
             )
             allowed_activity_contracts = (
                 [
-                    "FastPlannerProgressActivity",
-                    "FastPlannerClarificationActivity",
+                    "FastPlannerProgressAct",
+                    "FastPlannerClarificationAct",
                 ]
                 if has_blocking_user_gap
                 else [
-                    "FastPlannerProgressActivity",
+                    "FastPlannerProgressAct",
                     "FastPlannerCapabilityActivity",
                 ]
             )
@@ -379,9 +377,9 @@ class FastPlannerResolver:
                             if ref.rsplit("/", 1)[-1] in allowed_activity_contracts
                         }
         for contract_name in (
-            "FastPlannerCompleteResponseActivity",
-            "FastPlannerClarificationActivity",
-            "FastPlannerProgressActivity",
+            "FastPlannerCompleteResponseAct",
+            "FastPlannerClarificationAct",
+            "FastPlannerProgressAct",
             "FastPlannerCapabilityActivity",
         ):
             contract = definitions.get(contract_name)
@@ -394,7 +392,7 @@ class FastPlannerResolver:
                 source_refs["items"] = {"type": "string", "enum": refs}
                 source_refs["uniqueItems"] = True
         capability_contract = definitions.get("FastPlannerCapabilityActivity")
-        progress_contract = definitions.get("FastPlannerProgressActivity")
+        progress_contract = definitions.get("FastPlannerProgressAct")
         if isinstance(progress_contract, dict):
             progress_contract.setdefault("allOf", []).extend(
                 [
@@ -473,6 +471,16 @@ class FastPlannerResolver:
                 for gap in item.information_gaps
             )
         }
+        blocking_gap_ids_by_ref = {
+            item.local_ref: {
+                gap.gap_id
+                for gap in item.information_gaps
+                if gap.blocking
+                and not gap.resolved
+                and gap.preferred_resolution == "ask_user"
+            }
+            for item in responsibilities
+        }
         if blocking_user_gaps:
             clarification_refs = {
                 ref
@@ -508,12 +516,17 @@ class FastPlannerResolver:
                     "Fast Planner cannot complete a fresh-evidence Responsibility "
                     "before trusted evidence"
                 )
-            if activity.role in {"complete_response", "clarification"} and not (
-                self._speech_matches_language(activity.response_text, request.language)
-            ):
-                raise PlannerDTOContractError(
-                    "Fast Planner free-text speech must use the interaction language"
-                )
+            if activity.role == "clarification":
+                allowed_gap_ids = {
+                    gap_id
+                    for ref in activity.source_responsibility_refs
+                    for gap_id in blocking_gap_ids_by_ref.get(ref, set())
+                }
+                if set(activity.information_gap_ids) != allowed_gap_ids:
+                    raise PlannerDTOContractError(
+                        "clarification Communicative Act must reference exactly the "
+                        "blocking GI InformationGap IDs for its Responsibilities"
+                    )
             if activity.role != "capability":
                 continue
             definition = allowed.get(activity.capability_id)
@@ -537,24 +550,6 @@ class FastPlannerResolver:
                         sort_keys=True,
                     )
                 )
-
-    @staticmethod
-    def _speech_matches_language(text: str, language: str | None) -> bool:
-        """Validate model-owned wording against the interaction language.
-
-        Host never translates or rewrites this semantic surface. Bounded progress
-        bypasses this check because trusted runtime renders it directly.
-        """
-
-        normalized_language = str(language or "").strip().casefold()
-        if not normalized_language or normalized_language == "auto":
-            return True
-        has_cjk = any("\u4e00" <= ch <= "\u9fff" for ch in text or "")
-        if normalized_language.startswith("zh"):
-            return has_cjk
-        if normalized_language.startswith("en"):
-            return not has_cjk
-        return True
 
     @staticmethod
     def _advance_fail_safe(
@@ -1417,38 +1412,6 @@ class FastPlannerResolver:
             "When this list is non-empty, correct every listed defect in the fresh object. If an error reports an expected aggregate disposition, author exactly that disposition unless you also revise the underlying per-goal outcomes consistently."
         )
 
-    @staticmethod
-    def _advance_identity_voice_projection(context: dict[str, Any]) -> dict[str, Any]:
-        identity_context = owner_approved_identity_context(context)
-        identity = identity_context.get("identity")
-        if not isinstance(identity, dict):
-            identity = {}
-        personality = owner_approved_personality_context(context)
-        if not isinstance(personality, dict):
-            personality = {}
-        return {
-            "identity": {
-                key: identity[key]
-                for key in (
-                    "name",
-                    "kind",
-                    "age_description",
-                    "family_role",
-                    "short_self_description",
-                )
-                if identity.get(key) not in (None, "", [], {})
-            },
-            "voice": {
-                key: personality[key]
-                for key in (
-                    "core_traits",
-                    "spoken_style",
-                    "tool_use_style",
-                )
-                if personality.get(key) not in (None, "", [], {})
-            },
-        }
-
     def _advance_layered_prompt(
         self,
         request: CognitiveWorkRequest,
@@ -1458,20 +1421,14 @@ class FastPlannerResolver:
         validation_errors: str = "",
     ) -> LayeredPrompt:
         context = request.context if isinstance(request.context, dict) else {}
-        identity_voice = self._bounded(
-            self._advance_identity_voice_projection(context),
-            900,
-        )
-        identity_world = (
-            "Identity/voice facts for immediate conversational wording only:\n"
-            f"{identity_voice}\n\n"
-        )
         advance_contract = (
             "Responsibility evidence is authoritative contextual WHAT. Fast Planner owns "
             "the first complete HOW decision over that evidence: speaking and Capability "
             "Activities plus their sequential/parallel timing. Goal Association runs at "
             "the same time from the same GI result and alone commits Canonical Goal state. "
-            "Trusted Capability Runtime alone authorizes execution."
+            "A speaking Activity is a Communicative Act: select its function and semantic "
+            "provenance, never its sentence wording. Response Composer owns language "
+            "formulation and Trusted Capability Runtime alone authorizes execution."
         )
         responsibilities_json = self._bounded(
             [item.model_dump(mode="json", exclude_none=True) for item in responsibilities],
@@ -1485,8 +1442,7 @@ class FastPlannerResolver:
         capability_json = self._bounded(capabilities, 8000)
         user_text = " ".join(str(request.text or "").split())[:700]
         rendered = (
-            identity_world
-            + advance_contract
+            advance_contract
             + "\n\nCurrent user turn:\n"
             + user_text
             + "\nLanguage hint: "
@@ -1503,11 +1459,13 @@ class FastPlannerResolver:
             "Speaking is an Activity and uses the same timing field as Capability work. "
             "Use parallel only when activities can genuinely overlap without a declared "
             "resource or safety conflict; list dependent work sequentially. A progress "
-            "Activity is bounded and has progress_kind rather than response_text. A "
+            "Activity is bounded and has progress_kind rather than response_text. No "
+            "Communicative Act may contain response_text or other sentence wording. A "
             "complete_response Activity may satisfy only ordinary conversation that needs "
             "no fresh Evidence. When a blocking InformationGap has "
             "preferred_resolution=ask_user, return disposition=clarify, zero Capability "
-            "Activities, and a concise clarification Activity that asks for that exact gap. "
+            "Activities, and a clarification Communicative Act referencing every exact "
+            "blocking information_gap_id. "
             "An observe_environment or query_trusted_service gap is work for Chromie, "
             "not a reason to ask the user for the answer. Do not route a missing user "
             "parameter to Deep Planner. When all required "
@@ -1525,7 +1483,6 @@ class FastPlannerResolver:
         )
         return LayeredPrompt.promote(
             rendered,
-            identity_world=(identity_world,),
             operating_contract=(advance_contract,),
         )
 
@@ -1535,10 +1492,13 @@ class FastPlannerResolver:
             "You are Chromie's low-latency Fast Planner. Accept Goal Interpretation's "
             "Responsibility evidence as authoritative contextual WHAT. Produce the first "
             "Activity Plan, including speaking and exact available Capability Activities. "
-            "Ask the user through a clarification Activity when a required user-resolvable "
+            "Speaking Activities are Communicative Acts: select their function, timing, "
+            "and Responsibility/InformationGap provenance, but never author sentence "
+            "wording; speech_act is a closed communicative-function enum, not a text "
+            "escape hatch. Ask through a clarification act when a required user-resolvable "
             "binding is missing. Delegate only genuinely complex HOW to Deep Planner. Goal "
             "Association separately owns Canonical Goal commits, and Trusted Capability "
-            "Runtime owns execution authority. Keep speech natural, brief, and evidence-honest. "
+            "Runtime owns execution authority. Response Composer owns language formulation. "
             "Return only schema-constrained JSON."
         )
 

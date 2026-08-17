@@ -38,6 +38,8 @@ receive
   -> concurrently:
        Fast Planner authors the first Activity Plan
        Goal Association commits canonical Goal identity/updates
+  -> formulate wording for Planner-selected Communicative Acts without
+     changing their function, timing, provenance, or constraints
   -> bind Activities into per-Goal task-list views
   -> validate, authorize, and resource-schedule ready Work
   -> ask the user for missing user information, or use Deep Planner for complex HOW
@@ -196,9 +198,10 @@ phrase rule, route shortcut, or second semantic authority.
 One validated GI result fans out to Fast Planner and Goal Association concurrently.
 Fast Planner authors the first real Activity Plan over GI Responsibility references;
 GA independently remains the only canonical Goal commit authority. The Fast Plan may
-contain several speaking and Capability Activities with explicit sequential/parallel
-relations. A greeting can therefore be one complete speaking Activity while GA records
-the conversational Goal; a weather request can contain a progress speaking Activity and
+contain several Communicative Acts and Capability Activities with explicit
+sequential/parallel relations. A greeting can therefore be one complete Communicative
+Act while GA records the conversational Goal; a weather request can contain a progress
+Communicative Act and
 an exact weather-read Activity in parallel.
 
 A material value absent from user/context evidence is an InformationGap. Fast Planner
@@ -372,10 +375,11 @@ UserTurnEnvelope + Session Context
   -> Goal Interpretation
   -> concurrent fan-out
        |-> Fast Planner -> first Activity Plan
-       |     |-> speaking and Capability Activities
+       |     |-> Communicative Acts and Capability Activities
        |     |-> clarification for missing user information
        |     `-> Deep Planner only for complex HOW
        `-> Goal Association -> canonical Goal commit/version
+  -> Vocal Realization formulates wording for each selected Communicative Act
   -> deterministic Responsibility-to-Goal binding
   -> Goal-grouped Runtime task-list views
   -> terminal CanonicalPlan / Plan revision
@@ -632,13 +636,14 @@ Outcome reconciliation is a Core stage after execution. It:
 Streaming changes scheduling, not authority. Raw model-token deltas, partial JSON,
 private reasoning, and incomplete sentences are not speech contracts and must never
 reach TTS. In maintained cognitive apply, Goal Interpretation does not author speech.
-The first early speech contract is a complete typed Fast-Planner conversational Activity.
+The first early speech contract is an independently worded, typed Fast-Planner
+Communicative Act.
 The Host may schedule that Activity as soon as its provider-free claim/effect boundaries,
 turn correlation, cancellation generation, and Vocal transport contract validate; it
 need not wait for Goal Association or unrelated later response fields. The old Goal-Interpreter `fast_speech`/`native_response` contracts are removed;
 there is no parallel legacy early-speech path beside Fast Planner Activity.
 
-Current-turn conversational-act reuse is correlated by the exact speech-event
+Current-turn Communicative-Act reuse is correlated by the exact speech-event
 ID together with its turn, structured stage, purpose, route, intent,
 commitment, source Goal IDs, canonical Plan identity/fingerprint, delivery
 role, claim types, and completion-claim restriction. An event created before

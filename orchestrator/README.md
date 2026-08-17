@@ -71,7 +71,8 @@ microphone -> host VAD -> ASR -> Cognitive Gateway
   -> otherwise: attention review -> admitted UserTurnEnvelope
   -> Goal Interpretation: contextual Responsibility + Goal relation + InformationGaps
   -> same GI result, concurrent fan-out
-       |-> Fast Planner: first speaking/Capability Activity Plan
+       |-> Fast Planner: first Communicative-Act/Capability Activity Plan
+       |     `-> Response Composer formulation -> Vocal/TTS realization
        |     `-> Deep Planner only when HOW exceeds the Fast budget
        |-> Goal Association: sole canonical Goal commit/version authority
        `-> background Social Attention may prepare optional body decoration
@@ -232,10 +233,12 @@ duplicate processes, and starts the module from the repository root.
 The Orchestrator has a fast-first presentation path for Goal Progress
 Communication, but Goal Interpretation does not author that speech. Goal
 Interpretation emits provider-neutral Responsibility only. Fast Planner is the
-first HOW owner and may select one immediate conversational Activity while
+first HOW owner and may select one immediate Communicative Act while
 canonical Goal/Plan work continues. Pre-evidence progress is not free-form text:
-Fast Planner selects a bounded `progress_kind` and Runtime renders prospective
-wording, so progress cannot smuggle an unverified result. Interaction Context,
+Fast Planner selects a bounded `progress_kind`; Response Composer's bounded
+language realization renders prospective wording, so progress cannot smuggle an
+unverified result. Open answers and clarification acts also receive wording only
+after Planner selection. Interaction Context,
 claim/evidence checks, cancellation, and playback lifecycle remain the
 deterministic delivery boundaries. Maintained turns do not fall back to the old
 Goal-Interpreter `fast_speech`, route, or intent compatibility contract.

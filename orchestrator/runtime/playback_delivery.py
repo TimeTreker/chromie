@@ -132,7 +132,7 @@ class PlaybackDeliveryLifecycle:
         normalized_delivery_role = (
             " ".join(str(delivery_role or "response").strip().split()) or "response"
         )
-        # The event identity is a structured conversational-act and transport
+        # The event identity is a structured Communicative Act and transport
         # correlation key. Wording is payload integrity, not de-duplication
         # identity, so changing punctuation or whitespace cannot define a new
         # delivered act.

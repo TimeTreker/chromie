@@ -4783,7 +4783,7 @@ class VoiceAssistant:
         *,
         session_id: str | None,
     ) -> None:
-        """Offer a Host-presented conversational Activity to Social Attention.
+        """Offer a Host-presented Communicative Act to Social Attention.
 
         Normal cognitive-runtime responses are already anchored inside the runtime.
         This bridge is for presentation paths that bypass that return boundary, such

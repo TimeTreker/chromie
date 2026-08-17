@@ -8,8 +8,15 @@ from agent.app.response_composer import (
     ResponseComposerResolver,
 )
 from tests.cognitive_work_test_support import cognitive_work_request
-from shared.chromie_contracts.plan import CanonicalPlan
+from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+from shared.chromie_contracts.plan import (
+    CanonicalPlan,
+    FastPlannerClarificationAct,
+    FastPlannerCompleteResponseAct,
+    FastPlannerProgressAct,
+)
 from shared.chromie_contracts.response_composition import (
+    CommunicativeActRealizationRequest,
     CoordinatedResponsePlan,
     ResponseCompositionResolution,
     canonical_plan_fingerprint,
@@ -112,6 +119,152 @@ def request(canonical_plan: CanonicalPlan, *, context=None):
         context=merged,
         history=[],
     )
+
+
+def communicative_act_request(*acts, language="zh-CN"):
+    gaps = []
+    if any(act.role == "clarification" for act in acts):
+        gaps = [
+            {
+                "gap_id": "gap-tea-kind",
+                "description": "Which kind of tea should be brought?",
+                "blocking": True,
+                "required_for": ["tea_kind"],
+                "preferred_resolution": "ask_user",
+            }
+        ]
+    responsibility = CognitiveResponsibilityProposal(
+        local_ref="tea",
+        outcome="Bring the requester a cup of tea.",
+        information_gaps=gaps,
+        completion_requires_work=True,
+        confidence=0.96,
+    )
+    return CommunicativeActRealizationRequest(
+        turn_id="turn-tea",
+        session_id="session-tea",
+        language=language,
+        acts=list(acts),
+        responsibilities=[responsibility],
+        context={"interaction_context": {}},
+    )
+
+
+class CommunicativeActRealizationTests(unittest.TestCase):
+    def test_response_composer_authors_words_for_planner_act(self):
+        ollama = FakeOllama(
+            {
+                "wordings": [
+                    {"activity_id": "answer-tea", "text": "好呀，我来帮你。"}
+                ],
+                "confidence": 0.94,
+                "rationale": "Natural realization of the supplied act.",
+            }
+        )
+        act = FastPlannerCompleteResponseAct(
+            activity_id="answer-tea",
+            role="complete_response",
+            speech_act="answer",
+            source_responsibility_refs=["tea"],
+        )
+
+        result = asyncio.run(
+            ResponseComposerResolver(ollama).realize_communicative_acts(
+                communicative_act_request(act)
+            )
+        )
+
+        self.assertEqual(result.status, "resolved")
+        self.assertEqual(result.wordings[0].text, "好呀，我来帮你。")
+        self.assertEqual(result.wording_owner, "response_composer")
+        prompt = str(ollama.prompts[0][0])
+        self.assertIn("Immutable Communicative Acts", prompt)
+        self.assertIn("Bring the requester a cup of tea", prompt)
+        self.assertFalse(hasattr(act, "response_text"))
+
+    def test_closed_progress_act_is_realized_without_model_call(self):
+        ollama = FakeOllama(RuntimeError("model must not be called"))
+        act = FastPlannerProgressAct(
+            activity_id="check-tea",
+            role="progress",
+            progress_kind="check_information",
+            source_responsibility_refs=["tea"],
+        )
+
+        result = asyncio.run(
+            ResponseComposerResolver(ollama).realize_communicative_acts(
+                communicative_act_request(act)
+            )
+        )
+
+        self.assertEqual(result.wordings[0].text, "我先看看能不能查到。")
+        self.assertEqual(ollama.prompts, [])
+
+    def test_clarification_wording_receives_exact_gi_gap(self):
+        ollama = FakeOllama(
+            {
+                "wordings": [
+                    {"activity_id": "ask-tea", "text": "你想喝什么茶？"}
+                ],
+                "confidence": 0.95,
+                "rationale": "Ask only for the missing tea kind.",
+            }
+        )
+        act = FastPlannerClarificationAct(
+            activity_id="ask-tea",
+            role="clarification",
+            speech_act="ask_clarification",
+            source_responsibility_refs=["tea"],
+            information_gap_ids=["gap-tea-kind"],
+        )
+
+        result = asyncio.run(
+            ResponseComposerResolver(ollama).realize_communicative_acts(
+                communicative_act_request(act)
+            )
+        )
+
+        self.assertEqual(result.wordings[0].text, "你想喝什么茶？")
+        self.assertIn("gap-tea-kind", str(ollama.prompts[0][0]))
+
+    def test_clarification_wording_rejects_a_different_gap(self):
+        act = FastPlannerClarificationAct(
+            activity_id="ask-tea",
+            role="clarification",
+            speech_act="ask_clarification",
+            source_responsibility_refs=["tea"],
+            information_gap_ids=["gap-invented"],
+        )
+
+        with self.assertRaisesRegex(ValueError, "blocking GI InformationGap"):
+            communicative_act_request(act)
+
+    def test_wording_language_mismatch_gets_one_dto_revision_then_stops(self):
+        invalid = {
+            "wordings": [
+                {"activity_id": "answer-tea", "text": "I can help with that."}
+            ],
+            "confidence": 0.9,
+            "rationale": "Wrong language for this interaction.",
+        }
+        ollama = ScriptedOllama([invalid, invalid])
+        act = FastPlannerCompleteResponseAct(
+            activity_id="answer-tea",
+            role="complete_response",
+            speech_act="answer",
+            source_responsibility_refs=["tea"],
+        )
+
+        result = asyncio.run(
+            ResponseComposerResolver(ollama).realize_communicative_acts(
+                communicative_act_request(act, language="zh-CN")
+            )
+        )
+
+        self.assertEqual(result.status, "model_unavailable")
+        self.assertEqual(result.wordings, [])
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertIn("interaction language", str(ollama.prompts[1][0]))
 
 
 class ResponseCompositionContractTests(unittest.TestCase):

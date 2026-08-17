@@ -33,13 +33,20 @@ try:
     from chromie_contracts.execution_lanes import LaneCoordinationGroup
     from chromie_contracts.goal import GoalAssociationResolution
     from chromie_contracts.interaction import VOCAL_PERFORMANCE_CAPABILITY_ID
-    from chromie_contracts.plan import CanonicalPlan
+    from chromie_contracts.plan import (
+        CanonicalPlan,
+        FastPlannerProgressAct,
+    )
     from chromie_contracts.response_composition import (
+        CommunicativeActRealization,
+        CommunicativeActRealizationRequest,
+        CommunicativeActWording,
         CoordinatedResponsePlan,
         DirectResponseComposition,
         ResponseCompositionResolution,
         canonical_plan_fingerprint,
         goal_association_fingerprint,
+        realize_bounded_fast_progress_act,
     )
     from chromie_contracts.semantic_task import (
         ResponsePlan,
@@ -52,13 +59,20 @@ except ImportError:  # pragma: no cover
     from shared.chromie_contracts.execution_lanes import LaneCoordinationGroup
     from shared.chromie_contracts.goal import GoalAssociationResolution
     from shared.chromie_contracts.interaction import VOCAL_PERFORMANCE_CAPABILITY_ID
-    from shared.chromie_contracts.plan import CanonicalPlan
+    from shared.chromie_contracts.plan import (
+        CanonicalPlan,
+        FastPlannerProgressAct,
+    )
     from shared.chromie_contracts.response_composition import (
+        CommunicativeActRealization,
+        CommunicativeActRealizationRequest,
+        CommunicativeActWording,
         CoordinatedResponsePlan,
         DirectResponseComposition,
         ResponseCompositionResolution,
         canonical_plan_fingerprint,
         goal_association_fingerprint,
+        realize_bounded_fast_progress_act,
     )
     from shared.chromie_contracts.semantic_task import (
         ResponsePlan,
@@ -77,6 +91,16 @@ class ResponseComposerModelOutput(BaseModel):
     lane_coordination: list[LaneCoordinationGroup] = Field(default_factory=list)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     rationale: str = ""
+
+
+class CommunicativeActWordingModelOutput(BaseModel):
+    """Wording-only model output for immutable Planner-selected acts."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    wordings: list[CommunicativeActWording] = Field(min_length=1, max_length=16)
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    rationale: str = Field(default="", max_length=800)
 
 
 
@@ -118,9 +142,10 @@ class ResponseTruthAudit(BaseModel):
 class ResponseComposerResolver:
     """Advisory composition of truthful user-facing response expression.
 
-    The model owns ResponsePlan wording and optional Vocal/Activity lane presentation
-    around an immutable CanonicalPlan. Social Attention is independent background
-    cognition owned by SocialAttentionPlanner and is not part of this DTO.
+    Planner owns Communicative Act selection. This model owns exact wording and
+    optional Vocal/Activity lane presentation around immutable Planner/Goal state.
+    Social Attention is independent background cognition owned by
+    SocialAttentionPlanner and is not part of this DTO.
     """
 
     TRACE_MODULE = TraceModule(
@@ -136,6 +161,223 @@ class ResponseComposerResolver:
         self.ollama = ollama
         self.num_ctx = max(2048, int(num_ctx))
         self.num_predict = max(128, int(num_predict))
+
+    async def realize_communicative_acts(
+        self,
+        request: CommunicativeActRealizationRequest,
+    ) -> CommunicativeActRealization:
+        """Formulate exact words without re-deciding the Planner's activities."""
+
+        bounded_wordings: list[CommunicativeActWording] = []
+        open_acts = []
+        for act in request.acts:
+            if isinstance(act, FastPlannerProgressAct):
+                bounded_wordings.append(
+                    CommunicativeActWording(
+                        activity_id=act.activity_id,
+                        text=realize_bounded_fast_progress_act(
+                            act,
+                            language=request.language,
+                        ),
+                    )
+                )
+            else:
+                open_acts.append(act)
+
+        model_wordings: list[CommunicativeActWording] = []
+        if open_acts:
+            schema = CommunicativeActWordingModelOutput.model_json_schema()
+            ids = [act.activity_id for act in open_acts]
+            wording_items = schema.get("properties", {}).get("wordings")
+            item_ref = wording_items.get("items") if isinstance(wording_items, dict) else None
+            if isinstance(item_ref, dict) and "$ref" in item_ref:
+                definition = schema.get("$defs", {}).get(
+                    str(item_ref["$ref"]).rsplit("/", 1)[-1]
+                )
+                activity_id = (
+                    definition.get("properties", {}).get("activity_id")
+                    if isinstance(definition, dict)
+                    else None
+                )
+                if isinstance(activity_id, dict):
+                    activity_id["enum"] = ids
+            if isinstance(wording_items, dict):
+                wording_items["minItems"] = len(ids)
+                wording_items["maxItems"] = len(ids)
+            previous_errors = ""
+            for attempt in range(2):
+                try:
+                    raw = await self.ollama.generate(
+                        self._communicative_act_wording_prompt(
+                            request,
+                            acts=open_acts,
+                            validation_errors=previous_errors,
+                        ),
+                        system=self._communicative_act_wording_system_prompt(),
+                        options={
+                            "temperature": 0.2,
+                            "top_p": 0.9,
+                            "num_ctx": self.num_ctx,
+                            "num_predict": min(self.num_predict, 768),
+                        },
+                        response_format=schema,
+                        prompt_family=(
+                            "response_composer.communicative_act_wording.revision"
+                            if attempt
+                            else "response_composer.communicative_act_wording"
+                        ),
+                        turn_id=request.turn_id,
+                        attempt=attempt + 1,
+                    )
+                    output = CommunicativeActWordingModelOutput.model_validate(raw)
+                    output_ids = [item.activity_id for item in output.wordings]
+                    if set(output_ids) != set(ids) or len(output_ids) != len(ids):
+                        raise ResponseComposerDTOContractError(
+                            "wording output must cover every Communicative Act exactly once"
+                        )
+                    if any(
+                        not self._wording_matches_language(
+                            item.text,
+                            request.language,
+                        )
+                        for item in output.wordings
+                    ):
+                        raise ResponseComposerDTOContractError(
+                            "Communicative Act wording must use the interaction language"
+                        )
+                    model_wordings = list(output.wordings)
+                    break
+                except (ValidationError, ResponseComposerDTOContractError) as exc:
+                    if attempt:
+                        logger.warning(
+                            "communicative_act_wording_unavailable turn_id=%s error_type=%s error=%s",
+                            request.turn_id,
+                            type(exc).__name__,
+                            exc,
+                        )
+                        return CommunicativeActRealization(
+                            status="model_unavailable",
+                            turn_id=request.turn_id,
+                            reason_summary=(
+                                "Communicative Act wording failed its closed contract."
+                            ),
+                        )
+                    previous_errors = json.dumps(
+                        (
+                            exc.errors(include_url=False)
+                            if isinstance(exc, ValidationError)
+                            else [{"type": type(exc).__name__, "message": str(exc)}]
+                        ),
+                        ensure_ascii=False,
+                        default=str,
+                    )[:3000]
+
+        ordered_by_id = {
+            item.activity_id: item for item in [*bounded_wordings, *model_wordings]
+        }
+        if set(ordered_by_id) != {item.activity_id for item in request.acts}:
+            return CommunicativeActRealization(
+                status="model_unavailable",
+                turn_id=request.turn_id,
+                reason_summary="Communicative Act realization was incomplete.",
+            )
+        return CommunicativeActRealization(
+            status="resolved",
+            turn_id=request.turn_id,
+            wordings=[ordered_by_id[item.activity_id] for item in request.acts],
+        )
+
+    def _communicative_act_wording_prompt(
+        self,
+        request: CommunicativeActRealizationRequest,
+        *,
+        acts: list[Any],
+        validation_errors: str,
+    ) -> LayeredPrompt:
+        context = request.context if isinstance(request.context, dict) else {}
+        responsibility_by_ref = {
+            item.local_ref: item for item in request.responsibilities
+        }
+        projections = []
+        for act in acts:
+            projections.append(
+                {
+                    "activity_id": act.activity_id,
+                    "role": act.role,
+                    "speech_act": act.speech_act,
+                    "timing": act.timing,
+                    "source_responsibilities": [
+                        responsibility_by_ref[ref].model_dump(
+                            mode="json", exclude_none=True
+                        )
+                        for ref in act.source_responsibility_refs
+                    ],
+                    "information_gap_ids": list(
+                        getattr(act, "information_gap_ids", [])
+                    ),
+                }
+            )
+        identity_world = (
+            "Owner-approved Chromie identity JSON:\n"
+            f"{bounded_identity_json(context)}\n\n"
+            "Owner-approved Personality Expression JSON:\n"
+            f"{bounded_personality_json(context)}\n\n"
+        )
+        operating_contract = (
+            "Planner has already selected every Communicative Act. Formulate only "
+            "the exact surface sentence for each activity_id. Do not add, remove, "
+            "merge, split, reorder, suppress, or reinterpret an act. Do not choose "
+            "Capabilities, promise execution, claim external Evidence, change a Goal, "
+            "or answer a clarification gap on the user's behalf. A complete_response "
+            "may use only its supplied Responsibility and ordinary non-fresh reasoning. "
+            "A clarification must ask naturally for exactly its referenced unresolved "
+            "InformationGap. Preserve the requested language and Chromie's approved voice."
+        )
+        rendered = (
+            identity_world
+            + operating_contract
+            + IDENTITY_SEMANTIC_CONTRACT
+            + PERSONALITY_SEMANTIC_CONTRACT
+            + "\n\nLanguage hint:\n"
+            + request.language
+            + "\n\nImmutable Communicative Acts JSON:\n"
+            + self._bounded(projections, 5200)
+            + "\n\nBounded Interaction Context for continuity only:\n"
+            + self._bounded(context.get("interaction_context") or {}, 1800)
+            + "\n\nMechanical validation errors from the previous wording DTO:\n"
+            + (validation_errors or "[]")
+            + "\nReturn exactly one wording for every supplied activity_id as JSON only."
+        )
+        return LayeredPrompt.promote(
+            rendered,
+            identity_world=(identity_world,),
+            operating_contract=(
+                operating_contract,
+                IDENTITY_SEMANTIC_CONTRACT,
+                PERSONALITY_SEMANTIC_CONTRACT,
+            ),
+        )
+
+    @staticmethod
+    def _communicative_act_wording_system_prompt() -> str:
+        return (
+            "You are Chromie's language-formulation function inside Response Composer. "
+            "Planner owns whether to communicate and the function of each Communicative "
+            "Act. You own only exact wording for those immutable acts. Return the closed "
+            "schema JSON and no extra text."
+        )
+
+    @staticmethod
+    def _wording_matches_language(text: str, language: str | None) -> bool:
+        normalized_language = str(language or "").strip().casefold()
+        if not normalized_language or normalized_language == "auto":
+            return True
+        has_cjk = any("\u4e00" <= ch <= "\u9fff" for ch in text or "")
+        if normalized_language.startswith("zh"):
+            return has_cjk
+        if normalized_language.startswith("en"):
+            return not has_cjk
+        return True
 
     async def resolve(self, request: CognitiveWorkRequest) -> ResponseCompositionResolution:
         trace_scope = runtime_tracer.continue_from_context(request.context)
@@ -2253,9 +2495,9 @@ class ResponseComposerResolver:
             f"Previous Response Composer output for mechanical DTO regeneration:\n{self._bounded(previous_raw, 5000) if previous_raw is not None else 'null'}\n\n"
             f"Exact mechanical DTO validation errors:\n{validation_errors or '[]'}\n\n"
             "Compose one ResponsePlan and zero or more typed lane-coordination groups. Social Attention is owned by its independent background cognition and is not part of Response Composer output. Never author, select, validate, or suppress a Social Attention behavior here. "
-            "The CanonicalPlan is immutable: do not alter, replace, add, remove, reorder, authorize, or execute its steps. CanonicalPlan.response_text is planner-authored prospective conversational intent, not execution evidence: preserve its meaning when it is still needed, suppress or reuse it when Interaction Context shows the same act is already delivered or pending, and supplement or correct it only when new context requires that delta. The verified tool-memory index contains provenance and bound arguments only, not answer facts. It may support honest wording that Chromie recently checked an exact matching subject and is retrieving it, but never state the remembered result before the memory retrieval step returns evidence. Conversation context may ground ordinary conversational repair, but never claim external facts without executed evidence. Answer the user's requested judgment or decision directly before supporting detail, and naturally acknowledge a prior context failure when the current turn calls for repair. "
+            "The CanonicalPlan is immutable: do not alter, replace, add, remove, reorder, authorize, or execute its steps or Communicative Acts. A typed communicative_acts entry is Planner-owned semantic intent, timing, and provenance without wording: formulate its still-needed surface expression, but never re-decide whether the act exists or what function it serves. CanonicalPlan.response_text remains wording from an older canonical Planner contract and is not execution evidence: preserve its meaning when still needed while preferring typed Communicative Acts on the Fast-advance path. Suppress or reuse an act only when Interaction Context shows it is already delivered or pending, and supplement or correct it only when new context requires that delta. The verified tool-memory index contains provenance and bound arguments only, not answer facts. It may support honest wording that Chromie recently checked an exact matching subject and is retrieving it, but never state the remembered result before the memory retrieval step returns evidence. Conversation context may ground ordinary conversational repair, but never claim external facts without executed evidence. Answer the user's requested judgment or decision directly before supporting detail, and naturally acknowledge a prior context failure when the current turn calls for repair. "
             "Ground every user-specific statement in the newest turn, active Goals, or supplied conversation context. Do not invent the user's plans, schedule, preferences, relationships, experiences, feelings, or circumstances to make a response sound helpful. When a friendly supporting reason is useful but no personal fact was supplied, phrase it generally. "
-            "Use Interaction Context to account for what Chromie already said, committed, attempted, completed, or failed on the relevant Goals. Do not treat an earlier stage's silence as authoritative conversational policy: if no equivalent notification was actually delivered or is pending, a later stage may still speak when it owns a real new progress delta. Respond with only the conversational act still needed. Never promote speech, plan, committed-request, or social-action events into Activity completion; only execution_closure terminal events with evidence references can support such a claim. "
+            "Use Interaction Context to account for what Chromie already said, committed, attempted, completed, or failed on the relevant Goals. Do not treat an earlier stage's silence as authoritative conversational policy: if no equivalent notification was actually delivered or is pending, a later stage may still speak when Planner owns a real new progress delta. Realize only the Communicative Act still needed. Never promote speech, plan, committed-request, or social-action events into Activity completion; only execution_closure terminal events with evidence references can support such a claim. "
             "For a retained completed external-result Goal, treat delivered evidence-bound dialogue as the only supplied factual projection. Preserve every measurement and condition from the immutable plan and that dialogue exactly; do not substitute, infer, or embellish external details. The newest user turn remains the conversational target: when it is a reaction, feeling, acknowledgement, evaluation, or practical decision, respond to that act first and use prior facts only as useful support. Never replace the current intent with a replay of the old answer. Omit supporting detail when a direct judgment is sufficient. "
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
@@ -2264,7 +2506,7 @@ class ResponseComposerResolver:
             "For a terminal respond plan, emit exactly one final stage, omit immediate/pre_action/progress, set commitment_state=completed, and set must_not_claim_completion=false. This marks the conversational response itself as complete; it does not claim that an unexecuted action occurred. Greeting wording and length are ordinary model-authored conversational choices; use the full scene, recent relationship context, and owner-approved personality without a fixed greeting template or Host-imposed brevity target. "
             "For execute plans this is pre-execution composition. Effectful or confirmation-bound work must emit an immediate and/or pre_action stage covering every canonical goal, use only none/heard/evaluating/waiting_for_user commitments, set must_not_claim_completion=true, omit progress and final, and phrase the speech naturally. speech_act=none and punctuation-only placeholder text are not audible communication and cannot satisfy the playback/effect barrier. Reuse an exact scheduled acknowledgement when it already owns this act; otherwise author one real prospective acknowledgement. "
             "When the CanonicalPlan or supplied execution capability semantics require confirmation, explain any supplied adjustment or alternative without claiming it started, ask the user to approve it, set speech_act=ask_confirmation and commitment_state=waiting_for_user, and do not imply that approval has already been granted. "
-            "Speech already delivered in this current turn is part of the live conversation. Judge its meaning, not its wording. Do not repeat or lightly paraphrase a communicative responsibility the user has already heard. You may supplement it when it covered only part of the current plan, and you may correct it when the later canonical interpretation makes it misleading. Fast speech marked scheduled is a queued current-turn communicative commitment: do not author another acknowledgement with the same semantic job while it is starting, but never treat scheduled status as proof that the user heard it or as external-fact, execution, or completion evidence. When an existing delivered or scheduled acknowledgement adequately covers pending work, reference its speech_event_id in reused_speech_event_id, copy its text only as a playback-integrity field, set reuse_current_turn_speech=true, set speech_act to the event purpose, and add the current canonical goal IDs. That stage is a structured reference to an existing conversational act, not a request to speak it again. Use reuse_current_turn_speech=false and omit reused_speech_event_id for any supplement, correction, confirmation question, result, or failure. De-duplication is based on structured act identity and delivery status, never string similarity, keyword matching, or a fixed fast-speech suppression rule. "
+            "Speech already delivered in this current turn is part of the live conversation. Judge its meaning, not its wording. Do not repeat or lightly paraphrase a communicative responsibility the user has already heard. You may supplement it when it covered only part of the current plan, and you may correct it when the later canonical interpretation makes it misleading. Fast speech marked scheduled is a queued current-turn communicative commitment: do not author another acknowledgement with the same semantic job while it is starting, but never treat scheduled status as proof that the user heard it or as external-fact, execution, or completion evidence. When an existing delivered or scheduled acknowledgement adequately covers pending work, reference its speech_event_id in reused_speech_event_id, copy its text only as a playback-integrity field, set reuse_current_turn_speech=true, set speech_act to the event purpose, and add the current canonical goal IDs. That stage is a structured reference to an existing Communicative Act, not a request to speak it again. Use reuse_current_turn_speech=false and omit reused_speech_event_id for any supplement, correction, confirmation question, result, or failure. De-duplication is based on structured act identity and delivery status, never string similarity, keyword matching, or a fixed fast-speech suppression rule. "
             "For a pure execute plan whose pending capabilities are all safe_read or external_read, never author new pre-evidence speech. If scheduled Fast speech has not reached playback_started, represent that exact event as one immediate reused-speech stage so Runtime can reuse or fulfill it; otherwise omit immediate and pre_action speech. Never state any pending measurement, condition, recommendation, conclusion, or completed lookup before matching trusted evidence exists. The post-execution tool-result interpreter owns the evidence-bound factual result. A mixed plan with an independent respond responsibility may still require model-authored speech; that speech must cover only the still-needed conversational responsibility and must not substitute for pending effect evidence. Do not mention internal tools, APIs, execution, backend, evidence IDs, or memory implementation. "
             "For mixed plans, coordinate executable and conversational goals in one natural response: use prospective wording for pending physical steps, do not narrate them with stage directions such as *Blinks twice*, do not claim completion, omit final while work is pending, and include a specific waiting_for_user clarification stage for every clarify outcome. "
             "Chromie has one Cognitive Core and two execution lanes: Vocal delivers model-authored communication and exact provider-qualified vocal performance, while Activity executes non-vocal provider work. Social Attention is background social cognition, not a third execution lane. It may add small optional body decorations such as gaze, blink, nod, smile, wave, or slight posture/orientation changes around an anchored interaction; accepted body decorations execute through Activity with auxiliary_social_attention=true and never own Goal completion. chromie.vocal.perform is a Vocal-lane provider step, never response transport and never an Activity step. The exact chromie.media.* family is persistent Activity-lane playback/control, never Vocal or vocal-performance evidence. Media may share the physical speaker with Vocal only under its declared duck_media_during_vocal mixer policy; describing that overlap must not mutate either Goal, playback identity, or cancellation scope. An optional acknowledgement about pending vocal or media work remains ordinary chromie.speak delivery and is not provider completion evidence. lane_coordination describes Vocal/Activity execution overlap only; it never coordinates Social Attention as a lane, creates another mind, selects a provider, authorizes an effect, or weakens provider safety. Copy an already-parallel chromie.vocal.perform step into vocal_step_ids; copy only already-parallel non-speech provider steps, including chromie.media.play, into activity_step_ids. A coordinated response stage may supply the Vocal member only when no provider vocal_step_ids are present; it must copy the same coordination_id and use delivery_role=activity_companion or performance. Social Attention behaviors never carry coordination_id; they remain opportunistic, parallel, fail-soft Activity decorations. Ordinary pre-action acknowledgement remains delivery_role=response with no coordination_id and keeps the playback-start barrier. Never coordinate ask_confirmation or waiting_for_user speech with effect execution. The maintained start policy is best_effort_parallel and the failure policy is independent; do not imply synchronized starts or atomic cross-provider cancellation. "

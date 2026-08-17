@@ -176,6 +176,13 @@ Goal → Planner → Provider → Action → Evidence`; the responsive turn path
 allows Fast Planner to author an immediate safe Activity before or while that persistent
 continuity is established.
 
+When that Activity communicates, it is a **Communicative Act**. Planner owns
+the act's function (`acknowledge`, `ask`, `answer`, `explain`, `refuse`, or no
+speech), semantic provenance, timing, and truth constraints. The act contains no
+surface sentence. Vocal Realization/language formulation owns the exact wording,
+and TTS/playback owns physical production and delivery Evidence. This refines the
+Activity expansion without adding another semantic manager.
+
 ### Human-like does not mean perfectionist
 
 Normal people do not run an independent reviewer after every obvious thought.
@@ -299,20 +306,20 @@ not silently promoted into authority for that state.
 
 ### Response is how Chromie says established meaning
 
-Response composition is downstream expression. It receives authoritative
-conversation/Goal/Plan/Evidence state and chooses the still-needed natural
-user-facing act. It may verify that wording does not claim unobserved completion
+Response composition is downstream expression. It receives an immutable
+Planner-selected Communicative Act plus authoritative conversation/Goal/Plan/Evidence
+state and chooses only its natural wording. It may verify that wording does not claim unobserved completion
 or contradict a trusted limitation, but it cannot reinterpret the Goal, invent a
 new responsibility, reopen Planner authority, or authorize an effect.
 
 If wording is mechanically malformed, the representation may be regenerated once
-without changing its meaning. Wording authority is per conversational act, not one
-universal speech author. In the maintained flow, Goal Interpretation owns Responsibility
-meaning and **does not author response wording**. Fast Planner owns every conversational
-Activity it explicitly authors in its first Activity Plan; an evidence-bound Tool Result
-act retains Tool Result Interpretation as its writer; Response Composer is the sole
-writer only for the still-needed later acts it owns. Goal Association and Runtime may
-bind or exactly reuse those acts but may not rewrite them. Response stages do **not**
+without changing its meaning. Goal Interpretation owns Responsibility meaning and
+**does not author response wording or a Communicative Act**. Planner owns every
+Communicative Act; Response Composer/language formulation owns its surface sentence.
+Closed progress acts may use a deterministic bounded realization inside that same
+downstream wording boundary. Evidence interpreters supply grounded propositions and
+references, not permission to add another act. Goal Association and Runtime may bind
+or exactly reuse acts but may not rewrite them. Response stages do **not**
 author Goal coverage: `covers_goal_ids`
 is a read-only Host projection from the immutable CanonicalPlan, per-Goal outcomes,
 and exact reused-speech provenance. The model-facing schema permits no writable Goal
@@ -485,7 +492,7 @@ interaction act must acquire before useful progress can begin.
 Fast Goal Interpretation may establish a fully understood, low-risk Responsibility
 quickly, but it still stops at Responsibility evidence. Fast Planner then owns the
 smallest HOW advancement. For an ordinary greeting that can be satisfied immediately,
-Fast Planner may author one ready conversational Activity and no Goal Association is
+Fast Planner may author one ready Communicative Act and no Goal Association is
 needed. When work must persist, wait for evidence/provider effects, modify retained
 continuity, or survive the current instant, Fast Planner requests Goal Association while
 any separately safe immediate progress Activity may start in parallel. If HOW exceeds
@@ -659,7 +666,7 @@ Likewise, response transport is not a user-task step. `Converse` is a native
 cognitive ability to complete a conversational responsibility from current Mind
 and context; `chromie.speak` is only the trusted Vocal speech transport/evidence
 boundary. When Fast Planner determines that a conversational Responsibility can be
-satisfied immediately, it may author the ready conversational Activity and start that
+satisfied immediately, it may author the ready Communicative Act and start that
 Activity through the Vocal runtime without creating a persistent Goal. If the same turn
 also requires persistent work, a prospective Planner-authored progress Activity may start
 while Goal Association establishes the canonical unfinished Responsibility.
@@ -855,9 +862,11 @@ commits that Goal version.
 
 The same immutable GI result fans out concurrently to Fast Planner and Goal Association.
 Fast Planner returns a typed `FastPlannerAdvance` that is the first real Activity Plan:
-exact Responsibility refs covered, zero or more speaking and Capability Activities,
+exact Responsibility refs covered, zero or more Communicative Acts and Capability Activities,
 their sequential/parallel relation, and an optional `deep_planner` continuation for
-complex HOW. Missing user information produces a clarification Activity; it is not a
+complex HOW. A Communicative Act records function, timing, Responsibility provenance,
+and applicable InformationGap IDs but never `response_text`. Missing user information
+produces a clarification act; it is not a
 Deep-Planner escalation. A schema-valid safe, side-effect-free read may begin while GA
 commits canonical Goal identity. Effects remain gated by canonical Goal binding,
 confirmation, authorization, resource, and provider-safety checks.
@@ -2587,8 +2596,8 @@ expressive speech, recitation, singing, humming, and nonverbal vocalization are
 modes of one Vocal Expression; they are not peer Primary-Activity kinds.
 
 Responsibility/Goal meaning is **above** Activity identity. After Goal Association,
-concrete Primary Activities follow canonical Work/Plan granularity: a conversational
-act is one semantic Activity, and executable provider work is projected at canonical
+concrete Primary Activities follow canonical Work/Plan granularity: a Communicative
+Act is one semantic Activity, and executable provider work is projected at canonical
 Plan-step granularity. One Goal may therefore own several Activities—for example a
 `bring water` Responsibility may require walking, acquiring, returning, and handover
 Activities when only low-level providers are available. If a qualified provider later
@@ -2596,8 +2605,9 @@ exposes one atomic `bring water` capability/workflow, the Planner may instead ke
 that behavior as one Activity. This is the same dynamic capability boundary used by
 the rest of Chromie.
 
-Before Goal Association, a concrete scheduled conversational act such as an
-acknowledgement may temporarily anchor Social Attention from its own semantic text,
+Before Goal Association, a concrete scheduled Communicative Act such as an
+acknowledgement may temporarily anchor Social Attention from its semantic function
+and independently realized wording,
 while its realization records only `Vocal Expression(mode=speech)`. After planning,
 Plan-step `reason_summary`/ownership provide Activity meaning; request IDs and exact
 Capability IDs remain realization evidence. `InteractionResponse` is a coordination
@@ -2845,14 +2855,15 @@ interaction with no Goal Association, Plan, or provider request. The interaction
 whose trusted result is empty. Speech delivery can express the distinction but cannot
 change it, and `chromie.speak` cannot stand in for the missing substantive Capability.
 
-The Host may schedule a complete, schema-valid Fast-Planner immediate conversational
-Activity or later `ResponseStage` only after mechanical validation authorizes it against
+The Host may schedule a complete, schema-valid, independently worded Fast-Planner
+Communicative Act or later `ResponseStage` only after mechanical validation authorizes it against
 the applicable turn correlation, commitment/evidence state, claim guards, and
 cancellation generation; it need not wait for unrelated later response fields. Raw
 model-token deltas, partial JSON, private reasoning, and incomplete sentences are not
 response contracts. Goal Interpretation owns Responsibility meaning, not dynamic reply
-wording. Fast Planner owns the exact wording and semantic role of every conversational
-Activity it authors. The Host derives transport/claim-envelope facts and
+wording. Fast Planner owns the semantic role, timing, and provenance of every
+Communicative Act it authors, while Response Composer/language formulation owns the
+exact wording. The Host derives transport/claim-envelope facts and
 may reject malformed or authority-violating output, but it does not become a second
 semantic writer. Progress speech carries no Capability/Goal completion claim.
 The old Goal-Interpreter `fast_speech`/`native_response` fields are removed rather than
@@ -2948,10 +2959,10 @@ WHAT the user wants, material bindings, uncertainty, and whether fresh work or
 Evidence remains. It has no speech/progress Activity contract.
 
 After Responsibility meaning is sufficient, Fast Planner may select one tiny
-immediately-ready conversational Activity while downstream work continues. A
-pre-evidence progress Activity is structurally bounded: the model chooses only a
+immediately-ready Communicative Act while downstream work continues. A
+pre-evidence progress act is structurally bounded: the model chooses only a
 `progress_kind` such as `check_information`, `perform_action`, `think`, or
-`acknowledge_work`; Runtime renders the actual prospective wording. The progress
+`acknowledge_work`; the bounded language realizer renders the actual prospective wording. The progress
 schema contains no free-form result text, so an unverified result cannot become
 admissible merely by labelling it `role=progress`. A substantive immediate answer
 or clarification uses its own typed Activity and truth requirements instead.
@@ -2965,14 +2976,14 @@ only the maintained delivery lifecycle proves that the user was actually told.
 Internal modules, schemas, provider plumbing, planning mechanics, and ordinary
 low-level steps are not milestones merely because they occurred.
 
-Every ready human-observable conversational Activity is also an eligible Social
+Every ready human-observable Communicative Act is also an eligible Social
 Attention anchor, whether it is the first Goal Progress Communication act or a
 post-Evidence, failure, correction, or completion response. Social Attention remains
 an optional peer decoration lane and may choose `none`; speech never requires a
 gesture. Conversely, a tool lookup or an internal cognition milestone is not promoted
 into a Social Attention anchor merely because it happened.
 
-Each communication act has one semantic owner and deterministic authority,
+Each Communicative Act has one Planner owner and one downstream wording owner, with deterministic authority,
 evidence, cancellation, and delivery validation. The architecture does not add a
 second LLM to repair ordinary progress wording, and it does not retain a legacy
 Goal-Interpreter `fast_speech`/`native_response` compatibility path for maintained

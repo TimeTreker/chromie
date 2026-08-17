@@ -103,8 +103,8 @@ All risky or incomplete execution paths are default-off.
 | `ORCH_ENABLE_AGENT` | `1` | Enable the Agent-owned Cognitive Core and downstream runtime. |
 | `ORCH_ENABLE_INTERACTION_RESPONSE` | `1` | Enable strict structured responses. Unified cognitive `apply` requires this; the compatibility `/interaction` surface remains available for explicit diagnostics. |
 | `ORCH_ENABLE_SORIDORMI_CAPABILITIES` | `0` | Allow named Soridormi skills in the structured path. |
-| `ORCH_FAST_FIRST_RESPONSE_ENABLED` | `1` | Legacy/compatibility low-latency response gate. Maintained cognitive `apply` does not use Goal Interpretation as the wording owner; speaking Activities are authored by Fast Planner and scheduled by the Cognitive Runtime. |
-| `ORCH_AGENT_GOAL_INTERPRETER_GENERATED_FAST_SPEECH_ENABLED` | `1` | Legacy compatibility gate for Goal-Interpreter-generated `fast_speech`. In maintained cognitive `apply`, Goal Interpretation emits Responsibility evidence only and this field is structurally `null`; Fast Planner owns any immediate conversational Activity. |
+| `ORCH_FAST_FIRST_RESPONSE_ENABLED` | `1` | Legacy/compatibility low-latency response gate. Maintained cognitive `apply` does not use Goal Interpretation as a speech owner; Fast Planner selects Communicative Acts, Response Composer realizes their wording, and Cognitive Runtime schedules them. |
+| `ORCH_AGENT_GOAL_INTERPRETER_GENERATED_FAST_SPEECH_ENABLED` | `1` | Legacy compatibility gate for Goal-Interpreter-generated `fast_speech`. In maintained cognitive `apply`, Goal Interpretation emits Responsibility evidence only and this field is structurally `null`; Fast Planner owns any immediate Communicative-Act selection. |
 | `ORCH_FAST_FIRST_AUDIO_ENABLED` | `1` | Enable startup-primed in-memory PCM acknowledgements as a last-resort latency presentation path when dynamic speech is not admissible, absent, invalid, or cannot be scheduled. Cache entries are generic and cannot claim a tool result, memory commit, physical effect, or completion. |
 | `ORCH_FAST_FIRST_AUDIO_HEDGE_MS` | `750` | After dynamic fast speech cannot be scheduled, wait this long before playing the cached fallback; suppress it when the final response becomes ready first. |
 | `ORCH_FAST_FIRST_AUDIO_CACHE_DIR` | `.chromie/cache/fast-first-audio` | Ignored local WAV cache for speaker-specific English and Chinese acknowledgement cues. |
@@ -903,7 +903,7 @@ certificate-repair fallback.
 | `AGENT_DEEP_PLANNER_MAX_CAPABILITIES` | `96`; maximum full catalog entries supplied. |
 | `ORCH_DEEP_PLANNER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Deep Planning remains terminal in the unified runtime. |
 | `ORCH_DEEP_PLANNER_TIMEOUT_MS` | `10000`; host timeout for report-only deep planning. |
-| `AGENT_RESPONSE_COMPOSER_ENABLED` | `1`; exposes advisory expression of an immutable terminal `CanonicalPlan` as a goal-scoped `ResponsePlan`. Social Attention is owned independently by `SocialAttentionPlanner` and is not part of the Response Composer DTO. |
+| `AGENT_RESPONSE_COMPOSER_ENABLED` | `1`; exposes language formulation for immutable Fast-Planner Communicative Acts and advisory expression of an immutable terminal `CanonicalPlan` as a goal-scoped `ResponsePlan`. It does not select Planner acts. Social Attention is owned independently by `SocialAttentionPlanner` and is not part of the Response Composer DTO. |
 | `AGENT_RESPONSE_COMPOSER_MODEL` | `gemma4:e2b`; model used for multi-goal user-facing response expression. |
 | `AGENT_RESPONSE_COMPOSER_TIMEOUT_MS` | `4500`; response-composer model timeout. Failure does not alter the canonical task plan. |
 | `AGENT_RESPONSE_COMPOSER_NUM_CTX` | `8192`; bounded composition context sized for an immutable multi-goal plan plus the exact response schema. |
@@ -930,9 +930,12 @@ prospective plan adequacy if the proposed response and steps succeed, not
 already-completed execution.
 
 The planners exclude response-transport skills such as `chromie.speak` from
-their capability schemas. Conversational goals use `respond` outcomes and
-model-authored response text; the Response Composer turns those outcomes into
-the user-facing `ResponsePlan`. The composer sends the exact
+their capability schemas. The maintained first-advance path represents conversational
+work as wording-free Communicative Acts and calls Response Composer's
+`/communicative-acts/realize` boundary before Vocal delivery. The older canonical
+Fast/Deep Planner DTO still carries `response_text`; migrating that remaining contract
+to the same act/wording separation is tracked explicitly in current status rather than
+treated as proof that Planner should own wording. The terminal composer sends the exact
 `ResponseComposerModelOutput` schema and constrains response-stage Goal IDs to
 the immutable canonical plan. It may make one bounded same-stage repair with
 the original output and exact validation errors. Composition identity, the

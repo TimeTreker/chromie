@@ -14,7 +14,11 @@ from shared.chromie_contracts.interaction import InteractionResponse
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.plan import CanonicalPlan, FastPlannerAdvance
 from shared.chromie_contracts.reflection import ReflectionResolution
-from shared.chromie_contracts.response_composition import ResponseCompositionResolution
+from shared.chromie_contracts.response_composition import (
+    CommunicativeActRealization,
+    CommunicativeActRealizationRequest,
+    ResponseCompositionResolution,
+)
 from shared.chromie_contracts.social_attention import SocialAttentionPlan, SocialAttentionRequest
 from shared.chromie_contracts.tool_result import (
     ToolExecutionRequest,
@@ -147,6 +151,47 @@ class AgentClient:
                 "vocal_activity_count",
                 sum(item.role != "capability" for item in result.activities),
             )
+            return result
+
+    async def realize_communicative_acts(
+        self,
+        session: aiohttp.ClientSession,
+        *,
+        request: CommunicativeActRealizationRequest,
+        timeout_ms: int | None = None,
+    ) -> CommunicativeActRealization:
+        effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
+        async with runtime_tracer.span(
+            module=self.TRACE_MODULE,
+            operation="realize_communicative_acts",
+            kind="tool_call",
+            attributes={
+                "endpoint": "/communicative-acts/realize",
+                "timeout_ms": effective_timeout_ms,
+                "act_count": len(request.acts),
+            },
+        ) as span:
+            req = request.model_copy(
+                update={
+                    "context": runtime_tracer.inject_carrier(request.context),
+                }
+            )
+            timeout = aiohttp.ClientTimeout(total=effective_timeout_ms / 1000.0)
+            async with session.post(
+                f"{self.base_url}/communicative-acts/realize",
+                json=req.model_dump(mode="json"),
+                timeout=timeout,
+            ) as resp:
+                body = await resp.text()
+                span.set_attribute("http_status", resp.status)
+                if resp.status != 200:
+                    raise RuntimeError(
+                        "Agent Communicative Act realization endpoint returned HTTP "
+                        f"{resp.status}: {body[:500]}"
+                    )
+                result = CommunicativeActRealization.model_validate_json(body)
+            span.set_attribute("status", result.status)
+            span.set_attribute("wording_count", len(result.wordings))
             return result
 
     async def resolve_fast_plan(

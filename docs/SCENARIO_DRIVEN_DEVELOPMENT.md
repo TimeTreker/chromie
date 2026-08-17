@@ -153,7 +153,7 @@ latency score.
 When asynchronous work can finish during other speech or another ordinary turn,
 retain cases for urgent safety/control pre-emption, ordered ordinary-result
 delivery, internal-only evidence with no speech, and a slow earlier Goal whose
-result is delivered exactly once after the newer conversational act. A barge-in
+result is delivered exactly once after the newer Communicative Act. A barge-in
 case must distinguish invalidating current/queued audio from cancelling the
 underlying Goal; only explicit cancellation or supersession may discard its
 future result response, with any broader semantic interruption requiring the

@@ -4,6 +4,8 @@ import asyncio
 import json
 import unittest
 
+from pydantic import ValidationError
+
 from agent.app.fast_planner import FastPlannerResolver
 from agent.app.planner_contract import (
     PlannerModelOutput,
@@ -18,6 +20,8 @@ from shared.chromie_contracts.plan import (
     CanonicalPlan,
     FastPlannerAdvance,
     FastPlannerAdvanceModelOutput,
+    FastPlannerClarificationAct,
+    FastPlannerCompleteResponseAct,
 )
 from shared.chromie_runtime.llm_diagnostics import ollama_prompt_preflight_diagnostics
 
@@ -1037,7 +1041,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                     {
                         "activity_id": "activity-greeting",
                         "role": "complete_response",
-                        "response_text": "嗨～",
                         "speech_act": "greeting",
                         "source_responsibility_refs": ["greeting"],
                     }
@@ -1073,11 +1076,30 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         self.assertIsInstance(advance, FastPlannerAdvance)
         self.assertEqual(advance.continuations, [])
-        self.assertEqual(advance.activities[0].response_text, "嗨～")
+        self.assertFalse(hasattr(advance.activities[0], "response_text"))
         self.assertEqual(advance.activities[0].role, "complete_response")
         self.assertIn("Responsibility evidence", ollama.prompts[0][0])
         response_schema = ollama.prompts[0][1]["response_format"]
-        self.assertIn("FastPlannerCompleteResponseActivity", str(response_schema))
+        self.assertIn("FastPlannerCompleteResponseAct", str(response_schema))
+
+    def test_complete_response_act_cannot_hide_wording_in_speech_act(self):
+        with self.assertRaises(ValidationError):
+            FastPlannerCompleteResponseAct(
+                activity_id="activity-greeting",
+                role="complete_response",
+                speech_act="你好呀，我很高兴见到你。",
+                source_responsibility_refs=["greeting"],
+            )
+
+    def test_clarification_act_uses_closed_communicative_function(self):
+        with self.assertRaises(ValidationError):
+            FastPlannerClarificationAct(
+                activity_id="ask-tea",
+                role="clarification",
+                speech_act="你想喝什么茶？",
+                source_responsibility_refs=["tea"],
+                information_gap_ids=["gap-tea-kind"],
+            )
 
     def test_first_activity_plan_preserves_profile_context_topology(self):
         ollama = FakeOllama(
@@ -1089,7 +1111,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                     {
                         "activity_id": "activity-greeting",
                         "role": "complete_response",
-                        "response_text": "嗨～",
                         "speech_act": "greeting",
                         "source_responsibility_refs": ["greeting"],
                     }
@@ -1138,7 +1159,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                     {
                         "activity_id": "activity-greeting",
                         "role": "complete_response",
-                        "response_text": "嗨～",
                         "speech_act": "greeting",
                         "source_responsibility_refs": ["greeting"],
                     }
@@ -1285,9 +1305,9 @@ class FastPlannerResolverTests(unittest.TestCase):
             },
         )
         for activity_contract in (
-            "FastPlannerCompleteResponseActivity",
-            "FastPlannerClarificationActivity",
-            "FastPlannerProgressActivity",
+            "FastPlannerCompleteResponseAct",
+            "FastPlannerClarificationAct",
+            "FastPlannerProgressAct",
             "FastPlannerCapabilityActivity",
         ):
             activity_schema = schema["$defs"][activity_contract]
@@ -1344,7 +1364,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(
             activity_refs,
             {
-                "#/$defs/FastPlannerProgressActivity",
+                "#/$defs/FastPlannerProgressAct",
                 "#/$defs/FastPlannerCapabilityActivity",
             },
         )
@@ -1388,8 +1408,8 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(
             activity_refs,
             {
-                "#/$defs/FastPlannerProgressActivity",
-                "#/$defs/FastPlannerClarificationActivity",
+                "#/$defs/FastPlannerProgressAct",
+                "#/$defs/FastPlannerClarificationAct",
             },
         )
 
@@ -1573,7 +1593,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertFalse(hasattr(advance.activities[0], "response_text"))
         self.assertIn("Language hint: zh-CN", str(ollama.prompts[0][0]))
         response_schema = ollama.prompts[0][1]["response_format"]
-        self.assertIn("FastPlannerProgressActivity", str(response_schema))
+        self.assertIn("FastPlannerProgressAct", str(response_schema))
         self.assertIn("FastPlannerCapabilityActivity", str(response_schema))
 
     def test_progress_activity_cannot_smuggle_unsupported_weather_result_text(self):
@@ -4193,14 +4213,14 @@ class FastPlannerResolverTests(unittest.TestCase):
     def test_first_activity_decoder_exposes_capability_speech_and_clarification(self):
         schema = FastPlannerAdvanceModelOutput.model_json_schema()
         encoded = str(schema)
-        self.assertIn("FastPlannerProgressActivity", encoded)
+        self.assertIn("FastPlannerProgressAct", encoded)
         self.assertIn("FastPlannerCapabilityActivity", encoded)
-        self.assertIn("FastPlannerClarificationActivity", encoded)
-        self.assertIn("FastPlannerCompleteResponseActivity", encoded)
+        self.assertIn("FastPlannerClarificationAct", encoded)
+        self.assertIn("FastPlannerCompleteResponseAct", encoded)
 
-    def test_free_text_language_contract_rejects_english_for_chinese_turn(self):
-        self.assertFalse(FastPlannerResolver._speech_matches_language("I'll check it.", "zh-CN"))
-        self.assertTrue(FastPlannerResolver._speech_matches_language("好，我来看看。", "zh-CN"))
+    def test_first_activity_contract_cannot_author_sentence_wording(self):
+        schema = FastPlannerAdvanceModelOutput.model_json_schema()
+        self.assertNotIn("response_text", json.dumps(schema, sort_keys=True))
 
 if __name__ == "__main__":
     unittest.main()

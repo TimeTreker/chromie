@@ -16,8 +16,9 @@ experience artifacts. See
 > semantic authority with readiness-driven continuous progress. Goal Interpretation
 > emits contextual WHAT-only Responsibility evidence, and the same result enters
 > Fast Planner and Goal Association concurrently. Fast Planner authors the first
-> speaking/Capability Activity Plan; a complete native conversational answer may
-> enter the Vocal runtime immediately, and a trusted side-effect-free read may start
+> Communicative-Act/Capability Activity Plan. Response Composer/language formulation
+> turns each selected Communicative Act into wording without changing its function;
+> a complete realized answer may enter the Vocal runtime immediately, and a trusted side-effect-free read may start
 > while Goal Association commits its canonical Goal. Missing user information causes
 > a clarification Activity, while only genuinely complex HOW enters Deep Planner.
 > Goal Association alone creates or modifies canonical Goals, and Runtime groups the
@@ -85,8 +86,9 @@ Host Orchestrator
     `-> immutable admitted UserTurnEnvelope -> Goal-driven Cognitive Core
         -> Goal Interpretation (Responsibility + Goal relation + InformationGaps)
         -> same GI result, concurrent fan-out
-           |-> Fast Planner -> speaking/Capability Activities --.
-           |      `-> Deep Planner only for complex HOW          |
+           |-> Fast Planner -> Communicative Acts + Capability Activities --.
+           |      |-> Response Composer wording -> Vocal/TTS             |
+           |      `-> Deep Planner only for complex HOW                  |
            |-> Goal Association -> canonical Goal state --------+-> Goal-bound tasks
            `-> background Social Attention decoration            |
         -> resource-aware Trusted Capability Runtime <-----------'

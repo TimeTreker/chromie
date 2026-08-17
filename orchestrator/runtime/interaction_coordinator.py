@@ -18,10 +18,10 @@ from agent.app.tool_invocation import (
 )
 from shared.chromie_contracts.plan import (
     FastPlannerCapabilityActivity,
-    FastPlannerVocalActivity,
+    FastPlannerCommunicativeAct,
     fast_planner_activity_request_id,
-    render_fast_planner_vocal_activity,
 )
+from shared.chromie_contracts.response_composition import CommunicativeActWording
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
@@ -103,10 +103,11 @@ def _int_env(name: str, default: int, *, minimum: int = 0) -> int:
 
 
 @dataclass
-class ReadyPlannerVocalExecution:
-    """One Fast-Planner-authored conversational Activity entering the Vocal lane."""
+class ReadyPlannerCommunicativeExecution:
+    """One realized Planner Communicative Act entering the Vocal lane."""
 
-    activity: FastPlannerVocalActivity
+    activity: FastPlannerCommunicativeAct
+    wording: CommunicativeActWording
     interaction_id: str
     speech: InteractionSpeech
     task: asyncio.Task[CapabilityRuntimeResult]
@@ -245,31 +246,32 @@ class InteractionRuntimeCoordinator:
     def capability_definition(self, capability_id: str):
         return self.registry.get(capability_id)
 
-    async def start_fast_planner_vocal_activity(
+    async def start_fast_planner_communicative_act(
         self,
-        activity: FastPlannerVocalActivity,
+        activity: FastPlannerCommunicativeAct,
+        wording: CommunicativeActWording,
         *,
         session_id: str,
         turn_id: str,
         language: str,
-    ) -> ReadyPlannerVocalExecution:
-        """Start one planner-authored immediate conversational Activity.
+    ) -> ReadyPlannerCommunicativeExecution:
+        """Start one independently worded Planner Communicative Act.
 
         This path carries no canonical Goal or completion authority.  It exists so
         a safe progress/clarification act may begin while Goal Association or
         deeper planning continues in parallel.
         """
 
-        text = render_fast_planner_vocal_activity(activity, language=language)
         speech = InteractionSpeech(
             id=f"fast_activity_speech_{activity.activity_id}",
-            text=text,
+            text=wording.text,
             timing="immediate",
             style="brief",
             priority="normal",
             interruptible=True,
             metadata={
                 "source": "fast_planner_advance",
+                "wording_owner": "response_composer",
                 "phase": "fast_planner_immediate",
                 "speech_act": activity.speech_act,
                 "turn_id": turn_id,
@@ -318,7 +320,13 @@ class InteractionRuntimeCoordinator:
                 )
 
         task.add_done_callback(observe_completion)
-        return ReadyPlannerVocalExecution(activity, interaction_id, speech, task)
+        return ReadyPlannerCommunicativeExecution(
+            activity,
+            wording,
+            interaction_id,
+            speech,
+            task,
+        )
 
     async def start_fast_planner_capability_activities(
         self,

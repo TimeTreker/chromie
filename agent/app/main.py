@@ -37,6 +37,10 @@ try:
         CoreInterpretationResult,
         CoreInterpretationUnavailable,
     )
+    from chromie_contracts.response_composition import (
+        CommunicativeActRealization,
+        CommunicativeActRealizationRequest,
+    )
     from chromie_contracts.social_attention import SocialAttentionPlan, SocialAttentionRequest
     from chromie_contracts.tool_result import (
         ToolExecutionRequest,
@@ -60,6 +64,10 @@ except ImportError:  # pragma: no cover
         CognitiveWorkRequest,
         CoreInterpretationResult,
         CoreInterpretationUnavailable,
+    )
+    from shared.chromie_contracts.response_composition import (
+        CommunicativeActRealization,
+        CommunicativeActRealizationRequest,
     )
     from shared.chromie_contracts.social_attention import SocialAttentionPlan, SocialAttentionRequest
     from shared.chromie_contracts.tool_result import (
@@ -687,6 +695,20 @@ async def compose_response_plan(request: CognitiveWorkRequest):
     )
     result = await response_composer_resolver.resolve(prepared)
     return attach_disclosure_metadata(result, disclosure)
+
+
+@app.post(
+    "/communicative-acts/realize",
+    response_model=CommunicativeActRealization,
+)
+async def realize_communicative_acts(
+    request: CommunicativeActRealizationRequest,
+) -> CommunicativeActRealization:
+    """Formulate words for immutable Planner-selected Communicative Acts."""
+
+    if response_composer_resolver is None:
+        raise HTTPException(status_code=503, detail="Response composer is disabled")
+    return await response_composer_resolver.realize_communicative_acts(request)
 
 
 @app.post("/tools/execute", response_model=ToolExecutionResponse)

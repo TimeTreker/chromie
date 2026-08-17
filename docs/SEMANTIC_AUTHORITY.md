@@ -36,10 +36,12 @@ Speech composition and user-task execution may be prepared or scheduled
 independently from immutable projections of that authoritative turn. Parallel
 output preparation does not create another semantic owner: a response composer
 cannot reinterpret Goals or authorize effects, and an execution specialist
-cannot become the conversation authority. Wording ownership is per conversational
-act: a Fast-Planner immediate conversational Activity, a Tool Result
-act, and a Response-Composition act each retain exactly one writer, while later
-stages may only bind/reuse the exact act or author a genuinely different delta.
+cannot become the conversation authority. Planner owns each Communicative Act's
+function, timing, provenance, and constraints; Response Composer/language
+formulation owns its exact words. Goal Interpretation owns neither. Tool Result
+Interpretation supplies grounded propositions/evidence references for a later act,
+not permission to bypass Planner. Later stages may bind/reuse the exact act or
+Planner may author a genuinely different delta.
 
 Cross-cutting evidence qualification, retention/privacy policy, and bounded
 adaptation are not additional semantic owners. They refine factual/context input to

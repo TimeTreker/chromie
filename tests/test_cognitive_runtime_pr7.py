@@ -38,16 +38,18 @@ from shared.chromie_contracts.plan import (
     CanonicalPlan,
     FastPlannerAdvance,
     FastPlannerCapabilityActivity,
-    FastPlannerClarificationActivity,
-    FastPlannerCompleteResponseActivity,
-    FastPlannerProgressActivity,
-    render_fast_planner_vocal_activity,
+    FastPlannerClarificationAct,
+    FastPlannerCompleteResponseAct,
+    FastPlannerProgressAct,
 )
 from shared.chromie_contracts.response_composition import (
+    CommunicativeActRealization,
+    CommunicativeActWording,
     CoordinatedResponsePlan,
     DirectResponseComposition,
     ResponseCompositionResolution,
     canonical_plan_fingerprint,
+    realize_bounded_fast_progress_act,
     goal_association_fingerprint,
 )
 from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage, SemanticGoal
@@ -134,19 +136,19 @@ class FastAdvanceRuntime(FakeRuntime):
         super().__init__(definitions)
         self.started_fast_activities: list[tuple[str, str]] = []
 
-    async def start_fast_planner_vocal_activity(
-        self, activity, *, session_id: str, turn_id: str, language: str
+    async def start_fast_planner_communicative_act(
+        self, activity, wording, *, session_id: str, turn_id: str, language: str
     ):
-        del session_id
+        del session_id, language
         self.started_fast_activities.append(
-            (turn_id, render_fast_planner_vocal_activity(activity, language=language))
+            (turn_id, wording.text)
         )
         return object()
 
 
 class FastPlannerProgressRenderingTests(unittest.TestCase):
     def test_pre_capability_progress_does_not_promise_unknown_work(self):
-        activity = FastPlannerProgressActivity(
+        activity = FastPlannerProgressAct(
             activity_id="status-progress",
             role="progress",
             progress_kind="check_information",
@@ -154,11 +156,11 @@ class FastPlannerProgressRenderingTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            render_fast_planner_vocal_activity(activity, language="en-US"),
+            realize_bounded_fast_progress_act(activity, language="en-US"),
             "Let me see what I can check.",
         )
         self.assertEqual(
-            render_fast_planner_vocal_activity(activity, language="zh-CN"),
+            realize_bounded_fast_progress_act(activity, language="zh-CN"),
             "我先看看能不能查到。",
         )
 
@@ -206,6 +208,30 @@ class ScriptedClient:
         if not self.fast_advances:
             raise AssertionError("unexpected Fast Planner advance")
         return self.fast_advances.pop(0)
+
+    async def realize_communicative_acts(self, *args, **kwargs):
+        self.calls.append("realize")
+        request = kwargs["request"]
+        texts = {
+            "complete_response": "你好呀！",
+            "clarification": "你想喝什么茶？",
+            "progress": (
+                "我先看看能不能查到。"
+                if request.language.startswith("zh")
+                else "Let me see what I can check."
+            ),
+        }
+        return CommunicativeActRealization(
+            status="resolved",
+            turn_id=request.turn_id,
+            wordings=[
+                CommunicativeActWording(
+                    activity_id=act.activity_id,
+                    text=texts[act.role],
+                )
+                for act in request.acts
+            ],
+        )
 
     async def resolve_goal_association(self, *args, **kwargs):
         self.calls.append("association")
@@ -645,12 +671,13 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         events: list[str] = []
 
         class Runtime(FastAdvanceRuntime):
-            async def start_fast_planner_vocal_activity(
-                self, activity, *, session_id: str, turn_id: str, language: str
+            async def start_fast_planner_communicative_act(
+                self, activity, wording, *, session_id: str, turn_id: str, language: str
             ):
                 events.append("vocal_activity_started")
-                return await super().start_fast_planner_vocal_activity(
+                return await super().start_fast_planner_communicative_act(
                     activity,
+                    wording,
                     session_id=session_id,
                     turn_id=turn_id,
                     language=language,
@@ -674,7 +701,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             coverage="uncertain",
             covered_responsibility_refs=["weather"],
             activities=[
-                FastPlannerProgressActivity(
+                FastPlannerProgressAct(
                     activity_id="weather-progress",
                     role="progress",
                     progress_kind="check_information",
@@ -740,7 +767,10 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             events.index("association_completed"),
         )
         self.assertEqual(runtime.started_fast_activities[0][1], "我先看看能不能查到。")
-        self.assertEqual(client.calls, ["advance", "association", "fast", "compose"])
+        self.assertEqual(
+            client.calls,
+            ["advance", "realize", "association", "fast", "compose"],
+        )
 
     def test_gi_fans_out_to_fast_planner_and_ga_without_second_fast_plan(self):
         advance = FastPlannerAdvance(
@@ -749,10 +779,9 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             coverage="complete",
             covered_responsibility_refs=["r1"],
             activities=[
-                FastPlannerCompleteResponseActivity(
+                FastPlannerCompleteResponseAct(
                     activity_id="greeting-response",
                     role="complete_response",
-                    response_text="你好呀！",
                     speech_act="greeting",
                     source_responsibility_refs=["r1"],
                 )
@@ -778,7 +807,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         result = self.run_resolution(coordinator, client, text="你好")
 
         self.assertEqual(result.status, "applied")
-        self.assertCountEqual(client.calls, ["advance", "association"])
+        self.assertCountEqual(client.calls, ["advance", "realize", "association"])
         self.assertEqual(result.terminal_plan.planner_tier, "fast")
         self.assertEqual(result.terminal_plan.goal_ids, ["goal-1"])
         self.assertEqual(runtime.started_fast_activities[0][1], "你好呀！")
@@ -820,10 +849,10 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             coverage="uncertain",
             covered_responsibility_refs=["tea"],
             activities=[
-                FastPlannerClarificationActivity(
+                FastPlannerClarificationAct(
                     activity_id="ask-tea-kind",
                     role="clarification",
-                    response_text="你想喝什么茶？",
+                    information_gap_ids=["gap-tea-kind"],
                     speech_act="ask_clarification",
                     source_responsibility_refs=["tea"],
                 )
@@ -1027,7 +1056,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             coverage="uncertain",
             covered_responsibility_refs=["fetch-water"],
             activities=[
-                FastPlannerProgressActivity(
+                FastPlannerProgressAct(
                     activity_id="fetch-progress",
                     role="progress",
                     progress_kind="perform_action",
@@ -1082,8 +1111,11 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(result.status, "applied")
-        self.assertCountEqual(client.calls[:2], ["advance", "association"])
-        self.assertEqual(client.calls[2:], ["deep", "compose"])
+        self.assertCountEqual(
+            client.calls[:3],
+            ["advance", "realize", "association"],
+        )
+        self.assertEqual(client.calls[3:], ["deep", "compose"])
         self.assertIsNone(result.fast_plan)
         self.assertEqual(result.terminal_plan.planner_tier, "deep")
         self.assertEqual(result.metadata["fast_planner_path"], "deep_escalation")

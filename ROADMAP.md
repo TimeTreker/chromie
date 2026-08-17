@@ -32,12 +32,14 @@ Next design/implementation order:
 1. **Fast Planner first-advancement seam — implemented in the maintained path.** Keep
    Responsibility evidence as Goal Interpretation's provider-neutral WHAT handoff. The
    same Fast Planner is the first HOW owner: before canonical Goal binding it may author
-   one immediate safe conversational Activity and typed continuation dispositions for
+   one immediate safe Communicative Act and typed continuation dispositions for
    Goal Association and/or Deep Planner. Goal Association remains the only canonical
    Goal-continuity authority; commitment-bearing Capability work still requires
    applicable canonical Goal grounding and trusted validation. Retired Goal-Interpreter
    `native_response`/`fast_speech` compatibility vocabulary is not part of the
-   maintained path.
+   maintained path. A Communicative Act contains function, timing, semantic
+   provenance, and constraints but no wording; Response Composer/language formulation
+   realizes it before Vocal/TTS delivery.
 2. **Epistemic Qualification contract detail — first source slice implemented.** Do not add an `EpistemicManager`.
    Extend existing capability/evidence contracts to represent claim-specific required
    observations, provenance/trust-domain independence, alternatives/corroboration,
@@ -66,8 +68,8 @@ Next design/implementation order:
 Exit criteria for this line:
 
 - no reviewed case requires a new top-level semantic authority;
-- native response, later response composition, and result interpretation obey one
-  semantic wording owner per conversational act;
+- Planner-selected Communicative Acts and result propositions remain distinct from
+  their single downstream wording owner;
 - evidence integrity and evidence sufficiency are explicitly distinct;
 - terminal history can teach bounded future cognition without reopening history;
 - local adaptation has separately bounded scope and lifetime and cannot self-promote to
@@ -251,7 +253,7 @@ callbacks into a second planner.
 ## Current priorities
 
 1. Preserve the completed authority spine and implement only the contract detail now
-   proven necessary: conversational-act wording ownership, claim-specific Epistemic
+   proven necessary: Communicative-Act/wording ownership, claim-specific Epistemic
    Qualification, and bounded Forward Adaptation. Multi-user identity is not a new owner:
    recognition/authentication is a factual Capability/Evidence claim and effect-specific
    authorization/consent stays in Host policy. New top-level architecture requires the

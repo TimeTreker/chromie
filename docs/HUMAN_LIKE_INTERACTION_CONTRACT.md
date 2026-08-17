@@ -20,7 +20,7 @@ which interaction contract was violated:
 - Did ASR provide an uncertain hypothesis that was treated as truth?
 - Did the Core interpretation projection or canonical planner substitute a nearby capability
   for unclear user meaning?
-- Did fast-first speech and final speech both answer the same conversational act?
+- Did fast-first speech and final speech both realize the same Communicative Act?
 - Did an agent claim an action or tool result that had not been committed?
 - Did internal state-machine text leak to the user?
 - Did a safety fallback replace a valid proposal path with an unnatural apology?
@@ -177,7 +177,7 @@ or utterance adds work. It may cancel or supersede them only through an explicit
 deterministic stop/cancel scope or a Core decision that unambiguously authorizes
 foreground interruption; that decision and the affected work remain auditable.
 
-For one simple conversational act, one natural response is usually enough. If
+For one simple Communicative Act, one natural response is usually enough. If
 fast-first already answered a simple greeting or clarification, the final agent
 must not answer the same act again.
 
@@ -267,12 +267,14 @@ composer nor an execution specialist may reinterpret the Goal, widen effects,
 authorize work, or become a second conversation authority. Physical TaskGraph
 execution remains sequential.
 
-A provider-free already-complete conversational answer is authored by Fast Planner from
-Goal Interpretation's Responsibility evidence. It may begin through the existing Vocal
+A provider-free already-complete Communicative Act is selected by Fast Planner from
+Goal Interpretation's Responsibility evidence. Its wording is authored by the downstream
+language-formulation owner and may begin through the existing Vocal
 runtime immediately. A simple greeting may finish there without Goal Association; if
 persistent work also exists, Fast Planner may author only prospective progress while
 requesting Goal Association. These are model-authored planning decisions, never a Host
-greeting phrase table, and Goal Interpretation does not write the reply. Each conversational act has one semantic wording owner; exact
+greeting phrase table, and Goal Interpretation does not write the reply. Planner owns
+the Communicative Act; language formulation owns its wording. Exact
 reuse is not a second writer. Complete bounded capability work
 belongs on the Fast path. Once that Fast work is completely grounded, exactly
 capability-bound, deterministically safe/authorized, and needs no confirmation, it may
@@ -297,11 +299,12 @@ Streaming changes delivery timing, not semantic authority. Raw model-token
 deltas, partial JSON, private reasoning, and incomplete sentences are not speech
 contracts and must never reach TTS. Goal Interpretation never authors maintained
 speech. Fast Planner is the first HOW owner and may select one complete typed
-immediate conversational Activity after Responsibility meaning is sufficient.
-A terminal/clarification Activity may carry model-authored response text under
-its own truth contract; a pre-evidence `progress` Activity carries only a bounded
-`progress_kind`, its mechanically corresponding bounded `speech_act`, and Runtime
-renders the wording deterministically. An executable non-escalation Activity Plan
+immediate Communicative Act after Responsibility meaning is sufficient. A
+terminal or clarification act carries function, timing, semantic provenance, and
+truth constraints but no sentence wording. Response Composer/language formulation
+realizes it under its own truth contract; a pre-evidence `progress` act carries only a bounded
+`progress_kind`, its mechanically corresponding bounded `speech_act`, and the bounded
+language realizer renders the wording deterministically. An executable non-escalation Activity Plan
 has no Deep continuation and must contain a live Capability Activity. Therefore a
 model cannot hide an unverified result inside a field merely labelled progress or
 claim execution while emitting only conversational status.
@@ -353,7 +356,7 @@ enforces ordering, urgency, and required user-facing confirmation, failure,
 cancellation, and terminal obligations.
 
 A barge-in or newer ordinary turn may invalidate speech that is already playing
-or queued for an obsolete conversational act. It does not by itself cancel an
+or queued for an obsolete Communicative Act. It does not by itself cancel an
 independent Goal, erase its evidence, or discard the truthful result response
 that becomes eligible later. Task cancellation still requires an explicit
 deterministic scope or a Core-authorized semantic interruption.
@@ -487,14 +490,14 @@ what the wording may claim; it is not itself a reason for silence. A separate pr
 Activity is omitted when the substantive answer is immediate, an equivalent act is
 already delivered or pending, the user asked for silence, or another utterance would
 only repeat or add empty chatter. Fast Planner owns this HOW decision. Pre-evidence
-progress is represented only by a bounded `progress_kind`; Runtime renders the actual
+progress is represented only by a bounded `progress_kind`; the bounded language realizer renders the actual
 prospective wording and the schema provides no free-form result field. The removed
 Goal-Interpreter `fast_speech`/`native_response` path is not accepted as compatibility.
 No second production LLM reviews, repairs, or re-decides ordinary progress wording.
 Interaction Context remains the authority for whether any speech was actually heard or
 is still pending.
 
-Fast Response wording uses a bounded owner-approved **fast voice projection**:
+Communicative-Act wording uses a bounded owner-approved **fast voice projection**:
 Chromie's name, child age/role identity where relevant to expression, and the
 positive `spoken_style`, `maturity_boundary`, and `tool_use_style` guidance needed
 to sound like the same person as later responses. The fast path does not need the

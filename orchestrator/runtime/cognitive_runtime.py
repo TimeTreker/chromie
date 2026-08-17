@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Literal, Protocol
 
+import aiohttp
 from agent.app.capabilities.validator import validate_args_for_schema
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -42,13 +43,16 @@ from shared.chromie_contracts.plan import (
     ExecuteGoalPlanOutcome,
     FastPlannerAdvance,
     FastPlannerCapabilityActivity,
-    FastPlannerVocalActivity,
+    FastPlannerCommunicativeAct,
     GoalSatisfactionAssessment,
+    PlannedCommunicativeAct,
     RespondGoalPlanOutcome,
     fast_planner_activity_request_id,
-    render_fast_planner_vocal_activity,
 )
 from shared.chromie_contracts.response_composition import (
+    CommunicativeActRealization,
+    CommunicativeActRealizationRequest,
+    CommunicativeActWording,
     CoordinatedResponsePlan,
     DirectResponseComposition,
     ResponseCompositionResolution,
@@ -147,6 +151,10 @@ class CognitiveAgentClient(Protocol):
     async def resolve_fast_advance(
         self, session: Any, **kwargs: Any
     ) -> FastPlannerAdvance: ...
+
+    async def realize_communicative_acts(
+        self, session: Any, **kwargs: Any
+    ) -> CommunicativeActRealization: ...
 
     async def resolve_fast_plan(self, session: Any, **kwargs: Any) -> CanonicalPlan: ...
 
@@ -1079,10 +1087,11 @@ class CanonicalPlanRuntimeAdapter:
         plan: CanonicalPlan,
         session_id: str,
         language: str,
+        realized_wordings: dict[str, CommunicativeActWording],
         preexecuted_activity_ids: set[str] | None = None,
         context: dict[str, Any] | None = None,
     ) -> InteractionResponse:
-        """Compile Fast Planner conversational Activities after GA Goal binding."""
+        """Compile realized Fast Planner Communicative Acts after GA Goal binding."""
 
         if plan.steps or plan.disposition not in {"respond", "clarify"}:
             raise ValueError("Fast Planner vocal response requires a non-executable Plan")
@@ -1095,6 +1104,12 @@ class CanonicalPlanRuntimeAdapter:
         for activity in advance.activities:
             if activity.role == "capability" or activity.activity_id in preexecuted:
                 continue
+            wording = realized_wordings.get(activity.activity_id)
+            if wording is None:
+                raise ValueError(
+                    "Fast Communicative Act lacks Response-Composer wording: "
+                    + activity.activity_id
+                )
             source_goal_ids: list[str] = []
             for responsibility_ref in activity.source_responsibility_refs:
                 raw_goal_ids = refs_to_goals.get(responsibility_ref)
@@ -1106,15 +1121,14 @@ class CanonicalPlanRuntimeAdapter:
             speech.append(
                 InteractionSpeech(
                     id=f"fast_activity_speech_{activity.activity_id}",
-                    text=render_fast_planner_vocal_activity(
-                        activity, language=language
-                    ),
+                    text=wording.text,
                     timing=activity.timing,
                     style="brief",
                     priority="normal",
                     interruptible=True,
                     metadata={
                         "source": "fast_planner_advance",
+                        "wording_owner": "response_composer",
                         "phase": "fast_planner_activity",
                         "speech_act": activity.speech_act,
                         "turn_id": advance.turn_id,
@@ -1445,7 +1459,7 @@ class CanonicalPlanRuntimeAdapter:
         )
         reusable_turn_speech: dict[str, dict[str, Any]] = {}
         if isinstance(context, dict):
-            # A speech-event identity selects the conversational act. Text is
+            # A speech-event identity selects the Communicative Act. Text is
             # checked later only as payload integrity, never as de-duplication
             # identity. Prefer playback-qualified evidence when both projections
             # contain the same event.
@@ -2088,20 +2102,19 @@ class GoalDrivenRuntimeCoordinator:
         task.add_done_callback(_done)
 
     @staticmethod
-    def _fast_planner_vocal_social_activity(
-        activity: FastPlannerVocalActivity,
+    def _fast_planner_communicative_social_activity(
+        activity: FastPlannerCommunicativeAct,
         *,
-        language: str,
+        wording: CommunicativeActWording,
         ready_execution: Any | None = None,
     ) -> SocialAttentionActivityAnchor:
-        """Use the Planner-authored conversational Activity as its own SA anchor.
+        """Use the Planner-authored Communicative Act as its own SA anchor.
 
         Fast Planner already owns semantic Activity identity here. Do not wait for
         a later context projection to rediscover scheduled speech, and do not
         promote the underlying cognition milestone into a social Activity.
         """
 
-        rendered = render_fast_planner_vocal_activity(activity, language=language)
         speech = getattr(ready_execution, "speech", None)
         execution_item_id = str(getattr(speech, "id", "") or "").strip()
         if not execution_item_id:
@@ -2109,7 +2122,7 @@ class GoalDrivenRuntimeCoordinator:
         return SocialAttentionActivityAnchor(
             activity_id=activity.activity_id,
             phase="ready",
-            summary=" ".join(str(rendered or "").strip().split())[:500],
+            summary=" ".join(wording.text.strip().split())[:500],
             realization=SocialAttentionActivityRealization(
                 execution_lanes=["vocal"],
                 vocal_modes=["speech"],
@@ -2123,7 +2136,7 @@ class GoalDrivenRuntimeCoordinator:
         *,
         turn_id: str,
     ) -> SocialAttentionActivityAnchor | None:
-        """Project one scheduled Fast-Planner conversational act as a semantic Activity.
+        """Project one scheduled Fast-Planner Communicative Act as a semantic Activity.
 
         The act is not called a ``speech Activity``.  Speaking is only its Vocal
         Expression realization; the text/purpose carries the outward semantic act.
@@ -2145,7 +2158,7 @@ class GoalDrivenRuntimeCoordinator:
             commitment = " ".join(str(row.get("commitment") or "").strip().split())
             identity_digest = hashlib.sha256(
                 "|".join(
-                    [turn_id, "scheduled_conversational_activity", purpose, commitment, text]
+                    [turn_id, "scheduled_communicative_act", purpose, commitment, text]
                 ).encode("utf-8")
             ).hexdigest()[:20]
             if not execution_item_id:
@@ -2177,7 +2190,7 @@ class GoalDrivenRuntimeCoordinator:
 
         A Goal may own several Activities, while a sufficiently high-level provider
         capability may realize one whole Activity atomically.  Interaction speech is
-        projected as a semantic conversational act; canonical Capability work is
+        projected as a semantic Communicative Act; canonical Capability work is
         projected at Plan-step granularity.  Vocal modes, execution lanes, request IDs,
         and Capability IDs stay strictly below Activity identity as realization facts.
         """
@@ -2307,7 +2320,7 @@ class GoalDrivenRuntimeCoordinator:
                 "|".join(
                     [
                         turn_id,
-                        "conversational_activity",
+                        "communicative_act",
                         *goal_ids,
                         speech_act,
                         delivery_role,
@@ -2909,20 +2922,44 @@ class GoalDrivenRuntimeCoordinator:
                 )
 
         outcomes: list[Any] = []
-        response_parts: list[str] = []
         unresolved = list(advance.unresolved)
+        communicative_acts: list[PlannedCommunicativeAct] = []
+        for activity in advance.activities:
+            if activity.role == "capability":
+                continue
+            activity_goal_ids: list[str] = []
+            for responsibility_ref in activity.source_responsibility_refs:
+                for goal_id in refs_to_goals[responsibility_ref]:
+                    if goal_id not in activity_goal_ids:
+                        activity_goal_ids.append(goal_id)
+            communicative_acts.append(
+                PlannedCommunicativeAct(
+                    activity_id=activity.activity_id,
+                    role=activity.role,
+                    timing=activity.timing,
+                    speech_act=activity.speech_act,
+                    source_goal_ids=activity_goal_ids,
+                    source_responsibility_refs=list(
+                        activity.source_responsibility_refs
+                    ),
+                    information_gap_ids=list(
+                        getattr(activity, "information_gap_ids", [])
+                    ),
+                    progress_kind=getattr(activity, "progress_kind", None),
+                )
+            )
         for goal_id in goal_ids:
             goal_activities = activities_by_goal.get(goal_id, [])
             goal_steps = [
                 step.step_id for step in steps if goal_id in step.source_goal_ids
             ]
             clarifications = [
-                activity.response_text
+                activity
                 for activity in goal_activities
                 if activity.role == "clarification"
             ]
             responses = [
-                activity.response_text
+                activity
                 for activity in goal_activities
                 if activity.role == "complete_response"
             ]
@@ -2944,33 +2981,27 @@ class GoalDrivenRuntimeCoordinator:
                     )
                 )
             elif clarifications:
-                text = " ".join(dict.fromkeys(clarifications))
-                response_parts.append(text)
                 outcomes.append(
                     ClarifyGoalPlanOutcome(
                         goal_id=goal_id,
                         disposition="clarify",
                         coverage="uncertain",
-                        response_text=text,
                         unresolved=(unresolved or ["user_clarification_required"]),
                         rationale="A GI-declared InformationGap blocks this Goal's Work.",
                     )
                 )
             elif responses:
-                text = " ".join(dict.fromkeys(responses))
-                response_parts.append(text)
                 satisfaction = GoalSatisfactionAssessment(
                     score=max(0.95, advance.confidence),
                     status="exact",
                     satisfied_goal_ids=[goal_id],
-                    rationale="Fast Planner supplied the complete conversational Activity.",
+                    rationale="Fast Planner supplied the complete Communicative Act.",
                 )
                 outcomes.append(
                     RespondGoalPlanOutcome(
                         goal_id=goal_id,
                         disposition="respond",
                         coverage="complete",
-                        response_text=text,
                         satisfaction=satisfaction,
                         rationale="No Capability Evidence is required for this Goal.",
                     )
@@ -3012,7 +3043,8 @@ class GoalDrivenRuntimeCoordinator:
             confidence=advance.confidence,
             goal_ids=goal_ids,
             goal_summary=user_text,
-            response_text=" ".join(dict.fromkeys(response_parts)),
+            response_text="",
+            communicative_acts=communicative_acts,
             steps=steps,
             unresolved=(unresolved if disposition in {"clarify", "mixed"} else []),
             goal_outcomes=outcomes,
@@ -3073,7 +3105,7 @@ class GoalDrivenRuntimeCoordinator:
             }
 
         # Throttle per semantic primary Activity, never per cognition turn or execution
-        # modality/item. A Fast acknowledgement may be its own conversational Activity;
+        # modality/item. A Fast acknowledgement may be its own Communicative Act;
         # after planning, canonical conversational/Plan-step Work defines Activity identity.
         # Goal ownership is context above that identity, not the cooldown key.
         recent = getattr(self.adapter, "recent_auxiliary_behavior_evidence", None)
@@ -3115,7 +3147,7 @@ class GoalDrivenRuntimeCoordinator:
                     if not row_goal_ids.intersection(activity_goal_ids):
                         continue
                 elif row_goal_ids:
-                    # An unbound conversational act must not inherit unrelated later
+                    # An unbound Communicative Act must not inherit unrelated later
                     # Goal/Plan implementation merely because it shares the turn.
                     continue
                 capability_id = str(
@@ -3457,6 +3489,8 @@ class GoalDrivenRuntimeCoordinator:
         needs_deep_planner = False
         fast_advance_task: asyncio.Task[FastPlannerAdvance] | None = None
         fast_vocal_activity_ids: list[str] = []
+        fast_communicative_wordings: dict[str, CommunicativeActWording] = {}
+        fast_communicative_realization_status = "not_started"
         ready_fast_capability_execution: Any | None = None
         ready_fast_capability_status = "not_started"
 
@@ -3514,6 +3548,9 @@ class GoalDrivenRuntimeCoordinator:
                 ),
                 "goal_state_commit_stage": goal_state_commit_stage,
                 "fast_vocal_activity_ids": list(fast_vocal_activity_ids),
+                "fast_communicative_realization_status": (
+                    fast_communicative_realization_status
+                ),
                 "fast_capability_activity_status": ready_fast_capability_status,
                 "gi_fanout_concurrent": True,
                 "goal_grouped_task_list": True,
@@ -3565,6 +3602,7 @@ class GoalDrivenRuntimeCoordinator:
                 async def resolve_fast_activity_plan() -> FastPlannerAdvance:
                     nonlocal ready_fast_capability_execution
                     nonlocal ready_fast_capability_status
+                    nonlocal fast_communicative_realization_status
                     advance = await self._observe_workflow_stage(
                         sid=sid,
                         stage="fast_planner_advance",
@@ -3627,6 +3665,73 @@ class GoalDrivenRuntimeCoordinator:
                                     "deferred_to_canonical_validation:"
                                     + type(exc).__name__
                                 )
+                    communicative_acts = [
+                        item
+                        for item in advance.activities
+                        if item.role != "capability"
+                    ]
+                    if communicative_acts:
+                        try:
+                            realization = await self._observe_workflow_stage(
+                                sid=sid,
+                                stage="communicative_act_realization",
+                                input_payload={
+                                    "acts": [
+                                        item.model_dump(
+                                            mode="json", exclude_none=True
+                                        )
+                                        for item in communicative_acts
+                                    ],
+                                    "responsibilities": [
+                                        item.model_dump(
+                                            mode="json", exclude_none=True
+                                        )
+                                        for item in responsibility_proposals
+                                    ],
+                                },
+                                operation=self.agent_client.realize_communicative_acts(
+                                    session,
+                                    request=CommunicativeActRealizationRequest(
+                                        turn_id=turn_id,
+                                        session_id=sid,
+                                        language=language,
+                                        acts=communicative_acts,
+                                        responsibilities=responsibility_proposals,
+                                        context=context,
+                                    ),
+                                    timeout_ms=self.policy.response_composer_timeout_ms,
+                                ),
+                            )
+                            fast_communicative_realization_status = realization.status
+                            if realization.status == "resolved":
+                                fast_communicative_wordings.update(
+                                    {
+                                        item.activity_id: item
+                                        for item in realization.wordings
+                                    }
+                                )
+                        except (
+                            aiohttp.ClientError,
+                            asyncio.TimeoutError,
+                            AttributeError,
+                            RuntimeError,
+                            TypeError,
+                            ValidationError,
+                            ValueError,
+                        ) as exc:
+                            # Wording is optional progress at this point. Preserve
+                            # the Planner act and let the canonical response path
+                            # formulate it after GA rather than reopening cognition.
+                            fast_communicative_realization_status = (
+                                "unavailable:" + type(exc).__name__
+                            )
+                            logger.warning(
+                                "communicative_act_realization_failed sid=%s "
+                                "error_type=%s error=%s",
+                                sid,
+                                type(exc).__name__,
+                                exc,
+                            )
                     if (
                         self.policy.mode == "apply"
                         and self.policy.lane_enabled("chat")
@@ -3643,11 +3748,16 @@ class GoalDrivenRuntimeCoordinator:
                             # coordination to avoid duplicate delivery.
                             if activity.role == "complete_response" and has_capability:
                                 continue
+                            wording = fast_communicative_wordings.get(
+                                activity.activity_id
+                            )
+                            if wording is None:
+                                continue
                             self._queue_social_attention_for_activity(
                                 session,
-                                activity=self._fast_planner_vocal_social_activity(
+                                activity=self._fast_planner_communicative_social_activity(
                                     activity,
-                                    language=language,
+                                    wording=wording,
                                 ),
                                 text=text,
                                 sid=sid,
@@ -3656,8 +3766,9 @@ class GoalDrivenRuntimeCoordinator:
                                 context=context,
                                 history=history,
                             )
-                            await self.adapter.interaction_runtime.start_fast_planner_vocal_activity(
+                            await self.adapter.interaction_runtime.start_fast_planner_communicative_act(
                                 activity,
+                                wording,
                                 session_id=sid,
                                 turn_id=turn_id,
                                 language=language,
@@ -4149,6 +4260,11 @@ class GoalDrivenRuntimeCoordinator:
                 terminal_plan.metadata.get("resolver") == "fast_planner_advance"
                 and not terminal_plan.steps
                 and terminal_plan.disposition in {"respond", "clarify"}
+                and all(
+                    activity.activity_id in fast_communicative_wordings
+                    for activity in fast_advance.activities
+                    if activity.role != "capability"
+                )
             ):
                 lane = "chat"
                 timings["response_composer"] = 0.0
@@ -4178,6 +4294,7 @@ class GoalDrivenRuntimeCoordinator:
                         plan=terminal_plan,
                         session_id=sid,
                         language=language,
+                        realized_wordings=fast_communicative_wordings,
                         preexecuted_activity_ids=set(fast_vocal_activity_ids),
                         context=planning_context,
                     )

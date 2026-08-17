@@ -101,7 +101,7 @@ Accepted dialogue also survives semantic-path failure. A user turn that fails be
 Goal commit remains bounded conversation evidence for a later follow-up, but it never becomes a
 provisional Goal. A newer turn is not itself a semantic cancellation of older committed work.
 
-Goal Progress Communication is event-identity based. Once a typed conversational act is
+Goal Progress Communication is event-identity based. Once a typed Communicative Act is
 scheduled or heard for the current turn, a later stage reuses that exact event or produces a
 genuinely different speech act; it does not paraphrase the same acknowledgement as new audio.
 
@@ -123,7 +123,7 @@ flowchart TD
     GI -->|"same GI result, concurrent fan-out"| FP["Fast Planner<br/>first Activity Plan"]
     GI -->|"same GI result, concurrent fan-out"| GA["Goal Association (GA)<br/>sole Canonical Goal commit authority"]
 
-    FP --> SPEAK["Speaking Activities"]
+    FP --> COMM["Communicative Acts<br/>acknowledge / ask / answer / explain / refuse / silence"]
     FP --> SAFE["ready safe/read-only<br/>Capability Activities"]
     FP -->|"complex HOW only"| DP["Deep Planner"]
     FP -->|"missing user information"| ASK["Clarification Activity"]
@@ -135,7 +135,8 @@ flowchart TD
     DP -->|"new Plan revision"| TCR
     GA -->|"cancel/replace pending or cancellable Work"| TCR
 
-    SPEAK --> ARB["Resource-aware scheduling"]
+    COMM --> WORDS["Vocal Realization<br/>language formulation / wording"]
+    WORDS --> ARB["Resource-aware scheduling"]
     ASK --> ARB
     TCR --> ARB
     ARB --> PAR["Parallel when declared resources allow;<br/>sequential when dependency/resource requires"]
@@ -167,7 +168,10 @@ Read the diagram with these boundaries:
   of that Work.
 - The same GI result enters Fast Planner and Goal Association concurrently. Fast
   Planner is the first **HOW / Work-advancement authority** and authors an actual
-  Activity Plan, not a progress sentence standing in for a Plan. Speaking and
+  Activity Plan, not a progress sentence standing in for a Plan. When speech is
+  useful, Planner selects a **Communicative Act**: a semantic Primary Activity
+  describing its function, timing, Responsibility/Goal provenance, and truth or
+  silence constraints, but containing no sentence wording. Communicative Acts and
   Capability Activities share the same parallel/sequential semantics. Missing
   user-supplied information produces a clarification Activity; only genuinely
   complex HOW goes to Deep Planner.
@@ -201,6 +205,11 @@ Read the diagram with these boundaries:
 - `realization` describes **how** that Activity is carried out. Vocal Expression
   modes such as speaking, singing, humming, or recitation and Activity-lane
   Capability work belong here; they are not sibling Primary-Activity kinds.
+- Vocal Realization owns language formulation for a Planner-selected Communicative
+  Act. A closed progress act may use a deterministic bounded realization; open
+  answers and clarification questions use the existing Response Composer wording
+  owner. Neither path may add, remove, merge, suppress, or reinterpret the act.
+  TTS and playback own physical speech realization and delivery Evidence.
 - optional Social Attention is a subordinate, fail-soft sibling of primary
   realization around the same semantic Activity. It is not a Goal, Planner,
   execution lane, completion authority, or downstream stage after Vocal.
@@ -467,7 +476,7 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    has a new trustworthy, user-relevant semantic delta, the current speech-capable
    owner may communicate it; when an equivalent act is already delivered or pending,
    it stays silent. This is Chromie's polite-response obligation, not a requirement
-   to fill silence. For a simple greeting the first conversational Activity may fully
+   to fill silence. For a simple greeting the first Communicative Act may fully
    satisfy the turn. If downstream work, fresh Evidence, retained continuity, or
    effects remain, that act is prospective progress only and Fast Planner requests
    Goal Association. Later owners communicate only genuinely new limitation, wait,
@@ -668,7 +677,8 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    need not share a single depth or wall-clock barrier. Once a Responsibility has canonical
    Goal grounding, a terminal valid Fast Plan may execute while a genuinely uncertain
    remaining Responsibility enters Deep where supported by the canonical contracts. Before
-   GA finishes, only validated side-effect-free safe reads and speaking Activities may
+   GA finishes, only validated side-effect-free safe reads and realized
+   Communicative Acts may
    advance; effects remain gated. Do not run Deep merely to re-check work already resolved
    by Fast cognition.
 
@@ -686,17 +696,18 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    Interpretation authority.
 
 35. **Response is expression, not a second semantic mind.** Once authoritative
-   responsibility, plan/evidence state, and permitted conversational act are known,
+   responsibility, plan/evidence state, and a permitted Communicative Act are known,
    Response composition chooses natural wording for the still-needed user-facing
    delta. It may be mechanically validated and must be rejected if it claims
    unsupported reality, but it may not reinterpret Goals, reopen planning, or gain
-   effect authority. **Each conversational act has exactly one semantic wording
-   owner.** Goal Interpretation owns no maintained response wording. Fast Planner
-   owns every conversational Activity it authors in its first Activity Plan; Tool Result
-   Interpretation owns its evidence-bound result act; Response Composer is the sole
-   writer only for still-needed Response-Composition-owned acts. Later stages may
-   bind/reuse an already-authored act exactly or author a genuinely different act;
-   they may not paraphrase the same milestone into a second semantic writer.
+   effect authority. **Planner owns the Communicative Act; Vocal Realization owns
+   its sentence wording.** Goal Interpretation owns neither. A Planner act contains
+   function, semantic/evidence inputs, timing, provenance, and constraints—not a
+   sentence. Response Composer/language formulation realizes the immutable act;
+   closed bounded acts may be realized deterministically. Tool Result Interpretation
+   supplies evidence-bound propositions and references but does not gain Planner
+   authority. Later stages may bind/reuse the same act or plan a genuinely different
+   act; they may not silently paraphrase one milestone into a second act.
    Response-stage Goal coverage is not model-authored semantic truth:
    `covers_goal_ids` is mechanically projected from the immutable Plan/outcomes and
    exact reused-speech provenance after wording is accepted. A consequential response

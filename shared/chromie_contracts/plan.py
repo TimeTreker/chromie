@@ -40,7 +40,11 @@ ParameterResolutionStrategy = Literal[
 ]
 GoalSatisfactionStatus = Literal["exact", "substantial", "partial", "unsatisfied"]
 FastPlannerContinuation = Literal["deep_planner"]
-FastVocalActivityRole = Literal["complete_response", "progress", "clarification"]
+FastCommunicativeActRole = Literal[
+    "complete_response",
+    "progress",
+    "clarification",
+]
 FastProgressKind = Literal[
     "acknowledge_work",
     "check_information",
@@ -51,6 +55,24 @@ FastProgressSpeechAct = Literal[
     "acknowledge",
     "acknowledge_and_check",
     "thinking",
+]
+FastCompleteResponseSpeechAct = Literal[
+    "acknowledge",
+    "answer",
+    "apologize",
+    "explain",
+    "farewell",
+    "greeting",
+    "inform",
+    "respond",
+    "support",
+    "thank",
+]
+FastClarificationSpeechAct = Literal["ask_clarification"]
+FastCommunicativeSpeechAct = Union[
+    FastCompleteResponseSpeechAct,
+    FastProgressSpeechAct,
+    FastClarificationSpeechAct,
 ]
 
 _FAST_PROGRESS_SPEECH_ACT_BY_KIND: dict[
@@ -63,8 +85,14 @@ _FAST_PROGRESS_SPEECH_ACT_BY_KIND: dict[
 }
 
 
-class _FastPlannerVocalActivityBase(BaseModel):
-    """Common identity/provenance for one Fast-Planner-authored vocal Activity."""
+class _FastPlannerCommunicativeActBase(BaseModel):
+    """Planner-owned communicative intention, before wording or Vocal realization.
+
+    A Communicative Act is a semantic Activity: it records why speech should
+    happen, which Responsibility it advances, and when it may overlap other
+    Work.  It deliberately contains no surface sentence.  Response composition
+    owns wording and the Vocal runtime owns delivery.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -75,7 +103,7 @@ class _FastPlannerVocalActivityBase(BaseModel):
 
     @field_validator("activity_id", "speech_act", mode="before")
     @classmethod
-    def normalize_vocal_text(cls, value: Any) -> Any:
+    def normalize_communicative_act_text(cls, value: Any) -> Any:
         return " ".join(value.strip().split()) if isinstance(value, str) else value
 
     @field_validator("source_responsibility_refs", mode="before")
@@ -84,38 +112,34 @@ class _FastPlannerVocalActivityBase(BaseModel):
         return _normalize_ids(value)
 
 
-class FastPlannerCompleteResponseActivity(_FastPlannerVocalActivityBase):
-    """A conversational answer that can fully complete its Responsibility now."""
+class FastPlannerCompleteResponseAct(_FastPlannerCommunicativeActBase):
+    """An answer act that can fully complete its Responsibility once realized."""
 
     role: Literal["complete_response"]
-    response_text: str = Field(min_length=1, max_length=600)
-
-    @field_validator("response_text", mode="before")
-    @classmethod
-    def normalize_response_text(cls, value: Any) -> Any:
-        return " ".join(value.strip().split()) if isinstance(value, str) else value
+    speech_act: FastCompleteResponseSpeechAct = "respond"
 
 
-class FastPlannerClarificationActivity(_FastPlannerVocalActivityBase):
-    """A user-facing question when WHAT lacks a material binding."""
+class FastPlannerClarificationAct(_FastPlannerCommunicativeActBase):
+    """A question act bound to exact GI-declared InformationGap identities."""
 
     role: Literal["clarification"]
-    response_text: str = Field(min_length=1, max_length=600)
+    speech_act: FastClarificationSpeechAct = "ask_clarification"
+    information_gap_ids: list[str] = Field(min_length=1, max_length=8)
 
-    @field_validator("response_text", mode="before")
+    @field_validator("information_gap_ids", mode="before")
     @classmethod
-    def normalize_response_text(cls, value: Any) -> Any:
-        return " ".join(value.strip().split()) if isinstance(value, str) else value
+    def normalize_information_gap_ids(cls, value: Any) -> list[str]:
+        return _normalize_ids(value)
 
 
-class FastPlannerProgressActivity(_FastPlannerVocalActivityBase):
-    """Pre-evidence progress semantics with no model-authored factual wording.
+class FastPlannerProgressAct(_FastPlannerCommunicativeActBase):
+    """Pre-evidence progress intention with no model-authored factual wording.
 
     A progress Activity is deliberately not free text.  Before trusted Evidence
     exists, allowing arbitrary response text lets a model hide an unsupported
     result claim behind ``role=progress``.  The Planner therefore selects only a
-    bounded progress act; trusted runtime renders that act without inventing a
-    result.
+    bounded progress act; Response Composer's closed language realization renders
+    that act without inventing a result.
     """
 
     role: Literal["progress"]
@@ -176,20 +200,91 @@ class FastPlannerCapabilityActivity(CapabilityIdentityModel):
         return reject_forbidden_low_level_fields(value)
 
 
-FastPlannerVocalActivity = Annotated[
+class PlannedCommunicativeAct(BaseModel):
+    """Goal-bound semantic communication selected by Planner, without wording."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    activity_id: str = Field(min_length=1, max_length=160)
+    role: FastCommunicativeActRole
+    timing: PlanTiming = "parallel"
+    speech_act: FastCommunicativeSpeechAct
+    source_goal_ids: list[str] = Field(min_length=1)
+    source_responsibility_refs: list[str] = Field(default_factory=list)
+    information_gap_ids: list[str] = Field(default_factory=list, max_length=8)
+    progress_kind: FastProgressKind | None = None
+
+    @field_validator("activity_id", "speech_act", mode="before")
+    @classmethod
+    def normalize_act_text(cls, value: Any) -> Any:
+        return " ".join(value.strip().split()) if isinstance(value, str) else value
+
+    @field_validator(
+        "source_goal_ids",
+        "source_responsibility_refs",
+        "information_gap_ids",
+        mode="before",
+    )
+    @classmethod
+    def normalize_act_ids(cls, value: Any) -> list[str]:
+        return _normalize_ids(value)
+
+    @model_validator(mode="after")
+    def validate_role_fields(self) -> "PlannedCommunicativeAct":
+        if self.role == "complete_response" and self.speech_act not in {
+            "acknowledge",
+            "answer",
+            "apologize",
+            "explain",
+            "farewell",
+            "greeting",
+            "inform",
+            "respond",
+            "support",
+            "thank",
+        }:
+            raise ValueError(
+                "complete-response Communicative Act requires a complete-response function"
+            )
+        if self.role == "clarification" and self.speech_act != "ask_clarification":
+            raise ValueError(
+                "clarification Communicative Act requires ask_clarification"
+            )
+        if self.role == "progress" and self.speech_act not in {
+            "acknowledge",
+            "acknowledge_and_check",
+            "thinking",
+        }:
+            raise ValueError("progress Communicative Act requires a progress function")
+        if self.role == "progress" and self.progress_kind is None:
+            raise ValueError("progress Communicative Act requires progress_kind")
+        if self.role != "progress" and self.progress_kind is not None:
+            raise ValueError("only progress Communicative Acts carry progress_kind")
+        if self.role == "clarification" and not self.information_gap_ids:
+            raise ValueError(
+                "clarification Communicative Act requires InformationGap IDs"
+            )
+        if self.role != "clarification" and self.information_gap_ids:
+            raise ValueError(
+                "only clarification Communicative Acts carry InformationGap IDs"
+            )
+        return self
+
+
+FastPlannerCommunicativeAct = Annotated[
     Union[
-        FastPlannerCompleteResponseActivity,
-        FastPlannerProgressActivity,
-        FastPlannerClarificationActivity,
+        FastPlannerCompleteResponseAct,
+        FastPlannerProgressAct,
+        FastPlannerClarificationAct,
     ],
     Field(discriminator="role"),
 ]
 
 FastPlannerActivity = Annotated[
     Union[
-        FastPlannerCompleteResponseActivity,
-        FastPlannerProgressActivity,
-        FastPlannerClarificationActivity,
+        FastPlannerCompleteResponseAct,
+        FastPlannerProgressAct,
+        FastPlannerClarificationAct,
         FastPlannerCapabilityActivity,
     ],
     Field(discriminator="role"),
@@ -203,12 +298,12 @@ FastPlannerActivity = Annotated[
 # When WHAT is already confident, fresh Evidence means the only honest immediate
 # act is bounded progress. A separate clarifiable contract is used only when Goal
 # Interpretation explicitly carries material uncertainty at low confidence.
-FastPlannerFreshEvidenceVocalActivity = FastPlannerProgressActivity
+FastPlannerFreshEvidenceCommunicativeAct = FastPlannerProgressAct
 
-FastPlannerFreshEvidenceClarifiableVocalActivity = Annotated[
+FastPlannerFreshEvidenceClarifiableCommunicativeAct = Annotated[
     Union[
-        FastPlannerProgressActivity,
-        FastPlannerClarificationActivity,
+        FastPlannerProgressAct,
+        FastPlannerClarificationAct,
     ],
     Field(discriminator="role"),
 ]
@@ -221,31 +316,6 @@ def fast_planner_activity_request_id(turn_id: str, activity_id: str) -> str:
         f"{turn_id}|{activity_id}".encode("utf-8")
     ).hexdigest()[:20]
     return f"fastreq_{digest}"
-
-
-def render_fast_planner_vocal_activity(
-    activity: FastPlannerVocalActivity,
-    *,
-    language: str,
-) -> str:
-    """Render only the bounded speech semantics already authorized by Fast Planner."""
-
-    if activity.role != "progress":
-        return activity.response_text
-    zh = str(language or "").strip().casefold().startswith("zh")
-    if zh:
-        return {
-            "acknowledge_work": "好，我先想想。",
-            "check_information": "我先看看能不能查到。",
-            "perform_action": "我先看看能不能做到。",
-            "think": "我想一想。",
-        }[activity.progress_kind]
-    return {
-        "acknowledge_work": "Okay, let me think about that.",
-        "check_information": "Let me see what I can check.",
-        "perform_action": "Let me see what I can do.",
-        "think": "Let me think about it.",
-    }[activity.progress_kind]
 
 
 class FastPlannerAdvance(BaseModel):
@@ -541,7 +611,7 @@ class RespondGoalPlanOutcome(_GoalPlanOutcomeBase):
     coverage: Literal["complete"]
     unresolved: list[str] = Field(default_factory=list, max_length=0)
     step_ids: list[str] = Field(default_factory=list, max_length=0)
-    response_text: str = Field(min_length=1)
+    response_text: str = ""
 
     @field_validator("step_ids", mode="before")
     @classmethod
@@ -646,6 +716,10 @@ class CanonicalPlan(BaseModel):
     goal_ids: list[str] = Field(default_factory=list)
     goal_summary: str = ""
     response_text: str = ""
+    communicative_acts: list[PlannedCommunicativeAct] = Field(
+        default_factory=list,
+        max_length=24,
+    )
     steps: list[CanonicalPlanStep] = Field(default_factory=list)
     escalation_reason: str = ""
     unresolved: list[str] = Field(default_factory=list)
@@ -769,8 +843,14 @@ class CanonicalPlan(BaseModel):
             raise ValueError("execute disposition requires at least one step")
         if self.disposition == "mixed" and not self.steps:
             raise ValueError("mixed disposition requires at least one executable step")
-        if self.disposition == "respond" and not self.response_text:
-            raise ValueError("respond disposition requires response_text")
+        if self.disposition == "respond" and not (
+            self.response_text
+            or any(item.role == "complete_response" for item in self.communicative_acts)
+        ):
+            raise ValueError(
+                "respond disposition requires response_text or a complete-response "
+                "Communicative Act"
+            )
         if self.disposition not in {"execute", "mixed"} and self.steps:
             raise ValueError(
                 f"{self.disposition} disposition must not carry executable steps"
@@ -790,6 +870,18 @@ class CanonicalPlan(BaseModel):
             raise ValueError("executable plans cannot retain blocking parameter resolutions")
 
         goal_id_set = set(self.goal_ids)
+        communicative_act_ids = [
+            item.activity_id for item in self.communicative_acts
+        ]
+        if len(communicative_act_ids) != len(set(communicative_act_ids)):
+            raise ValueError("Canonical Plan Communicative Act IDs must be unique")
+        for act in self.communicative_acts:
+            unknown_act_goals = set(act.source_goal_ids) - goal_id_set
+            if unknown_act_goals:
+                raise ValueError(
+                    "Communicative Act references unknown Goal IDs: "
+                    + ",".join(sorted(unknown_act_goals))
+                )
         provenance_keys = [
             (item.agent_skill_id, item.selected_by_agent_role)
             for item in self.selected_agent_skills
@@ -862,6 +954,20 @@ class CanonicalPlan(BaseModel):
             if set(outcome_ids) != goal_id_set:
                 raise ValueError("goal outcomes must cover exactly the canonical plan goal_ids")
             outcome_by_goal = {item.goal_id: item for item in self.goal_outcomes}
+
+            for outcome in self.goal_outcomes:
+                if outcome.disposition == "respond" and not (
+                    outcome.response_text
+                    or any(
+                        act.role == "complete_response"
+                        and outcome.goal_id in act.source_goal_ids
+                        for act in self.communicative_acts
+                    )
+                ):
+                    raise ValueError(
+                        "respond goal outcome requires response_text or a matching "
+                        "Communicative Act"
+                    )
 
             outcome_dispositions = {item.disposition for item in self.goal_outcomes}
             expected_disposition = (

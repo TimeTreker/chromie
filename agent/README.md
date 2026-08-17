@@ -37,6 +37,8 @@ Important endpoints include:
 - `POST /capabilities/search`
 - Goal Interpretation / cognitive-core endpoints
 - `POST /goal-association`
+- `POST /fast-advance`
+- `POST /communicative-acts/realize`
 - `POST /fast-plan`
 - `POST /deep-plan`
 - `POST /social-attention/plan`
