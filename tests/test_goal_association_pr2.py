@@ -9,6 +9,8 @@ from pydantic import ValidationError
 from agent.app.clients.ollama_client import OllamaGenerationError
 from agent.app.goal_association import (
     GoalAssociationModelGoal,
+    GoalAssociationModelInformationResourceResponsibility,
+    GoalAssociationModelPhysicalResourceResponsibility,
     GoalAssociationResolver,
     GoalResponsibilityCoverageCertificate,
     GoalSegmentationModelOutput,
@@ -411,6 +413,15 @@ class GoalExecutionContractTests(unittest.TestCase):
                     resource=resource_responsibility(),
                 )
             )
+
+    def test_resource_discriminator_is_explicitly_required(self):
+        for contract in (
+            GoalAssociationModelInformationResourceResponsibility,
+            GoalAssociationModelPhysicalResourceResponsibility,
+        ):
+            schema = contract.model_json_schema()
+            self.assertIn("kind", schema.get("required", []))
+            self.assertNotIn("default", schema["properties"]["kind"])
 
     def test_resource_and_coverage_invariants_are_in_decoder_schemas(self):
         goal_schema = GoalAssociationResolver._response_schema(

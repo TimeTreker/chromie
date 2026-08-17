@@ -492,7 +492,7 @@ class GoalAssociationModelInformationResourceResponsibility(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    kind: Literal["information"] = "information"
+    kind: Literal["information"]
     description: str = Field(min_length=1)
     quantity: str = ""
     query_scope: list[GoalAssociationModelBinding] = Field(min_length=1, max_length=12)
@@ -538,7 +538,7 @@ class GoalAssociationModelPhysicalResourceResponsibility(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    kind: Literal["physical_object"] = "physical_object"
+    kind: Literal["physical_object"]
     description: str = Field(min_length=1)
     quantity: str = ""
     source: GoalAssociationModelPhysicalSource

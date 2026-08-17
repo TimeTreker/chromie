@@ -2978,16 +2978,19 @@ class VoiceAssistant:
         if resolution.status != "applied" or resolution.interaction_response is None:
             fallback_started_ms = now_ms()
             fast_first_scheduled = fast_planner_vocal_scheduled
-            text = (
-                "我听懂了，可是这次没能把这些事情安排好，所以先停下了。"
-                if self._looks_zh(user_text)
-                else "I understood, but I could not arrange those things correctly this time, so I stopped."
+            safe_response = await self._compose_cognitive_failure_response(
+                resolution,
+                user_text=user_text,
+                session_id=session_id,
             )
-            safe_response = self._host_speech_response(
-                text,
-                style="warning",
-                source="host_cognitive_runtime_fail_closed",
-            )
+            if safe_response is None:
+                safe_response = self._host_speech_response(
+                    "咦，刚才没弄成。"
+                    if self._looks_zh(user_text)
+                    else "Oh, that didn't work just now.",
+                    style="warning",
+                    source="host_cognitive_runtime_emergency_fallback",
+                )
             record_session_workflow_stage(
                 self,
                 session_id,
@@ -3757,9 +3760,9 @@ class VoiceAssistant:
         # unavailable runtime therefore fails closed instead of reconstructing a
         # retired route/intent projection or entering a second semantic pipeline.
         safe_response = self._host_speech_response(
-            "我听懂了，但现在不能继续安排这件事，所以先停下了。"
+            "咦，我现在还做不了这个。"
             if self._looks_zh(user_text)
-            else "I understood, but I cannot continue arranging this right now, so I stopped.",
+            else "Oh, I can't do that right now.",
             style="warning",
             source="host_cognitive_runtime_unavailable",
         )

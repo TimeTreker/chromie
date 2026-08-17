@@ -410,10 +410,27 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
             timings_ms={"total": 15.0},
         )
         assistant = self._assistant(resolution)
+        failure_response_calls = []
+
+        async def compose_failure(
+            resolution_arg,
+            *,
+            user_text,
+            session_id,
+            **kwargs,
+        ):
+            failure_response_calls.append(
+                (resolution_arg, user_text, session_id, kwargs)
+            )
+            return InteractionResponse(
+                speech=[{"text": "咦，这次没弄成。", "timing": "immediate"}],
+                metadata={"source": "llm_cognitive_failure_response"},
+            )
 
         async def settle(*args, **kwargs):
             return True
 
+        assistant._compose_cognitive_failure_response = compose_failure
         assistant._settle_fast_first_audio_hedge = settle
         core, envelope = _core_and_envelope("眨眼。", sid="sid", language="zh-CN")
 
@@ -430,8 +447,24 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
             self.assertTrue(handled)
 
         asyncio.run(run())
+        self.assertEqual(len(failure_response_calls), 1)
+        failure_resolution = failure_response_calls[0][0]
+        self.assertEqual(failure_resolution.status, "error")
+        self.assertEqual(failure_resolution.lane, "robot_action")
+        self.assertEqual(
+            failure_resolution.fallback_reason,
+            "lane_not_enabled_for_apply",
+        )
+        self.assertEqual(failure_response_calls[0][1], "眨眼。")
+        self.assertEqual(failure_response_calls[0][2], "sid")
         self.assertEqual(len(assistant.conversation_state.user_turns), 1)
         self.assertEqual(len(assistant.conversation_state.agent_results), 1)
+        safe_response = assistant.conversation_state.agent_results[0][0][1]
+        self.assertEqual(
+            safe_response.metadata["source"],
+            "llm_cognitive_failure_response",
+        )
+        self.assertEqual(safe_response.speech[0].text, "咦，这次没弄成。")
         self.assertEqual(len(assistant._launch_interaction_calls), 1)
 
 
