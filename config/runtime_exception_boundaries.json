@@ -606,8 +606,8 @@
       ]
     },
     {
-      "path": "agent/app/runtime.py",
-      "symbol": "InteractionRuntime._ensure_social_attention_candidates",
+      "path": "agent/app/social_attention.py",
+      "symbol": "SocialAttentionContextBuilder._ensure_candidates",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
@@ -619,8 +619,8 @@
       ]
     },
     {
-      "path": "agent/app/runtime.py",
-      "symbol": "InteractionRuntime._ensure_social_attention_candidates",
+      "path": "agent/app/social_attention.py",
+      "symbol": "SocialAttentionContextBuilder._ensure_candidates",
       "ordinal": 2,
       "classification": "fail_closed_boundary",
       "owner": "agent",

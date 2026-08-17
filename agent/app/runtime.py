@@ -22,7 +22,7 @@ from .agents import (
 from .clients.ollama_client import llm_failure_metadata
 from .dispatcher import selected_agents
 from .interaction import InteractionDraft, NativeInteractionOutputError
-from .social_attention import SocialAttentionPlanner
+from .social_attention import SocialAttentionContextBuilder, SocialAttentionPlanner
 from .schema import AgentResult, AgentRunRequest, RouteDecision
 
 try:
@@ -31,44 +31,6 @@ except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.interaction import InteractionResponse, CapabilityRequest
 
 logger = logging.getLogger("chromie.agent.runtime")
-
-
-_SOCIAL_ATTENTION_PROVIDER_OWNED_FIELDS = frozenset(
-    {
-        "head_yaw_rad",
-        "head_pitch_rad",
-        "yaw_rad",
-        "pitch_rad",
-        "target_yaw_rad",
-        "target_pitch_rad",
-        "suggested_args",
-        "installation_calibration",
-        "mode",
-        "backend",
-        "provider_backend",
-        "provider_mode",
-    }
-)
-
-
-def _contains_provider_owned_field(value: Any) -> bool:
-    if isinstance(value, dict):
-        for key, item in value.items():
-            if str(key).strip().lower() in _SOCIAL_ATTENTION_PROVIDER_OWNED_FIELDS:
-                return True
-            if _contains_provider_owned_field(item):
-                return True
-    elif isinstance(value, list):
-        return any(_contains_provider_owned_field(item) for item in value)
-    return False
-
-
-def _semantic_target_projection(value: dict[str, Any]) -> dict[str, Any]:
-    return {
-        key: value[key]
-        for key in ("target_ref", "relative_direction", "label", "confidence")
-        if key in value
-    }
 
 
 def _is_missing_ability_clarify(decision: RouteDecision) -> bool:
@@ -118,6 +80,7 @@ class _AgentPipeline:
         ]
         self.agents: dict[str, BaseAgent] = {agent.name: agent for agent in agents}
         self.social_attention_planner = SocialAttentionPlanner(services)
+        self.social_attention_context_builder = SocialAttentionContextBuilder(services)
 
     def available_agents(self) -> list[str]:
         return sorted(self.agents)
@@ -252,7 +215,7 @@ class InteractionRuntime(_AgentPipeline):
         request.route_decision.candidate_capabilities = [
             match.model_dump(mode="json") for match in search.matches
         ]
-        await self._ensure_social_attention_candidates(request)
+        await self.social_attention_context_builder._ensure_candidates(request)
         request.context["capability_catalog_version"] = search.catalog_version
         request.context["capability_candidates"] = list(
             request.route_decision.candidate_capabilities
@@ -319,216 +282,9 @@ class InteractionRuntime(_AgentPipeline):
         request.context["capability_candidates"] = list(payload)
         request.context["capability_catalog_scope"] = "all"
 
-    async def _ensure_social_attention_candidates(
-        self,
-        request: AgentRunRequest,
-    ) -> None:
-        mode = self.services.effective_social_attention_mode()
-        # Policy is host-owned runtime context, not a model preference. Clear any
-        # caller-supplied/stale candidates before rebuilding the eligible view.
-        request.context["social_attention_policy"] = {
-            "mode": mode,
-            "planning_enabled": mode != "off",
-            "execution_enabled": mode == "on",
-            "embodiment_independent": True,
-            "semantic_owner": "social_attention",
-        }
-        request.context.pop("social_attention_candidates", None)
-        request.context.pop("social_attention_candidate_source", None)
-        request.context.pop("social_attention_target_evidence", None)
-        if mode == "off":
-            return
-        catalog = self.services.capability_catalog
-        if catalog is None:
-            return
-
-        # Social attention is a behavior domain, not a fixed action list. Refresh
-        # the live catalog first, then discover every capability that declares
-        # the domain. Explicit IDs remain an operator override for providers that
-        # have not yet published domain metadata.
-        if hasattr(catalog, "refresh_live_named_capabilities"):
-            try:
-                await catalog.refresh_live_named_capabilities()
-            except Exception as exc:  # pragma: no cover - defensive service boundary
-                logger.warning("social attention catalog refresh failed error=%s", exc)
-
-        configured_ids = {
-            capability_id
-            for capability_id in self.services.social_attention_capability_ids
-            if capability_id
-        }
-        interaction_state = request.context.get(
-            "social_attention_interaction_state"
-        )
-        raw_primary_ids = (
-            interaction_state.get("primary_capability_ids")
-            if isinstance(interaction_state, dict)
-            else []
-        )
-        primary_capability_ids = (
-            {
-                str(capability_id).strip()
-                for capability_id in raw_primary_ids
-                if str(capability_id).strip()
-            }
-            if isinstance(raw_primary_ids, list)
-            else set()
-        )
-        candidate_ids: list[str] = []
-        seen_ids: set[str] = set()
-
-        entries = catalog.entries() if hasattr(catalog, "entries") else []
-        for entry in entries:
-            capability_id = str(getattr(entry, "capability_id", "") or "").strip()
-            domains = {
-                str(value).strip().lower()
-                for value in (getattr(entry, "behavior_domains", None) or [])
-                if str(value).strip()
-            }
-            if capability_id and (
-                "social_attention" in domains or capability_id in configured_ids
-            ):
-                if capability_id not in seen_ids:
-                    seen_ids.add(capability_id)
-                    candidate_ids.append(capability_id)
-
-        for capability_id in sorted(configured_ids):
-            if capability_id not in seen_ids:
-                seen_ids.add(capability_id)
-                candidate_ids.append(capability_id)
-
-        candidates: list[dict[str, Any]] = []
-        for capability_id in candidate_ids:
-            # An explicit primary Activity is never an eligible decoration.
-            # The trusted Host repeats this check before execution, but keeping
-            # it out of the model's enum prevents a proposal from wasting the
-            # optional Social Attention opportunity on the primary action.
-            if capability_id in primary_capability_ids:
-                continue
-            item = None
-            if hasattr(catalog, "get_capability"):
-                try:
-                    item = await catalog.get_capability(capability_id)
-                except Exception as exc:  # pragma: no cover - defensive service boundary
-                    logger.warning(
-                        "social attention capability lookup failed id=%s error=%s",
-                        capability_id,
-                        exc,
-                    )
-                    continue
-            if item is None:
-                item = next(
-                    (
-                        entry
-                        for entry in entries
-                        if str(getattr(entry, "capability_id", "")) == capability_id
-                    ),
-                    None,
-                )
-            if item is None:
-                continue
-            payload = (
-                item.model_dump(mode="json")
-                if hasattr(item, "model_dump")
-                else dict(item)
-                if isinstance(item, dict)
-                else None
-            )
-            if not isinstance(payload, dict):
-                continue
-            if payload.get("available") is False:
-                continue
-            if payload.get("interaction_executable") is not True:
-                continue
-            # In apply mode the background path cannot pause the primary turn for
-            # confirmation and the continuous runtime accepts only declared
-            # parallel-safe decoration. Do not label candidates "eligible" for the
-            # model when the trusted runtime would deterministically reject them.
-            if mode == "on" and (
-                bool(payload.get("requires_confirmation"))
-                or payload.get("can_run_parallel") is not True
-                or payload.get("parallel_metadata_declared") is not True
-            ):
-                continue
-            domains = {
-                str(value).strip().lower()
-                for value in payload.get("behavior_domains") or []
-                if str(value).strip()
-            }
-            if capability_id not in configured_ids and "social_attention" not in domains:
-                continue
-            if _contains_provider_owned_field(payload.get("input_schema") or {}):
-                logger.info(
-                    "social_attention_candidate_hidden_provider_owned_schema id=%s",
-                    capability_id,
-                )
-                continue
-            metadata = payload.get("metadata")
-            if isinstance(metadata, dict):
-                payload["metadata"] = {
-                    key: value
-                    for key, value in metadata.items()
-                    if str(key).strip().lower() not in _SOCIAL_ATTENTION_PROVIDER_OWNED_FIELDS
-                    and not _contains_provider_owned_field(value)
-                }
-            candidates.append(payload)
-
-        if candidates:
-            request.context["social_attention_candidates"] = candidates
-            request.context["social_attention_candidate_source"] = (
-                "behavior_domain_catalog"
-            )
-            request.context["social_attention_target_evidence"] = (
-                self._social_attention_target_evidence(request)
-            )
-
     async def prepare_social_attention_context(self, request: Any) -> None:
-        """Attach the bounded stable/social projection for one Social-Attention event."""
-
-        mind = request.context.get("mind")
-        style = mind.get("social_interaction_style") if isinstance(mind, dict) else None
-        if isinstance(style, dict) and style.get("owner_approved") is True:
-            request.context["social_interaction_style"] = dict(style)
-        else:
-            request.context.pop("social_interaction_style", None)
-
-        recent = request.context.get("recent_auxiliary_behavior_evidence")
-        if isinstance(recent, list):
-            request.context["recent_auxiliary_behavior_evidence"] = [
-                dict(item)
-                for item in recent[-12:]
-                if isinstance(item, dict)
-            ]
-        else:
-            request.context["recent_auxiliary_behavior_evidence"] = []
-
-        await self._ensure_social_attention_candidates(request)
-
-    def _social_attention_target_evidence(self, request: AgentRunRequest) -> dict[str, Any]:
-        for key in ("social_attention_target", "active_user_target", "perceived_user_target"):
-            value = request.context.get(key)
-            if isinstance(value, dict) and value:
-                explicit_source = str(value.get("source") or "").strip()
-                source = (
-                    explicit_source
-                    if explicit_source
-                    in {"live_perception", "conversation_context"}
-                    else "live_perception"
-                    if "perception" in key or "perceived" in key
-                    else "conversation_context"
-                )
-                target = value.get("target")
-                if not isinstance(target, dict):
-                    target = dict(value)
-                    target.pop("source", None)
-                    target.pop("available", None)
-                return {
-                    "available": True,
-                    "source": source,
-                    "target": _semantic_target_projection(target),
-                }
-
-        return {"available": False}
+        """Legacy runtime delegate; current API owns Social Attention directly."""
+        await self.social_attention_context_builder.prepare(request)
 
     def _start_social_attention_plan(
         self,

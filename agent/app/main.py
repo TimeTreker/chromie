@@ -85,6 +85,11 @@ from .goal_association import GoalAssociationResolver
 from .fast_planner import FastPlannerResolver
 from .deep_planner import DeepPlannerResolver
 from .reflection import ReflectionResolver
+from .social_attention import (
+    SocialAttentionContextBuilder,
+    SocialAttentionPlanner,
+    SocialAttentionServices,
+)
 from .response_composer import ResponseComposerResolver
 from .tool_result_interpreter import ToolResultInterpreter
 from .schema import AgentResult, AgentRunRequest, HealthResponse
@@ -279,6 +284,17 @@ capability_catalog = CapabilityCatalog(
         settings.capability_prompt_tier_overrides
     ),
 )
+social_attention_services = SocialAttentionServices(
+    social_attention_mode=settings.social_attention_mode,
+    social_attention_ollama=social_attention_client,
+    social_attention_num_ctx=settings.social_attention_num_ctx,
+    social_attention_num_predict=settings.social_attention_num_predict,
+    social_attention_max_behaviors=settings.social_attention_max_behaviors,
+    social_attention_capability_ids=settings.social_attention_capability_ids,
+    capability_catalog=capability_catalog,
+)
+social_attention_context_builder = SocialAttentionContextBuilder(social_attention_services)
+social_attention_planner = SocialAttentionPlanner(social_attention_services)
 task_graph_planner = (
     TaskGraphPlanner(capability_registry, ollama_client)
     if settings.enable_task_graph_planning and settings.use_llm
@@ -762,8 +778,8 @@ async def resolve_reflection(request: CognitiveWorkRequest):
 @app.post("/social-attention/plan", response_model=SocialAttentionPlan)
 async def plan_social_attention(request: SocialAttentionRequest) -> SocialAttentionPlan:
     """Plan one independent, event-scoped auxiliary Social-Attention proposal."""
-    await interaction_runtime.prepare_social_attention_context(request)
-    plan = await interaction_runtime.social_attention_planner.plan(request)
+    await social_attention_context_builder.prepare(request)
+    plan = await social_attention_planner.plan(request)
     if plan is None:
         return SocialAttentionPlan(
             decision="none",
