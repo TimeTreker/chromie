@@ -9,7 +9,7 @@ The contract package keeps JSON boundaries consistent between the host
 Orchestrator, Goal Interpretation, Agent, compatibility hardware daemon, tests, and
 acceptance tools. It includes:
 
-- route requests and `RouteDecision`;
+- Goal/Core interpretation requests and typed `CognitiveWorkRequest` handoff contracts;
 - agent requests, `AgentResult`, speech, memory, and compatibility actions;
 - strict `InteractionResponse`, `InteractionSpeech`, `CapabilityRequest`,
   `CapabilityResult`, and `CapabilityTrace` contracts;
@@ -29,10 +29,10 @@ acceptance tools. It includes:
 Interaction models use `extra="forbid"` and recursively reject known low-level
 motor, joint, torque, actuator, and raw-control field names. This prevents a
 model or adapter from smuggling low-level embodiment commands through metadata
-or nested skill arguments.
+or nested capability arguments.
 
 Contract validation is necessary but not sufficient authorization. A valid
-`CapabilityRequest` must still resolve through the trusted Skill Registry and pass
+`CapabilityRequest` must still resolve through the trusted Capability Registry and pass
 provider, confirmation, resource, timeout, and cancellation policy.
 
 ## `chromie_runtime`
@@ -59,7 +59,7 @@ Example imports:
 
 ```python
 from chromie_contracts.interaction import InteractionResponse, CapabilityRequest
-from chromie_contracts.route import RouteDecision
+from chromie_contracts.core_interpretation import CognitiveWorkRequest
 from chromie_runtime import ResourceArbiter
 ```
 

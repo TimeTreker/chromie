@@ -2498,6 +2498,16 @@
     {
       "boolean": false,
       "category": "profile_constant",
+      "key": "ORCH_CAPABILITY_MAX_CONCURRENCY",
+      "owners": [
+        ".env.common",
+        "orchestrator/runtime/host_settings.py",
+        "orchestrator/runtime/interaction_coordinator.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "profile_constant",
       "key": "ORCH_COGNITIVE_APPLY_LANES",
       "owners": [
         ".env.common",
@@ -2543,14 +2553,6 @@
         "orchestrator/runtime/host_settings.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/interaction_text_mujoco_check.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "ORCH_COGNITIVE_FALLBACK_POLICY",
-      "owners": [
-        "orchestrator/.env.local.example"
       ]
     },
     {
@@ -3187,14 +3189,6 @@
       ]
     },
     {
-      "boolean": true,
-      "category": "service_internal",
-      "key": "ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED",
-      "owners": [
-        "orchestrator/.env.local.example"
-      ]
-    },
-    {
       "boolean": false,
       "category": "service_internal",
       "key": "ORCH_MIND_CONTEXT_MAX_CHARS",
@@ -3448,16 +3442,6 @@
         "orchestrator/runtime/host_settings.py",
         "scripts/deep_thought_response_check.py",
         "scripts/interaction_text_mujoco_check.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "profile_constant",
-      "key": "ORCH_SKILL_MAX_CONCURRENCY",
-      "owners": [
-        ".env.common",
-        "orchestrator/runtime/host_settings.py",
-        "orchestrator/runtime/interaction_coordinator.py"
       ]
     },
     {
@@ -4462,10 +4446,10 @@
       "bounded_compatibility_alias": 0,
       "profile_constant": 141,
       "public_choice": 9,
-      "service_internal": 220
+      "service_internal": 218
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 423
+    "total_keys": 421
   }
 }

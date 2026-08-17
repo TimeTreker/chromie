@@ -145,7 +145,7 @@ def build_interaction_runtime(
             assistant.conversation_state.retrieve_verified_tool_memory
         ),
         capability_manifest_paths=cognition.capability_manifest_paths,
-        max_concurrency=settings.interaction.skill_max_concurrency,
-        catalog_refresh_ttl_s=settings.interaction.catalog_refresh_ttl_s,
+        max_concurrency=settings.capability_runtime.capability_max_concurrency,
+        catalog_refresh_ttl_s=settings.capability_runtime.catalog_refresh_ttl_s,
         interaction_ledger=interaction_ledger,
     )

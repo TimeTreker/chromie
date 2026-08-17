@@ -161,7 +161,7 @@ class InteractionRuntimeCoordinator:
                 int(
                     max_concurrency
                     if max_concurrency is not None
-                    else os.getenv("ORCH_SKILL_MAX_CONCURRENCY", "8")
+                    else os.getenv("ORCH_CAPABILITY_MAX_CONCURRENCY", "8")
                 ),
             ),
         )

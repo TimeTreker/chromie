@@ -87,7 +87,7 @@ class HostSettingsSnapshotTests(unittest.TestCase):
                     "ORCH_MIND_CONTEXT_MAX_CHARS": "2200",
                     "ORCH_ENABLE_EXPERIENCE_JOURNAL": "false",
                     "ORCH_EPISODE_MAX_TURNS": "20",
-                    "ORCH_SKILL_MAX_CONCURRENCY": "5",
+                    "ORCH_CAPABILITY_MAX_CONCURRENCY": "5",
                     "CHROMIE_RUNTIME_TRACE_RESOURCE_SAMPLING": "session",
                     "CHROMIE_RUNTIME_TRACE_ACCELERATOR_PROVIDER": "off",
                     "AGENT_TASK_GRAPH_EXECUTION_TOKEN": "secret",
@@ -103,11 +103,18 @@ class HostSettingsSnapshotTests(unittest.TestCase):
         self.assertEqual(settings.mind.context_max_chars, 2200)
         self.assertFalse(settings.experience.enabled)
         self.assertEqual(settings.episode.max_turns, 20)
-        self.assertEqual(settings.interaction.skill_max_concurrency, 5)
+        self.assertEqual(settings.capability_runtime.capability_max_concurrency, 5)
         self.assertEqual(settings.telemetry.system_resource_mode, "session")
         self.assertEqual(settings.telemetry.accelerator_provider, "off")
         self.assertEqual(settings.cognition.task_graph_execution_token, "secret")
         self.assertEqual(settings.session.event_log_path, root / "evidence/events.jsonl")
+
+    def test_legacy_skill_concurrency_key_is_not_a_compatibility_alias(self) -> None:
+        settings = HostSettingsSnapshot.from_env(
+            project_root=Path("/tmp"),
+            environ={"ORCH_SKILL_MAX_CONCURRENCY": "2"},
+        )
+        self.assertEqual(settings.capability_runtime.capability_max_concurrency, 8)
 
     def test_optional_device_rates_preserve_system_defaults(self) -> None:
         settings = HostSettingsSnapshot.from_env(

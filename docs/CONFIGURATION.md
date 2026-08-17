@@ -606,13 +606,13 @@ See [Scoped Discourse Referents and Verified Tool Memory](DISCOURSE_REFERENTS_AN
 
 | Variable | Default |
 |---|---:|
-| `ORCH_SKILL_MAX_CONCURRENCY` | `8`. |
+| `ORCH_CAPABILITY_MAX_CONCURRENCY` | `8`. |
 | `ORCH_SORIDORMI_MANIFEST` | `capabilities/soridormi.json`. |
 | `SORIDORMI_MCP_URL` | Required when the manifest is materialized and live calls are enabled. |
 | `SORIDORMI_REPO` | Optional checkout path recorded by live-text and voice/MuJoCo acceptance. Checkout revision and dirty state are diagnostic declarations only; endpoint-reported source identity is separate. |
 
 Trusted Capability Runtime uses a process-local scheduler. Imported Soridormi named
-skills share the exclusive group `soridormi.robot_motion`; Soridormi remains
+capabilities share the exclusive group `soridormi.robot_motion`; Soridormi remains
 responsible for cross-process resource safety.
 
 ## ASR
@@ -1384,13 +1384,13 @@ See [Scoped Discourse Referents and Verified Tool Memory](DISCOURSE_REFERENTS_AN
 
 | Variable | Default |
 |---|---:|
-| `ORCH_SKILL_MAX_CONCURRENCY` | `8`. |
+| `ORCH_CAPABILITY_MAX_CONCURRENCY` | `8`. |
 | `ORCH_SORIDORMI_MANIFEST` | `capabilities/soridormi.json`. |
 | `SORIDORMI_MCP_URL` | Required when the manifest is materialized and live calls are enabled. |
 | `SORIDORMI_REPO` | Optional checkout path recorded by live-text and voice/MuJoCo acceptance. Checkout revision and dirty state are diagnostic declarations only; endpoint-reported source identity is separate. |
 
 Trusted Capability Runtime uses a process-local scheduler. Imported Soridormi named
-skills share the exclusive group `soridormi.robot_motion`; Soridormi remains
+capabilities share the exclusive group `soridormi.robot_motion`; Soridormi remains
 responsible for cross-process resource safety.
 
 ## ASR

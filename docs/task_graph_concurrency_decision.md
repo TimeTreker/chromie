@@ -43,7 +43,7 @@ AGENT_TASK_GRAPH_MAX_CONCURRENCY=4
 Host Trusted Capability Runtime concurrency is bounded with:
 
 ```env
-ORCH_SKILL_MAX_CONCURRENCY=4
+ORCH_CAPABILITY_MAX_CONCURRENCY=4
 ```
 
 Both are default-conservative and process-local.

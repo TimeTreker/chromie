@@ -16,10 +16,9 @@ For authoritative architecture, status, and configuration, see:
 ## Service boundaries
 
 - ASR converts complete PCM utterances to final text.
-- Goal Interpretation produces deterministic or model-assisted `RouteDecision` objects.
+- Goal Interpretation produces typed WHAT-only goal interpretation decisions and Responsibility candidates.
 - Agent exposes schema-constrained Goal Association, Fast/Deep Planning, peer
-  Social-Attention proposals, and Response Composition, plus compatibility
-  `AgentResult`/`InteractionResponse` surfaces.
+  Social-Attention proposals, Response Composition, and Tool Result Interpretation.
 - TTS delivers PCM synthesis chunks; the current Orchestrator buffers one
   complete request through the provider `end` event before ordered playback and
   interruption handling.
@@ -57,10 +56,9 @@ post-dispatch reconciliation failure is surfaced as an uncertain final state.
 Input Normalization, Protective Reflex, Context Assembly, focused Attention
 Review, and Turn Admission are physically distinct modules. Admission completes
 before ordinary Goal Interpretation. The Core endpoint accepts only an admitted
-`CoreTurnRequest`; it returns a Core-owned `CoreInterpretationResult`, while the
-legacy `RouteDecision` shape survives only as a digest-bound internal projection
-for dependent planner contracts. Existing compatibility service names, environment
-variables, and log fields remain migration surfaces rather than semantic authority.
+`CoreTurnRequest`; it returns a Core-owned `CoreInterpretationResult`, and Goal
+Association receives the typed `CognitiveWorkRequest` handoff. Goal Interpretation
+has no route/intent compatibility projection and does not select executable capabilities.
 
 ## Current interaction paths
 
@@ -296,7 +294,7 @@ barge-in may silence current audio without cancelling the underlying work.
 
 The Interaction Coordinator validates the response and submits speech and capability
 requests to the Trusted Capability Runtime. Scheduling is bounded by
-`ORCH_SKILL_MAX_CONCURRENCY` and provider/exclusive-group policy.
+`ORCH_CAPABILITY_MAX_CONCURRENCY` and provider/exclusive-group policy.
 
 Cancellation:
 

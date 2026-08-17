@@ -348,8 +348,8 @@ The envelope deliberately excludes:
 
 An admitted envelope enters Goal Interpretation directly. The resulting
 `CoreInterpretationResult` carries Responsibility evidence only and is converted into a
-typed `CognitiveWorkRequest` for downstream HOW owners. No `RouteDecision` projection is
-created or reconstructed on the maintained path. Suppressed, unusable, and reflex-only
+typed `CognitiveWorkRequest` for Goal Association and subsequent planning. No route/intent
+compatibility projection is created or reconstructed on the maintained path. Suppressed, unusable, and reflex-only
 envelopes cannot enter ordinary Core cognition.
 
 ## 5. Goal understanding and planning
@@ -975,8 +975,8 @@ The contract-first loop baseline is implemented:
    confirmation-bound child plan.
 
 The five Gateway responsibilities remain logically distinct even when co-deployed.
-`RouteDecision` is retained only as a versioned structured advisory result inside
-the Core path; it is not a service boundary or independent semantic authority.
+The Core uses typed Goal Interpretation and `CognitiveWorkRequest` contracts; no
+route/intent compatibility projection remains in the maintained path.
 
 The maintained external cognitive endpoint is `chromie-agent`
 `POST /cognitive-core/interpret`. There is no `/route` compatibility API or

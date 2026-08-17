@@ -5,8 +5,9 @@ Normalization, Protective Reflex, Context Assembly, Attention Review, and Turn
 Admission are explicit modules. The normal order completes admission before
 ordinary Goal Interpretation; the admitted immutable `UserTurnEnvelope` and
 digest-bound `GatewayContextSnapshot` form `CoreTurnRequest`; and the Core returns
-`CoreInterpretationResult`. `RouteDecision` survives only as a digest-bound
-internal compatibility projection for dependent planner contracts. Dedicated
+`CoreInterpretationResult`. Goal Interpretation hands typed WHAT-only semantics to
+Goal Association through the current Core contract; there is no route/intent compatibility
+projection. Dedicated
 Soridormi E-stop/safe-idle evidence and source-bound target qualification remain
 open. Current implementation and evidence are owned by [STATUS.md](STATUS.md).
 
@@ -348,12 +349,10 @@ transport input
   -> validated planning, execution, reconciliation, and response composition
 ```
 
-The Gateway remains a narrow ingress boundary. Goal Interpretation may emit a
-structured advisory decision for downstream contracts, but the Gateway itself
-never authors an ordinary intent, goal, capability choice, plan, or response.
-Historical `RouteDecision` names may remain inside versioned data contracts
-until a separate contract-version update; they do not represent an active
-Router component or service.
+The Gateway remains a narrow ingress boundary. Goal Interpretation emits a typed
+WHAT-only decision for downstream Goal Association, while the Gateway itself never
+authors an ordinary goal, capability choice, plan, or response. The maintained Core
+contract contains no `RouteDecision` projection or active Router compatibility surface.
 
 ## 8. Implemented closure
 
@@ -432,4 +431,4 @@ cannot prove result reconciliation or final spoken truth.
 | Protective Reflex / 保护性反射 | Immediate deterministic operational-control path |
 | Goal-Driven Cognitive Core / 目标驱动认知核心 | Semantic goal understanding, planning, delegation, reconciliation, and response authority |
 | Goal Interpretation | Agent-owned Cognitive Core boundary; no independent routing service |
-| `RouteDecision` | Historical/versioned advisory contract name used inside the Core path; not an active Router service |
+| `CognitiveWorkRequest` | Typed Core handoff carrying interpreted WHAT/context into Goal Association without HOW authority |

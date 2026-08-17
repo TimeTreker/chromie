@@ -240,8 +240,8 @@ class EpisodeSettings:
 
 
 @dataclass(frozen=True)
-class InteractionRuntimeSettings:
-    skill_max_concurrency: int
+class CapabilityRuntimeSettings:
+    capability_max_concurrency: int
     catalog_refresh_ttl_s: float
 
 
@@ -377,7 +377,7 @@ class HostSettingsSnapshot:
     mind: MindSettings
     experience: ExperienceSettings
     episode: EpisodeSettings
-    interaction: InteractionRuntimeSettings
+    capability_runtime: CapabilityRuntimeSettings
     telemetry: TelemetrySettings
     model_generation: ModelGenerationSettings
     playback: PlaybackSettings
@@ -848,9 +848,9 @@ class HostSettingsSnapshot:
                     values, "CHROMIE_DATA_LOOP_TRIGGER_ROOT", project_root=project_root
                 ),
             ),
-            interaction=InteractionRuntimeSettings(
-                skill_max_concurrency=_int(
-                    values, "ORCH_SKILL_MAX_CONCURRENCY", 8, minimum=1
+            capability_runtime=CapabilityRuntimeSettings(
+                capability_max_concurrency=_int(
+                    values, "ORCH_CAPABILITY_MAX_CONCURRENCY", 8, minimum=1
                 ),
                 catalog_refresh_ttl_s=_float(
                     values, "ORCH_SORIDORMI_CATALOG_REFRESH_TTL_S", 30.0, minimum=0.0
