@@ -553,9 +553,7 @@ def collect_run_provenance(
                     "goal_driven_cognitive_runtime"
                     if selected
                     else (
-                        "agent_interaction_outside_apply_lanes"
-                        if cognitive_runtime
-                        else "legacy_agent_interaction"
+                        "goal_driven_runtime_lane_not_selected"
                     )
                 )
             ),
@@ -1537,22 +1535,13 @@ def build_parser() -> argparse.ArgumentParser:
         default=True,
         help="Play Chromie TTS through the configured speaker; use --no-speaker for headless checks.",
     )
-    parser.add_argument(
-        "--cognitive-runtime",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-        help=(
-            "Use goal association, Fast/Deep Planner, response composition, and "
-            "the trusted runtime adapter (default). Use --no-cognitive-runtime "
-            "only for an explicit legacy Agent /interaction compatibility check."
-        ),
-    )
+    parser.set_defaults(cognitive_runtime=True)
     parser.add_argument(
         "--cognitive-apply-lanes",
         default="chat,memory,robot_action,tool",
         help="Comma-separated PR7 apply lanes used with --cognitive-runtime.",
     )
-    parser.add_argument("--preview-only", action="store_true", help="Route and validate /interaction without executing Soridormi capabilities.")
+    parser.add_argument("--preview-only", action="store_true", help="Run the maintained cognitive path without executing Soridormi capabilities.")
     parser.add_argument("--allow-non-sim", action="store_true", help="Permit non-sim Soridormi modes. Use only under separate supervision.")
     parser.add_argument(
         "--grant-confirmation",

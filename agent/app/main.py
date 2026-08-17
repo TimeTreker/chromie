@@ -102,7 +102,6 @@ from .task_graph import (
     TaskGraphExecuteRequest,
     TaskGraphGuardedExecuteRequest,
     TaskGraphSchedulerStatus,
-    TaskGraphPlanner,
     TaskGraphService,
     TaskGraphValidationResponse,
 )
@@ -249,11 +248,6 @@ social_attention_services = SocialAttentionServices(
 )
 social_attention_context_builder = SocialAttentionContextBuilder(social_attention_services)
 social_attention_planner = SocialAttentionPlanner(social_attention_services)
-task_graph_planner = (
-    TaskGraphPlanner(capability_registry, ollama_client)
-    if settings.enable_task_graph_planning and settings.use_llm
-    else None
-)
 tool_result_interpreter_client = (
     OllamaClient(
         settings.ollama_url,
@@ -517,7 +511,6 @@ async def health() -> HealthResponse:
             settings.agent_skill_projection_total_max_chars
         ),
         agent_skill_projection_count_limit=settings.agent_skill_projection_count_limit,
-        task_graph_planning_enabled=task_graph_planner is not None,
         read_only_task_graph_execution_enabled=read_only_invoker is not None,
         planning_task_graph_execution_enabled=planning_invoker is not None,
         parallel_task_graph_execution_enabled=(

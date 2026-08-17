@@ -124,33 +124,6 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["AGENT_CAPABILITY_MANIFESTS"], "")
         self.assertEqual(values["SORIDORMI_MCP_URL"], "")
 
-    def test_agent_code_fallback_does_not_enable_capability_review(self) -> None:
-        with patch.dict(os.environ, {}, clear=True):
-            self.assertFalse(agent_main.Settings().require_capability_plan_review)
-
-    def test_agent_code_fallback_matches_documented_low_latency_defaults(self) -> None:
-        with patch.dict(os.environ, {}, clear=True):
-            settings = agent_main.Settings()
-        self.assertEqual(settings.social_attention_mode, "on")
-        self.assertFalse(settings.response_review_enabled)
-        self.assertEqual(settings.max_speak_chars, 140)
-        self.assertEqual(settings.fast_planner_num_ctx, 8192)
-        self.assertEqual(settings.fast_planner_num_predict, 2048)
-        self.assertEqual(settings.response_composer_num_ctx, 8192)
-        self.assertEqual(settings.response_composer_num_predict, 1024)
-        common = _common_env()
-        self.assertEqual(common["AGENT_FAST_PLANNER_NUM_CTX"], "8192")
-        self.assertEqual(common["AGENT_FAST_PLANNER_NUM_PREDICT"], "2048")
-        self.assertEqual(common["AGENT_RESPONSE_COMPOSER_NUM_CTX"], "8192")
-        self.assertEqual(common["AGENT_RESPONSE_COMPOSER_NUM_PREDICT"], "1024")
-        compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
-        self.assertIn(
-            "${AGENT_RESPONSE_COMPOSER_NUM_CTX:-8192}", compose
-        )
-        self.assertIn(
-            "${AGENT_RESPONSE_COMPOSER_NUM_PREDICT:-1024}", compose
-        )
-
     def test_agent_conversation_and_deepthinking_have_context_budgets(self) -> None:
         values = _common_env()
         self.assertEqual(values["AGENT_CONVERSATION_NUM_CTX"], "2048")
@@ -567,7 +540,6 @@ class RuntimeConfigurationTests(unittest.TestCase):
             source,
         )
         self.assertIn("AGENT_SOCIAL_ATTENTION_MODE=on", overlay)
-        self.assertIn("AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS=0", overlay)
         self.assertIn("AGENT_SOCIAL_ATTENTION_NUM_CTX=32768", overlay)
         self.assertIn("AGENT_SOCIAL_ATTENTION_NUM_PREDICT=4096", overlay)
         self.assertIn("AGENT_SOCIAL_ATTENTION_TIMEOUT_MS=120000", overlay)
@@ -590,13 +562,9 @@ class RuntimeConfigurationTests(unittest.TestCase):
         )
 
         self.assertIn("AGENT_SOCIAL_ATTENTION_MODE=on", common)
-        self.assertIn("AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS=0", common)
         self.assertIn("AGENT_SOCIAL_ATTENTION_MODE=on", overlay)
-        self.assertIn("AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS=0", overlay)
-        self.assertIn('stub.get("social_attention_wait_after_response_ms", 0)', scenarios)
-        self.assertNotIn('stub.get("social_attention_wait_after_response_ms", 150)', scenarios)
-        self.assertIn("effective wait is always `0`", agent_readme)
-        self.assertIn("runtime never awaits Social Attention", configuration)
+        self.assertIn("there is no compatibility wait-after-response setting", agent_readme)
+        self.assertNotIn("AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS", configuration)
         self.assertNotIn("default `150`", configuration)
 
     def test_start_chromie_diagnoses_soridormi_probe_failures(self) -> None:

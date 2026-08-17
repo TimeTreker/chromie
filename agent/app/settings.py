@@ -62,11 +62,6 @@ class Settings(BaseModel):
         ge=32,
         le=4096,
     )
-    social_attention_wait_after_response_ms: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS", "0")),
-        ge=0,
-        le=120000,
-    )
     social_attention_max_behaviors: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_SOCIAL_ATTENTION_MAX_BEHAVIORS", "2")),
         ge=1,
@@ -81,10 +76,6 @@ class Settings(BaseModel):
             ).split(",")
             if item.strip()
         )
-    )
-    enable_task_graph_planning: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_ENABLE_TASK_GRAPH_PLANNING", "0").strip().lower()
-        not in {"0", "false", "no", "off"}
     )
     enable_read_only_task_graph_execution: bool = Field(
         default_factory=lambda: os.getenv("AGENT_ENABLE_READ_ONLY_TASK_GRAPH_EXECUTION", "0").strip().lower()

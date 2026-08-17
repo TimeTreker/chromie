@@ -1037,8 +1037,10 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
             )
 
     memory_path = root / "agent/app/agents/memory.py"
-    tree, parse_findings = _parse_python(memory_path, root)
-    findings.extend(parse_findings)
+    tree = None
+    if memory_path.is_file():
+        tree, parse_findings = _parse_python(memory_path, root)
+        findings.extend(parse_findings)
     if tree is not None:
         for module_name, node in _imported_module_names(tree):
             if module_name.split(".", 1)[0] in {"re", "regex"}:

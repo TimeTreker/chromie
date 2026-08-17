@@ -12,7 +12,6 @@ SPEAKER_FLAG=--speaker
 PREVIEW_ONLY=0
 GRANT_CONFIRMATION=1
 SKILL_TIMEOUT_S="${CHROMIE_VOICE_MUJOCO_SKILL_TIMEOUT_S:-120}"
-SEMANTIC_RUNTIME_FLAG=--cognitive-runtime
 EXPECT_ROUTE=()
 EXPECT_NO_SKILLS=()
 EXPECT_SKILL=()
@@ -45,8 +44,6 @@ Options:
   --preview-only             Route and validate without executing Soridormi skills
   --no-grant-confirmation   Do not grant confirmation in this diagnostic harness
   --capability-timeout-s SECONDS  Per-Soridormi-skill timeout; default: 120
-  --goal-driven-runtime      Use the maintained goal-driven apply path; default
-  --legacy-agent-runtime     Use Agent /interaction compatibility mode explicitly
   --evidence-dir DIR         Write evidence to a specific directory
   --expect-route ROUTE       Post-run assertion for Goal Interpretation route: chat, deep_thought,
                              robot_action, tool, memory, clarify, interrupt,
@@ -70,8 +67,6 @@ while [ "$#" -gt 0 ]; do
     --preview-only) PREVIEW_ONLY=1; shift ;;
     --no-grant-confirmation) GRANT_CONFIRMATION=0; shift ;;
     --capability-timeout-s) SKILL_TIMEOUT_S="${2:?--capability-timeout-s requires seconds}"; shift 2 ;;
-    --goal-driven-runtime) SEMANTIC_RUNTIME_FLAG=--cognitive-runtime; shift ;;
-    --legacy-agent-runtime) SEMANTIC_RUNTIME_FLAG=--no-cognitive-runtime; shift ;;
     --evidence-dir) EVIDENCE_DIR="${2:?--evidence-dir requires a directory}"; shift 2 ;;
     --expect-route) EXPECT_ROUTE+=(--expect-route "${2:?--expect-route requires a route}"); shift 2 ;;
     --expect-no-skills) EXPECT_NO_SKILLS+=(--expect-no-skills); shift ;;
@@ -136,7 +131,6 @@ args=(
   "$SPEAKER_FLAG"
   --require-speech
   --capability-timeout-s "$SKILL_TIMEOUT_S"
-  "$SEMANTIC_RUNTIME_FLAG"
 )
 if [ "$PREVIEW_ONLY" = "1" ]; then args+=(--preview-only); fi
 if [ "$GRANT_CONFIRMATION" = "1" ]; then

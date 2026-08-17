@@ -46,7 +46,6 @@ except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.plan import CanonicalPlan
     from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 
-from ..schema import AgentRunRequest
 
 logger = logging.getLogger("chromie.agent.agent_skills.disclosure")
 _CONTEXT_KEY = "agent_skill_disclosure"
@@ -410,28 +409,20 @@ def _strip_untrusted_disclosure_context(context: dict[str, Any] | None) -> tuple
     return clean, removed
 
 def build_agent_skill_selection_request(
-    request: AgentRunRequest | CognitiveWorkRequest,
+    request: CognitiveWorkRequest,
     *,
     agent_role: AgentSkillProjectionName,
 ) -> AgentSkillSelectionRequest:
     context = request.context if isinstance(request.context, dict) else {}
     sid = str(request.sid or context.get("session_id") or "agent-turn")
-    if isinstance(request, CognitiveWorkRequest):
-        summary = [
-            "responsibilities="
-            + "; ".join(
-                item.outcome[:160] for item in request.responsibilities[:4]
-            )
-        ]
-        if request.interpretation_unresolved:
-            summary.append(
-                "unresolved="
-                + "; ".join(request.interpretation_unresolved[:4])
-            )
-    else:
-        summary = [f"route={request.route_decision.route}"]
-        if request.route_decision.intent:
-            summary.append(f"intent={request.route_decision.intent}")
+    summary = [
+        "responsibilities="
+        + "; ".join(item.outcome[:160] for item in request.responsibilities[:4])
+    ]
+    if request.interpretation_unresolved:
+        summary.append(
+            "unresolved=" + "; ".join(request.interpretation_unresolved[:4])
+        )
     current_goal_ids = _association_goal_ids(context)
     allowed_goal_ids = current_goal_ids if current_goal_ids else None
     # Goal Association has not yet decided which canonical Goal(s) the current
@@ -760,7 +751,9 @@ def _canonical_plan_from_context(context: dict[str, Any]) -> CanonicalPlan | Non
 
 def _planner_selection_for_role(
     *,
-    request: AgentRunRequest | CognitiveWorkRequest,
+    sid: str,
+    text: str,
+    context: dict[str, Any],
     agent_role: AgentSkillProjectionName,
     registry: AgentSkillRegistry,
 ) -> AgentSkillSelectionResolution | None:
@@ -774,7 +767,6 @@ def _planner_selection_for_role(
 
     if agent_role not in {"response_composer", "tool_result_interpreter"}:
         return None
-    context = request.context if isinstance(request.context, dict) else {}
     plan = _canonical_plan_from_context(context)
     if plan is None or not plan.selected_agent_skills:
         return None
@@ -839,8 +831,8 @@ def _planner_selection_for_role(
 
     if not selected:
         return None
-    sid = str(request.sid or context.get("session_id") or "agent-turn")
-    turn_id = _turn_id(sid=sid, text=request.text, context=context)
+    sid = str(sid or context.get("session_id") or "agent-turn")
+    turn_id = _turn_id(sid=sid, text=text, context=context)
     digest = hashlib.sha256(
         (
             f"{plan.plan_id}|{agent_role}|"
@@ -895,7 +887,9 @@ class AgentSkillProgressiveDisclosureCoordinator:
             else request
         )
         reused_selection = _planner_selection_for_role(
-            request=clean_request,
+            sid=str(clean_request.sid or "agent-turn"),
+            text=clean_request.text,
+            context=clean_request.context,
             agent_role=agent_role,
             registry=self.disclosure_service.registry,
         )
@@ -952,20 +946,10 @@ class AgentSkillProgressiveDisclosureCoordinator:
             else request
         )
         sid = str(context.get("sid") or context.get("session_id") or "tool-result")
-        reuse_request = AgentRunRequest(
+        reused_selection = _planner_selection_for_role(
             sid=sid,
             text=request.user_request,
-            language=request.language,
-            route_decision={
-                "route": "tool",
-                "intent": "tool_result",
-                "confidence": 1.0,
-                "source": "catalog",
-            },
             context=context,
-        )
-        reused_selection = _planner_selection_for_role(
-            request=reuse_request,
             agent_role="tool_result_interpreter",
             registry=self.disclosure_service.registry,
         )

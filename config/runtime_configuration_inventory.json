@@ -426,16 +426,6 @@
     {
       "boolean": true,
       "category": "service_internal",
-      "key": "AGENT_ENABLE_TASK_GRAPH_PLANNING",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": true,
-      "category": "service_internal",
       "key": "AGENT_EXTERNAL_INFORMATION_ENABLED",
       "owners": [
         ".env.common",
@@ -1236,17 +1226,6 @@
         "docker-compose.yml",
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
-        "env/validation/architecture.env"
-      ]
-    },
-    {
-      "boolean": true,
-      "category": "acceptance_override",
-      "key": "AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml",
         "env/validation/architecture.env"
       ]
     },
@@ -2663,10 +2642,9 @@
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "ORCH_COGNITIVE_FALLBACK_POLICY",
       "owners": [
-        ".env.common",
         "orchestrator/.env.local.example"
       ]
     },
@@ -3305,10 +3283,9 @@
     },
     {
       "boolean": true,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED",
       "owners": [
-        ".env.common",
         "orchestrator/.env.local.example"
       ]
     },
@@ -4576,14 +4553,14 @@
   "schema_version": "1.0",
   "summary": {
     "category_counts": {
-      "acceptance_override": 56,
+      "acceptance_override": 55,
       "bounded_compatibility_alias": 0,
-      "profile_constant": 144,
+      "profile_constant": 142,
       "public_choice": 9,
-      "service_internal": 225
+      "service_internal": 226
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 434
+    "total_keys": 432
   }
 }

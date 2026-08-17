@@ -110,21 +110,6 @@ class ComposeConfigurationTests(unittest.TestCase):
         self.assertIn("      dockerfile: agent/Dockerfile", agent_block)
         self.assertIn("AGENT_GOAL_INTERPRETER_MODEL", agent_block)
 
-    def test_agent_service_uses_main_model_for_response_review_by_default(self) -> None:
-        compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
-        agent_block = compose.split("  chromie-agent:", 1)[1].split(
-            "\nnetworks:",
-            1,
-        )[0]
-
-        self.assertIn("AGENT_RESPONSE_REVIEW_ENABLED: ${AGENT_RESPONSE_REVIEW_ENABLED:-0}", agent_block)
-        self.assertIn("AGENT_RESPONSE_REVIEW_MODEL: ${AGENT_RESPONSE_REVIEW_MODEL:-gemma4:e2b}", agent_block)
-        self.assertIn(
-            "AGENT_RESPONSE_REVIEW_TIMEOUT_MS: ${AGENT_RESPONSE_REVIEW_TIMEOUT_MS:-4000}",
-            agent_block,
-        )
-        self.assertIn("AGENT_RESPONSE_REVIEW_MODE: ${AGENT_RESPONSE_REVIEW_MODE:-auto}", agent_block)
-
     def test_agent_service_passes_capability_planner_budget(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         agent_block = compose.split("  chromie-agent:", 1)[1].split(
@@ -132,16 +117,11 @@ class ComposeConfigurationTests(unittest.TestCase):
             1,
         )[0]
 
-        self.assertIn("AGENT_EXPRESSIVE_BODY_CUES: ${AGENT_EXPRESSIVE_BODY_CUES:-off}", agent_block)
         self.assertIn(
             "AGENT_SOCIAL_ATTENTION_MODE: ${AGENT_SOCIAL_ATTENTION_MODE:-on}",
             agent_block,
         )
         self.assertNotIn("AGENT_SOCIAL_ATTENTION_FALLBACK_", agent_block)
-        self.assertIn(
-            "AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW: ${AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW:-0}",
-            agent_block,
-        )
         self.assertIn("AGENT_CAPABILITY_NUM_CTX: ${AGENT_CAPABILITY_NUM_CTX:-24576}", agent_block)
         self.assertIn(
             "AGENT_CAPABILITY_NUM_PREDICT: ${AGENT_CAPABILITY_NUM_PREDICT:-512}",

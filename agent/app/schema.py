@@ -328,7 +328,6 @@ class HealthResponse(BaseModel):
     agent_skill_projection_max_chars: int = 0
     agent_skill_projection_total_max_chars: int = 0
     agent_skill_projection_count_limit: int = 0
-    task_graph_planning_enabled: bool = False
     read_only_task_graph_execution_enabled: bool = False
     planning_task_graph_execution_enabled: bool = False
     parallel_task_graph_execution_enabled: bool = False

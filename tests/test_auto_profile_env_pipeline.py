@@ -21,7 +21,6 @@ MODEL_KEYS = (
     "AGENT_DEEP_PLANNER_MODEL",
     "AGENT_RESPONSE_COMPOSER_MODEL",
     "AGENT_SOCIAL_ATTENTION_MODEL",
-    "AGENT_RESPONSE_REVIEW_MODEL",
 )
 
 
@@ -394,7 +393,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             (root / ".env.local").write_text(
                 "CHROMIE_HARDWARE_PROFILE=rtx4090_laptop\n"
                 "AGENT_FAST_PLANNER_MODEL=stale-goal-interpreter-model\n"
-                "AGENT_RESPONSE_REVIEW_MODEL=stale-agent-model\n"
                 "LOG_LEVEL=DEBUG\n",
                 encoding="utf-8",
             )
@@ -411,18 +409,15 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             manifest = json.loads((root / ".chromie" / "runtime_profile.json").read_text())
 
         self.assertIn("[env][warning] Ignoring .env.local values", result.stderr)
-        self.assertIn("AGENT_RESPONSE_REVIEW_MODEL", result.stderr)
         self.assertIn("AGENT_FAST_PLANNER_MODEL", result.stderr)
         self.assertEqual(values["CHROMIE_ACTIVE_PROFILE"], "rtx5090")
         self.assertEqual(values["CHROMIE_HARDWARE_PROFILE"], "rtx5090")
         self.assertNotEqual(values["AGENT_FAST_PLANNER_MODEL"], "stale-goal-interpreter-model")
-        self.assertNotEqual(values["AGENT_RESPONSE_REVIEW_MODEL"], "stale-agent-model")
         self.assertEqual(values["LOG_LEVEL"], "DEBUG")
         self.assertEqual(
             set(manifest["ignored_local_overrides"]),
             {
-                "AGENT_RESPONSE_REVIEW_MODEL",
-                "CHROMIE_HARDWARE_PROFILE",
+                            "CHROMIE_HARDWARE_PROFILE",
                 "AGENT_FAST_PLANNER_MODEL",
             },
         )

@@ -15,7 +15,6 @@ from .models import (
     TaskGraph,
     TaskNode,
 )
-from .planner import TaskGraphPlanner
 from .reporting import build_trace_outcome_summary
 from .residual import attach_residual_replan_state, build_residual_replan_state
 from .service import (
@@ -52,7 +51,6 @@ __all__ = [
     "TaskGraphExecutionProofs",
     "TaskGraphGuardedExecuteRequest",
     "TaskGraphSchedulerStatus",
-    "TaskGraphPlanner",
     "TaskGraphService",
     "TaskGraphValidationResponse",
     "TaskNode",

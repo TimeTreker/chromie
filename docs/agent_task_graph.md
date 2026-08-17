@@ -358,7 +358,6 @@ continues to enforce cross-process robot exclusivity. See
 Enable planning with:
 
 ```env
-AGENT_ENABLE_TASK_GRAPH_PLANNING=1
 AGENT_USE_LLM=1
 ```
 

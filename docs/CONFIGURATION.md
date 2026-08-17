@@ -123,7 +123,6 @@ A successfully queued fast response is projected into downstream Response Compos
 | `ORCH_TTS_CJK_MIN_CHUNK_CHARS` | `8` | Minimum CJK clause size used when grouping punctuation-bounded fragments. |
 | `ORCH_CONFIRMATION_TTL_SEC` | `20` | Expiry in seconds for one pending spoken, request-bound confirmation. |
 | `AGENT_SOCIAL_ATTENTION_MODE` | `on` | Embodiment-independent auxiliary interaction policy. Supported values are `off`, `report_only`, and `on`. A legacy simulator-scoped value is migrated to `on`; Soridormi/provider remains responsible for simulator-versus-physical backend selection and all body safety. |
-| `AGENT_ENABLE_TASK_GRAPH_PLANNING` | `0` | Let tool routes ask the LLM for a validated TaskGraph. |
 | `AGENT_ENABLE_READ_ONLY_TASK_GRAPH_EXECUTION` | `0` | Enable the read-only execution endpoint. |
 | `AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION` | `0` | Enable safe reads plus stateful `planning_only` execution. |
 | `AGENT_ENABLE_PARALLEL_TASK_GRAPH_EXECUTION` | `0` | Enable bounded parallel read/planning and guarded non-physical work. |
@@ -610,7 +609,6 @@ retained. See
 | `AGENT_SOCIAL_ATTENTION_TIMEOUT_MS` | Model-call timeout for social attention; default `2500`. The architecture-validation overlay raises it to `120000` so qualification tests model capability before latency tuning. |
 | `AGENT_SOCIAL_ATTENTION_NUM_CTX` | Context window for the compact social-attention prompt; default `8192`. |
 | `AGENT_SOCIAL_ATTENTION_NUM_PREDICT` | JSON output budget for social-attention planning; default `160`. |
-| `AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS` | Deprecated compatibility input retained for diagnostics; default `0`. The runtime never awaits Social Attention after the primary response, and reports an effective wait of `0`. |
 | `AGENT_SOCIAL_ATTENTION_MAX_BEHAVIORS` | Maximum model-authored auxiliary behaviors per turn; default `2`. |
 | `AGENT_SOCIAL_ATTENTION_CAPABILITIES` | Optional comma-separated exact catalog IDs added to behavior-domain discovery. Default empty. Normal candidates are available interaction-executable entries tagged `social_attention`; provider backend metadata is ignored. |
 

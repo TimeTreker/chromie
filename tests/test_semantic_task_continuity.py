@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import unittest
 
-from agent.app.agents.capability import CapabilityAgent
-from agent.app.agents.base import AgentServices
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from agent.app.cognitive_core.goal_interpreter.model_interpreter import OllamaGoalInterpreter
 from agent.app.cognitive_core.goal_interpreter.schema import RouteRequest
@@ -373,41 +371,8 @@ class InterpreterSemanticTaskPromptTests(unittest.TestCase):
             )
         )
 
-        self.assertIn("task-coffee-001", prompt)
+        self.assertNotIn("task-coffee-001", prompt)
         self.assertIn("Prepare or obtain coffee", prompt)
-        self.assertIn("responsibility delta", prompt)
-        self.assertIn("by meaning, not lexical shortcuts", prompt)
-        self.assertIn("Do not author semantic_task_operations", prompt)
-        self.assertIn("Goal Association owns canonical lifecycle changes", prompt)
+        self.assertIn("Canonical Goal/Task/Plan identities", prompt)
+        self.assertIn("Goal Association alone owns canonical Goal continuity and identity", prompt)
         self.assertIn("Fast Planner owns those Activities", prompt)
-
-
-class CapabilityInformationGapTests(unittest.TestCase):
-    def test_required_schema_fields_become_structured_information_gaps(self) -> None:
-        agent = CapabilityAgent(AgentServices())
-
-        gaps = agent._schema_information_gaps(
-            "kitchen.prepare_coffee",
-            {"size": "large"},
-            {
-                "type": "object",
-                "required": ["temperature", "size"],
-                "properties": {
-                    "temperature": {
-                        "type": "string",
-                        "description": "Whether the coffee should be hot or iced.",
-                        "enum": ["hot", "iced"],
-                    },
-                    "size": {"type": "string"},
-                },
-            },
-        )
-
-        self.assertEqual(len(gaps), 1)
-        self.assertEqual(gaps[0].gap_id, "kitchen.prepare_coffee:temperature")
-        self.assertEqual(gaps[0].preferred_resolution, "ask_user")
-        self.assertEqual(gaps[0].candidate_values, ["hot", "iced"])
-
-
-if __name__ == "__main__":
-    unittest.main()

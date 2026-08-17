@@ -4,10 +4,8 @@ import asyncio
 from types import SimpleNamespace
 import unittest
 
-from agent.app.agents.base import AgentServices
 from agent.app.capabilities.catalog import CapabilityMatch
-from agent.app.runtime import InteractionRuntime
-from agent.app.schema import AgentRunRequest, RouteDecision
+from agent.app.social_attention import SocialAttentionContextBuilder, SocialAttentionServices
 from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
 from orchestrator.runtime.capability_runtime import CapabilityDefinition, CapabilityRegistry
 from orchestrator.runtime.soridormi_capability_provider import (
@@ -15,6 +13,7 @@ from orchestrator.runtime.soridormi_capability_provider import (
 )
 from shared.chromie_contracts.social_attention import (
     SocialAttentionPlan,
+    SocialAttentionRequest,
     normalize_social_attention_mode,
 )
 
@@ -84,24 +83,30 @@ class _Runtime:
     def capability_definition(self, skill_id):
         return self.definitions[skill_id]
 
-    async def execute(self, response, *, session_id):
+    async def submit_response(self, response, *, session_id):
         self.executed.append((response, session_id))
+        return SimpleNamespace(response=response, session_id=session_id)
+
+    async def wait_dispatch(self, dispatch):
         return SimpleNamespace(status="completed")
 
 
-def _request() -> AgentRunRequest:
-    return AgentRunRequest(
-        sid="social-policy",
-        text="Hello.",
-        language="en-US",
-        route_decision=RouteDecision(
-            route="chat",
-            intent="greeting",
-            confidence=0.95,
-            source="llm",
-        ),
-        context={},
-        history=[],
+def _request() -> SocialAttentionRequest:
+    return SocialAttentionRequest.model_validate(
+        {
+            "session_id": "social-policy",
+            "turn_id": "turn-1",
+            "event": "primary_activity_ready",
+            "primary_activity": {
+                "activity_id": "greet-user",
+                "phase": "ready",
+                "summary": "greet the user",
+            },
+            "text": "Hello.",
+            "language": "en-US",
+            "intent": "greeting",
+            "context": {},
+        }
     )
 
 
@@ -152,13 +157,13 @@ class SocialAttentionPolicyClosureTests(unittest.TestCase):
     def test_candidate_preparation_respects_all_modes(self):
         async def run(mode: str):
             request = _request()
-            runtime = InteractionRuntime(
-                AgentServices(
+            builder = SocialAttentionContextBuilder(
+                SocialAttentionServices(
                     social_attention_mode=mode,
                     capability_catalog=_Catalog(),
                 )
             )
-            await runtime.prepare_social_attention_context(request)
+            await builder.prepare(request)
             return request.context
 
         off = asyncio.run(run("off"))
@@ -255,14 +260,13 @@ class SocialAttentionPolicyClosureTests(unittest.TestCase):
     def test_model_facing_candidates_hide_backend_identity_and_calibration(self):
         catalog = _Catalog()
         request = _request()
-        runtime = InteractionRuntime(
-            AgentServices(
-                use_llm=False,
+        builder = SocialAttentionContextBuilder(
+            SocialAttentionServices(
                 capability_catalog=catalog,  # type: ignore[arg-type]
                 social_attention_mode="on",
             )
         )
-        asyncio.run(runtime.prepare_social_attention_context(request))
+        asyncio.run(builder.prepare(request))
         candidates = request.context["social_attention_candidates"]
         self.assertEqual(len(candidates), 2)
         self.assertNotIn("mode", candidates[0].get("metadata", {}))
@@ -287,14 +291,13 @@ class SocialAttentionPolicyClosureTests(unittest.TestCase):
             )
         )
         request = _request()
-        runtime = InteractionRuntime(
-            AgentServices(
-                use_llm=False,
+        builder = SocialAttentionContextBuilder(
+            SocialAttentionServices(
                 capability_catalog=catalog,  # type: ignore[arg-type]
                 social_attention_mode="on",
             )
         )
-        asyncio.run(runtime.prepare_social_attention_context(request))
+        asyncio.run(builder.prepare(request))
         ids = {item["capability_id"] for item in request.context["social_attention_candidates"]}
         self.assertNotIn("soridormi.calibrated_head_target", ids)
 

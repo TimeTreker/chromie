@@ -23,11 +23,6 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from agent.app.agents import AgentServices
-from agent.app.capabilities.catalog import CapabilityMatch, CapabilitySearchResult
-from agent.app.interaction import AgentResultInteractionAdapter
-from agent.app.runtime import InteractionRuntime
-from agent.app.schema import AgentResult, AgentRunRequest
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.cognitive_gateway import CognitiveGateway
 from orchestrator.runtime.conversation_state import ConversationStateManager
@@ -78,7 +73,7 @@ from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, Rout
 DEFAULT_SCENARIO_ROOT = ROOT / "scenarios"
 DEFAULT_REPORT_ROOT = ROOT / ".chromie" / "reports" / "behavior-scenarios"
 SUPPORTED_SUITES = {
-    "goal_interpretation", "cognitive_core_dialogue", "interaction", "dialogue", "adapter",
+    "goal_interpretation", "cognitive_core_dialogue", "dialogue",
     "cognitive_runtime", "cognitive_turn_loop",
 }
 
@@ -194,106 +189,6 @@ class _ScriptedGoalInterpreter(OllamaGoalInterpreter):
             "done": True,
             "done_reason": "stop",
         }
-
-
-class _AgentCatalog:
-    def __init__(self, capabilities: list[dict[str, Any]] | None = None) -> None:
-        self.capabilities = capabilities or [
-            {
-                "capability_id": "soridormi.walk_velocity",
-                "description": "Bounded walking velocity.",
-                "score": 0.92,
-            },
-            {
-                "capability_id": "soridormi.nod_yes",
-                "description": "Visible nod yes.",
-                "score": 0.85,
-            },
-            {
-                "capability_id": "soridormi.blink_eyes",
-                "description": "Blink robot eyes.",
-                "score": 0.78,
-            },
-        ]
-
-    async def search(self, text: str, **kwargs: Any) -> CapabilitySearchResult:
-        del kwargs
-        return CapabilitySearchResult(
-            query=text,
-            matched=bool(self.capabilities),
-            suggested_route="robot_action",
-            suggested_agents=["capability_agent", "safety_agent", "speaker_agent"],
-            catalog_version=42,
-            matches=[
-                CapabilityMatch(
-                    capability_id=str(item.get("capability_id") or ""),
-                    agent_id=str(item.get("agent_id") or "soridormi.skill"),
-                    description=str(item.get("description") or ""),
-                    input_schema=dict(item.get("input_schema") or {}),
-                    effects=list(item.get("effects") or ["physical_motion"]),
-                    safety_class=str(item.get("safety_class") or "physical_motion"),
-                    interaction_executable=bool(item.get("interaction_executable", True)),
-                    requires_confirmation=bool(item.get("requires_confirmation", True)),
-                    route=str(item.get("route") or "robot_action"),
-                    score=float(item.get("score", 0.9)),
-                    metadata=dict(item.get("metadata") or {"mode": "sim"}),
-                    can_run_parallel=(
-                        bool(item.get("can_run_parallel"))
-                        if "can_run_parallel" in item
-                        else None
-                    ),
-                    parallel_metadata_declared=any(
-                        key in item
-                        for key in (
-                            "can_run_parallel",
-                            "exclusive_group",
-                            "resource_claims",
-                            "execution_constraints",
-                        )
-                    ),
-                    exclusive_group=(
-                        str(item.get("exclusive_group") or "").strip() or None
-                    ),
-                    resource_claims=[
-                        str(value)
-                        for value in (item.get("resource_claims") or [])
-                        if str(value).strip()
-                    ],
-                    execution_constraints=dict(item.get("execution_constraints") or {}),
-                )
-                for item in self.capabilities
-                if item.get("capability_id")
-            ],
-        )
-
-
-    async def get_capability(self, capability_id: str, **kwargs: Any) -> CapabilityMatch | None:
-        del kwargs
-        result = await self.search("")
-        return next((item for item in result.matches if item.capability_id == capability_id), None)
-
-
-class _AgentOllama:
-    def __init__(
-        self,
-        reply: str | dict[str, Any] | list[str | dict[str, Any]] | None,
-    ) -> None:
-        self.replies = list(reply) if isinstance(reply, list) else [reply]
-        self.prompts: list[str] = []
-        self.calls = 0
-
-    async def generate(self, prompt: str, **kwargs: Any) -> str | dict[str, Any]:
-        del kwargs
-        self.prompts.append(prompt)
-        self.calls += 1
-        if not self.replies or self.replies[0] is None:
-            raise AssertionError("LLM should not be called for this interaction scenario")
-        if len(self.replies) > 1:
-            reply = self.replies.pop(0)
-        else:
-            reply = self.replies[0]
-        assert reply is not None
-        return reply
 
 
 class _CognitiveScenarioRuntime:
@@ -1386,205 +1281,6 @@ def _route_proposal_metadata_for_response(decision: RouteDecision) -> dict[str, 
     return out
 
 
-async def _run_interaction_turn(
-    *,
-    scenario_key: str,
-    scenario_id: str,
-    text: str,
-    language: str | None,
-    stub: dict[str, Any],
-    context: dict[str, Any] | None = None,
-    history: list[dict[str, Any]] | None = None,
-) -> Any:
-    route_decision = stub.get("route_decision")
-    if not isinstance(route_decision, dict):
-        raise ValueError(f"{scenario_key}: stub.route_decision is required")
-    catalog_capabilities = stub.get("catalog_capabilities")
-    if catalog_capabilities is not None and not isinstance(catalog_capabilities, list):
-        raise ValueError(f"{scenario_key}: stub.catalog_capabilities must be a list")
-    ollama_reply = stub.get("ollama_replies", stub.get("ollama_reply"))
-    reviewer_reply = stub.get("reviewer_replies", stub.get("reviewer_reply"))
-    social_attention_reply = stub.get(
-        "social_attention_replies",
-        stub.get("social_attention_reply"),
-    )
-    legacy_capability_equivalence = (
-        str(route_decision.get("route") or "") == "robot_action"
-        and "capability_agent" in list(route_decision.get("agents") or [])
-        and not list(route_decision.get("actions") or [])
-        and ollama_reply is not None
-    )
-    services = AgentServices(
-        ollama=_AgentOllama(ollama_reply),  # type: ignore[arg-type]
-        response_reviewer=(
-            _AgentOllama(reviewer_reply) if reviewer_reply is not None else None
-        ),  # type: ignore[arg-type]
-        use_llm=ollama_reply is not None,
-        max_speak_chars=int(stub.get("max_speak_chars", 160)),
-        capability_catalog=_AgentCatalog(catalog_capabilities),  # type: ignore[arg-type]
-        expressive_body_cues=str(stub.get("expressive_body_cues") or "off"),
-        social_attention_mode=str(stub.get("social_attention_mode") or ""),
-        social_attention_ollama=(
-            _AgentOllama(social_attention_reply)
-            if social_attention_reply is not None
-            else None
-        ),  # type: ignore[arg-type]
-        social_attention_capability_ids=tuple(
-            str(item).strip()
-            for item in (stub.get("social_attention_capability_ids") or [])
-            if str(item).strip()
-        ),
-        social_attention_wait_after_response_ms=int(
-            stub.get("social_attention_wait_after_response_ms", 0)
-        ),
-        require_capability_plan_review=bool(stub.get("require_capability_plan_review", False)),
-        legacy_capability_fallback_enabled=legacy_capability_equivalence,
-    )
-    request_context = dict(context or {})
-    stub_context = stub.get("context")
-    if stub_context is not None and not isinstance(stub_context, dict):
-        raise ValueError(f"{scenario_key}: stub.context must be an object")
-    if isinstance(stub_context, dict):
-        request_context.update(stub_context)
-    if legacy_capability_equivalence:
-        request_context["semantic_authority"] = {
-            "owner": "legacy_capability_fallback",
-            "role": "authoritative",
-            "turn_id": scenario_id,
-            "reason": "behavior_scenario_legacy_equivalence",
-            "emergency_fallback": True,
-        }
-    request = AgentRunRequest.model_validate(
-        {
-            "sid": scenario_id,
-            "text": text,
-            "language": language,
-            "route_decision": route_decision,
-            "context": request_context,
-            "history": history or [],
-        }
-    )
-    response = await InteractionRuntime(services).run(request)
-    if bool(stub.get("host_prepare_response", False)):
-        response = response.model_copy(
-            deep=True,
-            update={
-                "metadata": {
-                    **response.metadata,
-                    **_route_proposal_metadata_for_response(request.route_decision),
-                }
-            },
-        )
-        coordinator = InteractionRuntimeCoordinator(lambda payload: {"status": "scheduled"})
-        response = coordinator.prepare_response(response, session_id=scenario_id)
-    return response
-
-
-def _interaction_actual(response: Any) -> dict[str, Any]:
-    speech = _speech_text(response)
-    capability_ids = [skill.capability_id for skill in response.capabilities]
-    skill_args = [skill.args for skill in response.capabilities]
-    skill_timeout_ms = [skill.timeout_ms for skill in response.capabilities]
-    skill_metadata = [skill.metadata for skill in response.capabilities]
-    return {
-        "speech": speech,
-        "capabilities": capability_ids,
-        "skill_args": skill_args,
-        "skill_timeout_ms": skill_timeout_ms,
-        "skill_metadata": skill_metadata,
-        "requires_confirmation": response.requires_confirmation,
-        "status": response.status,
-        "reason": response.reason,
-        "metadata": response.metadata,
-    }
-
-
-async def evaluate_interaction_scenario(scenario: BehaviorScenario) -> dict[str, Any]:
-    response = await _run_interaction_turn(
-        scenario_key=scenario.key,
-        scenario_id=scenario.scenario_id,
-        text=scenario.text,
-        language=scenario.language,
-        stub=scenario.stub,
-    )
-    speech = _speech_text(response)
-    capability_ids = [skill.capability_id for skill in response.capabilities]
-    skill_args = [skill.args for skill in response.capabilities]
-    skill_timeout_ms = [skill.timeout_ms for skill in response.capabilities]
-    skill_metadata = [skill.metadata for skill in response.capabilities]
-    errors = _evaluate_interaction_expectations(
-        scenario,
-        speech=speech,
-        capability_ids=capability_ids,
-        skill_args=skill_args,
-        skill_timeout_ms=skill_timeout_ms,
-        skill_metadata=skill_metadata,
-        requires_confirmation=response.requires_confirmation,
-        status=response.status,
-        reason=response.reason,
-        metadata=response.metadata,
-    )
-    return {
-        "ok": not errors,
-        "errors": errors,
-        "actual": _interaction_actual(response),
-    }
-
-
-def _adapter_result_from_stub(scenario: BehaviorScenario) -> AgentResult:
-    result = AgentResult(
-        status=str(scenario.stub.get("status") or "ok"),
-        reason=scenario.stub.get("reason"),
-    )
-    for item in scenario.stub.get("speak_immediate") or []:
-        if not isinstance(item, dict):
-            raise ValueError(f"{scenario.key}: stub.speak_immediate items must be objects")
-        result.add_speak_immediate(str(item.get("text") or ""))
-    for item in scenario.stub.get("speak_after") or []:
-        if not isinstance(item, dict):
-            raise ValueError(f"{scenario.key}: stub.speak_after items must be objects")
-        result.add_speak_after(str(item.get("text") or ""))
-    for item in scenario.stub.get("actions") or []:
-        if not isinstance(item, dict):
-            raise ValueError(f"{scenario.key}: stub.actions items must be objects")
-        result.add_action(
-            str(item.get("target") or "robot_pose_controller"),
-            str(item.get("type") or ""),
-            params=dict(item.get("params") or {}),
-            blocking=bool(item.get("blocking", False)),
-            timeout_ms=item.get("timeout_ms"),
-            requires_confirmation=bool(item.get("requires_confirmation", False)),
-            reason=item.get("reason"),
-        )
-    return result
-
-
-async def evaluate_adapter_scenario(scenario: BehaviorScenario) -> dict[str, Any]:
-    response = AgentResultInteractionAdapter().convert(_adapter_result_from_stub(scenario))
-    speech = _speech_text(response)
-    capability_ids = [skill.capability_id for skill in response.capabilities]
-    skill_args = [skill.args for skill in response.capabilities]
-    skill_timeout_ms = [skill.timeout_ms for skill in response.capabilities]
-    skill_metadata = [skill.metadata for skill in response.capabilities]
-    errors = _evaluate_interaction_expectations(
-        scenario,
-        speech=speech,
-        capability_ids=capability_ids,
-        skill_args=skill_args,
-        skill_timeout_ms=skill_timeout_ms,
-        skill_metadata=skill_metadata,
-        requires_confirmation=response.requires_confirmation,
-        status=response.status,
-        reason=response.reason,
-        metadata=response.metadata,
-    )
-    return {
-        "ok": not errors,
-        "errors": errors,
-        "actual": _interaction_actual(response),
-    }
-
-
 def _merged_turn_stub(scenario: BehaviorScenario, turn: dict[str, Any]) -> dict[str, Any]:
     base = dict(scenario.stub)
     turn_stub = turn.get("stub") or {}
@@ -2565,10 +2261,6 @@ async def evaluate_scenario(scenario: BehaviorScenario) -> dict[str, Any]:
         return await evaluate_goal_interpretation_scenario(scenario)
     if scenario.suite == "cognitive_core_dialogue":
         return await evaluate_cognitive_core_dialogue_scenario(scenario)
-    if scenario.suite == "interaction":
-        return await evaluate_interaction_scenario(scenario)
-    if scenario.suite == "adapter":
-        return await evaluate_adapter_scenario(scenario)
     if scenario.suite == "dialogue":
         return await evaluate_dialogue_scenario(scenario)
     if scenario.suite == "cognitive_runtime":
