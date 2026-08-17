@@ -1408,6 +1408,7 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
                     )
 
     retired_runtime_paths = (
+        "orchestrator/runtime/abilities.py",
         "orchestrator/runtime/skill_runtime.py",
         "orchestrator/runtime/skill_adapters.py",
         "orchestrator/runtime/soridormi_skill_provider.py",
@@ -1420,7 +1421,10 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
                     path=relative,
                     rule_id=RULE_CANONICAL_CAPABILITY_ID,
                     symbol="<retired-runtime-path>",
-                    message="retired executable-Skill runtime module must not exist",
+                    message=(
+                        "retired duplicate runtime/ability authority module must not exist; "
+                        "Planner + live Capability Registry own executable HOW/availability"
+                    ),
                 )
             )
 

@@ -417,5 +417,6 @@ validated VAD buffer without another microphone path, and requires an enabled
 speech and require governance review before collection or sharing. See
 [Chromie Data Loop](../docs/SCENARIO_CANDIDATE_DATA_LOOP.md).
 
-The static, non-routing responsibility ontology used by the Orchestrator is
-documented in the [Chromie High-Level Ability Registry](../docs/chromie_ability_registry.md).
+The Orchestrator does not maintain a second static execution-ability registry.
+Goal Interpretation owns WHAT, Planner owns HOW, and executable availability comes
+from the live canonical Capability Registry and trusted Runtime evidence.

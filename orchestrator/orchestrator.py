@@ -44,10 +44,6 @@ from orchestrator.audio_device_manager import AudioDeviceManager
 from orchestrator.readiness import ServiceReadinessGate
 from orchestrator.vad import VAD
 from orchestrator.clients.action_client import ActionClient
-from orchestrator.runtime.abilities import (
-    AbilityRegistry,
-    build_default_ability_registry,
-)
 from orchestrator.runtime.body_recovery import (
     BodyRecoveryConfirmation,
     build_body_recovery_confirmation,
@@ -310,9 +306,6 @@ class VoiceAssistant:
         self.agent_url = cognition_settings.agent_url
         self.action_executor_url = cognition_settings.action_executor_url
         self.action_dry_run = cognition_settings.action_dry_run
-        self.abilities = build_default_ability_registry(
-            enable_agent=self.enable_agent,
-        )
         self.agent_client = build_agent_client(self.host_settings)
         self.action_client = ActionClient(
             self.action_executor_url,
@@ -2352,17 +2345,6 @@ class VoiceAssistant:
                 type(exc).__name__,
                 exc,
             )
-
-    def _ability_registry(self) -> AbilityRegistry:
-        abilities = getattr(self, "abilities", None)
-        if isinstance(abilities, AbilityRegistry):
-            return abilities
-        return build_default_ability_registry(
-            enable_agent=bool(getattr(self, "enable_agent", True)),
-        )
-
-
-
 
     @staticmethod
     def _fast_speech_payload_text(payload: Any) -> str | None:

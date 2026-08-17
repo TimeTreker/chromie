@@ -179,8 +179,6 @@ mechanical-contract owner.
 - [Social Attention Behavior Domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md)
 - [Execution Lanes and Coordination](EXECUTION_LANES_AND_COORDINATION.md)
 - [Social Attention Baseline Qualification](SOCIAL_ATTENTION_BASELINE_QUALIFICATION.md)
-- [Chromie High-Level Ability Registry](chromie_ability_registry.md)
-- [Dream Broadly, Execute Honestly](DREAM_BROADLY_EXECUTE_HONESTLY.md)
 - [Chromie Mind, Principles, and Experience](chromie_mind.md)
 - [Experience Evaluation and Scenario Mining](EXPERIENCE_EVALUATION_AND_SCENARIO_MINING.md)
 - [Experience-To-Ability Learning](EXPERIENCE_TO_ABILITY_LEARNING.md)
