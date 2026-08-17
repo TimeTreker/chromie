@@ -9,7 +9,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from orchestrator.runtime.conversation_state import ConversationStateManager
-from shared.chromie_contracts.route import MemoryUpdateProposal
+from shared.chromie_contracts.memory import MemoryUpdateProposal
 
 
 class DurableProfileMemoryTests(unittest.TestCase):
@@ -44,7 +44,7 @@ class DurableProfileMemoryTests(unittest.TestCase):
                 durable_memory_enabled=True,
                 durable_memory_path=path,
             )
-            manager.record_agent_result(
+            manager.record_interaction_response(
                 "sid-1",
                 {
                     "memory_updates": [
@@ -94,7 +94,7 @@ class DurableProfileMemoryTests(unittest.TestCase):
                 durable_memory_path=path,
             )
             for key in ("one", "two"):
-                manager.record_agent_result(
+                manager.record_interaction_response(
                     "sid",
                     {
                         "memory_updates": [
@@ -114,7 +114,7 @@ class DurableProfileMemoryTests(unittest.TestCase):
                         ]
                     },
                 )
-            manager.record_agent_result(
+            manager.record_interaction_response(
                 "sid",
                 {
                     "memory_updates": [
@@ -138,7 +138,7 @@ class DurableProfileMemoryTests(unittest.TestCase):
                 [item["key"] for item in manager.snapshot()["durable_profile_memory"]["entries"]],
                 ["two"],
             )
-            manager.record_agent_result(
+            manager.record_interaction_response(
                 "sid",
                 {
                     "memory_updates": [
@@ -168,7 +168,7 @@ class DurableProfileMemoryTests(unittest.TestCase):
                 durable_memory_enabled=True,
                 durable_memory_path=path,
             )
-            manager.record_agent_result(
+            manager.record_interaction_response(
                 "sid",
                 {
                     "memory_updates": [
@@ -187,7 +187,7 @@ class DurableProfileMemoryTests(unittest.TestCase):
                     ]
                 },
             )
-            manager.record_agent_result(
+            manager.record_interaction_response(
                 "sid",
                 {
                     "memory_updates": [
@@ -221,7 +221,7 @@ class DurableProfileMemoryTests(unittest.TestCase):
                 durable_memory_enabled=True,
                 durable_memory_path=path,
             )
-            manager.record_agent_result(
+            manager.record_interaction_response(
                 "sid",
                 {
                     "memory_updates": [
@@ -252,7 +252,7 @@ class DurableProfileMemoryTests(unittest.TestCase):
                 durable_memory_enabled=False,
                 durable_memory_path=path,
             )
-            manager.record_agent_result(
+            manager.record_interaction_response(
                 "sid",
                 {
                     "memory_updates": [

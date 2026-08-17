@@ -886,7 +886,7 @@ class ExecutionBindingTests(unittest.TestCase):
         calls: list[tuple[str, object, set[str] | None]] = []
 
         class ConversationState:
-            def record_agent_result(
+            def record_interaction_response(
                 self,
                 sid: str,
                 response: object,

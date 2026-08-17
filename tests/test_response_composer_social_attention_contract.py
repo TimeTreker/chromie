@@ -4,7 +4,8 @@ import unittest
 from typing import Any
 
 from agent.app.response_composer import ResponseComposerResolver
-from agent.app.schema import AgentRunRequest
+from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+from tests.cognitive_work_test_support import cognitive_work_request
 from shared.chromie_contracts.plan import CanonicalPlan
 
 
@@ -56,26 +57,15 @@ def _response_output() -> dict[str, Any]:
     }
 
 
-def _request() -> AgentRunRequest:
-    request = AgentRunRequest.model_validate(
-        {
-            "sid": "response-composer-social-attention",
-            "text": "Hello.",
-            "language": "en-US",
-            "route_decision": {
-                "route": "chat",
-                "intent": "greeting",
-                "agents": [],
-                "confidence": 0.99,
-                "source": "llm",
-            },
-        }
+def _request() -> CognitiveWorkRequest:
+    request = cognitive_work_request(
+        sid="response-composer-social-attention",
+        text="Hello.",
+        language="en-US",
     )
     request.context.update(
         {
             "canonical_plan_resolution": _respond_plan(),
-            # These fields may exist elsewhere in one turn, but Response Composer
-            # must not gain Social Attention semantic authority from them.
             "social_attention_policy": {"mode": "on"},
             "social_attention_candidates": [
                 {

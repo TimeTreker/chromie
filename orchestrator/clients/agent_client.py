@@ -31,13 +31,6 @@ from shared.chromie_contracts.user_turn import (
 )
 from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 
-try:
-    from schemas.agent import AgentRequest, AgentResult
-    from schemas.route import RouteDecision
-except ImportError:  # pragma: no cover
-    from orchestrator.schemas.agent import AgentRequest, AgentResult
-    from orchestrator.schemas.route import RouteDecision
-
 logger = logging.getLogger(__name__)
 
 
@@ -64,33 +57,6 @@ class AgentClient:
             else os.getenv("AGENT_TASK_GRAPH_EXECUTION_TOKEN", "").strip()
         )
 
-    async def run(
-        self,
-        session: aiohttp.ClientSession,
-        *,
-        text: str,
-        route_decision: RouteDecision,
-        sid: str | None = None,
-        context: dict[str, Any] | None = None,
-        history: list[dict[str, Any]] | None = None,
-    ) -> AgentResult:
-        req = AgentRequest(
-            sid=sid,
-            text=text,
-            route_decision=route_decision,
-            context=context or {},
-            history=history or [],
-        )
-        timeout = aiohttp.ClientTimeout(total=self.timeout_ms / 1000.0)
-        async with session.post(
-            f"{self.base_url}/run",
-            json=req.model_dump(mode="json"),
-            timeout=timeout,
-        ) as resp:
-            body = await resp.text()
-            if resp.status != 200:
-                raise RuntimeError(f"Agent returned HTTP {resp.status}: {body[:500]}")
-            return AgentResult.model_validate_json(body)
 
     async def review_attention(
         self,
@@ -141,35 +107,6 @@ class AgentClient:
         async with session.get(f"{self.base_url}/health", timeout=timeout) as resp:
             return await resp.json()
 
-    async def run_interaction(
-        self,
-        session: aiohttp.ClientSession,
-        *,
-        text: str,
-        route_decision: RouteDecision,
-        sid: str | None = None,
-        context: dict[str, Any] | None = None,
-        history: list[dict[str, Any]] | None = None,
-    ) -> InteractionResponse:
-        req = AgentRequest(
-            sid=sid,
-            text=text,
-            route_decision=route_decision,
-            context=context or {},
-            history=history or [],
-        )
-        timeout = aiohttp.ClientTimeout(total=self.timeout_ms / 1000.0)
-        async with session.post(
-            f"{self.base_url}/interaction",
-            json=req.model_dump(mode="json"),
-            timeout=timeout,
-        ) as resp:
-            body = await resp.text()
-            if resp.status != 200:
-                raise RuntimeError(
-                    f"Agent interaction endpoint returned HTTP {resp.status}: {body[:500]}"
-                )
-            return InteractionResponse.model_validate_json(body)
 
     async def resolve_fast_advance(
         self,

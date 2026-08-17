@@ -4,7 +4,7 @@ import asyncio
 import unittest
 
 from agent.app.response_composer import ResponseComposerResolver
-from agent.app.schema import AgentRunRequest, RouteDecision
+from tests.cognitive_work_test_support import cognitive_work_request
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.response_composition import (
     CoordinatedResponsePlan,
@@ -102,16 +102,10 @@ def request(canonical_plan: CanonicalPlan, *, context=None):
         },
     }
     merged.update(context or {})
-    return AgentRunRequest(
+    return cognitive_work_request(
         sid="sid-pr6",
         text="请处理这些事情。",
         language="zh-CN",
-        route_decision=RouteDecision(
-            route="robot_action" if canonical_plan.disposition == "execute" else "chat",
-            intent="test",
-            confidence=0.9,
-            source="llm",
-        ),
         context=merged,
         history=[],
     )
@@ -756,68 +750,6 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertEqual(stage.covers_goal_ids, ["goal-walk"])
         self.assertEqual(len(ollama.prompts), 1)
 
-    def test_pure_activity_preserves_unscheduled_core_fast_speech_after_composer_failure(self):
-        canonical = plan(
-            disposition="execute",
-            goals=["goal-nod"],
-            steps=[
-                {
-                    "step_id": "nod",
-                    "capability_id": "soridormi.nod_yes",
-                    "args": {"count": 2},
-                }
-            ],
-        )
-        invalid = {
-            "response_plan": {
-                "immediate": {
-                    "text": "...",
-                    "speech_act": "acknowledge",
-                    "commitment_state": "none",
-                    "must_not_claim_completion": True,
-                    "covers_goal_ids": ["goal-nod"],
-                }
-            },
-            "confidence": 1.0,
-            "rationale": "The model emitted a punctuation-only placeholder.",
-        }
-        ollama = FakeOllama(invalid)
-        composition_request = request(canonical)
-        composition_request.route_decision = RouteDecision(
-            route="robot_action",
-            intent="capability:soridormi.nod_yes",
-            confidence=0.95,
-            source="llm",
-            fast_speech={
-                "text": "Okay, I'll nod twice.",
-                "purpose": "acknowledge",
-                "commitment": "prelude_only",
-                "claim_state": "none",
-                "claimed_capability_ids": [],
-                "claimed_goal_ids": [],
-                "must_not_claim_completion": True,
-            },
-        )
-
-        result = asyncio.run(
-            ResponseComposerResolver(ollama).resolve(composition_request)
-        )
-
-        self.assertEqual(result.status, "resolved")
-        self.assertTrue(result.metadata["fail_soft_primary_activity"])
-        assert result.composition is not None
-        stage = result.composition.response_plan.pre_action
-        self.assertIsNotNone(stage)
-        assert stage is not None
-        self.assertEqual(stage.text, "Okay, I'll nod twice.")
-        self.assertEqual(stage.speech_act, "acknowledge")
-        self.assertEqual(stage.commitment_state, "none")
-        self.assertFalse(stage.reuse_current_turn_speech)
-        self.assertEqual(stage.covers_goal_ids, ["goal-nod"])
-        self.assertTrue(
-            result.composition.metadata["core_authored_fast_speech_used"]
-        )
-        self.assertEqual(len(ollama.prompts), 1)
 
     def test_mixed_plan_reuses_fast_speech_for_uncovered_execute_goal(self):
         canonical = CanonicalPlan(
@@ -1008,14 +940,6 @@ class ResponseComposerResolverTests(unittest.TestCase):
         }
         ollama = FakeOllama(natural_output)
         req = request(canonical)
-        req = req.model_copy(
-            deep=True,
-            update={
-                "route_decision": req.route_decision.model_copy(
-                    update={"intent": "greeting"}
-                )
-            },
-        )
         result = asyncio.run(ResponseComposerResolver(ollama).resolve(req))
         self.assertEqual(result.status, "resolved")
         self.assertEqual(

@@ -984,27 +984,13 @@
     },
     {
       "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._settle_fast_first_audio_hedge",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "38da014ccdb2c6563ccde92312f5f987c8ae798e427b0dbc93ab9a76fa1a050a",
-      "failure_signals": [
-        "diagnostic",
-        "return"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant._try_apply_cognitive_runtime",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "f32a18dca438471a3a66e59398765cfb34c8c4e9c9f33465fdd5b20aa70c2a82",
+      "body_sha256": "dd6e8bf86fc20d1ee511a6027afd176482ab28cfa66acd2bb7ccfaac380abfdc",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -1033,19 +1019,6 @@
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
       "body_sha256": "901f565678ff4ed2e6f640bd9087b2e67bccd119291b194df008d36e6f97e59c",
-      "failure_signals": [
-        "diagnostic"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant.execute_agent_result",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "6e483ebc0d1955b64cb812da8ee6400b020e5ba4f00155a72d5781aadb893f48",
       "failure_signals": [
         "diagnostic"
       ]
@@ -1085,7 +1058,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "20dae0fafe12231dc87cba46322faeb1a0daf3634a7505df6d205385a6d89671",
+      "body_sha256": "25acb3fa6806773830225faebccf2427ac345cf0a6031f8b2e675c17b2f28c70",
       "failure_signals": [
         "diagnostic",
         "return",

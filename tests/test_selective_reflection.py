@@ -3,7 +3,8 @@ from __future__ import annotations
 import asyncio
 
 from agent.app.reflection import ReflectionResolver
-from agent.app.schema import AgentRunRequest, RouteDecision
+from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+from tests.cognitive_work_test_support import cognitive_work_request
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from shared.chromie_contracts.reflection import ReflectionResolution
 from shared.chromie_contracts.situation import CognitiveOpportunity
@@ -22,17 +23,11 @@ class FakeOllama:
         return self.payload
 
 
-def request_for(opportunity: CognitiveOpportunity) -> AgentRunRequest:
-    return AgentRunRequest(
+def request_for(opportunity: CognitiveOpportunity) -> CognitiveWorkRequest:
+    return cognitive_work_request(
         sid="sid-reflect",
         text="Please keep trying.",
-        route_decision=RouteDecision(
-            route="robot_action",
-            intent="selective_reflection",
-            confidence=1.0,
-            source="llm",
-            language="en-US",
-        ),
+        language="en-US",
         context={
             "cognitive_opportunity": opportunity.prompt_projection(),
             "execution_outcome_bundle": {
@@ -182,16 +177,10 @@ def test_slow_reflection_without_trusted_evidence_does_not_invoke_model() -> Non
         recommended_cognition="slow",
     )
     ollama = FakeOllama({"actions": ["replan"]})
-    request = AgentRunRequest(
+    request = cognitive_work_request(
         sid="sid-reflect-no-evidence",
         text="Please keep trying.",
-        route_decision=RouteDecision(
-            route="robot_action",
-            intent="selective_reflection",
-            confidence=1.0,
-            source="llm",
-            language="en-US",
-        ),
+        language="en-US",
         context={
             "cognitive_opportunity": opportunity.prompt_projection(),
             "execution_outcome_bundle": {},

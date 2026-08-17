@@ -382,7 +382,7 @@ class ConversationStateTests(unittest.TestCase):
     def test_interaction_response_records_speech_and_named_skill(self) -> None:
         manager = ConversationStateManager()
 
-        manager.record_agent_result(
+        manager.record_interaction_response(
             "s1",
             InteractionResponse(
                 speech=[{"text": "Hello."}],
@@ -399,7 +399,7 @@ class ConversationStateTests(unittest.TestCase):
     def test_native_interaction_metadata_records_memory_update(self) -> None:
         manager = ConversationStateManager()
 
-        manager.record_agent_result(
+        manager.record_interaction_response(
             "s1",
             InteractionResponse(
                 metadata={
@@ -426,7 +426,7 @@ class ConversationStateTests(unittest.TestCase):
     def test_agent_result_extracted_memory_update_reaches_session_memory(self) -> None:
         manager = ConversationStateManager()
 
-        manager.record_agent_result(
+        manager.record_interaction_response(
             "s1",
             {
                 "memory_updates": [
@@ -453,7 +453,7 @@ class ConversationStateTests(unittest.TestCase):
     def test_keyed_extracted_memory_update_revises_prior_entry(self) -> None:
         manager = ConversationStateManager()
 
-        manager.record_agent_result(
+        manager.record_interaction_response(
             "s1",
             {
                 "memory_updates": [
@@ -469,7 +469,7 @@ class ConversationStateTests(unittest.TestCase):
                 ]
             },
         )
-        manager.record_agent_result(
+        manager.record_interaction_response(
             "s2",
             {
                 "memory_updates": [
@@ -498,7 +498,7 @@ class ConversationStateTests(unittest.TestCase):
             soft_idle_timeout_sec=5,
             hard_idle_timeout_sec=5,
         )
-        manager.record_agent_result(
+        manager.record_interaction_response(
             "s1",
             {
                 "memory_updates": [
@@ -524,7 +524,7 @@ class ConversationStateTests(unittest.TestCase):
     def test_agent_speech_alone_does_not_create_runtime_outcome_memory(self) -> None:
         manager = ConversationStateManager()
 
-        manager.record_agent_result(
+        manager.record_interaction_response(
             "s1",
             InteractionResponse(speech=[{"text": "Done, I blinked."}]),
         )
@@ -741,7 +741,7 @@ class ConversationStateTests(unittest.TestCase):
 
     def test_completed_skill_request_closes_active_task_and_can_be_pruned(self) -> None:
         manager = ConversationStateManager(completed_task_retention_sec=0)
-        manager.record_agent_result(
+        manager.record_interaction_response(
             "s1",
             InteractionResponse(
                 capabilities=[{"request_id": "skill-1", "capability_id": "soridormi.nod_yes"}],
@@ -851,7 +851,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             },
         )
 
-        manager.record_agent_result("sid-execute", response)
+        manager.record_interaction_response("sid-execute", response)
         self.assertEqual(
             [item["work_status"] for item in manager.active_goal_snapshots()],
             ["scheduled", "scheduled"],
@@ -915,7 +915,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             },
         )
 
-        manager.record_agent_result("sid-answer", response)
+        manager.record_interaction_response("sid-answer", response)
 
         active = manager.active_goal_snapshots()
         self.assertEqual(len(active), 1)
@@ -950,7 +950,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             },
         )
 
-        manager.record_agent_result("sid-native-answer", response)
+        manager.record_interaction_response("sid-native-answer", response)
 
         active = manager.active_goal_snapshots()
         self.assertEqual(len(active), 1)
@@ -994,7 +994,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             },
         )
 
-        manager.record_agent_result("sid-clarify", response)
+        manager.record_interaction_response("sid-clarify", response)
 
         active = manager.active_goal_snapshots()
         self.assertEqual(len(active), 1)
@@ -1024,7 +1024,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
                     base_conversation_id=f"terminal-{runtime_status}"
                 )
                 self._create_goals(manager, "goal-action")
-                manager.record_agent_result(
+                manager.record_interaction_response(
                     "sid-action",
                     InteractionResponse(
                         capabilities=[
@@ -1178,7 +1178,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             ["planning", "planning"],
         )
 
-        manager.record_agent_result(
+        manager.record_interaction_response(
             "sid-confirm",
             response,
             confirmed_request_ids={"skill-walk", "skill-blink"},
@@ -1216,7 +1216,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
     def test_compatible_goal_refinement_preserves_existing_plan_work(self) -> None:
         manager = ConversationStateManager(base_conversation_id="compatible-refinement")
         self._create_goals(manager, "goal-cup")
-        manager.record_agent_result(
+        manager.record_interaction_response(
             "sid-plan",
             InteractionResponse(
                 metadata={
@@ -1282,7 +1282,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
     def test_incompatible_goal_refinement_supersedes_plan_only_when_replan_required(self) -> None:
         manager = ConversationStateManager(base_conversation_id="incompatible-refinement")
         self._create_goals(manager, "goal-cup")
-        manager.record_agent_result(
+        manager.record_interaction_response(
             "sid-plan",
             InteractionResponse(
                 metadata={
@@ -1344,7 +1344,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
     def test_execution_outcome_bundle_preserves_exact_mixed_goal_evidence(self) -> None:
         manager = ConversationStateManager(base_conversation_id="outcome-bundle")
         self._create_goals(manager, "goal-walk", "goal-blink")
-        manager.record_agent_result(
+        manager.record_interaction_response(
             "sid-outcome",
             InteractionResponse(
                 interaction_id="interaction-outcome",
@@ -1487,7 +1487,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
     def test_completed_execution_with_insufficient_qualification_keeps_goal_open(self) -> None:
         manager = ConversationStateManager(base_conversation_id="qualification-open")
         self._create_goals(manager, "goal-walk")
-        manager.record_agent_result(
+        manager.record_interaction_response(
             "sid-qualified",
             InteractionResponse(
                 interaction_id="interaction-qualified",
@@ -1628,7 +1628,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
                 ),
             },
         )
-        manager.record_agent_result("sid-cup", response)
+        manager.record_interaction_response("sid-cup", response)
         bundle = ExecutionOutcomeBundle(
             outcome_id="outcome-cup",
             turn_id="turn-cup",
@@ -1752,7 +1752,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
                 },
             },
         )
-        manager.record_agent_result("sid-weather", response)
+        manager.record_interaction_response("sid-weather", response)
         bundle = ExecutionOutcomeBundle(
             outcome_id="outcome-weather-interrupted",
             turn_id="turn-weather",
@@ -1863,7 +1863,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
                 },
             )
 
-        manager.record_agent_result(
+        manager.record_interaction_response(
             "sid-current",
             response(
                 interaction_id="interaction-old",
@@ -1873,7 +1873,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
                 request_id="request-old",
             ),
         )
-        manager.record_agent_result(
+        manager.record_interaction_response(
             "sid-current",
             response(
                 interaction_id="interaction-new",
@@ -1930,7 +1930,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
     def test_not_run_never_creates_a_false_completed_memory(self) -> None:
         manager = ConversationStateManager(base_conversation_id="not-run-memory")
         self._create_goals(manager, "goal-walk")
-        manager.record_agent_result(
+        manager.record_interaction_response(
             "sid-not-run",
             InteractionResponse(
                 capabilities=[

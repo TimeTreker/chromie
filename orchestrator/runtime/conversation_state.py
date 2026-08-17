@@ -4209,7 +4209,7 @@ class ConversationStateManager:
                 continue
             if normalized_decision == "approved":
                 # Approval commits the plan but does not claim that Skill
-                # Runtime has scheduled it. record_agent_result performs that
+                # Runtime has scheduled it. record_interaction_response performs that
                 # transition immediately before the authorized launch.
                 context["status"] = "planning"
                 context["commitment_state"] = "accepted"
@@ -5126,7 +5126,7 @@ class ConversationStateManager:
         }
         self._persist_task_contexts_if_enabled()
 
-    def record_agent_result(
+    def record_interaction_response(
         self,
         sid: str | None,
         result: Any,
@@ -5363,7 +5363,7 @@ class ConversationStateManager:
                     },
                 )
 
-        # AgentResult exposes memory_updates at the top level. Native
+        # Legacy responses exposed memory_updates at the top level. Native
         # InteractionResponse keeps them in metadata so the shared wire
         # contract remains narrow. Support both representations.
         memory_updates = data.get("memory_updates", []) or []

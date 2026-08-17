@@ -172,65 +172,6 @@ class CognitiveGateway:
             reason=reason,
         )
 
-    def for_core_review(
-        self,
-        capture: GatewayTurnCapture,
-        *,
-        context: dict[str, Any],
-        decision: Any,
-    ) -> UserTurnEnvelope:
-        """Deprecated compatibility projection for historical tests/replays.
-
-        Production admission no longer depends on a semantic RouteDecision.
-        """
-
-        snapshot = self.assemble_context(capture, context)
-        metadata = (
-            decision.metadata
-            if isinstance(getattr(decision, "metadata", None), dict)
-            else {}
-        )
-        route = str(getattr(decision, "route", "") or "")
-        if route == "ignore":
-            review = AttentionReviewResult(
-                turn_id=capture.turn_id,
-                session_id=capture.session_id,
-                context_digest=snapshot.digest,
-                disposition="suppress",
-                speech_act=str(
-                    metadata.get("addressedness_speech_act") or "unclear"
-                ),
-                confidence=self._bounded_confidence(
-                    metadata.get("addressedness_confidence"),
-                    fallback=getattr(decision, "confidence", 0.0),
-                ),
-                source="cognitive_gateway.compatibility_route_projection",
-                reason=str(
-                    getattr(decision, "reason", "")
-                    or "compatibility ignore projection"
-                ),
-            )
-        else:
-            review = AttentionReviewResult(
-                turn_id=capture.turn_id,
-                session_id=capture.session_id,
-                context_digest=snapshot.digest,
-                disposition="admit",
-                speech_act=str(
-                    metadata.get("addressedness_speech_act") or "unclear"
-                ),
-                confidence=self._bounded_confidence(
-                    metadata.get("addressedness_confidence"),
-                    fallback=1.0,
-                ),
-                source="cognitive_gateway.compatibility_route_projection",
-                reason=str(
-                    getattr(decision, "reason", "")
-                    or "compatibility admitted projection"
-                ),
-            )
-        return self.admit_attention(capture, snapshot, review)
-
     def core_request(
         self,
         envelope: UserTurnEnvelope,
@@ -245,18 +186,18 @@ class CognitiveGateway:
         self,
         envelope: UserTurnEnvelope,
         *,
-        legacy_text: str,
-        legacy_session_id: str,
+        current_text: str,
+        current_session_id: str,
         context: dict[str, Any],
     ) -> CoreTurnProjection:
         if envelope.admission not in {"admit", "reflex_and_admit"}:
             raise ValueError(
                 f"Core projection requires admitted input, got {envelope.admission}"
             )
-        if normalize_turn_text(legacy_session_id) != envelope.session_id:
-            raise ValueError("legacy session_id does not match UserTurnEnvelope")
-        if normalize_turn_text(legacy_text) != envelope.normalized_input.text:
-            raise ValueError("legacy text does not match UserTurnEnvelope")
+        if normalize_turn_text(current_session_id) != envelope.session_id:
+            raise ValueError("session_id does not match UserTurnEnvelope")
+        if normalize_turn_text(current_text) != envelope.normalized_input.text:
+            raise ValueError("text does not match UserTurnEnvelope")
 
         projected_context = dict(context)
         projected_context[USER_TURN_ENVELOPE_CONTEXT_KEY] = envelope.model_dump(

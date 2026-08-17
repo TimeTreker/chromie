@@ -27,7 +27,8 @@ from agent.app.goal_association import (
     GoalSegmentationModelOutput,
 )
 from agent.app.response_composer import ResponseComposerResolver
-from agent.app.schema import AgentRunRequest, RouteDecision
+from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+from tests.cognitive_work_test_support import cognitive_work_request
 from agent.app.tool_result_interpreter import ToolResultInterpreter
 try:
     from chromie_contracts import (
@@ -124,17 +125,11 @@ class AgentSkillProgressiveDisclosureTests(unittest.TestCase):
         return package
 
     @staticmethod
-    def _request() -> AgentRunRequest:
-        return AgentRunRequest(
+    def _request() -> CognitiveWorkRequest:
+        return cognitive_work_request(
             sid="sid-disclosure",
             text="Check today's weather in Neixiang.",
             language="en-US",
-            route_decision=RouteDecision(
-                route="tool",
-                intent="weather_lookup",
-                confidence=0.95,
-                source="llm",
-            ),
             context={
                 "goal_association_resolution": {
                     "associations": [],
@@ -176,7 +171,7 @@ class AgentSkillProgressiveDisclosureTests(unittest.TestCase):
         )
 
     @staticmethod
-    def _request_with_projection(role: str, content: str) -> AgentRunRequest:
+    def _request_with_projection(role: str, content: str) -> CognitiveWorkRequest:
         request = AgentSkillProgressiveDisclosureTests._request()
         context = dict(request.context)
         context["agent_skill_disclosure"] = {
@@ -442,12 +437,11 @@ class AgentSkillProgressiveDisclosureTests(unittest.TestCase):
         action_request = request.model_copy(
             update={
                 "text": "Walk while blinking.",
-                "route_decision": RouteDecision(
-                    route="robot_action",
-                    intent="compound_action",
-                    confidence=0.95,
-                    source="llm",
-                ),
+                "responsibilities": [
+                    request.responsibilities[0].model_copy(
+                        update={"outcome": "Walk while blinking."}
+                    )
+                ],
                 "context": context,
             }
         )

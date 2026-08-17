@@ -10,109 +10,16 @@ from pathlib import Path
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
 from orchestrator.runtime.host_settings import HostSettingsSnapshot
-from orchestrator.schemas.route import RouteDecision
 
 
 class RuntimeReliabilityStage4Tests(unittest.TestCase):
-    def test_agent_disconnect_on_robot_action_fails_closed_without_promising_execution(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-        decision = RouteDecision(
-            route="robot_action",
-            intent="compound_common_catalog_task",
-            confidence=0.95,
-            actions=[
-                {
-                    "capability_id": "soridormi.nod_yes",
-                    "args": {"count": 1},
-                }
-            ],
-            metadata={},
-        )
-
-        response = assistant._agent_exception_safe_response(
-            decision,
-            user_text="你点点头再眨两下眼睛。",
-        )
-
-        self.assertIsNotNone(response)
-        assert response is not None
-        self.assertEqual(response.capabilities, [])
-        spoken = " ".join(item.text for item in response.speech)
-        self.assertIn("没有动", spoken)
-        self.assertNotIn("我会点头", spoken)
-        self.assertNotIn("正在执行", spoken)
-
-    def test_agent_disconnect_on_tool_route_refuses_to_invent_result(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-        decision = RouteDecision(
-            route="tool",
-            intent="weather_query",
-            confidence=0.95,
-            metadata={"tool_name": "weather"},
-        )
-
-        response = assistant._agent_exception_safe_response(
-            decision,
-            user_text="北京天气怎么样？",
-        )
-
-        self.assertIsNotNone(response)
-        assert response is not None
-        spoken = " ".join(item.text for item in response.speech)
-        self.assertIn("没查成功", spoken)
-        self.assertIn("不能乱说", spoken)
-        self.assertNotIn("查询服务", spoken)
-        self.assertNotIn("未经验证", spoken)
-        self.assertEqual(response.capabilities, [])
-
-
-    def test_chat_agent_disconnect_fails_closed_without_direct_answer(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-        decision = RouteDecision(
-            route="chat",
-            intent="user_question",
-            confidence=0.95,
-            metadata={},
-        )
-
-        response = assistant._agent_exception_safe_response(
-            decision,
-            user_text="你觉得怎么样？",
-        )
-
-        spoken = " ".join(item.text for item in response.speech)
-        self.assertIn("不想乱答", spoken)
-        self.assertNotIn("我觉得", spoken)
-        self.assertEqual(response.capabilities, [])
 
 
 
 
-    def test_tool_route_with_capability_task_does_not_use_action_fallback(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-        decision = RouteDecision(
-            route="tool",
-            intent="weather.lookup",
-            confidence=0.95,
-            metadata={
-                "task_list": [
-                    {
-                        "task_type": "task.execute.capability",
-                        "capability_id": "chromie.weather.lookup",
-                    }
-                ]
-            },
-        )
 
-        response = assistant._agent_exception_safe_response(
-            decision,
-            user_text="查一下重庆天气。",
-        )
 
-        assert response is not None
-        spoken = " ".join(item.text for item in response.speech)
-        self.assertIn("没查成功", spoken)
-        self.assertNotIn("没有动", spoken)
+
 
     def test_warmup_uses_a_one_token_non_thinking_generation(self) -> None:
         source = Path("scripts/warm_ollama.sh").read_text(encoding="utf-8")
@@ -195,16 +102,9 @@ class CognitiveFailureResponseComposerTests(unittest.IsolatedAsyncioTestCase):
                 "retryable": True,
             },
         )
-        decision = RouteDecision(
-            route="tool",
-            intent="weather.lookup",
-            confidence=0.95,
-            metadata={},
-        )
 
         response = await assistant._compose_cognitive_failure_response(
             resolution,
-            decision,
             user_text="重庆今天热不热？",
             session_id="failure-style",
         )
@@ -304,18 +204,17 @@ class CognitiveFailureResponseComposerTests(unittest.IsolatedAsyncioTestCase):
                 "retryable": True,
             },
         )
-        decision = RouteDecision(
-            route="tool",
-            intent="capability:chromie.weather.lookup",
-            confidence=0.95,
-            metadata={},
-        )
 
         response = await assistant._compose_cognitive_failure_response(
             resolution,
-            decision,
             user_text="帮我查一下重庆明天是晴天还是阴天。",
             session_id="weather-pre-dispatch",
+            trusted_failure_facts={
+                "selected_capability_ids": ["chromie.weather.lookup"],
+                "execution_started": False,
+                "verified_result_available": False,
+                "retryable": True,
+            },
         )
 
         assert response is not None
@@ -410,12 +309,6 @@ class CognitiveFailureResponseComposerTests(unittest.IsolatedAsyncioTestCase):
             lane="robot_action",
             metadata={},
         )
-        decision = RouteDecision(
-            route="robot_action",
-            intent="execution_outcome_failure",
-            confidence=1.0,
-            metadata={},
-        )
         facts = {
             "route": "robot_action",
             "failure_stage": "skill_execution",
@@ -428,7 +321,6 @@ class CognitiveFailureResponseComposerTests(unittest.IsolatedAsyncioTestCase):
 
         response = await assistant._compose_cognitive_failure_response(
             resolution,
-            decision,
             user_text="边走边眨眼睛。",
             session_id="execution-failure-style",
             trusted_failure_facts=facts,
@@ -510,20 +402,12 @@ class CognitiveFailureResponseComposerTests(unittest.IsolatedAsyncioTestCase):
             lane="tool",
             metadata={},
         )
-        decision = RouteDecision(
-            route="tool",
-            intent="execution_outcome_failure",
-            confidence=1.0,
-            metadata={},
-        )
 
         response = await assistant._compose_cognitive_failure_response(
             resolution,
-            decision,
             user_text="河南省内乡县现在下雨了没有？",
             session_id="location-not-found-style",
             trusted_failure_facts={
-                "route": "tool",
                 "failure_stage": "skill_execution",
                 "failure_class": "provider_execution_failed",
                 "execution_started": True,
@@ -603,22 +487,16 @@ class CognitiveFailureResponseComposerTests(unittest.IsolatedAsyncioTestCase):
                 "failure_class": "missing_ability",
             },
         )
-        decision = RouteDecision(
-            route="clarify",
-            intent="missing_or_unsupported_ability",
-            confidence=1.0,
-            metadata={
-                "desired_abilities": [
-                    {"ability_id": "local.restaurant_recommendation"}
-                ]
-            },
-        )
 
         response = await assistant._compose_cognitive_failure_response(
             resolution,
-            decision,
             user_text="帮我找重庆龙兴天街附近好吃的餐厅。",
             session_id="missing-ability-state",
+            trusted_failure_facts={
+                "missing_ability": True,
+                "execution_started": False,
+                "verified_result_available": False,
+            },
         )
 
         self.assertIsNotNone(response)
@@ -693,20 +571,9 @@ class CognitiveFailureResponseComposerTests(unittest.IsolatedAsyncioTestCase):
                 "failure_class": "missing_ability",
             },
         )
-        decision = RouteDecision(
-            route="clarify",
-            intent="missing_or_unsupported_ability",
-            confidence=1.0,
-            metadata={
-                "desired_abilities": [
-                    {"ability_id": "local.restaurant_recommendation"}
-                ]
-            },
-        )
 
         response = await assistant._compose_cognitive_failure_response(
             resolution,
-            decision,
             user_text="帮我找重庆龙兴天街附近好吃的餐厅。",
             session_id="failure-state-drift",
         )
@@ -774,16 +641,9 @@ class CognitiveFailureResponseComposerTests(unittest.IsolatedAsyncioTestCase):
                 "retryable": True,
             },
         )
-        decision = RouteDecision(
-            route="tool",
-            intent="weather.lookup",
-            confidence=0.95,
-            metadata={},
-        )
 
         response = await assistant._compose_cognitive_failure_response(
             resolution,
-            decision,
             user_text="重庆今天热不热？",
             session_id="failure-language",
         )

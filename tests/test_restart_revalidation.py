@@ -13,7 +13,6 @@ from orchestrator.runtime.named_goal_cancellation import (
     dispatch_named_goal_cancellation,
 )
 from orchestrator.runtime.situation import build_situation_projection
-from orchestrator.schemas.route import RouteDecision
 from shared.chromie_contracts.goal import GoalAssociationResolution
 
 
@@ -143,8 +142,6 @@ class RestartRevalidationTests(unittest.TestCase):
             situation = build_situation_projection(
                 context=fresh_context,
                 turn_id="turn-after-restart",
-                lane="robot_action",
-                intent="resume",
                 revision=1,
             )
             self.assertEqual(situation.focus_goal_ids, ["goal-walk"])
@@ -168,74 +165,6 @@ class RestartRevalidationTests(unittest.TestCase):
             payload = json.loads(store_path.read_text(encoding="utf-8"))
             self.assertEqual(payload["task_contexts"], [])
 
-    def test_named_cancellation_refuses_stale_restored_binding(self) -> None:
-        with TemporaryDirectory() as temp_dir:
-            store_path = Path(temp_dir) / "task_contexts.json"
-            manager = ConversationStateManager(
-                task_store_enabled=True,
-                task_store_path=store_path,
-            )
-            self._create_open_goal(manager)
-            context = manager._task_contexts[-1]
-            context["status"] = "running"
-            context["metadata"].update(
-                {
-                    "interaction_id": "interaction-old",
-                    "canonical_plan_id": "plan-old",
-                    "canonical_plan_fingerprint": "f" * 64,
-                    "remaining_request_ids": ["request-walk"],
-                }
-            )
-            self.assertTrue(manager.persist_task_contexts())
-            restored = ConversationStateManager(
-                task_store_enabled=True,
-                task_store_path=store_path,
-            )
-            association = GoalAssociationResolution.model_validate(
-                {
-                    "turn_id": "turn-cancel",
-                    "associations": [
-                        {
-                            "association_id": "assoc-cancel",
-                            "relationship": "cancel",
-                            "target_goal_ids": ["goal-walk"],
-                            "confidence": 1.0,
-                        }
-                    ],
-                    "confidence": 1.0,
-                }
-            )
-            resolution = CognitiveRuntimeResolution(
-                mode="apply",
-                status="applied",
-                lane="robot_action",
-                goal_association=association,
-            )
-            runtime = _NoDispatchRuntime()
-            with self.assertRaisesRegex(
-                NamedGoalCancellationClosureError,
-                "runtime_revalidation_required",
-            ):
-                asyncio.run(
-                    dispatch_named_goal_cancellation(
-                        conversation_state=restored,
-                        interaction_runtime=runtime,
-                        confirmation_dialogue=None,
-                        resolution=resolution,
-                        session_id="sid-cancel",
-                        user_text="Cancel it.",
-                        decision=RouteDecision(
-                            route="robot_action",
-                            intent="cancel_goal",
-                            confidence=1.0,
-                        ),
-                    )
-                )
-            self.assertEqual(runtime.calls, 0)
-            self.assertEqual(
-                restored.active_goal_snapshots()[0]["responsibility_status"],
-                "open",
-            )
 
 
 if __name__ == "__main__":

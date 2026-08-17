@@ -1207,7 +1207,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             intent="conversation",
             atomic=True,
         )
-        state.record_agent_result("sid-respond-delivery", response)
+        state.record_interaction_response("sid-respond-delivery", response)
         self.assertEqual(
             state.active_goal_snapshots()[0]["work_status"],
             "scheduled",

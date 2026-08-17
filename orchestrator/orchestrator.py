@@ -113,8 +113,6 @@ from shared.chromie_runtime.accelerator_telemetry import (
 )
 from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 from orchestrator.runtime.capability_runtime import CapabilityRuntimeResult
-from orchestrator.schemas.agent import AgentResult
-from orchestrator.schemas.route import RouteDecision
 from shared.chromie_contracts.core_interpretation import (
     CognitiveResponsibilityProposal,
     CognitiveWorkRequest,
@@ -199,111 +197,10 @@ def trace_session_async(module: TraceModule, operation: str, session_arg: str):
     return decorate
 
 
-async def _start_fast_first_delivery(
-    assistant: Any,
-    decision: RouteDecision,
-    user_text: str,
-    session_id: str,
-) -> tuple[bool, asyncio.Task[dict[str, Any]] | None]:
-    """Prefer model-authored immediate speech; use cached audio only on failure."""
-
-    dynamic_scheduled = await assistant._schedule_fast_first_response(
-        decision,
-        user_text,
-        session_id,
-    )
-    hedge_task = None
-    if not dynamic_scheduled:
-        hedge_task = assistant._start_fast_first_audio_hedge(
-            decision,
-            user_text,
-            session_id,
-        )
-    return dynamic_scheduled, hedge_task
 
 
-def _selected_capability_ids(decision: RouteDecision) -> list[str]:
-    """Return exact capabilities selected before planning or provider dispatch."""
-
-    selected: list[str] = []
-
-    def add(value: Any, *, require_capability_prefix: bool = False) -> None:
-        text = str(value or "").strip()
-        has_prefix = text.startswith("capability:")
-        if require_capability_prefix and not has_prefix:
-            return
-        if has_prefix:
-            text = text.split(":", 1)[1].strip()
-        if text and text not in selected:
-            selected.append(text)
-
-    add(decision.intent, require_capability_prefix=True)
-    for action in decision.actions or []:
-        add(getattr(action, "capability_id", None))
-    for route_item in decision.routes or []:
-        add(
-            getattr(route_item, "intent", None),
-            require_capability_prefix=True,
-        )
-        for action in getattr(route_item, "actions", None) or []:
-            add(getattr(action, "capability_id", None))
-    metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
-    for item in metadata.get("task_list") or []:
-        if isinstance(item, dict):
-            add(item.get("capability_id"))
-    return selected
 
 
-def _context_with_scheduled_fast_speech(
-    context: dict[str, Any],
-    decision: RouteDecision,
-    *,
-    scheduled: bool,
-) -> dict[str, Any]:
-    """Project queued fast speech into downstream composition context.
-
-    A scheduled utterance is not provider evidence and does not prove that the
-    user heard it.  It is nevertheless a current-turn communicative commitment
-    that the Response Composer must avoid repeating while TTS starts.  The
-    playback lifecycle remains the authority for delivered speech.
-    """
-
-    projected = dict(context)
-    if not scheduled:
-        return projected
-    metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
-    fast_first = metadata.get("fast_first_response")
-    if not isinstance(fast_first, dict):
-        return projected
-    text = " ".join(str(fast_first.get("text") or "").strip().split())
-    if not text:
-        return projected
-    fast_speech = decision.fast_speech
-    projected["scheduled_turn_speech"] = [
-        {
-            "status": "scheduled",
-            "stage": "fast_first",
-            "text": text,
-            "route": decision.route,
-            "intent": decision.intent,
-            "purpose": (
-                str(fast_speech.purpose or "")
-                if fast_speech is not None
-                else "pending_work_acknowledgement"
-            ),
-            "commitment": (
-                str(fast_speech.commitment or "")
-                if fast_speech is not None
-                else ""
-            ),
-            "speech_event_id": fast_first.get("speech_event_id"),
-            "generation": fast_first.get("generation"),
-            "orders": list(fast_first.get("orders") or []),
-            "external_fact_evidence": False,
-            "completion_evidence": False,
-        }
-    ]
-    return projected
 
 
 class VoiceAssistant:
@@ -1063,143 +960,7 @@ class VoiceAssistant:
             ),
         }
 
-    def _start_fast_first_audio_hedge(
-        self,
-        decision: RouteDecision,
-        user_text: str,
-        session_id: str,
-    ) -> asyncio.Task[dict[str, Any]] | None:
-        cache = getattr(self, "fast_first_audio_cache", None)
-        if (
-            not self.fast_first_response_enabled
-            or cache is None
-            or not cache.enabled
-            or not decision.should_speak
-            or decision.route in {"chat", "clarify", "interrupt", "ignore"}
-            or bool((decision.metadata or {}).get("fast_first_response_scheduled"))
-        ):
-            return None
-        audio = cache.get(
-            route=decision.route,
-            language=decision.language,
-            user_text=user_text,
-        )
-        if audio is None:
-            self.session_log(
-                session_id,
-                "fast_first_audio_skipped: route=%s intent=%s reason=cache_miss ready=%s",
-                decision.route,
-                decision.intent,
-                cache.ready_count,
-            )
-            return None
 
-        metadata = dict(decision.metadata or {})
-        metadata["fast_first_audio_hedge"] = {
-            "pending": True,
-            "purpose": audio.purpose,
-            "language": audio.language,
-            "hedge_ms": self.fast_first_audio_hedge_ms,
-        }
-        decision.metadata = metadata
-        # This cached cue is a last-resort latency fallback used only when the
-        # model-authored fast response could not be scheduled. Once it fires, do
-        # not let a later compatibility field repeat the acknowledgement.
-        if decision.speak_first:
-            metadata["goal_interpretation_speak_first_suppressed_by_audio_hedge"] = decision.speak_first
-            decision.speak_first = None
-
-        async def delayed_schedule() -> dict[str, Any]:
-            try:
-                await asyncio.sleep(max(0, self.fast_first_audio_hedge_ms) / 1000.0)
-                if self.is_stale_playback(self.playback_generation, session_id):
-                    return {"scheduled": False, "reason": "stale_session"}
-                return await self.schedule_cached_fast_first_audio(
-                    audio,
-                    session_id,
-                    route=decision.route,
-                    intent=decision.intent,
-                )
-            except asyncio.CancelledError:
-                return {"scheduled": False, "reason": "final_ready_before_hedge"}
-
-        self.session_log(
-            session_id,
-            "fast_first_audio_hedge_started: route=%s intent=%s purpose=%s "
-            "language=%s hedge_ms=%s",
-            decision.route,
-            decision.intent,
-            audio.purpose,
-            audio.language,
-            self.fast_first_audio_hedge_ms,
-        )
-        return asyncio.create_task(delayed_schedule())
-
-    async def _settle_fast_first_audio_hedge(
-        self,
-        hedge_task: asyncio.Task[dict[str, Any]] | None,
-        *,
-        decision: RouteDecision,
-        session_id: str,
-    ) -> bool:
-        if hedge_task is None:
-            return False
-        if not hedge_task.done():
-            hedge_task.cancel()
-        try:
-            result = await hedge_task
-        except asyncio.CancelledError:
-            result = {"scheduled": False, "reason": "final_ready_before_hedge"}
-        except Exception as exc:
-            self.session_log(
-                session_id,
-                "fast_first_audio_hedge_failed: error_type=%s error=%s",
-                type(exc).__name__,
-                exc,
-            )
-            return False
-
-        if result.get("scheduled") is not True:
-            self.session_log(
-                session_id,
-                "fast_first_audio_suppressed: route=%s intent=%s reason=%s",
-                decision.route,
-                decision.intent,
-                result.get("reason", "not_scheduled"),
-            )
-            return False
-
-        generation = int(result["generation"])
-        order = int(result["order"])
-        if self._cancel_playback_order_before_start(
-            generation=generation,
-            order=order,
-            session_id=session_id,
-            reason="final_ready_before_cached_playback",
-        ):
-            self.session_log(
-                session_id,
-                "fast_first_audio_suppressed: route=%s intent=%s reason=final_ready_before_playback",
-                decision.route,
-                decision.intent,
-            )
-            return False
-
-        metadata = dict(decision.metadata or {})
-        hedge = dict(metadata.get("fast_first_audio_hedge") or {})
-        hedge.update(
-            {
-                "pending": False,
-                "played_or_started": True,
-                "order": order,
-                "generation": generation,
-                "text": result.get("text"),
-            }
-        )
-        metadata["fast_first_audio_hedge"] = hedge
-        metadata["fast_first_response_scheduled"] = True
-        decision.metadata = metadata
-        return True
 
     def create_session(self) -> str:
         sid = self.sessions.create()
@@ -2556,26 +2317,6 @@ class VoiceAssistant:
             ),
         }
 
-    def _experience_context(
-        self,
-        *,
-        user_text: str,
-        decision: RouteDecision,
-        core_interpretation_latency_ms: float | None = None,
-        agent_latency_ms: float | None = None,
-    ) -> dict[str, Any]:
-        return {
-            "user_text": " ".join((user_text or "").strip().split())[:500],
-            "route": decision.route,
-            "intent": decision.intent,
-            "route_source": decision.source,
-            "route_confidence": decision.confidence,
-            "core_interpretation_latency_ms": core_interpretation_latency_ms,
-            "agent_latency_ms": agent_latency_ms,
-            "conversation_id": self.conversation_state.conversation_id,
-            "mind_profile_id": self.mind.profile.profile_id,
-            "mind_profile_version": self.mind.profile.version,
-        }
 
     def _record_experience(
         self,
@@ -2730,68 +2471,8 @@ class VoiceAssistant:
             enable_agent=bool(getattr(self, "enable_agent", True)),
         )
 
-    def _deep_thought_prelude_allowed(self, decision: RouteDecision) -> bool:
-        if decision.route != "deep_thought" or not decision.should_speak:
-            return False
-        metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
-        original = metadata.get("orchestrator_original_route")
-        original_intent = ""
-        if isinstance(original, dict):
-            original_intent = str(original.get("intent") or "").strip().casefold()
-        if str(decision.intent or "").startswith("clarify_") or original_intent.startswith("clarify_"):
-            return False
-        if decision.intent == "deep_thought_low_confidence" and not decision.speak_first:
-            return False
-        if metadata.get("thinking_ack_allowed") is False:
-            return False
-        return True
 
-    def _deep_thought_ack_text(
-        self,
-        decision: RouteDecision,
-        user_text: str,
-    ) -> str | None:
-        del user_text
-        if not self._deep_thought_prelude_allowed(decision):
-            return None
-        if not getattr(self, "core_generated_fast_speech_enabled", False):
-            return None
-        if decision.fast_speech is None:
-            return None
-        return self._validated_fast_speech_payload_text(
-            decision.fast_speech,
-            route="deep_thought",
-        )
 
-    def _route_item_dicts(self, decision: RouteDecision) -> list[dict[str, Any]]:
-        items: list[dict[str, Any]] = []
-        for item in getattr(decision, "routes", []) or []:
-            if hasattr(item, "model_dump"):
-                dumped = item.model_dump(mode="json", exclude_none=True)
-                if isinstance(dumped, dict):
-                    items.append(dumped)
-            elif isinstance(item, dict):
-                items.append(item)
-        metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
-        raw = metadata.get("route_items")
-        if isinstance(raw, list):
-            for item in raw:
-                if isinstance(item, dict):
-                    items.append(item)
-        seen: set[str] = set()
-        unique: list[dict[str, Any]] = []
-        for index, item in enumerate(items):
-            key = str(
-                item.get("id")
-                or item.get("route_item_id")
-                or (item.get("metadata") or {}).get("route_item_id")
-                or f"{index}:{item.get('route')}:{item.get('intent')}:{item.get('text')}"
-            )
-            if key in seen:
-                continue
-            seen.add(key)
-            unique.append(item)
-        return unique
 
     @staticmethod
     def _fast_speech_payload_text(payload: Any) -> str | None:
@@ -2898,317 +2579,12 @@ class VoiceAssistant:
             return None
         return cleaned
 
-    def _goal_interpretation_fast_speech_diagnostics(self, decision: RouteDecision) -> dict[str, Any]:
-        top_raw = self._fast_speech_payload_text(getattr(decision, "fast_speech", None))
-        top_safe = self._validated_fast_speech_payload_text(
-            getattr(decision, "fast_speech", None),
-            route=decision.route,
-        )
-        item_raw_count = 0
-        item_safe_count = 0
-        direct_item_count = 0
-        for item in self._route_item_dicts(decision):
-            item_raw = self._fast_speech_payload_text(item.get("fast_speech"))
-            if item_raw:
-                item_raw_count += 1
-                if self._validated_fast_speech_payload_text(
-                    item.get("fast_speech"),
-                    route=str(item.get("route") or ""),
-                ):
-                    item_safe_count += 1
-            if str(item.get("lane") or "") in {"immediate_speech", "fast_tts"} and item.get("direct_to_tts") is True:
-                direct_item_count += 1
-        speak_first_raw = " ".join((decision.speak_first or "").split())
-        speak_first_safe = self._safe_immediate_route_speech(speak_first_raw)
-        return {
-            "core_generated_fast_speech_enabled": bool(
-                getattr(self, "core_generated_fast_speech_enabled", False)
-            ),
-            "top_fast_speech_present": bool(top_raw),
-            "top_fast_speech_safe": bool(top_safe),
-            "route_item_fast_speech_count": item_raw_count,
-            "route_item_fast_speech_safe_count": item_safe_count,
-            "direct_immediate_speech_items": direct_item_count,
-            "speak_first_present": bool(speak_first_raw),
-            "speak_first_safe": bool(speak_first_safe),
-        }
-
-    def _goal_interpretation_fast_speech_text(
-        self,
-        decision: RouteDecision,
-        *,
-        task_snapshots: list[dict[str, Any]] | None = None,
-    ) -> str | None:
-        metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
-        response_plan = metadata.get("response_plan")
-        if isinstance(response_plan, dict):
-            validation = validate_immediate_response_plan(
-                response_plan,
-                task_snapshots or [],
-            )
-            metadata["response_plan_validation"] = validation.as_dict()
-            if validation.accepted and validation.stage is not None:
-                planned_text = self._safe_validated_response_plan_speech(
-                    validation.stage.text
-                )
-                if planned_text:
-                    return planned_text
-        if not getattr(self, "core_generated_fast_speech_enabled", False):
-            return None
-
-        text = self._validated_fast_speech_payload_text(
-            getattr(decision, "fast_speech", None),
-            route=decision.route,
-        )
-        if text:
-            return text
-
-        for item in self._route_item_dicts(decision):
-            item_fast = self._validated_fast_speech_payload_text(
-                item.get("fast_speech"),
-                route=str(item.get("route") or ""),
-            )
-            if item_fast:
-                return item_fast
-            if str(item.get("lane") or "") not in {"immediate_speech", "fast_tts"}:
-                continue
-            if item.get("direct_to_tts") is not True:
-                continue
-        return None
-
-    def _immediate_route_speech_text(self, decision: RouteDecision) -> str | None:
-        # Backward-compatible name used by older tests/call sites. The actual
-        # source of fast-first speech is now the Core-generated fast_speech
-        # field or an immediate_speech route item, not an Orchestrator template.
-        return self._goal_interpretation_fast_speech_text(decision)
-
-    async def _schedule_deep_thought_ack(
-        self,
-        decision: RouteDecision,
-        user_text: str,
-        session_id: str,
-    ) -> bool:
-        text = self._deep_thought_ack_text(decision, user_text)
-        if not text:
-            return False
-
-        self.session_log(
-            session_id,
-            "deep_thought_ack_schedule: chars=%s text=%r",
-            len(text),
-            text,
-        )
-        scheduled = await self.schedule_tts_text(text, session_id)
-        if scheduled.get("scheduled") is True:
-            raw_orders = scheduled.get("orders")
-            if not isinstance(raw_orders, list):
-                raw_orders = [scheduled.get("order")]
-            orders = [
-                int(order)
-                for order in raw_orders
-                if isinstance(order, int)
-            ]
-            fast_speech = decision.fast_speech
-            self._register_turn_speech_event(
-                session_id=session_id,
-                generation=int(scheduled.get("generation") or 0),
-                orders=orders,
-                text=text,
-                stage="deep_thought_ack",
-                purpose=(
-                    str(fast_speech.purpose or "")
-                    if fast_speech is not None
-                    else "pending_work_acknowledgement"
-                ),
-                route=decision.route,
-                intent=decision.intent,
-                commitment=(
-                    str(fast_speech.commitment or "")
-                    if fast_speech is not None
-                    else ""
-                ),
-            )
-            self.session_log(
-                session_id,
-                "deep_thought_ack_scheduled: order=%s chunks=%s generation=%s",
-                scheduled.get("order"),
-                scheduled.get("chunks", 1),
-                scheduled.get("generation"),
-            )
-            return True
-
-        self.session_log(
-            session_id,
-            "deep_thought_ack_skipped: reason=%s",
-            scheduled.get("reason", "unknown"),
-        )
-        return False
 
 
-    def _fast_first_response_text(
-        self,
-        decision: RouteDecision,
-        user_text: str,
-        *,
-        task_snapshots: list[dict[str, Any]] | None = None,
-    ) -> str | None:
-        if not self.fast_first_response_enabled or not decision.should_speak:
-            return None
-        if decision.route in {"interrupt", "ignore"}:
-            return None
-        # Fast Planner owns whether a separate immediate progress Activity is useful.
-        # The Host does not add route-specific suppression for tool work; it only
-        # validates and schedules a source-authored notification.
-        interpretation_text = self._goal_interpretation_fast_speech_text(
-            decision,
-            task_snapshots=task_snapshots,
-        )
-        if interpretation_text:
-            return interpretation_text
 
-        # Raw speak_first is retained in the wire schema for compatibility but
-        # is not independently playable. When the dynamic compatibility gate is
-        # enabled it is considered only by the deep-thought path below, which
-        # still applies the completion-claim guard.
 
-        if decision.route == "deep_thought":
-            return self._deep_thought_ack_text(decision, user_text)
 
-        # Do not invent route-specific fast-first wording here. The fast Goal Interpreter
-        # is responsible for natural, context-aware immediate speech. If it did
-        # not provide one, stay silent and let the downstream Agent/Tool speak.
-        return None
 
-    async def _schedule_fast_first_response(
-        self,
-        decision: RouteDecision,
-        user_text: str,
-        session_id: str,
-    ) -> bool:
-        conversation_state = getattr(self, "conversation_state", None)
-        task_snapshots = (
-            conversation_state.active_task_snapshots()
-            if conversation_state is not None
-            else []
-        )
-        text = self._fast_first_response_text(
-            decision,
-            user_text,
-            task_snapshots=task_snapshots,
-        )
-        if not text:
-            diagnostics = self._goal_interpretation_fast_speech_diagnostics(decision)
-            if not self.fast_first_response_enabled:
-                skip_reason = "fast_first_response_disabled"
-            elif not decision.should_speak:
-                skip_reason = "speech_not_requested"
-            elif decision.route in {"interrupt", "ignore"}:
-                skip_reason = "operational_route"
-            elif (
-                diagnostics["top_fast_speech_present"]
-                and not diagnostics["top_fast_speech_safe"]
-            ) or (
-                diagnostics["route_item_fast_speech_count"]
-                > diagnostics["route_item_fast_speech_safe_count"]
-            ):
-                skip_reason = "fast_speech_contract_rejected"
-            elif not diagnostics["top_fast_speech_present"] and not diagnostics[
-                "route_item_fast_speech_count"
-            ]:
-                skip_reason = "goal_interpreter_no_fast_speech"
-            else:
-                skip_reason = "not_applicable"
-            self.session_log(
-                session_id,
-                "fast_first_response_skipped: route=%s intent=%s reason=%s diagnostics=%s",
-                decision.route,
-                decision.intent,
-                skip_reason,
-                json.dumps(
-                    diagnostics,
-                    ensure_ascii=False,
-                    sort_keys=True,
-                ),
-            )
-            return False
-
-        self.session_log(
-            session_id,
-            "fast_first_response_schedule: route=%s intent=%s chars=%s text=%r",
-            decision.route,
-            decision.intent,
-            len(text),
-            text,
-        )
-        scheduled = await self.schedule_tts_text(text, session_id)
-        if scheduled.get("scheduled") is True:
-            raw_orders = scheduled.get("orders")
-            if not isinstance(raw_orders, list):
-                raw_orders = [scheduled.get("order")]
-            orders = [
-                int(order)
-                for order in raw_orders
-                if isinstance(order, int)
-            ]
-            fast_speech = decision.fast_speech
-            speech_event = self._register_turn_speech_event(
-                session_id=session_id,
-                generation=int(scheduled.get("generation") or 0),
-                orders=orders,
-                text=text,
-                stage="fast_first",
-                purpose=(
-                    str(fast_speech.purpose or "")
-                    if fast_speech is not None
-                    else "pending_work_acknowledgement"
-                ),
-                route=decision.route,
-                intent=decision.intent,
-                commitment=(
-                    str(fast_speech.commitment or "")
-                    if fast_speech is not None
-                    else ""
-                ),
-            )
-            self.session_log(
-                session_id,
-                "fast_first_response_scheduled: route=%s order=%s chunks=%s generation=%s",
-                decision.route,
-                scheduled.get("order"),
-                scheduled.get("chunks", 1),
-                scheduled.get("generation"),
-            )
-            decision.metadata = {
-                **(decision.metadata or {}),
-                "fast_first_response_scheduled": True,
-                "fast_first_response": {
-                    "scheduled": True,
-                    "route": decision.route,
-                    "intent": decision.intent,
-                    "text": text,
-                    "chunks": scheduled.get("chunks", 1),
-                    "order": scheduled.get("order"),
-                    "orders": orders,
-                    "generation": scheduled.get("generation"),
-                    "speech_event_id": (
-                        speech_event.get("event_id")
-                        if speech_event is not None
-                        else None
-                    ),
-                },
-            }
-            if decision.speak_first and decision.speak_first.strip() == text:
-                decision.speak_first = None
-            return True
-
-        self.session_log(
-            session_id,
-            "fast_first_response_skipped: route=%s intent=%s reason=%s",
-            decision.route,
-            decision.intent,
-            scheduled.get("reason", "unknown"),
-        )
-        return False
 
     def _cognitive_gateway_adapter(self) -> CognitiveGateway:
         adapter = getattr(self, "cognitive_gateway", None)
@@ -3237,12 +2613,6 @@ class VoiceAssistant:
         }
 
     @staticmethod
-    def _cognitive_lane_from_route(decision: RouteDecision) -> str:
-        if decision.route in {"chat", "clarify", "deep_thought"}:
-            return "chat"
-        if decision.route in {"robot_action", "tool", "memory"}:
-            return decision.route
-        return "unsupported"
 
     @staticmethod
     def _cognitive_resolution_summary(
@@ -3387,8 +2757,8 @@ class VoiceAssistant:
         if turn_envelope is not None:
             projection = self._cognitive_gateway_adapter().project_for_core(
                 turn_envelope,
-                legacy_text=user_text,
-                legacy_session_id=session_id,
+                current_text=user_text,
+                current_session_id=session_id,
                 context=authority_context,
             )
             resolved_text = projection.text
@@ -3826,7 +3196,7 @@ class VoiceAssistant:
                     turn_envelope,
                 ),
             )
-            self.conversation_state.record_agent_result(session_id, safe_response)
+            self.conversation_state.record_interaction_response(session_id, safe_response)
             self._record_cognitive_runtime_evidence(
                 resolution, session_id=session_id, user_text=user_text
             )
@@ -4059,7 +3429,7 @@ class VoiceAssistant:
                     turn_envelope,
                 ),
             )
-            self.conversation_state.record_agent_result(session_id, safe_response)
+            self.conversation_state.record_interaction_response(session_id, safe_response)
             self._record_cognitive_runtime_evidence(
                 resolution, session_id=session_id, user_text=user_text
             )
@@ -4120,7 +3490,7 @@ class VoiceAssistant:
             reset_playback=not fast_first_scheduled,
         ):
             return True
-        self.conversation_state.record_agent_result(session_id, response)
+        self.conversation_state.record_interaction_response(session_id, response)
         self._launch_interaction(
             response, session_id, reset_playback=not fast_first_scheduled
         )
@@ -4544,7 +3914,7 @@ class VoiceAssistant:
                     {"error_type": type(exc).__name__, "error": str(exc)}
                 ],
             )
-            self.conversation_state.record_agent_result(session_id, safe_response)
+            self.conversation_state.record_interaction_response(session_id, safe_response)
             self._launch_interaction(safe_response, session_id)
             return
 
@@ -4564,7 +3934,7 @@ class VoiceAssistant:
         # Interpretation has produced Responsibility evidence, execution may only
         # continue through the goal-driven Cognitive Runtime. A disabled or
         # unavailable runtime therefore fails closed instead of reconstructing a
-        # legacy RouteDecision or entering the old Agent routing pipeline.
+        # retired route/intent projection or entering a second semantic pipeline.
         safe_response = self._host_speech_response(
             "我听懂了，但现在不能继续安排这件事，所以先停下了。"
             if self._looks_zh(user_text)
@@ -4589,7 +3959,7 @@ class VoiceAssistant:
                 turn_envelope,
             ),
         )
-        self.conversation_state.record_agent_result(session_id, safe_response)
+        self.conversation_state.record_interaction_response(session_id, safe_response)
         self._launch_interaction(safe_response, session_id)
         return
 
@@ -4762,7 +4132,7 @@ class VoiceAssistant:
                 ",".join(sorted(resolution.confirmed_request_ids)),
                 resolution.fingerprint,
             )
-            self.conversation_state.record_agent_result(
+            self.conversation_state.record_interaction_response(
                 session_id,
                 resolution.response,
                 confirmed_request_ids=set(resolution.confirmed_request_ids),
@@ -4785,7 +4155,7 @@ class VoiceAssistant:
             resolution.message,
             style="warning" if resolution.decision in {"ambiguous", "expired"} else "brief",
         )
-        self.conversation_state.record_agent_result(session_id, response)
+        self.conversation_state.record_interaction_response(session_id, response)
         self._launch_interaction(response, session_id)
         return True
 
@@ -5165,7 +4535,6 @@ class VoiceAssistant:
     async def _compose_cognitive_failure_response(
         self,
         resolution: CognitiveRuntimeResolution,
-        decision: RouteDecision,
         *,
         user_text: str,
         session_id: str,
@@ -5186,7 +4555,7 @@ class VoiceAssistant:
         failure_facts = dict(trusted_failure_facts or {})
         if not failure_facts:
             failure_facts = {
-                "route": decision.route,
+                "lane": resolution.lane,
                 "failure_stage": str(metadata.get("failure_stage") or "runtime"),
                 "failure_class": str(metadata.get("failure_class") or "runtime_failure"),
                 "execution_started": False,
@@ -5194,11 +4563,12 @@ class VoiceAssistant:
                 "retryable": bool(metadata.get("retryable")),
             }
         execution_started = failure_facts.get("execution_started") is True
-        selected_capability_ids = _selected_capability_ids(decision)
-        missing_ability = (
-            decision.intent == "missing_or_unsupported_ability"
-            or bool((decision.metadata or {}).get("desired_abilities"))
-        )
+        selected_capability_ids = [
+            str(item).strip()
+            for item in failure_facts.get("selected_capability_ids", [])
+            if str(item).strip()
+        ]
+        missing_ability = bool(failure_facts.get("missing_ability"))
         if selected_capability_ids:
             missing_ability = False
         understanding_completed = bool(
@@ -5468,62 +4838,6 @@ class VoiceAssistant:
 
 
 
-    def _agent_exception_safe_response(
-        self,
-        decision: RouteDecision,
-        *,
-        user_text: str,
-    ) -> InteractionResponse:
-        """Fail closed when an Agent path becomes unavailable.
-
-        This guard uses the already-selected route and structured action
-        proposals.  It does not reinterpret user language or select a skill.
-        """
-
-        metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
-        task_list = metadata.get("task_list")
-        has_effectful_task = bool(decision.actions)
-        if isinstance(task_list, list):
-            has_effectful_task = has_effectful_task or any(
-                isinstance(item, dict)
-                and (
-                    str(item.get("task_type") or "").startswith("task.execute")
-                    or bool(str(item.get("capability_id") or "").strip())
-                )
-                for item in task_list
-            )
-        zh = self._looks_zh(user_text)
-        if decision.route == "robot_action" or (
-            has_effectful_task and decision.route not in {"tool", "memory"}
-        ):
-            text = (
-                "我刚才没弄好，所以没有动。你再说一次吧。"
-                if zh
-                else "I couldn\'t get that movement ready, so I stayed still. Please try again."
-            )
-        elif decision.route == "tool":
-            text = (
-                "我刚才没查成功，不能乱说。你再问我一次吧。"
-                if zh
-                else "I couldn\'t complete that lookup, so I won\'t guess. Please ask me again."
-            )
-        elif decision.route == "memory":
-            text = (
-                "我刚才没记好，所以这次没有保存。你再说一次吧。"
-                if zh
-                else "I couldn\'t save that properly, so nothing changed. Please try again."
-            )
-        else:
-            text = (
-                "我刚才没想明白，不想乱答。你再说一次吧。"
-                if zh
-                else "I couldn\'t make sense of that just now, so I won\'t guess. Please try again."
-            )
-        return self._host_speech_response(
-            text,
-            style="warning",
-            source="host_agent_exception_safe_fallback",
-        )
 
     @staticmethod
     def _looks_zh(text: str) -> bool:
@@ -5555,44 +4869,6 @@ class VoiceAssistant:
         )
 
     @staticmethod
-    def _route_proposal_metadata(decision: RouteDecision) -> dict[str, Any]:
-        metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
-        out: dict[str, Any] = {
-            "route_final": decision.route,
-            "route_intent": decision.intent,
-            "route_source": decision.source,
-            "route_confidence": decision.confidence,
-        }
-        route_stage_outputs = metadata.get("route_stage_outputs")
-        if isinstance(route_stage_outputs, list):
-            out["route_stage_outputs"] = route_stage_outputs
-        route_items = metadata.get("route_items")
-        if isinstance(route_items, list):
-            out["route_items"] = route_items
-        task_proposals = metadata.get("task_proposals")
-        if isinstance(task_proposals, list):
-            out["route_task_proposals"] = task_proposals
-        task_list = metadata.get("task_list")
-        if isinstance(task_list, list):
-            out["route_task_list"] = task_list
-        route_merge = metadata.get("route_merge")
-        if isinstance(route_merge, dict):
-            out["route_merge"] = route_merge
-        superseded = metadata.get("superseded_task_proposals")
-        if isinstance(superseded, list):
-            out["superseded_task_proposals"] = superseded
-        revised = metadata.get("revised_task_proposals")
-        if isinstance(revised, list):
-            out["revised_task_proposals"] = revised
-        revisions = metadata.get("task_proposal_revisions")
-        if isinstance(revisions, list):
-            out["task_proposal_revisions"] = revisions
-        if metadata.get("truth_reconciled") is True:
-            out["truth_reconciled"] = True
-        truth_reason = metadata.get("truth_reconciliation_reason")
-        if isinstance(truth_reason, str) and truth_reason.strip():
-            out["truth_reconciliation_reason"] = truth_reason.strip()
-        return out
 
     async def _execute_agent_tool(
         self,
@@ -5795,7 +5071,7 @@ class VoiceAssistant:
             },
         )
         try:
-            self.conversation_state.record_agent_result(
+            self.conversation_state.record_interaction_response(
                 session_id,
                 delivered_response,
             )
@@ -6055,14 +5331,6 @@ class VoiceAssistant:
             reflection_context["canonical_plan"] = plan.model_dump(
                 mode="json", exclude_none=True
             )
-            reflection_route = self._execution_outcome_route(response, plan)
-            reflection_decision = RouteDecision(
-                route=reflection_route,
-                intent="selective_reflection",
-                confidence=1.0,
-                source="trusted_execution_outcome",
-                language=str(response.metadata.get("language") or "en-US"),
-            )
             reflection_session = await self.get_http_session()
             reflection_calls = []
             for opportunity in slow_opportunities:
@@ -6073,11 +5341,21 @@ class VoiceAssistant:
                 reflection_calls.append(
                     reflection_call(
                         reflection_session,
-                        text=self._execution_outcome_user_text(response, plan),
-                        route_decision=reflection_decision,
-                        sid=session_id,
-                        context=context,
-                        history=self.conversation_state.get_history(),
+                        request=CognitiveWorkRequest(
+                            sid=session_id,
+                            text=self._execution_outcome_user_text(response, plan),
+                            language=str(response.metadata.get("language") or "en-US"),
+                            responsibilities=[
+                                CognitiveResponsibilityProposal(
+                                    local_ref=f"reflection:{opportunity.opportunity_id}",
+                                    outcome="Reflect on this trusted cognitive opportunity.",
+                                    confidence=1.0,
+                                )
+                            ],
+                            interpretation_confidence=1.0,
+                            context=context,
+                            history=self.conversation_state.get_history(),
+                        ),
                         timeout_ms=self.cognitive_runtime_policy.deep_planner_timeout_ms,
                     )
                 )
@@ -6280,15 +5558,13 @@ class VoiceAssistant:
                             "retryable": failure_facts["retryable"],
                         },
                     )
-                    failure_decision = RouteDecision(
-                        route=route,
-                        intent="execution_outcome_failure",
-                        confidence=1.0,
-                        metadata={},
-                    )
+                    failure_facts["selected_capability_ids"] = list(dict.fromkeys(
+                        str(step.capability_id).strip()
+                        for step in plan.steps
+                        if str(step.capability_id or "").strip()
+                    ))
                     final_response = await self._compose_cognitive_failure_response(
                         failure_resolution,
-                        failure_decision,
                         user_text=self._execution_outcome_user_text(response, plan),
                         session_id=str(session_id or ""),
                         trusted_failure_facts=failure_facts,
@@ -7602,57 +6878,6 @@ class VoiceAssistant:
             confirmed_request_ids=confirmed_request_ids,
         )
 
-    async def execute_agent_result(
-        self,
-        result: AgentResult,
-        session_id: str | None,
-        *,
-        reset_playback: bool = True,
-    ) -> None:
-        if reset_playback:
-            await self.reset_playback_ordering()
-        for item in result.speak_immediate:
-            await self.schedule_tts_text(item.text, session_id)
-
-        for graph in result.task_graphs:
-            self.session_log(
-                session_id,
-                "task_graph_planned: graph_id=%s nodes=%s execution=disabled",
-                graph.get("graph_id", "<missing>"),
-                len(graph.get("nodes", [])),
-            )
-
-        session = await self.get_http_session()
-        for action in result.actions:
-            action_start_ms = now_ms()
-            self.session_log(session_id, "action_start: id=%s target=%s type=%s blocking=%s dry_run=%s", action.id, action.target, action.type, action.blocking, self.action_dry_run)
-            if action.requires_confirmation:
-                self.session_log(
-                    session_id,
-                    "action_waiting_confirmation: id=%s target=%s type=%s",
-                    action.id,
-                    action.target,
-                    action.type,
-                )
-                continue
-            if self.action_dry_run:
-                self.session_log(session_id, "action_dry_run: id=%s target=%s type=%s params=%s", action.id, action.target, action.type, action.params)
-                continue
-            try:
-                res = await self.action_client.execute(session, action)
-                self.session_log(session_id, "action_done: id=%s target=%s type=%s status=%s action_ms=%.1f message=%s", res.id, res.target, res.type, res.status, now_ms() - action_start_ms, res.message)
-            except Exception as exc:
-                self.session_log(session_id, "action_exception: id=%s target=%s type=%s action_ms=%.1f error=%s", action.id, action.target, action.type, now_ms() - action_start_ms, exc)
-                logger.error("Action execution failed: %s", exc, exc_info=True)
-
-        for item in result.speak_after:
-            await self.schedule_tts_text(item.text, session_id)
-
-        state = self.sessions.state.get(session_id or "")
-        if state is not None:
-            state["llm_done"] = True
-            state["response_chars"] = state.get("response_chars", 0) + sum(len(i.text) for i in result.speak_immediate + result.speak_after)
-        self.maybe_session_done(session_id)
 
     def _invalidate_output_state(
         self,

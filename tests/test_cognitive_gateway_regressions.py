@@ -6,9 +6,7 @@ from types import MethodType
 from typing import Any
 
 from orchestrator.orchestrator import VoiceAssistant
-from orchestrator.schemas.route import RouteDecision
 from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
-from shared.chromie_contracts.route import RouteDecision as SharedRouteDecision
 
 
 class _Sessions:
@@ -95,7 +93,7 @@ class CognitiveGatewayRegressionTests(unittest.IsolatedAsyncioTestCase):
                         self,
                         *args: Any,
                         **kwargs: Any,
-                    ) -> RouteDecision:
+                    ) -> CoreInterpretationResult:
                         del self, args, kwargs
                         raise RuntimeError("cognitive core unavailable")
 

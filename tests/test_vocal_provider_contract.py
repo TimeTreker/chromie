@@ -15,7 +15,7 @@ from agent.app.planner_contract import (
     canonical_plan_response_schema,
     validate_goal_responsibility_outcomes,
 )
-from agent.app.schema import AgentRunRequest, RouteDecision
+from tests.cognitive_work_test_support import cognitive_work_request
 from orchestrator.runtime.cognitive_runtime import (
     CanonicalPlanRuntimeAdapter,
     GoalDrivenRuntimeCoordinator,
@@ -257,16 +257,10 @@ class VocalDeclarationAndPlannerTests(unittest.TestCase):
         catalog = CapabilityCatalog(registry)
         raw = vocal_model_output().model_dump(mode="json")
         model = ScriptedModel(raw)
-        request = AgentRunRequest(
+        request = cognitive_work_request(
             sid="vocal-planner-source-test",
             text="Sing a short greeting.",
             language="en-US",
-            route_decision=RouteDecision(
-                route="robot_action",
-                intent="provider_vocal_performance",
-                confidence=1.0,
-                source="llm",
-            ),
             context={
                 "active_goal_snapshots": [],
                 "goal_association_resolution": {

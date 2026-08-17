@@ -5,12 +5,10 @@ import unittest
 
 from pydantic import ValidationError
 
-from agent.app.schema import RouteItem as AgentRouteItem
 from orchestrator.runtime.episode import (
     EpisodeCapabilityRequestRecord,
     EpisodeCapabilityResultRecord,
 )
-from orchestrator.schemas.route import RouteItem as OrchestratorRouteItem
 from orchestrator.runtime.capability_runtime import (
     CapabilityDefinition,
     CapabilityRegistry,
@@ -23,7 +21,6 @@ from shared.chromie_contracts import (
     CanonicalPlanStep,
     ExecutionEvidence,
     InteractionResponse,
-    RouteItem as SharedRouteItem,
     SocialAttentionBehavior,
     TaskProposal,
 )
@@ -133,9 +130,6 @@ class CapabilityTerminologyContractTests(unittest.TestCase):
                 source_goal_ids=["goal-1"],
                 status="completed",
             ),
-            SharedRouteItem(route="tool", capability_id="chromie.weather.lookup"),
-            AgentRouteItem(route="tool", capability_id="chromie.weather.lookup"),
-            OrchestratorRouteItem(route="tool", capability_id="chromie.weather.lookup"),
             SocialAttentionBehavior(capability_id="soridormi.blink_eyes"),
             TaskProposal(
                 id="proposal-1",
@@ -160,12 +154,6 @@ class CapabilityTerminologyContractTests(unittest.TestCase):
                 self.assertNotIn("skill_id", payload)
                 self.assertNotIn("skill_id", contract.model_json_schema()["properties"])
 
-        optional = SharedRouteItem(route="chat")
-        self.assertIsNone(optional.capability_id)
-        with self.assertRaises(ValidationError):
-            SharedRouteItem.model_validate(
-                {"route": "tool", "skill_id": "chromie.weather.lookup"}
-            )
 
     def test_executable_skill_class_aliases_are_removed(self) -> None:
         interaction_module = importlib.import_module("shared.chromie_contracts.interaction")

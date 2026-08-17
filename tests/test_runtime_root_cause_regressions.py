@@ -17,7 +17,8 @@ from agent.app.planner_contract import (
     validate_goal_responsibility_outcomes,
 )
 from agent.app.response_composer import ResponseComposerResolver
-from agent.app.schema import AgentRunRequest
+from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+from tests.cognitive_work_test_support import cognitive_work_request
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.outcome_reconciliation import ExecutionOutcomeReconciler
 from shared.chromie_contracts.interaction import CapabilityRequest
@@ -37,20 +38,11 @@ class _SequenceOllama:
         return self.replies.pop(0)
 
 
-def _clarify_request() -> AgentRunRequest:
-    return AgentRunRequest.model_validate(
-        {
-            "sid": "clarify-authority",
-            "text": "F.",
-            "language": "en-US",
-            "route_decision": {
-                "route": "clarify",
-                "intent": "clarify_insufficient_information",
-                "agents": ["speaker_agent"],
-                "confidence": 0.0,
-                "source": "llm",
-            },
-        }
+def _clarify_request() -> CognitiveWorkRequest:
+    return cognitive_work_request(
+        sid="clarify-authority",
+        text="F.",
+        language="en-US",
     )
 
 
@@ -1038,18 +1030,10 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("Never satisfy a prohibition", source)
 
     def test_response_language_validation_rejects_full_english_for_chinese(self) -> None:
-        request = AgentRunRequest.model_validate(
-            {
-                "sid": "language-boundary",
-                "text": "今天重庆热不热？",
-                "language": "zh-CN",
-                "route_decision": {
-                    "route": "chat",
-                    "intent": "question",
-                    "confidence": 0.9,
-                    "source": "llm",
-                },
-            }
+        request = cognitive_work_request(
+            sid="language-boundary",
+            text="今天重庆热不热？",
+            language="zh-CN",
         )
         with self.assertRaisesRegex(ValueError, "authoritative Chinese"):
             ResponseComposerResolver._validate_spoken_language(

@@ -4,7 +4,7 @@ from agent.app.capabilities.local import chromie_capability_bundle
 from agent.app.deep_planner import DeepPlannerResolver
 from agent.app.fast_planner import FastPlannerResolver
 from agent.app.goal_association import GoalAssociationResolver, GoalSegmentationModelOutput
-from agent.app.schema import AgentRunRequest, RouteDecision
+from tests.cognitive_work_test_support import cognitive_work_request
 
 
 def test_weather_capability_declares_bounded_temporal_scope() -> None:
@@ -51,16 +51,10 @@ def test_safe_read_step_uses_model_owned_specific_language() -> None:
 
 
 def test_goal_and_planner_prompts_forbid_scope_narrowing() -> None:
-    request = AgentRunRequest(
+    request = cognitive_work_request(
         sid="scope-contract",
         text="Compare annual weather.",
         language="en-US",
-        route_decision=RouteDecision(
-            route="tool",
-            intent="weather_query",
-            confidence=0.9,
-            source="llm",
-        ),
         context={
             "goal_association_resolution": {
                 "associations": [],

@@ -26,16 +26,23 @@ def capture_cognitive_integrity_exception(*, stage: str, exc: Exception, request
         if hasattr(exc, "incident_evidence") and callable(exc.incident_evidence)
         else {}
     )
-    route = getattr(request, "route_decision", None)
-    if hasattr(route, "model_dump"):
-        route = route.model_dump(mode="json", exclude_none=True)
+    responsibilities = getattr(request, "responsibilities", []) or []
+    interpretation = {
+        "confidence": getattr(request, "interpretation_confidence", None),
+        "unresolved": list(getattr(request, "interpretation_unresolved", []) or []),
+        "responsibilities": [
+            item.model_dump(mode="json", exclude_none=True)
+            if hasattr(item, "model_dump") else item
+            for item in responsibilities
+        ],
+    }
     return capture_cognitive_integrity_event(
         stage=stage,
         failure=failure,
         session_id=getattr(request, "sid", None),
         user_text=str(getattr(request, "text", "") or ""),
         language=str(getattr(request, "language", "") or ""),
-        route_decision=route or {},
+        interpretation=interpretation,
         runtime_context=getattr(request, "context", {}) or {},
         model_exchange=evidence,
     )
@@ -63,7 +70,7 @@ def capture_cognitive_integrity_event(
     session_id: str | None,
     user_text: str,
     language: str,
-    route_decision: Any,
+    interpretation: Any,
     runtime_context: Any,
     model_exchange: Any,
     event_root: str | Path | None = None,
@@ -94,7 +101,7 @@ def capture_cognitive_integrity_event(
             "session_id": session_id or "",
             "conversation_id": conversation_id,
             "language": language,
-            "route_decision": route_decision,
+            "interpretation": interpretation,
             "runtime_context": runtime_context,
         },
         "model_exchange.json": model_exchange,

@@ -125,7 +125,7 @@ class ConversationSemanticTaskTests(unittest.TestCase):
         manager = ConversationStateManager()
         task_id = self._create_coffee(manager)
 
-        manager.record_agent_result(
+        manager.record_interaction_response(
             "s1",
             {
                 "metadata": {
@@ -191,7 +191,7 @@ class ConversationSemanticTaskTests(unittest.TestCase):
         manager = ConversationStateManager()
         task_id = self._create_coffee(manager)
 
-        manager.record_agent_result(
+        manager.record_interaction_response(
             "s1",
             {
                 "metadata": {

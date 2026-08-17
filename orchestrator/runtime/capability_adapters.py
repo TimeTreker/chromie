@@ -7,7 +7,6 @@ from typing import Any
 from agent.app.task_graph.models import ExecutionTrace, TaskGraph
 from agent.app.task_graph.residual import attach_residual_replan_state
 
-from shared.chromie_contracts.agent import AgentResult
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
@@ -18,98 +17,6 @@ from shared.chromie_contracts.interaction import (
 from .capability_runtime import CapabilityDefinition, CapabilityExecutionContext
 
 
-class AgentResultInteractionAdapter:
-    """Translate the current AgentResult shape into the I0 interaction contract."""
-
-    def convert(self, result: AgentResult) -> InteractionResponse:
-        speech = [
-            InteractionSpeech(
-                text=item.text,
-                timing="immediate",
-                style=item.style,
-                priority=item.priority,
-                interruptible=item.interruptible,
-                metadata=item.metadata,
-            )
-            for item in result.speak_immediate
-        ]
-        speech.extend(
-            InteractionSpeech(
-                text=item.text,
-                timing="after_capabilities",
-                style=item.style,
-                priority=item.priority,
-                interruptible=item.interruptible,
-                metadata=item.metadata,
-            )
-            for item in result.speak_after
-        )
-        capabilities = [self._action_request(action) for action in result.actions]
-        capabilities.extend(
-            CapabilityRequest(
-                capability_id="chromie.task_graph.execute",
-                args={"graph": graph},
-                timing="sequential",
-                requires_confirmation=result.requires_confirmation
-                or bool(graph.get("requires_confirmation")),
-            )
-            for graph in result.task_graphs
-        )
-        return InteractionResponse(
-            status=self._status(result.status),
-            speech=speech,
-            capabilities=capabilities,
-            requires_confirmation=result.requires_confirmation,
-            reason=result.reason,
-            metadata={
-                "handled_by": result.handled_by,
-                "legacy_trace": result.trace,
-                "memory_updates": [
-                    update.model_dump(mode="json") for update in result.memory_updates
-                ],
-            },
-        )
-
-    def _status(self, status: str) -> str:
-        return {
-            "blocked": "refused",
-        }.get(status, status)
-
-    def _action_request(self, action: Any) -> CapabilityRequest:
-        capability_id, args = self._named_capability(action)
-        translated_named_capability = capability_id != action.type
-        return CapabilityRequest(
-            request_id=action.id,
-            capability_id=capability_id,
-            capability_version=action.metadata.get("capability_version"),
-            args=args,
-            timing="sequential" if action.blocking else "parallel",
-            timeout_ms=None if translated_named_capability else action.timeout_ms,
-            requires_confirmation=action.requires_confirmation,
-            metadata={
-                **action.metadata,
-                "legacy_target": action.target,
-                "legacy_action_type": action.type,
-                "legacy_timeout_ms": action.timeout_ms,
-            },
-        )
-
-    def _named_capability(self, action: Any) -> tuple[str, dict[str, Any]]:
-        if action.type == "head.nod":
-            return "soridormi.nod_yes", {
-                "count": max(2, int(action.params.get("times", 1))),
-            }
-        if action.type == "head.shake":
-            return "soridormi.shake_no", {
-                "count": max(2, int(action.params.get("times", 1))),
-            }
-        if action.type == "head.look_at_user":
-            duration_ms = action.params.get("duration_ms")
-            args: dict[str, Any] = {}
-            if isinstance(duration_ms, (int, float)) and duration_ms > 0:
-                args["duration_s"] = duration_ms / 1000.0
-            return "soridormi.look_at_person", args
-        return str(action.metadata.get("capability_id") or action.type), dict(action.params)
 
 
 TaskGraphHandler = Callable[[dict[str, Any]], dict[str, Any] | Awaitable[dict[str, Any]]]

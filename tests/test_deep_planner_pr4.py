@@ -7,7 +7,8 @@ from agent.app.capabilities.catalog import CatalogCapability
 from agent.app.clients.ollama_client import OllamaGenerationError
 from agent.app.deep_planner import DeepPlannerResolver
 from agent.app.planner_contract import validate_planner_model_output
-from agent.app.schema import AgentRunRequest, RouteDecision
+from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+from tests.cognitive_work_test_support import cognitive_work_request
 from shared.chromie_contracts.plan import CanonicalPlan
 
 
@@ -132,11 +133,10 @@ class GranularResourceCatalog(FullCatalog):
         )
 
 
-def request(text="往前走15秒，然后眨眼。", *, goal_ids=None):
+def request(text="往前走15秒，然后眨眼。", *, goal_ids=None) -> CognitiveWorkRequest:
     goal_ids = list(goal_ids or ["goal-action"])
-    return AgentRunRequest(
+    return cognitive_work_request(
         sid="sid-pr4", text=text, language="zh-CN",
-        route_decision=RouteDecision(route="robot_action", intent="semantic_capability_planning", confidence=0.0, source="llm"),
         context={
             "fast_plan_resolution":{"disposition":"escalate","coverage":"partial","steps":[]},
             "goal_association_resolution": {
@@ -160,7 +160,7 @@ class CanonicalDeepPlanContractTests(unittest.TestCase):
 
 
 class DeepPlannerResolverTests(unittest.TestCase):
-    def test_compatibility_chat_route_cannot_suppress_canonical_body_goal(self):
+    def test_canonical_body_goal_is_planned_from_goal_state(self):
         raw = {
             "disposition": "execute",
             "coverage": "complete",
@@ -210,9 +210,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "user_confirmation_required": False,
         }
         run_request = request("Blink twice.", goal_ids=["goal-blink"])
-        run_request.route_decision = run_request.route_decision.model_copy(
-            update={"route": "chat", "intent": "compatibility_only_wrong_lane"}
-        )
         goal = run_request.context["goal_association_resolution"]["new_goals"][0]
         goal["metadata"] = {
             "responsibility_kind": "executable_action",

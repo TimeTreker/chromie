@@ -309,7 +309,7 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
             intent="compound_test",
             atomic=True,
         )
-        assistant.conversation_state.record_agent_result(session_id, response)
+        assistant.conversation_state.record_interaction_response(session_id, response)
         evidence = _EvidenceRecorder()
         assistant.cognitive_evidence = evidence
         assistant.session_log = lambda *args, **kwargs: None

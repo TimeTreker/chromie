@@ -784,7 +784,7 @@ def planner_goal_execution_requirements(
 ) -> tuple[bool, bool]:
     """Derive Planner execution shape only from canonical Goal semantics.
 
-    Pre-association ``RouteDecision.route`` is a compatibility projection and must
+    Goal Interpretation is provider-neutral WHAT evidence and must
     never grant or suppress executable capability access. Goal Association owns the
     typed completion contract; planners may tighten their decoder surface from that
     canonical truth only.

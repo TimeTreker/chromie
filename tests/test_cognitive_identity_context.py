@@ -18,7 +18,7 @@ from agent.app.goal_association import (
     GoalSegmentationModelOutput,
 )
 from agent.app.response_composer import ResponseComposerResolver
-from agent.app.schema import AgentRunRequest, RouteDecision
+from tests.cognitive_work_test_support import cognitive_work_request
 from shared.chromie_contracts.mind import default_mind_profile
 from shared.chromie_contracts.plan import CanonicalPlan
 
@@ -51,16 +51,10 @@ class CognitiveIdentityContextTests(unittest.TestCase):
                 "steps": [],
             },
         }
-        self.request = AgentRunRequest(
+        self.request = cognitive_work_request(
             sid="sid-identity",
             text="你叫什么名字？",
             language="zh-CN",
-            route_decision=RouteDecision(
-                route="chat",
-                intent="self_identity_question",
-                confidence=0.95,
-                source="llm",
-            ),
             context=self.context,
             history=[],
         )

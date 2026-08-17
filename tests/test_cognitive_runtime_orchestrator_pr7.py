@@ -63,7 +63,7 @@ class _State:
     def record_user_turn(self, *args, **kwargs):
         self.user_turns.append((args, kwargs))
 
-    def record_agent_result(self, *args, **kwargs):
+    def record_interaction_response(self, *args, **kwargs):
         self.agent_results.append((args, kwargs))
 
     def active_task_snapshots(self):

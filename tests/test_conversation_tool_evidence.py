@@ -8,7 +8,7 @@ from orchestrator.runtime.conversation_state import ConversationStateManager
 class ConversationToolEvidenceTests(unittest.TestCase):
     def test_schema_validated_tool_evidence_is_retained_for_followups(self) -> None:
         manager = ConversationStateManager(base_conversation_id="tool-followup")
-        manager.record_agent_result(
+        manager.record_interaction_response(
             "sid-weather",
             {
                 "metadata": {
@@ -110,7 +110,7 @@ class ConversationToolEvidenceTests(unittest.TestCase):
 
     def test_unvalidated_tool_payload_is_not_retained(self) -> None:
         manager = ConversationStateManager(base_conversation_id="tool-reject")
-        manager.record_agent_result(
+        manager.record_interaction_response(
             "sid-weather",
             {
                 "metadata": {

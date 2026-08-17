@@ -6,7 +6,7 @@ from orchestrator.runtime.conversation_state import ConversationStateManager
 from shared.chromie_contracts.execution_outcome import ExecutionOutcomeBundle
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from agent.app.goal_association import GoalAssociationResolver
-from agent.app.schema import AgentRunRequest, RouteDecision
+from tests.cognitive_work_test_support import cognitive_work_request
 from shared.chromie_contracts.interaction import InteractionResponse
 
 
@@ -39,7 +39,7 @@ class VoiceLogGoalReplayRegressionTests(unittest.TestCase):
             intent="compound_action",
             atomic=True,
         )
-        state.record_agent_result(
+        state.record_interaction_response(
             "sid-motion",
             InteractionResponse(
                 interaction_id="interaction-motion",
@@ -202,14 +202,9 @@ class VoiceLogGoalReplayRegressionTests(unittest.TestCase):
         # retained Goals. Once the completed motion Goals leave the active candidate
         # set, a model-shaped attempt to continue them must be rejected there; a
         # downstream route label is not an effect-safety fallback.
-        request = AgentRunRequest(
+        request = cognitive_work_request(
             sid="sid-social",
             text="想啥呢？",
-            route_decision=RouteDecision(
-                route="chat",
-                intent="social_exchange",
-                language="zh-CN",
-            ),
             language="zh-CN",
             context=social_context,
             history=state.get_history(),

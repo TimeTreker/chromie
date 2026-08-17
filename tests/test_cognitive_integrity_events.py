@@ -38,7 +38,7 @@ class CognitiveIntegrityEventTests(unittest.TestCase):
                 session_id="sid-1",
                 user_text="walk forward",
                 language="en",
-                route_decision={"route": "robot_action"},
+                interpretation={"responsibilities": [{"local_ref": "r1", "outcome": "walk forward"}]},
                 runtime_context={"experience_context": {"conversation_id": "conv-1"}},
                 model_exchange={},
                 event_root=root / "events",
@@ -80,7 +80,7 @@ class CognitiveIntegrityEventTests(unittest.TestCase):
                         session_id="sid-trace",
                         user_text="walk forward",
                         language="en",
-                        route_decision={"route": "robot_action"},
+                        interpretation={"responsibilities": [{"local_ref": "r1", "outcome": "walk forward"}]},
                         runtime_context={},
                         model_exchange={},
                         event_root=root / "events",
@@ -101,7 +101,9 @@ class CognitiveIntegrityEventTests(unittest.TestCase):
                 sid="sid-2",
                 text="hello",
                 language="en",
-                route_decision={},
+                responsibilities=[],
+                interpretation_confidence=0.0,
+                interpretation_unresolved=[],
                 context={},
             )
             old = os.environ.get("CHROMIE_EVENT_ROOT")

@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest import mock
 
 from agent.app.goal_association import GoalAssociationResolver
-from agent.app.schema import AgentRunRequest, RouteDecision
+from tests.cognitive_work_test_support import cognitive_work_request
 from shared.chromie_runtime.runtime_trace import (
     TRACE_CARRIER_KEY,
     TRACE_FRAGMENT_KEY,
@@ -251,16 +251,10 @@ class RuntimeTraceTests(unittest.TestCase):
                             {"active_goal_snapshots": [], "history": []}
                         )
                         result = await GoalAssociationResolver(FakeOllama()).resolve(
-                            AgentRunRequest(
+                            cognitive_work_request(
                                 sid="sid-distributed",
                                 text="hello",
                                 language="en-US",
-                                route_decision=RouteDecision(
-                                    route="chat",
-                                    intent="conversation",
-                                    confidence=0.9,
-                                    source="llm",
-                                ),
                                 context=context,
                             )
                         )

@@ -7,7 +7,8 @@ from pydantic import ValidationError
 
 from agent.app.capabilities.catalog import CatalogCapability
 from agent.app.deep_planner import DeepPlannerResolver
-from agent.app.schema import AgentRunRequest, RouteDecision
+from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+from tests.cognitive_work_test_support import cognitive_work_request
 from shared.chromie_contracts.plan import (
     CanonicalPlan,
     GoalSatisfactionAssessment,
@@ -59,17 +60,11 @@ class Catalog:
         ]
 
 
-def request(text: str, *, goal_ids: list[str]) -> AgentRunRequest:
-    return AgentRunRequest(
+def request(text: str, *, goal_ids: list[str]) -> CognitiveWorkRequest:
+    return cognitive_work_request(
         sid="sid-pr5",
         text=text,
         language="zh-CN",
-        route_decision=RouteDecision(
-            route="robot_action",
-            intent="semantic_capability_planning",
-            confidence=0.0,
-            source="llm",
-        ),
         context={
             "goal_association_resolution": {
                 "associations": [],

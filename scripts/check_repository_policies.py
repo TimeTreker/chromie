@@ -845,15 +845,6 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
             ),
             "semantic contracts may carry typed claims but may not infer them from speech tokens",
         ),
-        "shared/chromie_contracts/route.py": (
-            RULE_HOST_SEMANTIC_AUTHORITY,
-            (
-                "_FAST_SPEECH_CONTRACT_MARKERS",
-                "_fast_speech_marker",
-                "reject_contract_marker_as_spoken_text",
-            ),
-            "route contracts may validate typed fields but may not reclassify model speech from marker words",
-        ),
         "shared/chromie_contracts/perception.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
             ("_DEPENDENCY_ALIASES",),
@@ -877,9 +868,6 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
         "agent/app/cognitive_core/goal_interpreter/schema.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
             (
-                "class RouteItem",
-                "class RouteDecision",
-                "class RouteRequest",
                 'decision.speak_first = "你是指什么？"',
                 'decision.speak_first = "What do you mean?"',
                 "Core-authored process acknowledgement",
@@ -889,14 +877,6 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
                 "contract_markers =",
             ),
             "Goal Interpretation contracts may preserve exact typed model output but may not synthesize wording or semantic aliases",
-        ),
-        "orchestrator/schemas/route.py": (
-            RULE_HOST_SEMANTIC_AUTHORITY,
-            (
-                "reject_contract_marker_as_spoken_text",
-                "contract_markers =",
-            ),
-            "route schemas may validate typed fields but may not reclassify model speech from marker words",
         ),
         "agent/app/tool_result_interpreter.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
@@ -957,9 +937,7 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
         "orchestrator/runtime/confirmation.py",
         "orchestrator/runtime/conversation_state.py",
         "orchestrator/runtime/session.py",
-        "orchestrator/schemas/route.py",
         "shared/chromie_contracts/semantic_task.py",
-        "shared/chromie_contracts/route.py",
         "shared/chromie_contracts/perception.py",
     )
     strict_no_regex_paths = {
@@ -1100,13 +1078,6 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
     """
 
     targets = {
-        "shared/chromie_contracts/route.py": {
-            "RouteItem": "OptionalCapabilityIdentityModel",
-        },
-        "agent/app/schema.py": {"RouteItem": "OptionalCapabilityIdentityModel"},
-        "orchestrator/schemas/route.py": {
-            "RouteItem": "OptionalCapabilityIdentityModel",
-        },
         "shared/chromie_contracts/social_attention.py": {
             "SocialAttentionBehavior": "CapabilityIdentityModel",
         },

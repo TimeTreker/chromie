@@ -117,7 +117,7 @@ class _ConversationState:
     def update_pending_task_status_for_request_id(self, *, request_id: str, status: str):
         self.status_updates.append((request_id, status))
 
-    def record_agent_result(self, _sid, response, **_kwargs):
+    def record_interaction_response(self, _sid, response, **_kwargs):
         self.recorded_agent_results.append(response)
 
 

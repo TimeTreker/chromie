@@ -6,12 +6,10 @@ import asyncio
 import time
 import unittest
 
-from shared.chromie_contracts.agent import AgentResult, SpeechItem
 from shared.chromie_contracts.action import ActionCommand
 from shared.chromie_contracts.interaction import CapabilityResult, InteractionResponse
 from shared.chromie_contracts.reflex import CancellationDirective
 
-from orchestrator.runtime.capability_adapters import AgentResultInteractionAdapter
 from orchestrator.runtime.capability_runtime import (
     LocalSpeechCapabilityProvider,
     MockCapabilityProvider,
@@ -3356,35 +3354,6 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(provider.cancelled_request_ids, ["first-active"])
         self.assertEqual(runtime.scheduler_status().active_count, 0)
 
-    async def test_agent_result_adapter_preserves_speech_actions_and_graphs(self) -> None:
-        response = AgentResultInteractionAdapter().convert(
-            AgentResult(
-                speak_immediate=[SpeechItem(text="Starting.")],
-                actions=[
-                    ActionCommand(
-                        id="nod-1",
-                        target="motion_controller",
-                        type="soridormi.nod_yes",
-                        params={"count": 2},
-                    )
-                ],
-                speak_after=[SpeechItem(text="Done.")],
-                task_graphs=[
-                    {
-                        "graph_id": "legacy-1",
-                        "nodes": [],
-                        "requires_confirmation": True,
-                    }
-                ],
-            )
-        )
-
-        self.assertEqual(response.speech[0].timing, "immediate")
-        self.assertEqual(response.speech[1].timing, "after_capabilities")
-        self.assertEqual(response.capabilities[0].capability_id, "soridormi.nod_yes")
-        self.assertEqual(response.capabilities[1].capability_id, "chromie.task_graph.execute")
-        self.assertTrue(response.capabilities[1].requires_confirmation)
-        self.assertTrue(response.requires_confirmation)
 
 
 if __name__ == "__main__":
