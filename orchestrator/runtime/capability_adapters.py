@@ -95,7 +95,7 @@ TASK_GRAPH_RESULT_OUTPUT_SCHEMA: dict[str, Any] = {
 
 
 class TaskGraphCapabilityProvider:
-    """Compatibility provider around the existing guarded TaskGraph executor."""
+    """Capability provider around the guarded deterministic TaskGraph executor."""
 
     provider_id = "chromie.task_graph"
 
@@ -117,8 +117,8 @@ class TaskGraphCapabilityProvider:
         raw = self._handler(request.args["graph"])
         output = await raw if inspect.isawaitable(raw) else raw
         output = _with_residual_replan(request.args.get("graph"), output)
-        status = _task_graph_skill_status(output)
-        message = _task_graph_skill_message(output, status)
+        status = _task_graph_result_status(output)
+        message = _task_graph_result_message(output, status)
         model_safe_output = _task_graph_result_output(output)
         return CapabilityResult(
             request_id=request.request_id,
@@ -265,7 +265,7 @@ def _task_graph_result_output(output: dict[str, Any]) -> dict[str, Any]:
     return projected
 
 
-def _task_graph_skill_status(output: dict[str, Any]) -> str:
+def _task_graph_result_status(output: dict[str, Any]) -> str:
     """Map only explicit terminal TaskGraph evidence to CapabilityResult status."""
 
     graph_status = str(output.get("status") or "").strip().lower()
@@ -276,12 +276,12 @@ def _task_graph_skill_status(output: dict[str, Any]) -> str:
     if graph_status in {"failed", "aborted"}:
         return "failed"
     # Missing, pending, running, or unknown provider states are not completion
-    # evidence. The compatibility adapter must fail closed rather than turning
+    # evidence. The provider adapter must fail closed rather than turning
     # an incomplete receipt into a successful user-visible result.
     return "failed"
 
 
-def _task_graph_skill_message(output: dict[str, Any], status: str) -> str:
+def _task_graph_result_message(output: dict[str, Any], status: str) -> str:
     if status == "completed":
         return ""
     summary = str(output.get("outcome_summary") or "").strip()

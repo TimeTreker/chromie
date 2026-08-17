@@ -149,6 +149,32 @@ class CapabilityTerminologyContractTests(unittest.TestCase):
                 self.assertNotIn("skill_id", contract.model_json_schema()["properties"])
 
 
+
+    def test_static_preflight_uses_capability_vocabulary_only(self) -> None:
+        from orchestrator.runtime.interaction_preflight import (
+            PREFLIGHT_STRATEGY,
+            annotate_preflight_validation,
+        )
+
+        registry = CapabilityRegistry()
+        response = annotate_preflight_validation(
+            InteractionResponse(
+                capabilities=[
+                    CapabilityRequest(
+                        request_id="unknown-1",
+                        capability_id="chromie.unknown",
+                    )
+                ]
+            ),
+            registry=registry,
+            provider_ids=set(),
+        )
+        preflight = response.metadata["preflight_validation"]
+        self.assertEqual(PREFLIGHT_STRATEGY, "static_capability_preflight_v1")
+        self.assertEqual(preflight["summary"]["checked_capability_count"], 1)
+        self.assertNotIn("checked_skill_count", preflight["summary"])
+        self.assertEqual(preflight["items"][0]["reason_code"], "unknown_capability")
+
     def test_executable_skill_class_aliases_are_removed(self) -> None:
         interaction_module = importlib.import_module("shared.chromie_contracts.interaction")
         runtime_module = importlib.import_module("orchestrator.runtime.capability_runtime")

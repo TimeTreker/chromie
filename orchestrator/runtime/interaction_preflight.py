@@ -8,7 +8,7 @@ from .capability_runtime import CapabilityRegistry, _validate_json_schema
 
 
 PREFLIGHT_SCHEMA_VERSION = 1
-PREFLIGHT_STRATEGY = "static_skill_preflight_v1"
+PREFLIGHT_STRATEGY = "static_capability_preflight_v1"
 
 
 def annotate_preflight_validation(
@@ -20,7 +20,7 @@ def annotate_preflight_validation(
     safety_monitor_active: bool = False,
     soridormi_catalog_loaded: bool = False,
 ) -> InteractionResponse:
-    """Attach a static skill preflight summary without proving execution.
+    """Attach a static Capability preflight summary without proving execution.
 
     This catches contract and provider issues the host can know before runtime.
     Dynamic world feasibility remains unknown until the trusted runtime and
@@ -29,7 +29,7 @@ def annotate_preflight_validation(
 
     confirmed = set(confirmed_request_ids or ())
     items = [
-        _preflight_skill_request(
+        _preflight_capability_request(
             request,
             registry=registry,
             provider_ids=provider_ids,
@@ -60,7 +60,7 @@ def annotate_preflight_validation(
     )
 
 
-def _preflight_skill_request(
+def _preflight_capability_request(
     request: CapabilityRequest,
     *,
     registry: CapabilityRegistry,
@@ -87,7 +87,7 @@ def _preflight_skill_request(
         return {
             **base,
             "status": "blocked",
-            "reason_code": "unknown_skill",
+            "reason_code": "unknown_capability",
             "message": str(exc),
             "world_feasibility": "unknown_until_runtime",
         }
@@ -115,7 +115,7 @@ def _preflight_skill_request(
         return {
             **base,
             "status": "blocked",
-            "reason_code": "skill_unavailable",
+            "reason_code": "capability_unavailable",
             "message": definition.unavailable_reason or "unavailable",
             "world_feasibility": "unknown_until_runtime",
         }
@@ -165,7 +165,7 @@ def _summary(items: list[dict[str, Any]]) -> dict[str, Any]:
         statuses[status] = statuses.get(status, 0) + 1
         reason_codes[reason_code] = reason_codes.get(reason_code, 0) + 1
     return {
-        "checked_skill_count": len(items),
+        "checked_capability_count": len(items),
         "statuses": dict(sorted(statuses.items())),
         "reason_codes": dict(sorted(reason_codes.items())),
         "blocked_count": statuses.get("blocked", 0),

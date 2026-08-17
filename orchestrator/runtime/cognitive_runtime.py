@@ -617,7 +617,7 @@ class CanonicalPlanRuntimeAdapter:
             if not definition.available:
                 errors.append(
                     {
-                        "type": "runtime_skill_unavailable",
+                        "type": "runtime_capability_unavailable",
                         "step_id": step.step_id,
                         "capability_id": step.capability_id,
                         "reason": definition.unavailable_reason,

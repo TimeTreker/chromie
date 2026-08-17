@@ -377,7 +377,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             by_request["local-unknown"]["reason_code"],
-            "unknown_skill",
+            "unknown_capability",
         )
         self.assertEqual(
             by_request["body-deferred"]["status"],
