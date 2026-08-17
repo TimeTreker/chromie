@@ -410,14 +410,6 @@ class Settings(BaseModel):
     weather_geocoding_url: str = Field(default_factory=lambda: os.getenv("AGENT_WEATHER_GEOCODING_URL", "https://geocoding-api.open-meteo.com/v1/search"))
     weather_forecast_url: str = Field(default_factory=lambda: os.getenv("AGENT_WEATHER_FORECAST_URL", "https://api.open-meteo.com/v1/forecast"))
     weather_timeout_s: float = Field(default_factory=lambda: float(os.getenv("AGENT_WEATHER_TIMEOUT_S", "8")), gt=0.0)
-    conversation_num_ctx: int = Field(default_factory=lambda: int(os.getenv("AGENT_CONVERSATION_NUM_CTX", "2048")), ge=512)
-    conversation_num_predict: int = Field(default_factory=lambda: int(os.getenv("AGENT_CONVERSATION_NUM_PREDICT", "64")), ge=16)
-    deepthinking_num_ctx: int = Field(default_factory=lambda: int(os.getenv("AGENT_DEEPTHINKING_NUM_CTX", "8192")), ge=2048)
-    deepthinking_num_predict: int = Field(default_factory=lambda: int(os.getenv("AGENT_DEEPTHINKING_NUM_PREDICT", "384")), ge=64)
-    capability_review_num_predict: int = Field(default_factory=lambda: int(os.getenv("AGENT_CAPABILITY_REVIEW_NUM_PREDICT", "160")), ge=32)
-    capability_num_ctx: int = Field(default_factory=lambda: int(os.getenv("AGENT_CAPABILITY_NUM_CTX", "24576")), ge=2048)
-    capability_num_predict: int = Field(default_factory=lambda: int(os.getenv("AGENT_CAPABILITY_NUM_PREDICT", "512")), ge=64)
-    capability_parameter_repair_num_predict: int = Field(default_factory=lambda: int(os.getenv("AGENT_CAPABILITY_PARAMETER_REPAIR_NUM_PREDICT", "384")), ge=64)
     environment: dict[str, str] = Field(default_factory=lambda: dict(os.environ), exclude=True, repr=False)
     mode: Literal["runtime"] = "runtime"
 

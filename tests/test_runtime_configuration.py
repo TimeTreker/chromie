@@ -123,22 +123,12 @@ class RuntimeConfigurationTests(unittest.TestCase):
 
     def test_capability_planner_has_json_output_budget(self) -> None:
         values = _common_env()
-        self.assertEqual(values["AGENT_CAPABILITY_NUM_CTX"], "24576")
-        self.assertEqual(values["AGENT_CAPABILITY_NUM_PREDICT"], "512")
-        self.assertEqual(values["AGENT_CAPABILITY_REVIEW_NUM_PREDICT"], "160")
         self.assertEqual(values["AGENT_SOCIAL_ATTENTION_MODE"], "on")
         self.assertFalse(
             any(name.startswith("AGENT_SOCIAL_ATTENTION_FALLBACK_") for name in values)
         )
         self.assertEqual(values["AGENT_CAPABILITY_MANIFESTS"], "")
         self.assertEqual(values["SORIDORMI_MCP_URL"], "")
-
-    def test_agent_conversation_and_deepthinking_have_context_budgets(self) -> None:
-        values = _common_env()
-        self.assertEqual(values["AGENT_CONVERSATION_NUM_CTX"], "2048")
-        self.assertEqual(values["AGENT_CONVERSATION_NUM_PREDICT"], "64")
-        self.assertEqual(values["AGENT_DEEPTHINKING_NUM_CTX"], "8192")
-        self.assertEqual(values["AGENT_DEEPTHINKING_NUM_PREDICT"], "384")
 
     def test_common_profile_uses_one_coherent_cognitive_runtime(self) -> None:
         values = _common_env()
@@ -469,7 +459,6 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("OLLAMA_CONTEXT_LENGTH", verifier)
         self.assertIn("AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS", verifier)
         self.assertIn("AGENT_DEEP_PLANNER_NUM_PREDICT", verifier)
-        self.assertIn("AGENT_CAPABILITY_PARAMETER_REPAIR_NUM_PREDICT", verifier)
         self.assertNotIn('check_value "$name"', verifier)
 
     def test_start_chromie_logs_effective_cognitive_model_roles(self) -> None:

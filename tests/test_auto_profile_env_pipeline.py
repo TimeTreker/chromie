@@ -315,9 +315,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_RESPONSE_COMPOSER_NUM_CTX",
             "AGENT_TOOL_RESULT_INTERPRETER_NUM_CTX",
             "AGENT_SOCIAL_ATTENTION_NUM_CTX",
-            "AGENT_CONVERSATION_NUM_CTX",
-            "AGENT_DEEPTHINKING_NUM_CTX",
-            "AGENT_CAPABILITY_NUM_CTX",
         ):
             self.assertEqual(values[key], "32768", key)
         self.assertEqual(values["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"], "2048")

@@ -396,10 +396,6 @@ retained. See
 | `AGENT_TIMEOUT_MS` | Agent-to-Ollama timeout; profile-specific. |
 | `ORCH_AGENT_TIMEOUT_MS` | Host-to-Agent timeout; common default `9000`; must exceed `AGENT_TIMEOUT_MS`. |
 | `AGENT_USE_LLM` | Enable LLM-backed conversation/planning; default `1`. |
-| `AGENT_CONVERSATION_NUM_CTX` | Ollama context window for normal conversation prompts; common default `2048`. |
-| `AGENT_CONVERSATION_NUM_PREDICT` | Output token budget for normal conversation replies; common default `64`. |
-| `AGENT_DEEPTHINKING_NUM_CTX` | Ollama context window for deep-thinking prompts with session memory; default `8192`. |
-| `AGENT_DEEPTHINKING_NUM_PREDICT` | Output token budget for deep-thinking replies; default `512`. |
 | `AGENT_SOCIAL_ATTENTION_MODE` | Embodiment-independent policy with values `off`, `report_only`, or `on`; maintained default `on`. Legacy simulator-scoped values are no longer accepted; maintained modes compose this service-owned policy explicitly. Soridormi/provider owns simulator-versus-physical selection. See [Social Attention Behavior Domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md). |
 | `AGENT_SOCIAL_ATTENTION_MODEL` | Dedicated Ollama model for optional `SocialAttentionPlan` generation; default `qwen3:4b`. |
 | `AGENT_SOCIAL_ATTENTION_TIMEOUT_MS` | Model-call timeout for social attention; default `2500`. The architecture-validation overlay raises it to `120000` so qualification tests model capability before latency tuning. |
@@ -446,10 +442,6 @@ provider key such as `河南省内乡县` -> `neixiang` and tries that bare key 
 descriptive English forms. Candidates are qualified against available
 administrative context. If none match, the tool returns typed
 `location_not_found`.
-| `AGENT_CAPABILITY_NUM_CTX` | Ollama context window for LLM capability selection; common default `24576` while validating feasibility. Do not reduce this below the capability prompt size; truncated JSON plans fail closed. |
-| `AGENT_CAPABILITY_NUM_PREDICT` | Output token budget for LLM capability-selection JSON; common default `512`. |
-| `AGENT_CAPABILITY_REVIEW_NUM_PREDICT` | Output token budget for semantic capability-plan review JSON; common default `160`. |
-| `AGENT_CAPABILITY_PARAMETER_REPAIR_NUM_PREDICT` | Output token budget for the semantic parameter-resolution retry; common default `384`. This retry runs only when a model-authored capability plan is schema-invalid. |
 | `AGENT_TASK_GRAPH_MAX_CONCURRENCY` | Process-local TaskGraph bound; default `4`, range 1–64. |
 | `AGENT_TASK_GRAPH_EXECUTION_TOKEN` | Secret bearer token for grants, guarded execution, and cancellation. |
 | `AGENT_TASK_GRAPH_DIAGNOSTICS_TOKEN` | Bearer token for dry-run, trace, and scheduler diagnostics. A blank value falls back to `AGENT_TASK_GRAPH_EXECUTION_TOKEN`; when both are blank, those endpoints return 503. |
@@ -1174,10 +1166,6 @@ retained. See
 | `AGENT_TIMEOUT_MS` | Agent-to-Ollama timeout; profile-specific. |
 | `ORCH_AGENT_TIMEOUT_MS` | Host-to-Agent timeout; common default `9000`; must exceed `AGENT_TIMEOUT_MS`. |
 | `AGENT_USE_LLM` | Enable LLM-backed conversation/planning; default `1`. |
-| `AGENT_CONVERSATION_NUM_CTX` | Ollama context window for normal conversation prompts; common default `2048`. |
-| `AGENT_CONVERSATION_NUM_PREDICT` | Output token budget for normal conversation replies; common default `64`. |
-| `AGENT_DEEPTHINKING_NUM_CTX` | Ollama context window for deep-thinking prompts with session memory; default `8192`. |
-| `AGENT_DEEPTHINKING_NUM_PREDICT` | Output token budget for deep-thinking replies; default `512`. |
 | `AGENT_SOCIAL_ATTENTION_MODE` | Embodiment-independent policy with values `off`, `report_only`, or `on`; maintained default `on`. Legacy simulator-scoped values are no longer accepted; maintained modes compose this service-owned policy explicitly. Soridormi/provider owns simulator-versus-physical selection. See [Social Attention Behavior Domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md). |
 | `AGENT_SOCIAL_ATTENTION_MODEL` | Dedicated Ollama model for optional `SocialAttentionPlan` generation; default `qwen3:4b`. |
 | `AGENT_SOCIAL_ATTENTION_TIMEOUT_MS` | Model-call timeout for social attention; default `2500`. The architecture-validation overlay raises it to `120000` so qualification tests model capability before latency tuning. |
@@ -1224,10 +1212,6 @@ provider key such as `河南省内乡县` -> `neixiang` and tries that bare key 
 descriptive English forms. Candidates are qualified against available
 administrative context. If none match, the tool returns typed
 `location_not_found`.
-| `AGENT_CAPABILITY_NUM_CTX` | Ollama context window for LLM capability selection; common default `24576` while validating feasibility. Do not reduce this below the capability prompt size; truncated JSON plans fail closed. |
-| `AGENT_CAPABILITY_NUM_PREDICT` | Output token budget for LLM capability-selection JSON; common default `512`. |
-| `AGENT_CAPABILITY_REVIEW_NUM_PREDICT` | Output token budget for semantic capability-plan review JSON; common default `160`. |
-| `AGENT_CAPABILITY_PARAMETER_REPAIR_NUM_PREDICT` | Output token budget for the semantic parameter-resolution retry; common default `384`. This retry runs only when a model-authored capability plan is schema-invalid. |
 | `AGENT_TASK_GRAPH_MAX_CONCURRENCY` | Process-local TaskGraph bound; default `4`, range 1–64. |
 | `AGENT_TASK_GRAPH_EXECUTION_TOKEN` | Secret bearer token for grants, guarded execution, and cancellation. |
 | `AGENT_TASK_GRAPH_DIAGNOSTICS_TOKEN` | Bearer token for dry-run, trace, and scheduler diagnostics. A blank value falls back to `AGENT_TASK_GRAPH_EXECUTION_TOKEN`; when both are blank, those endpoints return 503. |

@@ -133,15 +133,6 @@ class ComposeConfigurationTests(unittest.TestCase):
             agent_block,
         )
         self.assertNotIn("AGENT_SOCIAL_ATTENTION_FALLBACK_", agent_block)
-        self.assertIn("AGENT_CAPABILITY_NUM_CTX: ${AGENT_CAPABILITY_NUM_CTX:-24576}", agent_block)
-        self.assertIn(
-            "AGENT_CAPABILITY_NUM_PREDICT: ${AGENT_CAPABILITY_NUM_PREDICT:-512}",
-            agent_block,
-        )
-        self.assertIn(
-            "AGENT_CAPABILITY_REVIEW_NUM_PREDICT: ${AGENT_CAPABILITY_REVIEW_NUM_PREDICT:-160}",
-            agent_block,
-        )
         self.assertIn(
             "AGENT_CAPABILITY_MANIFESTS: ${AGENT_CAPABILITY_MANIFESTS:-/app/capabilities/soridormi.json}",
             agent_block,
@@ -159,29 +150,6 @@ class ComposeConfigurationTests(unittest.TestCase):
             agent_block,
         )
 
-    def test_agent_service_passes_conversation_and_deepthinking_budgets(self) -> None:
-        compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
-        agent_block = compose.split("  chromie-agent:", 1)[1].split(
-            "\nnetworks:",
-            1,
-        )[0]
-
-        self.assertIn(
-            "AGENT_CONVERSATION_NUM_CTX: ${AGENT_CONVERSATION_NUM_CTX:-2048}",
-            agent_block,
-        )
-        self.assertIn(
-            "AGENT_CONVERSATION_NUM_PREDICT: ${AGENT_CONVERSATION_NUM_PREDICT:-64}",
-            agent_block,
-        )
-        self.assertIn(
-            "AGENT_DEEPTHINKING_NUM_CTX: ${AGENT_DEEPTHINKING_NUM_CTX:-8192}",
-            agent_block,
-        )
-        self.assertIn(
-            "AGENT_DEEPTHINKING_NUM_PREDICT: ${AGENT_DEEPTHINKING_NUM_PREDICT:-384}",
-            agent_block,
-        )
 
 
 if __name__ == "__main__":
