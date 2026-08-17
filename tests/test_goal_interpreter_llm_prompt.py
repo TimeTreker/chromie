@@ -139,6 +139,13 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertNotIn("Route Taxonomy", prompt)
         self.assertNotIn("Compatibility Framing", prompt)
 
+    def test_system_prompt_preserves_direct_entity_surface_and_rejects_provider_time_uncertainty(self) -> None:
+        prompt = self._interpreter().load_system_prompt()
+        self.assertIn("exact contiguous surface", prompt)
+        self.assertIn("Never translate, transliterate", prompt)
+        self.assertIn("provider timezone", prompt)
+        self.assertIn("never an unresolved WHAT question", prompt)
+
     def test_payload_omits_capability_catalog_and_route_contract(self) -> None:
         interpreter = self._interpreter()
         request = GoalInterpretationRequest(
@@ -228,6 +235,62 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(result.responsibilities[0].local_ref, "r1")
         self.assertTrue(result.responsibilities[0].completion_requires_fresh_evidence)
+        self.assertEqual(interpreter._chat.await_count, 1)
+
+    async def test_unprovenanced_translated_location_gets_one_dto_repair(self) -> None:
+        interpreter = self._interpreter()
+        translated = {
+            **_valid_output(),
+            "responsibilities": [
+                {
+                    **_valid_output()["responsibilities"][0],
+                    "outcome": "provide tonight's weather for Chongqing",
+                    "bindings": {"location": "Chongqing", "time": "tonight"},
+                }
+            ],
+        }
+        corrected = {
+            **translated,
+            "responsibilities": [
+                {
+                    **translated["responsibilities"][0],
+                    "bindings": {"location": "重庆", "time": "tonight"},
+                }
+            ],
+        }
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            side_effect=[
+                {"message": {"content": json.dumps(translated)}},
+                {"message": {"content": json.dumps(corrected, ensure_ascii=False)}},
+            ]
+        )
+        result = await interpreter.interpret_goal(
+            GoalInterpretationRequest(
+                text="今天晚上重庆会不会下雨啊？",
+                language="zh-CN",
+            )
+        )
+        self.assertEqual(result.responsibilities[0].bindings["location"], "重庆")
+        self.assertEqual(interpreter._chat.await_count, 2)
+
+    async def test_context_backed_indirect_location_does_not_require_current_turn_surface(self) -> None:
+        interpreter = self._interpreter()
+        contextual = _valid_output()
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            return_value={"message": {"content": json.dumps(contextual)}}
+        )
+        result = await interpreter.interpret_goal(
+            GoalInterpretationRequest(
+                text="那里今天会下雨吗？",
+                language="zh-CN",
+                context={
+                    "discourse_referents": [
+                        {"entity_type": "location", "canonical_value": "Chongqing"}
+                    ]
+                },
+            )
+        )
+        self.assertEqual(result.responsibilities[0].bindings["location"], "Chongqing")
         self.assertEqual(interpreter._chat.await_count, 1)
 
     async def test_route_output_gets_one_mechanical_dto_repair(self) -> None:

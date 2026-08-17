@@ -246,6 +246,78 @@ def _reject_canonical_goal_identity_refs(
             )
 
 
+_GOAL_INTERPRETATION_PROVENANCE_CONTEXT_KEYS = (
+    "history",
+    "discourse_referents",
+    "discourse_focus",
+    "active_goal_snapshots",
+    "recent_goal_snapshots",
+    "active_task_snapshots",
+    "active_task_contexts",
+    "current_task_context",
+)
+
+
+def _semantic_context_string_values(context: dict[str, Any]) -> set[str]:
+    values: set[str] = set()
+
+    def collect(node: Any) -> None:
+        if isinstance(node, dict):
+            for item in node.values():
+                collect(item)
+        elif isinstance(node, (list, tuple, set)):
+            for item in node:
+                collect(item)
+        elif isinstance(node, str):
+            text = " ".join(node.strip().split())
+            if text:
+                values.add(text.casefold())
+
+    for key in _GOAL_INTERPRETATION_PROVENANCE_CONTEXT_KEYS:
+        collect(context.get(key))
+    return values
+
+
+def _reject_unprovenanced_location_bindings(
+    request: GoalInterpretationRequest,
+    parsed: dict[str, Any],
+) -> None:
+    """Reject model-authored location spellings with no semantic provenance.
+
+    This gate does not resolve or repair a location. It only verifies that the
+    model copied a current-turn surface or a value already present in bounded
+    semantic continuity context. One same-stage DTO repair may then regenerate
+    from the authoritative turn.
+    """
+
+    current_turn = " ".join((request.text or "").strip().split()).casefold()
+    contextual_values = _semantic_context_string_values(request.context)
+    responsibilities = parsed.get("responsibilities")
+    if not isinstance(responsibilities, list):
+        return
+    for index, item in enumerate(responsibilities):
+        if not isinstance(item, dict):
+            continue
+        bindings = item.get("bindings")
+        if not isinstance(bindings, dict):
+            continue
+        raw_location = bindings.get("location")
+        if not isinstance(raw_location, str):
+            continue
+        location = " ".join(raw_location.strip().split())
+        if not location:
+            continue
+        folded = location.casefold()
+        if folded in current_turn or folded in contextual_values:
+            continue
+        raise _GoalInterpretationAuthorityViolation(
+            "Goal Interpretation location binding has no authoritative surface "
+            f"provenance: responsibilities[{index}].bindings.location={location!r}. "
+            "A directly named location must copy the exact current-turn user-language "
+            "surface; an indirect location must already exist in bounded semantic context."
+        )
+
+
 def _bounded_json(value: Any, *, max_chars: int = 4000) -> str:
     try:
         text = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
@@ -553,8 +625,10 @@ class OllamaGoalInterpreter:
             "Active Task/progress semantics without lifecycle identity JSON:"
             f"{_bounded_json_array(_compact_active_task_snapshots(request.context), max_chars=1400)}\n\n"
             "Interpret only WHAT the human means. Return responsibilities, confidence, "
-            "and unresolved semantic uncertainty. No route, intent, response wording, "
-            "Activity, Work, Plan, Capability, Tool, provider, executable args, or IDs."
+            "and unresolved semantic uncertainty. For directly named entities, preserve "
+            "the exact current-turn user-language surface in bindings; never translate or "
+            "provider-canonicalize it. No route, intent, response wording, Activity, Work, "
+            "Plan, Capability, Tool, provider, executable args, or IDs."
         )
 
     @staticmethod
@@ -605,7 +679,10 @@ class OllamaGoalInterpreter:
                     "route/intent/Capability/Activity/Work/Plan/provider field into another "
                     "implementation hint. Preserve only the human outcome, material semantic "
                     "bindings, work/fresh-evidence requirements, confidence, and genuine "
-                    "semantic uncertainty. Return JSON only."
+                    "semantic uncertainty. A directly named entity binding must copy the exact "
+                    "current-turn surface; never translate or transliterate it. Provider timezone "
+                    "or clock-range choices for an already-preserved relative time are not semantic "
+                    "uncertainty. Return JSON only."
                 ),
             },
             {
@@ -642,6 +719,7 @@ class OllamaGoalInterpreter:
             parsed = _extract_json_object(content)
             _reject_planner_shaped_goal_interpretation(parsed)
             _reject_canonical_goal_identity_refs(request, parsed)
+            _reject_unprovenanced_location_bindings(request, parsed)
             return GoalInterpretationDecision.model_validate(parsed)
         except (_GoalInterpretationAuthorityViolation, ValueError, ValidationError) as exc:
             logger.warning(
@@ -663,6 +741,7 @@ class OllamaGoalInterpreter:
                 parsed = _extract_json_object(str(repaired.get("message", {}).get("content") or ""))
                 _reject_planner_shaped_goal_interpretation(parsed)
                 _reject_canonical_goal_identity_refs(request, parsed)
+                _reject_unprovenanced_location_bindings(request, parsed)
                 return GoalInterpretationDecision.model_validate(parsed)
             except Exception as repair_exc:
                 _raise_if_llm_budget_failure(repair_exc)

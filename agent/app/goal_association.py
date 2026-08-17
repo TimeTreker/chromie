@@ -8,7 +8,16 @@ import logging
 import re
 from typing import Annotated, Any, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    GetJsonSchemaHandler,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
+from pydantic.json_schema import JsonSchemaValue
 
 from .clients.ollama_client import (
     LayeredPrompt,
@@ -270,7 +279,15 @@ class GoalAssociationModelBinding(BaseModel):
 
     name: str = Field(min_length=1)
     entity_type: str = Field(min_length=1)
-    value: str = Field(min_length=1)
+    value: str = Field(
+        min_length=1,
+        description=(
+            "Resolved semantic value. A directly named entity must preserve the exact "
+            "contiguous user-language surface from the authoritative current turn; "
+            "only an indirect reference backed by supplied discourse provenance may "
+            "use a contextual canonical value."
+        ),
+    )
     referent_id: str = ""
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
 
@@ -600,6 +617,26 @@ class GoalAssociationModelGoal(BaseModel):
     related_goal_ids: list[str] = Field(default_factory=list, max_length=8)
     supersedes_goal_ids: list[str] = Field(default_factory=list, max_length=8)
     resource_responsibility: GoalAssociationModelResourceResponsibility | None = None
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls,
+        core_schema: Any,
+        handler: GetJsonSchemaHandler,
+    ) -> JsonSchemaValue:
+        schema = handler(core_schema)
+        schema.setdefault("allOf", []).append(
+            {
+                "if": {
+                    "properties": {
+                        "resource_responsibility": {"not": {"type": "null"}}
+                    },
+                    "required": ["resource_responsibility"],
+                },
+                "then": {"properties": {"bindings": {"maxItems": 0}}},
+            }
+        )
+        return schema
 
     @property
     def responsibility_kind(self) -> GoalResponsibilityKind:
@@ -2189,7 +2226,7 @@ class GoalAssociationResolver:
             + "\n\n"
             + skill_section
             + f"Latest user turn:\n{request.text}\n\n"
-            "For a location named directly in that user turn, copy the complete location binding value verbatim as one contiguous span. Never translate, transliterate, shorten, or expand it. Do not ask the user for provider canonicalization or extra administrative granularity merely because multiple real-world places might share the supplied value; bind it exactly and let the downstream Capability resolve it or report provider ambiguity. Only an indirect reference resolved from a supplied referent may use the referent's canonical value.\n\n"
+            "For a location named directly in that user turn, copy the complete location binding value verbatim as one contiguous span. Never translate, transliterate, shorten, or expand it. Responsibility evidence may contain a normalized or incorrectly translated spelling; the FINAL AUTHORITATIVE USER TURN owns the direct entity surface and must win. Do not ask the user for provider canonicalization or extra administrative granularity merely because multiple real-world places might share the supplied value; bind it exactly and let the downstream Capability resolve it or report provider ambiguity. Only an indirect reference resolved from a supplied referent may use the referent's canonical value.\n\n"
             "Bounded active goals JSON:\n"
             f"{self._bounded_json(candidate_goals, 7000)}\n\n"
             "Bounded live Situation projection JSON (soft/revisable relevance only):\n"

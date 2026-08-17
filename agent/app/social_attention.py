@@ -65,6 +65,83 @@ def _semantic_target_projection(value: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _compact_social_input_schema(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    raw_properties = value.get("properties")
+    required_names = {
+        str(item) for item in value.get("required") or [] if str(item).strip()
+    }
+    properties: dict[str, Any] = {}
+    if isinstance(raw_properties, dict):
+        for name, raw in raw_properties.items():
+            if not isinstance(raw, dict):
+                continue
+            projected = {
+                key: raw[key]
+                for key in ("type", "enum", "minimum", "maximum", "default")
+                if key in raw
+            }
+            if str(name) in required_names:
+                projected["required"] = True
+            properties[str(name)] = projected
+    return properties
+
+
+def _compact_social_candidate(value: dict[str, Any]) -> dict[str, Any]:
+    """Project only semantics Social Attention needs to choose a decoration."""
+
+    projected: dict[str, Any] = {
+        "capability_id": str(value.get("capability_id") or "").strip(),
+        "description": str(value.get("description") or "").strip()[:60],
+        "behavior_domains": [
+            str(item).strip()
+            for item in value.get("behavior_domains") or []
+            if str(item).strip()
+        ],
+        "args_schema": _compact_social_input_schema(value.get("input_schema") or {}),
+    }
+    return projected
+
+
+def _compact_social_style(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    return {
+        key: value[key]
+        for key in (
+            "expressiveness",
+            "repetition_guidance",
+            "restraint",
+        )
+        if key in value
+    }
+
+
+def _compact_recent_auxiliary_evidence(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    projected: list[dict[str, Any]] = []
+    for item in value[-12:]:
+        if not isinstance(item, dict):
+            continue
+        compact = {
+            key: item[key]
+            for key in (
+                "capability_id",
+                "semantic_args",
+                "purpose",
+                "primary_activity_id",
+                "execution_claim",
+            )
+            if key in item
+        }
+        if compact:
+            projected.append(compact)
+    return projected
+
+
+
 @dataclass(slots=True)
 class SocialAttentionServices:
     """Narrow dependencies owned by the current Social Attention component."""
@@ -240,7 +317,7 @@ class SocialAttentionContextBuilder:
                     if str(key).strip().lower() not in _SOCIAL_ATTENTION_PROVIDER_OWNED_FIELDS
                     and not _contains_provider_owned_field(value)
                 }
-            candidates.append(payload)
+            candidates.append(_compact_social_candidate(payload))
 
         if candidates:
             request.context["social_attention_candidates"] = candidates
@@ -500,32 +577,27 @@ class SocialAttentionPlanner:
             "primary_activity": primary_activity,
             "user_utterance": request.text,
             "language": language,
-            "interaction_state": request.context.get("social_attention_interaction_state") or {},
-            "social_interaction_style": request.context.get("social_interaction_style") or {},
-            "recent_auxiliary_behavior_evidence": request.context.get(
-                "recent_auxiliary_behavior_evidence"
-            )
-            or [],
-            "recent_history": list(request.history[-4:]),
+            "social_interaction_style": _compact_social_style(
+                request.context.get("social_interaction_style")
+            ),
+            "recent_auxiliary_behavior_evidence": _compact_recent_auxiliary_evidence(
+                request.context.get("recent_auxiliary_behavior_evidence")
+            ),
             "attention_target_evidence": request.context.get("social_attention_target_evidence")
             or {"available": False},
-            "eligible_social_capabilities": candidates,
+            "eligible_social_capabilities": [
+                _compact_social_candidate(item)
+                for item in candidates
+                if isinstance(item, dict)
+            ],
             "max_behaviors": int(self.services.social_attention_max_behaviors),
         }
         return (
-            "Plan optional Social Attention attached to the supplied semantically meaningful primary human-observable Activity.\n"
-            "The primary_activity tells you WHAT Chromie is doing. goal_ids are higher-level Responsibility ownership/context, not the Activity identity: one Goal may own several Activities. Its realization tells you only HOW that Activity is currently expressed or executed. Never promote an execution lane, Capability, transport, or mode into the Activity identity. Goal interpretation, Goal Association, planning, waiting, evidence arrival, and other internal cognitive milestones are never Social Attention anchors.\n"
-            "Vocal Expression has modes speech, expressive_speech, recitation, singing, humming, and nonverbal_vocalization; these modes share one personal voice and are not peer Primary-Activity categories. For example, tell a joke may realize through Vocal Expression mode=speech, while sing a song may realize through mode=singing. Body/media Capability work is likewise realization, not Activity meaning.\n"
-            "Social Attention is subordinate decoration, never the user Goal. Blinking, gaze, nodding, and other supplied Capabilities are only possible expressions.\n"
-            "Every explicit primary action remains mandatory, exact, and completion-owning. Never replace it, duplicate its capability, change its count or args, or treat decoration as its completion. "
-            "A greeting, telling a joke, walking toward someone, singing a song, handing over water, showing or playing something, or another outward semantic Activity may each independently have no Social Attention or one small compatible expression. "
-            "Ordinary cooperative engagement can support a subtle acknowledgement or presence cue when the owner-approved style, Activity semantics, candidate semantics, and concurrency metadata make that cue useful and non-disruptive. "
-            "A clear task is not evidence that the user requires exact-only action or stillness. Treat exact-only action or stillness as a constraint only when it is supplied by the utterance or typed primary Activity state. "
-            "Choose decision=none whenever no expression adds social value, when stillness is more natural, or when a gesture would be repetitive, distracting, unsafe, unsupported, or conflict with the primary Activity. "
-            "Primary Activity safety/resource ownership always wins; Social Attention must disappear on conflict.\n"
-            "Use owner-approved Social Interaction Style and recent auxiliary evidence to keep variation contextual and restrained. A pleasant surprise is bounded contextual variation, never an unrelated random gesture.\n"
-            "Use only supplied semantic target evidence. Never invent a perceived person, target location, body calibration, joint target, or controller parameter.\n"
-            "Do not create or change the user's primary task or response text. Do not add speech, tool calls, memory writes, or raw joint/motor controls. Select only exact capability_id values from eligible_social_capabilities and provide schema-valid semantic args. Every auxiliary behavior must use timing=parallel and remain optional.\n"
-            "Return one JSON object with keys decision, target, behaviors, confidence, reason, and optional metadata. decision is none or express. target contains target_ref, source, relative_direction, confidence, metadata. Each behavior contains capability_id, args, timing, and reason.\n\n"
+            "Choose optional body expression for this Primary Activity. Never change Goal, speech, "
+            "completion, or requested action. Internal cognition is not an anchor. Use only supplied "
+            "candidate and target semantics; invent no perception, calibration, motor, or provider facts. "
+            "Prefer none when expression adds no social value, repeats recent behavior, conflicts, or "
+            "stillness is more natural. If expressing, use only listed capability_id, valid args, and "
+            "timing=parallel. Return JSON only.\n\n"
             f"Interaction context:\n{json.dumps(payload, ensure_ascii=False, sort_keys=True)}"
         )

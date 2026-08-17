@@ -1697,15 +1697,20 @@ canonical Goal metadata for downstream Planner/runtime consumers. This preserves
 one source of semantic truth without forcing downstream stages to repeat the
 same derivation.
 
-Typed entity provenance is part of that validation. When the model declares a
-new directly named location binding without a supplied referent, its value must
-remain a contiguous verbatim span of the authoritative current user turn in the
-user's language. A translated, transliterated, or otherwise ungrounded value is
-rejected and may receive the same single schema-constrained model repair as
+Typed entity provenance begins at Goal Interpretation and remains binding at Goal
+Association. A directly named entity is preserved in the user's own surface form
+rather than translated, transliterated, or provider-canonicalized inside WHAT.
+For locations, Goal Interpretation rejects a model-authored spelling that has
+neither a current-turn surface nor bounded semantic-context provenance; the one
+existing same-stage DTO repair may regenerate from the authoritative turn. When
+Goal Association declares a new directly named location binding without a
+supplied referent, its value must likewise remain a contiguous verbatim span of
+the authoritative current user turn in the user's language. An ungrounded value
+is rejected and may receive the same single schema-constrained model repair as
 other invalid Goal Association output. Indirect references instead retain the
-canonical value and referent ID selected by Goal Association from the supplied
-bounded discourse state. The Host checks provenance shape; it does not extract a
-place name, choose a referent, or decide the user's meaning.
+canonical value and referent ID selected from supplied bounded discourse state.
+Deterministic code checks provenance shape; it does not extract a place name,
+choose a referent, translate an entity, or decide the user's meaning.
 
 Goal semantic information and Planner execution information are distinct. A
 material entity or parameter that determines what Chromie owes the user must be

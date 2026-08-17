@@ -453,6 +453,11 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertTrue(list(goal_validator.iter_errors(weather)))
         weather["new_goals"][0]["output_mode"] = "capability_work"
         self.assertEqual(list(goal_validator.iter_errors(weather)), [])
+        weather["new_goals"][0]["bindings"] = [
+            binding("location", "location", "Chongqing")
+        ]
+        self.assertTrue(list(goal_validator.iter_errors(weather)))
+        weather["new_goals"][0]["bindings"] = []
 
         untyped_known_source = create_goals(
             goal(

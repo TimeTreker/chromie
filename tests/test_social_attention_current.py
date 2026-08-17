@@ -109,6 +109,18 @@ class SocialAttentionCurrentArchitectureTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(request.context["social_interaction_style"]["tone"], "gentle")
         self.assertEqual(len(request.context["recent_auxiliary_behavior_evidence"]), 12)
         self.assertTrue(request.context["social_attention_target_evidence"]["available"])
+        candidate = request.context["social_attention_candidates"][0]
+        self.assertEqual(
+            set(candidate),
+            {
+                "capability_id",
+                "description",
+                "behavior_domains",
+                "args_schema",
+            },
+        )
+        self.assertNotIn("metadata", candidate)
+        self.assertNotIn("route", candidate)
 
     async def test_off_mode_exposes_policy_but_no_candidates(self) -> None:
         request = _request()
@@ -145,6 +157,62 @@ class SocialAttentionCurrentArchitectureTests(unittest.IsolatedAsyncioTestCase):
             behavior_schema["properties"]["capability_id"]["enum"],
             ["soridormi.blink_eyes"],
         )
+
+    async def test_planner_prompt_is_compact_and_does_not_replay_runtime_history(self) -> None:
+        client = _Ollama(
+            {
+                "decision": "none",
+                "target": {"target_ref": "none", "source": "none", "confidence": 0.0},
+                "behaviors": [],
+                "confidence": 0.9,
+                "reason": "stillness is natural",
+            }
+        )
+        request = _request(
+            context={
+                "social_attention_candidates": [
+                    {
+                        "capability_id": "soridormi.blink_eyes",
+                        "description": "Blink the eyes.",
+                        "behavior_domains": ["social_attention"],
+                        "can_run_parallel": True,
+                        "metadata": {"provider_backend": "must-not-leak", "blob": "x" * 12000},
+                        "route": "robot_action",
+                        "input_schema": {
+                            "type": "object",
+                            "properties": {
+                                "count": {"type": "integer", "minimum": 1, "maximum": 6}
+                            },
+                        },
+                    }
+                ],
+                "recent_auxiliary_behavior_evidence": [
+                    {
+                        "capability_id": "soridormi.wave_hand",
+                        "semantic_args": {"count": 2},
+                        "purpose": "greeting",
+                        "debug_blob": "y" * 12000,
+                    }
+                ],
+            }
+        )
+        request.history = [
+            {
+                "role": "user",
+                "text": "hello",
+                "metadata": {"context_refs": ["z" * 12000]},
+            }
+        ]
+        plan = await SocialAttentionPlanner(
+            SocialAttentionServices(social_attention_ollama=client)
+        ).plan(request)
+        self.assertIsNotNone(plan)
+        prompt = client.calls[0]["prompt"]
+        self.assertLess(len(prompt), 5000)
+        self.assertNotIn("must-not-leak", prompt)
+        self.assertNotIn("context_refs", prompt)
+        self.assertNotIn("debug_blob", prompt)
+        self.assertIn("soridormi.blink_eyes", prompt)
 
     async def test_planner_failure_is_fail_soft(self) -> None:
         client = _Ollama(RuntimeError("model unavailable"))

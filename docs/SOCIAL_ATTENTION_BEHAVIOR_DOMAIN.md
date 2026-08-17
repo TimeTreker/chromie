@@ -457,6 +457,15 @@ policy. Because decoration is optional and fail-soft, malformed primary output
 resolves directly to no decoration; it is not repaired and cannot trigger another
 model call or reopen Response/Goal/Plan cognition.
 
+The model-facing Social Attention projection is intentionally small. It contains
+the anchored Primary Activity, bounded social style/target evidence, compact
+recent auxiliary-behavior evidence, and only the candidate semantics needed to
+choose a decoration and form valid semantic arguments. Full dialogue/runtime
+records, provider metadata, transport fields, and complete Capability DTOs are
+not Social Attention authority and must not be replayed into this background
+planner. This keeps auxiliary cognition temporally compatible with the Activity
+it decorates rather than buying latency with an oversized context window.
+
 ## Testing and acceptance
 
 Tests should prove the semantic boundary rather than one fixed gesture:
