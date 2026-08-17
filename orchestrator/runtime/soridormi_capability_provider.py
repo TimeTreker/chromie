@@ -1058,10 +1058,6 @@ class SoridormiCapabilityProvider:
             ),
         }
         for source_key, target_key in (
-            ("route_source", "route_source"),
-            ("route_stage", "route_stage"),
-            ("route_task_source_stage", "route_task_source_stage"),
-            ("route_confidence", "route_confidence"),
             ("goal_interpretation_source", "goal_interpretation_source"),
         ):
             value = request.metadata.get(source_key)

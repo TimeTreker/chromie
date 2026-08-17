@@ -285,30 +285,7 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
         assistant.conversation_state = ConversationStateManager(
             base_conversation_id="turn-closure"
         )
-        assistant.conversation_state.apply_goal_association_resolution(
-            {
-                "turn_id": "turn-closure",
-                "new_goals": [
-                    {
-                        "goal_id": "goal-first",
-                        "description": "Run the first test capability.",
-                        "source_text": "Run two test capabilities.",
-                    },
-                    {
-                        "goal_id": "goal-second",
-                        "description": "Run the second test capability.",
-                        "source_text": "Run two test capabilities.",
-                    },
-                ],
-                "confidence": 0.98,
-                "reason_summary": "Two independent goals.",
-            },
-            sid=session_id,
-            user_text="Run two test capabilities.",
-            route="tool",
-            intent="compound_test",
-            atomic=True,
-        )
+        assistant.conversation_state.apply_goal_association_resolution({'turn_id': 'turn-closure', 'new_goals': [{'goal_id': 'goal-first', 'description': 'Run the first test capability.', 'source_text': 'Run two test capabilities.'}, {'goal_id': 'goal-second', 'description': 'Run the second test capability.', 'source_text': 'Run two test capabilities.'}], 'confidence': 0.98, 'reason_summary': 'Two independent goals.'}, sid=session_id, user_text='Run two test capabilities.', atomic=True)
         assistant.conversation_state.record_interaction_response(session_id, response)
         evidence = _EvidenceRecorder()
         assistant.cognitive_evidence = evidence

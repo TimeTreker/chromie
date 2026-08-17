@@ -547,7 +547,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(execute_context.confirmed)
         self.assertFalse(execute_context.trusted_preflight_authorized)
 
-    async def test_named_skill_propagates_route_trace_metadata_to_plan(self) -> None:
+    async def test_named_skill_propagates_current_trace_metadata_to_plan(self) -> None:
         invoker = _RecordingInvoker()
         execution = await submit_and_wait_terminal(self._runtime(invoker),
             InteractionResponse(
@@ -559,10 +559,6 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
                         "args": {"count": 1, "amplitude": "small"},
                         "metadata": {
                             "source": "agent.capability",
-                            "route_source": "llm",
-                            "route_stage": "quick_intent",
-                            "route_task_source_stage": "capability_catalog",
-                            "route_confidence": 0.92,
                             "goal_interpretation_source": "goal_interpreter.v1",
                         },
                     }
@@ -577,13 +573,10 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(execution.status, "completed")
         chromie_intent = invoker.calls[0][1]["chromie_intent"]
         self.assertEqual(chromie_intent["source_component"], "agent.capability")
-        self.assertEqual(chromie_intent["route_source"], "llm")
-        self.assertEqual(chromie_intent["route_stage"], "quick_intent")
-        self.assertEqual(
-            chromie_intent["route_task_source_stage"],
-            "capability_catalog",
-        )
-        self.assertEqual(chromie_intent["route_confidence"], 0.92)
+        self.assertNotIn("route_source", chromie_intent)
+        self.assertNotIn("route_stage", chromie_intent)
+        self.assertNotIn("route_task_source_stage", chromie_intent)
+        self.assertNotIn("route_confidence", chromie_intent)
         self.assertEqual(chromie_intent["goal_interpretation_source"], "goal_interpreter.v1")
 
 

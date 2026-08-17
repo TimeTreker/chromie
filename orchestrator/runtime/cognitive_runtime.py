@@ -2337,7 +2337,6 @@ class GoalDrivenRuntimeCoordinator:
         sid: str,
         turn_id: str,
         language: str,
-        intent: str,
         context: dict[str, Any],
         history: list[dict[str, Any]],
     ) -> None:
@@ -2355,7 +2354,6 @@ class GoalDrivenRuntimeCoordinator:
             sid=sid,
             turn_id=turn_id,
             language=language,
-            intent=intent,
             context={
                 **context,
                 "social_attention_primary_activity": activity.model_dump(
@@ -2374,7 +2372,6 @@ class GoalDrivenRuntimeCoordinator:
         sid: str,
         turn_id: str,
         language: str,
-        intent: str,
         context: dict[str, Any],
         history: list[dict[str, Any]],
     ) -> None:
@@ -2399,7 +2396,6 @@ class GoalDrivenRuntimeCoordinator:
             "sid": sid,
             "turn_id": turn_id,
             "language": language,
-            "intent": intent,
             "context": dict(context),
             "history": [dict(item) for item in history if isinstance(item, dict)],
         }
@@ -2720,7 +2716,6 @@ class GoalDrivenRuntimeCoordinator:
         sid: str,
         turn_id: str,
         language: str,
-        intent: str,
         context: dict[str, Any],
         history: list[dict[str, Any]],
     ) -> dict[str, Any]:
@@ -2834,7 +2829,6 @@ class GoalDrivenRuntimeCoordinator:
             primary_activity=primary_activity,
             text=text,
             language=language,
-            intent="responsibility",
             context=social_context,
             history=[dict(item) for item in history[-6:] if isinstance(item, dict)],
         )
@@ -3025,7 +3019,6 @@ class GoalDrivenRuntimeCoordinator:
                     sid=sid,
                     turn_id=resolved_turn_id,
                     language=language,
-                    intent="responsibility",
                     context=social_context,
                     history=history,
                 )
@@ -3323,7 +3316,6 @@ class GoalDrivenRuntimeCoordinator:
                 sid=sid,
                 turn_id=turn_id,
                 language=language,
-                intent="responsibility",
                 context=context,
                 history=history,
             )
@@ -3418,8 +3410,6 @@ class GoalDrivenRuntimeCoordinator:
                                 association,
                                 sid=sid,
                                 user_text=text,
-                                route=None,
-                                intent=None,
                                 source=("goal_driven_cognitive_runtime_goal_association"),
                             )
                         except Exception as exc:

@@ -140,15 +140,7 @@ class NamedGoalCancellationClosureTests(unittest.TestCase):
         association = _replacement_resolution().goal_association
         assert association is not None
 
-        results = manager.apply_goal_replacement_resolution(
-            association,
-            receipts=[],
-            confirmation_transition=None,
-            sid="sid-replace",
-            user_text="Actually, wave instead.",
-            route="robot_action",
-            intent="replace_goal",
-        )
+        results = manager.apply_goal_replacement_resolution(association, receipts=[], confirmation_transition=None, sid='sid-replace', user_text='Actually, wave instead.')
 
         self.assertTrue(any(item.get("applied") for item in results))
         old = manager._task_context_by_goal_id("goal-a")
@@ -193,15 +185,7 @@ class NamedGoalCancellationClosureTests(unittest.TestCase):
         with self.assertRaisesRegex(
             ValueError, "provider_cancel_failure"
         ):
-            manager.apply_goal_cancellation_resolution(
-                resolution,
-                receipts=[receipt],
-                confirmation_transition=None,
-                sid="sid-cancel",
-                user_text="Cancel the nod.",
-                route="chat",
-                intent="cancel_goal",
-            )
+            manager.apply_goal_cancellation_resolution(resolution, receipts=[receipt], confirmation_transition=None, sid='sid-cancel', user_text='Cancel the nod.')
         unchanged = manager._task_context_by_goal_id("goal-a")
         assert unchanged is not None
         self.assertEqual(unchanged["status"], "running")
@@ -281,15 +265,7 @@ class NamedGoalCancellationClosureTests(unittest.TestCase):
             ),
         )
 
-        results = manager.apply_goal_cancellation_resolution(
-            association,
-            receipts=[receipt],
-            confirmation_transition=None,
-            sid="sid-cancel",
-            user_text="Cancel the nod.",
-            route="chat",
-            intent="cancel_goal",
-        )
+        results = manager.apply_goal_cancellation_resolution(association, receipts=[receipt], confirmation_transition=None, sid='sid-cancel', user_text='Cancel the nod.')
 
         self.assertTrue(any(item.get("applied") for item in results))
         target = manager._task_context_by_goal_id("goal-a")
@@ -343,15 +319,7 @@ class NamedGoalCancellationClosureTests(unittest.TestCase):
             cancel_requested_request_ids=("request-a",),
         )
 
-        results = manager.apply_goal_cancellation_resolution(
-            association,
-            receipts=[receipt],
-            confirmation_transition=None,
-            sid="sid-cancel",
-            user_text="Cancel the nod.",
-            route="chat",
-            intent="cancel_goal",
-        )
+        results = manager.apply_goal_cancellation_resolution(association, receipts=[receipt], confirmation_transition=None, sid='sid-cancel', user_text='Cancel the nod.')
 
         self.assertTrue(
             any(

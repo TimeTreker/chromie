@@ -220,11 +220,9 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
                 sid: str,
                 user_text: str,
                 *,
-                route: str,
-                intent: str,
                 metadata: dict[str, Any],
             ) -> None:
-                events.append(f"record:{sid}:{route}")
+                events.append(f"record:{sid}")
 
         async def abort_output_stream(
             self: VoiceAssistant,
@@ -376,8 +374,6 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
                 sid: str,
                 user_text: str,
                 *,
-                route: str,
-                intent: str,
                 metadata: dict[str, Any],
             ) -> None:
                 events.append("record_user_turn")
@@ -385,8 +381,6 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
                     {
                         "sid": sid,
                         "text": user_text,
-                        "route": route,
-                        "intent": intent,
                         "metadata": metadata,
                     }
                 )
@@ -398,7 +392,6 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
                 revoked_confirmation: dict[str, Any],
                 sid: str,
                 user_text: str,
-                intent: str,
                 source: str,
             ) -> list[dict[str, Any]]:
                 if "output_invalidation" not in events:
@@ -507,14 +500,15 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("cognitive_gateway_reflex_detected", events)
         self.assertIn("cognitive_gateway_reflex_applied", events)
         self.assertEqual(assistant.sessions.state["sid-stop"]["llm_done"], True)
-        self.assertEqual(recorded_turn["route"], "interrupt")
+        self.assertNotIn("route", recorded_turn)
+        self.assertNotIn("intent", recorded_turn)
         expected_intent = (
             "global_emergency_stop"
             if recorded_turn["metadata"]["reflex_outcome"]["trigger"]
             == "emergency_stop_command"
             else "cancel_current_interaction"
         )
-        self.assertEqual(recorded_turn["intent"], expected_intent)
+        self.assertEqual(recorded_turn["metadata"]["reflex_outcome"]["intent"], expected_intent)
         self.assertEqual(recorded_turn["metadata"]["source"], "cognitive_gateway_reflex")
         self.assertEqual(recorded_turn["metadata"]["reflex_outcome"]["action"], "interrupt")
         self.assertEqual(

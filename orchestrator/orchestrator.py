@@ -561,7 +561,7 @@ class VoiceAssistant:
             # reason over the in-flight Goal while planning and composition
             # continue.  Effectful execution still remains behind the trusted
             # canonical-plan/runtime boundary.
-            goal_state_apply=self._apply_cognitive_goal_association_stage,
+            goal_state_apply=self._commit_goal_association_state,
             context_refresh=self.build_context,
             delivered_turn_speech_provider=self._delivered_turn_speech_events,
             workflow_stage_sink=host_support.sessions.record_cognitive_stage,
@@ -695,8 +695,6 @@ class VoiceAssistant:
         text: str,
         stage: str,
         purpose: str,
-        route: str = "",
-        intent: str = "",
         commitment: str = "",
         turn_id: str | None = None,
         source_goal_ids: list[str] | None = None,
@@ -714,8 +712,6 @@ class VoiceAssistant:
             normalized_text=self.normalize_tts_candidate(text),
             stage=stage,
             purpose=purpose,
-            route=route,
-            intent=intent,
             commitment=commitment,
             turn_id=turn_id,
             source_goal_ids=source_goal_ids,
@@ -882,85 +878,6 @@ class VoiceAssistant:
             ):
                 cancelled.append(order)
         return cancelled
-
-    async def schedule_cached_fast_first_audio(
-        self,
-        audio: CachedFastFirstAudio,
-        session_id: str | None,
-        *,
-        route: str = "",
-        intent: str = "",
-    ) -> dict[str, Any]:
-        if not audio.pcm16 or audio.sample_rate <= 0:
-            return {"scheduled": False, "reason": "invalid_cached_audio"}
-        async with self.order_lock:
-            generation = self.playback_generation
-            if self.is_stale_playback(generation, session_id):
-                self.session_log(
-                    session_id,
-                    "fast_first_audio_drop_stale_no_order: generation=%s current_generation=%s current_sid=%s",
-                    generation,
-                    self.playback_generation,
-                    self.session_id,
-                )
-                return {"scheduled": False, "reason": "stale_playback"}
-            order = self.synthesis_order
-            self.synthesis_order += 1
-        if self.is_stale_playback(generation, session_id):
-            return {"scheduled": False, "reason": "stale_playback"}
-        self._remember_tts_text(generation, audio.text)
-        key = self.playback_start_key(generation, order, session_id)
-        self.playback_start_waiters[key] = asyncio.get_running_loop().create_future()
-        self._playback_state().create_playback_release_waiter(
-            generation=generation,
-            order=order,
-            session_id=session_id,
-        )
-        speech_event = self._register_turn_speech_event(
-            session_id=session_id,
-            generation=generation,
-            orders=[order],
-            text=audio.text,
-            stage="fast_first",
-            purpose=audio.purpose or "pending_work_acknowledgement",
-            route=route,
-            intent=intent,
-        )
-        state = self.sessions.state.get(session_id or "")
-        if state is not None:
-            state["scheduled_tts"] = int(state.get("scheduled_tts", 0)) + 1
-            state["queued_tts"] = int(state.get("queued_tts", 0)) + 1
-        self.session_log(
-            session_id,
-            "fast_first_audio_schedule: order=%s purpose=%s language=%s chars=%s "
-            "bytes=%s sample_rate=%s hedge_ms=%s generation=%s",
-            order,
-            audio.purpose,
-            audio.language,
-            len(audio.text),
-            len(audio.pcm16),
-            audio.sample_rate,
-            self.fast_first_audio_hedge_ms,
-            generation,
-        )
-        self.ensure_playback_worker()
-        await self.playback_queue.put(
-            (generation, order, audio.pcm16, audio.sample_rate, session_id, None)
-        )
-        return {
-            "scheduled": True,
-            "order": order,
-            "generation": generation,
-            "purpose": audio.purpose,
-            "language": audio.language,
-            "text": audio.text,
-            "cached": True,
-            "speech_event_id": (
-                speech_event.get("event_id") if speech_event is not None else None
-            ),
-        }
-
-
 
     def create_session(self) -> str:
         sid = self.sessions.create()
@@ -2017,16 +1934,6 @@ class VoiceAssistant:
                     if isinstance(metadata, dict)
                     else "response"
                 ),
-                route=(
-                    str(metadata.get("route") or "")
-                    if isinstance(metadata, dict)
-                    else ""
-                ),
-                intent=(
-                    str(metadata.get("intent") or "")
-                    if isinstance(metadata, dict)
-                    else ""
-                ),
                 commitment=(
                     str(metadata.get("commitment_state") or "")
                     if isinstance(metadata, dict)
@@ -2340,23 +2247,6 @@ class VoiceAssistant:
                 experience_context["user_text"] = str(
                     turn_snapshot.get("text") or ""
                 )
-                if not str(experience_context.get("route") or "").strip():
-                    experience_context["route"] = str(
-                        turn_snapshot.get("route") or "unknown"
-                    )
-                if not str(experience_context.get("intent") or "").strip():
-                    experience_context["intent"] = str(
-                        turn_snapshot.get("intent") or "unknown"
-                    )
-                experience_context.setdefault(
-                    "route_source",
-                    str(
-                        (turn_snapshot.get("metadata") or {}).get("source")
-                        if isinstance(turn_snapshot.get("metadata"), dict)
-                        else ""
-                    )
-                    or "conversation_state",
-                )
                 experience_context.setdefault(
                     "conversation_id",
                     str(turn_snapshot.get("conversation_id") or ""),
@@ -2498,8 +2388,6 @@ class VoiceAssistant:
     def _validated_fast_speech_payload_text(
         cls,
         payload: Any,
-        *,
-        route: str | None = None,
     ) -> str | None:
         """Validate the whole dynamic FastSpeech contract before playback.
 
@@ -2536,32 +2424,13 @@ class VoiceAssistant:
         claimed_goal_ids = payload.get("claimed_goal_ids")
         if claimed_capability_ids != [] or claimed_goal_ids != []:
             return None
-        # Route-specific typed fields constrain authority but do not decide
-        # whether a polite notification is semantically useful. ``chat`` is a
-        # deprecated compatibility framing that can still carry work-bearing
-        # provider-neutral Responsibilities, so it gets the generic prelude envelope.
-        route_contracts = {
-            "chat": ("acknowledge", "prelude_only"),
-            "tool": ("acknowledge_and_check", "checking_only"),
-            "robot_action": ("acknowledge", "prelude_only"),
-            "deep_thought": ("thinking", "prelude_only"),
-            "memory": ("acknowledge", "prelude_only"),
-        }
-        expected = route_contracts.get(str(route or ""))
-        if expected is not None:
-            actual = (
-                str(payload.get("purpose") or "").strip().casefold(),
-                str(payload.get("commitment") or "").strip().casefold(),
-            )
-            if actual != expected:
-                return None
         return cls._safe_immediate_route_speech(str(payload.get("text") or ""))
 
     @staticmethod
     def _safe_immediate_route_speech(text: str | None) -> str | None:
         """Apply only transport-safe checks to source-authored immediate speech.
 
-        Semantic wording is owned by Goal Interpretation. Typed FastSpeech fields
+        Semantic wording is owned by the cognitive speech author. Typed FastSpeech fields
         carry the mechanical claim boundary; the Host deliberately does not add a
         second semantic LLM or infer meaning from phrases, keywords, or punctuation.
         """
@@ -3004,8 +2873,6 @@ class VoiceAssistant:
             association,
             sid=session_id,
             user_text=user_text,
-            route=None,
-            intent=None,
             source="goal_driven_cognitive_runtime",
             atomic=True,
         )
@@ -3022,30 +2889,21 @@ class VoiceAssistant:
             )
         return results
 
-    def _apply_cognitive_goal_association_stage(
+
+    def _commit_goal_association_state(
         self,
         association: GoalAssociationResolution,
         *,
         sid: str | None,
         user_text: str,
-        route: str | None,
-        intent: str | None,
         source: str,
     ) -> list[dict[str, Any]]:
-        """Publish validated model-owned Goal semantics before slow planning.
-
-        This boundary deliberately performs no continuity or entity reasoning.
-        It only applies the Goal Association DTO that the LLM already produced
-        and the Agent already validated.  Named cancellation is withheld by the
-        coordinator until trusted runtime cancellation closure is available.
-        """
+        """Commit the validated Goal Association DTO without semantic reinterpretation."""
 
         results = self.conversation_state.apply_goal_association_resolution(
             association,
             sid=sid,
             user_text=user_text,
-            route=route,
-            intent=intent,
             source=source,
             atomic=True,
         )
@@ -3071,11 +2929,9 @@ class VoiceAssistant:
                     self._compact_json_for_prompt(applied, max_chars=3000),
                     len(created),
                     len(task_contexts) if isinstance(task_contexts, list) else 0,
-                    (
-                        len(active_task_contexts)
-                        if isinstance(active_task_contexts, list)
-                        else 0
-                    ),
+                    len(active_task_contexts)
+                    if isinstance(active_task_contexts, list)
+                    else 0,
                     len(active_goals),
                     current_thread.name,
                     current_thread is threading.main_thread(),
@@ -3083,11 +2939,9 @@ class VoiceAssistant:
                     self._compact_json_for_prompt(recent_goals, max_chars=4000),
                 )
             except (AttributeError, KeyError, RuntimeError, TypeError, ValueError) as exc:
-                # Observability must never turn committed Goal state into a failed
-                # user turn.
+                # Observability must never turn committed Goal state into a failed turn.
                 logger.warning(
-                    "goal_list_after_association_log_failed: applied=%s "
-                    "error_type=%s error=%s",
+                    "goal_list_after_association_log_failed: applied=%s error_type=%s error=%s",
                     len(applied),
                     type(exc).__name__,
                     exc,
@@ -3171,8 +3025,6 @@ class VoiceAssistant:
             self.conversation_state.record_user_turn(
                 session_id,
                 user_text,
-                route=None,
-                intent=None,
                 metadata=self._metadata_with_turn_envelope(
                     {
                         "source": "goal_driven_cognitive_runtime",
@@ -3418,8 +3270,6 @@ class VoiceAssistant:
             self.conversation_state.record_user_turn(
                 session_id,
                 user_text,
-                route=None,
-                intent=None,
                 metadata=self._metadata_with_turn_envelope(
                     {
                         "source": "goal_driven_cognitive_runtime",
@@ -3441,8 +3291,6 @@ class VoiceAssistant:
         self.conversation_state.record_user_turn(
             session_id,
             user_text,
-            route=None,
-            intent=None,
             metadata=self._metadata_with_turn_envelope(
                 {
                     "source": "goal_driven_cognitive_runtime",
@@ -3555,8 +3403,7 @@ class VoiceAssistant:
                     session_id,
                     user_text=user_text,
                     cancellation_scope=reflex_outcome.cancellation_scope,
-                    intent=reflex_outcome.intent,
-                )
+                    )
             )
             cancelled_confirmation = dict(
                 cancellation_reconciliation.get(
@@ -3587,8 +3434,6 @@ class VoiceAssistant:
             self.conversation_state.record_user_turn(
                 session_id,
                 user_text,
-                route="interrupt",
-                intent=reflex_outcome.intent,
                 metadata=self._metadata_with_turn_envelope(
                     {
                         "source": "cognitive_gateway_reflex",
@@ -3633,8 +3478,6 @@ class VoiceAssistant:
             self.conversation_state.record_user_turn(
                 session_id,
                 user_text,
-                route="ignore",
-                intent=reflex_outcome.intent,
                 metadata=self._metadata_with_turn_envelope(
                     {
                         "source": "cognitive_gateway_reflex",
@@ -3779,8 +3622,6 @@ class VoiceAssistant:
             self.conversation_state.record_user_turn(
                 session_id,
                 user_text,
-                route="ignore",
-                intent="ambient_speech",
                 metadata=self._metadata_with_turn_envelope(
                     {
                         "source": attention_review.source,
@@ -3878,8 +3719,6 @@ class VoiceAssistant:
             self.conversation_state.record_user_turn(
                 session_id,
                 user_text,
-                route=None,
-                intent=None,
                 metadata=self._metadata_with_turn_envelope(
                     {
                         "source": "cognitive_core_exception",
@@ -3945,8 +3784,6 @@ class VoiceAssistant:
         self.conversation_state.record_user_turn(
             session_id,
             user_text,
-            route=None,
-            intent=None,
             metadata=self._metadata_with_turn_envelope(
                 {
                     "source": "goal_driven_cognitive_runtime",
@@ -4077,8 +3914,6 @@ class VoiceAssistant:
         self.conversation_state.record_user_turn(
             session_id,
             user_text,
-            route="confirmation",
-            intent=f"confirmation_{resolution.decision}",
             metadata=self._metadata_with_turn_envelope(
                 {
                     "confirmation_id": resolution.confirmation_id,
@@ -4407,7 +4242,6 @@ class VoiceAssistant:
         *,
         user_text: str,
         cancellation_scope: str,
-        intent: str,
     ) -> dict[str, Any]:
         """Commit a broad fixed-reflex receipt and confirmation as one state update."""
 
@@ -4437,7 +4271,6 @@ class VoiceAssistant:
                 revoked_confirmation=confirmation_evidence,
                 sid=session_id,
                 user_text=user_text,
-                intent=intent,
                 source="cognitive_gateway_fixed_reflex",
             )
         except Exception as exc:

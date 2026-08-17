@@ -104,7 +104,6 @@ def _request() -> SocialAttentionRequest:
             },
             "text": "Hello.",
             "language": "en-US",
-            "intent": "greeting",
             "context": {},
         }
     )

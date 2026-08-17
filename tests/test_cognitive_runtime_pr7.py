@@ -1199,14 +1199,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         state = ConversationStateManager(
             base_conversation_id="respond-delivery-failure"
         )
-        state.apply_goal_association_resolution(
-            new_goal_association(),
-            sid="sid-respond-delivery",
-            user_text="hello",
-            route="chat",
-            intent="conversation",
-            atomic=True,
-        )
+        state.apply_goal_association_resolution(new_goal_association(), sid='sid-respond-delivery', user_text='hello', atomic=True)
         state.record_interaction_response("sid-respond-delivery", response)
         self.assertEqual(
             state.active_goal_snapshots()[0]["work_status"],

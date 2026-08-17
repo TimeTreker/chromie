@@ -107,27 +107,7 @@ class GoalContractTests(unittest.TestCase):
 class ActiveGoalProjectionTests(unittest.TestCase):
     @staticmethod
     def _create_goal(manager: ConversationStateManager, operation_id: str, description: str) -> None:
-        manager.record_user_turn(
-            operation_id,
-            description,
-            route="deep_thought",
-            intent="create semantic goal",
-            metadata={
-                "source": "llm",
-                "semantic_task_operations": [
-                    {
-                        "operation_id": operation_id,
-                        "operation": "create",
-                        "confidence": 0.99,
-                        "goal": {
-                            "description": description,
-                            "source_text": description,
-                        },
-                        "requires_replan": True,
-                    }
-                ],
-            },
-        )
+        manager.record_user_turn(operation_id, description, metadata={'source': 'llm', 'semantic_task_operations': [{'operation_id': operation_id, 'operation': 'create', 'confidence': 0.99, 'goal': {'description': description, 'source_text': description}, 'requires_replan': True}]})
 
     def test_active_goal_projection_is_bounded_and_goal_first(self) -> None:
         manager = ConversationStateManager(max_pending_tasks=4)

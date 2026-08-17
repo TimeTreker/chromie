@@ -201,10 +201,8 @@ class ExperienceManagerTests(unittest.TestCase):
                 metadata={
                     "experience_context": {
                         "user_text": "Please blink your eyes.",
-                        "route": "robot_action",
-                        "intent": "capability:soridormi.blink_eyes",
-                        "route_source": "catalog",
-                        "route_confidence": 0.86,
+                        "goal_interpretation_confidence": 0.86,
+                        "goal_interpretation_unresolved": [],
                         "conversation_id": "local_default",
                     }
                 },
@@ -236,7 +234,7 @@ class ExperienceManagerTests(unittest.TestCase):
             )
 
             self.assertIsNotNone(record)
-            self.assertEqual(record.route, "robot_action")
+            self.assertEqual(record.interpretation_confidence, 0.86)
             self.assertEqual(record.selected_capabilities, ["soridormi.blink_eyes"])
             self.assertTrue(manager.log_path.exists())
             self.assertFalse(manager.proposal_path.exists())
@@ -254,7 +252,7 @@ class ExperienceManagerTests(unittest.TestCase):
                 metadata={
                     "experience_context": {
                         "user_text": "Please do the impossible task.",
-                        "route": "robot_action",
+                        "goal_interpretation_confidence": 0.9,
                         "intent": "unknown",
                     }
                 }

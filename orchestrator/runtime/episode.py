@@ -37,10 +37,8 @@ if TYPE_CHECKING:
 class EpisodeGoalInterpretationRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    route: str = "unknown"
-    intent: str = "unknown"
-    source: str = "unknown"
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    unresolved: list[str] = Field(default_factory=list)
     latency_ms: float | None = Field(default=None, ge=0.0)
 
 
@@ -451,11 +449,17 @@ class EpisodeRecorder:
             turn_index=turn_index,
             user_text=str(context.get("user_text") or ""),
             goal_interpretation=EpisodeGoalInterpretationRecord(
-                route=str(context.get("route") or "unknown"),
-                intent=str(context.get("intent") or "unknown"),
-                source=str(context.get("route_source") or "unknown"),
-                confidence=self._float_or_none(context.get("route_confidence")),
-                latency_ms=self._float_or_none(context.get("core_interpretation_latency_ms")),
+                confidence=self._float_or_none(
+                    context.get("goal_interpretation_confidence")
+                ),
+                unresolved=[
+                    str(item)
+                    for item in context.get("goal_interpretation_unresolved", [])
+                    if str(item).strip()
+                ],
+                latency_ms=self._float_or_none(
+                    context.get("goal_interpretation_latency_ms")
+                ),
             ),
             agent=EpisodeAgentRecord(
                 status=response.status,
@@ -481,7 +485,6 @@ class EpisodeRecorder:
             errors=list(errors or ()),
             metadata={
                 "interaction_id": response.interaction_id,
-                "route_stage": context.get("route_stage"),
                 **(
                     {
                         "interaction_session_evidence": dict(

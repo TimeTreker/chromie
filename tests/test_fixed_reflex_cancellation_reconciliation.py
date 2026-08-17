@@ -95,13 +95,7 @@ class FixedReflexCancellationReconciliationTests(unittest.TestCase):
             ),
         )
 
-        results = manager.apply_reflex_cancellation_receipt(
-            receipt,
-            revoked_confirmation=None,
-            sid="sid-stop",
-            user_text="Stop.",
-            intent="cancel_current_interaction",
-        )
+        results = manager.apply_reflex_cancellation_receipt(receipt, revoked_confirmation=None, sid='sid-stop', user_text='Stop.')
 
         self.assertTrue(any(item.get("operation") == "fixed_reflex_receipt_reconciliation" for item in results))
         for goal_id in ("goal-a", "goal-b"):
@@ -146,13 +140,7 @@ class FixedReflexCancellationReconciliationTests(unittest.TestCase):
             ),
         )
 
-        manager.apply_reflex_cancellation_receipt(
-            receipt,
-            revoked_confirmation=None,
-            sid="sid-stop",
-            user_text="Stop moving.",
-            intent="stop_embodied_motion",
-        )
+        manager.apply_reflex_cancellation_receipt(receipt, revoked_confirmation=None, sid='sid-stop', user_text='Stop moving.')
 
         context = manager._task_context_by_goal_id("goal-a")
         assert context is not None
@@ -204,13 +192,7 @@ class FixedReflexCancellationReconciliationTests(unittest.TestCase):
             ),
         )
 
-        manager.apply_reflex_cancellation_receipt(
-            receipt,
-            revoked_confirmation=None,
-            sid="sid-stop",
-            user_text="Stop moving.",
-            intent="stop_embodied_motion",
-        )
+        manager.apply_reflex_cancellation_receipt(receipt, revoked_confirmation=None, sid='sid-stop', user_text='Stop moving.')
 
         context = manager._task_context_by_goal_id("goal-a")
         assert context is not None
@@ -249,13 +231,7 @@ class FixedReflexCancellationReconciliationTests(unittest.TestCase):
             },
         )
 
-        manager.apply_reflex_cancellation_receipt(
-            receipt,
-            revoked_confirmation=None,
-            sid="sid-emergency",
-            user_text="Emergency stop!",
-            intent="global_emergency_stop",
-        )
+        manager.apply_reflex_cancellation_receipt(receipt, revoked_confirmation=None, sid='sid-emergency', user_text='Emergency stop!')
 
         context = manager._task_context_by_goal_id("goal-a")
         assert context is not None
@@ -296,16 +272,7 @@ class FixedReflexCancellationReconciliationTests(unittest.TestCase):
             effective_scope="current_interaction",
         )
 
-        manager.apply_reflex_cancellation_receipt(
-            receipt,
-            revoked_confirmation={
-                "confirmation_id": "confirmation-a",
-                "confirmed_request_ids": ["request-a"],
-            },
-            sid="sid-stop",
-            user_text="Stop.",
-            intent="cancel_current_interaction",
-        )
+        manager.apply_reflex_cancellation_receipt(receipt, revoked_confirmation={'confirmation_id': 'confirmation-a', 'confirmed_request_ids': ['request-a']}, sid='sid-stop', user_text='Stop.')
 
         context = manager._task_context_by_goal_id("goal-a")
         assert context is not None
@@ -355,13 +322,7 @@ class FixedReflexCancellationReconciliationTests(unittest.TestCase):
             output_invalidation_requested=True,
         )
 
-        manager.apply_reflex_cancellation_receipt(
-            receipt,
-            revoked_confirmation=None,
-            sid="sid-quiet",
-            user_text="Stop talking.",
-            intent="stop_current_output",
-        )
+        manager.apply_reflex_cancellation_receipt(receipt, revoked_confirmation=None, sid='sid-quiet', user_text='Stop talking.')
 
         context = manager._task_context_by_goal_id("goal-a")
         assert context is not None
@@ -404,13 +365,7 @@ class FixedReflexCancellationReconciliationTests(unittest.TestCase):
             ),
         )
 
-        results = manager.apply_reflex_cancellation_receipt(
-            receipt,
-            revoked_confirmation=None,
-            sid="sid-stop",
-            user_text="Stop.",
-            intent="cancel_current_interaction",
-        )
+        results = manager.apply_reflex_cancellation_receipt(receipt, revoked_confirmation=None, sid='sid-stop', user_text='Stop.')
 
         self.assertTrue(
             any(

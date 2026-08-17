@@ -55,17 +55,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         key = assistant.playback_start_key(3, 7, "sid-fast")
         assistant.playback_start_waiters[key] = asyncio.get_running_loop().create_future()
 
-        event = assistant._register_turn_speech_event(
-            session_id="sid-fast",
-            generation=3,
-            orders=[7],
-            text="好呀，我帮你看看。",
-            stage="fast_first",
-            purpose="acknowledge_and_check",
-            route="tool",
-            intent="capability:chromie.weather.lookup",
-            commitment="checking_only",
-        )
+        event = assistant._register_turn_speech_event(session_id='sid-fast', generation=3, orders=[7], text='好呀，我帮你看看。', stage='fast_first', purpose='acknowledge_and_check', commitment='checking_only')
 
         self.assertIsNotNone(event)
         self.assertEqual(assistant._delivered_turn_speech_events("sid-fast"), [])
@@ -130,7 +120,6 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 context["user_text"],
                 "帮我找重庆龙兴天街附近好吃的地方。",
             )
-            self.assertEqual(context["route_source"], "cognitive_gateway_admitted_dialogue")
             self.assertEqual(
                 context["conversation_id"],
                 assistant.conversation_state.conversation_id,
@@ -598,30 +587,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.conversation_state = ConversationStateManager(
             base_conversation_id="orchestrator-confirm-denied"
         )
-        assistant.conversation_state.apply_goal_association_resolution(
-            {
-                "turn_id": "turn-confirm-denied",
-                "new_goals": [
-                    {
-                        "goal_id": "goal-walk",
-                        "description": "Walk forward.",
-                        "source_text": "Walk forward.",
-                    },
-                    {
-                        "goal_id": "goal-blink",
-                        "description": "Blink.",
-                        "source_text": "Blink.",
-                    },
-                ],
-                "confidence": 0.95,
-                "reason_summary": "Two independent actions.",
-            },
-            sid="sid-confirm",
-            user_text="Walk and blink.",
-            route="robot_action",
-            intent="compound_action",
-            atomic=True,
-        )
+        assistant.conversation_state.apply_goal_association_resolution({'turn_id': 'turn-confirm-denied', 'new_goals': [{'goal_id': 'goal-walk', 'description': 'Walk forward.', 'source_text': 'Walk forward.'}, {'goal_id': 'goal-blink', 'description': 'Blink.', 'source_text': 'Blink.'}], 'confidence': 0.95, 'reason_summary': 'Two independent actions.'}, sid='sid-confirm', user_text='Walk and blink.', atomic=True)
         launched: list[tuple[InteractionResponse, set[str] | None]] = []
 
         class _Runtime:
@@ -739,30 +705,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.conversation_state = ConversationStateManager(
             base_conversation_id="orchestrator-confirm-approved"
         )
-        assistant.conversation_state.apply_goal_association_resolution(
-            {
-                "turn_id": "turn-confirm-approved",
-                "new_goals": [
-                    {
-                        "goal_id": "goal-walk",
-                        "description": "Walk forward.",
-                        "source_text": "Walk forward.",
-                    },
-                    {
-                        "goal_id": "goal-blink",
-                        "description": "Blink.",
-                        "source_text": "Blink.",
-                    },
-                ],
-                "confidence": 0.95,
-                "reason_summary": "Two independent actions.",
-            },
-            sid="sid-confirm",
-            user_text="Walk and blink.",
-            route="robot_action",
-            intent="compound_action",
-            atomic=True,
-        )
+        assistant.conversation_state.apply_goal_association_resolution({'turn_id': 'turn-confirm-approved', 'new_goals': [{'goal_id': 'goal-walk', 'description': 'Walk forward.', 'source_text': 'Walk forward.'}, {'goal_id': 'goal-blink', 'description': 'Blink.', 'source_text': 'Blink.'}], 'confidence': 0.95, 'reason_summary': 'Two independent actions.'}, sid='sid-confirm', user_text='Walk and blink.', atomic=True)
         launched: list[tuple[InteractionResponse, set[str] | None]] = []
 
         class _Runtime:
@@ -935,8 +878,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                     "claimed_capability_ids": [],
                     "claimed_goal_ids": [],
                     "must_not_claim_completion": True,
-                },
-                route="robot_action",
+                }
             )
         )
         self.assertIsNone(
@@ -949,8 +891,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                     "claimed_capability_ids": ["soridormi.walk_forward"],
                     "claimed_goal_ids": [],
                     "must_not_claim_completion": True,
-                },
-                route="robot_action",
+                }
             )
         )
 
@@ -965,8 +906,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                     "claimed_capability_ids": [],
                     "claimed_goal_ids": [],
                     "must_not_claim_completion": True,
-                },
-                route="memory",
+                }
             ),
             "Okay, I will remember it.",
         )
@@ -982,8 +922,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                     "claimed_capability_ids": [],
                     "claimed_goal_ids": [],
                     "must_not_claim_completion": True,
-                },
-                route="tool",
+                }
             ),
             "Let me check the weather.",
         )
@@ -1005,17 +944,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             lambda self, sid, message, *args: None,
             assistant,
         )
-        event = assistant._register_turn_speech_event(
-            session_id="sid-reuse",
-            generation=2,
-            orders=[5],
-            text="好，我帮你查一下。",
-            stage="fast_first",
-            purpose="acknowledge_and_check",
-            route="tool",
-            intent="capability:chromie.weather.lookup",
-            commitment="checking_only",
-        )
+        event = assistant._register_turn_speech_event(session_id='sid-reuse', generation=2, orders=[5], text='好，我帮你查一下。', stage='fast_first', purpose='acknowledge_and_check', commitment='checking_only')
         self.assertIsNotNone(event)
         assert event is not None
         event["status"] = "playback_started"
@@ -1058,17 +987,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             lambda self, sid, message, *args: None,
             assistant,
         )
-        event = assistant._register_turn_speech_event(
-            session_id="sid-fallback",
-            generation=2,
-            orders=[5],
-            text="好，我帮你查一下。",
-            stage="fast_first",
-            purpose="acknowledge_and_check",
-            route="tool",
-            intent="capability:chromie.weather.lookup",
-            commitment="checking_only",
-        )
+        event = assistant._register_turn_speech_event(session_id='sid-fallback', generation=2, orders=[5], text='好，我帮你查一下。', stage='fast_first', purpose='acknowledge_and_check', commitment='checking_only')
         self.assertIsNotNone(event)
         assert event is not None
         event["status"] = "not_delivered"

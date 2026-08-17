@@ -1226,8 +1226,6 @@ async def run_check(
         assistant.conversation_state.record_user_turn(
             sid,
             args.text,
-            route=route.route,
-            intent=route.intent,
             metadata={
                 "source": "interaction_text_mujoco_check",
                 "semantic_task_resolution_authoritative": bool(

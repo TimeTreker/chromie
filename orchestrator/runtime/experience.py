@@ -101,10 +101,13 @@ class ExperienceManager:
             sid=session_id,
             conversation_id=self._str_or_none(context.get("conversation_id")),
             user_text=str(context.get("user_text") or ""),
-            route=str(context.get("route") or "unknown"),
-            intent=str(context.get("intent") or "unknown"),
-            route_source=str(context.get("route_source") or "unknown"),
-            route_confidence=self._float_or_none(context.get("route_confidence")),
+            interpretation_confidence=self._float_or_none(
+                context.get("goal_interpretation_confidence")
+            ),
+            interpretation_unresolved=[
+                str(item) for item in context.get("goal_interpretation_unresolved", [])
+                if str(item).strip()
+            ],
             response_status=response.status,
             execution_status=execution_status,
             selected_capabilities=selected_capabilities,
@@ -174,8 +177,7 @@ class ExperienceManager:
             proposed_change=proposed_change,
             rationale=(
                 f"Experience {record.experience_id} ended with execution_status="
-                f"{record.execution_status!r}, route={record.route!r}, "
-                f"intent={record.intent!r}."
+                f"{record.execution_status!r}."
                 + (f" Learning signal: {learning_signal}." if learning_signal else "")
             ),
             evidence_ids=[record.experience_id],

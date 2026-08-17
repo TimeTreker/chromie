@@ -76,7 +76,6 @@ def _request(*, context: dict[str, Any] | None = None) -> SocialAttentionRequest
             },
             "text": "hello",
             "language": "en-US",
-            "intent": "greeting",
             "context": context or {},
         }
     )

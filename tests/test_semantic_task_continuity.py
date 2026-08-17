@@ -39,29 +39,7 @@ class SemanticTaskContractTests(unittest.TestCase):
 class ConversationSemanticTaskTests(unittest.TestCase):
     @staticmethod
     def _create_coffee(manager: ConversationStateManager) -> str:
-        manager.record_user_turn(
-            "s1",
-            "Bring me a coffee.",
-            route="deep_thought",
-            intent="prepare or obtain coffee for the current user",
-            metadata={
-                "source": "llm",
-                "semantic_task_operations": [
-                    {
-                        "operation_id": "op-create-coffee",
-                        "operation": "create",
-                        "confidence": 0.98,
-                        "relationship": "new independent user goal",
-                        "goal": {
-                            "description": "Prepare or obtain a coffee and deliver it to the current user.",
-                            "source_text": "Bring me a coffee.",
-                            "constraints": {},
-                        },
-                        "requires_replan": True,
-                    }
-                ],
-            },
-        )
+        manager.record_user_turn('s1', 'Bring me a coffee.', metadata={'source': 'llm', 'semantic_task_operations': [{'operation_id': 'op-create-coffee', 'operation': 'create', 'confidence': 0.98, 'relationship': 'new independent user goal', 'goal': {'description': 'Prepare or obtain a coffee and deliver it to the current user.', 'source_text': 'Bring me a coffee.', 'constraints': {}}, 'requires_replan': True}]})
         return manager.snapshot()["current_task_context"]["task_id"]
 
     def test_create_operation_builds_versioned_open_goal(self) -> None:
@@ -87,29 +65,7 @@ class ConversationSemanticTaskTests(unittest.TestCase):
             "goal_version": 1,
         }
 
-        manager.record_user_turn(
-            "s2",
-            "Make the coffee iced.",
-            route="deep_thought",
-            intent="refine the active coffee request",
-            metadata={
-                "source": "llm",
-                "semantic_task_operations": [
-                    {
-                        "operation_id": "op-ice-coffee",
-                        "operation": "modify",
-                        "target_task_ids": [task_id],
-                        "confidence": 0.99,
-                        "relationship": "constraint refinement",
-                        "goal_update": {
-                            "description": "Prepare or obtain an iced coffee and deliver it to the current user.",
-                            "constraint_updates": {"temperature": "iced"},
-                        },
-                        "requires_replan": True,
-                    }
-                ],
-            },
-        )
+        manager.record_user_turn('s2', 'Make the coffee iced.', metadata={'source': 'llm', 'semantic_task_operations': [{'operation_id': 'op-ice-coffee', 'operation': 'modify', 'target_task_ids': [task_id], 'confidence': 0.99, 'relationship': 'constraint refinement', 'goal_update': {'description': 'Prepare or obtain an iced coffee and deliver it to the current user.', 'constraint_updates': {'temperature': 'iced'}}, 'requires_replan': True}]})
 
         updated = manager.snapshot()["current_task_context"]
 
@@ -152,32 +108,7 @@ class ConversationSemanticTaskTests(unittest.TestCase):
         self.assertEqual(waiting["status"], "waiting_for_user")
         self.assertEqual(waiting["open_information_gaps"][0]["gap_id"], "coffee-temperature")
 
-        manager.record_user_turn(
-            "s2",
-            "Iced, with no sugar.",
-            route="deep_thought",
-            intent="answer active coffee clarification",
-            metadata={
-                "source": "llm",
-                "semantic_task_operations": [
-                    {
-                        "operation_id": "op-answer-temperature",
-                        "operation": "clarification_answer",
-                        "target_task_ids": [task_id],
-                        "confidence": 0.99,
-                        "relationship": "answers a blocking information gap",
-                        "goal_update": {
-                            "constraint_updates": {
-                                "temperature": "iced",
-                                "sugar": "none",
-                            }
-                        },
-                        "resolved_gap_ids": ["coffee-temperature"],
-                        "requires_replan": True,
-                    }
-                ],
-            },
-        )
+        manager.record_user_turn('s2', 'Iced, with no sugar.', metadata={'source': 'llm', 'semantic_task_operations': [{'operation_id': 'op-answer-temperature', 'operation': 'clarification_answer', 'target_task_ids': [task_id], 'confidence': 0.99, 'relationship': 'answers a blocking information gap', 'goal_update': {'constraint_updates': {'temperature': 'iced', 'sugar': 'none'}}, 'resolved_gap_ids': ['coffee-temperature'], 'requires_replan': True}]})
 
         resumed = manager.snapshot()["current_task_context"]
         self.assertEqual(resumed["task_id"], task_id)
@@ -238,22 +169,8 @@ class ConversationSemanticTaskTests(unittest.TestCase):
             "requires_replan": True,
         }
 
-        first = manager.apply_semantic_task_operations(
-            [operation],
-            sid="s2",
-            user_text="Make it iced.",
-            route="deep_thought",
-            intent="modify coffee",
-            source="llm",
-        )
-        second = manager.apply_semantic_task_operations(
-            [operation],
-            sid="s2",
-            user_text="Make it iced.",
-            route="deep_thought",
-            intent="modify coffee",
-            source="llm",
-        )
+        first = manager.apply_semantic_task_operations([operation], sid='s2', user_text='Make it iced.', source='llm')
+        second = manager.apply_semantic_task_operations([operation], sid='s2', user_text='Make it iced.', source='llm')
 
         context = manager.snapshot()["current_task_context"]
         self.assertTrue(first[0]["applied"])
@@ -278,20 +195,8 @@ class ConversationSemanticTaskTests(unittest.TestCase):
             "requires_replan": True,
         }
 
-        first = manager.apply_semantic_task_operations(
-            [operation],
-            sid="s1",
-            user_text="Bring me coffee.",
-            route="deep_thought",
-            source="llm",
-        )
-        second = manager.apply_semantic_task_operations(
-            [operation],
-            sid="s1",
-            user_text="Bring me coffee.",
-            route="deep_thought",
-            source="llm",
-        )
+        first = manager.apply_semantic_task_operations([operation], sid='s1', user_text='Bring me coffee.', source='llm')
+        second = manager.apply_semantic_task_operations([operation], sid='s1', user_text='Bring me coffee.', source='llm')
 
         self.assertEqual(len(manager.snapshot()["active_task_contexts"]), 1)
         self.assertEqual(second[0]["task_id"], first[0]["task_id"])
@@ -302,12 +207,7 @@ class ConversationSemanticTaskTests(unittest.TestCase):
         manager = ConversationStateManager()
         task_id = self._create_coffee(manager)
 
-        manager.record_user_turn(
-            "s2",
-            "That one is interesting.",
-            route="chat",
-            intent="casual_conversation",
-        )
+        manager.record_user_turn('s2', 'That one is interesting.')
 
         tasks = manager.snapshot()["active_task_contexts"]
         self.assertEqual(len(tasks), 1)
@@ -316,24 +216,7 @@ class ConversationSemanticTaskTests(unittest.TestCase):
 
     def test_unknown_task_operation_is_retained_as_rejected_audit_result(self) -> None:
         manager = ConversationStateManager()
-        manager.record_user_turn(
-            "s1",
-            "Make it iced.",
-            route="deep_thought",
-            intent="modify task",
-            metadata={
-                "semantic_task_operations": [
-                    {
-                        "operation_id": "op-missing-target",
-                        "operation": "modify",
-                        "target_task_ids": ["missing-task"],
-                        "confidence": 0.8,
-                        "goal_update": {"constraint_updates": {"temperature": "iced"}},
-                        "requires_replan": True,
-                    }
-                ]
-            },
-        )
+        manager.record_user_turn('s1', 'Make it iced.', metadata={'semantic_task_operations': [{'operation_id': 'op-missing-target', 'operation': 'modify', 'target_task_ids': ['missing-task'], 'confidence': 0.8, 'goal_update': {'constraint_updates': {'temperature': 'iced'}}, 'requires_replan': True}]})
 
         result = manager.get_history()[-1]["metadata"]["semantic_task_operation_results"][0]
         self.assertFalse(result["applied"])

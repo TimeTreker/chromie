@@ -492,7 +492,6 @@ class SocialAttentionPlanner:
     ) -> str:
         language = request.language
         event = request.event
-        intent = request.intent
         primary_activity = request.primary_activity.model_dump(
             mode="json", exclude_none=True
         )
@@ -501,7 +500,6 @@ class SocialAttentionPlanner:
             "primary_activity": primary_activity,
             "user_utterance": request.text,
             "language": language,
-            "intent": intent,
             "interaction_state": request.context.get("social_attention_interaction_state") or {},
             "social_interaction_style": request.context.get("social_interaction_style") or {},
             "recent_auxiliary_behavior_evidence": request.context.get(

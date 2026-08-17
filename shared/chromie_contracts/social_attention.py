@@ -143,11 +143,10 @@ class SocialAttentionRequest(BaseModel):
     primary_activity: SocialAttentionActivityAnchor
     text: str = ""
     language: str = Field(default="auto", min_length=1, max_length=64)
-    intent: str = Field(default="unknown", min_length=1, max_length=200)
     context: dict[str, Any] = Field(default_factory=dict)
     history: list[dict[str, Any]] = Field(default_factory=list, max_length=12)
 
-    @field_validator("session_id", "turn_id", "text", "language", "intent", mode="before")
+    @field_validator("session_id", "turn_id", "text", "language", mode="before")
     @classmethod
     def normalize_request_text(cls, value: Any) -> str:
         return " ".join(str(value or "").strip().split())

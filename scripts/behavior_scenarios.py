@@ -1426,13 +1426,7 @@ async def evaluate_dialogue_scenario(scenario: BehaviorScenario) -> dict[str, An
         actual = _interaction_actual(response)
         route_decision = stub["route_decision"]
         route_metadata = _route_metadata_for_state(route_decision)
-        manager.record_user_turn(
-            turn_id,
-            text,
-            route=str(route_decision.get("route") or ""),
-            intent=str(route_decision.get("intent") or ""),
-            metadata=route_metadata,
-        )
+        manager.record_user_turn(turn_id, text, metadata=route_metadata)
         manager.record_agent_result(turn_id, response)
         post_snapshot = manager.snapshot()
         post_context_report = _context_report(post_snapshot)
@@ -1603,13 +1597,7 @@ async def evaluate_cognitive_core_dialogue_scenario(
         route_metadata = _route_metadata_for_state(
             decision.model_dump(mode="json", exclude_none=True)
         )
-        manager.record_user_turn(
-            turn_id,
-            text,
-            route=decision.route,
-            intent=decision.intent,
-            metadata=route_metadata,
-        )
+        manager.record_user_turn(turn_id, text, metadata=route_metadata)
         post_snapshot = manager.snapshot()
         if isinstance(expect, dict):
             _evaluate_context_expectations(
@@ -1977,8 +1965,6 @@ async def evaluate_cognitive_turn_loop_scenario(
         },
         sid=session_id,
         user_text=scenario.text,
-        route="tool",
-        intent="cognitive_turn_loop_acceptance",
         atomic=True,
     )
     manager.record_agent_result(session_id, response)

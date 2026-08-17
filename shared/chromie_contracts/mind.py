@@ -492,10 +492,8 @@ class ExperienceRecord(BaseModel):
     sid: str | None = None
     conversation_id: str | None = None
     user_text: str = ""
-    route: str = "unknown"
-    intent: str = "unknown"
-    route_source: str = "unknown"
-    route_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    interpretation_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    interpretation_unresolved: list[str] = Field(default_factory=list)
     response_status: str = "unknown"
     execution_status: str = "unknown"
     selected_capabilities: list[str] = Field(default_factory=list)

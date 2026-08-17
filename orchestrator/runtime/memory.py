@@ -328,7 +328,6 @@ class MemoryExtractor:
         *,
         sid: str | None,
         text: str,
-        route: str | None,
         metadata: dict[str, Any] | None,
         task_context: dict[str, Any] | None,
     ) -> list[MemoryEntry]:
@@ -351,19 +350,6 @@ class MemoryExtractor:
                     persistence_policy=str(patch.get("persistence_policy") or "persist_if_unfinished"),
                 )
             )
-        elif route in {"robot_action", "tool", "memory", "deep_thought"}:
-            compact = compact_text(text, limit=180)
-            if compact:
-                entries.append(
-                    MemoryEntry(
-                        scope=task_scope,
-                        kind="goal",
-                        text=f"Current task: {compact}",
-                        confidence=0.7,
-                        source_sids=[sid] if sid else [],
-                        persistence_policy="ephemeral",
-                    )
-                )
 
         for claim in self._string_list(patch.get("important_claims") or patch.get("claims")):
             entries.append(

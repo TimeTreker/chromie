@@ -820,8 +820,6 @@ class ConversationStateManager:
                 **{
                     key: metadata.get(key)
                     for key in (
-                        "last_route",
-                        "last_intent",
                         "restored_from_task_store",
                         "restored_original_status",
                     )
@@ -965,8 +963,6 @@ class ConversationStateManager:
         sid: str | None,
         operation: SemanticTaskOperation,
         user_text: str,
-        route: str | None,
-        intent: str | None,
         source: str | None,
     ) -> dict[str, Any]:
         if operation.goal is None:
@@ -997,7 +993,7 @@ class ConversationStateManager:
             "conversation_id": self.conversation_id,
             "status": status,
             "task_relation": "new_task",
-            "task_type": str((operation.metadata or {}).get("task_type") or self._default_task_type(route, intent)),
+            "task_type": str((operation.metadata or {}).get("task_type") or "conversation"),
             "goal": self._compact_text(goal.description, limit=220),
             "semantic_goal": goal.model_dump(mode="json", exclude_none=True),
             "goal_version": 1,
@@ -1031,8 +1027,6 @@ class ConversationStateManager:
             "confirmation": None,
             "evidence_summary": {},
             "metadata": {
-                "last_route": route,
-                "last_intent": intent,
                 "source": source,
                 "semantic_operation_id": operation.operation_id,
                 "semantic_operation_confidence": operation.confidence,
@@ -1121,8 +1115,6 @@ class ConversationStateManager:
         *,
         sid: str | None,
         user_text: str,
-        route: str | None,
-        intent: str | None,
         source: str | None,
     ) -> dict[str, Any]:
         now = _now_ms()
@@ -1344,8 +1336,6 @@ class ConversationStateManager:
             metadata = {}
         context["metadata"] = {
             **metadata,
-            "last_route": route,
-            "last_intent": intent,
             "source": source,
             "semantic_operation_id": operation.operation_id,
             "semantic_operation_confidence": operation.confidence,
@@ -1577,8 +1567,6 @@ class ConversationStateManager:
         confirmation_transition: dict[str, Any] | None,
         sid: str | None,
         user_text: str,
-        route: str | None = None,
-        intent: str | None = None,
         source: str = "goal_cancellation_reconciliation",
         target_goal_ids_override: set[str] | list[str] | tuple[str, ...] | None = None,
         target_responsibility_status: str = "cancelled",
@@ -1614,8 +1602,6 @@ class ConversationStateManager:
                 resolved,
                 sid=sid,
                 user_text=user_text,
-                route=route,
-                intent=intent,
                 source=source,
                 atomic=True,
             )
@@ -1700,8 +1686,6 @@ class ConversationStateManager:
                 resolved,
                 sid=sid,
                 user_text=user_text,
-                route=route,
-                intent=intent,
                 source=source,
             )
             rejected = [
@@ -2000,8 +1984,6 @@ class ConversationStateManager:
         confirmation_transition: dict[str, Any] | None,
         sid: str | None,
         user_text: str,
-        route: str | None = None,
-        intent: str | None = None,
         source: str = "goal_replacement_reconciliation",
     ) -> list[dict[str, Any]]:
         resolved = (
@@ -2019,8 +2001,6 @@ class ConversationStateManager:
                 resolved,
                 sid=sid,
                 user_text=user_text,
-                route=route,
-                intent=intent,
                 source=source,
                 atomic=True,
             )
@@ -2030,8 +2010,6 @@ class ConversationStateManager:
             confirmation_transition=confirmation_transition,
             sid=sid,
             user_text=user_text,
-            route=route,
-            intent=intent,
             source=source,
             target_goal_ids_override=target_goal_ids,
             target_responsibility_status="superseded",
@@ -2044,7 +2022,6 @@ class ConversationStateManager:
         revoked_confirmation: dict[str, Any] | None,
         sid: str | None,
         user_text: str,
-        intent: str | None = None,
         source: str = "reflex_cancellation_reconciliation",
     ) -> list[dict[str, Any]]:
         """Atomically reconcile a fixed-reflex dispatch into canonical Goal state.
@@ -2525,8 +2502,6 @@ class ConversationStateManager:
         *,
         sid: str | None,
         user_text: str,
-        route: str | None = None,
-        intent: str | None = None,
         source: str = "goal_association",
         atomic: bool = False,
     ) -> list[dict[str, Any]]:
@@ -2540,8 +2515,6 @@ class ConversationStateManager:
                 resolution,
                 sid=sid,
                 user_text=user_text,
-                route=route,
-                intent=intent,
                 source=source,
             )
 
@@ -2563,8 +2536,6 @@ class ConversationStateManager:
         *,
         sid: str | None,
         user_text: str,
-        route: str | None = None,
-        intent: str | None = None,
         source: str = "goal_association",
     ) -> list[dict[str, Any]]:
         """Apply a validated goal-continuity result through semantic-task state.
@@ -2735,9 +2706,7 @@ class ConversationStateManager:
                     operations,
                     sid=sid,
                     user_text=user_text,
-                    route=route,
-                    intent=intent,
-                    source=source,
+                            source=source,
                     persist=False,
                 )
             )
@@ -2749,8 +2718,6 @@ class ConversationStateManager:
         *,
         sid: str | None,
         user_text: str,
-        route: str | None = None,
-        intent: str | None = None,
         source: str | None = None,
         persist: bool = True,
     ) -> list[dict[str, Any]]:
@@ -2790,9 +2757,7 @@ class ConversationStateManager:
                     sid=sid,
                     operation=operation,
                     user_text=user_text,
-                    route=route,
-                    intent=intent,
-                    source=source,
+                            source=source,
                 )
                 results.append(
                     {
@@ -2825,9 +2790,7 @@ class ConversationStateManager:
                         operation,
                         sid=sid,
                         user_text=user_text,
-                        route=route,
-                        intent=intent,
-                        source=source,
+                                        source=source,
                     )
                 )
         if results:
@@ -2842,8 +2805,6 @@ class ConversationStateManager:
         *,
         sid: str | None,
         user_text: str,
-        route: str | None = None,
-        intent: str | None = None,
         source: str | None = None,
     ) -> list[dict[str, Any]]:
         """Apply a semantic-operation batch as one in-memory/durable transaction.
@@ -2874,8 +2835,6 @@ class ConversationStateManager:
                 validated,
                 sid=sid,
                 user_text=user_text,
-                route=route,
-                intent=intent,
                 source=source,
                 persist=False,
             )
@@ -2906,175 +2865,6 @@ class ConversationStateManager:
             seen.add(key)
             merged.append(self._compact_text(item, limit=180))
         return merged[-max_items:]
-
-    @staticmethod
-    def _task_patch_from_metadata(metadata: dict[str, Any] | None) -> dict[str, Any]:
-        if not isinstance(metadata, dict):
-            return {}
-        patch = metadata.get("task_context_patch") or metadata.get("task_context")
-        return patch if isinstance(patch, dict) else {}
-
-    @staticmethod
-    def _task_relation_from_metadata(metadata: dict[str, Any] | None) -> str | None:
-        if not isinstance(metadata, dict):
-            return None
-        relation = str(metadata.get("task_relation") or "").strip()
-        return relation if relation in _TASK_RELATIONS else None
-
-    def _default_task_type(self, route: str | None, intent: str | None) -> str:
-        route = str(route or "chat").strip() or "chat"
-        intent = str(intent or "").strip()
-        if route == "robot_action":
-            return "robot_action"
-        if route in {"tool", "memory", "deep_thought"}:
-            return route
-        if intent:
-            return intent
-        return "conversation"
-
-    def _model_task_relation(
-        self,
-        metadata: dict[str, Any] | None,
-    ) -> str | None:
-        """Accept only a model-authored typed task relationship.
-
-        Creation, continuation, modification, and side-conversation meaning
-        never falls back to routes, keywords, regexes, pronouns, or recency.
-        """
-
-        relation = self._task_relation_from_metadata(metadata)
-        if relation:
-            return relation
-        return None
-
-    def _record_task_context_from_user_turn(
-        self,
-        *,
-        sid: str | None,
-        text: str,
-        route: str | None,
-        intent: str | None,
-        metadata: dict[str, Any] | None,
-    ) -> None:
-        if not self.enabled or route == "ignore":
-            return
-        relation = self._model_task_relation(metadata)
-        if relation is None:
-            return
-
-        patch = self._task_patch_from_metadata(metadata)
-        target_task_id = str((metadata or {}).get("target_task_id") or patch.get("task_id") or "").strip()
-        context = self._task_context_by_id(target_task_id)
-        if context is None and relation in {"continue_task", "modify_task", "close_task", "clarify_task"}:
-            context = self._current_task_context()
-        if context is None and relation in {"continue_task", "modify_task", "close_task", "clarify_task"}:
-            return
-
-        if context is None or relation in {"new_task", "side_conversation"}:
-            task_id = target_task_id or self._new_task_id()
-            now = _now_ms()
-            context = {
-                "task_id": task_id,
-                "conversation_id": self.conversation_id,
-                "status": "open",
-                "task_relation": relation,
-                "task_type": str(patch.get("task_type") or self._default_task_type(route, intent)),
-                "goal": self._compact_text(str(patch.get("goal") or text), limit=220),
-                "semantic_goal": SemanticGoal(
-                    goal_id=task_id,
-                    version=1,
-                    description=self._compact_text(str(patch.get("goal") or text), limit=220),
-                    source_text=self._compact_text(text, limit=220),
-                    constraints=(
-                        dict(patch.get("constraints"))
-                        if isinstance(patch.get("constraints"), dict)
-                        else {}
-                    ),
-                ).model_dump(mode="json", exclude_none=True),
-                "goal_version": 1,
-                "plan_version": 0,
-                "plan_status": "not_planned",
-                "commitment_state": "evaluating",
-                "open_information_gaps": [],
-                "operation_history": [],
-                "confirmation": None,
-                "evidence_summary": {},
-                "important_claims": [],
-                "entities": [],
-                "constraints": {},
-                "pending_questions": [],
-                "last_meaningful_user_turn": None,
-                "last_assistant_response": None,
-                "related_sids": [],
-                "created_ms": now,
-                "updated_ms": now,
-                "persistence_policy": str(
-                    patch.get("persistence_policy") or "persist_if_unfinished"
-                ),
-                "metadata": {},
-            }
-            self._task_contexts.append(context)
-
-        now = _now_ms()
-        context["task_relation"] = relation
-        context["updated_ms"] = now
-        context["last_meaningful_user_turn"] = self._compact_text(text, limit=220)
-        context["task_type"] = str(patch.get("task_type") or context.get("task_type") or self._default_task_type(route, intent))
-        if patch.get("goal"):
-            context["goal"] = self._compact_text(str(patch.get("goal")), limit=220)
-        legacy_goal = self._semantic_goal_from_context(context)
-        context["important_claims"] = self._merge_string_list(
-            context.get("important_claims"),
-            patch.get("important_claims") or patch.get("claims"),
-        )
-        if not context["important_claims"] and route == "chat":
-            context["important_claims"] = [self._compact_text(text, limit=180)]
-        context["entities"] = self._merge_string_list(context.get("entities"), patch.get("entities"))
-        context["pending_questions"] = self._merge_string_list(
-            context.get("pending_questions"),
-            patch.get("pending_questions") or patch.get("questions"),
-            max_items=4,
-        )
-        constraints = context.get("constraints")
-        if not isinstance(constraints, dict):
-            constraints = {}
-        patch_constraints = patch.get("constraints")
-        if isinstance(patch_constraints, dict):
-            constraints = {**constraints, **patch_constraints}
-        context["constraints"] = constraints
-        legacy_goal = legacy_goal.model_copy(
-            update={
-                "description": str(context.get("goal") or legacy_goal.description),
-                "source_text": self._compact_text(text, limit=220),
-                "constraints": dict(constraints),
-            }
-        )
-        context["semantic_goal"] = legacy_goal.model_dump(mode="json", exclude_none=True)
-        context["goal_version"] = max(1, int(context.get("goal_version") or legacy_goal.version or 1))
-        related_sids = context.get("related_sids")
-        if not isinstance(related_sids, list):
-            related_sids = []
-        if sid and sid not in related_sids:
-            related_sids.append(sid)
-        context["related_sids"] = related_sids[-12:]
-        meta = context.get("metadata")
-        if not isinstance(meta, dict):
-            meta = {}
-        context["metadata"] = {
-            **meta,
-            "last_route": route,
-            "last_intent": intent,
-            "source": (metadata or {}).get("source"),
-            "confidence": (metadata or {}).get("confidence"),
-        }
-        if relation == "close_task":
-            context["status"] = str(patch.get("status") or "done")
-            self._set_goal_responsibility_status(
-                context,
-                "satisfied",
-                source="model_authored_close_task",
-            )
-        self._persist_task_contexts_if_enabled()
 
     def _prune_completed_tasks(self, now_ms: float | None = None) -> None:
         if not self._pending_tasks:
@@ -3728,8 +3518,6 @@ class ConversationStateManager:
                 "role": "user",
                 "sid": sid,
                 "text": compact,
-                "route": None,
-                "intent": None,
                 "ts_ms": _now_ms(),
                 "conversation_id": self.conversation_id,
                 "metadata": accepted_metadata,
@@ -3742,8 +3530,6 @@ class ConversationStateManager:
         sid: str | None,
         text: str | None,
         *,
-        route: str | None = None,
-        intent: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
         if not self.enabled:
@@ -3753,16 +3539,11 @@ class ConversationStateManager:
             return
         turn_metadata = dict(metadata or {})
         semantic_operations = self._semantic_operations_from_metadata(turn_metadata)
-        semantic_resolution_authoritative = bool(
-            turn_metadata.get("semantic_task_resolution_authoritative")
-        )
         if semantic_operations:
             operation_results = self.apply_semantic_task_operations(
                 semantic_operations,
                 sid=sid,
                 user_text=compact,
-                route=route,
-                intent=intent,
                 source=str(turn_metadata.get("source") or "goal_interpreter"),
             )
             turn_metadata["semantic_task_operation_results"] = operation_results
@@ -3773,8 +3554,6 @@ class ConversationStateManager:
                     "role": "user",
                     "sid": sid,
                     "text": compact,
-                    "route": route,
-                    "intent": intent,
                     "ts_ms": _now_ms(),
                     "conversation_id": self.conversation_id,
                     "metadata": turn_metadata,
@@ -3784,22 +3563,11 @@ class ConversationStateManager:
             existing_metadata = existing.get("metadata")
             if not isinstance(existing_metadata, dict):
                 existing_metadata = {}
-            existing["route"] = route
-            existing["intent"] = intent
             existing["metadata"] = {**existing_metadata, **turn_metadata}
-        if not semantic_operations and not semantic_resolution_authoritative:
-            self._record_task_context_from_user_turn(
-                sid=sid,
-                text=compact,
-                route=route,
-                intent=intent,
-                metadata=turn_metadata,
-            )
         self._memory_store.add_many(
             self._memory_extractor.extract_user_turn(
                 sid=sid,
                 text=compact,
-                route=route,
                 metadata=turn_metadata,
                 task_context=self._current_task_context(),
             )

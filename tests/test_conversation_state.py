@@ -34,28 +34,23 @@ class ConversationStateTests(unittest.TestCase):
         history = manager.get_history()
         self.assertEqual(len(history), 1)
         self.assertEqual(history[0]["text"], "上海今晚是不是有大暴雨？")
-        self.assertIsNone(history[0]["route"])
+        self.assertNotIn("route", history[0])
+        self.assertNotIn("intent", history[0])
         self.assertEqual(manager.active_goal_snapshots(), [])
         self.assertEqual(manager.active_task_snapshots(), [])
 
-        manager.record_user_turn(
-            "s1",
-            "上海今晚是不是有大暴雨？",
-            route="tool",
-            intent="capability:chromie.weather.lookup",
-            metadata={"source": "goal_driven_cognitive_runtime"},
-        )
+        manager.record_user_turn('s1', '上海今晚是不是有大暴雨？', metadata={'source': 'goal_driven_cognitive_runtime'})
 
         history = manager.get_history()
         self.assertEqual(len(history), 1)
-        self.assertEqual(history[0]["route"], "tool")
-        self.assertEqual(history[0]["intent"], "capability:chromie.weather.lookup")
+        self.assertNotIn("route", history[0])
+        self.assertNotIn("intent", history[0])
         self.assertTrue(history[0]["metadata"]["accepted_dialogue_evidence"])
         self.assertEqual(history[0]["metadata"]["source"], "goal_driven_cognitive_runtime")
 
     def test_natural_language_reset_is_not_classified_by_host(self) -> None:
         manager = ConversationStateManager(base_conversation_id="test")
-        manager.record_user_turn("s1", "check the weather", route="tool", intent="weather_query")
+        manager.record_user_turn('s1', 'check the weather')
         original_id = manager.conversation_id
 
         boundary = manager.prepare_for_user_text("new topic", "s2")
@@ -259,12 +254,17 @@ class ConversationStateTests(unittest.TestCase):
         self.assertFalse(boundary["started_new"])
         self.assertEqual(boundary["reason"], "kept_default")
 
-    def test_missing_typed_relation_does_not_create_host_task_association(self) -> None:
+    def test_user_turn_metadata_does_not_create_host_task_association(self) -> None:
         manager = ConversationStateManager()
 
-        relation = manager._model_task_relation({})
+        manager.record_user_turn(
+            "s1",
+            "Please continue that task.",
+            metadata={"task_relation": "continue_task", "task_context_patch": {"goal": "legacy"}},
+        )
 
-        self.assertIsNone(relation)
+        self.assertEqual(manager.active_goal_snapshots(), [])
+        self.assertEqual(manager.active_task_snapshots(), [])
 
     def test_pending_task_keeps_context_for_new_topic_like_text(self) -> None:
         manager = ConversationStateManager(soft_idle_timeout_sec=10, hard_idle_timeout_sec=100)
@@ -551,7 +551,7 @@ class ConversationStateTests(unittest.TestCase):
 
     def test_session_memory_summarizes_active_task_and_typed_boundary_clears_it(self) -> None:
         manager = ConversationStateManager(base_conversation_id="session")
-        manager.record_user_turn("s1", "walk forward", route="robot_action", intent="capability:soridormi.walk_velocity")
+        manager.record_user_turn('s1', 'walk forward')
         manager.record_pending_task(
             sid="s1",
             task_type="robot_action",
@@ -578,25 +578,7 @@ class ConversationStateTests(unittest.TestCase):
             "sentence in future prompts."
         )
 
-        manager.record_user_turn(
-            "s1",
-            raw_turn,
-            route="deep_thought",
-            intent="memory_architecture_design",
-            metadata={
-                "task_relation": "new_task",
-                "task_context_patch": {
-                    "task_type": "design",
-                    "goal": "Design extracted prompt memory for Chromie",
-                    "important_claims": [
-                        "User wants refined memory extracted from chat history."
-                    ],
-                    "constraints": {
-                        "prompt_context": "do not inject raw original chat history"
-                    },
-                },
-            },
-        )
+        manager.record_user_turn('s1', raw_turn, metadata={'task_relation': 'new_task', 'task_context_patch': {'task_type': 'design', 'goal': 'Design extracted prompt memory for Chromie', 'important_claims': ['User wants refined memory extracted from chat history.'], 'constraints': {'prompt_context': 'do not inject raw original chat history'}}})
 
         memory = manager.snapshot()["session_memory"]
         summary = memory["memory_summary"]
@@ -609,21 +591,7 @@ class ConversationStateTests(unittest.TestCase):
 
     def test_extracted_memory_clears_on_typed_boundary(self) -> None:
         manager = ConversationStateManager(base_conversation_id="session")
-        manager.record_user_turn(
-            "s1",
-            "Please remember this only for the current session.",
-            route="memory",
-            intent="remember_session_note",
-            metadata={
-                "extracted_memory": [
-                    {
-                        "scope": "session",
-                        "kind": "preference",
-                        "text": "User wants this note kept only for the current session.",
-                    }
-                ]
-            },
-        )
+        manager.record_user_turn('s1', 'Please remember this only for the current session.', metadata={'extracted_memory': [{'scope': 'session', 'kind': 'preference', 'text': 'User wants this note kept only for the current session.'}]})
 
         self.assertIn("current session", manager.snapshot()["session_memory"]["memory_summary"])
 
@@ -634,39 +602,37 @@ class ConversationStateTests(unittest.TestCase):
 
     def test_task_context_keeps_meaningful_claim_across_sessions(self) -> None:
         manager = ConversationStateManager(base_conversation_id="session")
-        manager.record_user_turn(
-            "s1",
-            "I think the moon is round. Do you think so?",
-            route="chat",
-            intent="general_conversation",
-            metadata={
-                "task_relation": "new_task",
-                "task_context_patch": {
-                    "task_type": "conversation",
-                    "goal": "Discuss whether the Moon is round",
-                    "important_claims": ["The user thinks the Moon is round."],
-                    "entities": ["Moon"],
+        manager.apply_semantic_task_operations_atomically(
+            [{
+                "operation_id": "create-moon-discussion",
+                "operation": "create",
+                "goal": {
+                    "description": "Discuss whether the Moon is round",
+                    "source_text": "I think the moon is round. Do you think so?",
+                    "metadata": {"important_claims": ["The user thinks the Moon is round."]},
                 },
-            },
+                "metadata": {"task_type": "conversation"},
+            }],
+            sid="s1",
+            user_text="I think the moon is round. Do you think so?",
+            source="test_goal_association",
         )
         task_id = manager.snapshot()["current_task_context"]["task_id"]
+        manager._task_contexts[-1]["important_claims"] = ["The user thinks the Moon is round."]
         manager.record_assistant_turn("s1", "The moon is round.")
 
-        manager.record_user_turn(
-            "s2",
-            "or",
-            route="deep_thought",
-            intent="deep_thought_low_confidence",
-        )
-        manager.record_user_turn(
-            "s3",
-            "Do you agree with me?",
-            route="chat",
-            intent="general_conversation",
-            metadata={
-                "task_relation": "continue_task",
-                "target_task_id": task_id,
-            },
+        manager.record_user_turn('s2', 'or')
+        manager.apply_semantic_task_operations_atomically(
+            [{
+                "operation_id": "continue-moon-discussion",
+                "operation": "modify",
+                "target_task_ids": [task_id],
+                "goal_update": {"source_text": "Do you agree with me?"},
+                "requires_replan": False,
+            }],
+            sid="s3",
+            user_text="Do you agree with me?",
+            source="test_goal_association",
         )
 
         context = manager.snapshot()["current_task_context"]
@@ -687,18 +653,19 @@ class ConversationStateTests(unittest.TestCase):
                 task_store_enabled=True,
                 task_store_path=store_path,
             )
-            manager.record_user_turn(
-                "s1",
-                "Walk forward when I confirm.",
-                route="robot_action",
-                intent="capability:soridormi.walk_velocity",
-                metadata={
-                    "task_relation": "new_task",
-                    "task_context_patch": {
-                        "task_type": "robot_action",
-                        "goal": "Walk forward after confirmation",
+            manager.apply_semantic_task_operations_atomically(
+                [{
+                    "operation_id": "create-walk-confirm",
+                    "operation": "create",
+                    "goal": {
+                        "description": "Walk forward after confirmation",
+                        "source_text": "Walk forward when I confirm.",
                     },
-                },
+                    "metadata": {"task_type": "robot_action"},
+                }],
+                sid="s1",
+                user_text="Walk forward when I confirm.",
+                source="test_goal_association",
             )
             manager.record_pending_task(
                 sid="s1",
@@ -768,26 +735,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
         manager: ConversationStateManager,
         *goal_ids: str,
     ) -> list[dict]:
-        return manager.apply_goal_association_resolution(
-            {
-                "turn_id": "turn-create-" + "-".join(goal_ids),
-                "new_goals": [
-                    {
-                        "goal_id": goal_id,
-                        "description": f"Complete {goal_id}.",
-                        "source_text": f"Complete {goal_id}.",
-                    }
-                    for goal_id in goal_ids
-                ],
-                "confidence": 0.95,
-                "reason_summary": "Independent user goals.",
-            },
-            sid="sid-create",
-            user_text="Complete the requested goals.",
-            route="robot_action",
-            intent="compound_action",
-            atomic=True,
-        )
+        return manager.apply_goal_association_resolution({'turn_id': 'turn-create-' + '-'.join(goal_ids), 'new_goals': [{'goal_id': goal_id, 'description': f'Complete {goal_id}.', 'source_text': f'Complete {goal_id}.'} for goal_id in goal_ids], 'confidence': 0.95, 'reason_summary': 'Independent user goals.'}, sid='sid-create', user_text='Complete the requested goals.', atomic=True)
 
     @staticmethod
     def _canonical_plan(
@@ -1240,31 +1188,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
         self.assertEqual(before["plan_status"], "proposed")
         self.assertEqual(before["status"], "planning")
 
-        applied = manager.apply_goal_association_resolution(
-            {
-                "turn_id": "turn-blue-cup",
-                "associations": [
-                    {
-                        "association_id": "assoc-blue-cup",
-                        "relationship": "modify",
-                        "target_goal_ids": ["goal-cup"],
-                        "goal_update": {
-                            "description": "Pick up the blue cup."
-                        },
-                        "requires_replan": False,
-                        "confidence": 0.99,
-                        "reason_summary": "The user refined the same cup responsibility.",
-                    }
-                ],
-                "confidence": 0.99,
-                "reason_summary": "Same responsibility, compatible refinement.",
-            },
-            sid="sid-blue",
-            user_text="The blue one.",
-            route="robot_action",
-            intent="refinement",
-            atomic=True,
-        )
+        applied = manager.apply_goal_association_resolution({'turn_id': 'turn-blue-cup', 'associations': [{'association_id': 'assoc-blue-cup', 'relationship': 'modify', 'target_goal_ids': ['goal-cup'], 'goal_update': {'description': 'Pick up the blue cup.'}, 'requires_replan': False, 'confidence': 0.99, 'reason_summary': 'The user refined the same cup responsibility.'}], 'confidence': 0.99, 'reason_summary': 'Same responsibility, compatible refinement.'}, sid='sid-blue', user_text='The blue one.', atomic=True)
 
         self.assertTrue(all(item.get("applied") is True for item in applied))
         after = manager.snapshot()["task_contexts"][0]
@@ -1302,31 +1226,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             ),
         )
 
-        applied = manager.apply_goal_association_resolution(
-            {
-                "turn_id": "turn-red-cup",
-                "associations": [
-                    {
-                        "association_id": "assoc-red-cup",
-                        "relationship": "modify",
-                        "target_goal_ids": ["goal-cup"],
-                        "goal_update": {
-                            "description": "Pick up the red cup instead."
-                        },
-                        "requires_replan": True,
-                        "confidence": 0.99,
-                        "reason_summary": "The changed target makes the old plan incompatible.",
-                    }
-                ],
-                "confidence": 0.99,
-                "reason_summary": "Same responsibility, incompatible current Work.",
-            },
-            sid="sid-red",
-            user_text="Actually, the red one.",
-            route="robot_action",
-            intent="refinement",
-            atomic=True,
-        )
+        applied = manager.apply_goal_association_resolution({'turn_id': 'turn-red-cup', 'associations': [{'association_id': 'assoc-red-cup', 'relationship': 'modify', 'target_goal_ids': ['goal-cup'], 'goal_update': {'description': 'Pick up the red cup instead.'}, 'requires_replan': True, 'confidence': 0.99, 'reason_summary': 'The changed target makes the old plan incompatible.'}], 'confidence': 0.99, 'reason_summary': 'Same responsibility, incompatible current Work.'}, sid='sid-red', user_text='Actually, the red one.', atomic=True)
 
         self.assertTrue(all(item.get("applied") is True for item in applied))
         after = manager.snapshot()["task_contexts"][0]
@@ -1665,31 +1565,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             "satisfied",
         )
 
-        correction = manager.apply_goal_association_resolution(
-            {
-                "turn_id": "turn-correction",
-                "associations": [
-                    {
-                        "association_id": "assoc-correction",
-                        "relationship": "modify",
-                        "target_goal_ids": ["goal-cup"],
-                        "goal_update": {
-                            "description": "Pick up the blue cup, not the red cup."
-                        },
-                        "requires_replan": True,
-                        "confidence": 0.99,
-                        "reason_summary": "The user corrected the intended cup.",
-                    }
-                ],
-                "confidence": 0.99,
-                "reason_summary": "The same responsibility was misunderstood.",
-            },
-            sid="sid-correction",
-            user_text="No, I meant the blue cup.",
-            route="robot_action",
-            intent="correction",
-            atomic=True,
-        )
+        correction = manager.apply_goal_association_resolution({'turn_id': 'turn-correction', 'associations': [{'association_id': 'assoc-correction', 'relationship': 'modify', 'target_goal_ids': ['goal-cup'], 'goal_update': {'description': 'Pick up the blue cup, not the red cup.'}, 'requires_replan': True, 'confidence': 0.99, 'reason_summary': 'The user corrected the intended cup.'}], 'confidence': 0.99, 'reason_summary': 'The same responsibility was misunderstood.'}, sid='sid-correction', user_text='No, I meant the blue cup.', atomic=True)
         self.assertTrue(all(item.get("applied") is True for item in correction))
         active = manager.active_goal_snapshots()
         self.assertEqual(len(active), 1)
@@ -1986,19 +1862,7 @@ class AcceptedDialogueSemanticStatusTests(unittest.TestCase):
             metadata={"source": "cognitive_gateway_admitted_dialogue"},
         )
 
-        manager.record_user_turn(
-            "sid-failed",
-            "帮我找附近好吃的地方。",
-            route="safe_fallback",
-            intent="goal_association_failure",
-            metadata={
-                "semantic_task_resolution_authoritative": True,
-                "semantic_status": "failed",
-                "semantic_failure_stage": "goal_association",
-                "semantic_failure_class": "contract_failure",
-                "canonical_goal_committed": False,
-            },
-        )
+        manager.record_user_turn('sid-failed', '帮我找附近好吃的地方。', metadata={'semantic_task_resolution_authoritative': True, 'semantic_status': 'failed', 'semantic_failure_stage': 'goal_association', 'semantic_failure_class': 'contract_failure', 'canonical_goal_committed': False})
         turn = manager.user_turn_snapshot("sid-failed")
         self.assertEqual(turn["text"], "帮我找附近好吃的地方。")
         self.assertEqual(turn["metadata"]["semantic_status"], "failed")
