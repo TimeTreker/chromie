@@ -231,7 +231,7 @@ class MediaDeclarationAndPlannerTests(unittest.TestCase):
 
     def test_goal_projection_retains_exact_media_operation_for_planners(self) -> None:
         resolution = GoalAssociationResolution.model_validate(
-            {
+            {"resolution_status": "resolved",
                 "turn_id": "turn-media",
                 "new_goals": [
                     {

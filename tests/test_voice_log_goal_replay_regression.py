@@ -16,7 +16,7 @@ class VoiceLogGoalReplayRegressionTests(unittest.TestCase):
             base_conversation_id="voice-log-goal-replay",
             task_store_enabled=False,
         )
-        state.apply_goal_association_resolution({'turn_id': 'turn-motion', 'new_goals': [{'goal_id': 'goal-walk', 'description': 'Walk forward for fifteen seconds.', 'source_text': '往前走十五秒。'}, {'goal_id': 'goal-blink', 'description': 'Blink twice.', 'source_text': '眨两下眼睛。'}], 'confidence': 0.95}, sid='sid-motion', user_text='往前走十五秒，同时眨两下眼睛。', atomic=True)
+        state.apply_goal_association_resolution({'resolution_status': 'resolved', 'turn_id': 'turn-motion', 'new_goals': [{'goal_id': 'goal-walk', 'description': 'Walk forward for fifteen seconds.', 'source_text': '往前走十五秒。'}, {'goal_id': 'goal-blink', 'description': 'Blink twice.', 'source_text': '眨两下眼睛。'}], 'confidence': 0.95}, sid='sid-motion', user_text='往前走十五秒，同时眨两下眼睛。', atomic=True)
         state.record_interaction_response(
             "sid-motion",
             InteractionResponse(
@@ -150,7 +150,7 @@ class VoiceLogGoalReplayRegressionTests(unittest.TestCase):
         )
 
         association = GoalAssociationResolution.model_validate(
-            {
+            {"resolution_status": "resolved",
                 "turn_id": "turn-social",
                 "associations": [
                     {

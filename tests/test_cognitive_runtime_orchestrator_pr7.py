@@ -258,6 +258,7 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
             status="applied",
             lane="chat",
             goal_association=GoalAssociationResolution(
+                resolution_status="resolved",
                 turn_id="turn-cancel-delivery",
                 associations=[
                     {
@@ -292,6 +293,7 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
             lane="chat",
             interaction_response=response,
             goal_association=GoalAssociationResolution(
+                resolution_status="resolved",
                 turn_id="turn-cancel-delivery",
                 associations=[
                     {

@@ -18,7 +18,7 @@ class _AgentClient:
         self.request = request
         goal_ids = request.context["pending_confirmation_scope"]["goal_ids"]
         return GoalAssociationResolution.model_validate(
-            {
+            {"resolution_status": "resolved",
                 "turn_id": "confirmation-reply",
                 "associations": [
                     {

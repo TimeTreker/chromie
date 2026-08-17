@@ -483,6 +483,7 @@ def test_social_attention_projects_semantic_activities_not_execution_modalities(
         status="applied",
         lane="robot_action",
         goal_association=GoalAssociationResolution(
+            resolution_status="resolved",
             turn_id="turn-compound-social",
             new_goals=[
                 SemanticGoal(

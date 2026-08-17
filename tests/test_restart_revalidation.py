@@ -28,7 +28,7 @@ class _NoDispatchRuntime:
 class RestartRevalidationTests(unittest.TestCase):
     @staticmethod
     def _create_open_goal(manager: ConversationStateManager) -> None:
-        results = manager.apply_goal_association_resolution({'turn_id': 'turn-create', 'new_goals': [{'goal_id': 'goal-walk', 'description': 'Walk forward after confirmation.', 'source_text': 'Walk forward when I confirm.'}], 'confidence': 1.0}, sid='sid-create', user_text='Walk forward when I confirm.', atomic=True)
+        results = manager.apply_goal_association_resolution({'resolution_status': 'resolved', 'turn_id': 'turn-create', 'new_goals': [{'goal_id': 'goal-walk', 'description': 'Walk forward after confirmation.', 'source_text': 'Walk forward when I confirm.'}], 'confidence': 1.0}, sid='sid-create', user_text='Walk forward when I confirm.', atomic=True)
         assert all(item.get("applied") for item in results)
 
     def test_restart_restores_responsibility_but_revalidates_work(self) -> None:

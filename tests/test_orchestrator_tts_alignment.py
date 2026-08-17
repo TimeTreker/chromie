@@ -587,7 +587,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.conversation_state = ConversationStateManager(
             base_conversation_id="orchestrator-confirm-denied"
         )
-        assistant.conversation_state.apply_goal_association_resolution({'turn_id': 'turn-confirm-denied', 'new_goals': [{'goal_id': 'goal-walk', 'description': 'Walk forward.', 'source_text': 'Walk forward.'}, {'goal_id': 'goal-blink', 'description': 'Blink.', 'source_text': 'Blink.'}], 'confidence': 0.95, 'reason_summary': 'Two independent actions.'}, sid='sid-confirm', user_text='Walk and blink.', atomic=True)
+        assistant.conversation_state.apply_goal_association_resolution({'resolution_status': 'resolved', 'turn_id': 'turn-confirm-denied', 'new_goals': [{'goal_id': 'goal-walk', 'description': 'Walk forward.', 'source_text': 'Walk forward.'}, {'goal_id': 'goal-blink', 'description': 'Blink.', 'source_text': 'Blink.'}], 'confidence': 0.95, 'reason_summary': 'Two independent actions.'}, sid='sid-confirm', user_text='Walk and blink.', atomic=True)
         launched: list[tuple[InteractionResponse, set[str] | None]] = []
 
         class _Runtime:
@@ -705,7 +705,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.conversation_state = ConversationStateManager(
             base_conversation_id="orchestrator-confirm-approved"
         )
-        assistant.conversation_state.apply_goal_association_resolution({'turn_id': 'turn-confirm-approved', 'new_goals': [{'goal_id': 'goal-walk', 'description': 'Walk forward.', 'source_text': 'Walk forward.'}, {'goal_id': 'goal-blink', 'description': 'Blink.', 'source_text': 'Blink.'}], 'confidence': 0.95, 'reason_summary': 'Two independent actions.'}, sid='sid-confirm', user_text='Walk and blink.', atomic=True)
+        assistant.conversation_state.apply_goal_association_resolution({'resolution_status': 'resolved', 'turn_id': 'turn-confirm-approved', 'new_goals': [{'goal_id': 'goal-walk', 'description': 'Walk forward.', 'source_text': 'Walk forward.'}, {'goal_id': 'goal-blink', 'description': 'Blink.', 'source_text': 'Blink.'}], 'confidence': 0.95, 'reason_summary': 'Two independent actions.'}, sid='sid-confirm', user_text='Walk and blink.', atomic=True)
         launched: list[tuple[InteractionResponse, set[str] | None]] = []
 
         class _Runtime:

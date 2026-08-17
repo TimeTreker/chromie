@@ -28,7 +28,7 @@ class ConfirmationDialogueTests(unittest.TestCase):
     def test_goal_association_confirmation_requires_exact_pending_scope(self) -> None:
         def resolution(relationship: str, goal_ids: list[str]) -> GoalAssociationResolution:
             return GoalAssociationResolution.model_validate(
-                {
+                {"resolution_status": "resolved",
                     "turn_id": "turn-confirm",
                     "associations": [
                         {

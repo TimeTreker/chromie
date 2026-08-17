@@ -1590,9 +1590,13 @@ class GoalAssociationResolutionContractTests(unittest.TestCase):
         self.assertEqual(failed.prompt_projection()["resolution_status"], "fail_closed")
         with self.assertRaises(ValueError):
             GoalAssociationResolution(turn_id="turn-1")
+        self.assertTrue(
+            GoalAssociationResolution.model_fields["resolution_status"].is_required()
+        )
 
-    def test_legacy_clarification_infers_explicit_status(self):
+    def test_clarification_requires_explicit_terminal_status(self):
         resolution = GoalAssociationResolution(
+            resolution_status="needs_clarification",
             turn_id="turn-1",
             clarification="Which one?",
         )
@@ -1601,6 +1605,7 @@ class GoalAssociationResolutionContractTests(unittest.TestCase):
     def test_clarification_cannot_mix_with_goal_changes(self):
         with self.assertRaises(ValueError):
             GoalAssociationResolution(
+                resolution_status="needs_clarification",
                 turn_id="turn-1",
                 clarification="Which one?",
                 new_goals=[

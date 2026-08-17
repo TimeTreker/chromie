@@ -98,6 +98,7 @@ def _cancel_resolution(goal_ids: list[str]) -> CognitiveRuntimeResolution:
         status="applied",
         lane="chat",
         goal_association=GoalAssociationResolution(
+            resolution_status="resolved",
             turn_id="turn-cancel",
             associations=[
                 {
@@ -118,6 +119,7 @@ def _replacement_resolution() -> CognitiveRuntimeResolution:
         status="applied",
         lane="robot_action",
         goal_association=GoalAssociationResolution(
+            resolution_status="resolved",
             turn_id="turn-replace",
             new_goals=[
                 {

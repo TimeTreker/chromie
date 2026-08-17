@@ -65,6 +65,7 @@ class AgentClientTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_goal_association_call_injects_runtime_trace_carrier(self) -> None:
         resolution = GoalAssociationResolution(
+            resolution_status="resolved",
             turn_id="turn-agent-client",
             new_goals=[
                 SemanticGoal(

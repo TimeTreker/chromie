@@ -90,6 +90,7 @@ class ConversationStateTests(unittest.TestCase):
         ):
             results = manager.apply_goal_association_resolution(
                 GoalAssociationResolution(
+                    resolution_status="resolved",
                     turn_id=turn_id,
                     referent_updates=[
                         DiscourseReferentUpdate(
@@ -118,6 +119,7 @@ class ConversationStateTests(unittest.TestCase):
         )
         results = manager.apply_goal_association_resolution(
             GoalAssociationResolution(
+                resolution_status="resolved",
                 turn_id="turn-neixiang",
                 referent_updates=[
                     DiscourseReferentUpdate(
@@ -149,6 +151,7 @@ class ConversationStateTests(unittest.TestCase):
 
         focus_result = manager.apply_goal_association_resolution(
             GoalAssociationResolution(
+                resolution_status="resolved",
                 turn_id="turn-rain",
                 resolved_references=[
                     ResolvedDiscourseReference(
@@ -188,6 +191,7 @@ class ConversationStateTests(unittest.TestCase):
         )
         results = manager.apply_goal_association_resolution(
             GoalAssociationResolution(
+                resolution_status="resolved",
                 turn_id="turn-neixiang",
                 referent_updates=[
                     DiscourseReferentUpdate(
@@ -735,7 +739,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
         manager: ConversationStateManager,
         *goal_ids: str,
     ) -> list[dict]:
-        return manager.apply_goal_association_resolution({'turn_id': 'turn-create-' + '-'.join(goal_ids), 'new_goals': [{'goal_id': goal_id, 'description': f'Complete {goal_id}.', 'source_text': f'Complete {goal_id}.'} for goal_id in goal_ids], 'confidence': 0.95, 'reason_summary': 'Independent user goals.'}, sid='sid-create', user_text='Complete the requested goals.', atomic=True)
+        return manager.apply_goal_association_resolution({'resolution_status': 'resolved', 'turn_id': 'turn-create-' + '-'.join(goal_ids), 'new_goals': [{'goal_id': goal_id, 'description': f'Complete {goal_id}.', 'source_text': f'Complete {goal_id}.'} for goal_id in goal_ids], 'confidence': 0.95, 'reason_summary': 'Independent user goals.'}, sid='sid-create', user_text='Complete the requested goals.', atomic=True)
 
     @staticmethod
     def _canonical_plan(
@@ -1188,7 +1192,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
         self.assertEqual(before["plan_status"], "proposed")
         self.assertEqual(before["status"], "planning")
 
-        applied = manager.apply_goal_association_resolution({'turn_id': 'turn-blue-cup', 'associations': [{'association_id': 'assoc-blue-cup', 'relationship': 'modify', 'target_goal_ids': ['goal-cup'], 'goal_update': {'description': 'Pick up the blue cup.'}, 'requires_replan': False, 'confidence': 0.99, 'reason_summary': 'The user refined the same cup responsibility.'}], 'confidence': 0.99, 'reason_summary': 'Same responsibility, compatible refinement.'}, sid='sid-blue', user_text='The blue one.', atomic=True)
+        applied = manager.apply_goal_association_resolution({'resolution_status': 'resolved', 'turn_id': 'turn-blue-cup', 'associations': [{'association_id': 'assoc-blue-cup', 'relationship': 'modify', 'target_goal_ids': ['goal-cup'], 'goal_update': {'description': 'Pick up the blue cup.'}, 'requires_replan': False, 'confidence': 0.99, 'reason_summary': 'The user refined the same cup responsibility.'}], 'confidence': 0.99, 'reason_summary': 'Same responsibility, compatible refinement.'}, sid='sid-blue', user_text='The blue one.', atomic=True)
 
         self.assertTrue(all(item.get("applied") is True for item in applied))
         after = manager.snapshot()["task_contexts"][0]
@@ -1226,7 +1230,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             ),
         )
 
-        applied = manager.apply_goal_association_resolution({'turn_id': 'turn-red-cup', 'associations': [{'association_id': 'assoc-red-cup', 'relationship': 'modify', 'target_goal_ids': ['goal-cup'], 'goal_update': {'description': 'Pick up the red cup instead.'}, 'requires_replan': True, 'confidence': 0.99, 'reason_summary': 'The changed target makes the old plan incompatible.'}], 'confidence': 0.99, 'reason_summary': 'Same responsibility, incompatible current Work.'}, sid='sid-red', user_text='Actually, the red one.', atomic=True)
+        applied = manager.apply_goal_association_resolution({'resolution_status': 'resolved', 'turn_id': 'turn-red-cup', 'associations': [{'association_id': 'assoc-red-cup', 'relationship': 'modify', 'target_goal_ids': ['goal-cup'], 'goal_update': {'description': 'Pick up the red cup instead.'}, 'requires_replan': True, 'confidence': 0.99, 'reason_summary': 'The changed target makes the old plan incompatible.'}], 'confidence': 0.99, 'reason_summary': 'Same responsibility, incompatible current Work.'}, sid='sid-red', user_text='Actually, the red one.', atomic=True)
 
         self.assertTrue(all(item.get("applied") is True for item in applied))
         after = manager.snapshot()["task_contexts"][0]
@@ -1565,7 +1569,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             "satisfied",
         )
 
-        correction = manager.apply_goal_association_resolution({'turn_id': 'turn-correction', 'associations': [{'association_id': 'assoc-correction', 'relationship': 'modify', 'target_goal_ids': ['goal-cup'], 'goal_update': {'description': 'Pick up the blue cup, not the red cup.'}, 'requires_replan': True, 'confidence': 0.99, 'reason_summary': 'The user corrected the intended cup.'}], 'confidence': 0.99, 'reason_summary': 'The same responsibility was misunderstood.'}, sid='sid-correction', user_text='No, I meant the blue cup.', atomic=True)
+        correction = manager.apply_goal_association_resolution({'resolution_status': 'resolved', 'turn_id': 'turn-correction', 'associations': [{'association_id': 'assoc-correction', 'relationship': 'modify', 'target_goal_ids': ['goal-cup'], 'goal_update': {'description': 'Pick up the blue cup, not the red cup.'}, 'requires_replan': True, 'confidence': 0.99, 'reason_summary': 'The user corrected the intended cup.'}], 'confidence': 0.99, 'reason_summary': 'The same responsibility was misunderstood.'}, sid='sid-correction', user_text='No, I meant the blue cup.', atomic=True)
         self.assertTrue(all(item.get("applied") is True for item in correction))
         active = manager.active_goal_snapshots()
         self.assertEqual(len(active), 1)

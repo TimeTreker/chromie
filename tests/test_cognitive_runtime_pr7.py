@@ -306,6 +306,7 @@ class ScriptedClient:
 
 def new_goal_association(goal_id: str = "goal-1") -> GoalAssociationResolution:
     return GoalAssociationResolution(
+        resolution_status="resolved",
         turn_id="turn-1",
         new_goals=[
             SemanticGoal(
@@ -328,6 +329,7 @@ def new_goal_association(goal_id: str = "goal-1") -> GoalAssociationResolution:
 
 def body_goal_association(goal_id: str = "goal-1") -> GoalAssociationResolution:
     return GoalAssociationResolution(
+        resolution_status="resolved",
         turn_id="turn-body",
         new_goals=[
             SemanticGoal(
@@ -350,6 +352,7 @@ def body_goal_association(goal_id: str = "goal-1") -> GoalAssociationResolution:
 
 def multi_goal_association(*goal_ids: str) -> GoalAssociationResolution:
     return GoalAssociationResolution(
+        resolution_status="resolved",
         turn_id="turn-multi",
         new_goals=[
             SemanticGoal(
@@ -1097,6 +1100,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
     def test_goal_association_clarification_skips_planners_and_composes_directly(self):
         association = GoalAssociationResolution(
+            resolution_status="needs_clarification",
             turn_id="turn-needs-clarification",
             clarification="Which direction should I move?",
             confidence=0.8,
@@ -1119,6 +1123,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
     def test_resolved_empty_goal_set_fails_closed_before_planning(self):
         association = GoalAssociationResolution(
+            resolution_status="resolved",
             turn_id="turn-empty",
             associations=[
                 {
@@ -2506,6 +2511,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
     def test_named_cancellation_is_not_committed_before_runtime_closure(self):
         association = GoalAssociationResolution(
+            resolution_status="resolved",
             turn_id="turn-cancel",
             associations=[
                 {
@@ -2684,6 +2690,7 @@ class AtomicGoalStateTests(unittest.TestCase):
         before = state.active_goal_snapshots()
         existing_goal_id = before[0]["goal_id"]
         mixed = GoalAssociationResolution(
+            resolution_status="resolved",
             turn_id="turn-mixed",
             associations=[
                 {

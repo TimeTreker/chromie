@@ -12,6 +12,7 @@ from shared.chromie_runtime.llm_diagnostics import cognition_text_reference
 class CognitionPromptProjectionTests(unittest.TestCase):
     def test_goal_association_projection_excludes_all_diagnostic_metadata(self) -> None:
         resolution = GoalAssociationResolution(
+            resolution_status="resolved",
             turn_id="turn-1",
             new_goals=[
                 SemanticGoal(
@@ -50,6 +51,7 @@ class CognitionPromptProjectionTests(unittest.TestCase):
 
     def test_goal_association_projection_strips_nested_referent_metadata(self) -> None:
         resolution = GoalAssociationResolution(
+            resolution_status="resolved",
             turn_id="turn-1",
             referent_updates=[
                 {

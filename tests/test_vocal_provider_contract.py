@@ -307,7 +307,7 @@ class VocalDeclarationAndPlannerTests(unittest.TestCase):
 
     def test_provider_vocal_goal_cannot_take_direct_chat_shortcut(self) -> None:
         provider_association = GoalAssociationResolution.model_validate(
-            {
+            {"resolution_status": "resolved",
                 "turn_id": "turn-provider-vocal",
                 "new_goals": [vocal_goal(mode="recitation")],
                 "confidence": 1.0,
@@ -322,7 +322,7 @@ class VocalDeclarationAndPlannerTests(unittest.TestCase):
             },
         }
         ordinary_association = GoalAssociationResolution.model_validate(
-            {
+            {"resolution_status": "resolved",
                 "turn_id": "turn-ordinary-speech",
                 "new_goals": [ordinary_goal],
                 "confidence": 1.0,

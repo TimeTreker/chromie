@@ -228,7 +228,7 @@ class GoalAssociationResolution(BaseModel):
         "resolved",
         "needs_clarification",
         "fail_closed",
-    ] = "resolved"
+    ]
     associations: list[GoalAssociation] = Field(default_factory=list)
     new_goals: list[SemanticGoal] = Field(default_factory=list)
     referent_updates: list[DiscourseReferentUpdate] = Field(default_factory=list)
@@ -237,21 +237,6 @@ class GoalAssociationResolution(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reason_summary: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)
-
-    @model_validator(mode="before")
-    @classmethod
-    def infer_explicit_terminal_status(cls, value: Any) -> Any:
-        """Keep older producers compatible while making terminal state explicit."""
-
-        if not isinstance(value, dict) or value.get("resolution_status"):
-            return value
-        normalized = dict(value)
-        normalized["resolution_status"] = (
-            "needs_clarification"
-            if str(normalized.get("clarification") or "").strip()
-            else "resolved"
-        )
-        return normalized
 
     @field_validator("turn_id", "clarification", "reason_summary", mode="before")
     @classmethod
