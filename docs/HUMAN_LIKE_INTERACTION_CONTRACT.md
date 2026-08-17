@@ -189,6 +189,16 @@ Planner and Goal Association concurrently. Fast Planner asks the user when a
 user-resolvable value is missing; Deep Planner is for complex HOW. GA alone commits
 the Goal creation or update.
 
+An unresolved `ask_user` InformationGap names each specific missing semantic value
+in `required_for` using its exact lowercase-snake-case binding name; it cannot name
+an already-bound value or a natural-language result description. The unknown answer
+to an already-defined external lookup is not
+such a value: GI marks fresh Evidence as required, Fast Planner may schedule the
+trusted read, and nobody asks the user to provide the result Chromie was asked to
+find. GA preserves the user's natural temporal wording in the Goal description while
+normalizing typed `day_part` scope to the shared canonical values `day`, `morning`,
+`afternoon`, `evening`, or `tonight`, so Planner and Capability contracts agree.
+
 Trusted Capability Runtime exposes one task-list view per canonical Goal. A task
 serving multiple Goals appears in each applicable view under the same stable request
 identity and executes once. Runtime may execute independent tasks concurrently when
@@ -290,8 +300,11 @@ speech. Fast Planner is the first HOW owner and may select one complete typed
 immediate conversational Activity after Responsibility meaning is sufficient.
 A terminal/clarification Activity may carry model-authored response text under
 its own truth contract; a pre-evidence `progress` Activity carries only a bounded
-`progress_kind` and Runtime renders the wording deterministically. Therefore a
-model cannot hide an unverified result inside a field merely labelled progress.
+`progress_kind`, its mechanically corresponding bounded `speech_act`, and Runtime
+renders the wording deterministically. An executable non-escalation Activity Plan
+has no Deep continuation and must contain a live Capability Activity. Therefore a
+model cannot hide an unverified result inside a field merely labelled progress or
+claim execution while emitting only conversational status.
 Later `ResponseStage` speech is scheduled only after the applicable Goal/Plan,
 evidence, claim, cancellation, and delivery contracts authorize it. The Host
 validates typed fields and lifecycle authority without phrase blacklists or a
@@ -393,14 +406,14 @@ catalog as affordance grounding, not phrase tables. Catalog presence does not
 justify weak substitution: a capability may be selected only when user meaning
 and required arguments are sufficiently supported.
 
-The Fast Goal Interpreter is an internal stage of the Goal-Driven Cognitive
-Core. It receives admitted evidence and emits provider-neutral Responsibility
-proposals, material semantic bindings, and optional immediate conversational
-progress. Legacy route/intent fields are compatibility diagnostics only; they do
-not select affordances, create tasks, authorize effects, or filter Planner
-Capabilities. Gateway reflex/admission evidence, canonical Goals, Planner output,
-Host validation, runtime results, and provider postconditions remain separate
-authorities.
+Goal Interpretation is an internal stage of the Goal-Driven Cognitive Core. It
+receives admitted evidence and emits provider-neutral Responsibility proposals,
+material semantic bindings, Goal relationships, and InformationGaps. It does not
+emit conversational progress, route/intent labels, Activities, or Capabilities.
+The same GI result enters Fast Planner and Goal Association concurrently; Fast
+Planner is the first owner of conversational and executable Activities. Gateway
+reflex/admission evidence, canonical Goals, Planner output, Host validation,
+runtime results, and provider postconditions remain separate authorities.
 
 If no matching capability exists, Chromie should say what is missing or ask a
 clarifying question. It should not substitute a vaguely related skill or tool.

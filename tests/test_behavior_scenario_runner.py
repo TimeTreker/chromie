@@ -25,8 +25,8 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
         )
         selected = load_scenarios(only={"goal_interpretation/goal_interpretation_normal_greeting"})
 
-        self.assertEqual(len(all_cases), 52)
-        self.assertEqual(len(goal_interpretation_cases), 27)
+        self.assertEqual(len(all_cases), 53)
+        self.assertEqual(len(goal_interpretation_cases), 28)
         self.assertEqual(len(cognitive_core_dialogue_cases), 3)
         cognitive_cases = load_scenarios(suites={"cognitive_runtime"})
         self.assertEqual(len(cognitive_cases), 16)

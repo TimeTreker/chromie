@@ -79,8 +79,6 @@ try:
         CanonicalPlan,
         FastPlannerAdvance,
         FastPlannerAdvanceModelOutput,
-        FastPlannerFreshEvidenceAdvanceModelOutput,
-        FastPlannerFreshEvidenceClarifiableAdvanceModelOutput,
     )
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
@@ -88,8 +86,6 @@ except ImportError:  # pragma: no cover
         CanonicalPlan,
         FastPlannerAdvance,
         FastPlannerAdvanceModelOutput,
-        FastPlannerFreshEvidenceAdvanceModelOutput,
-        FastPlannerFreshEvidenceClarifiableAdvanceModelOutput,
     )
 
 logger = logging.getLogger("chromie.agent.fast_planner")
@@ -183,7 +179,11 @@ class FastPlannerResolver:
             }
             for item in executable[: self.max_capabilities]
         ]
-        response_schema = FastPlannerAdvanceModelOutput.model_json_schema()
+        response_schema = self._advance_response_schema(
+            responsibility_refs,
+            responsibilities=responsibilities,
+            capabilities=capability_payload,
+        )
         options = {
             "temperature": 0,
             "top_p": 0.9,
@@ -258,6 +258,196 @@ class FastPlannerResolver:
                     raw_output=last_raw,
                 )
         raise AssertionError("unreachable")
+
+    @staticmethod
+    def _advance_response_schema(
+        responsibility_refs: list[str],
+        *,
+        responsibilities: list[CognitiveResponsibilityProposal] | None = None,
+        capabilities: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        """Constrain Fast Activities to the authoritative WHAT and live catalog.
+
+        A Responsibility that only lacks fresh external Evidence cannot be decoded
+        as a clarification or a completed answer.  This keeps the small Fast model
+        on its actual planning choices: bounded progress, an available Capability,
+        or an honest escalation.  A genuine ``ask_user`` gap retains the separate
+        clarification branch.
+        """
+
+        responsibility_items = list(responsibilities or [])
+        all_need_fresh_evidence = bool(responsibility_items) and all(
+            item.completion_requires_fresh_evidence
+            for item in responsibility_items
+        )
+        has_blocking_user_gap = any(
+            gap.blocking
+            and not gap.resolved
+            and gap.preferred_resolution == "ask_user"
+            for item in responsibility_items
+            for gap in item.information_gaps
+        )
+        schema = copy.deepcopy(FastPlannerAdvanceModelOutput.model_json_schema())
+        top_properties = schema.get("properties", {})
+        disposition = top_properties.get("disposition")
+        if isinstance(disposition, dict) and all_need_fresh_evidence:
+            disposition["enum"] = (
+                ["clarify", "refused", "unavailable"]
+                if has_blocking_user_gap
+                else ["execute", "mixed", "escalate", "refused", "unavailable"]
+            )
+        schema.setdefault("allOf", []).extend(
+            [
+                {
+                    "if": {
+                        "properties": {"disposition": {"const": "escalate"}},
+                        "required": ["disposition"],
+                    },
+                    "then": {
+                        "properties": {
+                            "continuations": {
+                                "items": {"const": "deep_planner"},
+                                "minItems": 1,
+                                "maxItems": 1,
+                            }
+                        }
+                    },
+                    "else": {
+                        "properties": {"continuations": {"maxItems": 0}}
+                    },
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "disposition": {"enum": ["execute", "mixed"]}
+                        },
+                        "required": ["disposition"],
+                    },
+                    "then": {
+                        "properties": {
+                            "activities": {
+                                "contains": {
+                                    "type": "object",
+                                    "properties": {"role": {"const": "capability"}},
+                                    "required": ["role"],
+                                },
+                                "minContains": 1,
+                            }
+                        }
+                    },
+                },
+            ]
+        )
+        refs = list(dict.fromkeys(responsibility_refs))
+        covered = schema.get("properties", {}).get(
+            "covered_responsibility_refs"
+        )
+        if isinstance(covered, dict):
+            covered["items"] = {"type": "string", "enum": refs}
+            covered["minItems"] = len(refs)
+            covered["maxItems"] = len(refs)
+            covered["uniqueItems"] = True
+        definitions = schema.get("$defs", {})
+        if all_need_fresh_evidence:
+            activities = top_properties.get("activities")
+            activity_items = (
+                activities.get("items") if isinstance(activities, dict) else None
+            )
+            allowed_activity_contracts = (
+                [
+                    "FastPlannerProgressActivity",
+                    "FastPlannerClarificationActivity",
+                ]
+                if has_blocking_user_gap
+                else [
+                    "FastPlannerProgressActivity",
+                    "FastPlannerCapabilityActivity",
+                ]
+            )
+            if isinstance(activity_items, dict):
+                activity_items["oneOf"] = [
+                    {"$ref": f"#/$defs/{contract_name}"}
+                    for contract_name in allowed_activity_contracts
+                ]
+                discriminator = activity_items.get("discriminator")
+                if isinstance(discriminator, dict):
+                    mapping = discriminator.get("mapping")
+                    if isinstance(mapping, dict):
+                        discriminator["mapping"] = {
+                            role: ref
+                            for role, ref in mapping.items()
+                            if ref.rsplit("/", 1)[-1] in allowed_activity_contracts
+                        }
+        for contract_name in (
+            "FastPlannerCompleteResponseActivity",
+            "FastPlannerClarificationActivity",
+            "FastPlannerProgressActivity",
+            "FastPlannerCapabilityActivity",
+        ):
+            contract = definitions.get(contract_name)
+            if not isinstance(contract, dict):
+                continue
+            source_refs = contract.get("properties", {}).get(
+                "source_responsibility_refs"
+            )
+            if isinstance(source_refs, dict):
+                source_refs["items"] = {"type": "string", "enum": refs}
+                source_refs["uniqueItems"] = True
+        capability_contract = definitions.get("FastPlannerCapabilityActivity")
+        progress_contract = definitions.get("FastPlannerProgressActivity")
+        if isinstance(progress_contract, dict):
+            progress_contract.setdefault("allOf", []).extend(
+                [
+                    {
+                        "if": {
+                            "properties": {"progress_kind": {"const": progress_kind}},
+                            "required": ["progress_kind"],
+                        },
+                        "then": {
+                            "properties": {"speech_act": {"const": speech_act}}
+                        },
+                    }
+                    for progress_kind, speech_act in (
+                        ("acknowledge_work", "acknowledge"),
+                        ("check_information", "acknowledge_and_check"),
+                        ("perform_action", "acknowledge"),
+                        ("think", "thinking"),
+                    )
+                ]
+            )
+        allowed_capabilities = [
+            item
+            for item in (capabilities or [])
+            if isinstance(item, dict) and item.get("capability_id")
+        ]
+        if isinstance(capability_contract, dict) and allowed_capabilities:
+            capability_id = capability_contract.get("properties", {}).get(
+                "capability_id"
+            )
+            if isinstance(capability_id, dict):
+                capability_id["enum"] = [
+                    str(item["capability_id"])
+                    for item in allowed_capabilities
+                ]
+            capability_contract["allOf"] = [
+                {
+                    "if": {
+                        "properties": {
+                            "capability_id": {
+                                "const": str(item["capability_id"])
+                            }
+                        },
+                        "required": ["capability_id"],
+                    },
+                    "then": {
+                        "properties": {
+                            "args": copy.deepcopy(item.get("input_schema") or {})
+                        }
+                    },
+                }
+                for item in allowed_capabilities
+            ]
+        return schema
 
     def _validate_advance_output(
         self,
@@ -1318,7 +1508,9 @@ class FastPlannerResolver:
             "no fresh Evidence. When a blocking InformationGap has "
             "preferred_resolution=ask_user, return disposition=clarify, zero Capability "
             "Activities, and a concise clarification Activity that asks for that exact gap. "
-            "Do not route a missing user parameter to Deep Planner. When all required "
+            "An observe_environment or query_trusted_service gap is work for Chromie, "
+            "not a reason to ask the user for the answer. Do not route a missing user "
+            "parameter to Deep Planner. When all required "
             "bindings are present and one exact available Capability covers the work, emit "
             "its exact capability_id and schema-valid args now. Preserve every GI binding, "
             "including all independent temporal dimensions. Add a progress speaking "

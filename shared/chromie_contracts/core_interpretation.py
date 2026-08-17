@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -28,6 +29,8 @@ _PLANNER_OWNED_BINDING_FIELDS = frozenset({
     "coordination_id",
     "execution_item_ids",
 })
+
+_SEMANTIC_BINDING_NAME = re.compile(r"[a-z][a-z0-9_]{0,79}")
 
 
 def _reject_planner_owned_bindings(value: Any, *, path: str = "bindings") -> Any:
@@ -162,6 +165,40 @@ class CognitiveResponsibilityProposal(BaseModel):
             raise ValueError(
                 "a Responsibility cannot introduce and resolve the same InformationGap: "
                 + ",".join(sorted(overlap))
+            )
+        invalid_user_gaps = [
+            item.gap_id
+            for item in self.information_gaps
+            if item.preferred_resolution == "ask_user"
+            and not item.resolved
+            and not item.required_for
+        ]
+        if invalid_user_gaps:
+            raise ValueError(
+                "ask_user InformationGap must name the missing user-resolvable value "
+                "in required_for: "
+                + ",".join(invalid_user_gaps)
+            )
+        invalid_required_bindings: list[str] = []
+        already_bound: list[str] = []
+        for gap in self.information_gaps:
+            if gap.preferred_resolution != "ask_user" or gap.resolved:
+                continue
+            for binding_name in gap.required_for:
+                if _SEMANTIC_BINDING_NAME.fullmatch(binding_name) is None:
+                    invalid_required_bindings.append(binding_name)
+                elif binding_name in self.bindings:
+                    already_bound.append(binding_name)
+        if invalid_required_bindings:
+            raise ValueError(
+                "ask_user required_for entries must be unresolved semantic binding "
+                "names, not natural-language result descriptions: "
+                + ",".join(invalid_required_bindings)
+            )
+        if already_bound:
+            raise ValueError(
+                "ask_user required_for cannot name values already present in bindings: "
+                + ",".join(already_bound)
             )
         return self
 

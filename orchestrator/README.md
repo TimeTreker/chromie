@@ -69,16 +69,15 @@ microphone -> host VAD -> ASR -> Cognitive Gateway
   -> matched stop/cancel: interrupt current work and retain the envelope/outcome
   -> local suppression: record the envelope and start no ordinary cognition
   -> otherwise: attention review -> admitted UserTurnEnvelope
-  -> Fast Understanding
-       |-> complete native response -> existing Vocal runtime may start
-       |-> exact capability candidate -> trusted safe read may start when ready
-       |-> background Social Attention may prepare optional body decoration
-       `-> Goal Association resolves scoped references, Goal relations, and exact candidate bindings
-  -> fully bound native conversation: deterministic canonical speech adoption
-     fully bound information work: adopt canonical Plan without Fast Planner
-     otherwise: Fast Planner -> terminal Deep Planner when required
-  -> reuse already-started Vocal / execution-only ready read when sufficient
-     otherwise: Response Composer -> host-built strict InteractionResponse
+  -> Goal Interpretation: contextual Responsibility + Goal relation + InformationGaps
+  -> same GI result, concurrent fan-out
+       |-> Fast Planner: first speaking/Capability Activity Plan
+       |     `-> Deep Planner only when HOW exceeds the Fast budget
+       |-> Goal Association: sole canonical Goal commit/version authority
+       `-> background Social Attention may prepare optional body decoration
+  -> bind Activities into one Runtime task-list view per Goal
+  -> start ready side-effect-free reads; hold effects for Goal/confirmation authority
+  -> Response Composer only for a still-needed presentation decision
   -> InteractionCoordinator -> Trusted Capability Runtime
       -> Soridormi or peer provider
   -> exact plan/request/result/trace join -> per-goal outcome commit

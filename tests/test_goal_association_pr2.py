@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from agent.app.clients.ollama_client import OllamaGenerationError
 from agent.app.goal_association import (
+    GoalAssociationModelBinding,
     GoalAssociationModelGoal,
     GoalAssociationModelInformationResourceResponsibility,
     GoalAssociationModelPhysicalResourceResponsibility,
@@ -233,6 +234,17 @@ def active_goal(goal_id: str, description: str) -> dict:
 
 
 class GoalExecutionContractTests(unittest.TestCase):
+    def test_day_part_binding_uses_canonical_runtime_vocabulary(self):
+        with self.assertRaisesRegex(ValueError, "canonical day-part value"):
+            GoalAssociationModelBinding.model_validate(
+                binding("time", "day_part", "daytime")
+            )
+
+        parsed = GoalAssociationModelBinding.model_validate(
+            binding("time", "day_part", "day")
+        )
+        self.assertEqual(parsed.value, "day")
+
     def test_host_execution_projection_is_derived_from_output_mode(self):
         item = GoalAssociationModelGoal.model_validate(
             goal("Check tomorrow's weather.", "capability_work")
@@ -472,6 +484,14 @@ class GoalExecutionContractTests(unittest.TestCase):
         ]
         self.assertTrue(list(goal_validator.iter_errors(weather)))
         weather["new_goals"][0]["bindings"] = []
+
+        weather_scope = weather["new_goals"][0]["resource_responsibility"][
+            "query_scope"
+        ]
+        weather_scope.append(binding("time", "day_part", "daytime"))
+        self.assertTrue(list(goal_validator.iter_errors(weather)))
+        weather_scope[-1]["value"] = "day"
+        self.assertEqual(list(goal_validator.iter_errors(weather)), [])
 
         bounded_goal_schema = GoalAssociationResolver._response_schema(
             GoalSegmentationModelOutput,

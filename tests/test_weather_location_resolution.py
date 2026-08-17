@@ -313,6 +313,66 @@ class WeatherLocationResolutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(query.location, "Neixiang County, Henan Province")
         self.assertEqual(report.location_name, "Neixiang")
 
+    async def test_provider_municipality_suffix_matches_same_explicit_admin(self) -> None:
+        geocode_queries: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path.endswith("/search"):
+                query = parse_qs(request.url.query.decode())["name"][0]
+                geocode_queries.append(query)
+                if query == "Chongqing":
+                    return httpx.Response(
+                        200,
+                        json={
+                            "results": [
+                                {
+                                    "name": "Chongqing",
+                                    "admin1": "Chongqing Municipality",
+                                    "country": "China",
+                                    "latitude": 29.56026,
+                                    "longitude": 106.55771,
+                                }
+                            ]
+                        },
+                    )
+                return httpx.Response(200, json={"results": []})
+            return httpx.Response(
+                200,
+                json={
+                    "timezone": "Asia/Shanghai",
+                    "current": {"temperature_2m": 32.0, "weather_code": 2},
+                    "daily": {
+                        "time": ["2026-08-18", "2026-08-19"],
+                        "weather_code": [2, 3],
+                        "temperature_2m_max": [37.0, 36.0],
+                        "temperature_2m_min": [28.0, 27.0],
+                        "precipitation_sum": [0.0, 1.0],
+                        "precipitation_probability_max": [20.0, 40.0],
+                    },
+                },
+            )
+
+        client = OpenMeteoWeatherClient(
+            geocoding_url="https://example.test/v1/search",
+            forecast_url="https://example.test/v1/forecast",
+            transport=httpx.MockTransport(handler),
+        )
+        report = await client.lookup(
+            WeatherQuery(
+                location="重庆",
+                language="zh-CN",
+                location_context=WeatherLocationContext(
+                    locality="Chongqing",
+                    admin1="Chongqing",
+                    country="China",
+                ),
+            )
+        )
+
+        self.assertEqual(geocode_queries[:2], ["重庆", "Chongqing"])
+        self.assertEqual(report.location_name, "Chongqing")
+        self.assertEqual(report.provider_admin1, "Chongqing Municipality")
+
     async def test_fallback_rejects_same_named_locality_from_wrong_admin1(self) -> None:
         def handler(request: httpx.Request) -> httpx.Response:
             if request.url.path.endswith("/search"):

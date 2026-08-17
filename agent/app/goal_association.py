@@ -304,6 +304,21 @@ class GoalAssociationModelBinding(BaseModel):
             return " ".join(value.strip().split())
         return value
 
+    @model_validator(mode="after")
+    def validate_canonical_day_part(self) -> "GoalAssociationModelBinding":
+        if self.entity_type.casefold() == "day_part" and self.value not in {
+            "day",
+            "morning",
+            "afternoon",
+            "evening",
+            "tonight",
+        }:
+            raise ValueError(
+                "day_part bindings require a canonical day-part value: "
+                "day, morning, afternoon, evening, or tonight"
+            )
+        return self
+
 
 class GoalAssociationModelResolvedReference(BaseModel):
     """Model-facing explicit resolution of a reference in the current turn."""
@@ -1975,6 +1990,28 @@ class GoalAssociationResolver:
                     },
                 }
             )
+        clauses.append(
+            {
+                "if": {
+                    "properties": {"entity_type": {"const": "day_part"}},
+                    "required": ["entity_type"],
+                },
+                "then": {
+                    "properties": {
+                        "value": {
+                            "enum": [
+                                "day",
+                                "morning",
+                                "afternoon",
+                                "evening",
+                                "tonight",
+                            ]
+                        }
+                    },
+                    "required": ["value"],
+                },
+            }
+        )
         return schema
 
     @staticmethod
@@ -2195,7 +2232,7 @@ class GoalAssociationResolver:
             "A factual lookup and the user's requested interpretation of that same evidence are one Goal when one capability result can satisfy both, such as checking weather and judging whether it is hot. Multiple requested aspects of one information result, such as precipitation and whether the resulting temperature is cold, remain one information responsibility when the same result satisfies them. Do not split evidence acquisition, requested result aspects, or interpretation of that result into separate Goals. "
             "A physical action and a conversational answer or spoken performance are independent goals when the answer or performance is genuinely requested. Separate independently requested outcomes that can be accepted or rejected on their own. However, acquisition and delivery stages that together constitute one human responsibility are one Goal: navigating/searching, locating, grasping or retrieving, carrying, returning, and handing over are provider-owned stages of one physical resource delivery; external search, evidence retrieval, evaluation, and spoken explanation are stages of one information resource delivery. Do not split those implementation stages into separate Goals unless the user independently requests one stage as its own outcome. A simple acknowledgement, confirmation, willingness statement, or progress prelude for capability work is not a separate vocal_output Goal; it is prospective conversational output attached to the existing responsibility and every cognitive stage must use Interaction Context to avoid repeating an already fulfilled act. Before returning, verify that every independently satisfiable user responsibility appears in exactly one new_goals item: no merged unrelated outcomes and no duplicated responsibility across Goals. "
             "For a responsibility whose human-level outcome is to obtain something and make it available to a recipient, include exactly one nested resource_responsibility. It is the sole writable resource authority and is discriminated by top-level kind. A physical_object resource means a distinct concrete object that exists independently of Chromie's body motion and whose acquisition plus handover completes the human outcome. It is never a generic wrapper for embodied work: locomotion, body motion, gaze, blinking, waving, turning, posture, and gestures are non-resource body_action Goals, keep resource_responsibility absent, and preserve their material semantic parameters in top-level bindings. For kind=information, use output_mode=capability_work and write every requested query fact—location, time, requested aspect, comparison, threshold, or other answer-shaping scope—exactly once in query_scope. Its source object is intentionally narrow: source.status=provider_resolved delegates public/external source selection; source.status=unknown preserves an unavailable local/private/runtime source; source.status=known is only for a user- or discourse-named information source and then source_name is required. Never copy query_scope facts into source. For kind=physical_object, use output_mode=body_action and delivery_mode=physical_handover; identity and quantity live at resource_responsibility.description/quantity, while source.acquisition_bindings is the only writable location/distance/direction/route surface. Preserve explicit distance and direction separately; source.description is summary only and any numeric fact in it must also exist in acquisition_bindings. Resource Goals keep top-level bindings empty. No flat compatibility copy is created. resource_responsibility must never name or imply a Capability, provider implementation, website, search engine, coordinates, grasp pose, execution mode, or plan. Human-readable descriptions never override typed fields. "
-            "Also preserve semantic qualifiers such as temporal scope, comparison period, and requested answer shape. Temporal scope can contain more than one material dimension. When the user supplies a calendar or relative date together with a local day part, emit separate query_scope bindings for both: entity_type=date with the resolved date value such as today or tomorrow, and entity_type=day_part with the resolved value morning, afternoon, evening, or tonight. Neither dimension covers or replaces the other. When only a local day part is semantically resolved, represent it provider-neutrally as entity_type=day_part with its canonical value; keep the user's natural wording in the Goal description rather than using a provider-specific clock interval. This is semantic normalization, not Capability selection. Never silently rewrite annual, seasonal, historical, comparative, or otherwise broad scope into current, today, tomorrow, or another narrower scope. If the intended scope is materially ambiguous, return clarification instead of choosing a narrower interpretation. "
+            "Also preserve semantic qualifiers such as temporal scope, comparison period, and requested answer shape. Temporal scope can contain more than one material dimension. When the user supplies a calendar or relative date together with a local day part, emit separate query_scope bindings for both: entity_type=date with the resolved date value such as today or tomorrow, and entity_type=day_part with exactly one canonical value from day, morning, afternoon, evening, or tonight. Use day for the whole local daylight period. Neither dimension covers or replaces the other. When only a local day part is semantically resolved, represent it provider-neutrally as entity_type=day_part with its canonical value; keep the user's natural wording in the Goal description rather than using a provider-specific clock interval. This is semantic normalization, not Capability selection. Never silently rewrite annual, seasonal, historical, comparative, or otherwise broad scope into current, today, tomorrow, or another narrower scope. If the intended scope is materially ambiguous, return clarification instead of choosing a narrower interpretation. "
             "Resolve references, pronouns, demonstratives, ellipsis, and task mentions before planning. Authority order is: explicit current user meaning; foreground scoped discourse referents; candidate Goal bindings; recent dialogue. First identify every material indirect referring expression, then require a unique value from that authority order and preserve it in a typed binding or supplied referent. Imperative grammar and a plausible generic noun such as device, object, person, task, or setting are never reference evidence. If two or more contextual candidates remain plausible, or none is supplied, ask a narrow clarification. Phrases such as ‘the last task I told you’ may semantically associate with an active, recoverable, or retained recent terminal Goal, but the model must decide that relationship from the supplied Goal state and dialogue—not from a Host phrase table. Tool-result memory is not reference-resolution authority and must never decide what an unresolved expression refers to. "
             "When the user introduces or explicitly corrects a salient entity, emit referent_updates only when the required discourse-index provenance is available. Use operation=correct with non-empty target_referent_ids copied from supplied discourse context when a new value supersedes an earlier referent; never emit an unscoped correction when no target referent ID was supplied. The canonical Goal association and typed bindings still preserve a correction even when no discourse-index update can be authored. The old referent remains available in its own task scope but becomes background. Use operation=introduce for a new salient entity, and focus/background/retire only for supplied referent IDs. "
             "Use resolved_references only for indirect references whose denotation must be selected from a supplied discourse referent or active Goal binding, such as pronouns, demonstratives, ellipsis, aliases, corrections, or task mentions. Do not emit resolved_references for an ordinary explicit entity mention such as a directly named place; represent that meaning in the new Goal bindings and, when it is salient for future dialogue, in referent_updates. Every resolved_references item must copy a supplied referent_id and include explicit confidence. If resolution is materially ambiguous, return decision=clarify rather than selecting a value from stale evidence or recency alone. "

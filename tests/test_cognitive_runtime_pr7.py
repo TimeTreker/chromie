@@ -148,6 +148,7 @@ class FastPlannerProgressRenderingTests(unittest.TestCase):
     def test_pre_capability_progress_does_not_promise_unknown_work(self):
         activity = FastPlannerProgressActivity(
             activity_id="status-progress",
+            role="progress",
             progress_kind="check_information",
             source_responsibility_refs=["status"],
         )
@@ -675,8 +676,9 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             activities=[
                 FastPlannerProgressActivity(
                     activity_id="weather-progress",
+                    role="progress",
                     progress_kind="check_information",
-                    speech_act="acknowledge",
+                    speech_act="acknowledge_and_check",
                     source_responsibility_refs=["weather"],
                 )
             ],
@@ -749,6 +751,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             activities=[
                 FastPlannerCompleteResponseActivity(
                     activity_id="greeting-response",
+                    role="complete_response",
                     response_text="你好呀！",
                     speech_act="greeting",
                     source_responsibility_refs=["r1"],
@@ -787,7 +790,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             "gap_id": "gap-tea-kind",
             "description": "Which tea should be brought?",
             "blocking": True,
-            "required_for": ["tea selection"],
+            "required_for": ["tea_kind"],
             "preferred_resolution": "ask_user",
         }
         association = GoalAssociationResolution(
@@ -819,6 +822,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             activities=[
                 FastPlannerClarificationActivity(
                     activity_id="ask-tea-kind",
+                    role="clarification",
                     response_text="你想喝什么茶？",
                     speech_act="ask_clarification",
                     source_responsibility_refs=["tea"],
@@ -949,6 +953,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             activities=[
                 FastPlannerCapabilityActivity(
                     activity_id="weather-lookup",
+                    role="capability",
                     capability_id="chromie.weather.lookup",
                     args={"location": "重庆", "date": "today"},
                     timing="parallel",
@@ -1024,6 +1029,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             activities=[
                 FastPlannerProgressActivity(
                     activity_id="fetch-progress",
+                    role="progress",
                     progress_kind="perform_action",
                     speech_act="acknowledge",
                     source_responsibility_refs=["fetch-water"],

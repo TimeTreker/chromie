@@ -34,7 +34,9 @@
               "gap_id": "restaurant_location",
               "description": "The user location for nearby recommendations is not known.",
               "blocking": true,
-              "required_for": [],
+              "required_for": [
+                "location"
+              ],
               "preferred_resolution": "ask_user",
               "candidate_values": [],
               "resolved": false,
@@ -77,7 +79,9 @@
             "gap_id": "restaurant_location",
             "description": "The user location for nearby recommendations is not known.",
             "blocking": true,
-            "required_for": [],
+            "required_for": [
+              "location"
+            ],
             "preferred_resolution": "ask_user",
             "candidate_values": [],
             "resolved": false,

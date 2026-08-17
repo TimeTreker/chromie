@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import unittest
 
 from agent.app.fast_planner import FastPlannerResolver
@@ -1268,7 +1269,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("Executable common Capability catalog", str(prompt))
 
     def test_first_activity_plan_schema_requires_explicit_decision_fields(self):
-        schema = FastPlannerAdvanceModelOutput.model_json_schema()
+        schema = FastPlannerResolver._advance_response_schema(["weather"])
 
         self.assertEqual(
             set(schema["required"]),
@@ -1283,6 +1284,180 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "reason_summary",
             },
         )
+        for activity_contract in (
+            "FastPlannerCompleteResponseActivity",
+            "FastPlannerClarificationActivity",
+            "FastPlannerProgressActivity",
+            "FastPlannerCapabilityActivity",
+        ):
+            activity_schema = schema["$defs"][activity_contract]
+            self.assertIn("role", activity_schema["required"])
+            self.assertNotIn("default", activity_schema["properties"]["role"])
+            refs = activity_schema["properties"]["source_responsibility_refs"]
+            self.assertEqual(refs["items"]["enum"], ["weather"])
+        covered = schema["properties"]["covered_responsibility_refs"]
+        self.assertEqual(covered["items"]["enum"], ["weather"])
+        self.assertEqual(covered["minItems"], 1)
+        self.assertEqual(covered["maxItems"], 1)
+        self.assertTrue(covered["uniqueItems"])
+
+    def test_fresh_external_evidence_schema_excludes_clarification_and_completion(self):
+        responsibility = CognitiveResponsibilityProposal.model_validate(
+            {
+                "local_ref": "weather",
+                "outcome": "Describe today's daytime weather in Chongqing.",
+                "bindings": {
+                    "location": "重庆",
+                    "date": "today",
+                    "time_of_day": "白天",
+                },
+                "information_gaps": [
+                    {
+                        "gap_id": "weather_result",
+                        "description": "Current weather data for Chongqing",
+                        "preferred_resolution": "query_trusted_service",
+                    }
+                ],
+                "completion_requires_work": True,
+                "completion_requires_fresh_evidence": True,
+                "confidence": 0.96,
+            }
+        )
+        capability = WeatherCatalog().items[-1]
+        capability_payload = [
+            {
+                "capability_id": capability.capability_id,
+                "input_schema": capability.input_schema,
+            }
+        ]
+
+        schema = FastPlannerResolver._advance_response_schema(
+            ["weather"],
+            responsibilities=[responsibility],
+            capabilities=capability_payload,
+        )
+
+        activity_refs = {
+            item["$ref"]
+            for item in schema["properties"]["activities"]["items"]["oneOf"]
+        }
+        self.assertEqual(
+            activity_refs,
+            {
+                "#/$defs/FastPlannerProgressActivity",
+                "#/$defs/FastPlannerCapabilityActivity",
+            },
+        )
+        capability_schema = schema["$defs"]["FastPlannerCapabilityActivity"]
+        self.assertEqual(
+            capability_schema["properties"]["capability_id"]["enum"],
+            ["chromie.weather.lookup"],
+        )
+        encoded_capability_schema = json.dumps(capability_schema, sort_keys=True)
+        self.assertIn('"period"', encoded_capability_schema)
+
+    def test_fresh_evidence_with_user_gap_keeps_clarification_not_capability(self):
+        responsibility = CognitiveResponsibilityProposal.model_validate(
+            {
+                "local_ref": "weather",
+                "outcome": "Describe today's weather at the requested location.",
+                "bindings": {"date": "today"},
+                "information_gaps": [
+                    {
+                        "gap_id": "weather_location",
+                        "description": "The location is missing.",
+                        "required_for": ["location"],
+                        "preferred_resolution": "ask_user",
+                    }
+                ],
+                "completion_requires_work": True,
+                "completion_requires_fresh_evidence": True,
+                "confidence": 0.96,
+            }
+        )
+
+        schema = FastPlannerResolver._advance_response_schema(
+            ["weather"],
+            responsibilities=[responsibility],
+        )
+
+        activity_refs = {
+            item["$ref"]
+            for item in schema["properties"]["activities"]["items"]["oneOf"]
+        }
+        self.assertEqual(
+            activity_refs,
+            {
+                "#/$defs/FastPlannerProgressActivity",
+                "#/$defs/FastPlannerClarificationActivity",
+            },
+        )
+
+    def test_daytime_weather_can_check_and_speak_in_parallel(self):
+        ollama = FakeOllama(
+            {
+                "disposition": "execute",
+                "coverage": "complete",
+                "covered_responsibility_refs": ["weather"],
+                "activities": [
+                    {
+                        "activity_id": "activity-weather-progress",
+                        "role": "progress",
+                        "progress_kind": "check_information",
+                        "speech_act": "acknowledge_and_check",
+                        "timing": "parallel",
+                        "source_responsibility_refs": ["weather"],
+                    },
+                    {
+                        "activity_id": "activity-weather-lookup",
+                        "role": "capability",
+                        "capability_id": "chromie.weather.lookup",
+                        "args": {
+                            "location": "重庆",
+                            "date": "today",
+                            "period": "day",
+                        },
+                        "timing": "parallel",
+                        "source_responsibility_refs": ["weather"],
+                        "reason_summary": "Check the requested daytime weather.",
+                    },
+                ],
+                "continuations": [],
+                "confidence": 0.95,
+                "unresolved": [],
+                "reason_summary": "The request is complete and needs fresh evidence.",
+            }
+        )
+        run_request = _work_request(
+            sid="turn-weather-daytime-progress",
+            text="你好，今天重庆白天天气怎么样啊？",
+            language="zh-CN",
+            context={
+                "responsibility_proposals": [
+                    {
+                        "local_ref": "weather",
+                        "outcome": "Tell the user today's daytime weather in Chongqing.",
+                        "bindings": {
+                            "location": "重庆",
+                            "date": "today",
+                            "time_of_day": "白天",
+                        },
+                        "completion_requires_work": True,
+                        "completion_requires_fresh_evidence": True,
+                        "confidence": 0.96,
+                    }
+                ]
+            },
+            history=[],
+        )
+
+        advance = asyncio.run(
+            FastPlannerResolver(ollama, WeatherCatalog()).resolve_advance(run_request)
+        )
+
+        self.assertEqual([item.role for item in advance.activities], ["progress", "capability"])
+        self.assertEqual(advance.activities[1].args["period"], "day")
+        self.assertEqual(advance.continuations, [])
 
     def test_invalid_first_activity_plan_is_discarded_for_one_canonical_fast_revision(self):
         # Retained live regression: qwen3:4b once emitted only this Activity,
@@ -1344,7 +1519,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "activity_id": "activity-weather-progress",
                         "role": "progress",
                         "progress_kind": "check_information",
-                        "speech_act": "acknowledge",
+                        "speech_act": "acknowledge_and_check",
                         "timing": "parallel",
                         "source_responsibility_refs": ["weather"],
                     },

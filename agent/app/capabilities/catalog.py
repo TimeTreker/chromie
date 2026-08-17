@@ -490,6 +490,12 @@ class CapabilityCatalog:
         entries: list[CatalogCapability] = []
         for tool in registry.tools_for_llm():
             agent = registry.get_agent(tool.agent_id)
+            execution_parallel_declared = (
+                "can_run_parallel" in tool.execution.model_fields_set
+            )
+            execution_exclusive_declared = (
+                "exclusive_group" in tool.execution.model_fields_set
+            )
             capability = CatalogCapability(
                 capability_id=tool.name,
                 agent_id=tool.agent_id,
@@ -515,7 +521,9 @@ class CapabilityCatalog:
                 hints=dict(tool.llm_hints),
                 metadata={"version": tool.version},
                 can_run_parallel=(
-                    bool(tool.llm_hints.get("can_run_parallel"))
+                    tool.execution.can_run_parallel
+                    if execution_parallel_declared
+                    else bool(tool.llm_hints.get("can_run_parallel"))
                     if "can_run_parallel" in tool.llm_hints
                     else None
                 ),
@@ -527,9 +535,14 @@ class CapabilityCatalog:
                         "resource_claims",
                         "execution_constraints",
                     )
-                ),
+                )
+                or execution_parallel_declared
+                or execution_exclusive_declared,
                 exclusive_group=(
-                    str(tool.llm_hints.get("exclusive_group") or "").strip() or None
+                    tool.execution.exclusive_group
+                    if execution_exclusive_declared
+                    else str(tool.llm_hints.get("exclusive_group") or "").strip()
+                    or None
                 ),
                 resource_claims=[
                     str(value)

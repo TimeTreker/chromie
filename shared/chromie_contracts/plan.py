@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Annotated, Any, Literal, Union
+from typing import Annotated, Any, Literal, Union, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -47,6 +47,20 @@ FastProgressKind = Literal[
     "perform_action",
     "think",
 ]
+FastProgressSpeechAct = Literal[
+    "acknowledge",
+    "acknowledge_and_check",
+    "thinking",
+]
+
+_FAST_PROGRESS_SPEECH_ACT_BY_KIND: dict[
+    FastProgressKind, FastProgressSpeechAct
+] = {
+    "acknowledge_work": "acknowledge",
+    "check_information": "acknowledge_and_check",
+    "perform_action": "acknowledge",
+    "think": "thinking",
+}
 
 
 class _FastPlannerVocalActivityBase(BaseModel):
@@ -73,7 +87,7 @@ class _FastPlannerVocalActivityBase(BaseModel):
 class FastPlannerCompleteResponseActivity(_FastPlannerVocalActivityBase):
     """A conversational answer that can fully complete its Responsibility now."""
 
-    role: Literal["complete_response"] = "complete_response"
+    role: Literal["complete_response"]
     response_text: str = Field(min_length=1, max_length=600)
 
     @field_validator("response_text", mode="before")
@@ -85,7 +99,7 @@ class FastPlannerCompleteResponseActivity(_FastPlannerVocalActivityBase):
 class FastPlannerClarificationActivity(_FastPlannerVocalActivityBase):
     """A user-facing question when WHAT lacks a material binding."""
 
-    role: Literal["clarification"] = "clarification"
+    role: Literal["clarification"]
     response_text: str = Field(min_length=1, max_length=600)
 
     @field_validator("response_text", mode="before")
@@ -104,8 +118,34 @@ class FastPlannerProgressActivity(_FastPlannerVocalActivityBase):
     result.
     """
 
-    role: Literal["progress"] = "progress"
+    role: Literal["progress"]
     progress_kind: FastProgressKind
+    speech_act: str = Field(
+        default="acknowledge",
+        json_schema_extra={
+            "enum": ["acknowledge", "acknowledge_and_check", "thinking"]
+        },
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def bind_progress_kind_to_safe_speech_act(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        progress_kind = normalized.get("progress_kind")
+        expected = _FAST_PROGRESS_SPEECH_ACT_BY_KIND.get(
+            cast(FastProgressKind, progress_kind)
+        )
+        if expected is None:
+            return normalized
+        supplied = normalized.get("speech_act")
+        if supplied not in (None, "") and supplied != expected:
+            raise ValueError(
+                "Fast Planner progress speech_act must match progress_kind"
+            )
+        normalized["speech_act"] = expected
+        return normalized
 
 
 class FastPlannerCapabilityActivity(CapabilityIdentityModel):
@@ -113,7 +153,7 @@ class FastPlannerCapabilityActivity(CapabilityIdentityModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    role: Literal["capability"] = "capability"
+    role: Literal["capability"]
     activity_id: str = Field(min_length=1, max_length=160)
     args: dict[str, Any] = Field(default_factory=dict)
     timing: PlanTiming = "sequential"
@@ -339,23 +379,6 @@ class FastPlannerAdvanceModelOutput(BaseModel):
     @classmethod
     def normalize_output_text(cls, value: Any) -> Any:
         return " ".join(value.strip().split()) if isinstance(value, str) else value
-
-
-class FastPlannerFreshEvidenceAdvanceModelOutput(FastPlannerAdvanceModelOutput):
-    """Decoder contract for confident WHAT that still needs fresh Evidence.
-
-    No factual result can be complete yet, and confident WHAT does not need a
-    clarification question. The only immediate user-facing semantic delta is
-    bounded progress (or silence).
-    """
-
-    activities: list[FastPlannerActivity]
-
-
-class FastPlannerFreshEvidenceClarifiableAdvanceModelOutput(FastPlannerAdvanceModelOutput):
-    """Fresh-evidence decoder contract when WHAT is materially uncertain."""
-
-    activities: list[FastPlannerActivity]
 
 
 def _normalize_ids(value: Any) -> list[str]:

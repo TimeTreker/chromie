@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "id": "chongqing_daytime_weather_is_evidence_not_user_gap",
+  "suite": "goal_interpretation",
+  "level": "module",
+  "description": "A fully scoped daytime weather request requires fresh external Evidence and no user clarification.",
+  "tags": [
+    "tool",
+    "normal",
+    "regression"
+  ],
+  "input": {
+    "text": "你好，今天重庆白天天气怎么样啊？",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "llm_decision": {
+      "confidence": 0.95,
+      "responsibilities": [
+        {
+          "schema_version": 1,
+          "local_ref": "weather",
+          "outcome": "告知用户今天重庆白天的天气情况",
+          "bindings": {
+            "location": "重庆",
+            "date": "today",
+            "time_of_day": "白天"
+          },
+          "relationship": "new",
+          "target_goal_ids": [],
+          "information_gaps": [],
+          "resolved_gap_ids": [],
+          "completion_requires_work": true,
+          "completion_requires_fresh_evidence": true,
+          "confidence": 0.95
+        }
+      ],
+      "unresolved": []
+    }
+  },
+  "expect": {
+    "confidence": 0.95,
+    "llm_calls": 1,
+    "llm_stages": [
+      "goal_interpretation"
+    ],
+    "unresolved": [],
+    "responsibilities": [
+      {
+        "schema_version": 1,
+        "local_ref": "weather",
+        "outcome": "告知用户今天重庆白天的天气情况",
+        "bindings": {
+          "location": "重庆",
+          "date": "today",
+          "time_of_day": "白天"
+        },
+        "relationship": "new",
+        "target_goal_ids": [],
+        "information_gaps": [],
+        "resolved_gap_ids": [],
+        "completion_requires_work": true,
+        "completion_requires_fresh_evidence": true,
+        "confidence": 0.95
+      }
+    ]
+  }
+}

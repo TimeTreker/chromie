@@ -33,7 +33,9 @@
               "gap_id": "headset_reference",
               "description": "What the user means by that about the headset is unclear.",
               "blocking": true,
-              "required_for": [],
+              "required_for": [
+                "headset_reference"
+              ],
               "preferred_resolution": "ask_user",
               "candidate_values": [],
               "resolved": false,
@@ -76,7 +78,9 @@
             "gap_id": "headset_reference",
             "description": "What the user means by that about the headset is unclear.",
             "blocking": true,
-            "required_for": [],
+            "required_for": [
+              "headset_reference"
+            ],
             "preferred_resolution": "ask_user",
             "candidate_values": [],
             "resolved": false,

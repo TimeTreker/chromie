@@ -188,6 +188,10 @@
           "rationale": "A weather request without location asks for that missing user parameter."
         },
         {
+          "key": "goal_interpretation/chongqing_daytime_weather_is_evidence_not_user_gap",
+          "rationale": "A fully scoped weather request treats the unknown result as fresh Evidence rather than a user-resolvable gap."
+        },
+        {
           "key": "goal_interpretation/missing_restaurant_recommendation_closes_truthfully",
           "rationale": "A nearby recommendation request preserves the missing location as an InformationGap."
         }
@@ -442,6 +446,10 @@
           "rationale": "Weather meaning requires fresh evidence and preserves its missing location."
         },
         {
+          "key": "goal_interpretation/chongqing_daytime_weather_is_evidence_not_user_gap",
+          "rationale": "The exact reported weather turn is fully bound at GI and requires a trusted lookup rather than clarification."
+        },
+        {
           "key": "goal_interpretation/missing_restaurant_recommendation_closes_truthfully",
           "rationale": "External recommendation meaning retains its evidence and location requirements."
         },
@@ -463,6 +471,28 @@
         }
       ],
       "live_text_cases": [
+        {
+          "id": "chongqing_daytime_weather_progress_and_lookup",
+          "text": "你好，今天重庆白天天气怎么样啊？",
+          "language": "zh-CN",
+          "expected_capabilities": [
+            "chromie.weather.lookup"
+          ],
+          "expected_args": [
+            "0:location=重庆",
+            "0:date=today",
+            "0:period=day"
+          ],
+          "require_speech": true,
+          "require_fast_speech": true,
+          "expected_fast_speech_purposes": [
+            "acknowledge_and_check"
+          ],
+          "expect_no_fast_contract_failure": true,
+          "min_new_goal_count": 1,
+          "min_goal_outcome_count": 1,
+          "description": "The reported Chongqing daytime request should speak prompt progress and perform the safe weather lookup without asking the user for the answer."
+        },
         {
           "id": "beijing_rain_evidence_bound_result",
           "text": "今天北京下雨了没有？",

@@ -4,6 +4,8 @@ import json
 import unittest
 from unittest import mock
 
+from pydantic import ValidationError
+
 from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
 from agent.app.cognitive_core.goal_interpreter.engine import interpret_goal
 from agent.app.cognitive_core.goal_interpreter.errors import InterpretationUnavailableError
@@ -39,6 +41,52 @@ def _valid_output(*, local_ref: str = "r1") -> dict[str, object]:
 
 
 class GoalInterpreterContractTests(unittest.TestCase):
+    def test_user_resolvable_gap_names_the_missing_semantic_value(self) -> None:
+        with self.assertRaisesRegex(
+            ValueError,
+            "ask_user required_for entries must be unresolved semantic binding names",
+        ):
+            CognitiveResponsibilityProposal(
+                local_ref="weather",
+                outcome="report today's daytime weather in Chongqing",
+                bindings={
+                    "location": "重庆",
+                    "date": "today",
+                    "time_of_day": "白天",
+                },
+                information_gaps=[
+                    {
+                        "gap_id": "weather_result",
+                        "description": "The current weather result is not known yet.",
+                        "blocking": True,
+                        "required_for": ["weather data for Chongqing"],
+                        "preferred_resolution": "ask_user",
+                    }
+                ],
+                completion_requires_work=True,
+                completion_requires_fresh_evidence=True,
+                confidence=0.95,
+            )
+
+        valid = CognitiveResponsibilityProposal(
+            local_ref="weather",
+            outcome="report today's weather at the user's location",
+            bindings={"date": "today"},
+            information_gaps=[
+                {
+                    "gap_id": "weather_location",
+                    "description": "The requested location is missing.",
+                    "blocking": True,
+                    "required_for": ["location"],
+                    "preferred_resolution": "ask_user",
+                }
+            ],
+            completion_requires_work=True,
+            completion_requires_fresh_evidence=True,
+            confidence=0.9,
+        )
+        self.assertEqual(valid.information_gaps[0].required_for, ["location"])
+
     def test_responsibility_rejects_planner_owned_bindings(self) -> None:
         with self.assertRaisesRegex(ValueError, "Planner-owned field"):
             CognitiveResponsibilityProposal(
@@ -51,6 +99,39 @@ class GoalInterpreterContractTests(unittest.TestCase):
                 completion_requires_work=True,
                 completion_requires_fresh_evidence=True,
                 confidence=0.95,
+            )
+
+    def test_external_evidence_is_not_top_level_semantic_uncertainty(self) -> None:
+        with self.assertRaisesRegex(
+            ValueError,
+            "external Evidence acquisition is not unresolved semantic meaning",
+        ):
+            GoalInterpretationDecision.model_validate(
+                {
+                    "confidence": 0.95,
+                    "responsibilities": [
+                        {
+                            "local_ref": "weather",
+                            "outcome": "Describe today's daytime weather in Chongqing.",
+                            "bindings": {
+                                "location": "重庆",
+                                "date": "today",
+                                "time_of_day": "白天",
+                            },
+                            "information_gaps": [
+                                {
+                                    "gap_id": "weather_result",
+                                    "description": "current weather data for Chongqing",
+                                    "preferred_resolution": "query_trusted_service",
+                                }
+                            ],
+                            "completion_requires_work": True,
+                            "completion_requires_fresh_evidence": True,
+                            "confidence": 0.95,
+                        }
+                    ],
+                    "unresolved": ["current weather data for Chongqing"],
+                }
             )
 
     def test_decision_contract_is_what_only(self) -> None:
@@ -206,6 +287,52 @@ class GoalInterpreterPromptTests(unittest.TestCase):
                 "confidence",
             },
         )
+        gap_schema = payload["format"]["$defs"]["InformationGap"]
+        self.assertEqual(
+            gap_schema["properties"]["required_for"]["items"]["pattern"],
+            "^[a-z][a-z0-9_]{0,79}$",
+        )
+
+    def test_repair_schema_excludes_already_bound_user_gap_names(self) -> None:
+        interpreter = self._interpreter()
+        request = GoalInterpretationRequest(
+            text="你好，今天重庆白天天气怎么样啊？",
+            language="zh-CN",
+        )
+        try:
+            CognitiveResponsibilityProposal(
+                local_ref="weather",
+                outcome="report today's daytime weather in Chongqing",
+                bindings={"location": "重庆", "date": "today"},
+                information_gaps=[
+                    {
+                        "gap_id": "weather_result",
+                        "description": "Current weather has not been queried.",
+                        "required_for": ["location", "date"],
+                        "preferred_resolution": "ask_user",
+                    }
+                ],
+                completion_requires_work=True,
+                completion_requires_fresh_evidence=True,
+                confidence=0.95,
+            )
+        except ValidationError as exc:
+            payload = interpreter.build_interpretation_repair_payload(
+                request,
+                previous_content="rejected",
+                validation_error=exc,
+            )
+        else:  # pragma: no cover - protects the regression setup itself
+            self.fail("invalid ask_user gap unexpectedly passed validation")
+
+        gap_schema = payload["format"]["$defs"]["InformationGap"]
+        encoded_schema = json.dumps(gap_schema, sort_keys=True)
+        self.assertIn('"enum": ["date", "location"]', encoded_schema)
+        self.assertIn('"not"', encoded_schema)
+        self.assertEqual(payload["format"]["properties"]["unresolved"]["maxItems"], 0)
+        system_text, _, _ = _payload_message_texts(payload)
+        self.assertIn("already-bound value", system_text)
+        self.assertIn("open descriptive question", system_text)
 
     def test_prompt_keeps_semantic_continuity_with_context_goal_identity_but_no_route(self) -> None:
         prompt = self._interpreter().build_interpretation_user_prompt(
@@ -306,6 +433,135 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(result.responsibilities[0].bindings["location"], "重庆")
         self.assertEqual(interpreter._chat.await_count, 2)
+
+    async def test_external_weather_result_gap_gets_one_dto_repair(self) -> None:
+        interpreter = self._interpreter()
+        invalid = {
+            "confidence": 0.95,
+            "responsibilities": [
+                {
+                    "local_ref": "weather",
+                    "outcome": "report today's daytime weather in Chongqing",
+                    "bindings": {
+                        "location": "重庆",
+                        "date": "today",
+                        "time_of_day": "白天",
+                    },
+                    "relationship": "new",
+                    "target_goal_ids": [],
+                    "information_gaps": [
+                        {
+                            "gap_id": "weather_result",
+                            "description": "The current weather result is not known yet.",
+                            "blocking": True,
+                            "required_for": ["weather data for Chongqing"],
+                            "preferred_resolution": "ask_user",
+                            "candidate_values": [],
+                            "resolved": False,
+                            "resolution_value": None,
+                            "metadata": {},
+                        }
+                    ],
+                    "resolved_gap_ids": [],
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.95,
+                }
+            ],
+            "unresolved": ["The current weather result is not known yet."],
+        }
+        corrected = {
+            **invalid,
+            "responsibilities": [
+                {
+                    **invalid["responsibilities"][0],
+                    "information_gaps": [],
+                }
+            ],
+            "unresolved": [],
+        }
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            side_effect=[
+                {"message": {"content": json.dumps(invalid, ensure_ascii=False)}},
+                {"message": {"content": json.dumps(corrected, ensure_ascii=False)}},
+            ]
+        )
+
+        result = await interpreter.interpret_goal(
+            GoalInterpretationRequest(
+                text="你好，今天重庆白天天气怎么样啊？",
+                language="zh-CN",
+            )
+        )
+
+        responsibility = result.responsibilities[0]
+        self.assertEqual(responsibility.information_gaps, [])
+        self.assertTrue(responsibility.completion_requires_fresh_evidence)
+        self.assertEqual(interpreter._chat.await_count, 2)
+
+    async def test_external_query_gap_cannot_be_repeated_as_semantic_uncertainty(self) -> None:
+        interpreter = self._interpreter()
+        invalid = {
+            "confidence": 0.95,
+            "responsibilities": [
+                {
+                    "local_ref": "r1",
+                    "outcome": "determine whether Chongqing is sunny today",
+                    "bindings": {
+                        "location": "重庆",
+                        "time": "today",
+                        "time_of_day": "daytime",
+                    },
+                    "relationship": "new",
+                    "target_goal_ids": [],
+                    "information_gaps": [
+                        {
+                            "gap_id": "info_gap_1",
+                            "description": "current weather data for Chongqing",
+                            "preferred_resolution": "query_trusted_service",
+                        }
+                    ],
+                    "resolved_gap_ids": [],
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.95,
+                }
+            ],
+            "unresolved": ["current weather data for Chongqing"],
+        }
+        corrected = {
+            **invalid,
+            "responsibilities": [
+                {
+                    **invalid["responsibilities"][0],
+                    "outcome": "describe today's daytime weather in Chongqing",
+                }
+            ],
+            "unresolved": [],
+        }
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            side_effect=[
+                {"message": {"content": json.dumps(invalid, ensure_ascii=False)}},
+                {"message": {"content": json.dumps(corrected, ensure_ascii=False)}},
+            ]
+        )
+
+        result = await interpreter.interpret_goal(
+            GoalInterpretationRequest(
+                text="你好，今天重庆白天天气怎么样啊？",
+                language="zh-CN",
+            )
+        )
+
+        self.assertEqual(
+            result.responsibilities[0].outcome,
+            "describe today's daytime weather in Chongqing",
+        )
+        self.assertEqual(result.unresolved, [])
+        self.assertEqual(interpreter._chat.await_count, 2)
+        repair_payload = interpreter._chat.await_args_list[1].args[0]
+        system_text, _, _ = _payload_message_texts(repair_payload)
+        self.assertIn("open descriptive question", system_text)
 
     async def test_context_backed_indirect_location_does_not_require_current_turn_surface(self) -> None:
         interpreter = self._interpreter()

@@ -132,6 +132,8 @@ _CANONICAL_GOAL_ID_KEYS = frozenset(
     }
 )
 
+_SEMANTIC_BINDING_NAME = re.compile(r"[a-z][a-z0-9_]{0,79}")
+
 
 class _GoalInterpretationAuthorityViolation(ValueError):
     """Goal Interpretation attempted to claim downstream identity/authority."""
@@ -751,6 +753,11 @@ class OllamaGoalInterpreter:
             "IDs, preserve unresolved InformationGaps, and copy any resolved gap IDs. A "
             "short answer to a pending clarification modifies that Goal; it is not an "
             "isolated new request. Goal Association will verify and commit this result. "
+            "An ask_user InformationGap must name each specific missing user-resolvable "
+            "semantic binding in required_for using its lowercase snake_case binding "
+            "name; natural-language result descriptions and already-bound values are "
+            "invalid. An external result that Chromie must query is fresh Evidence, not "
+            "a value to ask the user for. "
             "Return responsibilities, confidence, and unresolved semantic uncertainty. "
             "For directly named entities, preserve "
             "the exact current-turn user-language surface in bindings; never translate or "
@@ -760,10 +767,21 @@ class OllamaGoalInterpreter:
         )
 
     @staticmethod
-    def _goal_interpretation_response_schema() -> dict[str, Any]:
+    def _goal_interpretation_response_schema(
+        *,
+        forbidden_ask_user_binding_names: tuple[str, ...] = (),
+    ) -> dict[str, Any]:
         schema = GoalInterpretationDecision.model_json_schema()
         schema["additionalProperties"] = False
         schema["required"] = ["confidence", "responsibilities", "unresolved"]
+        if forbidden_ask_user_binding_names:
+            unresolved = schema.get("properties", {}).get("unresolved")
+            if isinstance(unresolved, dict):
+                # The rejected DTO treated already-bound values as semantic
+                # uncertainty.  One mechanical repair must remove that false
+                # uncertainty completely rather than move it to an external-result
+                # paraphrase and require a forbidden repair chain.
+                unresolved["maxItems"] = 0
         responsibility = schema.get("$defs", {}).get(
             "CognitiveResponsibilityProposal"
         )
@@ -780,7 +798,66 @@ class OllamaGoalInterpreter:
                 "completion_requires_fresh_evidence",
                 "confidence",
             ]
+        information_gap = schema.get("$defs", {}).get("InformationGap")
+        if isinstance(information_gap, dict):
+            required_for = information_gap.get("properties", {}).get(
+                "required_for"
+            )
+            if isinstance(required_for, dict):
+                required_for["items"] = {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]{0,79}$",
+                }
+            if forbidden_ask_user_binding_names:
+                information_gap.setdefault("allOf", []).append(
+                    {
+                        "if": {
+                            "properties": {
+                                "preferred_resolution": {"const": "ask_user"}
+                            },
+                            "required": ["preferred_resolution"],
+                        },
+                        "then": {
+                            "properties": {
+                                "required_for": {
+                                    "items": {
+                                        "type": "string",
+                                        "pattern": "^[a-z][a-z0-9_]{0,79}$",
+                                        "not": {
+                                            "enum": list(
+                                                forbidden_ask_user_binding_names
+                                            )
+                                        },
+                                    }
+                                }
+                            }
+                        },
+                    }
+                )
         return schema
+
+    @staticmethod
+    def _already_bound_ask_user_names(
+        validation_error: Exception,
+    ) -> tuple[str, ...]:
+        if not isinstance(validation_error, ValidationError):
+            return ()
+        names: set[str] = set()
+        for error in validation_error.errors(include_url=False):
+            message = str(error.get("msg") or "")
+            if "ask_user" not in message:
+                continue
+            rejected = error.get("input")
+            if not isinstance(rejected, dict):
+                continue
+            bindings = rejected.get("bindings")
+            if isinstance(bindings, dict):
+                names.update(
+                    str(name)
+                    for name in bindings
+                    if _SEMANTIC_BINDING_NAME.fullmatch(str(name)) is not None
+                )
+        return tuple(sorted(names))
 
     def build_interpretation_payload(
         self, request: GoalInterpretationRequest
@@ -812,8 +889,39 @@ class OllamaGoalInterpreter:
         previous_content: str,
         validation_error: Exception,
     ) -> dict[str, Any]:
-        del previous_content, validation_error
+        del previous_content
+        forbidden_binding_names = self._already_bound_ask_user_names(
+            validation_error
+        )
         payload = self.build_interpretation_payload(request)
+        payload["format"] = self._goal_interpretation_response_schema(
+            forbidden_ask_user_binding_names=forbidden_binding_names,
+        )
+        ask_user_repair = (
+            " The rejected DTO encoded an ask_user gap incorrectly. Re-evaluate the "
+            "authoritative turn: ask_user is only for a genuinely absent semantic "
+            "binding and must never request an already-bound value. An external result "
+            "Chromie was asked to find requires fresh Evidence; represent any retained "
+            "external acquisition gap with query_trusted_service, or omit the gap when "
+            "completion_requires_fresh_evidence already expresses that need. Top-level "
+            "unresolved must be empty in this repair because the rejected items were "
+            "already-bound values, not uncertainty about user meaning. Re-read the "
+            "current question form and preserve its full requested answer scope; an "
+            "open descriptive question must not become a guessed yes/no condition."
+            if forbidden_binding_names
+            else ""
+        )
+        external_evidence_repair = (
+            " The rejected DTO listed external Evidence acquisition as unresolved "
+            "semantic meaning. Keep completion_requires_fresh_evidence=true and, when "
+            "useful, a query_trusted_service or observe_environment InformationGap, "
+            "but remove that acquisition need from top-level unresolved. Re-read the "
+            "current question form and preserve its full requested answer scope; an "
+            "open descriptive question must not become a guessed yes/no condition."
+            if "external Evidence acquisition is not unresolved semantic meaning"
+            in str(validation_error)
+            else ""
+        )
         payload["messages"] = [
             {
                 "role": "system",
@@ -828,7 +936,10 @@ class OllamaGoalInterpreter:
                     "semantic uncertainty. A directly named entity binding must copy the exact "
                     "current-turn surface; never translate or transliterate it. Provider timezone "
                     "or clock-range choices for an already-preserved relative time are not semantic "
-                    "uncertainty. Return JSON only."
+                    "uncertainty."
+                    + ask_user_repair
+                    + external_evidence_repair
+                    + " Return JSON only."
                 ),
             },
             {

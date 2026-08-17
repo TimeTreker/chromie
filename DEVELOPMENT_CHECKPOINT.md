@@ -1,8 +1,7 @@
 # Chromie Development Checkpoint
 Status: current resume point
 Updated: 2026-08-18
-Base main: `f1d5320` (`fix voice interaction semantic and delivery boundaries`).
-This is the fast handoff for the next development session. Canonical owners linked below win if a conflict appears; refresh this checkpoint afterward.
+Base main before this delivery: `6603dce` (`implement concurrent goal-grouped activity runtime`). This is the fast handoff for the next development session; canonical owners linked below win if a conflict appears.
 ## Project in one minute
 Chromie is a local-first realtime interaction control plane for a voice assistant that can use embodied capabilities safely. Chromie owns user-facing cognition, Goal meaning and continuity, cross-provider planning, personal Vocal behavior, trusted authorization, coordination, and evidence reconciliation.
 Soridormi is a peer embodied Capability Provider beneath Activity; its advertised granularity may be one atomic workflow or smaller capabilities that Chromie composes.
@@ -99,14 +98,17 @@ Reflection actions from terminal-history learning proposals: future online adapt
 bounded advisory Memory with independent scope/lifetime and can never self-modify shared
 cognitive policy or cache semantic decisions.
 
-The rebuilt current-source Agent live-text preview for “今天北京下雨了没有？” is
-retained at
-`.chromie/acceptance/general-ability/20260817T190043Z-live-text/`. It failed
-closed before tool execution: GI incorrectly represented missing external weather
-Evidence as a user-resolvable InformationGap, Fast advancement emitted an invalid
-Activity discriminator, and the canonical Fast Plan omitted the authoritative `今天`
-temporal binding. This is the next reproduced behavior blocker; no sixth repair loop
-was started because the owner capped this investigation at five cycles.
+The owner-capped fifth rebuilt-Agent live-text run for “你好，今天重庆白天天气怎么样啊？”
+is retained at `.chromie/acceptance/general-ability/20260817T224316Z-live-text/`. It
+proves GI no longer requested the already-supplied location/date, GA committed the
+Chongqing/today/day Goal, and Runtime dispatched `chromie.weather.lookup`. It then
+exposed arbitrary Fast `speech_act` text with an invalid Deep continuation and a
+weather-adapter mismatch between `Chongqing Municipality` and `Chongqing`. Current
+source closes both through constrained Fast decoding and provider administrative-suffix
+normalization. The canonical gate passes 1,893 tests, all 44 Level A cases pass, and a
+real-network provider probe resolves `重庆`. The five-cycle limit leaves no sixth
+combined proof; the fifth-run GI also narrowed the open question to sunny/not-sunny,
+so that semantic fidelity remains an explicit evidence gap.
 The current daily-life source correction also closes the general boundaries exposed by the generated-voice suite: Capability choice requires declared semantic entailment rather than topical proximity; state mutations are not information resources; local/private sensor state stays unknown without a trusted Provider; unavailable persistent work cannot be phrased as a future promise; and Gateway Attention uses bounded recent dialogue for temporary user-authored addressedness policy with one fail-open judgment and no online repair/reviewer chain. The follow-up authority correction makes the weather case explicit: Goal Interpretation preserves typed provider-neutral information scope and Goal/InformationGap relationship as Responsibility evidence; the same result enters Fast Planner and GA concurrently. Fast Planner is the first HOW owner and authors speaking and Capability Activities; safe side-effect-free reads may start while GA commits canonical Goal identity, while effects remain Goal/confirmation/authorization gated. Trusted Capability Runtime presents one task-list view per Goal and never duplicates a shared task identity. Social Attention is now keyed to semantic primary human-observable Activity meaning rather than to cognition milestones, execution modalities, or a once-per-turn budget. Responsibility/Goal sits above Activity; one Goal may own several semantic Activities/Work items, and a high-level provider Capability may realize one Activity atomically. Final `InteractionResponse` transport objects, Vocal modes, body/media requests, and Capability IDs are realization evidence only. Canonical conversational acts and Plan-step meaning provide Activity granularity; execution modality never does. Planner execution eligibility is derived from canonical Goal completion semantics. The maintained Goal Interpretation handoff has no route/intent compatibility fields; Responsibility moves into downstream cognition through typed `CognitiveWorkRequest`.
 These are source claims only; no new target evidence is implied.
 ## Do not resurrect

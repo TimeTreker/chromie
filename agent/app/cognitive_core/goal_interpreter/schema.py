@@ -65,4 +65,23 @@ class GoalInterpretationDecision(BaseModel):
         refs = [item.local_ref for item in self.responsibilities]
         if len(refs) != len(set(refs)):
             raise ValueError("responsibility local_ref values must be unique")
+        external_evidence_descriptions = {
+            " ".join(gap.description.strip().casefold().split())
+            for item in self.responsibilities
+            for gap in item.information_gaps
+            if not gap.resolved
+            and gap.preferred_resolution
+            in {"observe_environment", "query_trusted_service"}
+        }
+        repeated_external_evidence = sorted(
+            text
+            for text in self.unresolved
+            if " ".join(text.strip().casefold().split())
+            in external_evidence_descriptions
+        )
+        if repeated_external_evidence:
+            raise ValueError(
+                "external Evidence acquisition is not unresolved semantic meaning: "
+                + ",".join(repeated_external_evidence)
+            )
         return self

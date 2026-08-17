@@ -13,16 +13,17 @@ experience artifacts. See
 [Runtime Observability Architecture](docs/RUNTIME_OBSERVABILITY.md).
 
 > **Current state:** the Goal-driven Runtime is implemented as Chromie's single
-> semantic authority with readiness-driven continuous progress. After admitted
-> Fast Understanding, complete native conversational answers, and exact capability
-> work candidates may advance independently while Goal Association continues;
-> background Social Attention may independently prepare optional body decoration
-> for the same anchored interaction. Native answers enter the existing Vocal runtime;
-> trusted safe reads may start provider work early. Goal Association later binds
-> those candidates to canonical Goals. Fully bound native conversation can close
-> without Planner/Response-Composer model calls, and fully bound information reads
-> may adopt a canonical Plan without a Fast-Planner call; other work falls through
-> to Fast/terminal Deep Planning. Response Composition runs only when a new
+> semantic authority with readiness-driven continuous progress. Goal Interpretation
+> emits contextual WHAT-only Responsibility evidence, and the same result enters
+> Fast Planner and Goal Association concurrently. Fast Planner authors the first
+> speaking/Capability Activity Plan; a complete native conversational answer may
+> enter the Vocal runtime immediately, and a trusted side-effect-free read may start
+> while Goal Association commits its canonical Goal. Missing user information causes
+> a clarification Activity, while only genuinely complex HOW enters Deep Planner.
+> Goal Association alone creates or modifies canonical Goals, and Runtime groups the
+> resulting task-list view by Goal while preserving one execution identity for shared
+> Work. Background Social Attention may independently prepare optional body
+> decoration for the same anchored interaction. Response Composition runs only when a new
 > presentation decision is still needed, then trusted execution and
 > deterministic per-goal reconciliation own completion truth. A frozen
 > `UserTurnEnvelope` now preserves the admitted Gateway input through this loop.
@@ -82,16 +83,14 @@ Host Orchestrator
   microphone -> VAD -> ASR -> Cognitive Gateway
     |-> Protective Reflex -> immediate stop/cancel (no model wait)
     `-> immutable admitted UserTurnEnvelope -> Goal-driven Cognitive Core
-        -> Fast Understanding
-           |-> complete native response -> Vocal --- .
-           |-> exact capability progress candidate ----|
-           |      `-> readiness-qualified safe read ---|
-           |-> background Social Attention decoration |
-           `-> Goal Association -----------------------+-> canonical Goal state
-                                                        |
-        -> exact ready-progress adoption OR Fast Planner -> terminal Deep Planner when needed
+        -> Goal Interpretation (Responsibility + Goal relation + InformationGaps)
+        -> same GI result, concurrent fan-out
+           |-> Fast Planner -> speaking/Capability Activities --.
+           |      `-> Deep Planner only for complex HOW          |
+           |-> Goal Association -> canonical Goal state --------+-> Goal-bound tasks
+           `-> background Social Attention decoration            |
+        -> resource-aware Trusted Capability Runtime <-----------'
         -> Response Composer only when a new presentation decision is still needed
-        -> Trusted Capability Runtime (`CapabilityRuntime`)
         -> named capability -> Soridormi / peer providers
         -> structured results and traces
         -> exact plan/request/result join -> per-goal outcome reconciliation

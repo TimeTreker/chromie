@@ -128,6 +128,16 @@ _CHINESE_LOCALITY_SUFFIXES = (
     "市",
     "旗",
 )
+_ENGLISH_ADMIN_SUFFIXES = (
+    " special administrative region",
+    " autonomous region",
+    " municipality",
+    " prefecture",
+    " province",
+    " territory",
+    " region",
+    " state",
+)
 
 
 def _normalize_location_text(value: Any) -> str:
@@ -143,6 +153,10 @@ def _strip_admin_suffix(value: Any) -> str:
     for suffix in (*_CHINESE_ADMIN_PREFIX_SUFFIXES, *_CHINESE_LOCALITY_SUFFIXES):
         if text.endswith(suffix) and len(text) > len(suffix):
             return text[: -len(suffix)]
+    folded = text.casefold()
+    for suffix in _ENGLISH_ADMIN_SUFFIXES:
+        if folded.endswith(suffix) and len(text) > len(suffix):
+            return text[: -len(suffix)].rstrip(" ,")
     return text
 
 

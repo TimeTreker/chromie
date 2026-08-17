@@ -28,7 +28,9 @@
               "gap_id": "referenced_action",
               "description": "The action referred to by it is not identified.",
               "blocking": true,
-              "required_for": [],
+              "required_for": [
+                "referenced_action"
+              ],
               "preferred_resolution": "ask_user",
               "candidate_values": [],
               "resolved": false,
@@ -69,7 +71,9 @@
             "gap_id": "referenced_action",
             "description": "The action referred to by it is not identified.",
             "blocking": true,
-            "required_for": [],
+            "required_for": [
+              "referenced_action"
+            ],
             "preferred_resolution": "ask_user",
             "candidate_values": [],
             "resolved": false,

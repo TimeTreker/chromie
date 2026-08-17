@@ -571,6 +571,8 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(weather.route, "tool")
         self.assertEqual(weather.score, 0.0)
+        self.assertTrue(weather.can_run_parallel)
+        self.assertTrue(weather.parallel_metadata_declared)
 
     async def test_physical_live_skill_requires_confirmation_despite_sim_exemption(self) -> None:
         catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker())

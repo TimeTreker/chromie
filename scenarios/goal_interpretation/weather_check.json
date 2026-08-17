@@ -30,7 +30,9 @@
               "gap_id": "weather_location",
               "description": "The location for the weather check is not known.",
               "blocking": true,
-              "required_for": [],
+              "required_for": [
+                "location"
+              ],
               "preferred_resolution": "ask_user",
               "candidate_values": [],
               "resolved": false,
@@ -74,7 +76,9 @@
             "gap_id": "weather_location",
             "description": "The location for the weather check is not known.",
             "blocking": true,
-            "required_for": [],
+            "required_for": [
+              "location"
+            ],
             "preferred_resolution": "ask_user",
             "candidate_values": [],
             "resolved": false,

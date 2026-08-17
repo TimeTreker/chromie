@@ -30,7 +30,9 @@
               "gap_id": "target_location",
               "description": "The intended destination is not identified.",
               "blocking": true,
-              "required_for": [],
+              "required_for": [
+                "destination"
+              ],
               "preferred_resolution": "ask_user",
               "candidate_values": [],
               "resolved": false,
@@ -73,7 +75,9 @@
             "gap_id": "target_location",
             "description": "The intended destination is not identified.",
             "blocking": true,
-            "required_for": [],
+            "required_for": [
+              "destination"
+            ],
             "preferred_resolution": "ask_user",
             "candidate_values": [],
             "resolved": false,
