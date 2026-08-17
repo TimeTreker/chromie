@@ -14,6 +14,17 @@ from shared.chromie_contracts.reflex import CancellationDirective
 
 
 
+def _request_ids(bindings):  # type: ignore[no-untyped-def]
+    return tuple(item.request_id for item in bindings)
+
+
+def _provider_failure_texts(receipt):  # type: ignore[no-untyped-def]
+    return tuple(
+        f"{item.request_id}:{item.error}"
+        for item in receipt.provider_cancel_failure_evidence
+    )
+
+
 async def _execute_to_terminal(coordinator, response, *, session_id, confirmed_request_ids=None):
     dispatch = await coordinator.submit_response(
         response,
@@ -1460,9 +1471,9 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         execution = await execution_task
 
         self.assertEqual(cancelled_graph_ids, ["graph-cancel"])
-        self.assertEqual(receipt.provider_cancel_failures, ())
+        self.assertEqual(_provider_failure_texts(receipt), ())
         self.assertEqual(
-            receipt.cancel_requested_request_ids,
+            _request_ids(receipt.cancel_requested_request_bindings),
             ("graph-request",),
         )
         self.assertEqual(execution.status, "cancelled")
@@ -1517,10 +1528,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
         execution = await execution_task
 
-        self.assertEqual(len(receipt.provider_cancel_failures), 1)
+        self.assertEqual(len(_provider_failure_texts(receipt)), 1)
         self.assertIn(
             "endpoint is not configured",
-            receipt.provider_cancel_failures[0],
+            _provider_failure_texts(receipt)[0],
         )
         self.assertEqual(execution.status, "failed")
         self.assertEqual(execution.results[0].status, "failed")

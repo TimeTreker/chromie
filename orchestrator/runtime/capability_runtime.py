@@ -922,8 +922,8 @@ class CapabilityRuntime:
             effective_scope = requested_scope
             widened = False
             widening_reason = ""
-            stale_binding_request_ids: set[str] = set()
-            shared_owner_conflict_request_ids: set[str] = set()
+            stale_binding_request_keys: set[tuple[str, str]] = set()
+            shared_owner_conflict_request_keys: set[tuple[str, str]] = set()
             base_selected: list[tuple[str, CapabilityRequest, CapabilityDefinition]] = []
             for interaction_id, request, definition in base_scheduled_items:
                 if requested_scope == "specific_goal":
@@ -932,10 +932,10 @@ class CapabilityRuntime:
                         request,
                     )
                     if binding == "stale":
-                        stale_binding_request_ids.add(request.request_id)
+                        stale_binding_request_keys.add((interaction_id, request.request_id))
                         continue
                     if binding == "shared_owner_conflict":
-                        shared_owner_conflict_request_ids.add(request.request_id)
+                        shared_owner_conflict_request_keys.add((interaction_id, request.request_id))
                         continue
                     if binding == "match":
                         base_selected.append((interaction_id, request, definition))
@@ -1322,25 +1322,20 @@ class CapabilityRuntime:
             expected_plan_id=directive.expected_plan_id,
             expected_plan_fingerprint=(directive.expected_plan_fingerprint),
             affected_goal_ids=tuple(sorted(affected_goal_ids)),
-            selected_request_ids=tuple(key[1] for key in selected_binding_order),
             selected_request_bindings=tuple(binding(key) for key in selected_binding_order),
-            active_request_ids=tuple(key[1] for key in active_binding_order),
             active_request_bindings=tuple(binding(key) for key in active_binding_order),
-            queued_request_ids=tuple(key[1] for key in queued_binding_order),
             queued_request_bindings=tuple(binding(key) for key in queued_binding_order),
-            cancel_requested_request_ids=tuple(sorted({key[1] for key in cancel_requested_keys})),
             cancel_requested_request_bindings=tuple(
                 binding(key) for key in sorted(cancel_requested_keys)
             ),
-            non_interruptible_request_ids=tuple(sorted({key[1] for key in non_interruptible_keys})),
             non_interruptible_request_bindings=tuple(
                 binding(key) for key in sorted(non_interruptible_keys)
             ),
-            shared_owner_conflict_request_ids=tuple(sorted(shared_owner_conflict_request_ids)),
-            stale_binding_request_ids=tuple(sorted(stale_binding_request_ids)),
-            provider_cancel_failures=tuple(
-                (f"{request_id}:{provider_failures[(interaction_id, request_id)]}")
-                for interaction_id, request_id in sorted(provider_failures)
+            shared_owner_conflict_request_bindings=tuple(
+                binding(key) for key in sorted(shared_owner_conflict_request_keys)
+            ),
+            stale_binding_request_bindings=tuple(
+                binding(key) for key in sorted(stale_binding_request_keys)
             ),
             provider_cancel_failure_evidence=tuple(
                 CancellationProviderFailure(

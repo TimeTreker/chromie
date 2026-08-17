@@ -1547,13 +1547,13 @@ class ConversationStateManager:
         reasons: list[str] = []
         if receipt.requested_scope != "specific_goal":
             reasons.append("receipt_scope_not_specific_goal")
-        if receipt.stale_binding_request_ids:
+        if receipt.stale_binding_request_bindings:
             reasons.append("stale_runtime_binding")
-        if receipt.shared_owner_conflict_request_ids:
+        if receipt.shared_owner_conflict_request_bindings:
             reasons.append("shared_owner_conflict")
-        if receipt.non_interruptible_request_ids:
+        if receipt.non_interruptible_request_bindings:
             reasons.append("non_interruptible_request")
-        if receipt.provider_cancel_failures:
+        if receipt.provider_cancel_failure_evidence:
             reasons.append("provider_cancel_failure")
         if receipt.dispatch_failures:
             reasons.append("cancellation_dispatch_failure")
@@ -1656,7 +1656,11 @@ class ConversationStateManager:
             required_request_ids = set(
                 binding.get("remaining_request_ids") or ()
             ) - cancelled_confirmation_ids
-            selected_request_ids = set(receipt.selected_request_ids)
+            selected_request_ids = {
+                item.request_id
+                for item in receipt.selected_request_bindings
+                if item.interaction_id == binding.get("interaction_id")
+            }
             missing = sorted(required_request_ids - selected_request_ids)
             if missing:
                 validation_errors.append(
@@ -1787,10 +1791,10 @@ class ConversationStateManager:
                         }
                     )
 
-            selected_request_ids = {
-                request_id
+            selected_request_bindings = {
+                (item.interaction_id, item.request_id)
                 for receipt in validated_receipts
-                for request_id in receipt.selected_request_ids
+                for item in receipt.selected_request_bindings
             }
             for task in self._pending_tasks:
                 if task.get("type") != "goal_execution":
@@ -1812,10 +1816,14 @@ class ConversationStateManager:
                         task_metadata.get("remaining_request_ids")
                         or task_metadata.get("request_ids")
                     )
+                    task_interaction_id = str(
+                        task_metadata.get("interaction_id") or ""
+                    ).strip()
                     remaining = [
                         request_id
                         for request_id in remaining
-                        if request_id not in selected_request_ids
+                        if (task_interaction_id, request_id)
+                        not in selected_request_bindings
                     ]
                     task["status"] = "recoverable"
                     task["updated_ms"] = timestamp_ms
@@ -2067,18 +2075,6 @@ class ConversationStateManager:
             for item in validated.provider_cancel_failure_evidence
         }
         failed_keys = non_interruptible_keys | provider_failure_keys
-        legacy_failed_request_ids = {
-            str(item).split(":", 1)[0].strip()
-            for item in validated.provider_cancel_failures
-            if str(item).strip()
-        } | set(validated.non_interruptible_request_ids)
-        if legacy_failed_request_ids:
-            failed_keys.update(
-                key
-                for key in selected_keys
-                if key[1] in legacy_failed_request_ids
-            )
-        selected_ids = set(validated.selected_request_ids)
         affected_goal_ids = set(validated.affected_goal_ids)
         receipt_interactions = {
             *validated.interaction_ids,
@@ -2213,35 +2209,24 @@ class ConversationStateManager:
                     and bound_confirmation_id == confirmation_id
                 )
 
-                if selected_keys:
-                    selected_for_goal = {
-                        request_id
-                        for bound_interaction, request_id in selected_keys
-                        if (
-                            not interaction_id
-                            or bound_interaction == interaction_id
-                        )
-                        and (not remaining or request_id in remaining)
-                    }
-                    failed_for_goal = {
-                        request_id
-                        for bound_interaction, request_id in failed_keys
-                        if (
-                            not interaction_id
-                            or bound_interaction == interaction_id
-                        )
-                        and (not remaining or request_id in remaining)
-                    }
-                else:
-                    selected_for_goal = (
-                        remaining.intersection(selected_ids)
-                        if (
-                            goal_id in affected_goal_ids
-                            or interaction_id in receipt_interactions
-                        )
-                        else set()
+                selected_for_goal = {
+                    request_id
+                    for bound_interaction, request_id in selected_keys
+                    if (
+                        not interaction_id
+                        or bound_interaction == interaction_id
                     )
-                    failed_for_goal = set()
+                    and (not remaining or request_id in remaining)
+                }
+                failed_for_goal = {
+                    request_id
+                    for bound_interaction, request_id in failed_keys
+                    if (
+                        not interaction_id
+                        or bound_interaction == interaction_id
+                    )
+                    and (not remaining or request_id in remaining)
+                }
 
                 known_cancelled = selected_for_goal - failed_for_goal
                 uncertain = set(failed_for_goal)

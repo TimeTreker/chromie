@@ -155,6 +155,10 @@ def vocal_model_output(
     )
 
 
+def _request_ids(bindings):  # type: ignore[no-untyped-def]
+    return tuple(item.request_id for item in bindings)
+
+
 class ScriptedModel:
     def __init__(self, response: dict[str, object]) -> None:
         self.response = response
@@ -632,7 +636,7 @@ class VocalTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
         execution = await execution_task
 
-        self.assertEqual(receipt.selected_request_ids, ("vocal-cancel-request",))
+        self.assertEqual(_request_ids(receipt.selected_request_bindings), ("vocal-cancel-request",))
         self.assertEqual(cancelled, ["vocal-cancel-request"])
         self.assertEqual(execution.results[0].capability_id, VOCAL_PERFORMANCE_CAPABILITY_ID)
         self.assertEqual(execution.results[0].status, "cancelled")

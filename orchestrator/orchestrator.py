@@ -7193,11 +7193,11 @@ class VoiceAssistant:
             receipt.requested_scope,
             receipt.effective_scope,
             ",".join(receipt.interaction_ids) or "none",
-            len(receipt.selected_request_ids),
-            len(receipt.active_request_ids),
-            len(receipt.queued_request_ids),
-            len(receipt.non_interruptible_request_ids),
-            len(receipt.provider_cancel_failures),
+            len(receipt.selected_request_bindings),
+            len(receipt.active_request_bindings),
+            len(receipt.queued_request_bindings),
+            len(receipt.non_interruptible_request_bindings),
+            len(receipt.provider_cancel_failure_evidence),
             len(receipt.dispatch_failures),
         )
         emergency_status = str(

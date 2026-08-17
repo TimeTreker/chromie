@@ -2145,22 +2145,22 @@ async def evaluate_cognitive_turn_loop_scenario(
             else None
         ),
         "cancel_selected_request_ids": (
-            list(cancellation_receipt.selected_request_ids)
+            [item.request_id for item in cancellation_receipt.selected_request_bindings]
             if cancellation_receipt is not None
             else []
         ),
         "cancel_queued_request_ids": (
-            list(cancellation_receipt.queued_request_ids)
+            [item.request_id for item in cancellation_receipt.queued_request_bindings]
             if cancellation_receipt is not None
             else []
         ),
         "cancel_selected_step_ids": (
-            cancellation_step_ids(cancellation_receipt.selected_request_ids)
+            cancellation_step_ids([item.request_id for item in cancellation_receipt.selected_request_bindings])
             if cancellation_receipt is not None
             else []
         ),
         "cancel_queued_step_ids": (
-            cancellation_step_ids(cancellation_receipt.queued_request_ids)
+            cancellation_step_ids([item.request_id for item in cancellation_receipt.queued_request_bindings])
             if cancellation_receipt is not None
             else []
         ),

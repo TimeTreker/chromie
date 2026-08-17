@@ -166,23 +166,21 @@ class CancellationDispatchReceipt(BaseModel):
     expected_plan_id: str | None = None
     expected_plan_fingerprint: str | None = None
     affected_goal_ids: tuple[str, ...] = ()
-    selected_request_ids: tuple[str, ...] = ()
     selected_request_bindings: tuple[CancellationRequestBinding, ...] = ()
-    active_request_ids: tuple[str, ...] = ()
     active_request_bindings: tuple[CancellationRequestBinding, ...] = ()
-    queued_request_ids: tuple[str, ...] = ()
     queued_request_bindings: tuple[CancellationRequestBinding, ...] = ()
-    cancel_requested_request_ids: tuple[str, ...] = ()
     cancel_requested_request_bindings: tuple[
         CancellationRequestBinding, ...
     ] = ()
-    non_interruptible_request_ids: tuple[str, ...] = ()
     non_interruptible_request_bindings: tuple[
         CancellationRequestBinding, ...
     ] = ()
-    shared_owner_conflict_request_ids: tuple[str, ...] = ()
-    stale_binding_request_ids: tuple[str, ...] = ()
-    provider_cancel_failures: tuple[str, ...] = ()
+    shared_owner_conflict_request_bindings: tuple[
+        CancellationRequestBinding, ...
+    ] = ()
+    stale_binding_request_bindings: tuple[
+        CancellationRequestBinding, ...
+    ] = ()
     provider_cancel_failure_evidence: tuple[
         CancellationProviderFailure, ...
     ] = ()

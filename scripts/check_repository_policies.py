@@ -1144,6 +1144,78 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
                         )
                     )
 
+    cancellation_path = root / "shared/chromie_contracts/reflex.py"
+    cancellation_tree, parse_findings = _parse_python(cancellation_path, root)
+    findings.extend(parse_findings)
+    if cancellation_tree is not None:
+        receipt = next(
+            (
+                node
+                for node in ast.walk(cancellation_tree)
+                if isinstance(node, ast.ClassDef)
+                and node.name == "CancellationDispatchReceipt"
+            ),
+            None,
+        )
+        if receipt is None:
+            findings.append(
+                _source_policy_finding(
+                    root=root,
+                    path="shared/chromie_contracts/reflex.py",
+                    rule_id=RULE_CANONICAL_CAPABILITY_ID,
+                    symbol="CancellationDispatchReceipt",
+                    message="canonical cancellation receipt contract is missing",
+                )
+            )
+        else:
+            fields = {name for name, _ in _class_field_names(receipt)}
+            retired_unqualified_fields = {
+                "selected_request_ids",
+                "active_request_ids",
+                "queued_request_ids",
+                "cancel_requested_request_ids",
+                "non_interruptible_request_ids",
+                "shared_owner_conflict_request_ids",
+                "stale_binding_request_ids",
+                "provider_cancel_failures",
+            }
+            for field_name in sorted(fields.intersection(retired_unqualified_fields)):
+                findings.append(
+                    _source_policy_finding(
+                        root=root,
+                        path="shared/chromie_contracts/reflex.py",
+                        rule_id=RULE_CANONICAL_CAPABILITY_ID,
+                        symbol=f"CancellationDispatchReceipt.{field_name}",
+                        message=(
+                            "async cancellation identity must remain interaction-qualified; "
+                            "do not reintroduce bare request-ID compatibility fields"
+                        ),
+                    )
+                )
+            required_binding_fields = {
+                "selected_request_bindings",
+                "active_request_bindings",
+                "queued_request_bindings",
+                "cancel_requested_request_bindings",
+                "non_interruptible_request_bindings",
+                "shared_owner_conflict_request_bindings",
+                "stale_binding_request_bindings",
+                "provider_cancel_failure_evidence",
+            }
+            for field_name in sorted(required_binding_fields - fields):
+                findings.append(
+                    _source_policy_finding(
+                        root=root,
+                        path="shared/chromie_contracts/reflex.py",
+                        rule_id=RULE_CANONICAL_CAPABILITY_ID,
+                        symbol=f"CancellationDispatchReceipt.{field_name}",
+                        message=(
+                            "canonical cancellation receipt must preserve exact "
+                            "interaction-qualified runtime identity"
+                        ),
+                    )
+                )
+
     runtime_path = root / "orchestrator/runtime/capability_runtime.py"
     if runtime_path.is_file():
         runtime_tree, parse_findings = _parse_python(runtime_path, root)

@@ -8,7 +8,7 @@ import unittest
 
 from shared.chromie_contracts.action import ActionCommand
 from shared.chromie_contracts.interaction import CapabilityResult, InteractionResponse
-from shared.chromie_contracts.reflex import CancellationDirective
+from shared.chromie_contracts.reflex import CancellationDirective, CancellationDispatchReceipt
 
 from orchestrator.runtime.capability_runtime import (
     LocalSpeechCapabilityProvider,
@@ -23,6 +23,17 @@ from orchestrator.runtime.soridormi_capability_provider import (
     SORIDORMI_NAMED_CAPABILITY_OUTPUT_SCHEMA,
     import_soridormi_capability_catalog,
 )
+
+
+def _request_ids(bindings):  # type: ignore[no-untyped-def]
+    return tuple(item.request_id for item in bindings)
+
+
+def _provider_failure_texts(receipt):  # type: ignore[no-untyped-def]
+    return tuple(
+        f"{item.request_id}:{item.error}"
+        for item in receipt.provider_cancel_failure_evidence
+    )
 
 
 def _body_definition(
@@ -999,6 +1010,33 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(peak, 1)
 
+    def test_cancellation_receipt_exposes_only_qualified_request_identity(self) -> None:
+        fields = set(CancellationDispatchReceipt.model_fields)
+        self.assertTrue(
+            {
+                "selected_request_bindings",
+                "active_request_bindings",
+                "queued_request_bindings",
+                "cancel_requested_request_bindings",
+                "non_interruptible_request_bindings",
+                "shared_owner_conflict_request_bindings",
+                "stale_binding_request_bindings",
+                "provider_cancel_failure_evidence",
+            }.issubset(fields)
+        )
+        self.assertTrue(
+            {
+                "selected_request_ids",
+                "active_request_ids",
+                "queued_request_ids",
+                "cancel_requested_request_ids",
+                "non_interruptible_request_ids",
+                "shared_owner_conflict_request_ids",
+                "stale_binding_request_ids",
+                "provider_cancel_failures",
+            }.isdisjoint(fields)
+        )
+
     async def test_duplicate_request_ids_do_not_collide_across_interactions(self) -> None:
         cancelled_interactions: list[str] = []
 
@@ -1062,7 +1100,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
             },
         )
         self.assertEqual(
-            len(receipt.cancel_requested_request_bindings),
+            len(_request_ids(receipt.cancel_requested_request_bindings)),
             2,
         )
         self.assertEqual(
@@ -1226,9 +1264,9 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         release_body.set()
         execution = await execution_task
 
-        self.assertEqual(receipt.selected_request_ids, ("speech-output",))
+        self.assertEqual(_request_ids(receipt.selected_request_bindings), ("speech-output",))
         self.assertEqual(
-            receipt.cancel_requested_request_ids,
+            _request_ids(receipt.cancel_requested_request_bindings),
             ("speech-output",),
         )
         self.assertEqual(body_provider.cancelled_request_ids, [])
@@ -1312,7 +1350,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         release_tool.set()
         execution = await execution_task
 
-        self.assertEqual(receipt.selected_request_ids, ("motion-cancel",))
+        self.assertEqual(_request_ids(receipt.selected_request_bindings), ("motion-cancel",))
         self.assertEqual(tool_provider.cancelled_request_ids, [])
         self.assertEqual(
             [
@@ -1408,7 +1446,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         execution = await execution_task
 
         self.assertEqual(
-            receipt.queued_request_ids,
+            _request_ids(receipt.queued_request_bindings),
             ("cancel-before-start",),
         )
         self.assertEqual(
@@ -1479,7 +1517,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
             runtime.end_interaction(interaction_id)
 
         self.assertEqual(receipt.interaction_ids, (interaction_id,))
-        self.assertEqual(receipt.selected_request_ids, ())
+        self.assertEqual(_request_ids(receipt.selected_request_bindings), ())
         self.assertEqual(provider.calls, [])
         self.assertEqual(execution.status, "cancelled")
         self.assertEqual(
@@ -1580,7 +1618,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
             runtime.end_interaction(interaction_id)
 
         self.assertEqual(receipt.interaction_ids, (interaction_id,))
-        self.assertEqual(receipt.selected_request_ids, ())
+        self.assertEqual(_request_ids(receipt.selected_request_bindings), ())
         self.assertEqual(unrelated_execution.status, "completed")
         self.assertEqual(
             [request.request_id for request in provider.calls],
@@ -1743,7 +1781,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
         execution = await execution_task
 
-        self.assertEqual(receipt.active_request_ids, ("cancel-active",))
+        self.assertEqual(_request_ids(receipt.active_request_bindings), ("cancel-active",))
         self.assertEqual(
             [
                 (result.request_id, result.status, result.reason_code)
@@ -1822,9 +1860,9 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         release.set()
         execution = await execution_task
 
-        self.assertEqual(receipt.selected_request_ids, ())
+        self.assertEqual(_request_ids(receipt.selected_request_bindings), ())
         self.assertEqual(
-            receipt.shared_owner_conflict_request_ids,
+            _request_ids(receipt.shared_owner_conflict_request_bindings),
             ("shared-request",),
         )
         self.assertEqual(provider.cancelled_request_ids, [])
@@ -1890,9 +1928,9 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         release.set()
         execution = await execution_task
 
-        self.assertEqual(receipt.selected_request_ids, ())
+        self.assertEqual(_request_ids(receipt.selected_request_bindings), ())
         self.assertEqual(
-            receipt.stale_binding_request_ids,
+            _request_ids(receipt.stale_binding_request_bindings),
             ("stale-request",),
         )
         self.assertEqual(provider.cancelled_request_ids, [])
@@ -1987,7 +2025,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
             "provider_supports_only_global_embodied_motion_cancel",
         )
         self.assertEqual(
-            receipt.selected_request_ids,
+            _request_ids(receipt.selected_request_bindings),
             ("motion-a", "motion-b"),
         )
         self.assertEqual(
@@ -2082,7 +2120,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
             "provider_supports_only_global_output_cancel",
         )
         self.assertEqual(
-            receipt.selected_request_ids,
+            _request_ids(receipt.selected_request_bindings),
             ("speech-request-a", "speech-request-b"),
         )
         self.assertEqual(
@@ -2167,7 +2205,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(receipt.interaction_ids, ("cancel",))
         self.assertEqual(
-            receipt.selected_request_ids,
+            _request_ids(receipt.selected_request_bindings),
             ("cancel-request",),
         )
         self.assertEqual(cancelled.status, "cancelled")
@@ -2283,10 +2321,10 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(
-            receipt.non_interruptible_request_ids,
+            _request_ids(receipt.non_interruptible_request_bindings),
             ("cannot-interrupt",),
         )
-        self.assertEqual(receipt.cancel_requested_request_ids, ())
+        self.assertEqual(_request_ids(receipt.cancel_requested_request_bindings), ())
         release.set()
         execution = await execution_task
         self.assertEqual(execution.status, "completed")
@@ -2387,7 +2425,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(execution.status, "cancelled")
         self.assertEqual(
-            receipt.queued_request_ids,
+            _request_ids(receipt.queued_request_bindings),
             ("queued-after-barrier",),
         )
         self.assertEqual(
@@ -2472,7 +2510,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         execution = await execution_task
 
         self.assertEqual(
-            receipt.selected_request_ids,
+            _request_ids(receipt.selected_request_bindings),
             ("required-pre-action",),
         )
         self.assertEqual(
@@ -2535,7 +2573,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         execution = await execution_task
 
         self.assertEqual(
-            receipt.provider_cancel_failures,
+            _provider_failure_texts(receipt),
             ("motion-unknown:physical cancel failed",),
         )
         self.assertEqual(execution.status, "failed")
@@ -2609,7 +2647,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(provider.cancel_attempts, 1)
         for receipt in (first_receipt, second_receipt):
             self.assertEqual(
-                receipt.provider_cancel_failures,
+                _provider_failure_texts(receipt),
                 (
                     "motion-concurrent-failure:"
                     "shared physical cancel failure",
@@ -2699,14 +2737,14 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         execution = await execution_task
 
         self.assertEqual(provider.cancel_attempts, 1)
-        self.assertEqual(first_receipt.provider_cancel_failures, ())
-        self.assertEqual(second_receipt.provider_cancel_failures, ())
+        self.assertEqual(_provider_failure_texts(first_receipt), ())
+        self.assertEqual(_provider_failure_texts(second_receipt), ())
         self.assertEqual(
-            first_receipt.cancel_requested_request_ids,
+            _request_ids(first_receipt.cancel_requested_request_bindings),
             ("motion-shared-in-flight",),
         )
         self.assertEqual(
-            second_receipt.cancel_requested_request_ids,
+            _request_ids(second_receipt.cancel_requested_request_bindings),
             ("motion-shared-in-flight",),
         )
         self.assertEqual(execution.status, "cancelled")
@@ -2817,8 +2855,8 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         execution = await execution_task
 
         self.assertEqual(provider.cancel_attempts, 1)
-        self.assertEqual(first_receipt.provider_cancel_failures, ())
-        self.assertEqual(second_receipt.provider_cancel_failures, ())
+        self.assertEqual(_provider_failure_texts(first_receipt), ())
+        self.assertEqual(_provider_failure_texts(second_receipt), ())
         self.assertEqual(execution.status, "cancelled")
         self.assertEqual(
             execution.results[0].reason_code,
@@ -2932,11 +2970,11 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(provider.cancel_attempts, 2)
         self.assertEqual(
-            first_receipt.selected_request_ids,
+            _request_ids(first_receipt.selected_request_bindings),
             ("motion-first-epoch",),
         )
         self.assertEqual(
-            second_receipt.selected_request_ids,
+            _request_ids(second_receipt.selected_request_bindings),
             ("motion-first-epoch", "motion-second-epoch"),
         )
         self.assertEqual(first_result.status, "cancelled")
@@ -3014,7 +3052,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         execution = await execution_task
 
         self.assertEqual(
-            receipt.queued_request_ids,
+            _request_ids(receipt.queued_request_bindings),
             ("queued-current-failure",),
         )
         self.assertEqual(

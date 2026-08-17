@@ -177,9 +177,19 @@ class NamedGoalCancellationClosureTests(unittest.TestCase):
             expected_plan_id="plan-parent",
             expected_plan_fingerprint="fingerprint-parent",
             affected_goal_ids=("goal-a",),
-            selected_request_ids=("request-a",),
-            active_request_ids=("request-a",),
-            provider_cancel_failures=("request-a:provider failed",),
+            selected_request_bindings=(
+                {"interaction_id": "interaction-parent", "request_id": "request-a"},
+            ),
+            active_request_bindings=(
+                {"interaction_id": "interaction-parent", "request_id": "request-a"},
+            ),
+            provider_cancel_failure_evidence=(
+                {
+                    "interaction_id": "interaction-parent",
+                    "request_id": "request-a",
+                    "error": "provider failed",
+                },
+            ),
         )
 
         with self.assertRaisesRegex(
@@ -256,9 +266,18 @@ class NamedGoalCancellationClosureTests(unittest.TestCase):
             expected_plan_id="plan-parent",
             expected_plan_fingerprint="fingerprint-parent",
             affected_goal_ids=("goal-a", "goal-b"),
-            selected_request_ids=("request-a", "request-b"),
-            active_request_ids=("request-a", "request-b"),
-            cancel_requested_request_ids=("request-a", "request-b"),
+            selected_request_bindings=(
+                {"interaction_id": "interaction-a", "request_id": "request-a"},
+                {"interaction_id": "interaction-b", "request_id": "request-b"},
+            ),
+            active_request_bindings=(
+                {"interaction_id": "interaction-a", "request_id": "request-a"},
+                {"interaction_id": "interaction-b", "request_id": "request-b"},
+            ),
+            cancel_requested_request_bindings=(
+                {"interaction_id": "interaction-a", "request_id": "request-a"},
+                {"interaction_id": "interaction-b", "request_id": "request-b"},
+            ),
             widened=True,
             widening_reason=(
                 "provider_supports_only_global_embodied_motion_cancel"
@@ -314,9 +333,15 @@ class NamedGoalCancellationClosureTests(unittest.TestCase):
             expected_plan_id="plan-parent",
             expected_plan_fingerprint="fingerprint-parent",
             affected_goal_ids=("goal-a",),
-            selected_request_ids=("request-a",),
-            active_request_ids=("request-a",),
-            cancel_requested_request_ids=("request-a",),
+            selected_request_bindings=(
+                {"interaction_id": "interaction-parent", "request_id": "request-a"},
+            ),
+            active_request_bindings=(
+                {"interaction_id": "interaction-parent", "request_id": "request-a"},
+            ),
+            cancel_requested_request_bindings=(
+                {"interaction_id": "interaction-parent", "request_id": "request-a"},
+            ),
         )
 
         results = manager.apply_goal_cancellation_resolution(association, receipts=[receipt], confirmation_transition=None, sid='sid-cancel', user_text='Cancel the nod.')

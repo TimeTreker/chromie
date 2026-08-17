@@ -14,10 +14,12 @@ acceptance tools. It includes:
 - strict `InteractionResponse`, `InteractionSpeech`, `CapabilityRequest`,
   `CapabilityResult`, and `CapabilityTrace` contracts;
 - deterministic `ReflexOutcome`, `CancellationDirective`, and
-  `CancellationDispatchReceipt` contracts. Fixed reflex scopes remain separate
-  from exact plan/fingerprint-bound goal cancellation, while both paths reconcile
-  trusted receipts into canonical Goal state; dispatch, provider, and dedicated
-  E-stop/safe-idle evidence remain separately represented;
+  `CancellationDispatchReceipt` contracts. Runtime request identity in cancellation
+  receipts is always interaction-qualified (`interaction_id` + `request_id`); bare
+  request-ID compatibility fields are not part of the canonical contract. Fixed
+  reflex scopes remain separate from exact plan/fingerprint-bound goal cancellation,
+  while both paths reconcile trusted receipts into canonical Goal state; dispatch,
+  provider, and dedicated E-stop/safe-idle evidence remain separately represented;
 - shared `TaskProposal`, `TaskProposalLedger`, and preflight-summary contracts
   for Goal Interpretation/Cognitive Core/Orchestrator proposal merge diagnostics;
 - Goal, Goal Association, semantic task-operation, and active-goal contracts;

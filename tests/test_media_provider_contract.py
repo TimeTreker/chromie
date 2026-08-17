@@ -165,6 +165,10 @@ def media_plan(
     )
 
 
+def _request_ids(bindings):  # type: ignore[no-untyped-def]
+    return tuple(item.request_id for item in bindings)
+
+
 class MediaDeclarationAndPlannerTests(unittest.TestCase):
     def test_advertised_operations_require_exact_retained_evidence(self) -> None:
         with self.assertRaisesRegex(ValueError, "operation_evidence must match"):
@@ -643,7 +647,7 @@ class MediaTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
                         requested_scope="media_output",
                     )
                 )
-                self.assertEqual(followup.selected_request_ids, ("media-request",))
+                self.assertEqual(_request_ids(followup.selected_request_bindings), ("media-request",))
             elif scope == "media_output":
                 followup = await runtime.cancel_scope(
                     CancellationDirective(
@@ -652,23 +656,23 @@ class MediaTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
                         foreground_interaction_id=interaction_id,
                     )
                 )
-                self.assertEqual(followup.selected_request_ids, ("speech-request",))
+                self.assertEqual(_request_ids(followup.selected_request_bindings), ("speech-request",))
             execution = await task
             return receipt, execution, speech_cancelled, media_cancelled
 
         output, _, output_speech, output_media = await run_and_cancel("output_only")
-        self.assertEqual(output.selected_request_ids, ("speech-request",))
+        self.assertEqual(_request_ids(output.selected_request_bindings), ("speech-request",))
         self.assertEqual(output_speech, ["speech-request"])
         self.assertEqual(output_media, ["media-request"])
 
         media, _, media_speech, media_media = await run_and_cancel("media_output")
-        self.assertEqual(media.selected_request_ids, ("media-request",))
+        self.assertEqual(_request_ids(media.selected_request_bindings), ("media-request",))
         self.assertEqual(media_speech, ["speech-request"])
         self.assertEqual(media_media, ["media-request"])
 
         all_receipt, _, all_speech, all_media = await run_and_cancel("current_interaction")
         self.assertEqual(
-            set(all_receipt.selected_request_ids),
+            set(_request_ids(all_receipt.selected_request_bindings)),
             {"speech-request", "media-request"},
         )
         self.assertEqual(all_speech, ["speech-request"])

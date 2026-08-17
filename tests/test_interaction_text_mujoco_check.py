@@ -72,7 +72,6 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
                             "reflex_outcome": outcome.model_dump(mode="json"),
                             "cancellation_dispatch_receipt": {
                                 "requested_scope": "media_output",
-                                "selected_request_ids": [],
                             },
                         },
                     }

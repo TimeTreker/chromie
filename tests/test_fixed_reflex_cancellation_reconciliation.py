@@ -59,6 +59,54 @@ def _bind_execution(
 
 
 class FixedReflexCancellationReconciliationTests(unittest.TestCase):
+    def test_same_request_id_in_other_interaction_is_not_reconciled(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="reflex-qualified-request")
+        for goal_id, interaction_id in (
+            ("goal-a", "interaction-a"),
+            ("goal-b", "interaction-b"),
+        ):
+            _create_goal(manager, goal_id, goal_id)
+            _bind_execution(
+                manager,
+                goal_id=goal_id,
+                interaction_id=interaction_id,
+                request_ids=["same-request"],
+            )
+
+        receipt = CancellationDispatchReceipt(
+            source_turn_id="turn-stop-a",
+            requested_scope="current_interaction",
+            effective_scope="current_interaction",
+            interaction_ids=("interaction-a",),
+            affected_goal_ids=("goal-a",),
+            selected_request_bindings=(
+                {"interaction_id": "interaction-a", "request_id": "same-request"},
+            ),
+            active_request_bindings=(
+                {"interaction_id": "interaction-a", "request_id": "same-request"},
+            ),
+            cancel_requested_request_bindings=(
+                {"interaction_id": "interaction-a", "request_id": "same-request"},
+            ),
+        )
+
+        manager.apply_reflex_cancellation_receipt(
+            receipt,
+            revoked_confirmation=None,
+            sid="sid-stop",
+            user_text="Stop this one.",
+        )
+
+        goal_a = manager._task_context_by_goal_id("goal-a")
+        goal_b = manager._task_context_by_goal_id("goal-b")
+        assert goal_a is not None and goal_b is not None
+        self.assertEqual(goal_a["status"], "cancelled")
+        self.assertNotEqual(goal_b["status"], "cancelled")
+        self.assertEqual(
+            goal_b["metadata"]["remaining_request_ids"],
+            ["same-request"],
+        )
+
     def test_current_interaction_cancels_every_selected_goal_request(self) -> None:
         manager = ConversationStateManager(base_conversation_id="reflex-current")
         for goal_id, request_id in (("goal-a", "request-a"), ("goal-b", "request-b")):
@@ -76,20 +124,16 @@ class FixedReflexCancellationReconciliationTests(unittest.TestCase):
             effective_scope="current_interaction",
             interaction_ids=("interaction-parent",),
             affected_goal_ids=("goal-a", "goal-b"),
-            selected_request_ids=("request-a", "request-b"),
             selected_request_bindings=(
                 {"interaction_id": "interaction-parent", "request_id": "request-a"},
                 {"interaction_id": "interaction-parent", "request_id": "request-b"},
             ),
-            active_request_ids=("request-a",),
             active_request_bindings=(
                 {"interaction_id": "interaction-parent", "request_id": "request-a"},
             ),
-            queued_request_ids=("request-b",),
             queued_request_bindings=(
                 {"interaction_id": "interaction-parent", "request_id": "request-b"},
             ),
-            cancel_requested_request_ids=("request-a",),
             cancel_requested_request_bindings=(
                 {"interaction_id": "interaction-parent", "request_id": "request-a"},
             ),
@@ -126,15 +170,12 @@ class FixedReflexCancellationReconciliationTests(unittest.TestCase):
             effective_scope="embodied_motion",
             interaction_ids=("interaction-parent",),
             affected_goal_ids=("goal-a",),
-            selected_request_ids=("request-motion",),
             selected_request_bindings=(
                 {"interaction_id": "interaction-parent", "request_id": "request-motion"},
             ),
-            active_request_ids=("request-motion",),
             active_request_bindings=(
                 {"interaction_id": "interaction-parent", "request_id": "request-motion"},
             ),
-            cancel_requested_request_ids=("request-motion",),
             cancel_requested_request_bindings=(
                 {"interaction_id": "interaction-parent", "request_id": "request-motion"},
             ),
@@ -170,19 +211,15 @@ class FixedReflexCancellationReconciliationTests(unittest.TestCase):
             effective_scope="embodied_motion",
             interaction_ids=("interaction-parent",),
             affected_goal_ids=("goal-a",),
-            selected_request_ids=("request-a",),
             selected_request_bindings=(
                 {"interaction_id": "interaction-parent", "request_id": "request-a"},
             ),
-            active_request_ids=("request-a",),
             active_request_bindings=(
                 {"interaction_id": "interaction-parent", "request_id": "request-a"},
             ),
-            cancel_requested_request_ids=("request-a",),
             cancel_requested_request_bindings=(
                 {"interaction_id": "interaction-parent", "request_id": "request-a"},
             ),
-            provider_cancel_failures=("request-a:provider timeout",),
             provider_cancel_failure_evidence=(
                 {
                     "interaction_id": "interaction-parent",
@@ -307,15 +344,12 @@ class FixedReflexCancellationReconciliationTests(unittest.TestCase):
             effective_scope="output_only",
             interaction_ids=("interaction-parent",),
             affected_goal_ids=("goal-a",),
-            selected_request_ids=("speech-pre-action",),
             selected_request_bindings=(
                 {"interaction_id": "interaction-parent", "request_id": "speech-pre-action"},
             ),
-            active_request_ids=("speech-pre-action",),
             active_request_bindings=(
                 {"interaction_id": "interaction-parent", "request_id": "speech-pre-action"},
             ),
-            cancel_requested_request_ids=("speech-pre-action",),
             cancel_requested_request_bindings=(
                 {"interaction_id": "interaction-parent", "request_id": "speech-pre-action"},
             ),
@@ -355,11 +389,9 @@ class FixedReflexCancellationReconciliationTests(unittest.TestCase):
             effective_scope="current_interaction",
             interaction_ids=("interaction-parent",),
             affected_goal_ids=("goal-a",),
-            selected_request_ids=("request-a",),
             selected_request_bindings=(
                 {"interaction_id": "interaction-parent", "request_id": "request-a"},
             ),
-            queued_request_ids=("request-a",),
             queued_request_bindings=(
                 {"interaction_id": "interaction-parent", "request_id": "request-a"},
             ),
