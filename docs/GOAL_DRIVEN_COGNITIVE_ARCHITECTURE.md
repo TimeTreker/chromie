@@ -2974,6 +2974,13 @@ only the maintained delivery lifecycle proves that the user was actually told.
 Internal modules, schemas, provider plumbing, planning mechanics, and ordinary
 low-level steps are not milestones merely because they occurred.
 
+Every ready human-observable conversational Activity is also an eligible Social
+Attention anchor, whether it is the first Goal Progress Communication act or a
+post-Evidence, failure, correction, or completion response. Social Attention remains
+an optional peer decoration lane and may choose `none`; speech never requires a
+gesture. Conversely, a tool lookup or an internal cognition milestone is not promoted
+into a Social Attention anchor merely because it happened.
+
 Each communication act has one semantic owner and deterministic authority,
 evidence, cancellation, and delivery validation. The architecture does not add a
 second LLM to repair ordinary progress wording, and it does not retain a legacy

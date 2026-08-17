@@ -79,6 +79,7 @@ try:
         CanonicalPlan,
         FastPlannerAdvance,
         FastPlannerAdvanceModelOutput,
+        FastPlannerFreshEvidenceAdvanceModelOutput,
     )
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
@@ -86,6 +87,7 @@ except ImportError:  # pragma: no cover
         CanonicalPlan,
         FastPlannerAdvance,
         FastPlannerAdvanceModelOutput,
+        FastPlannerFreshEvidenceAdvanceModelOutput,
     )
 
 logger = logging.getLogger("chromie.agent.fast_planner")
@@ -160,11 +162,24 @@ class FastPlannerResolver:
         ]
 
         responsibility_refs = [item.local_ref for item in responsibilities]
+        requires_fresh_evidence = any(
+            item.completion_requires_fresh_evidence for item in responsibilities
+        )
         # Pre-Goal advancement cannot select or emit Capability steps.  Pulling the
         # common Capability catalog into this prompt therefore adds latency and
         # context pressure without granting any useful authority.  Exact capability
         # availability belongs to canonical planning after applicable Goal binding.
-        response_schema = FastPlannerAdvanceModelOutput.model_json_schema()
+        #
+        # Responsibility already tells us when completion requires fresh Evidence.
+        # Express that truth in the decoder schema: Goal Progress Communication may
+        # acknowledge/progress or clarify, but ``complete_response`` is impossible
+        # until the required Evidence exists.
+        advance_output_model = (
+            FastPlannerFreshEvidenceAdvanceModelOutput
+            if requires_fresh_evidence
+            else FastPlannerAdvanceModelOutput
+        )
+        response_schema = advance_output_model.model_json_schema()
         options = {
             "temperature": 0,
             "top_p": 0.9,
@@ -202,7 +217,7 @@ class FastPlannerResolver:
                 raw_output=raw,
             )
         try:
-            output = FastPlannerAdvanceModelOutput.model_validate(raw)
+            output = advance_output_model.model_validate(raw)
         except ValidationError as exc:
             return self._advance_fail_safe(
                 request,
@@ -219,7 +234,7 @@ class FastPlannerResolver:
             )
 
         continuation_set = set(output.continuations)
-        if any(item.completion_requires_fresh_evidence for item in responsibilities):
+        if requires_fresh_evidence:
             if "goal_association" not in continuation_set:
                 return contract_fail(
                     "fresh-evidence Responsibilities require Goal Association continuity"

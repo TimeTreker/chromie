@@ -227,7 +227,6 @@ def test_social_attention_cooldown_is_scoped_to_primary_activity_not_turn():
             sid="session-social-cooldown",
             turn_id="turn-social-cooldown",
             language="en-US",
-            intent="weather_lookup",
             history=[],
         )
         first = await coordinator._run_social_attention_event(
@@ -315,7 +314,6 @@ def test_social_attention_primary_progress_is_scoped_to_semantic_activity_goal()
             sid="session-semantic-activity-scope",
             turn_id="turn-semantic-activity-scope",
             language="en-US",
-            intent="compound_action",
             context=context,
             history=[],
         )
@@ -666,7 +664,6 @@ def test_social_attention_uses_scheduled_primary_speech_as_activity_anchor(caplo
             sid="session-social-speech",
             turn_id="turn-social-speech",
             language="zh-CN",
-            intent="weather_lookup",
             context=context,
             history=[],
         )
@@ -754,7 +751,6 @@ def test_social_attention_lane_coalesces_duplicate_updates_for_one_primary_activ
             sid="session-social-events",
             turn_id="turn-social-events",
             language="en-US",
-            intent="conversation",
             history=[],
         )
         activity = coordinator._scheduled_speech_social_activity(

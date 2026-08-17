@@ -1047,6 +1047,8 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(advance.immediate_vocal_activity.response_text, "嗨～")
         self.assertEqual(advance.immediate_vocal_activity.role, "complete_response")
         self.assertIn("Responsibility evidence", ollama.prompts[0][0])
+        response_schema = ollama.prompts[0][1]["response_format"]
+        self.assertIn("FastPlannerCompleteResponseActivity", str(response_schema))
 
     def test_pre_goal_advance_preserves_profile_context_topology(self):
         ollama = FakeOllama(
@@ -1338,6 +1340,10 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(advance.immediate_vocal_activity.progress_kind, "check_information")
         self.assertFalse(hasattr(advance.immediate_vocal_activity, "response_text"))
         self.assertIn("Language hint: zh-CN", str(ollama.prompts[0][0]))
+        response_schema = ollama.prompts[0][1]["response_format"]
+        self.assertIn("FastPlannerProgressActivity", str(response_schema))
+        self.assertIn("FastPlannerClarificationActivity", str(response_schema))
+        self.assertNotIn("FastPlannerCompleteResponseActivity", str(response_schema))
 
     def test_pre_goal_progress_cannot_smuggle_unsupported_weather_result_text(self):
         ollama = FakeOllama(

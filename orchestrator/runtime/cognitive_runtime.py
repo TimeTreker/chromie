@@ -40,6 +40,7 @@ from shared.chromie_contracts.plan import (
     CanonicalPlanStep,
     ExecuteGoalPlanOutcome,
     FastPlannerAdvance,
+    FastPlannerVocalActivity,
     GoalSatisfactionAssessment,
     render_fast_planner_vocal_activity,
 )
@@ -2048,6 +2049,36 @@ class GoalDrivenRuntimeCoordinator:
         task.add_done_callback(_done)
 
     @staticmethod
+    def _fast_planner_vocal_social_activity(
+        activity: FastPlannerVocalActivity,
+        *,
+        language: str,
+        ready_execution: Any | None = None,
+    ) -> SocialAttentionActivityAnchor:
+        """Use the Planner-authored conversational Activity as its own SA anchor.
+
+        Fast Planner already owns semantic Activity identity here. Do not wait for
+        a later context projection to rediscover scheduled speech, and do not
+        promote the underlying cognition milestone into a social Activity.
+        """
+
+        rendered = render_fast_planner_vocal_activity(activity, language=language)
+        speech = getattr(ready_execution, "speech", None)
+        execution_item_id = str(getattr(speech, "id", "") or "").strip()
+        if not execution_item_id:
+            execution_item_id = f"fast_activity_speech_{activity.activity_id}"
+        return SocialAttentionActivityAnchor(
+            activity_id=activity.activity_id,
+            phase="ready",
+            summary=" ".join(str(rendered or "").strip().split())[:500],
+            realization=SocialAttentionActivityRealization(
+                execution_lanes=["vocal"],
+                vocal_modes=["speech"],
+                execution_item_ids=[execution_item_id],
+            ),
+        )
+
+    @staticmethod
     def _scheduled_speech_social_activity(
         context: dict[str, Any],
         *,
@@ -2323,6 +2354,63 @@ class GoalDrivenRuntimeCoordinator:
             )
             for row in activities.values()
         ]
+
+    def queue_interaction_social_attention(
+        self,
+        session: Any,
+        *,
+        response: InteractionResponse,
+        sid: str,
+        context: dict[str, Any],
+    ) -> None:
+        """Offer one ready user-facing response to optional Social Attention.
+
+        This is a presentation bridge only. It does not create speech, infer Goal
+        meaning, or force an expression; Social Attention may still choose ``none``.
+        """
+
+        metadata = response.metadata if isinstance(response.metadata, dict) else {}
+        bundle = metadata.get("execution_outcome_bundle")
+        bundle_turn_id = (
+            str(bundle.get("turn_id") or "").strip()
+            if isinstance(bundle, dict)
+            else ""
+        )
+        turn_id = (
+            str(metadata.get("turn_id") or "").strip()
+            or bundle_turn_id
+            or str(sid or response.interaction_id or "response").strip()
+        )
+        language = str(metadata.get("language") or "auto").strip() or "auto"
+        history = context.get("history")
+        if not isinstance(history, list):
+            history = []
+        user_text = ""
+        for item in reversed(history):
+            if not isinstance(item, dict) or item.get("role") != "user":
+                continue
+            user_text = str(item.get("text") or "").strip()
+            if user_text:
+                break
+        projection = CognitiveRuntimeResolution(
+            mode="apply",
+            status="applied",
+            lane="chat",
+            interaction_response=response,
+        )
+        for activity in self._resolution_social_activities(
+            projection, turn_id=turn_id, context=context
+        ):
+            self._queue_social_attention_for_activity(
+                session,
+                activity=activity,
+                text=user_text,
+                sid=sid,
+                turn_id=turn_id,
+                language=language,
+                context=context,
+                history=[dict(item) for item in history if isinstance(item, dict)],
+            )
 
     def _queue_social_attention_for_activity(
         self,
@@ -3294,11 +3382,27 @@ class GoalDrivenRuntimeCoordinator:
                     and self.policy.lane_enabled("chat")
                     and fast_advance.immediate_vocal_activity is not None
                 ):
-                    await self.adapter.interaction_runtime.start_fast_planner_vocal_activity(
-                        fast_advance.immediate_vocal_activity,
-                        session_id=sid,
+                    ready_vocal_execution = (
+                        await self.adapter.interaction_runtime.start_fast_planner_vocal_activity(
+                            fast_advance.immediate_vocal_activity,
+                            session_id=sid,
+                            turn_id=turn_id,
+                            language=language,
+                        )
+                    )
+                    self._queue_social_attention_for_activity(
+                        session,
+                        activity=self._fast_planner_vocal_social_activity(
+                            fast_advance.immediate_vocal_activity,
+                            language=language,
+                            ready_execution=ready_vocal_execution,
+                        ),
+                        text=text,
+                        sid=sid,
                         turn_id=turn_id,
                         language=language,
+                        context=context,
+                        history=history,
                     )
 
             self._queue_social_attention_for_activity(

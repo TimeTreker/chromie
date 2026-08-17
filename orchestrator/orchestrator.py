@@ -2954,7 +2954,7 @@ class VoiceAssistant:
         runtime_context = dict(context)
         self.session_log(
             session_id,
-            "fast_response_owner=fast_planner_advance gi_fast_speech_bypassed=true",
+            "goal_progress_communication_owner=fast_planner_advance gi_speech_bypassed=true",
         )
         resolution = await self._run_cognitive_runtime_pipeline(
             session,
@@ -3034,6 +3034,10 @@ class VoiceAssistant:
                 ),
             )
             self.conversation_state.record_interaction_response(session_id, safe_response)
+            await self._queue_response_social_attention(
+                safe_response,
+                session_id=session_id,
+            )
             self._record_cognitive_runtime_evidence(
                 resolution, session_id=session_id, user_text=user_text
             )
@@ -3782,6 +3786,10 @@ class VoiceAssistant:
             ),
         )
         self.conversation_state.record_interaction_response(session_id, safe_response)
+        await self._queue_response_social_attention(
+            safe_response,
+            session_id=session_id,
+        )
         self._launch_interaction(safe_response, session_id)
         return
 
@@ -4770,6 +4778,39 @@ class VoiceAssistant:
             )
         )
 
+    async def _queue_response_social_attention(
+        self,
+        response: InteractionResponse,
+        *,
+        session_id: str | None,
+    ) -> None:
+        """Offer a Host-presented conversational Activity to Social Attention.
+
+        Normal cognitive-runtime responses are already anchored inside the runtime.
+        This bridge is for presentation paths that bypass that return boundary, such
+        as post-Evidence outcome speech and fail-closed conversational responses.
+        """
+
+        runtime = getattr(self, "cognitive_runtime", None)
+        queue = getattr(runtime, "queue_interaction_social_attention", None)
+        if not callable(queue):
+            return
+        try:
+            session = await self.get_http_session()
+            queue(
+                session,
+                response=response,
+                sid=str(session_id or response.interaction_id or "response"),
+                context=self.build_context(session_id),
+            )
+        except (TypeError, ValueError, ValidationError, RuntimeError, AttributeError) as exc:
+            self.session_log(
+                session_id,
+                "response_social_attention_queue_failed: error_type=%s error=%s",
+                type(exc).__name__,
+                exc,
+            )
+
     async def _execute_cognitive_outcome_response(
         self,
         response: InteractionResponse,
@@ -4777,6 +4818,10 @@ class VoiceAssistant:
         session_id: str | None,
         detached_delivery: bool = False,
     ) -> str:
+        await self._queue_response_social_attention(
+            response,
+            session_id=session_id,
+        )
         try:
             dispatch = await self.interaction_runtime.submit_response(
                 response,

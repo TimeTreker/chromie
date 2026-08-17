@@ -401,6 +401,48 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         asyncio.run(run())
         self.assertEqual(len(assistant.interaction_runtime.prepared), 1)
 
+    def test_host_presented_response_is_offered_to_social_attention(self):
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        queued = []
+
+        class Runtime:
+            def queue_interaction_social_attention(self, *args, **kwargs):
+                queued.append((args, kwargs))
+
+        assistant.cognitive_runtime = Runtime()
+
+        async def get_http_session():
+            return object()
+
+        assistant.get_http_session = get_http_session
+        assistant.build_context = lambda session_id: {
+            "history": [{"role": "user", "text": "重庆今晚会下雨吗？"}]
+        }
+        assistant.session_log = lambda *args, **kwargs: None
+        response = InteractionResponse(
+            interaction_id="interaction-weather",
+            speech=[{"text": "今晚有雨。", "timing": "immediate"}],
+            metadata={
+                "language": "zh-CN",
+                "execution_outcome_bundle": {"turn_id": "turn-weather"},
+            },
+        )
+
+        asyncio.run(
+            assistant._queue_response_social_attention(
+                response,
+                session_id="sid-weather",
+            )
+        )
+
+        self.assertEqual(len(queued), 1)
+        self.assertEqual(queued[0][1]["response"], response)
+        self.assertEqual(queued[0][1]["sid"], "sid-weather")
+        self.assertEqual(
+            queued[0][1]["context"]["history"][0]["text"],
+            "重庆今晚会下雨吗？",
+        )
+
     def test_cognitive_failure_is_handled_without_legacy_reentry(self):
         resolution = CognitiveRuntimeResolution(
             mode="apply",

@@ -474,19 +474,18 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    semantic inference, measure and attribute that model failure instead of
    automatically hiding it behind another example-specific instruction.
 
-23. **Fast response is a planning effect, not a module or GI side channel.**
+23. **Goal Progress Communication is semantic courtesy, not a latency feature.**
    Once Goal Interpretation has emitted sufficient Responsibility evidence, Fast
-   Planner owns the smallest useful HOW advancement. It may author one brief
-   provider-free conversational Activity that is ready now. For a simple greeting
-   this Activity may fully satisfy the turn and no persistent Goal is required. If
-   downstream work, fresh evidence, retained continuity, or effects remain, that
-   Activity is prospective progress only and Fast Planner requests Goal Association.
-   If HOW exceeds the fast planning budget, Fast Planner may additionally request
-   Deep Planner. These are typed continuation dispositions; Fast Planner does not
-   itself mutate Goal state or call another semantic owner. The Core follows the
-   dispositions mechanically. Missing result evidence limits what early speech may
-   claim but does not require silence. Every later speech-capable stage consults the
-   Interaction Ledger and communicates only the still-needed semantic delta.
+   Planner owns the first possible user-facing HOW advancement. Whenever cognition
+   has a new trustworthy, user-relevant semantic delta, the current speech-capable
+   owner may communicate it; when an equivalent act is already delivered or pending,
+   it stays silent. This is Chromie's polite-response obligation, not a requirement
+   to fill silence. For a simple greeting the first conversational Activity may fully
+   satisfy the turn. If downstream work, fresh Evidence, retained continuity, or
+   effects remain, that act is prospective progress only and Fast Planner requests
+   Goal Association. Later owners communicate only genuinely new limitation, wait,
+   failure, correction, result, or completion meaning. Speed is desirable but is not
+   the semantic contract, and Goal Interpretation never regains a speech side channel.
 24. **Publish dialogue early; publish semantic state only after validation.**
    Goal Interpretation and Goal Association require a bounded view of the recent
    accepted conversation together with active/recent Goals, task/progress state,

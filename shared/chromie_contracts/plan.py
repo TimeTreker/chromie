@@ -115,6 +115,19 @@ FastPlannerVocalActivity = Annotated[
     Field(discriminator="role"),
 ]
 
+# Fresh-evidence Responsibilities cannot be completed before new Evidence exists.
+# Encode that known truth in the decoder contract itself so Goal Progress
+# Communication can still choose progress/clarification without offering an
+# impossible complete_response branch and discarding useful communication after
+# inference.
+FastPlannerFreshEvidenceVocalActivity = Annotated[
+    Union[
+        FastPlannerProgressActivity,
+        FastPlannerClarificationActivity,
+    ],
+    Field(discriminator="role"),
+]
+
 
 def render_fast_planner_vocal_activity(
     activity: FastPlannerVocalActivity,
@@ -229,6 +242,17 @@ class FastPlannerAdvanceModelOutput(BaseModel):
     @classmethod
     def normalize_output_text(cls, value: Any) -> Any:
         return " ".join(value.strip().split()) if isinstance(value, str) else value
+
+
+class FastPlannerFreshEvidenceAdvanceModelOutput(FastPlannerAdvanceModelOutput):
+    """Decoder contract while completion still depends on fresh Evidence.
+
+    Responsibility evidence already makes ``complete_response`` impossible at
+    this lifecycle point. The model-facing schema therefore exposes only the
+    conversational acts that are actually legal now.
+    """
+
+    immediate_vocal_activity: FastPlannerFreshEvidenceVocalActivity | None
 
 
 def _normalize_ids(value: Any) -> list[str]:

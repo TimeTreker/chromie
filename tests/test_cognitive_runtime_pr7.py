@@ -654,6 +654,15 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             adapter=CanonicalPlanRuntimeAdapter(runtime),
             policy=CognitiveRuntimePolicy(mode="apply", apply_lanes=frozenset({"chat", "tool"})),
         )
+        original_queue = coordinator._queue_social_attention_for_activity
+
+        def observe_social_attention_queue(*args, **kwargs):
+            activity = kwargs.get("activity")
+            if activity is not None and activity.activity_id == "weather-progress":
+                events.append("social_attention_queued")
+            return original_queue(*args, **kwargs)
+
+        coordinator._queue_social_attention_for_activity = observe_social_attention_queue
         core, envelope = admitted_core(
             "今天下午重庆会下雨吗？",
             sid="turn-weather",
@@ -683,7 +692,10 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(result.status, "applied")
-        self.assertEqual(events[:3], ["advance", "vocal_activity_started", "association"])
+        self.assertEqual(
+            events[:4],
+            ["advance", "vocal_activity_started", "social_attention_queued", "association"],
+        )
         self.assertEqual(runtime.started_fast_activities[0][1], "好，我查一下。")
         self.assertEqual(client.calls[:3], ["advance", "association", "compose"])
 
