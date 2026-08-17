@@ -694,7 +694,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(result.status, "applied")
         self.assertEqual(
             events[:4],
-            ["advance", "vocal_activity_started", "social_attention_queued", "association"],
+            ["advance", "social_attention_queued", "vocal_activity_started", "association"],
         )
         self.assertEqual(runtime.started_fast_activities[0][1], "好，我查一下。")
         self.assertEqual(client.calls[:3], ["advance", "association", "compose"])

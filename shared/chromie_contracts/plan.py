@@ -120,7 +120,12 @@ FastPlannerVocalActivity = Annotated[
 # Communication can still choose progress/clarification without offering an
 # impossible complete_response branch and discarding useful communication after
 # inference.
-FastPlannerFreshEvidenceVocalActivity = Annotated[
+# When WHAT is already confident, fresh Evidence means the only honest immediate
+# act is bounded progress. A separate clarifiable contract is used only when Goal
+# Interpretation explicitly carries material uncertainty at low confidence.
+FastPlannerFreshEvidenceVocalActivity = FastPlannerProgressActivity
+
+FastPlannerFreshEvidenceClarifiableVocalActivity = Annotated[
     Union[
         FastPlannerProgressActivity,
         FastPlannerClarificationActivity,
@@ -245,14 +250,20 @@ class FastPlannerAdvanceModelOutput(BaseModel):
 
 
 class FastPlannerFreshEvidenceAdvanceModelOutput(FastPlannerAdvanceModelOutput):
-    """Decoder contract while completion still depends on fresh Evidence.
+    """Decoder contract for confident WHAT that still needs fresh Evidence.
 
-    Responsibility evidence already makes ``complete_response`` impossible at
-    this lifecycle point. The model-facing schema therefore exposes only the
-    conversational acts that are actually legal now.
+    No factual result can be complete yet, and confident WHAT does not need a
+    clarification question. The only immediate user-facing semantic delta is
+    bounded progress (or silence).
     """
 
     immediate_vocal_activity: FastPlannerFreshEvidenceVocalActivity | None
+
+
+class FastPlannerFreshEvidenceClarifiableAdvanceModelOutput(FastPlannerAdvanceModelOutput):
+    """Fresh-evidence decoder contract when WHAT is materially uncertain."""
+
+    immediate_vocal_activity: FastPlannerFreshEvidenceClarifiableVocalActivity | None
 
 
 def _normalize_ids(value: Any) -> list[str]:

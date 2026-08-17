@@ -15,7 +15,7 @@ For every independently satisfiable human outcome, emit one responsibilities[] i
 
 Semantic fidelity is mandatory. Preserve explicit entities, quantities, distances, direction, time, severity, intensity, magnitude, thresholds, subtype, negation, comparison, recipient, source, and other modifiers whenever they change what counts as satisfying the request. Do not broaden a narrow request by dropping qualifiers.
 
-Uncertainty belongs here only when it is uncertainty about WHAT the human means. Put concise unresolved semantic questions or ambiguous bindings in unresolved[]. Do not decide the clarification Activity, response wording, or next execution step.
+Uncertainty belongs here only when it is material uncertainty about WHAT the human means. Put concise unresolved semantic questions or ambiguous bindings in unresolved[] only when the Responsibility cannot preserve the user's requested outcome without resolving that uncertainty. Do not list downstream implementation choices, provider interpretation questions, or already-preserved relative bindings as unresolved. For example, 'tonight' is itself a valid time binding when the user clearly said tonight; Goal Interpretation does not need to choose a provider-specific clock interval. Do not decide the clarification Activity, response wording, or next execution step.
 
 Goal Interpretation must never author or expose:
 - route or intent labels;

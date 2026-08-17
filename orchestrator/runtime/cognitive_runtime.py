@@ -3382,20 +3382,14 @@ class GoalDrivenRuntimeCoordinator:
                     and self.policy.lane_enabled("chat")
                     and fast_advance.immediate_vocal_activity is not None
                 ):
-                    ready_vocal_execution = (
-                        await self.adapter.interaction_runtime.start_fast_planner_vocal_activity(
-                            fast_advance.immediate_vocal_activity,
-                            session_id=sid,
-                            turn_id=turn_id,
-                            language=language,
-                        )
-                    )
+                    # Social Attention decorates this already-authorized conversational
+                    # Activity. Start its optional cognition before waiting on TTS so the
+                    # expression can accompany the Activity instead of arriving after it.
                     self._queue_social_attention_for_activity(
                         session,
                         activity=self._fast_planner_vocal_social_activity(
                             fast_advance.immediate_vocal_activity,
                             language=language,
-                            ready_execution=ready_vocal_execution,
                         ),
                         text=text,
                         sid=sid,
@@ -3403,6 +3397,12 @@ class GoalDrivenRuntimeCoordinator:
                         language=language,
                         context=context,
                         history=history,
+                    )
+                    await self.adapter.interaction_runtime.start_fast_planner_vocal_activity(
+                        fast_advance.immediate_vocal_activity,
+                        session_id=sid,
+                        turn_id=turn_id,
+                        language=language,
                     )
 
             self._queue_social_attention_for_activity(

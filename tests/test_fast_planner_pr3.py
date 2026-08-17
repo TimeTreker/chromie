@@ -1342,7 +1342,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("Language hint: zh-CN", str(ollama.prompts[0][0]))
         response_schema = ollama.prompts[0][1]["response_format"]
         self.assertIn("FastPlannerProgressActivity", str(response_schema))
-        self.assertIn("FastPlannerClarificationActivity", str(response_schema))
+        self.assertNotIn("FastPlannerClarificationActivity", str(response_schema))
         self.assertNotIn("FastPlannerCompleteResponseActivity", str(response_schema))
 
     def test_pre_goal_progress_cannot_smuggle_unsupported_weather_result_text(self):
@@ -3789,6 +3789,20 @@ class FastPlannerResolverTests(unittest.TestCase):
 
 
 
+
+
+    def test_confident_fresh_evidence_decoder_exposes_progress_not_clarification(self):
+        from shared.chromie_contracts.plan import FastPlannerFreshEvidenceAdvanceModelOutput
+
+        schema = FastPlannerFreshEvidenceAdvanceModelOutput.model_json_schema()
+        encoded = str(schema)
+        self.assertIn("FastPlannerProgressActivity", encoded)
+        self.assertNotIn("FastPlannerClarificationActivity", encoded)
+        self.assertNotIn("FastPlannerCompleteResponseActivity", encoded)
+
+    def test_free_text_language_contract_rejects_english_for_chinese_turn(self):
+        self.assertFalse(FastPlannerResolver._speech_matches_language("I'll check it.", "zh-CN"))
+        self.assertTrue(FastPlannerResolver._speech_matches_language("好，我来看看。", "zh-CN"))
 
 if __name__ == "__main__":
     unittest.main()

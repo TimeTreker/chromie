@@ -2270,9 +2270,8 @@ class VoiceAssistant:
         if record is not None:
             self.session_log(
                 session_id,
-                "experience_recorded: experience_id=%s route=%s execution_status=%s",
+                "experience_recorded: experience_id=%s execution_status=%s",
                 record.experience_id,
-                record.route,
                 record.execution_status,
             )
         try:
@@ -4693,8 +4692,6 @@ class VoiceAssistant:
             ],
             metadata={"source": source},
         )
-
-    @staticmethod
 
     async def _execute_agent_tool(
         self,

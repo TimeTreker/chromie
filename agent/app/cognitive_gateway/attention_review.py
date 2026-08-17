@@ -74,21 +74,10 @@ class AttentionReviewer:
                 reason="attention gate is disabled",
             )
 
-        # Active provider/task work is already an explicit interaction anchor. A
-        # mere recent exchange is weaker: the user may have established a temporary
-        # addressedness rule (for example during a meeting or call), so review that
-        # turn once with bounded dialogue rather than blindly admitting everything
-        # inside the engagement timeout.
-        if (
-            engagement.get("active") is True
-            and str(engagement.get("evidence") or "") in {"active_task", "in_flight_turn"}
-        ):
-            return self._admit(
-                request=request,
-                confidence=1.0,
-                source="cognitive_gateway.attention_policy",
-                reason="active task context admits the turn",
-            )
+        # Active work is context for addressedness, not proof that the latest
+        # transcript carries a new directed meaning. Always review it. Otherwise an
+        # ASR fragment such as "The." can inherit an unrelated active Goal and be
+        # mistaken for semantic continuation merely because work is in flight.
         if self.client is None:
             return self._admit(
                 request=request,
@@ -160,7 +149,7 @@ class AttentionReviewer:
         if result.speech_act in DIRECTED_SPEECH_ACTS:
             return "direct_speech_act"
         if result.speech_act == "unclear":
-            return "unclear_speech_act"
+            return ""
         if result.speech_act not in SUPPRESSIBLE_INACTIVE_SPEECH_ACTS:
             return "unsupported_speech_act"
         return ""
@@ -168,12 +157,9 @@ class AttentionReviewer:
     @staticmethod
     def _validate_model_output(raw: dict[str, Any]) -> _AttentionModelOutput:
         result = _AttentionModelOutput.model_validate(raw)
-        if not result.addressed and (
-            result.speech_act in DIRECTED_SPEECH_ACTS
-            or result.speech_act == "unclear"
-        ):
+        if not result.addressed and result.speech_act in DIRECTED_SPEECH_ACTS:
             raise ValueError(
-                "addressed=false requires an explicit ambient speech act; "
+                "addressed=false cannot carry an explicitly directed speech act; "
                 f"got speech_act={result.speech_act}"
             )
         return result
@@ -264,9 +250,12 @@ class AttentionReviewer:
             "an ongoing direct exchange is addressed when no restrictive rule is "
             "active. Assistant wording never creates or relaxes the user's addressedness "
             "rule. If the linguistic function, policy applicability, or addressee is "
-            "genuinely ambiguous, use addressed=true and speech_act=unclear. "
-            "addressed=false is valid only with reply, ambient_report, dictation, "
-            "or narration. Return only the schema-valid JSON object."
+            "genuinely ambiguous but there is positive evidence it is directed to Chromie, "
+            "use addressed=true and speech_act=unclear. A contentless or corrupted fragment "
+            "with no reliable directed meaning may use addressed=false and speech_act=unclear, "
+            "including while an unrelated task is active. Active work is context, not proof "
+            "that the latest transcript semantically advances that work. Return only the "
+            "schema-valid JSON object."
         )
 
     @staticmethod

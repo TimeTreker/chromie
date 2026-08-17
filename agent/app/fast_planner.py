@@ -80,6 +80,7 @@ try:
         FastPlannerAdvance,
         FastPlannerAdvanceModelOutput,
         FastPlannerFreshEvidenceAdvanceModelOutput,
+        FastPlannerFreshEvidenceClarifiableAdvanceModelOutput,
     )
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
@@ -88,6 +89,7 @@ except ImportError:  # pragma: no cover
         FastPlannerAdvance,
         FastPlannerAdvanceModelOutput,
         FastPlannerFreshEvidenceAdvanceModelOutput,
+        FastPlannerFreshEvidenceClarifiableAdvanceModelOutput,
     )
 
 logger = logging.getLogger("chromie.agent.fast_planner")
@@ -174,11 +176,17 @@ class FastPlannerResolver:
         # Express that truth in the decoder schema: Goal Progress Communication may
         # acknowledge/progress or clarify, but ``complete_response`` is impossible
         # until the required Evidence exists.
-        advance_output_model = (
-            FastPlannerFreshEvidenceAdvanceModelOutput
-            if requires_fresh_evidence
-            else FastPlannerAdvanceModelOutput
+        fresh_evidence_needs_clarification = bool(request.interpretation_unresolved) and any(
+            item.confidence < self.min_confidence for item in responsibilities
         )
+        if requires_fresh_evidence:
+            advance_output_model = (
+                FastPlannerFreshEvidenceClarifiableAdvanceModelOutput
+                if fresh_evidence_needs_clarification
+                else FastPlannerFreshEvidenceAdvanceModelOutput
+            )
+        else:
+            advance_output_model = FastPlannerAdvanceModelOutput
         response_schema = advance_output_model.model_json_schema()
         options = {
             "temperature": 0,
@@ -274,6 +282,13 @@ class FastPlannerResolver:
                     "a continuing Fast Planner advance may only emit progress or "
                     "clarification speech"
                 )
+            if activity.role in {"complete_response", "clarification"} and not self._speech_matches_language(
+                activity.response_text,
+                request.language,
+            ):
+                return contract_fail(
+                    "Fast Planner free-text speech must use the current interaction language"
+                )
             if not output.continuations and activity.role == "progress":
                 return contract_fail(
                     "terminal Fast Planner advance cannot end on progress-only speech"
@@ -293,6 +308,24 @@ class FastPlannerResolver:
                 "capability_selection_authority": "deferred_until_canonical_planning",
             },
         )
+
+    @staticmethod
+    def _speech_matches_language(text: str, language: str | None) -> bool:
+        """Validate model-owned wording against the interaction language.
+
+        Host never translates or rewrites this semantic surface. Bounded progress
+        bypasses this check because trusted runtime renders it directly.
+        """
+
+        normalized_language = str(language or "").strip().casefold()
+        if not normalized_language or normalized_language == "auto":
+            return True
+        has_cjk = any("\u4e00" <= ch <= "\u9fff" for ch in text or "")
+        if normalized_language.startswith("zh"):
+            return has_cjk
+        if normalized_language.startswith("en"):
+            return not has_cjk
+        return True
 
     @staticmethod
     def _advance_fail_safe(
@@ -1238,9 +1271,10 @@ class FastPlannerResolver:
             "Progress is not free text: use role=progress with one progress_kind "
             "(acknowledge_work, check_information, perform_action, or think) and no "
             "response_text. Runtime renders that bounded act. If any covered "
-            "Responsibility has completion_requires_fresh_evidence=true, continuations "
-            "MUST include goal_association and any immediate vocal Activity MUST use "
-            "role=progress, never complete_response. For complete_response or clarification, "
+            "Fresh-evidence Responsibilities MUST continue to goal_association. Use progress "
+            "unless the decoder explicitly exposes clarification for low-confidence WHAT; "
+            "clarification must ask a question, never narrate progress. Never complete before "
+            "fresh Evidence. For complete_response or clarification, "
             "write response_text in the user's language unless the user explicitly asks for "
             "another language. Add "
             "goal_association when persistence, "

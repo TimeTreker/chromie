@@ -92,7 +92,7 @@ class CognitiveGatewayAttentionReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.source, "cognitive_gateway.attention_review_model")
         self.assertEqual(client.calls, 1)
 
-    async def test_inconsistent_unaddressed_output_fails_open_without_repair(self) -> None:
+    async def test_high_confidence_unaddressed_unclear_fragment_is_suppressed(self) -> None:
         client = _Client(
             {
                 "addressed": False,
@@ -102,13 +102,11 @@ class CognitiveGatewayAttentionReviewTests(unittest.IsolatedAsyncioTestCase):
         )
         reviewer = AttentionReviewer(client)
 
-        result = await reviewer.review(
-            self.request("The deployment pipeline completed before lunch.")
-        )
+        result = await reviewer.review(self.request("The."))
 
-        self.assertEqual(result.disposition, "admit")
+        self.assertEqual(result.disposition, "suppress")
         self.assertEqual(result.speech_act, "unclear")
-        self.assertIn("failed open", result.reason)
+        self.assertEqual(result.source, "cognitive_gateway.attention_review_model")
         self.assertEqual(client.calls, 1)
 
     async def test_recent_exchange_with_temporary_address_rule_is_reviewed_once(self) -> None:
@@ -140,14 +138,20 @@ class CognitiveGatewayAttentionReviewTests(unittest.IsolatedAsyncioTestCase):
         prompt = client.result  # keep fake result untouched; inspect generated prompt below
         del prompt
 
-    async def test_active_exchange_bypasses_model_and_is_admitted(self) -> None:
-        client = _Client(error=AssertionError("model must not run"))
+    async def test_active_task_is_context_not_automatic_semantic_admission(self) -> None:
+        client = _Client(
+            {
+                "addressed": False,
+                "speech_act": "unclear",
+                "confidence": 0.97,
+            }
+        )
         reviewer = AttentionReviewer(client)
 
-        result = await reviewer.review(self.request("Yes.", active=True, evidence="active_task"))
+        result = await reviewer.review(self.request("The.", active=True, evidence="active_task"))
 
-        self.assertEqual(result.disposition, "admit")
-        self.assertEqual(client.calls, 0)
+        self.assertEqual(result.disposition, "suppress")
+        self.assertEqual(client.calls, 1)
 
     async def test_model_failure_is_fail_open(self) -> None:
         reviewer = AttentionReviewer(_Client(error=TimeoutError("slow")))
