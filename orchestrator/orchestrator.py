@@ -115,7 +115,11 @@ from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 from orchestrator.runtime.capability_runtime import CapabilityRuntimeResult
 from orchestrator.schemas.agent import AgentResult
 from orchestrator.schemas.route import RouteDecision
-from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
+from shared.chromie_contracts.core_interpretation import (
+    CognitiveResponsibilityProposal,
+    CognitiveWorkRequest,
+    CoreInterpretationResult,
+)
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
@@ -507,11 +511,7 @@ class VoiceAssistant:
         # These tasks consume Runtime lifecycle/Evidence after submit() returned.
         self.active_capability_result_tasks: dict[asyncio.Task, str] = {}
         self.task_continuity_report_tasks: set[asyncio.Task] = set()
-        self.goal_association_report_tasks: set[asyncio.Task] = set()
-        self.fast_planner_report_tasks: set[asyncio.Task] = set()
         self.observability_tasks: set[asyncio.Task] = set()
-        self.deep_planner_report_tasks: set[asyncio.Task] = set()
-        self.cognitive_runtime_report_tasks: set[asyncio.Task] = set()
         self.is_playing_audio = False
 
         self.audio_input_mode = audio_settings.mode
@@ -4011,67 +4011,7 @@ class VoiceAssistant:
         )
         return resolution
 
-    async def _run_cognitive_runtime_report(
-        self,
-        session: aiohttp.ClientSession,
-        *,
-        user_text: str,
-        session_id: str,
-        context: dict[str, Any],
-        decision: RouteDecision,
-        turn_envelope: UserTurnEnvelope | None = None,
-    ) -> None:
-        await self._run_cognitive_runtime_pipeline(
-            session,
-            user_text=user_text,
-            session_id=session_id,
-            context=context,
-            decision=decision,
-            turn_envelope=turn_envelope,
-        )
 
-    def _schedule_cognitive_runtime_report(
-        self,
-        session: aiohttp.ClientSession,
-        *,
-        user_text: str,
-        session_id: str,
-        context: dict[str, Any],
-        decision: RouteDecision,
-        turn_envelope: UserTurnEnvelope | None = None,
-    ) -> RouteDecision:
-        if (
-            self.cognitive_runtime_mode != "report_only"
-            or not self.enable_agent
-            or decision.interrupt_current
-            or decision.route in {"interrupt", "ignore"}
-        ):
-            return decision
-        task = asyncio.create_task(
-            self._run_cognitive_runtime_report(
-                session,
-                user_text=user_text,
-                session_id=session_id,
-                context=context,
-                decision=decision,
-                turn_envelope=turn_envelope,
-            )
-        )
-        self.cognitive_runtime_report_tasks.add(task)
-        task.add_done_callback(self.cognitive_runtime_report_tasks.discard)
-        metadata = dict(decision.metadata or {})
-        metadata["cognitive_runtime_resolution"] = {
-            "status": "scheduled",
-            "mode": "report_only",
-            "active_goal_count": len(context.get("active_goal_snapshots") or []),
-        }
-        metadata["cognitive_runtime_mode"] = "report_only"
-        self.session_log(
-            session_id,
-            "cognitive_runtime_report_scheduled: active_goals=%s",
-            len(context.get("active_goal_snapshots") or []),
-        )
-        return decision.model_copy(update={"metadata": metadata})
 
     def _named_goal_cancellation_failure_response(
         self,
@@ -4724,232 +4664,10 @@ class VoiceAssistant:
         )
         return True
 
-    async def _run_response_composer_report(
-        self,
-        session: aiohttp.ClientSession,
-        *,
-        user_text: str,
-        session_id: str,
-        context: dict[str, Any],
-        decision: RouteDecision,
-        plan: Any,
-    ) -> None:
-        if getattr(self, "response_composer_mode", "off") != "report_only":
-            return
-        started_ms = now_ms()
-        composition_context = dict(context)
-        composition_context["canonical_plan_resolution"] = plan.prompt_projection()
-        self.session_log(
-            session_id,
-            "response_composer_report_started: plan_id=%s disposition=%s goals=%s",
-            plan.plan_id,
-            plan.disposition,
-            len(plan.goal_ids),
-        )
-        try:
-            resolution = await self.agent_client.compose_response_plan(
-                session,
-                text=user_text,
-                route_decision=decision,
-                sid=session_id,
-                context=composition_context,
-                history=context.get("history", []),
-                timeout_ms=getattr(self, "response_composer_timeout_ms", 5000),
-            )
-        except Exception as exc:
-            self.session_log(
-                session_id,
-                "response_composer_report_failed: ms=%.1f error_type=%s error=%s",
-                now_ms() - started_ms,
-                type(exc).__name__,
-                exc,
-            )
-            return
-        composition = resolution.composition
-        if composition is None:
-            self.session_log(
-                session_id,
-                "response_composer_report_done: ms=%.1f status=%s composition=false reason=%s",
-                now_ms() - started_ms,
-                resolution.status,
-                resolution.reason_summary or "none",
-            )
-            return
-        response_plan = composition.response_plan
-        stage_count = sum(
-            1
-            for stage in (
-                response_plan.immediate,
-                response_plan.pre_action,
-                *response_plan.progress,
-                response_plan.final,
-            )
-            if stage is not None
-        )
-        self.session_log(
-            session_id,
-            "response_composer_report_done: ms=%.1f status=%s stages=%s confidence=%.2f fingerprint=%s",
-            now_ms() - started_ms,
-            resolution.status,
-            stage_count,
-            composition.confidence,
-            composition.canonical_plan_fingerprint[:12],
-        )
 
-    async def _run_fast_planner_report(
-        self, session: aiohttp.ClientSession, *, user_text: str, session_id: str,
-        context: dict[str, Any], decision: RouteDecision,
-    ) -> None:
-        started_ms = now_ms()
-        try:
-            plan = await self.agent_client.resolve_fast_plan(
-                session, text=user_text, route_decision=decision, sid=session_id,
-                context=context, history=context.get("history", []), timeout_ms=self.fast_planner_timeout_ms,
-            )
-        except Exception as exc:
-            self.session_log(session_id, "fast_planner_report_failed: ms=%.1f error_type=%s error=%s",
-                             now_ms() - started_ms, type(exc).__name__, exc)
-            return
-        self.session_log(session_id,
-            "fast_planner_report_done: ms=%.1f coverage=%s disposition=%s steps=%s confidence=%.2f escalation=%s",
-            now_ms() - started_ms, plan.coverage, plan.disposition, len(plan.steps), plan.confidence,
-            plan.escalation_reason or "none")
-        if plan.disposition != "escalate":
-            await self._run_response_composer_report(
-                session, user_text=user_text, session_id=session_id,
-                context=context, decision=decision, plan=plan,
-            )
-            return
-        if self.deep_planner_mode != "report_only":
-            return
-        deep_context = dict(context)
-        deep_context["fast_plan_resolution"] = plan.prompt_projection()
-        deep_started_ms = now_ms()
-        self.session_log(session_id, "deep_planner_report_started: fast_plan_id=%s reason=%s",
-                         plan.plan_id, plan.escalation_reason or "unspecified")
-        try:
-            deep_plan = await self.agent_client.resolve_deep_plan(
-                session, text=user_text, route_decision=decision, sid=session_id,
-                context=deep_context, history=context.get("history", []),
-                timeout_ms=self.deep_planner_timeout_ms,
-            )
-        except Exception as exc:
-            self.session_log(session_id, "deep_planner_report_failed: ms=%.1f error_type=%s error=%s",
-                             now_ms() - deep_started_ms, type(exc).__name__, exc)
-            return
-        self.session_log(session_id,
-            "deep_planner_report_done: ms=%.1f coverage=%s disposition=%s steps=%s confidence=%.2f attempts=%s",
-            now_ms() - deep_started_ms, deep_plan.coverage, deep_plan.disposition, len(deep_plan.steps),
-            deep_plan.confidence, deep_plan.metadata.get("attempt_count", 1))
-        await self._run_response_composer_report(
-            session, user_text=user_text, session_id=session_id,
-            context=context, decision=decision, plan=deep_plan,
-        )
 
-    def _schedule_fast_planner_report(
-        self, session: aiohttp.ClientSession, *, user_text: str, session_id: str,
-        context: dict[str, Any], decision: RouteDecision,
-    ) -> RouteDecision:
-        if self.fast_planner_mode != "report_only" or not self.enable_agent or decision.interrupt_current or decision.route in {"interrupt", "ignore"}:
-            return decision
-        task = asyncio.create_task(self._run_fast_planner_report(
-            session, user_text=user_text, session_id=session_id, context=context, decision=decision))
-        self.fast_planner_report_tasks.add(task)
-        task.add_done_callback(self.fast_planner_report_tasks.discard)
-        metadata = dict(decision.metadata or {})
-        metadata["fast_planner_resolution"] = {"status": "scheduled", "mode": "report_only"}
-        metadata["fast_planner_mode"] = "report_only"
-        if getattr(self, "response_composer_mode", "off") == "report_only":
-            metadata["response_composer_resolution"] = {
-                "status": "waiting_for_terminal_plan",
-                "mode": "report_only",
-            }
-            metadata["response_composer_mode"] = "report_only"
-        self.session_log(session_id, "fast_planner_report_scheduled")
-        return decision.model_copy(update={"metadata": metadata})
 
-    async def _run_goal_association_report(
-        self,
-        session: aiohttp.ClientSession,
-        *,
-        user_text: str,
-        session_id: str,
-        context: dict[str, Any],
-        decision: RouteDecision,
-    ) -> None:
-        started_ms = now_ms()
-        try:
-            resolution = await self.agent_client.resolve_goal_association(
-                session,
-                text=user_text,
-                route_decision=decision,
-                sid=session_id,
-                context=context,
-                history=context.get("history", []),
-                timeout_ms=self.goal_association_timeout_ms,
-            )
-        except Exception as exc:
-            self.session_log(
-                session_id,
-                "goal_association_report_failed: ms=%.1f error_type=%s error=%s",
-                now_ms() - started_ms,
-                type(exc).__name__,
-                exc,
-            )
-            return
-        status = str((resolution.metadata or {}).get("status") or "resolved")
-        relationships = ",".join(item.relationship for item in resolution.associations) or "none"
-        self.session_log(
-            session_id,
-            "goal_association_report_done: ms=%.1f status=%s associations=%s new_goals=%s clarification=%s confidence=%.2f",
-            now_ms() - started_ms,
-            status,
-            relationships,
-            len(resolution.new_goals),
-            bool(resolution.clarification),
-            resolution.confidence,
-        )
 
-    def _schedule_goal_association_report(
-        self,
-        session: aiohttp.ClientSession,
-        *,
-        user_text: str,
-        session_id: str,
-        context: dict[str, Any],
-        decision: RouteDecision,
-    ) -> RouteDecision:
-        if (
-            self.goal_association_mode != "report_only"
-            or not self.enable_agent
-            or decision.interrupt_current
-            or decision.route in {"interrupt", "ignore"}
-        ):
-            return decision
-        task = asyncio.create_task(
-            self._run_goal_association_report(
-                session,
-                user_text=user_text,
-                session_id=session_id,
-                context=context,
-                decision=decision,
-            )
-        )
-        self.goal_association_report_tasks.add(task)
-        task.add_done_callback(self.goal_association_report_tasks.discard)
-        metadata = dict(decision.metadata or {})
-        metadata["goal_association_resolution"] = {
-            "status": "scheduled",
-            "mode": "report_only",
-            "active_goal_count": len(context.get("active_goal_snapshots") or []),
-        }
-        metadata["goal_association_mode"] = "report_only"
-        self.session_log(
-            session_id,
-            "goal_association_report_scheduled: active_goals=%s",
-            len(context.get("active_goal_snapshots") or []),
-        )
-        return decision.model_copy(update={"metadata": metadata})
 
     async def _run_task_continuity_report(
         self,
@@ -5782,24 +5500,33 @@ class VoiceAssistant:
             )
             return "ambiguous"
         context = self.build_context(session_id)
-        decision = RouteDecision(
-            route="chat",
-            intent="pending_confirmation_reply",
-            confidence=1.0,
+        context = {
+            **context,
+            "pending_confirmation_scope": {
+                "confirmation_id": pending.confirmation_id,
+                "goal_ids": sorted(pending_goal_ids),
+            },
+        }
+        request = CognitiveWorkRequest(
+            sid=session_id,
+            text=user_text,
             language="zh-CN" if self._looks_zh(user_text) else "en-US",
-            needs_agent=True,
-            should_speak=False,
-            source="llm",
+            responsibilities=[
+                CognitiveResponsibilityProposal(
+                    local_ref="pending_confirmation_reply",
+                    outcome=user_text,
+                    confidence=1.0,
+                )
+            ],
+            interpretation_confidence=1.0,
+            context=context,
+            history=list(context.get("history", [])),
         )
         try:
             session = await self.get_http_session()
             association = await self.agent_client.resolve_goal_association(
                 session,
-                text=user_text,
-                route_decision=decision,
-                sid=session_id,
-                context=context,
-                history=context.get("history", []),
+                request=request,
                 timeout_ms=self.goal_association_timeout_ms,
             )
         except Exception as exc:

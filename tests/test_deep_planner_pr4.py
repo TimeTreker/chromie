@@ -2953,31 +2953,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.metadata["attempt_count"], 1)
 
 
-class OrchestratorDeepPlannerTests(unittest.TestCase):
-    def test_fast_escalation_triggers_report_only_deep_planner(self):
-        from orchestrator.orchestrator import VoiceAssistant
-        from orchestrator.schemas.route import RouteDecision as ODecision
-
-        class Client:
-            def __init__(self):
-                self.deep_context = None
-            async def resolve_fast_plan(self, *args, **kwargs):
-                return CanonicalPlan(plan_id="fast", planner_tier="fast", disposition="escalate", coverage="partial", confidence=0.8, escalation_reason="compound", steps=[])
-            async def resolve_deep_plan(self, *args, **kwargs):
-                self.deep_context = kwargs["context"]
-                return CanonicalPlan(plan_id="deep", planner_tier="deep", disposition="execute", coverage="complete", confidence=0.9, goal_ids=["goal-action"], steps=[{"step_id":"s1","capability_id":"soridormi.blink_eyes","args":{"count":3},"source_goal_ids":["goal-action"]}], metadata={"attempt_count":1})
-
-        async def run():
-            assistant = VoiceAssistant.__new__(VoiceAssistant)
-            assistant.fast_planner_timeout_ms = 1000
-            assistant.deep_planner_mode = "report_only"
-            assistant.deep_planner_timeout_ms = 2000
-            assistant.agent_client = Client()
-            assistant.session_log = lambda *args, **kwargs: None
-            decision = ODecision(route="robot_action", intent="semantic_capability_planning", confidence=0.0, source="llm")
-            await assistant._run_fast_planner_report(object(), user_text="walk and blink", session_id="sid", context={"history":[]}, decision=decision)
-            self.assertEqual(assistant.agent_client.deep_context["fast_plan_resolution"]["plan_id"], "fast")
-        asyncio.run(run())
 
 
 if __name__ == "__main__":

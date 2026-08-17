@@ -7,6 +7,7 @@ from unittest import mock
 from typing import Any
 
 from shared.chromie_contracts.goal import GoalAssociationResolution
+from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, CognitiveWorkRequest
 from shared.chromie_contracts.semantic_task import SemanticGoal
 from shared.chromie_contracts.tool_result import (
     ToolResultEvidence,
@@ -91,15 +92,19 @@ class AgentClientTests(unittest.IsolatedAsyncioTestCase):
                     "http://agent.local"
                 ).resolve_goal_association(
                     session,  # type: ignore[arg-type]
-                    sid="sid-agent-client",
-                    text="hello",
-                    route_decision={
-                        "route": "chat",
-                        "intent": "conversation",
-                        "confidence": 0.9,
-                        "source": "llm",
-                    },
-                    context={"history": []},
+                    request=CognitiveWorkRequest(
+                        sid="sid-agent-client",
+                        text="hello",
+                        responsibilities=[
+                            CognitiveResponsibilityProposal(
+                                local_ref="reply",
+                                outcome="hello",
+                                confidence=0.9,
+                            )
+                        ],
+                        interpretation_confidence=0.9,
+                        context={"history": []},
+                    ),
                 )
             snapshot = scope.finish()
 

@@ -3782,29 +3782,6 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.metadata["path_classification"], "contract_failure")
 
 
-class OrchestratorFastPlannerTests(unittest.TestCase):
-    def test_report_only_schedules_without_changing_route(self):
-        from orchestrator.orchestrator import VoiceAssistant
-        from orchestrator.schemas.route import RouteDecision as ODecision
-
-        class Client:
-            async def resolve_fast_plan(self, *args, **kwargs):
-                return CanonicalPlan(plan_id="p", planner_tier="fast", disposition="respond", coverage="complete", confidence=0.9, response_text="hi")
-
-        async def run():
-            assistant = VoiceAssistant.__new__(VoiceAssistant)
-            assistant.fast_planner_mode = "report_only"
-            assistant.fast_planner_timeout_ms = 1000
-            assistant.enable_agent = True
-            assistant.agent_client = Client()
-            assistant.fast_planner_report_tasks = set()
-            assistant.session_log = lambda *args, **kwargs: None
-            decision = ODecision(route="chat", intent="conversation", confidence=0.8, source="llm")
-            reviewed = assistant._schedule_fast_planner_report(object(), user_text="hello", session_id="sid", context={"history":[]}, decision=decision)
-            self.assertEqual(reviewed.route, "chat")
-            self.assertEqual(reviewed.metadata["fast_planner_resolution"]["status"], "scheduled")
-            await asyncio.gather(*list(assistant.fast_planner_report_tasks))
-        asyncio.run(run())
 
 
 if __name__ == "__main__":
