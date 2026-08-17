@@ -3,30 +3,90 @@
   "id": "weather_check",
   "suite": "goal_interpretation",
   "level": "module",
-  "description": "Weather question is understood by the quick Goal Interpreter model and uses the tool lane without robot motion.",
-  "tags": ["tool", "normal"],
+  "description": "GI preserves the weather outcome, fresh-evidence need, and missing location InformationGap without choosing a tool or provider.",
+  "tags": [
+    "tool",
+    "normal"
+  ],
   "input": {
     "text": "Can you check whether it will rain today?"
   },
   "stub": {
-    "interpretation_mode": "hybrid",
-    "catalog": {
-      "matched": false
-    },
     "llm_decision": {
-      "route": "tool",
-      "agents": [],
-      "intent": "weather_query",
       "confidence": 0.84,
-      "language": "en-US",
-      "source": "llm"
+      "responsibilities": [
+        {
+          "schema_version": 1,
+          "local_ref": "r1",
+          "outcome": "tell the user whether it will rain today at their intended location",
+          "bindings": {
+            "date": "today",
+            "question": "rain"
+          },
+          "relationship": "new",
+          "target_goal_ids": [],
+          "information_gaps": [
+            {
+              "gap_id": "weather_location",
+              "description": "The location for the weather check is not known.",
+              "blocking": true,
+              "required_for": [],
+              "preferred_resolution": "ask_user",
+              "candidate_values": [],
+              "resolved": false,
+              "resolution_value": null,
+              "metadata": {}
+            }
+          ],
+          "resolved_gap_ids": [],
+          "completion_requires_work": true,
+          "completion_requires_fresh_evidence": true,
+          "confidence": 0.84
+        }
+      ],
+      "unresolved": [
+        "The location for the weather check is not known."
+      ]
     }
   },
   "expect": {
-    "route": "tool",
-    "intent": "weather_query",
-    "source": "llm",
-    "task_types_include": ["task.use_tool"],
-    "llm_calls": 1
+    "confidence": 0.84,
+    "llm_calls": 1,
+    "llm_stages": [
+      "goal_interpretation"
+    ],
+    "unresolved": [
+      "The location for the weather check is not known."
+    ],
+    "responsibilities": [
+      {
+        "schema_version": 1,
+        "local_ref": "r1",
+        "outcome": "tell the user whether it will rain today at their intended location",
+        "bindings": {
+          "date": "today",
+          "question": "rain"
+        },
+        "relationship": "new",
+        "target_goal_ids": [],
+        "information_gaps": [
+          {
+            "gap_id": "weather_location",
+            "description": "The location for the weather check is not known.",
+            "blocking": true,
+            "required_for": [],
+            "preferred_resolution": "ask_user",
+            "candidate_values": [],
+            "resolved": false,
+            "resolution_value": null,
+            "metadata": {}
+          }
+        ],
+        "resolved_gap_ids": [],
+        "completion_requires_work": true,
+        "completion_requires_fresh_evidence": true,
+        "confidence": 0.84
+      }
+    ]
   }
 }

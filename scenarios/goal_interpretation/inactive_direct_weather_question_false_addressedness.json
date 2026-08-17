@@ -3,7 +3,7 @@
   "id": "inactive_direct_weather_question_false_addressedness",
   "suite": "goal_interpretation",
   "level": "integration",
-  "description": "Regression from the 2026-07-23 microphone trace: an inactive direct Chinese weather question must keep its grounded tool route when the addressedness reviewer falsely returns addressed=false.",
+  "description": "Once Gateway admits the direct Chinese weather question, GI preserves its location, time, polarity, and fresh-evidence requirement.",
   "tags": [
     "voice-log",
     "chinese",
@@ -17,7 +17,6 @@
     "language": "zh-CN"
   },
   "stub": {
-    "interpretation_mode": "hybrid",
     "context": {
       "interaction_engagement": {
         "gate_enabled": true,
@@ -36,34 +35,11 @@
         }
       ]
     },
-    "catalog": {
-      "matched": false,
-      "catalog_version": 72,
-      "capabilities": [
-        {
-          "capability_id": "chromie.weather.lookup",
-          "agent_id": "chromie.tool",
-          "description": "Retrieve current weather or forecast for a city.",
-          "route": "tool",
-          "prompt_tier": "common",
-          "available": true,
-          "interaction_executable": true,
-          "effects": [
-            "external_read",
-            "weather_lookup"
-          ],
-          "safety_class": "read_only"
-        }
-      ]
-    },
     "llm_script": [
       {
-        "stage": "quick_intent",
+        "stage": "goal_interpretation",
         "decision": {
-          "route": "tool",
-          "intent": "weather_lookup",
           "confidence": 0.95,
-          "language": "zh-CN",
           "responsibilities": [
             {
               "local_ref": "r1",
@@ -75,46 +51,25 @@
               },
               "completion_requires_work": true,
               "completion_requires_fresh_evidence": true,
-              "confidence": 0.95
+              "confidence": 0.95,
+              "relationship": "new",
+              "target_goal_ids": [],
+              "information_gaps": [],
+              "resolved_gap_ids": []
             }
           ],
-          "fast_speech": null,
-          "progress": []
-        }
-      },
-      {
-        "stage": "addressedness_review",
-        "decision": {
-          "addressed": false,
-          "speech_act": "question",
-          "confidence": 0.95
+          "unresolved": []
         }
       }
     ]
   },
   "expect": {
-    "route": "tool",
-    "intent": "weather_lookup",
-    "source": "llm",
-    "should_speak": true,
-    "llm_calls": 2,
+    "confidence": 0.95,
+    "llm_calls": 1,
     "llm_stages": [
-      "quick_intent",
-      "addressedness_review"
+      "goal_interpretation"
     ],
-    "task_types_include": [
-      "task.use_tool"
-    ],
-    "task_types_forbid": [
-      "speech.ignore",
-      "task.execute_capability"
-    ],
-    "metadata_json_forbid": [
-      "semantic_addressedness_gate",
-      "ambient_speech",
-      "tool_name",
-      "weather_query"
-    ],
+    "unresolved": [],
     "responsibilities": [
       {
         "local_ref": "r1",
@@ -126,7 +81,11 @@
         },
         "completion_requires_work": true,
         "completion_requires_fresh_evidence": true,
-        "confidence": 0.95
+        "confidence": 0.95,
+        "relationship": "new",
+        "target_goal_ids": [],
+        "information_gaps": [],
+        "resolved_gap_ids": []
       }
     ]
   }

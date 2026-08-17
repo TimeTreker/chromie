@@ -3,7 +3,7 @@
   "id": "voice_log_chinese_blink_chat_not_catalog_recovered",
   "suite": "goal_interpretation",
   "level": "module",
-  "description": "Regression from the 2026-07-03 live voice log: if the fast Goal Interpreter LLM treats noisy Chinese blink ASR as chat, catalog search must not recover it into an executable blink skill.",
+  "description": "GI preserves the noisy Chinese blink request as provider-neutral blink meaning without consulting a Capability catalog.",
   "tags": [
     "voice-log",
     "zh-CN",
@@ -16,40 +16,51 @@
     "language": "zh-CN"
   },
   "stub": {
-    "interpretation_mode": "hybrid",
-    "catalog": {
-      "matched": true,
-      "suggested_route": "robot_action",
-      "suggested_agents": ["capability_agent", "safety_agent", "speaker_agent"],
-      "catalog_version": 13,
-      "capabilities": [
-        {
-          "capability_id": "soridormi.blink_eyes",
-          "agent_id": "soridormi.skill",
-          "description": "Blink the robot eyes visibly.",
-          "score": 0.87,
-          "available": true,
-          "interaction_executable": true
-        }
-      ]
-    },
     "llm_decision": {
-      "route": "chat",
-      "agents": ["conversation_agent", "speaker_agent"],
-      "intent": "general_conversation",
       "confidence": 0.9,
-      "language": "zh-CN",
-      "source": "llm",
-      "reason": "fast Goal Interpreter treated the ASR phrase as conversation"
+      "responsibilities": [
+        {
+          "schema_version": 1,
+          "local_ref": "r1",
+          "outcome": "眨眼两次",
+          "bindings": {
+            "count": 2
+          },
+          "relationship": "new",
+          "target_goal_ids": [],
+          "information_gaps": [],
+          "resolved_gap_ids": [],
+          "completion_requires_work": true,
+          "completion_requires_fresh_evidence": false,
+          "confidence": 0.9
+        }
+      ],
+      "unresolved": []
     }
   },
   "expect": {
-    "route": "chat",
-    "intent": "general_conversation",
-    "source": "llm",
-    "task_types_include": ["speech.answer"],
-    "task_types_forbid": ["task.execute_capability"],
-    "metadata_json_forbid": ["\"recovered_from_route\": \"chat\"", "\"task_type\": \"task.execute_capability\""],
-    "llm_calls": 1
+    "confidence": 0.9,
+    "llm_calls": 1,
+    "llm_stages": [
+      "goal_interpretation"
+    ],
+    "unresolved": [],
+    "responsibilities": [
+      {
+        "schema_version": 1,
+        "local_ref": "r1",
+        "outcome": "眨眼两次",
+        "bindings": {
+          "count": 2
+        },
+        "relationship": "new",
+        "target_goal_ids": [],
+        "information_gaps": [],
+        "resolved_gap_ids": [],
+        "completion_requires_work": true,
+        "completion_requires_fresh_evidence": false,
+        "confidence": 0.9
+      }
+    ]
   }
 }

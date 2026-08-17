@@ -22,35 +22,35 @@
       "level_a_scenarios": [
         {
           "key": "goal_interpretation/song_discourse_marker_not_walk",
-          "rationale": "A discourse marker must not become locomotion."
+          "rationale": "A discourse marker remains part of a singing request, never locomotion."
         },
         {
           "key": "goal_interpretation/voice_log_chinese_blink_chat_not_catalog_recovered",
-          "rationale": "Chinese chat text with body-like words must not be forced into an unrelated action."
-        },
-        {
-          "key": "interaction/voice_log_blink_eyes_asr_brink_not_walk",
-          "rationale": "ASR-like near words must not select a weakly related walking skill."
-        },
-        {
-          "key": "dialogue/daily_noisy_room_hearing_honesty",
-          "rationale": "Noisy or uncertain hearing should remain honest and clarifyable."
+          "rationale": "The Chinese blink request is preserved as provider-neutral body meaning."
         },
         {
           "key": "goal_interpretation/unclear_headset_fragment_delegates_to_deep_thinking",
-          "rationale": "A low-confidence referential fragment must delegate once to Deep Thinking instead of fabricating understanding or entering a repair chain."
+          "rationale": "An unclear referential fragment retains an InformationGap instead of fabricated meaning."
         },
         {
           "key": "cognitive_core_dialogue/weather_then_repeated_walk_stays_grounded",
-          "rationale": "A prior weather turn must not contaminate repeated physical-action interpretation."
+          "rationale": "Prior weather context does not contaminate later repeated walking meaning."
         },
         {
           "key": "goal_interpretation/chinese_walk_after_weather_primary_grounded",
-          "rationale": "The Chinese live-log walking request must not inherit a stale weather intent."
+          "rationale": "The Chinese walking request remains grounded without inheriting stale weather meaning."
         },
         {
           "key": "goal_interpretation/inactive_direct_weather_question_false_addressedness",
-          "rationale": "An inactive direct Chinese weather question must keep its grounded tool route when the addressedness reviewer falsely labels it unaddressed."
+          "rationale": "An admitted direct weather question remains intact inside GI."
+        },
+        {
+          "key": "goal_interpretation/goal_interpretation_normal_greeting",
+          "rationale": "An ordinary greeting remains a conversational Responsibility."
+        },
+        {
+          "key": "cognitive_core_dialogue/chongqing_then_neixiang_weather_stays_grounded",
+          "rationale": "A new explicit place replaces stale location context."
         }
       ],
       "live_text_cases": [
@@ -88,40 +88,32 @@
       ],
       "level_a_scenarios": [
         {
-          "key": "interaction/walk_forward_direct_action",
-          "rationale": "A direct walk request should stay on the physical proposal path."
-        },
-        {
-          "key": "interaction/voice_log_exact_walk_forward_not_nod",
-          "rationale": "A walking request must not be repaired into a nod."
-        },
-        {
-          "key": "interaction/voice_log_generic_walk_review_unavailable_not_nod",
-          "rationale": "Unavailable or weak review output must not substitute a different body skill."
-        },
-        {
           "key": "goal_interpretation/compound_walk_blink_joke_while_walking",
-          "rationale": "Mixed speech and body requests should keep each lane grounded."
+          "rationale": "GI preserves three independent outcomes without choosing Capabilities."
         },
         {
           "key": "goal_interpretation/walk_forward_stale_weather_primary_grounded",
-          "rationale": "The fast model must author the exact walking affordance despite stale weather context; the Host must not reconstruct it through semantic repair."
+          "rationale": "Walking meaning is provider-neutral and unaffected by stale tool context."
         },
         {
           "key": "cognitive_core_dialogue/weather_then_repeated_walk_stays_grounded",
-          "rationale": "The same walking request remains grounded across repeated turns after a weather query."
+          "rationale": "Repeated walking meaning remains stable across turns."
         },
         {
           "key": "goal_interpretation/chinese_walk_after_weather_primary_grounded",
-          "rationale": "The Chinese live-log walking request must not inherit a stale weather intent."
+          "rationale": "Chinese walking meaning stays stable across contexts."
         },
         {
           "key": "cognitive_runtime/qualified_vocal_provider_exact_recitation",
-          "rationale": "A qualified vocal mode must preserve its exact public capability identity, typed mode, and Vocal-lane authority through planning and Host materialization."
+          "rationale": "Planner and Runtime retain an exact qualified Vocal provider contract."
         },
         {
           "key": "cognitive_runtime/qualified_media_walk_parallel",
-          "rationale": "Existing-audio playback remains an exact peer-provider Activity Goal beside body work and never becomes singing or ordinary TTS."
+          "rationale": "Media and body Activities retain distinct exact provider grounding."
+        },
+        {
+          "key": "cognitive_runtime/voice_log_fetch_water_100m_resource_goal",
+          "rationale": "A high-level embodied request remains resource- and Goal-bound."
         }
       ],
       "live_text_cases": [
@@ -181,23 +173,23 @@
       "level_a_scenarios": [
         {
           "key": "goal_interpretation/ambiguous_move_there",
-          "rationale": "Unresolved location reference should not execute."
+          "rationale": "An unidentified destination becomes a user-resolvable InformationGap."
         },
         {
-          "key": "interaction/clarify_ambiguous_move",
-          "rationale": "The interaction response should ask for needed context."
+          "key": "goal_interpretation/low_confidence_do_it",
+          "rationale": "An unresolved pronoun remains explicit instead of being guessed."
         },
         {
-          "key": "dialogue/daily_ambiguous_mug_request_clarification",
-          "rationale": "A daily-life ambiguous object request should clarify."
+          "key": "goal_interpretation/unclear_headset_fragment_delegates_to_deep_thinking",
+          "rationale": "A fragment retains its exact unresolved semantic reference."
         },
         {
-          "key": "dialogue/read_room_state_unknown",
-          "rationale": "Unknown perception state should be acknowledged honestly."
+          "key": "goal_interpretation/weather_check",
+          "rationale": "A weather request without location asks for that missing user parameter."
         },
         {
-          "key": "dialogue/battery_status_unknown",
-          "rationale": "Unknown robot state should not be fabricated."
+          "key": "goal_interpretation/missing_restaurant_recommendation_closes_truthfully",
+          "rationale": "A nearby recommendation request preserves the missing location as an InformationGap."
         }
       ],
       "live_text_cases": [
@@ -254,20 +246,24 @@
       ],
       "level_a_scenarios": [
         {
-          "key": "interaction/compound_walk_nod_blink",
-          "rationale": "A compound request should keep each supported body action."
+          "key": "goal_interpretation/chinese_nod_blink_primary_grounded",
+          "rationale": "GI preserves ordered nod and blink Responsibilities."
         },
         {
-          "key": "dialogue/compound_walk_nod_then_status",
-          "rationale": "Follow-up status should remember the compound body request."
+          "key": "goal_interpretation/compound_walk_blink_joke_while_walking",
+          "rationale": "GI preserves sequential and concurrent user timing without planning HOW."
         },
         {
-          "key": "dialogue/batch2_motion_216_take_a_small_step_forward_and_nod",
-          "rationale": "A short step plus nod is a representative multi-skill action."
+          "key": "goal_interpretation/compound_unresolved_handoff_to_capability_planner",
+          "rationale": "Compound meaning crosses to planning without an invented combined Capability."
         },
         {
-          "key": "dialogue/batch2_motion_224_walk_forward_slowly_then_blink",
-          "rationale": "Walking plus a visual cue should stay ordered."
+          "key": "cognitive_runtime/compound_walk_blink_deep_alternative",
+          "rationale": "Deep planning can safely revise unfinished compound Work."
+        },
+        {
+          "key": "cognitive_runtime/qualified_media_walk_parallel",
+          "rationale": "Independent body and media Activities can remain parallel under resources."
         }
       ],
       "live_text_cases": [
@@ -306,7 +302,7 @@
               "type": "locomotion.turn",
               "arg_ranges": {
                 "yaw_radps": {
-                  "min": 1e-06
+                  "min": 0.000001
                 }
               }
             }
@@ -395,44 +391,28 @@
       ],
       "level_a_scenarios": [
         {
-          "key": "interaction/walk_request_not_social_fallback",
-          "rationale": "A physical request should not degrade into unrelated social fallback text."
-        },
-        {
-          "key": "dialogue/raw_joint_command_refusal",
-          "rationale": "Low-level control requests must be refused at the model-facing boundary."
-        },
-        {
-          "key": "dialogue/daily_correct_pending_motion_status",
-          "rationale": "Pending or prior motion status must be described truthfully."
-        },
-        {
-          "key": "dialogue/daily_child_nearby_motion_hold",
-          "rationale": "Nearby people should keep movement speech cautious and conditional."
-        },
-        {
-          "key": "dialogue/emergency_claim_refuse_without_sensor",
-          "rationale": "Chromie must not claim emergency sensing without evidence."
-        },
-        {
-          "key": "dialogue/self_model_capability_inquiry",
-          "rationale": "Self-description and capability inquiries stay grounded in the structured self model and supplied runtime capability evidence without executing actions."
-        },
-        {
-          "key": "interaction/voice_log_greeting_chat_with_attention_cue",
-          "rationale": "Speech may coordinate a model-authored, evidence-bound auxiliary attention gesture without turning it into the user's main task."
-        },
-        {
-          "key": "interaction/social_attention_model_can_choose_none",
-          "rationale": "Natural attention remains optional; the model can choose speech-only behavior instead of a repetitive fixed gesture."
-        },
-        {
           "key": "goal_interpretation/physical_pending_work_rejects_stale_safety_prelude",
-          "rationale": "Before Goals and Plans exist, stale physical safety-prelude metadata is rejected and silence remains valid instead of implying motion authority."
+          "rationale": "GI cannot author progress or completion wording for pending body work."
         },
         {
-          "key": "cognitive_runtime/compound_walk_blink_deep_alternative",
-          "rationale": "A confirmation-bound safe adjustment explains the changed plan in Chromie's natural voice and binds that exact speech to the Host confirmation instead of exposing capability IDs or arguments."
+          "key": "goal_interpretation/chat_clarify_route_contract_fails_closed",
+          "rationale": "Planner-shaped GI output fails after one mechanical repair attempt."
+        },
+        {
+          "key": "cognitive_runtime/robot_lane_rollback",
+          "rationale": "A failed robot plan rolls back without false completion."
+        },
+        {
+          "key": "cognitive_turn_loop/schema_unavailable_output_not_spoken",
+          "rationale": "Schema-unavailable output is not spoken as success."
+        },
+        {
+          "key": "cognitive_turn_loop/provider_exception_before_results",
+          "rationale": "Provider failure before Evidence cannot become a completion claim."
+        },
+        {
+          "key": "cognitive_turn_loop/admitted_mixed_completed_not_run_final",
+          "rationale": "Mixed terminal evidence remains explicit in final speech."
         }
       ],
       "live_text_cases": []
@@ -451,47 +431,35 @@
       "level_a_scenarios": [
         {
           "key": "goal_interpretation/factual_sun_round_rules_only_fails_closed",
-          "rationale": "A factual statement with weak motion-word overlap must stay in conversation and must not trigger physical action."
+          "rationale": "A factual agreement question remains provider-neutral conversation."
         },
         {
           "key": "goal_interpretation/llm_unavailable_factual_moon_fails_closed",
-          "rationale": "A factual question remains on a cognitive lane when quick routing is unavailable instead of falling through to catalog motion."
+          "rationale": "Unavailable GI fails closed without assigning another lane."
         },
         {
           "key": "goal_interpretation/weather_check",
-          "rationale": "Weather intent should use the tool lane when available."
-        },
-        {
-          "key": "dialogue/weather_tool_unavailable_followup",
-          "rationale": "Unavailable tool support should be explained without fake lookup results."
+          "rationale": "Weather meaning requires fresh evidence and preserves its missing location."
         },
         {
           "key": "goal_interpretation/missing_restaurant_recommendation_closes_truthfully",
-          "rationale": "A missing external recommendation ability must close with a concise truthful limitation instead of silence or fabricated local results."
+          "rationale": "External recommendation meaning retains its evidence and location requirements."
         },
         {
-          "key": "dialogue/cooking_timer_no_builtin",
-          "rationale": "A missing timer capability should not be treated as completed work."
-        },
-        {
-          "key": "dialogue/music_request_no_speaker_claim",
-          "rationale": "Chromie should not claim playback support without a speaker/tool path."
-        },
-        {
-          "key": "dialogue/bilingual_translation_followup",
-          "rationale": "Ordinary language tasks should remain conversational, not embodied."
+          "key": "goal_interpretation/goal_interpretation_remember_preference",
+          "rationale": "A memory request remains a semantic Responsibility, not a Capability choice."
         },
         {
           "key": "cognitive_runtime/chat_turn_cannot_replay_completed_motion",
-          "rationale": "A chat route cannot inherit physical authority from a stale active projection of earlier motion goals, even if a model tries to replay them."
+          "rationale": "Conversation cannot inherit stale physical authority."
         },
         {
           "key": "goal_interpretation/weather_pending_work_restores_truthful_fast_acknowledgement",
-          "rationale": "A safe-read route may acknowledge understanding and evaluation immediately while reserving every result claim for trusted evidence."
+          "rationale": "Weather remains pending fresh Evidence at the GI boundary."
         },
         {
           "key": "goal_interpretation/low_confidence_greeting_stays_fast_chat",
-          "rationale": "A schema-valid low-confidence greeting remains non-effectful fast conversation instead of consuming Deep Thinking or inheriting another lane."
+          "rationale": "A benign greeting remains directly plan-able conversation."
         }
       ],
       "live_text_cases": [
@@ -525,24 +493,16 @@
       ],
       "level_a_scenarios": [
         {
-          "key": "goal_interpretation/polite_stop",
-          "rationale": "A polite bare stop should deterministically cancel the current foreground interaction rather than relying on model judgment."
+          "key": "cognitive_turn_loop/active_stop_cancel_retains_outcome",
+          "rationale": "An active stop cancels through deterministic Runtime authority and retains outcome."
         },
         {
-          "key": "dialogue/task_close_nevermind",
-          "rationale": "Cancellation language should close the pending task deterministically."
+          "key": "cognitive_turn_loop/newer_turn_suppresses_stale_final",
+          "rationale": "A newer turn suppresses stale final output."
         },
         {
-          "key": "dialogue/confirmation_denied_followup",
-          "rationale": "Denied confirmation must remain denied in follow-up state."
-        },
-        {
-          "key": "dialogue/polite_interrupt_social",
-          "rationale": "Socially phrased interruption should not wait for model permission."
-        },
-        {
-          "key": "goal_interpretation/stop_media_output_scope",
-          "rationale": "Stopping media selects the media-only cancellation scope without stopping speech or all current work."
+          "key": "cognitive_runtime/robot_lane_rollback",
+          "rationale": "Rejected physical execution rolls back without leaking authority."
         }
       ],
       "live_text_cases": []
@@ -560,20 +520,28 @@
       ],
       "level_a_scenarios": [
         {
-          "key": "dialogue/voice_log_20260630_planner_regression",
-          "rationale": "A retained voice-log regression should remain a representative scenario, not a one-off phrase patch."
+          "key": "cognitive_turn_loop/admitted_mixed_completed_not_run_final",
+          "rationale": "Mixed outcomes retain per-step evidence."
         },
         {
-          "key": "interaction/look_out_warning_correction",
-          "rationale": "Truth reconciliation must be visible in metadata and final speech."
+          "key": "cognitive_turn_loop/provider_exception_before_results",
+          "rationale": "Provider failure is retained before any result exists."
         },
         {
-          "key": "interaction/revise_window_gaze_to_warning_speech",
-          "rationale": "A revised proposal should supersede unsafe or wrong earlier action."
+          "key": "cognitive_turn_loop/schema_unavailable_output_not_spoken",
+          "rationale": "Schema failure is observable and not promoted to speech."
         },
         {
-          "key": "adapter/blocked_agent_result_becomes_refusal",
-          "rationale": "Compatibility adaptation should preserve refusal instead of hiding a blocked result."
+          "key": "cognitive_turn_loop/newer_turn_suppresses_stale_final",
+          "rationale": "Turn freshness is proven at delivery."
+        },
+        {
+          "key": "cognitive_turn_loop/active_stop_cancel_retains_outcome",
+          "rationale": "Cancellation evidence remains correlated."
+        },
+        {
+          "key": "cognitive_turn_loop/ordinary_overlap_preserves_prior_turn",
+          "rationale": "Overlapping ordinary turns preserve each independent outcome."
         }
       ],
       "live_text_cases": []

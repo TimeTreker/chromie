@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from typing import Annotated, Any, Literal, Union
 
@@ -38,7 +39,7 @@ ParameterResolutionStrategy = Literal[
     "unresolvable",
 ]
 GoalSatisfactionStatus = Literal["exact", "substantial", "partial", "unsatisfied"]
-FastPlannerContinuation = Literal["goal_association", "deep_planner"]
+FastPlannerContinuation = Literal["deep_planner"]
 FastVocalActivityRole = Literal["complete_response", "progress", "clarification"]
 FastProgressKind = Literal[
     "acknowledge_work",
@@ -54,6 +55,7 @@ class _FastPlannerVocalActivityBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     activity_id: str = Field(min_length=1, max_length=160)
+    timing: PlanTiming = "parallel"
     speech_act: str = Field(default="inform", min_length=1, max_length=120)
     source_responsibility_refs: list[str] = Field(min_length=1)
 
@@ -106,11 +108,49 @@ class FastPlannerProgressActivity(_FastPlannerVocalActivityBase):
     progress_kind: FastProgressKind
 
 
+class FastPlannerCapabilityActivity(CapabilityIdentityModel):
+    """One Fast-Planner-authored executable Activity over Responsibility evidence."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["capability"] = "capability"
+    activity_id: str = Field(min_length=1, max_length=160)
+    args: dict[str, Any] = Field(default_factory=dict)
+    timing: PlanTiming = "sequential"
+    source_responsibility_refs: list[str] = Field(min_length=1)
+    reason_summary: str = ""
+
+    @field_validator("activity_id", "reason_summary", mode="before")
+    @classmethod
+    def normalize_text(cls, value: Any) -> Any:
+        return " ".join(value.strip().split()) if isinstance(value, str) else value
+
+    @field_validator("source_responsibility_refs", mode="before")
+    @classmethod
+    def normalize_responsibility_refs(cls, value: Any) -> list[str]:
+        return _normalize_ids(value)
+
+    @field_validator("args")
+    @classmethod
+    def reject_low_level_args(cls, value: dict[str, Any]) -> dict[str, Any]:
+        return reject_forbidden_low_level_fields(value)
+
+
 FastPlannerVocalActivity = Annotated[
     Union[
         FastPlannerCompleteResponseActivity,
         FastPlannerProgressActivity,
         FastPlannerClarificationActivity,
+    ],
+    Field(discriminator="role"),
+]
+
+FastPlannerActivity = Annotated[
+    Union[
+        FastPlannerCompleteResponseActivity,
+        FastPlannerProgressActivity,
+        FastPlannerClarificationActivity,
+        FastPlannerCapabilityActivity,
     ],
     Field(discriminator="role"),
 ]
@@ -132,6 +172,15 @@ FastPlannerFreshEvidenceClarifiableVocalActivity = Annotated[
     ],
     Field(discriminator="role"),
 ]
+
+
+def fast_planner_activity_request_id(turn_id: str, activity_id: str) -> str:
+    """Return the stable Runtime request identity for one Fast Activity."""
+
+    digest = hashlib.sha256(
+        f"{turn_id}|{activity_id}".encode("utf-8")
+    ).hexdigest()[:20]
+    return f"fastreq_{digest}"
 
 
 def render_fast_planner_vocal_activity(
@@ -160,13 +209,13 @@ def render_fast_planner_vocal_activity(
 
 
 class FastPlannerAdvance(BaseModel):
-    """Fast Planner's pre-Goal advancement decision over Responsibility evidence.
+    """Fast Planner's first Activity Plan over Goal Interpretation evidence.
 
-    Fast Goal Interpretation owns WHAT the user appears to want.  This contract is
-    the first planner-owned decision about HOW to advance that meaning.  It may
-    author one immediately-ready conversational Activity and may request Goal
-    Association and/or Deep Planner continuation.  It cannot mutate canonical Goal
-    state or authorize effects.
+    Goal Interpretation owns contextual WHAT. This contract is the first
+    planner-owned HOW decision and may contain speaking and Capability Activities
+    with the same sequential/parallel relation. Goal Association runs independently
+    from the same GI result; it is not a Planner continuation. Runtime safety,
+    confirmation, and authorization still decide whether an Activity may start.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -174,8 +223,10 @@ class FastPlannerAdvance(BaseModel):
     schema_version: int = Field(default=1, ge=1)
     turn_id: str = Field(min_length=1, max_length=160)
     planner_tier: Literal["fast"] = "fast"
+    disposition: PlanDisposition
+    coverage: PlanCoverage
     covered_responsibility_refs: list[str] = Field(default_factory=list)
-    immediate_vocal_activity: FastPlannerVocalActivity | None = None
+    activities: list[FastPlannerActivity] = Field(default_factory=list, max_length=24)
     continuations: list[FastPlannerContinuation] = Field(default_factory=list)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     unresolved: list[str] = Field(default_factory=list)
@@ -199,23 +250,62 @@ class FastPlannerAdvance(BaseModel):
 
     @model_validator(mode="after")
     def validate_advance_contract(self) -> "FastPlannerAdvance":
-        if "deep_planner" in self.continuations and "goal_association" not in self.continuations:
+        if self.disposition == "escalate" and "deep_planner" not in self.continuations:
+            raise ValueError("Fast Planner escalation requires Deep Planner continuation")
+        if "deep_planner" in self.continuations and self.disposition != "escalate":
+            raise ValueError("Deep Planner continuation requires disposition=escalate")
+        if self.disposition in {"execute", "mixed"} and not any(
+            item.role == "capability" for item in self.activities
+        ):
+            raise ValueError("executable Fast Planner disposition requires a Capability Activity")
+        if self.disposition == "respond" and not any(
+            item.role == "complete_response" for item in self.activities
+        ):
+            raise ValueError("respond disposition requires a complete-response Activity")
+        if self.disposition == "clarify" and not any(
+            item.role == "clarification" for item in self.activities
+        ):
+            raise ValueError("clarify disposition requires a clarification Activity")
+        if self.disposition == "escalate" and any(
+            item.role == "capability" for item in self.activities
+        ):
+            raise ValueError("escalating Fast Planner output must not carry Capability Activities")
+        if self.coverage != "complete" and self.disposition not in {
+            "clarify",
+            "escalate",
+            "unavailable",
+            "refused",
+        }:
             raise ValueError(
-                "Deep Planner continuation requires Goal Association so deeper planning "
-                "receives canonical Goal state"
+                "non-complete Fast Planner output must clarify, escalate, report "
+                "unavailable, or refuse"
             )
-        if not self.continuations and self.immediate_vocal_activity is None:
-            raise ValueError(
-                "a terminal Fast Planner advance requires an immediate conversational Activity"
-            )
-        if self.immediate_vocal_activity is not None:
-            unknown = set(self.immediate_vocal_activity.source_responsibility_refs) - set(
+        activity_ids = [item.activity_id for item in self.activities]
+        if len(activity_ids) != len(set(activity_ids)):
+            raise ValueError("Fast Planner Activity IDs must be unique")
+        for activity in self.activities:
+            unknown = set(activity.source_responsibility_refs) - set(
                 self.covered_responsibility_refs
             )
             if unknown:
                 raise ValueError(
-                    "immediate vocal Activity references uncovered Responsibility refs: "
+                    "Fast Planner Activity references uncovered Responsibility refs: "
                     + ",".join(sorted(unknown))
+                )
+        activity_roles_by_ref: dict[str, set[str]] = {}
+        for activity in self.activities:
+            for responsibility_ref in activity.source_responsibility_refs:
+                activity_roles_by_ref.setdefault(responsibility_ref, set()).add(
+                    activity.role
+                )
+        for responsibility_ref, roles in activity_roles_by_ref.items():
+            terminal_roles = roles.intersection(
+                {"capability", "complete_response", "clarification"}
+            )
+            if len(terminal_roles) > 1:
+                raise ValueError(
+                    "one Responsibility cannot have conflicting terminal Fast "
+                    f"Planner Activities: {responsibility_ref}={sorted(terminal_roles)}"
                 )
         return self
 
@@ -231,8 +321,10 @@ class FastPlannerAdvanceModelOutput(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    disposition: PlanDisposition
+    coverage: PlanCoverage
     covered_responsibility_refs: list[str]
-    immediate_vocal_activity: FastPlannerVocalActivity | None
+    activities: list[FastPlannerActivity]
     continuations: list[FastPlannerContinuation]
     confidence: float = Field(ge=0.0, le=1.0)
     unresolved: list[str]
@@ -257,13 +349,13 @@ class FastPlannerFreshEvidenceAdvanceModelOutput(FastPlannerAdvanceModelOutput):
     bounded progress (or silence).
     """
 
-    immediate_vocal_activity: FastPlannerFreshEvidenceVocalActivity | None
+    activities: list[FastPlannerActivity]
 
 
 class FastPlannerFreshEvidenceClarifiableAdvanceModelOutput(FastPlannerAdvanceModelOutput):
     """Fresh-evidence decoder contract when WHAT is materially uncertain."""
 
-    immediate_vocal_activity: FastPlannerFreshEvidenceClarifiableVocalActivity | None
+    activities: list[FastPlannerActivity]
 
 
 def _normalize_ids(value: Any) -> list[str]:
@@ -640,9 +732,11 @@ class CanonicalPlan(BaseModel):
             if self.steps:
                 raise ValueError("non-complete plans must not carry executable steps")
             if self.planner_tier == "fast":
-                if self.disposition != "escalate":
-                    raise ValueError("partial or uncertain fast plans must escalate")
-                if not self.escalation_reason:
+                if self.disposition not in {"escalate", "clarify"}:
+                    raise ValueError(
+                        "partial or uncertain fast plans must clarify or escalate"
+                    )
+                if self.disposition == "escalate" and not self.escalation_reason:
                     raise ValueError("escalating plans require escalation_reason")
             elif self.disposition not in {"clarify", "unavailable", "refused"}:
                 raise ValueError("non-complete deep plans must clarify, report unavailable, or refuse")
@@ -823,10 +917,11 @@ class CanonicalPlan(BaseModel):
             if "execute" not in dispositions:
                 raise ValueError("mixed plans require at least one executable goal outcome")
             if self.planner_tier == "fast":
-                unsupported = dispositions - {"execute", "respond"}
+                unsupported = dispositions - {"execute", "respond", "clarify"}
                 if unsupported:
                     raise ValueError(
-                        "fast mixed plans may contain only execute and respond outcomes: "
+                        "fast mixed plans may contain only execute, respond, and "
+                        "clarify outcomes: "
                         + ",".join(sorted(unsupported))
                     )
         return self

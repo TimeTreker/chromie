@@ -229,6 +229,21 @@
       ]
     },
     {
+      "path": "agent/app/fast_planner.py",
+      "symbol": "FastPlannerResolver.resolve_advance",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "agent.fast_planner",
+      "contract": "Map Fast Activity-Plan inference and contract failures into a typed unavailable FastPlannerAdvance without authorizing Work.",
+      "review_status": "reviewed",
+      "body_sha256": "7f7b8b1f0dc84dd9cd747076a5ae7c2a6818fafd07040d1ef24bc5cfdedc4494",
+      "failure_signals": [
+        "continue",
+        "return",
+        "state_update"
+      ]
+    },
+    {
       "path": "agent/app/goal_association.py",
       "symbol": "GoalAssociationResolver._resolve",
       "ordinal": 1,
@@ -1257,9 +1272,23 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "80d0299bc5c6906f652e06656174d714238856f0f20276eb3885103ec4d7cf7f",
+      "body_sha256": "91c61be3ea85ab9b60e1d618cf7a2708d0e3769449332f5bc649d5e86fe82250",
       "failure_signals": [
         "return"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/cognitive_runtime.py",
+      "symbol": "GoalDrivenRuntimeCoordinator._resolve.cancel_uncommitted_fast_work",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator.cognitive_runtime",
+      "contract": "Best-effort cancellation of Fast Work that never received canonical Goal binding; retain an observable failure status if cleanup itself fails.",
+      "review_status": "reviewed",
+      "body_sha256": "7de9bc4f72ec18f5e7ec53062f64b4570d5b69aeab90f2f77752069d1ec13eb9",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
       ]
     },
     {

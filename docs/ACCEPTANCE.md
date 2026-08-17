@@ -475,7 +475,7 @@ python scripts/scenario_author.py new --suite goal_interpretation --id draft_cas
   --text "Hello Chromie."
 python scripts/scenario_author.py edit --suite goal_interpretation --id draft_case
 python scripts/scenario_author.py validate-all
-python scripts/scenario_author.py prompt --suite interaction --count 20
+python scripts/scenario_author.py prompt --suite goal_interpretation --count 20
 ```
 
 The prompt command is for generating reviewed candidate JSON with an LLM; the
@@ -813,7 +813,7 @@ heard:
 python -m unittest tests.test_media_provider_contract
 python scripts/scenario_runner.py \
   --only cognitive_runtime/qualified_media_walk_parallel \
-  --only goal_interpretation/stop_media_output_scope
+  --only cognitive_turn_loop/active_stop_cancel_retains_outcome
 python scripts/general_ability_acceptance.py \
   --mode level-a \
   --ability-class stable_capability_grounding \

@@ -4,6 +4,7 @@ import unittest
 
 from agent.app.planner_contract import (
     EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
+    PlannerDTOContractError,
     PlannerModelOutput,
     normalize_schema_default_parameter_provenance,
     validate_explicit_numeric_parameter_grounding,
@@ -102,15 +103,18 @@ def _weather_goal() -> dict:
 
 def _information_weather_goal() -> dict:
     goal = _weather_goal()
-    goal["object"]["bindings"]["time_frame"] = {
-        "entity_type": "time_frame",
+    attributes = dict(goal["object"]["bindings"])
+    attributes["time_frame"] = {
+        "entity_type": "day_part",
         "value": "tonight",
     }
+    goal["object"]["bindings"] = {}
     goal["resource_responsibility"] = {
         "responsibility_type": "acquire_and_deliver_resource",
         "resource": {
             "kind": "information",
             "description": "Chongqing weather tonight",
+            "attributes": attributes,
         },
         "source": {"status": "provider_resolved"},
         "recipient": {"description": "requester"},
@@ -456,7 +460,7 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
 
     def test_information_step_rejects_calendar_date_that_omits_day_part(self):
         with self.assertRaisesRegex(
-            ValueError,
+            PlannerDTOContractError,
             "omits authoritative temporal scope",
         ):
             validate_goal_binding_argument_grounding(
@@ -474,7 +478,7 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
 
     def test_information_step_preserves_exact_afternoon_argument(self):
         goal = _information_weather_goal()
-        goal["object"]["bindings"]["time_frame"] = {
+        goal["resource_responsibility"]["resource"]["attributes"]["time_frame"] = {
             "entity_type": "day_part",
             "value": "afternoon",
         }
@@ -484,6 +488,46 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
             ),
             authoritative_goals=[goal],
         )
+
+    def test_information_step_preserves_compound_date_and_day_part(self):
+        goal = _information_weather_goal()
+        attributes = goal["resource_responsibility"]["resource"]["attributes"]
+        attributes["date"] = {
+            "entity_type": "date",
+            "value": "today",
+        }
+        attributes["time_frame"] = {
+            "entity_type": "day_part",
+            "value": "evening",
+        }
+
+        validate_goal_binding_argument_grounding(
+            _weather_output(
+                extra_args={"date": "today", "period": "evening"}
+            ),
+            authoritative_goals=[goal],
+        )
+
+    def test_information_step_rejects_omitted_compound_date_dimension(self):
+        goal = _information_weather_goal()
+        attributes = goal["resource_responsibility"]["resource"]["attributes"]
+        attributes["date"] = {
+            "entity_type": "date",
+            "value": "today",
+        }
+        attributes["time_frame"] = {
+            "entity_type": "day_part",
+            "value": "evening",
+        }
+
+        with self.assertRaisesRegex(
+            PlannerDTOContractError,
+            "value='today'",
+        ):
+            validate_goal_binding_argument_grounding(
+                _weather_output(extra_args={"period": "evening"}),
+                authoritative_goals=[goal],
+            )
 
     def test_typed_list_binding_accepts_chinese_list_separators(self):
         goal = _weather_goal()

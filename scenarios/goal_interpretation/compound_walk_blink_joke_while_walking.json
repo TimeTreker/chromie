@@ -19,99 +19,19 @@
     "language": "en-US"
   },
   "stub": {
-    "interpretation_mode": "hybrid",
-    "catalog": {
-      "matched": true,
-      "suggested_route": "robot_action",
-      "suggested_agents": [
-        "capability_agent",
-        "safety_agent",
-        "speaker_agent"
-      ],
-      "catalog_version": 21,
-      "capabilities": [
-        {
-          "capability_id": "soridormi.walk_forward",
-          "agent_id": "soridormi.skill",
-          "description": "Walk forward for a bounded duration.",
-          "score": 0.88,
-          "available": true,
-          "interaction_executable": true
-        },
-        {
-          "capability_id": "chromie.speak",
-          "agent_id": "chromie.speech",
-          "description": "Speak a short message through TTS.",
-          "score": 0.42,
-          "available": true,
-          "interaction_executable": true
-        },
-        {
-          "capability_id": "soridormi.blink_eyes",
-          "agent_id": "soridormi.skill",
-          "description": "Blink the simulated social eyes.",
-          "score": 0.76,
-          "available": true,
-          "interaction_executable": true
-        }
-      ]
-    },
     "llm_script": [
       {
-        "stage": "quick_intent",
+        "stage": "goal_interpretation",
         "decision": {
-          "route": "robot_action",
-          "agents": [
-            "capability_agent",
-            "safety_agent",
-            "speaker_agent"
-          ],
-          "intent": "compound_common_catalog_task",
           "confidence": 0.87,
-          "language": "en-US",
-          "source": "llm",
-          "actions": [
-            {
-              "capability_id": "soridormi.walk_forward",
-              "args": {
-                "duration_s": 20
-              },
-              "sequence": 0,
-              "timing": "sequential",
-              "confidence": 0.91
-            },
-            {
-              "capability_id": "chromie.speak",
-              "args": {
-                "text": "Why did the robot bring a map? Because every good walk needs direction.",
-                "style": "brief"
-              },
-              "sequence": 1,
-              "timing": "parallel",
-              "confidence": 0.86
-            },
-            {
-              "capability_id": "soridormi.blink_eyes",
-              "args": {
-                "count": 6
-              },
-              "sequence": 2,
-              "timing": "sequential",
-              "confidence": 0.88
-            }
-          ],
           "responsibilities": [],
-          "fast_speech": null,
-          "progress": []
+          "unresolved": []
         }
       },
       {
-        "stage": "quick_intent_contract_repair",
+        "stage": "goal_interpretation_contract_repair",
         "decision": {
-          "route": "robot_action",
-          "intent": "compound_activity",
           "confidence": 0.87,
-          "language": "en-US",
           "responsibilities": [
             {
               "local_ref": "r1",
@@ -122,7 +42,11 @@
               },
               "completion_requires_work": true,
               "completion_requires_fresh_evidence": false,
-              "confidence": 0.91
+              "confidence": 0.91,
+              "relationship": "new",
+              "target_goal_ids": [],
+              "information_gaps": [],
+              "resolved_gap_ids": []
             },
             {
               "local_ref": "r2",
@@ -132,7 +56,11 @@
               },
               "completion_requires_work": true,
               "completion_requires_fresh_evidence": false,
-              "confidence": 0.86
+              "confidence": 0.86,
+              "relationship": "new",
+              "target_goal_ids": [],
+              "information_gaps": [],
+              "resolved_gap_ids": []
             },
             {
               "local_ref": "r3",
@@ -142,30 +70,26 @@
               },
               "completion_requires_work": true,
               "completion_requires_fresh_evidence": false,
-              "confidence": 0.88
+              "confidence": 0.88,
+              "relationship": "new",
+              "target_goal_ids": [],
+              "information_gaps": [],
+              "resolved_gap_ids": []
             }
           ],
-          "fast_speech": null,
-          "progress": []
+          "unresolved": []
         }
       }
     ]
   },
   "expect": {
-    "route": "robot_action",
-    "intent": "compound_activity",
-    "source": "llm",
-    "task_types_include": [
-      "task.execute_robot_action"
-    ],
-    "metadata_json_contains": [
-      "goal_interpreter_transaction"
-    ],
+    "confidence": 0.87,
     "llm_calls": 2,
     "llm_stages": [
-      "quick_intent",
-      "quick_intent_contract_repair"
+      "goal_interpretation",
+      "goal_interpretation_contract_repair"
     ],
+    "unresolved": [],
     "responsibilities": [
       {
         "local_ref": "r1",
@@ -176,7 +100,11 @@
         },
         "completion_requires_work": true,
         "completion_requires_fresh_evidence": false,
-        "confidence": 0.91
+        "confidence": 0.91,
+        "relationship": "new",
+        "target_goal_ids": [],
+        "information_gaps": [],
+        "resolved_gap_ids": []
       },
       {
         "local_ref": "r2",
@@ -186,7 +114,11 @@
         },
         "completion_requires_work": true,
         "completion_requires_fresh_evidence": false,
-        "confidence": 0.86
+        "confidence": 0.86,
+        "relationship": "new",
+        "target_goal_ids": [],
+        "information_gaps": [],
+        "resolved_gap_ids": []
       },
       {
         "local_ref": "r3",
@@ -196,19 +128,12 @@
         },
         "completion_requires_work": true,
         "completion_requires_fresh_evidence": false,
-        "confidence": 0.88
+        "confidence": 0.88,
+        "relationship": "new",
+        "target_goal_ids": [],
+        "information_gaps": [],
+        "resolved_gap_ids": []
       }
-    ],
-    "actions": [],
-    "task_types_forbid": [
-      "task.execute_capability",
-      "speech.speak"
-    ],
-    "metadata_json_forbid": [
-      "soridormi.walk_forward",
-      "chromie.speak",
-      "soridormi.blink_eyes",
-      "fast_goal_interpreter_action_min_confidence"
     ]
   }
 }

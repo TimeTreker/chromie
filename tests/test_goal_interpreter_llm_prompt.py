@@ -112,7 +112,10 @@ class GoalInterpreterContractTests(unittest.TestCase):
         )
         self.assertEqual(
             projected,
-            {"nested": {"meaning": "walk forward for ten seconds"}},
+            {
+                "goal_id": "goal-1",
+                "nested": {"meaning": "walk forward for ten seconds"},
+            },
         )
 
     def test_extract_json_object_accepts_fenced_json(self) -> None:
@@ -194,13 +197,17 @@ class GoalInterpreterPromptTests(unittest.TestCase):
                 "local_ref",
                 "outcome",
                 "bindings",
+                "relationship",
+                "target_goal_ids",
+                "information_gaps",
+                "resolved_gap_ids",
                 "completion_requires_work",
                 "completion_requires_fresh_evidence",
                 "confidence",
             },
         )
 
-    def test_prompt_keeps_semantic_continuity_without_canonical_identity_or_route(self) -> None:
+    def test_prompt_keeps_semantic_continuity_with_context_goal_identity_but_no_route(self) -> None:
         prompt = self._interpreter().build_interpretation_user_prompt(
             GoalInterpretationRequest(
                 sid="s1",
@@ -226,7 +233,7 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         )
         self.assertIn("Bring me a coffee", prompt)
         self.assertIn("obtain coffee for the user", prompt)
-        self.assertNotIn("goal-coffee", prompt)
+        self.assertIn("goal-coffee", prompt)
         self.assertNotIn('"route"', prompt)
         self.assertNotIn('"intent"', prompt)
 

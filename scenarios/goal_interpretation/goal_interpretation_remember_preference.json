@@ -3,7 +3,7 @@
   "id": "goal_interpretation_remember_preference",
   "suite": "goal_interpretation",
   "level": "module",
-  "description": "Simple memory request is understood by the quick Goal Interpreter model and routes to memory, not body motion.",
+  "description": "GI preserves the user request to remember a session preference without selecting a memory implementation.",
   "tags": [
     "memory",
     "normal"
@@ -12,36 +12,56 @@
     "text": "Remember that my favorite color is blue."
   },
   "stub": {
-    "interpretation_mode": "hybrid",
-    "catalog": {
-      "matched": false
-    },
     "llm_decision": {
-      "route": "memory",
-      "agents": [],
-      "intent": "remember_user_fact",
-      "confidence": 0.86,
-      "language": "en-US",
-      "source": "llm",
-      "memory_update": {
-        "schema_version": "1.0",
-        "scope": "session",
-        "kind": "preference",
-        "text": "My favorite color is blue.",
-        "key": "favorite_color",
-        "persistence_policy": "ephemeral",
-        "confidence": 0.96
-      }
+      "confidence": 0.96,
+      "responsibilities": [
+        {
+          "schema_version": 1,
+          "local_ref": "r1",
+          "outcome": "remember within the session that the user favorite color is blue",
+          "bindings": {
+            "preference": "favorite color",
+            "value": "blue",
+            "scope": "session"
+          },
+          "relationship": "new",
+          "target_goal_ids": [],
+          "information_gaps": [],
+          "resolved_gap_ids": [],
+          "completion_requires_work": true,
+          "completion_requires_fresh_evidence": false,
+          "confidence": 0.96
+        }
+      ],
+      "unresolved": []
     }
   },
   "expect": {
-    "route": "memory",
-    "intent": "remember_user_fact",
-    "source": "llm",
-    "task_types_include": [
-      "memory.remember_session_context"
+    "confidence": 0.96,
+    "llm_calls": 1,
+    "llm_stages": [
+      "goal_interpretation"
     ],
-    "llm_calls": 1
+    "unresolved": [],
+    "responsibilities": [
+      {
+        "schema_version": 1,
+        "local_ref": "r1",
+        "outcome": "remember within the session that the user favorite color is blue",
+        "bindings": {
+          "preference": "favorite color",
+          "value": "blue",
+          "scope": "session"
+        },
+        "relationship": "new",
+        "target_goal_ids": [],
+        "information_gaps": [],
+        "resolved_gap_ids": [],
+        "completion_requires_work": true,
+        "completion_requires_fresh_evidence": false,
+        "confidence": 0.96
+      }
+    ]
   },
   "provenance": {
     "legacy_scenario_id": "remember_preference"

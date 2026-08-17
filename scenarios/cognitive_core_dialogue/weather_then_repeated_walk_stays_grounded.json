@@ -12,58 +12,7 @@
     "walk",
     "cognitive-core-agent-contract"
   ],
-  "stub": {
-    "interpretation_mode": "hybrid",
-    "catalog": {
-      "catalog_version": 72,
-      "capabilities": [
-        {
-          "capability_id": "chromie.weather.lookup",
-          "agent_id": "chromie.tool",
-          "description": "Read current weather or forecast for a city.",
-          "route": "tool",
-          "prompt_tier": "common",
-          "available": true,
-          "interaction_executable": true,
-          "effects": [
-            "read_only",
-            "weather_lookup"
-          ],
-          "safety_class": "safe_read",
-          "requires_confirmation": false
-        },
-        {
-          "capability_id": "soridormi.walk_velocity",
-          "agent_id": "soridormi.skill",
-          "description": "Walk forward or backward at a bounded velocity for a bounded duration.",
-          "route": "robot_action",
-          "prompt_tier": "common",
-          "available": true,
-          "interaction_executable": true,
-          "effects": [
-            "physical_motion"
-          ],
-          "safety_class": "physical_motion",
-          "requires_confirmation": true,
-          "input_schema": {
-            "type": "object",
-            "properties": {
-              "vx_mps": {
-                "type": "number"
-              },
-              "duration_s": {
-                "type": "number"
-              }
-            },
-            "required": [
-              "vx_mps",
-              "duration_s"
-            ]
-          }
-        }
-      ]
-    }
-  },
+  "stub": {},
   "turns": [
     {
       "id": "weather",
@@ -72,18 +21,9 @@
       "stub": {
         "llm_script": [
           {
-            "stage": "quick_intent",
+            "stage": "goal_interpretation",
             "decision": {
-              "route": "tool",
-              "intent": "weather_lookup",
               "confidence": 0.96,
-              "language": "en-US",
-              "fast_speech": {
-                "text": "Okay, I will check today's weather in Beijing.",
-                "purpose": "acknowledge_and_check",
-                "commitment": "checking_only",
-                "must_not_claim_completion": true
-              },
               "responsibilities": [
                 {
                   "local_ref": "r1",
@@ -94,28 +34,22 @@
                   },
                   "completion_requires_work": true,
                   "completion_requires_fresh_evidence": true,
-                  "confidence": 0.96
+                  "confidence": 0.96,
+                  "relationship": "new",
+                  "target_goal_ids": [],
+                  "information_gaps": [],
+                  "resolved_gap_ids": []
                 }
               ],
-              "progress": []
+              "unresolved": []
             }
           }
         ]
       },
       "expect": {
-        "route": "tool",
-        "intent": "weather_lookup",
-        "source": "llm",
         "llm_calls": 1,
         "llm_stages": [
-          "quick_intent"
-        ],
-        "fast_speech_present": true,
-        "fast_speech_purpose": "acknowledge_and_check",
-        "fast_speech_commitment": "checking_only",
-        "fast_speech_must_not_claim_completion": true,
-        "task_types_include": [
-          "task.use_tool"
+          "goal_interpretation"
         ],
         "responsibilities": [
           {
@@ -139,12 +73,9 @@
       "stub": {
         "llm_script": [
           {
-            "stage": "quick_intent",
+            "stage": "goal_interpretation",
             "decision": {
-              "route": "robot_action",
-              "intent": "walk_forward",
               "confidence": 0.97,
-              "language": "en-US",
               "responsibilities": [
                 {
                   "local_ref": "r1",
@@ -156,29 +87,22 @@
                   },
                   "completion_requires_work": true,
                   "completion_requires_fresh_evidence": false,
-                  "confidence": 0.97
+                  "confidence": 0.97,
+                  "relationship": "new",
+                  "target_goal_ids": [],
+                  "information_gaps": [],
+                  "resolved_gap_ids": []
                 }
               ],
-              "fast_speech": null,
-              "progress": []
+              "unresolved": []
             }
           }
         ]
       },
       "expect": {
-        "route": "robot_action",
-        "intent": "walk_forward",
-        "source": "llm",
         "llm_calls": 1,
         "llm_stages": [
-          "quick_intent"
-        ],
-        "history_contains": [
-          "What is the weather in Beijing today?"
-        ],
-        "actions": [],
-        "task_types_include": [
-          "task.execute_robot_action"
+          "goal_interpretation"
         ],
         "responsibilities": [
           {
@@ -194,12 +118,8 @@
             "confidence": 0.97
           }
         ],
-        "task_types_forbid": [
-          "task.execute_capability",
-          "task.use_tool"
-        ],
-        "metadata_json_forbid": [
-          "soridormi.walk_velocity"
+        "history_contains": [
+          "What is the weather in Beijing today?"
         ]
       }
     },
@@ -210,12 +130,9 @@
       "stub": {
         "llm_script": [
           {
-            "stage": "quick_intent",
+            "stage": "goal_interpretation",
             "decision": {
-              "route": "robot_action",
-              "intent": "walk_forward",
               "confidence": 0.97,
-              "language": "en-US",
               "responsibilities": [
                 {
                   "local_ref": "r1",
@@ -227,30 +144,22 @@
                   },
                   "completion_requires_work": true,
                   "completion_requires_fresh_evidence": false,
-                  "confidence": 0.97
+                  "confidence": 0.97,
+                  "relationship": "new",
+                  "target_goal_ids": [],
+                  "information_gaps": [],
+                  "resolved_gap_ids": []
                 }
               ],
-              "fast_speech": null,
-              "progress": []
+              "unresolved": []
             }
           }
         ]
       },
       "expect": {
-        "route": "robot_action",
-        "intent": "walk_forward",
-        "source": "llm",
         "llm_calls": 1,
         "llm_stages": [
-          "quick_intent"
-        ],
-        "history_contains": [
-          "What is the weather in Beijing today?",
-          "walk forward for 15 seconds quickly"
-        ],
-        "actions": [],
-        "task_types_include": [
-          "task.execute_robot_action"
+          "goal_interpretation"
         ],
         "responsibilities": [
           {
@@ -266,14 +175,14 @@
             "confidence": 0.97
           }
         ],
-        "task_types_forbid": [
-          "task.execute_capability",
-          "task.use_tool"
-        ],
-        "metadata_json_forbid": [
-          "soridormi.walk_velocity"
+        "history_contains": [
+          "What is the weather in Beijing today?",
+          "walk forward for 15 seconds quickly"
         ]
       }
     }
-  ]
+  ],
+  "expect": {
+    "llm_stages": []
+  }
 }

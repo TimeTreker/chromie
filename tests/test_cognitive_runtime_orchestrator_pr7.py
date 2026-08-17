@@ -372,7 +372,7 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
             "rejected",
         )
 
-    def test_chat_apply_needs_no_pre_goal_route_label(self):
+    def test_chat_apply_needs_no_legacy_route_label(self):
         response = InteractionResponse(
             speech=[{"text": "Could you clarify?", "timing": "immediate"}],
             metadata={"source": "goal_driven_cognitive_runtime"},

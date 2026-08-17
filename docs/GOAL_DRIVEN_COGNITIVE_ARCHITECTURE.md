@@ -308,8 +308,8 @@ new responsibility, reopen Planner authority, or authorize an effect.
 If wording is mechanically malformed, the representation may be regenerated once
 without changing its meaning. Wording authority is per conversational act, not one
 universal speech author. In the maintained flow, Goal Interpretation owns Responsibility
-meaning and **does not author response wording**. Fast Planner owns any immediate
-pre-Goal conversational Activity it explicitly authors; an evidence-bound Tool Result
+meaning and **does not author response wording**. Fast Planner owns every conversational
+Activity it explicitly authors in its first Activity Plan; an evidence-bound Tool Result
 act retains Tool Result Interpretation as its writer; Response Composer is the sole
 writer only for the still-needed later acts it owns. Goal Association and Runtime may
 bind or exactly reuse those acts but may not rewrite them. Response stages do **not**
@@ -704,9 +704,9 @@ unfinished, deferred, waiting, or otherwise relevant beyond an immediately
 completed progress act.
 
 A goal should preserve natural meaning rather than forcing every request into a
-fixed taxonomy. An admitted turn may produce no persistent Goal when a complete
-low-risk conversational responsibility is immediately satisfied; the delivered
-act and evidence still remain part of interaction history. Conversely, a
+fixed taxonomy. Every admitted semantic Responsibility enters GA; a complete
+low-risk conversational Goal may be committed and satisfied in the same turn, while
+the delivered act and Evidence remain part of interaction history. Conversely, a
 well-understood responsibility that cannot yet be completed should survive as
 Goal state rather than force synchronous deep thinking before the interaction
 can move on.
@@ -835,38 +835,42 @@ A retained interaction outcome used for evaluation, scenario mining, and
 owner-reviewed improvement. Experience never silently changes safety policy or
 core principles.
 
-### 4.10 Fast Responsibility evidence and pre-Goal Fast Planning
+### 4.10 Contextual Responsibility evidence and Fast Activity Planning
 
 `CognitiveResponsibilityProposal` is the implemented provider-neutral Goal-
 Interpretation evidence for what human outcome appears to be owed. It carries a local
-reference, outcome, material semantic bindings, whether work remains, and whether fresh
-evidence is required. It is not a Goal, Plan, Capability selection, or execution
+reference, outcome, material semantic bindings, its proposed relation to supplied Goal
+IDs, introduced/resolved InformationGap IDs, whether work remains, and whether fresh
+evidence is required. It is not a canonical Goal commit, Plan, Capability selection, or execution
 authorization. Capability IDs, executable arguments, actions, providers, realization,
 and execution methods are forbidden in its bindings. Responsibility evidence must
 preserve every explicit material qualifier that changes what would satisfy the human
 outcome—such as severity, intensity, magnitude, threshold, subtype, negation,
 comparison, quantity, or temporal scope—rather than generalizing a narrower request
-into a broader category. It may preserve bounded unresolved material meaning;
-uncertainty belongs to interpretation, while the decision to clarify, continue, or
-deepen HOW belongs downstream.
+into a broader category. GI must read bounded Session Context, including pending
+clarifications and active Goal/Activity state. A reply such as “Green tea” therefore
+resolves the identified tea-kind gap and proposes modification of the existing tea Goal;
+it is not interpreted as an isolated new request. GA remains the sole authority that
+commits that Goal version.
 
-The maintained first downstream HOW owner is Fast Planner. Before canonical Goal binding
-it may return a typed `FastPlannerAdvance`: exact Responsibility refs covered, at most one
-immediate conversational Activity, and continuation dispositions for
-`goal_association` and/or `deep_planner`. This pre-Goal phase cannot emit executable
-Capability steps or authorize effects. A terminal ordinary greeting may therefore become
-an immediate Vocal Activity with no persistent Goal. A weather/resource/effectful turn
-may start a short prospective progress Activity while requesting Goal Association.
-`deep_planner` is a HOW-complexity continuation and always requires canonical Goal
-continuity before commitment-bearing Deep Work.
+The same immutable GI result fans out concurrently to Fast Planner and Goal Association.
+Fast Planner returns a typed `FastPlannerAdvance` that is the first real Activity Plan:
+exact Responsibility refs covered, zero or more speaking and Capability Activities,
+their sequential/parallel relation, and an optional `deep_planner` continuation for
+complex HOW. Missing user information produces a clarification Activity; it is not a
+Deep-Planner escalation. A schema-valid safe, side-effect-free read may begin while GA
+commits canonical Goal identity. Effects remain gated by canonical Goal binding,
+confirmation, authorization, resource, and provider-safety checks.
 
 The old Goal-Interpreter `CognitiveProgressCandidate` / `native_response` /
 `fast_speech` path has been removed rather than retained as compatibility. Goal
-Association consumes the authoritative Responsibility evidence only when Fast Planner
-requests canonical continuity. Its model-facing projection receives only Fast Planner
-continuation markers and Activity identity/role/source refs; Planner-authored wording is
-not a second human Responsibility. Canonical Fast/Deep planning after Goal Association
-then selects exact Capabilities and executable arguments when needed.
+Association always consumes the same authoritative GI result concurrently and never
+waits for Fast Planner output. Fast Activities retain GI Responsibility refs until the
+deterministic join maps them to GA-owned canonical Goal IDs. Trusted Capability Runtime
+then exposes one task-list view per Goal. A task shared across Goals appears in every
+applicable view with the same request identity and executes once. GA/Deep-authorized Plan
+revisions may cancel or replace pending/cancellable Work while completed Evidence remains
+immutable.
 
 ### 4.11 Continuous Mind candidate vocabulary — retained problem-space inventory
 
@@ -958,8 +962,8 @@ Direction:
 
 Questions:
 
-- When does a transient understood act need no persistent Goal, and when must an
-  unfinished responsibility be materialized?
+- When may a conversational Goal be committed and satisfied in the same turn,
+  and when must its Responsibility remain open?
 - How are a concern, user-requested Goal, promise/obligation, preference/drive,
   and self-generated Goal distinguished so Goal state does not explode?
 - How do waiting, deferred, superseded, cancelled, completed, stale, deadline,
@@ -1580,44 +1584,30 @@ The maintained architecture is a state-driven loop with multiple cognitive
 timescales, not a mandatory module pipeline:
 
 ```text
-Admitted Observation / User Turn
-  ↓
-Goal Interpretation (Fast depth; deepen only when WHAT needs more cognition)
-  ↓
-provider-neutral Responsibility evidence
-  ↓
-Fast Planner pre-Goal advancement
-  ├─ immediate safe conversational Activity ────────────────→ Vocal Runtime
-  ├─ if continuity/persistence is needed ───────────────────→ Goal Association
-  │                                                            ↓
-  │                                                       canonical Goal state
-  │                                                            ↓
-  │                                                     canonical Fast Planner
-  └─ if HOW exceeds fast budget ── request Deep ────────────────→ Deep Planner
-
-Canonical planning when required:
-  → exact Capability + executable arguments
-  → deterministic validation/authorization
-  → trusted execution → observation/evidence
-
-In parallel only when a concrete semantic primary observable Activity exists:
-  background Social Attention decoration cognition
-  existing already-authorized work and observations
-
-Every new observation:
-  → reconcile current responsibility/progress
-  → close, correct, replan, clarify, reactivate, or continue
-  → optionally trigger bounded Reflection when surprise/importance warrants it
+Admitted Observation / User Turn + bounded Session Context
+  -> Goal Interpretation (GI)
+       Responsibility + Goal relation + InformationGaps
+  -> concurrent fan-out of the same GI result
+       |-> Fast Planner -> first Activity Plan
+       |     |-> speaking and ready Capability Activities
+       |     |-> clarification when user information is missing
+       |     `-> Deep Planner only when HOW is complex
+       `-> Goal Association -> sole canonical Goal commit/version authority
+  -> bind each Activity to the applicable per-Goal Runtime task-list views
+  -> deterministic validation/authorization/resource scheduling
+  -> trusted execution -> observation/Evidence
+  -> reconcile current Responsibility and each Goal
+  -> close, correct, replan, clarify, reactivate, or continue
 ```
 
 The loop preserves one semantic authority even when work overlaps in time.
-Responsibility evidence does not authorize provider work. Fast Planner may author an
-early provider-free conversational Activity, but effectful/commitment-bearing Capability
-work still crosses canonical Goal grounding when continuity is required, canonical
-planning, and trusted authorization.
+Responsibility evidence alone does not authorize provider work. Fast Planner may author
+safe side-effect-free reads that Runtime validates and starts while GA completes; all
+effectful/commitment-bearing Capability work still crosses canonical Goal grounding,
+confirmation, authorization, resource, and provider-safety boundaries.
 
-Goal Association is therefore the canonical Responsibility/continuity boundary when
-persistent Goal state is required, not a mandatory gate for a one-turn greeting. Fast
+Goal Association is therefore always the sole canonical Responsibility/continuity commit
+boundary. It runs concurrently rather than acting as a wall-clock gate. Fast
 Planner is the
 exclusive intention-forming owner of Capability selection and executable arguments.
 Response Composer is a still-needed-delta expression coordinator and has no Social
@@ -2140,17 +2130,10 @@ coverage, satisfaction, response, information gaps, and execution evidence.
 ### 8.1 Fast Planner
 
 The Fast Planner is the low-latency first HOW owner once Goal Interpretation has
-produced sufficient Responsibility evidence. It operates in two lifecycle phases with
-the **same planning authority**, not as two planner modules:
-
-1. **pre-Goal advancement** over the current turn, Responsibility evidence, bounded
-   continuity context, compact self model, and common-Capability awareness; and
-2. **canonical planning** after Goal Association when persistent Goal grounding is
-   required.
-
-Pre-Goal Fast Planner may author one immediate safe conversational Activity and decide
-whether `goal_association` and/or `deep_planner` continuation is required. It cannot emit
-executable Capability steps or mutate Goal state. Canonical Fast Planner may then use:
+produced contextual Responsibility evidence. It authors one Activity Plan while GA
+independently establishes canonical Goal identity. This is one planner role and one
+planning pass in the normal easy case, not two lifecycle phases or two planner modules.
+Fast Planner may use:
 
 - the complete current canonical Goal;
 - bounded summaries or projections of model-selected Agent Skills;
@@ -2159,13 +2142,15 @@ executable Capability steps or mutate Goal state. Canonical Fast Planner may the
 - common capabilities;
 - essential provider and safety state.
 
-Across those phases it may:
+It may:
 
-- complete a simple one-turn conversational Responsibility with an immediate Activity;
-- author prospective conversational progress while persistent work continues;
-- request Goal Association for continuity/persistence;
+- complete a simple conversational Responsibility with a speaking Activity;
+- combine prospective conversational progress with independent Capability Activities;
+- ask a user-resolvable clarification for a GI-declared InformationGap;
+- select exact safe/read-only Capability Activities before GA finishes, subject to
+  trusted Runtime validation and later canonical Goal binding;
 - request Deep Planner when HOW exceeds the fast planning budget;
-- produce a complete direct common-skill canonical plan after Goal binding;
+- produce a complete direct common-skill Activity Plan without a second Fast pass;
 - propose a low-consequence bounded default in canonical planning;
 - escalate.
 
@@ -2179,18 +2164,18 @@ Only complete, high-confidence, structurally valid coverage may proceed to
 validation.
 
 A complete Fast Plan is a commit candidate, not a draft waiting for Deep approval.
-When authoritative Goal grounding, exact Capability availability, parameter schema,
+When the GI-to-GA Goal mapping, exact Capability availability, parameter schema,
 safety/authorization, and confirmation policy all pass deterministic validation, the
 runtime may dispatch that Responsibility immediately. Deep Planner is not a second
 approval gate. Conversely, a Fast contract/provenance failure stops before execution;
 it does not gain semantic legitimacy by asking Deep to repair the same malformed Plan.
 
-For confirmation-free `safe_read` work, provider execution still begins only after
-Goal Association has produced canonical Goal grounding and Planner has selected the
-exact Capability and executable arguments. Once that boundary is crossed, the valid
-Fast Plan may execute without waiting for unrelated Deep cognition. Pre-Goal Fast
-advancement is limited to provider-free conversational Activity plus typed continuation
-judgment; it is not provider execution.
+For confirmation-free `safe_read` work, Fast Planner may select the exact Capability
+and executable arguments from the bounded common catalog. Trusted Runtime may start it
+before GA finishes only after validating availability, schema, side-effect-free safety,
+parallel metadata, and absence of confirmation. The request initially retains GI
+Responsibility refs; GA later binds the same request identity into each applicable
+canonical Goal task-list view. It is never restarted merely to acquire Goal identity.
 
 The planner model emits a flat semantic DTO, not the canonical transport
 envelope. Plan identity, schema version, planner tier, and authoritative
@@ -2866,10 +2851,10 @@ the applicable turn correlation, commitment/evidence state, claim guards, and
 cancellation generation; it need not wait for unrelated later response fields. Raw
 model-token deltas, partial JSON, private reasoning, and incomplete sentences are not
 response contracts. Goal Interpretation owns Responsibility meaning, not dynamic reply
-wording. Fast Planner owns the exact wording and semantic role of any pre-Goal
-conversational Activity it authors. The Host derives transport/claim-envelope facts and
+wording. Fast Planner owns the exact wording and semantic role of every conversational
+Activity it authors. The Host derives transport/claim-envelope facts and
 may reject malformed or authority-violating output, but it does not become a second
-semantic writer. Dynamic pre-Goal speech carries no Capability/Goal completion claim.
+semantic writer. Progress speech carries no Capability/Goal completion claim.
 The old Goal-Interpreter `fast_speech`/`native_response` fields are removed rather than
 retained as compatibility. Tool speech uses the typed
 `acknowledge_and_check`/
@@ -2884,8 +2869,9 @@ speech requires reconciled terminal evidence.
 Response stages reuse earlier current-turn speech by exact speech-event ID and
 structured act fields, not text comparison. The playback event preserves turn,
 source Goal IDs, canonical Plan identity/fingerprint, delivery role, claims,
-and the completion-claim restriction emitted by the Core. Pre-Goal Fast speech
-stays explicitly unbound; Goal-bound speech cannot later be reassigned to an
+and the completion-claim restriction emitted by the Core. Fast speech scheduled
+before GA finishes retains GI Responsibility refs until canonical binding;
+Goal-bound speech cannot later be reassigned to an
 unrelated Goal or Plan. Only playback-started or completed events satisfy an
 audible act. A scheduled event remains pending; if it never becomes audible,
 Runtime may fulfill the referenced act once. This does not suppress independent

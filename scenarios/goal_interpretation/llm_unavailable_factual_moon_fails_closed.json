@@ -14,49 +14,22 @@
     "language": "en-US"
   },
   "stub": {
-    "interpretation_mode": "hybrid",
-    "catalog": {
-      "matched": true,
-      "suggested_route": "robot_action",
-      "suggested_agents": [
-        "capability_agent",
-        "conversation_agent",
-        "safety_agent",
-        "speaker_agent"
-      ],
-      "catalog_version": 4,
-      "capabilities": [
-        {
-          "capability_id": "soridormi.turn_in_place",
-          "agent_id": "soridormi.skill",
-          "description": "Rotate left or right with near-zero forward velocity.",
-          "score": 0.165,
-          "available": true,
-          "interaction_executable": true
-        }
-      ]
-    },
-    "llm_decision": {
-      "route": "chat",
-      "agents": [
-        "conversation_agent",
-        "speaker_agent"
-      ],
-      "intent": "general_conversation",
-      "confidence": 0.45,
-      "language": "en-US",
-      "source": "fallback",
-      "reason": "invalid_goal_interpreter_response: no JSON object in model response"
-    }
+    "llm_script": [
+      {
+        "stage": "goal_interpretation",
+        "error": "llm unavailable"
+      }
+    ]
   },
   "expect": {
     "status": "interpretation_unavailable",
     "failure_reason_contains": [
-      "invalid_goal_interpreter_response"
+      "goal_interpreter_error",
+      "llm unavailable"
     ],
     "llm_calls": 1,
     "llm_stages": [
-      "quick_intent"
+      "goal_interpretation"
     ]
   }
 }

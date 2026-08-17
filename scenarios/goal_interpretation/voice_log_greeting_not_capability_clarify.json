@@ -3,7 +3,7 @@
   "id": "voice_log_greeting_not_capability_clarify",
   "suite": "goal_interpretation",
   "level": "module",
-  "description": "Regression from the 2026-07-05 live voice log: a plain greeting must not become capability work. A capability-shaped Fast Goal Interpreter mistake is repaired into provider-neutral conversational responsibility evidence rather than normalized by the Host.",
+  "description": "A capability-shaped GI DTO receives one mechanical repair into a provider-neutral greeting Responsibility.",
   "tags": [
     "voice-log",
     "greeting",
@@ -14,85 +14,19 @@
     "text": "Hello, how are you."
   },
   "stub": {
-    "interpretation_mode": "hybrid",
-    "catalog": {
-      "matched": false,
-      "suggested_route": "chat",
-      "suggested_agents": [],
-      "catalog_version": 24,
-      "capabilities": [
-        {
-          "capability_id": "chromie.speak",
-          "agent_id": "chromie.speech",
-          "description": "Speak a short message to the user through Chromie's TTS/output layer.",
-          "route": "chat",
-          "prompt_tier": "common",
-          "score": 0.0,
-          "available": true,
-          "interaction_executable": true,
-          "effects": [
-            "user_interaction",
-            "audio_output"
-          ],
-          "safety_class": "low_risk_action"
-        },
-        {
-          "capability_id": "soridormi.walk_forward",
-          "agent_id": "soridormi.skill",
-          "description": "Walk forward for a bounded duration.",
-          "route": "robot_action",
-          "prompt_tier": "common",
-          "score": 0.0,
-          "available": true,
-          "interaction_executable": true,
-          "effects": [
-            "physical_motion"
-          ],
-          "safety_class": "low_risk_motion"
-        },
-        {
-          "capability_id": "soridormi.blink_eyes",
-          "agent_id": "soridormi.skill",
-          "description": "Blink the robot eyes visibly.",
-          "route": "robot_action",
-          "prompt_tier": "common",
-          "score": 0.0,
-          "available": true,
-          "interaction_executable": true,
-          "effects": [
-            "visual_expression"
-          ],
-          "safety_class": "low_risk_action"
-        }
-      ]
-    },
     "llm_script": [
       {
-        "stage": "quick_intent",
+        "stage": "goal_interpretation",
         "decision": {
-          "route": "robot_action",
-          "agents": [
-            "capability_agent",
-            "safety_agent",
-            "speaker_agent"
-          ],
-          "intent": "capability:chromie.speak",
           "confidence": 0.86,
-          "language": "en-US",
-          "source": "llm",
-          "reason": "bad fast Goal Interpreter speech-capability interpretation on greeting",
           "responsibilities": [],
-          "fast_speech": null,
-          "progress": []
+          "unresolved": []
         }
       },
       {
-        "stage": "quick_intent_contract_repair",
+        "stage": "goal_interpretation_contract_repair",
         "decision": {
-          "route": "chat",
-          "intent": "general_conversation",
           "confidence": 0.94,
-          "language": "en-US",
           "responsibilities": [
             {
               "local_ref": "r1",
@@ -100,45 +34,26 @@
               "bindings": {},
               "completion_requires_work": false,
               "completion_requires_fresh_evidence": false,
-              "confidence": 0.94
+              "confidence": 0.94,
+              "relationship": "new",
+              "target_goal_ids": [],
+              "information_gaps": [],
+              "resolved_gap_ids": []
             }
           ],
-          "fast_speech": null,
-          "progress": [
-            {
-              "kind": "native_response",
-              "response_text": "Hi! I'm doing well. How are you?",
-              "speech_act": "greeting",
-              "intent": "general_conversation",
-              "confidence": 0.94
-            }
-          ]
+          "unresolved": []
         }
       }
     ]
   },
   "expect": {
-    "route": "chat",
-    "intent": "general_conversation",
-    "source": "llm",
-    "task_types_include": [
-      "speech.answer"
-    ],
-    "task_types_forbid": [
-      "task.execute_capability",
-      "cognition.deep_think"
-    ],
-    "metadata_json_forbid": [
-      "clarify_capability_selection",
-      "execute the motion",
-      "motion plan",
-      "capability:chromie.speak"
-    ],
+    "confidence": 0.94,
     "llm_calls": 2,
     "llm_stages": [
-      "quick_intent",
-      "quick_intent_contract_repair"
+      "goal_interpretation",
+      "goal_interpretation_contract_repair"
     ],
+    "unresolved": [],
     "responsibilities": [
       {
         "local_ref": "r1",
@@ -146,7 +61,11 @@
         "bindings": {},
         "completion_requires_work": false,
         "completion_requires_fresh_evidence": false,
-        "confidence": 0.94
+        "confidence": 0.94,
+        "relationship": "new",
+        "target_goal_ids": [],
+        "information_gaps": [],
+        "resolved_gap_ids": []
       }
     ]
   }

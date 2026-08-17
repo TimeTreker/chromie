@@ -270,6 +270,7 @@ class GoalAndCoverageRegressionTests(unittest.TestCase):
                 "decision": "create_goals",
                 "new_goals": [
                     {
+                        "source_responsibility_refs": ["r1"],
                         "description": "Perform several independently observable outcomes together.",
                         "output_mode": "capability_work",
                     }

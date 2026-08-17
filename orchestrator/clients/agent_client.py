@@ -142,8 +142,10 @@ class AgentClient:
                 result = FastPlannerAdvance.model_validate_json(body)
             runtime_tracer.merge_fragment_from_metadata(result.metadata)
             span.set_attribute("continuations", ",".join(result.continuations))
+            span.set_attribute("activity_count", len(result.activities))
             span.set_attribute(
-                "immediate_vocal", result.immediate_vocal_activity is not None
+                "vocal_activity_count",
+                sum(item.role != "capability" for item in result.activities),
             )
             return result
 

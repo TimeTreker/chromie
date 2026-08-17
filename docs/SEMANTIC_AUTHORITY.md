@@ -70,7 +70,7 @@ legacy Agent semantic compatibility surface remains on the Core path.
 
 | Entrypoint | Semantic owner | Role | Planner path | Failure behavior |
 |---|---|---|---|---|
-| Orchestrator turn in `apply`; mapped route lane is allowlisted and apply preconditions pass | Goal-Driven Cognitive Core (current Goal-driven Runtime) | authoritative | Goal Interpretation → Responsibility evidence → pre-Goal Fast Planner advancement → optional immediate Activity + optional Goal Association → canonical Fast/Deep Planner when required → Response Composer → trusted adapter | Fail closed after ownership is acquired. |
+| Orchestrator turn in `apply`; mapped route lane is allowlisted and apply preconditions pass | Goal-Driven Cognitive Core (current Goal-driven Runtime) | authoritative | Goal Interpretation → concurrent Fast Planner Activity Plan and Goal Association → deterministic Goal binding → optional Deep Planner for complex HOW → Goal-grouped Trusted Capability Runtime → Evidence/Response | Fail closed after ownership is acquired. |
 | Orchestrator turn in `apply`; mapped route lane is excluded | Goal-Driven Cognitive Core policy boundary | authoritative fail-closed | No semantic planner is entered; deprecated externally supplied `actions[]` remain unexecuted compatibility input only | Return a typed no-action/error outcome without legacy semantic re-entry. |
 | Orchestrator turn in `report_only` | Goal-Driven Cognitive Core (current Goal-driven Runtime) | observer | Same stages, evidence only | The existing routed Agent path remains the only authority. |
 | Agent `/interaction` or `/run` with deprecated exact `actions[]` compatibility input | No new semantic planner; legacy action materializer | adapter | Schema validation and `CapabilityRequest` materialization only | Invalid actions are blocked or clarified; no LLM reinterpretation and no claim that Fast Goal Interpretation authored them. |
@@ -160,7 +160,7 @@ emergency-fallback tests while adding boundary tests that establish:
 Run the dependency-light audit with:
 
 ```bash
-python scripts/semantic_authority_audit.py --check
+python scripts/semantic_authority_audit.py
 ```
 
 Run the relevant regression tests with:

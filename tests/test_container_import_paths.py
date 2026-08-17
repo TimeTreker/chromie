@@ -25,7 +25,7 @@ class ContainerImportPathTests(unittest.TestCase):
                 "agent",
                 ROOT / "agent" / "app",
                 "import app.clients.ollama_client; "
-                "import app.agents.capability; "
+                "import app.fast_planner; "
                 "import app.cognitive_core.goal_interpreter.engine; print('ok')",
             ),
         )
@@ -63,7 +63,7 @@ class ContainerImportPathTests(unittest.TestCase):
 
     def test_semantic_authority_audit_runs_from_repository_root(self) -> None:
         result = subprocess.run(
-            [sys.executable, "scripts/semantic_authority_audit.py", "--check"],
+            [sys.executable, "scripts/semantic_authority_audit.py"],
             cwd=ROOT,
             text=True,
             capture_output=True,

@@ -137,8 +137,8 @@ E2E levels remain evidence-scoped. Text-only, virtual audio, simulator, and
 supervised physical-device runs must not be reported as equivalent evidence.
 
 The independent Router service and wire contract are removed. Existing
-`scenarios/goal_interpretation/` and `scenarios/cognitive_core_dialogue/` assets are maintained as
-compatibility regressions so historical evidence is not lost. New benchmark
+`scenarios/goal_interpretation/` and `scenarios/cognitive_core_dialogue/` assets
+exercise the maintained WHAT-only GI contract and bounded multi-turn Context. New benchmark
 architecture must name the actual boundary under evaluation: Cognitive Gateway
 for ingress/admission, or Goal-Driven Cognitive Core for semantic goal reasoning
 and planning.
@@ -712,22 +712,21 @@ semantic IDs, source paths, Git provenance, or evidence claims.
 | `scenarios/goal_interpretation/` | `modules/goal_interpretation` and semantic interpretation datasets |
 | `scenarios/cognitive_turn_loop/` | `integration/cognitive_turn_loop` |
 | `scenarios/cognitive_runtime/` | `integration/goal_driven_runtime` |
-| `scenarios/interaction/` | `integration/interaction` and selected `e2e/text` |
-| `scenarios/dialogue/` | `integration/multi_turn` |
 | `scenarios/cognitive_core_dialogue/` | `integration/cognitive_core_dialogue` |
-| `scenarios/adapter/` | contract/compatibility regression |
 | `tests/scenarios/` | module, integration, or historical-regression datasets according to behavior |
 | `scripts/general_ability_acceptance.py` manifests | E2E ability cohorts and evidence qualification |
 | voice-milestone and MuJoCo acceptance paths | E2E audio/simulator cohorts |
 | Social Attention closure scenarios | `social_attention`, `style_matrix`, `user_preferences`, and regression cohorts |
 
 `benchmarks/manifests/scenario_migration_v1.json` now owns this classification.
-The suites manifest is only a compatibility redirect. Physical moves are not
-required for closure because the Benchmark-native runner, inventory, common
-normalizer, and retained commands reconcile 528 inventory entries with 527
-semantic scenarios. Compatibility entrypoints have explicit criteria-based
-removal schedules. No scenario is copied into multiple directories solely to
-represent multiple tags.
+The suites manifest is only a compatibility redirect. The current inventory no
+longer references the retired interaction, dialogue, or adapter fixture directories;
+their former route-based executors did not exercise the maintained WHAT-only GI and
+Goal-driven Runtime contracts. Historical retained reports keep their revision-bound
+counts, while current executable evidence comes from the four maintained file-backed
+suites above plus benchmark datasets and entrypoints. Compatibility entrypoints have
+explicit criteria-based removal schedules. No scenario is copied into multiple
+directories solely to represent multiple tags.
 
 ## 10. Authoring and review policy
 

@@ -35,9 +35,9 @@ Next design/implementation order:
    one immediate safe conversational Activity and typed continuation dispositions for
    Goal Association and/or Deep Planner. Goal Association remains the only canonical
    Goal-continuity authority; commitment-bearing Capability work still requires
-   applicable canonical Goal grounding and trusted validation. Goal-Interpreter
-   `native_response`/`fast_speech` survive only as compatibility vocabulary and are not
-   maintained wording owners.
+   applicable canonical Goal grounding and trusted validation. Retired Goal-Interpreter
+   `native_response`/`fast_speech` compatibility vocabulary is not part of the
+   maintained path.
 2. **Epistemic Qualification contract detail — first source slice implemented.** Do not add an `EpistemicManager`.
    Extend existing capability/evidence contracts to represent claim-specific required
    observations, provenance/trust-domain independence, alternatives/corroboration,
@@ -386,8 +386,8 @@ Exit criteria:
 - Goal Association receives bounded recent Interaction Context and later
   planners/composition receive the Goal-scoped projection so they can produce
   only the still-needed delta;
-- pre-Goal Fast speech remains explicitly unbound rather than receiving
-  Host-invented Goal ownership;
+- Fast speech scheduled before GA finishes retains GI Responsibility refs and is
+  later bound only through GA-owned canonical Goal identity;
 - Goal-bound speech cannot be reused for unrelated Goals or a different Plan;
 - scheduled and delivered speech remain distinct, and neither proves Activity
   execution or completion; and

@@ -3,7 +3,7 @@
   "id": "unclear_headset_fragment_delegates_to_deep_thinking",
   "suite": "goal_interpretation",
   "level": "integration",
-  "description": "A low-confidence referential headset fragment remains explicitly unresolved and delegates once to the existing Deep Thinking lane instead of being rewritten by Goal Interpreter reviewers.",
+  "description": "GI retains the headset topic and explicit referential InformationGap; Fast Planner should clarify instead of sending missing user data to Deep Planner.",
   "tags": [
     "voice-log",
     "uncertainty",
@@ -16,42 +16,79 @@
     "language": "zh-CN"
   },
   "stub": {
-    "interpretation_mode": "hybrid",
-    "catalog": {
-      "catalog_version": 71,
-      "capabilities": []
-    },
-    "llm_script": [
-      {
-        "stage": "quick_intent",
-        "decision": {
-          "route": "deep_thought",
-          "intent": "deep_thought_low_confidence",
-          "confidence": 0.45,
-          "language": "zh-CN"
+    "llm_decision": {
+      "confidence": 0.45,
+      "responsibilities": [
+        {
+          "schema_version": 1,
+          "local_ref": "r1",
+          "outcome": "understand and respond to what the user means about their headset",
+          "bindings": {
+            "topic": "headset"
+          },
+          "relationship": "new",
+          "target_goal_ids": [],
+          "information_gaps": [
+            {
+              "gap_id": "headset_reference",
+              "description": "What the user means by that about the headset is unclear.",
+              "blocking": true,
+              "required_for": [],
+              "preferred_resolution": "ask_user",
+              "candidate_values": [],
+              "resolved": false,
+              "resolution_value": null,
+              "metadata": {}
+            }
+          ],
+          "resolved_gap_ids": [],
+          "completion_requires_work": true,
+          "completion_requires_fresh_evidence": false,
+          "confidence": 0.45
         }
-      }
-    ]
+      ],
+      "unresolved": [
+        "What the user means by that about the headset is unclear."
+      ]
+    }
   },
   "expect": {
-    "route": "deep_thought",
-    "intent": "deep_thought_low_confidence",
-    "source": "llm",
+    "confidence": 0.45,
     "llm_calls": 1,
     "llm_stages": [
-      "quick_intent"
+      "goal_interpretation"
     ],
-    "task_types_include": [
-      "cognition.delegate_deep_thought",
-      "cognition.deep_think"
+    "unresolved": [
+      "What the user means by that about the headset is unclear."
     ],
-    "task_types_forbid": [
-      "speech.ask_clarification",
-      "task.execute_capability"
-    ],
-    "metadata_json_forbid": [
-      "intent_review",
-      "semantic_route_repair"
+    "responsibilities": [
+      {
+        "schema_version": 1,
+        "local_ref": "r1",
+        "outcome": "understand and respond to what the user means about their headset",
+        "bindings": {
+          "topic": "headset"
+        },
+        "relationship": "new",
+        "target_goal_ids": [],
+        "information_gaps": [
+          {
+            "gap_id": "headset_reference",
+            "description": "What the user means by that about the headset is unclear.",
+            "blocking": true,
+            "required_for": [],
+            "preferred_resolution": "ask_user",
+            "candidate_values": [],
+            "resolved": false,
+            "resolution_value": null,
+            "metadata": {}
+          }
+        ],
+        "resolved_gap_ids": [],
+        "completion_requires_work": true,
+        "completion_requires_fresh_evidence": false,
+        "confidence": 0.45
+      }
     ]
   }
 }

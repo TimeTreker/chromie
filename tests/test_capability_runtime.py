@@ -154,6 +154,87 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("async-dispatch", final_observation.executing_interaction_ids)
         self.assertEqual(final_observation.requests, [])
 
+    async def test_goal_task_lists_share_one_runtime_task_and_retain_goal_authority(self) -> None:
+        started = asyncio.Event()
+        release = asyncio.Event()
+
+        class SlowProvider(MockCapabilityProvider):
+            async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
+                self.calls.append(request)
+                started.set()
+                await release.wait()
+                return CapabilityResult(
+                    request_id=request.request_id,
+                    capability_id=request.capability_id,
+                    capability_version=definition.version,
+                    status="completed",
+                    provider_id=self.provider_id,
+                    output={"args": dict(request.args)},
+                )
+
+        registry = CapabilityRegistry()
+        registry.register(_tool_definition(capability_id="chromie.weather.lookup"))
+        provider = SlowProvider("mock.tool")
+        runtime = CapabilityRuntime(registry)
+        runtime.register_provider(provider)
+        response = InteractionResponse(
+            interaction_id="fast-weather-work",
+            capabilities=[
+                {
+                    "request_id": "weather-shared-task",
+                    "capability_id": "chromie.weather.lookup",
+                    "timing": "parallel",
+                    "metadata": {
+                        "fast_activity_id": "check-shared-weather",
+                        "source_responsibility_refs": ["weather"],
+                        "source_goal_ids": [],
+                        "canonical_goal_binding_pending": True,
+                        "task_list_revision": 1,
+                    },
+                }
+            ],
+        )
+
+        receipt = await runtime.submit(response)
+        await started.wait()
+        await runtime.bind_scheduled_tasks_to_goals(
+            response.interaction_id,
+            goal_ids_by_responsibility={
+                "weather": ["goal-outdoor-weather", "goal-travel-weather"]
+            },
+            canonical_plan_id="plan-weather",
+            canonical_plan_fingerprint="sha256:weather-plan",
+            task_list_revision=2,
+        )
+
+        observation = await runtime.execution_observation()
+        self.assertEqual(len(observation.requests), 1)
+        self.assertEqual(
+            [item.goal_id for item in observation.goal_task_lists],
+            ["goal-outdoor-weather", "goal-travel-weather"],
+        )
+        self.assertEqual(
+            [item.tasks[0].request_id for item in observation.goal_task_lists],
+            ["weather-shared-task", "weather-shared-task"],
+        )
+        self.assertEqual(observation.requests[0].task_list_revision, 2)
+        self.assertEqual(observation.requests[0].canonical_plan_id, "plan-weather")
+        self.assertEqual(observation.requests[0].state, "running")
+        self.assertEqual(len(provider.calls), 1)
+
+        release.set()
+        terminal = await runtime.wait_terminal(receipt)
+        self.assertEqual(terminal.status, "completed")
+        self.assertEqual(len(provider.calls), 1)
+        self.assertEqual(
+            terminal.results[0].metadata["source_goal_ids"],
+            ["goal-outdoor-weather", "goal-travel-weather"],
+        )
+        self.assertEqual(
+            terminal.results[0].metadata["canonical_plan_fingerprint"],
+            "sha256:weather-plan",
+        )
+
     async def test_duplicate_submit_fails_without_corrupting_first_submission(self) -> None:
         started = asyncio.Event()
         release = asyncio.Event()

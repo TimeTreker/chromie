@@ -162,7 +162,7 @@ The evaluator output should be structured JSON:
   "summary": "Walking intent was preserved by the Goal Interpreter but lost by the Agent skill plan.",
   "scores": {
     "intent_preservation": 10,
-    "route_correctness": 80,
+    "responsibility_advancement": 80,
     "skill_correctness": 0,
     "safety_confirmation": 70,
     "memory_continuity": 80,
@@ -176,7 +176,7 @@ The evaluator output should be structured JSON:
   ],
   "candidate_scenario": {
     "recommended": true,
-    "suite": "dialogue",
+    "suite": "cognitive_runtime",
     "reason": "Wrong physical/social skill selected for a forward walking request."
   }
 }
@@ -259,7 +259,7 @@ Suggested location:
   20260630T082700Z/
     episode.json
     evaluation.json
-    dialogue_candidate.json
+    cognitive_runtime_candidate.json
 ```
 
 Candidate scenarios should follow the same schema as committed files but include
@@ -269,7 +269,7 @@ review metadata:
 {
   "schema_version": 1,
   "id": "candidate_voice_log_walk_not_gaze_20260630",
-  "suite": "dialogue",
+  "suite": "cognitive_runtime",
   "level": "integration",
   "description": "Candidate mined from a live voice episode where forward walking became gaze.",
   "tags": ["candidate", "voice-log", "semantic-review", "intent-preservation"],
@@ -296,8 +296,9 @@ Promotion flow:
 1. Evaluator writes candidate files under `.chromie/scenario_candidates/`.
 2. Developer or owner reviews the candidate and edits deterministic
    expectations.
-3. Candidate is copied into `scenarios/dialogue`, `scenarios/interaction`, or
-   `scenarios/goal_interpretation`.
+3. Candidate is promoted into the applicable maintained suite:
+   `scenarios/goal_interpretation`, `scenarios/cognitive_core_dialogue`,
+   `scenarios/cognitive_runtime`, or `scenarios/cognitive_turn_loop`.
 4. `python scripts/scenario_author.py validate-all` and the relevant scenario
    runner gate must pass.
 5. The promoted scenario is committed with the code or prompt fix.
@@ -423,7 +424,7 @@ Compatibility command:
 
 ```bash
 python scripts/promote_scenario_candidate.py \
-  .chromie/scenario_candidates/20260630T082700Z/dialogue_candidate.json \
+  .chromie/scenario_candidates/20260630T082700Z/cognitive_runtime_candidate.json \
   --suite dialogue \
   --id voice_log_walk_not_gaze
 ```

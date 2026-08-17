@@ -18,64 +18,10 @@
     "language": "zh-CN"
   },
   "stub": {
-    "interpretation_mode": "hybrid",
-    "catalog": {
-      "catalog_version": 74,
-      "capabilities": [
-        {
-          "capability_id": "soridormi.nod_yes",
-          "description": "Nod the robot head yes a bounded number of times.",
-          "route": "robot_action",
-          "prompt_tier": "common",
-          "available": true,
-          "interaction_executable": true,
-          "effects": [
-            "physical_motion"
-          ],
-          "requires_confirmation": true,
-          "input_schema": {
-            "type": "object",
-            "properties": {
-              "count": {
-                "type": "integer"
-              }
-            },
-            "required": [
-              "count"
-            ]
-          }
-        },
-        {
-          "capability_id": "soridormi.blink_eyes",
-          "description": "Blink the robot eyes a bounded number of times.",
-          "route": "robot_action",
-          "prompt_tier": "common",
-          "available": true,
-          "interaction_executable": true,
-          "effects": [
-            "physical_motion"
-          ],
-          "requires_confirmation": true,
-          "input_schema": {
-            "type": "object",
-            "properties": {
-              "count": {
-                "type": "integer"
-              }
-            },
-            "required": [
-              "count"
-            ]
-          }
-        }
-      ]
-    },
     "llm_script": [
       {
-        "stage": "quick_intent",
+        "stage": "goal_interpretation",
         "decision": {
-          "route": "robot_action",
-          "intent": "compound_body_actions",
           "confidence": 0.97,
           "responsibilities": [
             {
@@ -87,7 +33,11 @@
               },
               "completion_requires_work": true,
               "completion_requires_fresh_evidence": false,
-              "confidence": 0.98
+              "confidence": 0.98,
+              "relationship": "new",
+              "target_goal_ids": [],
+              "information_gaps": [],
+              "resolved_gap_ids": []
             },
             {
               "local_ref": "r2",
@@ -98,38 +48,25 @@
               },
               "completion_requires_work": true,
               "completion_requires_fresh_evidence": false,
-              "confidence": 0.98
+              "confidence": 0.98,
+              "relationship": "new",
+              "target_goal_ids": [],
+              "information_gaps": [],
+              "resolved_gap_ids": []
             }
           ],
-          "fast_speech": null,
-          "progress": []
+          "unresolved": []
         }
       }
     ]
   },
   "expect": {
-    "route": "robot_action",
-    "intent": "compound_body_actions",
-    "source": "llm",
+    "confidence": 0.97,
     "llm_calls": 1,
     "llm_stages": [
-      "quick_intent"
+      "goal_interpretation"
     ],
-    "actions": [],
-    "task_types_include": [
-      "task.execute_robot_action"
-    ],
-    "task_types_forbid": [
-      "task.execute_capability",
-      "speech.answer"
-    ],
-    "metadata_json_forbid": [
-      "soridormi.nod_yes",
-      "soridormi.blink_eyes",
-      "semantic_route_repair",
-      "capability_grounding_review",
-      "generic_chat_affordance_review"
-    ],
+    "unresolved": [],
     "responsibilities": [
       {
         "local_ref": "r1",
@@ -140,7 +77,11 @@
         },
         "completion_requires_work": true,
         "completion_requires_fresh_evidence": false,
-        "confidence": 0.98
+        "confidence": 0.98,
+        "relationship": "new",
+        "target_goal_ids": [],
+        "information_gaps": [],
+        "resolved_gap_ids": []
       },
       {
         "local_ref": "r2",
@@ -151,7 +92,11 @@
         },
         "completion_requires_work": true,
         "completion_requires_fresh_evidence": false,
-        "confidence": 0.98
+        "confidence": 0.98,
+        "relationship": "new",
+        "target_goal_ids": [],
+        "information_gaps": [],
+        "resolved_gap_ids": []
       }
     ]
   }

@@ -4,37 +4,62 @@
   "suite": "goal_interpretation",
   "level": "module",
   "description": "Discourse marker 'go ahead' does not become locomotion.",
-  "tags": ["chat", "discourse-marker", "motion-confusion"],
+  "tags": [
+    "chat",
+    "discourse-marker",
+    "motion-confusion"
+  ],
   "input": {
     "text": "Go ahead and tell me a short joke about robots."
   },
   "stub": {
-    "goal_interpretation_mode": "hybrid",
-    "catalog": {
-      "matched": true,
-      "capabilities": [
-        {
-          "capability_id": "soridormi.walk_velocity",
-          "description": "Bounded walking velocity.",
-          "score": 0.9
-        }
-      ]
-    },
     "llm_decision": {
-      "route": "chat",
-      "agents": [],
-      "intent": "general_conversation",
       "confidence": 0.91,
-      "language": "en-US",
-      "source": "llm"
+      "responsibilities": [
+        {
+          "schema_version": 1,
+          "local_ref": "r1",
+          "outcome": "tell the user a short joke about robots",
+          "bindings": {
+            "topic": "robots",
+            "length": "short"
+          },
+          "relationship": "new",
+          "target_goal_ids": [],
+          "information_gaps": [],
+          "resolved_gap_ids": [],
+          "completion_requires_work": false,
+          "completion_requires_fresh_evidence": false,
+          "confidence": 0.91
+        }
+      ],
+      "unresolved": []
     }
   },
   "expect": {
-    "route": "chat",
-    "intent": "general_conversation",
-    "source": "llm",
-    "task_types_include": ["speech.answer"],
-    "task_types_forbid": ["task.execute_capability"],
-    "llm_calls": 1
+    "confidence": 0.91,
+    "llm_calls": 1,
+    "llm_stages": [
+      "goal_interpretation"
+    ],
+    "unresolved": [],
+    "responsibilities": [
+      {
+        "schema_version": 1,
+        "local_ref": "r1",
+        "outcome": "tell the user a short joke about robots",
+        "bindings": {
+          "topic": "robots",
+          "length": "short"
+        },
+        "relationship": "new",
+        "target_goal_ids": [],
+        "information_gaps": [],
+        "resolved_gap_ids": [],
+        "completion_requires_work": false,
+        "completion_requires_fresh_evidence": false,
+        "confidence": 0.91
+      }
+    ]
   }
 }

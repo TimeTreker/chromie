@@ -3,31 +3,89 @@
   "id": "ambiguous_move_there",
   "suite": "goal_interpretation",
   "level": "module",
-  "description": "Ambiguous location reference clarifies rather than executing motion.",
-  "tags": ["clarify", "motion-safety", "ambiguous"],
+  "description": "GI preserves the requested movement and exposes the unidentified destination as an InformationGap; asking the user is Fast Planner work.",
+  "tags": [
+    "clarify",
+    "motion-safety",
+    "ambiguous"
+  ],
   "input": {
     "text": "Can you move over there a little?"
   },
   "stub": {
-    "interpretation_mode": "hybrid",
-    "catalog": {
-      "matched": false
-    },
     "llm_decision": {
-      "route": "clarify",
-      "agents": [],
-      "intent": "clarify_target_location",
       "confidence": 0.78,
-      "language": "en-US",
-      "source": "llm",
-      "speak_first": "Where exactly should I move?"
+      "responsibilities": [
+        {
+          "schema_version": 1,
+          "local_ref": "r1",
+          "outcome": "move a short distance to the location the user indicates",
+          "bindings": {
+            "distance": "a little"
+          },
+          "relationship": "new",
+          "target_goal_ids": [],
+          "information_gaps": [
+            {
+              "gap_id": "target_location",
+              "description": "The intended destination is not identified.",
+              "blocking": true,
+              "required_for": [],
+              "preferred_resolution": "ask_user",
+              "candidate_values": [],
+              "resolved": false,
+              "resolution_value": null,
+              "metadata": {}
+            }
+          ],
+          "resolved_gap_ids": [],
+          "completion_requires_work": true,
+          "completion_requires_fresh_evidence": false,
+          "confidence": 0.78
+        }
+      ],
+      "unresolved": [
+        "The intended destination is not identified."
+      ]
     }
   },
   "expect": {
-    "route": "clarify",
-    "intent": "clarify_target_location",
-    "source": "llm",
-    "task_types_include": ["speech.ask_clarification"],
-    "llm_calls": 1
+    "confidence": 0.78,
+    "llm_calls": 1,
+    "llm_stages": [
+      "goal_interpretation"
+    ],
+    "unresolved": [
+      "The intended destination is not identified."
+    ],
+    "responsibilities": [
+      {
+        "schema_version": 1,
+        "local_ref": "r1",
+        "outcome": "move a short distance to the location the user indicates",
+        "bindings": {
+          "distance": "a little"
+        },
+        "relationship": "new",
+        "target_goal_ids": [],
+        "information_gaps": [
+          {
+            "gap_id": "target_location",
+            "description": "The intended destination is not identified.",
+            "blocking": true,
+            "required_for": [],
+            "preferred_resolution": "ask_user",
+            "candidate_values": [],
+            "resolved": false,
+            "resolution_value": null,
+            "metadata": {}
+          }
+        ],
+        "resolved_gap_ids": [],
+        "completion_requires_work": true,
+        "completion_requires_fresh_evidence": false,
+        "confidence": 0.78
+      }
+    ]
   }
 }

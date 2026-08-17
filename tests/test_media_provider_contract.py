@@ -210,11 +210,13 @@ class MediaDeclarationAndPlannerTests(unittest.TestCase):
 
     def test_goal_contract_keeps_playback_activity_and_singing_vocal(self) -> None:
         playback = GoalAssociationModelGoal(
+            source_responsibility_refs=["playback"],
             description="Play a song.",
             output_mode="media_playback",
             media_operation="play",
         )
         singing = GoalAssociationModelGoal(
+            source_responsibility_refs=["singing"],
             description="Sing a song a cappella.",
             output_mode="singing",
             media_operation="none",
@@ -225,6 +227,7 @@ class MediaDeclarationAndPlannerTests(unittest.TestCase):
         self.assertEqual(singing.output_mode, "singing")
         with self.assertRaisesRegex(ValueError, "exact media_operation"):
             GoalAssociationModelGoal(
+                source_responsibility_refs=["playback"],
                 description="Play a song.",
                 output_mode="media_playback",
             )

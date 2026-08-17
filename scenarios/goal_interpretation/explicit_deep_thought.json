@@ -3,31 +3,60 @@
   "id": "explicit_deep_thought",
   "suite": "goal_interpretation",
   "level": "module",
-  "description": "Explicit careful-reasoning request is understood by the quick Goal Interpreter model and delegates to deep thought without a route-level thinking acknowledgement.",
-  "tags": ["deep-thought", "planning"],
+  "description": "GI preserves the request for a thorough test strategy and its requested depth; planning depth remains a Planner decision.",
+  "tags": [
+    "deep-thought",
+    "planning"
+  ],
   "input": {
     "text": "Please think deeply and design a test strategy."
   },
   "stub": {
-    "interpretation_mode": "hybrid",
-    "catalog": {
-      "matched": false
-    },
     "llm_decision": {
-      "route": "deep_thought",
-      "agents": [],
-      "intent": "deep_thought_planning",
       "confidence": 0.92,
-      "language": "en-US",
-      "source": "llm"
+      "responsibilities": [
+        {
+          "schema_version": 1,
+          "local_ref": "r1",
+          "outcome": "design a thorough test strategy",
+          "bindings": {
+            "depth": "deep"
+          },
+          "relationship": "new",
+          "target_goal_ids": [],
+          "information_gaps": [],
+          "resolved_gap_ids": [],
+          "completion_requires_work": true,
+          "completion_requires_fresh_evidence": false,
+          "confidence": 0.92
+        }
+      ],
+      "unresolved": []
     }
   },
   "expect": {
-    "route": "deep_thought",
-    "intent": "deep_thought_planning",
-    "source": "llm",
-    "task_types_include": ["cognition.delegate_deep_thought", "cognition.deep_think"],
-    "task_types_forbid": ["speech.thinking_ack"],
-    "llm_calls": 1
+    "confidence": 0.92,
+    "llm_calls": 1,
+    "llm_stages": [
+      "goal_interpretation"
+    ],
+    "unresolved": [],
+    "responsibilities": [
+      {
+        "schema_version": 1,
+        "local_ref": "r1",
+        "outcome": "design a thorough test strategy",
+        "bindings": {
+          "depth": "deep"
+        },
+        "relationship": "new",
+        "target_goal_ids": [],
+        "information_gaps": [],
+        "resolved_gap_ids": [],
+        "completion_requires_work": true,
+        "completion_requires_fresh_evidence": false,
+        "confidence": 0.92
+      }
+    ]
   }
 }

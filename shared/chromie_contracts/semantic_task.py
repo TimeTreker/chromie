@@ -99,6 +99,7 @@ class SemanticGoal(BaseModel):
         default=None,
         exclude_if=lambda value: value is None,
     )
+    source_responsibility_refs: list[str] = Field(default_factory=list)
     related_goal_ids: list[str] = Field(default_factory=list)
     supersedes_goal_ids: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -118,7 +119,12 @@ class SemanticGoal(BaseModel):
             return " ".join(value.strip().split())
         return value
 
-    @field_validator("related_goal_ids", "supersedes_goal_ids", mode="before")
+    @field_validator(
+        "source_responsibility_refs",
+        "related_goal_ids",
+        "supersedes_goal_ids",
+        mode="before",
+    )
     @classmethod
     def normalize_related_goal_ids(cls, value: Any) -> list[str]:
         if value is None:

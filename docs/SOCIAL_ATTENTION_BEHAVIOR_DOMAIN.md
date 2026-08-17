@@ -119,7 +119,7 @@ Social Attention obeys all of the following:
 9. **No completion authority.** Decoration evidence can say that a decoration
    ran; it cannot satisfy or prove completion of the primary Goal.
 10. **Eligibility is per semantic primary Activity, not per turn or execution item.**
-    One pre-Goal acknowledgement act may choose a blink and a later canonical
+    One Fast-Planner acknowledgement Activity may choose a blink and a later
     walk/final-answer Activity in the same turn may independently choose another
     compatible cue. Multiple speech/body/provider execution items that realize the
     same semantic Activity do not manufacture extra decoration opportunities.

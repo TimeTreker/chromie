@@ -114,63 +114,35 @@ that can invoke embodied capabilities safely.
 The following expanded flow is the canonical primary architecture and mental
 model for Chromie:
 
-```text
-                         WORLD / PERSON
-                               │
-                          Perception
-                               ↓
-                      Cognitive Gateway
-                               ↓
-                    Goal Interpretation
-                       Fast / Deep
-                               ↓
-                    Responsibility evidence
-                               ↓
-                         Fast Planner
-                               │
-             ┌─────────────────┼─────────────────┐
-             │                 │                 │
-             ▼                 ▼                 ▼
-      immediate safe      Goal continuity      HOW exceeds
-         Activity             needed           fast budget
-             │                 │                 │
-             │                 ▼                 │
-             │          Goal Association         │
-             │                 │                 │
-             │                 ▼                 │
-             │           Canonical Goal          │
-             │                 │                 │
-             │          ┌──────┴──────┐          │
-             │          │             │          │
-             │          ▼             ▼          │
-             │    canonical Fast   Deep Planner ◄┘
-             │       Planner          │
-             │          │             │
-             └──────────┴──────┬──────┘
-                               ↓
-                          planned Work
-                               │
-                 ┌─────────────┴─────────────┐
-                 │                           │
-                 ▼                           ▼
-          Primary Activity A          Primary Activity B
-                 │                           │
-        ┌────────┴────────┐          ┌───────┴────────┐
-        │                 │          │                │
- realization       optional SA   realization      optional SA
-        │                 │          │                │
- Vocal / Activity     auxiliary   Vocal / Activity  auxiliary
- lane / Capability    expression lane / Capability expression
-        │                            │
-        └──────────┬─────────────────┘
-                   ↓
-                Provider
-                   ↓
-                 Action
-                   ↓
-                Evidence
-                   ↓
-          Response / Reflection
+```mermaid
+flowchart TD
+    U["Person / world input"] --> GW["Cognitive Gateway"]
+    GW --> CTX["Bounded Session Context<br/>dialogue, active Goals, Activities,<br/>pending clarification, Evidence"]
+    CTX --> GI["Goal Interpretation (GI)<br/>Responsibility + Goal relation + InformationGaps"]
+
+    GI -->|"same GI result, concurrent fan-out"| FP["Fast Planner<br/>first Activity Plan"]
+    GI -->|"same GI result, concurrent fan-out"| GA["Goal Association (GA)<br/>sole Canonical Goal commit authority"]
+
+    FP --> SPEAK["Speaking Activities"]
+    FP --> SAFE["ready safe/read-only<br/>Capability Activities"]
+    FP -->|"complex HOW only"| DP["Deep Planner"]
+    FP -->|"missing user information"| ASK["Clarification Activity"]
+
+    GA --> GOALS["Canonical Goals<br/>each Goal has a Task-list view"]
+    GOALS --> BIND["Bind/reindex Fast Activities<br/>to Canonical Goal IDs"]
+    SAFE --> TCR["Trusted Capability Runtime<br/>one task identity; Goal-grouped views"]
+    BIND --> TCR
+    DP -->|"new Plan revision"| TCR
+    GA -->|"cancel/replace pending or cancellable Work"| TCR
+
+    SPEAK --> ARB["Resource-aware scheduling"]
+    ASK --> ARB
+    TCR --> ARB
+    ARB --> PAR["Parallel when declared resources allow;<br/>sequential when dependency/resource requires"]
+    PAR --> PROVIDERS["Vocal / tool / Soridormi Providers"]
+    PROVIDERS --> EVIDENCE["Trusted Evidence"]
+    EVIDENCE --> CTX
+    EVIDENCE --> RECON["Per-Goal reconciliation / Response / Reflection"]
 ```
 
 This expanded diagram is the stable architecture invariant. It describes
@@ -181,35 +153,51 @@ explicit internal expansion of how Planner advances Goals.
 
 Read the diagram with these boundaries:
 
-- Goal Interpretation owns only **provider-neutral Responsibility evidence**:
+- Goal Interpretation owns **provider-neutral contextual Responsibility evidence**:
   what human outcome appears to be wanted, material semantic bindings already
-  present in the turn/context, whether downstream work or fresh evidence is
-  required, and bounded unresolved material meaning. Fast and Deep differ only
-  in cognition depth/context/reasoning budget; they have the same authority and
-  output boundary. Neither may author conversational response wording, Work, a
+  present in the turn/context, whether the Responsibility creates, continues,
+  modifies, clarifies, or otherwise relates to a supplied Goal, which pending
+  InformationGap it resolves or creates, whether downstream work or fresh evidence
+  is required, and bounded unresolved material meaning. It may propose those Goal
+  relationships but cannot commit canonical Goal state. Neither GI depth may author
+  conversational response wording, Work, a
   Primary-Activity contract, Plan steps, execution lanes, realization, Capability
   selection, executable arguments, provider requests, or authorization.
   `completion_requires_work` says only that work remains; it is not a description
   of that Work.
-- Fast Planner is the first **HOW / Work-advancement authority** once Responsibility
-  meaning is sufficient. Before canonical Goal binding it may author one immediate
-  safe conversational Activity and typed continuation dispositions indicating that
-  Goal Association and/or Deep Planner is also required. It does not mutate Goal
-  state or invoke another semantic owner itself; Core/Runtime follows those typed
-  dispositions mechanically.
+- The same GI result enters Fast Planner and Goal Association concurrently. Fast
+  Planner is the first **HOW / Work-advancement authority** and authors an actual
+  Activity Plan, not a progress sentence standing in for a Plan. Speaking and
+  Capability Activities share the same parallel/sequential semantics. Missing
+  user-supplied information produces a clarification Activity; only genuinely
+  complex HOW goes to Deep Planner.
 - Goal Association remains the only canonical Responsibility/Goal-state authority.
-  When Fast Planner requests persistent continuity, GA associates, creates,
-  continues, corrects, or supersedes canonical Goals from the same authoritative
-  Responsibility evidence without choosing HOW or rewriting an already-authored
-  immediate Activity.
+  GA independently associates, creates, continues, corrects, merges, splits, or
+  supersedes canonical Goals from the same GI result without waiting for or
+  rewriting Fast Planner output.
 - Canonical Goal owns **what outcome Chromie still owes persistently**.
-- Canonical Fast/Deep Planner owns **what commitment-bearing Work can advance those
-  Goals now**, constrained by the currently available Capability/provider contracts.
+- Fast/Deep Planner owns **what Work can advance those Goals now**, constrained by
+  the currently available Capability/provider contracts. Deep Planner is used for
+  complex HOW, not for a missing parameter that Fast Planner can ask the user to
+  supply.
   Available Capabilities are therefore Planner input and realization constraints even
   though they are not drawn as a separate box in the expanded view.
 - A Primary Activity is a concrete semantic Work/Plan act describing **what
   Chromie is doing**. One Goal may own several Activities, while a sufficiently
   high-level provider Capability may keep one Activity atomic.
+- Trusted Capability Runtime owns the executable task set. Every canonical Goal
+  has a task-list view. A shared Activity may appear in more than one Goal view,
+  but the pair of runtime interaction/request IDs denotes one task and it executes
+  only once. GA or Deep Planner may supply a newer authorized Plan revision;
+  Runtime cancels or replaces only pending/cancellable Work, preserves completed
+  Evidence, and never silently replays completed Work.
+- Runtime schedules independent Activities according to declared dependencies,
+  provider concurrency, and resource ownership. Vocal work, locomotion, and
+  manipulation may overlap when their declared resources do not conflict. Multiple
+  safe weather/information reads may overlap within provider/rate/concurrency
+  limits. Internal nodes of one physical TaskGraph remain sequential; separate
+  embodied Activities overlap only when Soridormi explicitly declares that plan
+  and its resources safe.
 - `realization` describes **how** that Activity is carried out. Vocal Expression
   modes such as speaking, singing, humming, or recitation and Activity-lane
   Capability work belong here; they are not sibling Primary-Activity kinds.
@@ -220,11 +208,10 @@ Read the diagram with these boundaries:
   Response expresses established meaning/truth, and Reflection improves future
   cognition.
 
-The shorter persistent-work ownership chain
-`Responsibility evidence → Goal Association → Canonical Goal → Planner → Provider → Action → Evidence`
-remains valid for canonical continuity. It is not a mandatory wall-clock pipeline: Fast
-Planner may first author a safe turn-local conversational Activity and may request GA/
-Deep continuation in parallel.
+The shorter ownership chain
+`GI result → {Fast Planner || GA} → Goal-bound Activity Plan → Trusted Capability Runtime → Evidence`
+remains valid for canonical continuity. Braces indicate concurrent consumers of the
+same immutable GI result, not two competing Goal authorities.
 
 Cross-cutting contracts do not add rows to the semantic ownership table merely because
 they influence several stages. Epistemic qualification refines factual evidence;
@@ -507,16 +494,18 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
 25. **Progress is gated by local readiness without crossing semantic authority.**
    Chromie does not wait for every cognitive stage to finish before every useful
    part of an interaction may advance, but local readiness never grants an upstream
-   stage authority that belongs downstream. Goal Interpretation stops at
-   Responsibility evidence. Fast Planner may immediately author a safe
-   conversational Activity and, in parallel, request Goal Association and/or Deep
-   Planner continuation. Provider/capability work is different: no executable
-   Capability step, provider request, or commitment-bearing effect is authorized by
-   the pre-Goal advance. When persistence is required, Goal Association first
-   establishes canonical Goal continuity and canonical Fast/Deep Planner selects
-   execution Work. Effectful work additionally retains confirmation, authorization,
-   resource, and safety barriers. A one-turn greeting does not require a persistent
-   Goal merely to permit speech.
+   stage authority that belongs downstream. Goal Interpretation emits one contextual
+   Responsibility result to Fast Planner and GA concurrently. Fast Planner may
+   immediately author a complete Activity Plan containing speaking and Capability
+   Activities. Safe, side-effect-free, schema-valid read Activities may start while
+   GA establishes canonical Goal identity; Runtime initially indexes them by GI
+   Responsibility and then reindexes the same task identity into each applicable
+   Goal's task-list view. Effectful work still waits for canonical Goal binding and
+   retains confirmation, authorization, resource, and safety barriers. If GA or Deep
+   Planner corrects the Plan, Runtime cancels/replaces only pending or cancellable
+   tasks and preserves completed Evidence. A one-turn greeting still receives a
+   canonical conversational Goal; it does not need a second planning pass merely to
+   permit speech.
 26. **Stable Mind is cacheable; live context is projected.** Chromie's identity,
    self-concept, personality, interaction style, worldview, values, and compact
    hard-boundary principles are owner-controlled, low-churn Mind state. They
@@ -679,17 +668,18 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    need not share a single depth or wall-clock barrier. Once a Responsibility has canonical
    Goal grounding, a terminal valid Fast Plan may execute while a genuinely uncertain
    remaining Responsibility enters Deep where supported by the canonical contracts. Before
-   that Goal/Planner boundary, only provider-free conversational progress may advance. Do not
-   run Deep in parallel merely to re-check work already resolved by Fast cognition.
+   GA finishes, only validated side-effect-free safe reads and speaking Activities may
+   advance; effects remain gated. Do not run Deep merely to re-check work already resolved
+   by Fast cognition.
 
    **Fast outcome types do not borrow authority from each other.** Fast Goal
    Interpretation emits provider-neutral Responsibility evidence with material
    semantic bindings, bounded unresolved meaning, and whether work/fresh evidence
    remains. It does not author the reply. Fast Planner is the first HOW owner and may
-   author one immediate provider-free conversational Activity plus typed continuation
-   dispositions. An ordinary greeting may terminate there; persistent/evidence/effect
-   work requests Goal Association; HOW that exceeds the fast budget may additionally
-   request Deep Planner. Exact Capability IDs, executable arguments, and effectful
+   author a complete first Activity Plan with speaking and Capability Activities.
+   Goal Association concurrently receives the same GI result and commits canonical Goal
+   identity. Missing user information produces a clarification Activity; HOW that exceeds
+   the fast budget may request Deep Planner. Exact Capability IDs, executable arguments, and effectful
    actions remain canonical Planner-owned after applicable Goal grounding and are
    invalid Goal-Interpreter output. The Host may normalize representation-safe fields,
    but it must not convert Capability selection or response wording into Goal-
@@ -702,7 +692,7 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    unsupported reality, but it may not reinterpret Goals, reopen planning, or gain
    effect authority. **Each conversational act has exactly one semantic wording
    owner.** Goal Interpretation owns no maintained response wording. Fast Planner
-   owns any immediate pre-Goal conversational Activity it authors; Tool Result
+   owns every conversational Activity it authors in its first Activity Plan; Tool Result
    Interpretation owns its evidence-bound result act; Response Composer is the sole
    writer only for still-needed Response-Composition-owned acts. Later stages may
    bind/reuse an already-authored act exactly or author a genuinely different act;

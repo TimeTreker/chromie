@@ -3,7 +3,7 @@
   "id": "missing_restaurant_recommendation_closes_truthfully",
   "suite": "goal_interpretation",
   "level": "integration",
-  "description": "A request for nearby restaurant recommendations closes from the primary interpretation with a concise truthful limitation when the catalog has no matching external-information ability.",
+  "description": "GI preserves the nearby restaurant recommendation outcome, fresh-evidence need, and missing location; downstream capability availability remains Planner authority.",
   "tags": [
     "missing-ability",
     "external-information",
@@ -17,71 +17,79 @@
     "language": "zh-CN"
   },
   "stub": {
-    "interpretation_mode": "hybrid",
-    "catalog": {
-      "catalog_version": 83,
-      "capabilities": [
+    "llm_decision": {
+      "confidence": 0.93,
+      "responsibilities": [
         {
-          "capability_id": "chromie.weather.lookup",
-          "agent_id": "chromie.tool",
-          "description": "Retrieve current weather for a supplied place.",
-          "route": "tool",
-          "prompt_tier": "common",
-          "available": true,
-          "interaction_executable": true,
-          "effects": [
-            "read_only",
-            "weather_lookup"
+          "schema_version": 1,
+          "local_ref": "r1",
+          "outcome": "recommend good nearby places for the user to eat",
+          "bindings": {
+            "proximity": "nearby"
+          },
+          "relationship": "new",
+          "target_goal_ids": [],
+          "information_gaps": [
+            {
+              "gap_id": "restaurant_location",
+              "description": "The user location for nearby recommendations is not known.",
+              "blocking": true,
+              "required_for": [],
+              "preferred_resolution": "ask_user",
+              "candidate_values": [],
+              "resolved": false,
+              "resolution_value": null,
+              "metadata": {}
+            }
           ],
-          "safety_class": "safe_read",
-          "requires_confirmation": false
+          "resolved_gap_ids": [],
+          "completion_requires_work": true,
+          "completion_requires_fresh_evidence": true,
+          "confidence": 0.93
         }
+      ],
+      "unresolved": [
+        "The user location for nearby recommendations is not known."
       ]
-    },
-    "llm_script": [
-      {
-        "stage": "quick_intent",
-        "decision": {
-          "route": "clarify",
-          "intent": "missing_or_unsupported_ability",
-          "confidence": 1.0,
-          "limitation": "我现在还没有餐厅搜索和推荐能力，所以这次不能给你可靠的推荐。",
-          "metadata": {
-            "desired_abilities": [
-              {
-                "ability_id": "local.restaurant_recommendation",
-                "intent": "查找并推荐用户附近的优质餐厅",
-                "status": "missing_ability",
-                "confidence": 1.0,
-                "reason": "当前能力目录没有餐厅搜索或本地商家推荐能力。"
-              }
-            ]
-          }
-        }
-      }
-    ]
+    }
   },
   "expect": {
-    "route": "clarify",
-    "intent": "missing_or_unsupported_ability",
-    "source": "llm",
+    "confidence": 0.93,
     "llm_calls": 1,
     "llm_stages": [
-      "quick_intent"
+      "goal_interpretation"
     ],
-    "fast_speech_present": false,
-    "metadata_json_contains": [
-      "local.restaurant_recommendation",
-      "missing_ability",
-      "当前能力目录没有餐厅搜索或本地商家推荐能力"
+    "unresolved": [
+      "The user location for nearby recommendations is not known."
     ],
-    "task_types_forbid": [
-      "task.use_tool",
-      "task.execute_capability"
-    ],
-    "metadata_json_forbid": [
-      "capability_grounding_review",
-      "semantic_route_repair"
+    "responsibilities": [
+      {
+        "schema_version": 1,
+        "local_ref": "r1",
+        "outcome": "recommend good nearby places for the user to eat",
+        "bindings": {
+          "proximity": "nearby"
+        },
+        "relationship": "new",
+        "target_goal_ids": [],
+        "information_gaps": [
+          {
+            "gap_id": "restaurant_location",
+            "description": "The user location for nearby recommendations is not known.",
+            "blocking": true,
+            "required_for": [],
+            "preferred_resolution": "ask_user",
+            "candidate_values": [],
+            "resolved": false,
+            "resolution_value": null,
+            "metadata": {}
+          }
+        ],
+        "resolved_gap_ids": [],
+        "completion_requires_work": true,
+        "completion_requires_fresh_evidence": true,
+        "confidence": 0.93
+      }
     ]
   }
 }

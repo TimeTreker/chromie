@@ -88,6 +88,12 @@ def _numbers_close(left: Any, right: Any, *, tolerance: float) -> bool:
     return left == right
 
 
+def _field(value: Any, name: str, default: Any = None) -> Any:
+    if isinstance(value, dict):
+        return value.get(name, default)
+    return getattr(value, name, default)
+
+
 def validate_contract(
     *,
     route: Any,
@@ -101,7 +107,7 @@ def validate_contract(
     errors: list[str] = []
     route_actions = [
         str(item.get("capability_id") or "")
-        for item in getattr(route, "actions", [])
+        for item in _field(route, "actions", [])
     ]
     capabilities = [
         item
@@ -110,15 +116,16 @@ def validate_contract(
     ]
     capability_ids = [item.capability_id for item in capabilities]
 
-    if expected_route and route.route != expected_route:
-        errors.append(f"route={route.route!r}, expected {expected_route!r}")
+    route_name = str(_field(route, "route", "") or "")
+    if expected_route and route_name != expected_route:
+        errors.append(f"route={route_name!r}, expected {expected_route!r}")
 
     if expected_capabilities:
         expects_only_soridormi = all(
             capability_id.startswith("soridormi.") for capability_id in expected_capabilities
         )
-        if expects_only_soridormi and route.route != "robot_action":
-            errors.append(f"route={route.route!r}, expected 'robot_action'")
+        if expects_only_soridormi and route_name and route_name != "robot_action":
+            errors.append(f"route={route_name!r}, expected 'robot_action'")
         if expects_only_soridormi and route_actions and route_actions != expected_capabilities:
             errors.append(
                 "goal interpretation actions mismatch: "
@@ -191,9 +198,9 @@ def safe_idle_errors(status: dict[str, Any]) -> list[str]:
 def should_require_tts_speech(route: Any, *, require_speech: bool) -> bool:
     if not require_speech:
         return False
-    if getattr(route, "route", "") == "interrupt":
+    if _field(route, "route", "") == "interrupt":
         return False
-    if getattr(route, "should_speak", True) is False:
+    if _field(route, "should_speak", True) is False:
         return False
     return True
 
@@ -312,15 +319,20 @@ def build_debug_summary(
     response: Any,
     errors: list[str],
 ) -> dict[str, Any]:
-    route_metadata = getattr(route, "metadata", {}) or {}
+    route_metadata = _field(route, "metadata", {}) or {}
     route_actions = [
         _short_capability_id(item)
-        for item in getattr(route, "actions", [])
+        for item in _field(route, "actions", [])
         if isinstance(item, dict)
     ]
     candidates = [
         _short_capability_id(item)
-        for item in getattr(route, "candidate_capabilities", [])[:5]
+        for item in _field(route, "candidate_capabilities", [])[:5]
+        if isinstance(item, dict)
+    ]
+    responsibilities = [
+        item
+        for item in _field(route, "responsibilities", [])
         if isinstance(item, dict)
     ]
     task_list = [
@@ -348,14 +360,24 @@ def build_debug_summary(
         if str(item.capability_id).startswith("soridormi.")
     ]
     speech = [str(item.text) for item in getattr(response, "speech", [])]
-    return {
-        "route": (
-            f"route={getattr(route, 'route', '?')} "
-            f"intent={getattr(route, 'intent', '?')} "
-            f"source={getattr(route, 'source', '?')} "
-            f"confidence={float(getattr(route, 'confidence', 0.0)):.2f} "
+    interpretation_summary = (
+        f"responsibilities={len(responsibilities)} "
+        f"confidence={float(_field(route, 'confidence', 0.0)):.2f}"
+        if responsibilities
+        else (
+            f"route={_field(route, 'route', '?')} "
+            f"intent={_field(route, 'intent', '?')} "
+            f"source={_field(route, 'source', '?')} "
+            f"confidence={float(_field(route, 'confidence', 0.0)):.2f} "
             f"actions={len(route_actions)}"
-        ),
+        )
+    )
+    return {
+        "interpretation": interpretation_summary,
+        "route": interpretation_summary,
+        "responsibility_outcomes": [
+            str(item.get("outcome") or "") for item in responsibilities
+        ],
         "route_actions": route_actions,
         "candidate_capabilities": candidates,
         "stages": stages,
@@ -368,7 +390,11 @@ def build_debug_summary(
 
 
 def print_debug_summary(debug_summary: dict[str, Any]) -> None:
-    print(f"[interaction-text-mujoco][debug] {debug_summary['route']}", file=sys.stderr)
+    print(
+        f"[interaction-text-mujoco][debug] "
+        f"{debug_summary.get('interpretation') or debug_summary.get('route')}",
+        file=sys.stderr,
+    )
     if debug_summary.get("stages"):
         print(
             "[interaction-text-mujoco][debug] stages: "
@@ -713,7 +739,7 @@ def record_execution_bindings(
     """Mirror the Host commit boundary before an acceptance-only execution."""
 
     conversation_state = getattr(assistant, "conversation_state", None)
-    record = getattr(conversation_state, "record_agent_result", None)
+    record = getattr(conversation_state, "record_interaction_response", None)
     if not callable(record):
         raise RuntimeError("conversation state execution binding is unavailable")
     record(
@@ -729,9 +755,8 @@ async def dispatch_initial_reflex(
     text: str,
     sid: str,
     turn_capture: Any,
-    route_model: Any,
     timeout_s: float,
-) -> tuple[Any, Any, dict[str, Any], list[str]]:
+) -> tuple[dict[str, Any], Any, dict[str, Any], list[str]]:
     """Exercise an admitted deterministic control through the production path.
 
     The text/MuJoCo runner captures the Gateway turn itself so it can retain
@@ -780,15 +805,23 @@ async def dispatch_initial_reflex(
     errors: list[str] = []
     if not recorded_turn:
         errors.append("production reflex dispatch retained no reflex user turn")
-    if recorded_turn.get("route") != outcome.action:
+    retained_envelope = recorded_metadata.get("user_turn_envelope")
+    if not isinstance(retained_envelope, dict):
+        retained_envelope = recorded_metadata.get("turn_envelope")
+    if not isinstance(retained_envelope, dict):
+        retained_envelope = {}
+    retained_reflex = retained_envelope.get("reflex")
+    if not isinstance(retained_reflex, dict):
+        retained_reflex = recorded_outcome
+    if retained_reflex.get("action") != outcome.action:
         errors.append(
-            "production reflex route mismatch: "
-            f"expected {outcome.action!r}, got {recorded_turn.get('route')!r}"
+            "production reflex action mismatch: "
+            f"expected {outcome.action!r}, got {retained_reflex.get('action')!r}"
         )
-    if recorded_turn.get("intent") != outcome.intent:
+    if retained_reflex.get("intent") != outcome.intent:
         errors.append(
             "production reflex intent mismatch: "
-            f"expected {outcome.intent!r}, got {recorded_turn.get('intent')!r}"
+            f"expected {outcome.intent!r}, got {retained_reflex.get('intent')!r}"
         )
     if recorded_outcome.get("cancellation_scope") != outcome.cancellation_scope:
         errors.append(
@@ -806,8 +839,7 @@ async def dispatch_initial_reflex(
         "recorded_turn": recorded_turn,
         "goal_interpretation_bypassed": True,
     }
-    route = route_model.model_validate(
-        {
+    reflex_decision = {
             "route": outcome.action,
             "intent": outcome.intent,
             "confidence": outcome.confidence,
@@ -824,7 +856,6 @@ async def dispatch_initial_reflex(
                 "goal_interpretation_bypassed": True,
             },
         }
-    )
     response = InteractionResponse(
         metadata={
             "source": "cognitive_gateway_reflex",
@@ -832,7 +863,7 @@ async def dispatch_initial_reflex(
             "no_interaction_response": True,
         }
     )
-    return route, response, reflex_evidence, errors
+    return reflex_decision, response, reflex_evidence, errors
 
 
 async def run_check(
@@ -850,7 +881,6 @@ async def run_check(
 
     # Import after the explicit environment bootstrap and harness overrides.
     from orchestrator.orchestrator import VoiceAssistant  # noqa: PLC0415
-    from orchestrator.schemas.route import RouteDecision  # noqa: PLC0415
 
     owns_assistant = assistant is None
     if assistant is None:
@@ -921,13 +951,12 @@ async def run_check(
                     "non-preview retained run so cancellation evidence is real"
                 )
             reflex_start = time.perf_counter()
-            route, response, reflex_evidence, reflex_errors = (
+            reflex_decision, response, reflex_evidence, reflex_errors = (
                 await dispatch_initial_reflex(
                     assistant=assistant,
                     text=args.text,
                     sid=sid,
                     turn_capture=turn_capture,
-                    route_model=RouteDecision,
                     timeout_s=args.timeout_s,
                 )
             )
@@ -937,7 +966,7 @@ async def run_check(
             errors.extend(reflex_errors)
             errors.extend(
                 validate_contract(
-                    route=route,
+                    route=reflex_decision,
                     response=response,
                     expected_route=args.expect_route,
                     expected_capabilities=args.expect_capability,
@@ -958,7 +987,7 @@ async def run_check(
             )
 
             _write_json(evidence_dir / "reflex.json", reflex_evidence)
-            _write_json(evidence_dir / "route.json", route.model_dump(mode="json"))
+            _write_json(evidence_dir / "reflex_decision.json", reflex_decision)
             _write_json(
                 evidence_dir / "interaction_response.json",
                 response.model_dump(mode="json"),
@@ -988,7 +1017,7 @@ async def run_check(
                 errors.extend(safe_idle_errors(status_after))
 
             debug_summary = build_debug_summary(
-                route=route,
+                route=reflex_decision,
                 response=response,
                 errors=errors,
             )
@@ -1012,7 +1041,7 @@ async def run_check(
                 },
                 "debug_summary": debug_summary,
                 "errors": errors,
-                "route": route.model_dump(mode="json"),
+                "reflex_decision": reflex_decision,
                 "interaction_response": response.model_dump(mode="json"),
                 "reflex": reflex_evidence,
                 "cognitive_runtime": None,
@@ -1071,48 +1100,36 @@ async def run_check(
                 "text-to-MuJoCo acceptance input was suppressed before Core entry"
             )
 
-        route_start = time.perf_counter()
+        interpretation_start = time.perf_counter()
         core_interpretation = await assistant.agent_client.interpret_turn(
             session,
             turn_envelope=turn_envelope,
             context_snapshot=context_snapshot,
         )
-        route = RouteDecision.model_validate(
-            core_interpretation.route_decision_projection().model_dump(
-                mode="json"
-            )
-        )
-        route_ms = (time.perf_counter() - route_start) * 1000.0
-        timings_ms["route_ms"] = route_ms
+        interpretation_ms = (time.perf_counter() - interpretation_start) * 1000.0
+        timings_ms["goal_interpretation_ms"] = interpretation_ms
         _write_json(
             evidence_dir / "core_interpretation.json",
             core_interpretation.model_dump(mode="json"),
         )
-        _write_json(evidence_dir / "route.json", route.model_dump(mode="json"))
         assistant.session_log(
             sid,
-            "text_check_route_done: route=%s intent=%s source=%s actions=%s route_ms=%.1f",
-            route.route,
-            route.intent,
-            route.source,
-            len(route.actions),
-            route_ms,
+            "text_check_goal_interpretation_done: responsibilities=%s confidence=%.2f unresolved=%s interpretation_ms=%.1f",
+            len(core_interpretation.responsibilities),
+            core_interpretation.confidence,
+            len(core_interpretation.unresolved),
+            interpretation_ms,
         )
 
         agent_start = time.perf_counter()
         cognitive_resolution_payload: dict[str, Any] | None = None
-        cognitive_runtime_selected = should_apply_cognitive_runtime(
-            route,
-            enabled=bool(args.cognitive_runtime),
-            apply_lanes=str(args.cognitive_apply_lanes),
-        )
+        cognitive_runtime_selected = bool(args.cognitive_runtime)
         if cognitive_runtime_selected:
             cognitive_resolution = await assistant._run_cognitive_runtime_pipeline(
                 session,
                 user_text=args.text,
                 session_id=sid,
                 context=context,
-                decision=route,
                 core_interpretation=core_interpretation,
                 record_evidence=False,
                 turn_envelope=turn_envelope,
@@ -1143,12 +1160,17 @@ async def run_check(
                 response = assistant.interaction_runtime.prepare_response(
                     response, session_id=sid
                 )
-                goal_state_results = assistant._apply_cognitive_goal_state(
-                    cognitive_resolution,
-                    session_id=sid,
-                    user_text=args.text,
-                    decision=route,
-                )
+                if (
+                    cognitive_resolution.metadata.get("goal_state_commit_stage")
+                    == "goal_association"
+                ):
+                    goal_state_results = list(cognitive_resolution.goal_state_results)
+                else:
+                    goal_state_results = assistant._apply_cognitive_goal_state(
+                        cognitive_resolution,
+                        session_id=sid,
+                        user_text=args.text,
+                    )
                 response.metadata = {
                     **assistant._metadata_with_turn_envelope(
                         response.metadata,
@@ -1170,13 +1192,13 @@ async def run_check(
                 cognitive_resolution, session_id=sid, user_text=args.text
             )
         else:
-            response = await assistant.agent_client.run_interaction(
-                session,
-                text=args.text,
-                route_decision=route,
-                sid=sid,
-                context=context,
-                history=context.get("history", []),
+            errors.append(
+                "goal-driven Cognitive Runtime is disabled; the maintained runner has no legacy semantic path"
+            )
+            response = assistant._host_speech_response(
+                "Goal-driven runtime is disabled.",
+                style="warning",
+                source="cognitive_text_check_runtime_disabled",
             )
         agent_ms = (time.perf_counter() - agent_start) * 1000.0
         timings_ms["agent_ms"] = agent_ms
@@ -1185,7 +1207,7 @@ async def run_check(
             update={
                 "metadata": {
                     **response.metadata,
-                    "language": route.language,
+                    "language": core_interpretation.language,
                 }
             },
         )
@@ -1204,9 +1226,17 @@ async def run_check(
             agent_ms,
         )
 
+        interpretation_projection = {
+            "confidence": core_interpretation.confidence,
+            "responsibilities": [
+                item.model_dump(mode="json")
+                for item in core_interpretation.responsibilities
+            ],
+            "unresolved": list(core_interpretation.unresolved),
+        }
         errors.extend(
             validate_contract(
-                route=route,
+                route=interpretation_projection,
                 response=response,
                 expected_route=args.expect_route,
                 expected_capabilities=args.expect_capability,
@@ -1238,7 +1268,7 @@ async def run_check(
             },
         )
         if args.preview_only or errors:
-            assistant.conversation_state.record_agent_result(sid, response)
+            assistant.conversation_state.record_interaction_response(sid, response)
         if confirmation_request_ids and not args.grant_confirmation:
             errors.append(
                 "The provider/Host contract requires confirmation, but this text "
@@ -1385,7 +1415,7 @@ async def run_check(
 
             session_state = assistant.sessions.state.get(sid) or {}
             require_tts = should_require_tts_speech(
-                route,
+                interpretation_projection,
                 require_speech=args.require_speech,
             )
             if require_tts:
@@ -1397,7 +1427,7 @@ async def run_check(
                 )
 
         debug_summary = build_debug_summary(
-            route=route,
+            route=interpretation_projection,
             response=response,
             errors=errors,
         )
@@ -1415,7 +1445,7 @@ async def run_check(
             },
             "debug_summary": debug_summary,
             "errors": errors,
-            "route": route.model_dump(mode="json"),
+            "goal_interpretation": core_interpretation.model_dump(mode="json"),
             "interaction_response": response.model_dump(mode="json"),
             "cognitive_runtime": cognitive_resolution_payload,
             "execution": execution_payload,

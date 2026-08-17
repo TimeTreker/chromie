@@ -432,6 +432,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                     "decision": "create_goals",
                     "new_goals": [
                         {
+                            "source_responsibility_refs": ["test_responsibility"],
                             "description": "Respond naturally to F.",
                             "output_mode": "speech",
                         }

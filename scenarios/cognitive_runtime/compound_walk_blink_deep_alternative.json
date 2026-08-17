@@ -184,6 +184,7 @@
     ],
     "confirmation_prompt_matches_speech": true,
     "calls": [
+      "fast_advance",
       "goal_association",
       "fast_plan",
       "deep_plan",

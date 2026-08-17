@@ -302,6 +302,7 @@ class AtomicSemanticOperationTests(unittest.TestCase):
         ) as commit:
             association_manager.apply_goal_association_resolution(
                 {
+                    "resolution_status": "resolved",
                     "turn_id": "turn-association",
                     "new_goals": [
                         {
@@ -327,6 +328,7 @@ class AtomicSemanticOperationTests(unittest.TestCase):
         with patch.object(manager, "persist_task_contexts", return_value=True) as persist:
             results = manager.apply_goal_association_resolution(
                 {
+                    "resolution_status": "resolved",
                     "turn_id": "turn-persist",
                     "new_goals": [
                         {

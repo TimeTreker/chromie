@@ -105,7 +105,7 @@ def evaluate_episode_contract_precheck(episode: EpisodeRecord) -> EpisodeEvaluat
     summaries: list[str] = []
     scores = {
         "intent_preservation": 90,
-        "route_correctness": 90,
+        "responsibility_advancement": 90,
         "skill_correctness": 90,
         "safety_confirmation": 90,
         "memory_continuity": 80,
@@ -118,7 +118,10 @@ def evaluate_episode_contract_precheck(episode: EpisodeRecord) -> EpisodeEvaluat
         text = turn.user_text.lower()
         capabilities = [item.capability_id for item in turn.agent.selected_capabilities]
         skill_set = set(capabilities)
-        route = turn.goal_interpretation.route
+        requires_activity = any(
+            item.completion_requires_work
+            for item in turn.goal_interpretation.responsibilities
+        )
         speech = " ".join(turn.agent.speech).strip()
 
         looks_like_locomotion = any(hint in text for hint in LOCOMOTION_HINTS)
@@ -146,22 +149,21 @@ def evaluate_episode_contract_precheck(episode: EpisodeRecord) -> EpisodeEvaluat
             summaries.append(
                 f"Turn {turn.turn_index} is greeting-like but selected body skill {', '.join(selected_social_fallback)}."
             )
-            scores["route_correctness"] = min(scores["route_correctness"], 60)
+            scores["responsibility_advancement"] = min(
+                scores["responsibility_advancement"], 60
+            )
             scores["skill_correctness"] = min(scores["skill_correctness"], 20)
             cap = min(cap, 45)
 
-        if route == "robot_action" and looks_like_locomotion and not selected_locomotion and not selected_social_fallback:
-            _add_tag(failure_tags, "missing_locomotion_skill")
-            scores["skill_correctness"] = min(scores["skill_correctness"], 55)
-            cap = min(cap, 65)
-
-        if looks_like_locomotion and route != "robot_action" and not selected_locomotion:
-            _add_tag(failure_tags, "action_request_as_chat")
+        if looks_like_locomotion and not selected_locomotion:
+            _add_tag(failure_tags, "activity_request_not_planned")
             _add_tag(failure_tags, "missing_locomotion_skill")
             summaries.append(
-                f"Turn {turn.turn_index} looks like locomotion but route={route!r} emitted no locomotion skill."
+                f"Turn {turn.turn_index} requires locomotion Activity but emitted no locomotion Capability."
             )
-            scores["route_correctness"] = min(scores["route_correctness"], 45)
+            scores["responsibility_advancement"] = min(
+                scores["responsibility_advancement"], 45
+            )
             scores["skill_correctness"] = min(scores["skill_correctness"], 25)
             cap = min(cap, 45)
 
@@ -180,9 +182,11 @@ def evaluate_episode_contract_precheck(episode: EpisodeRecord) -> EpisodeEvaluat
             scores["intent_preservation"] = min(scores["intent_preservation"], 35)
             scores["skill_correctness"] = min(scores["skill_correctness"], 15)
             cap = min(cap, 45)
-            if route != "robot_action":
-                _add_tag(failure_tags, "action_request_as_chat")
-                scores["route_correctness"] = min(scores["route_correctness"], 45)
+            if requires_activity:
+                _add_tag(failure_tags, "activity_request_not_planned")
+                scores["responsibility_advancement"] = min(
+                    scores["responsibility_advancement"], 45
+                )
             if selected_locomotion or selected_social_fallback:
                 _add_tag(failure_tags, "wrong_action_class")
                 cap = min(cap, 40)
@@ -195,7 +199,7 @@ def evaluate_episode_contract_precheck(episode: EpisodeRecord) -> EpisodeEvaluat
             _add_tag(failure_tags, "confirmation_without_skill")
             scores["safety_confirmation"] = min(scores["safety_confirmation"], 55)
 
-        if not speech and route not in {"ignore", "interrupt"}:
+        if not speech:
             _add_tag(failure_tags, "missing_speech")
             scores["speech_quality"] = min(scores["speech_quality"], 20)
             cap = min(cap, 50)
@@ -237,7 +241,7 @@ def evaluate_episode_contract_precheck(episode: EpisodeRecord) -> EpisodeEvaluat
         failure_tags=failure_tags,
         candidate_scenario={
             "recommended": recommended,
-            "suite": "dialogue" if len(episode.turns) > 1 else "interaction",
+            "suite": "cognitive_runtime",
             "reason": summary if recommended else "",
         },
         evaluator="contract_precheck",
@@ -296,7 +300,7 @@ def _evaluation_prompt(episode: EpisodeRecord) -> str:
         "Return exactly one JSON object with keys: overall_score integer 0-100, passed boolean, "
         "severity one of pass/minor/major/critical, summary string, scores object, "
         "failure_tags array, candidate_scenario object with recommended boolean, suite string, reason string.\n\n"
-        "Scoring axes: intent_preservation, route_correctness, skill_correctness, "
+        "Scoring axes: intent_preservation, responsibility_advancement, skill_correctness, "
         "safety_confirmation, memory_continuity, speech_quality, latency.\n"
         "Hard caps: social acknowledgement/gaze for unrelated locomotion <=35; "
         "wrong physical action class <=40; unconfirmed physical execution <=30.\n\n"
@@ -510,20 +514,21 @@ def scenario_candidate_from_episode(
         }
         if forbidden:
             expect["forbidden_capabilities"] = forbidden
-        if "body_skill_for_chat" in evaluation.failure_tags and turn.goal_interpretation.route == "chat":
+        if "body_skill_for_chat" in evaluation.failure_tags:
             expect["no_capabilities"] = True
         if "missing_eye_skill" in evaluation.failure_tags:
-            if turn.goal_interpretation.route == "robot_action":
+            if any(
+                item.completion_requires_work
+                for item in turn.goal_interpretation.responsibilities
+            ):
                 expect["capabilities"] = ["soridormi.blink_eyes"]
-            else:
-                expect["no_capabilities"] = True
-                expect["forbidden_speech_any"] = [
-                    "blinked",
-                    "blinking",
-                    "眨了",
-                    "眨眼",
-                    "👁",
-                ]
+            expect["forbidden_speech_any"] = [
+                "blinked",
+                "blinking",
+                "眨了",
+                "眨眼",
+                "👁",
+            ]
         if not forbidden and selected_capabilities:
             expect["forbidden_capabilities"] = sorted(set(selected_capabilities))
         turns.append(
@@ -531,12 +536,13 @@ def scenario_candidate_from_episode(
                 "id": f"turn_{turn.turn_index}",
                 "ask": turn.user_text,
                 "stub": {
-                    "route_decision": {
-                        "route": turn.goal_interpretation.route,
-                        "agents": _agents_for_route(turn.goal_interpretation.route),
-                        "intent": turn.goal_interpretation.intent,
+                    "goal_interpretation": {
                         "confidence": turn.goal_interpretation.confidence or 0.5,
-                        "source": turn.goal_interpretation.source,
+                        "responsibilities": [
+                            item.model_dump(mode="json")
+                            for item in turn.goal_interpretation.responsibilities
+                        ],
+                        "unresolved": list(turn.goal_interpretation.unresolved),
                     }
                 },
                 "expect": expect,
@@ -551,7 +557,7 @@ def scenario_candidate_from_episode(
             "auto_promotion_allowed": False,
         },
         "id": scenario_id,
-        "suite": "dialogue",
+        "suite": "cognitive_runtime",
         "level": "integration",
         "description": f"Candidate mined from episode {episode.episode_id}: {evaluation.summary}",
         "tags": ["candidate", "experience-mined", *evaluation.failure_tags],
@@ -601,14 +607,6 @@ def _slug(value: str) -> str:
     if not slug or not slug[0].isalpha():
         slug = f"candidate_{slug}"
     return slug[:80]
-
-
-def _agents_for_route(route: str) -> list[str]:
-    if route == "robot_action":
-        return ["capability_agent", "conversation_agent", "safety_agent", "speaker_agent"]
-    if route == "deep_thought":
-        return ["deepthinking_agent", "speaker_agent"]
-    return ["conversation_agent", "speaker_agent"]
 
 
 def _add_tag(tags: list[str], tag: str) -> None:

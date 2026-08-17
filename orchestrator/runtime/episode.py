@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
 from shared.chromie_contracts.interaction import CapabilityIdentityModel, InteractionResponse
 from shared.chromie_contracts.mind import MindProfile
 from shared.chromie_runtime.runtime_events import persist_runtime_event
@@ -38,6 +39,7 @@ class EpisodeGoalInterpretationRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    responsibilities: list[CognitiveResponsibilityProposal] = Field(default_factory=list)
     unresolved: list[str] = Field(default_factory=list)
     latency_ms: float | None = Field(default=None, ge=0.0)
 
@@ -451,6 +453,14 @@ class EpisodeRecorder:
             goal_interpretation=EpisodeGoalInterpretationRecord(
                 confidence=self._float_or_none(
                     context.get("goal_interpretation_confidence")
+                ),
+                responsibilities=list(
+                    (
+                        context.get("goal_interpretation")
+                        if isinstance(context.get("goal_interpretation"), dict)
+                        else {}
+                    ).get("responsibilities")
+                    or []
                 ),
                 unresolved=[
                     str(item)

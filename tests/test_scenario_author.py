@@ -13,25 +13,17 @@ from scripts.behavior_scenarios import load_scenario_file
 
 class ScenarioAuthorTests(unittest.TestCase):
     def test_new_creates_scenarios_from_templates(self) -> None:
-        cases = (
-            {
-                "suite": "goal_interpretation",
-                "scenario_id": "draft_greeting",
-                "text": "Hello there.",
-                "extra_args": [
-                    "--description",
-                    "Draft greeting.",
-                    "--tag",
-                    "normal",
-                ],
-            },
-            {
-                "suite": "dialogue",
-                "scenario_id": "draft_dialogue",
-                "text": "Hi Chromie.",
-                "extra_args": [],
-            },
-        )
+        cases = ({
+            "suite": "goal_interpretation",
+            "scenario_id": "draft_greeting",
+            "text": "Hello there.",
+            "extra_args": [
+                "--description",
+                "Draft greeting.",
+                "--tag",
+                "normal",
+            ],
+        },)
 
         for case in cases:
             with self.subTest(suite=case["suite"]), tempfile.TemporaryDirectory() as temp_dir:
@@ -59,11 +51,8 @@ class ScenarioAuthorTests(unittest.TestCase):
                 self.assertEqual(code, 0)
                 self.assertEqual(scenario.scenario_id, case["scenario_id"])
                 self.assertEqual(scenario.suite, case["suite"])
-                if case["suite"] == "goal_interpretation":
-                    self.assertEqual(scenario.text, case["text"])
-                    self.assertEqual(scenario.tags, ("normal",))
-                else:
-                    self.assertEqual(scenario.turns[0]["ask"], case["text"])
+                self.assertEqual(scenario.text, case["text"])
+                self.assertEqual(scenario.tags, ("normal",))
 
     def test_new_rejects_invalid_id(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -81,14 +70,14 @@ class ScenarioAuthorTests(unittest.TestCase):
 
         self.assertEqual(code, 2)
 
-    def test_validate_all_discovers_created_interaction_scenario(self) -> None:
+    def test_validate_all_discovers_created_goal_interpretation_scenario(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             scenario_author.main(
                 [
                     "new",
                     "--suite",
-                    "interaction",
+                    "goal_interpretation",
                     "--id",
                     "draft_chat",
                     "--text",
@@ -102,7 +91,7 @@ class ScenarioAuthorTests(unittest.TestCase):
                 [
                     "validate-all",
                     "--suite",
-                    "interaction",
+                    "goal_interpretation",
                     "--scenario-root",
                     str(root),
                 ]
@@ -157,29 +146,17 @@ class ScenarioAuthorTests(unittest.TestCase):
         self.assertEqual(code, 1)
 
     def test_prompt_mentions_suite_specific_expectations(self) -> None:
-        cases = (
-            {
-                "suite": "goal_interpretation",
-                "count": "3",
-                "focus": "normal greetings and ambiguous commands",
-                "expected": (
-                    "Generate 3 candidate JSON scenario files",
-                    "deterministic expectations",
-                    "scenarios/goal_interpretation/<id>.json",
-                ),
-            },
-            {
-                "suite": "dialogue",
-                "count": "2",
-                "focus": "follow-up task context",
-                "expected": (
-                    "turns[]",
-                    "history_contains",
-                    "extracted_memory_contains",
-                    "scenarios/dialogue/<id>.json",
-                ),
-            },
-        )
+        cases = ({
+            "suite": "goal_interpretation",
+            "count": "3",
+            "focus": "normal greetings and ambiguous commands",
+            "expected": (
+                "Generate 3 candidate JSON scenario files",
+                "deterministic expectations",
+                "provider-neutral responsibilities",
+                "scenarios/goal_interpretation/<id>.json",
+            ),
+        },)
 
         for case in cases:
             with self.subTest(suite=case["suite"]):

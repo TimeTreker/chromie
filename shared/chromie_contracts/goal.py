@@ -49,6 +49,7 @@ class GoalAssociation(BaseModel):
     schema_version: int = Field(default=1, ge=1)
     association_id: str = Field(min_length=1)
     relationship: GoalRelationship
+    source_responsibility_refs: list[str] = Field(default_factory=list)
     target_goal_ids: list[str] = Field(default_factory=list)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reason_summary: str = ""
@@ -65,7 +66,12 @@ class GoalAssociation(BaseModel):
             return " ".join(value.strip().split())
         return value
 
-    @field_validator("target_goal_ids", "resolved_gap_ids", mode="before")
+    @field_validator(
+        "source_responsibility_refs",
+        "target_goal_ids",
+        "resolved_gap_ids",
+        mode="before",
+    )
     @classmethod
     def normalize_goal_ids(cls, value: Any) -> list[str]:
         if value is None:
@@ -233,6 +239,7 @@ class GoalAssociationResolution(BaseModel):
     new_goals: list[SemanticGoal] = Field(default_factory=list)
     referent_updates: list[DiscourseReferentUpdate] = Field(default_factory=list)
     resolved_references: list[ResolvedDiscourseReference] = Field(default_factory=list)
+    information_gaps: dict[str, list[InformationGap]] = Field(default_factory=dict)
     clarification: str = ""
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reason_summary: str = ""
@@ -250,6 +257,25 @@ class GoalAssociationResolution(BaseModel):
     def reject_resolution_low_level_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
         return reject_forbidden_low_level_fields(value)
 
+    @field_validator("information_gaps")
+    @classmethod
+    def validate_information_gap_map(
+        cls,
+        value: dict[str, list[InformationGap]],
+    ) -> dict[str, list[InformationGap]]:
+        normalized: dict[str, list[InformationGap]] = {}
+        for raw_ref, gaps in value.items():
+            ref = " ".join(str(raw_ref or "").strip().split())
+            if not ref:
+                raise ValueError("information_gaps requires non-empty Responsibility refs")
+            ids = [item.gap_id for item in gaps]
+            if len(ids) != len(set(ids)):
+                raise ValueError(
+                    f"information_gaps[{ref}] contains duplicate InformationGap IDs"
+                )
+            normalized[ref] = list(gaps)
+        return normalized
+
     @model_validator(mode="after")
     def validate_resolution_shape(self) -> "GoalAssociationResolution":
         existing_targets = {
@@ -264,6 +290,22 @@ class GoalAssociationResolution(BaseModel):
         if existing_targets.intersection(new_ids):
             raise ValueError("new_goals must not reuse target existing goal IDs")
         new_id_set = set(new_ids)
+        responsibility_refs = {
+            ref
+            for association in self.associations
+            for ref in association.source_responsibility_refs
+        }
+        responsibility_refs.update(
+            ref
+            for goal in self.new_goals
+            for ref in goal.source_responsibility_refs
+        )
+        unknown_gap_owners = sorted(set(self.information_gaps) - responsibility_refs)
+        if unknown_gap_owners:
+            raise ValueError(
+                "information_gaps references unassociated Responsibilities: "
+                + ",".join(unknown_gap_owners)
+            )
         superseded_ids = {
             goal_id
             for goal in self.new_goals
@@ -291,7 +333,8 @@ class GoalAssociationResolution(BaseModel):
                 or self.associations
                 or self.referent_updates
                 or self.resolved_references
-                    or self.confidence != 0.0
+                or self.information_gaps
+                or self.confidence != 0.0
             ):
                 raise ValueError(
                     "fail-closed resolution must contain no semantic operation, "
@@ -380,6 +423,17 @@ class GoalAssociationResolution(BaseModel):
                 item.model_dump(mode="json", exclude_none=True)
                 for item in self.resolved_references
             ],
+            "information_gaps": {
+                ref: [
+                    gap.model_dump(
+                        mode="json",
+                        exclude={"metadata"},
+                        exclude_none=True,
+                    )
+                    for gap in gaps
+                ]
+                for ref, gaps in self.information_gaps.items()
+            },
             "clarification": self.clarification,
             "confidence": self.confidence,
             "reason_summary": self.reason_summary,

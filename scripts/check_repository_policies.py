@@ -1411,7 +1411,10 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
         "orchestrator/runtime/capability_runtime.py",
         "orchestrator/runtime/interaction_coordinator.py",
     ):
-        source = (root / relative).read_text(encoding="utf-8")
+        path = root / relative
+        if not path.is_file():
+            continue
+        source = path.read_text(encoding="utf-8")
         if "async def cancel_all(" in source:
             findings.append(
                 _source_policy_finding(

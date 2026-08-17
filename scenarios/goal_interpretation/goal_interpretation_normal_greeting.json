@@ -12,27 +12,48 @@
     "text": "Hello Chromie, how are you today?"
   },
   "stub": {
-    "interpretation_mode": "hybrid",
-    "catalog": {
-      "matched": false
-    },
     "llm_decision": {
-      "route": "chat",
-      "agents": [],
-      "intent": "general_conversation",
       "confidence": 0.82,
-      "language": "en-US",
-      "source": "llm"
+      "responsibilities": [
+        {
+          "schema_version": 1,
+          "local_ref": "r1",
+          "outcome": "respond to the user greeting and wellbeing question",
+          "bindings": {},
+          "relationship": "new",
+          "target_goal_ids": [],
+          "information_gaps": [],
+          "resolved_gap_ids": [],
+          "completion_requires_work": false,
+          "completion_requires_fresh_evidence": false,
+          "confidence": 0.82
+        }
+      ],
+      "unresolved": []
     }
   },
   "expect": {
-    "route": "chat",
-    "intent": "general_conversation",
-    "source": "llm",
-    "task_types_include": [
-      "speech.answer"
+    "confidence": 0.82,
+    "llm_calls": 1,
+    "llm_stages": [
+      "goal_interpretation"
     ],
-    "llm_calls": 1
+    "unresolved": [],
+    "responsibilities": [
+      {
+        "schema_version": 1,
+        "local_ref": "r1",
+        "outcome": "respond to the user greeting and wellbeing question",
+        "bindings": {},
+        "relationship": "new",
+        "target_goal_ids": [],
+        "information_gaps": [],
+        "resolved_gap_ids": [],
+        "completion_requires_work": false,
+        "completion_requires_fresh_evidence": false,
+        "confidence": 0.82
+      }
+    ]
   },
   "provenance": {
     "legacy_scenario_id": "normal_greeting"

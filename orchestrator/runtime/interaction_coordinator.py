@@ -17,7 +17,9 @@ from agent.app.tool_invocation import (
     ToolInvocationContext,
 )
 from shared.chromie_contracts.plan import (
+    FastPlannerCapabilityActivity,
     FastPlannerVocalActivity,
+    fast_planner_activity_request_id,
     render_fast_planner_vocal_activity,
 )
 from shared.chromie_contracts.interaction import (
@@ -107,6 +109,17 @@ class ReadyPlannerVocalExecution:
     activity: FastPlannerVocalActivity
     interaction_id: str
     speech: InteractionSpeech
+    task: asyncio.Task[CapabilityRuntimeResult]
+
+
+@dataclass
+class ReadyFastPlannerCapabilityExecution:
+    """Safe Fast Activities accepted while GA establishes canonical Goal IDs."""
+
+    interaction_id: str
+    turn_id: str
+    activities: list[FastPlannerCapabilityActivity]
+    dispatch: CapabilityInteractionDispatch
     task: asyncio.Task[CapabilityRuntimeResult]
 
 
@@ -306,6 +319,189 @@ class InteractionRuntimeCoordinator:
 
         task.add_done_callback(observe_completion)
         return ReadyPlannerVocalExecution(activity, interaction_id, speech, task)
+
+    async def start_fast_planner_capability_activities(
+        self,
+        activities: list[FastPlannerCapabilityActivity],
+        *,
+        session_id: str,
+        turn_id: str,
+    ) -> ReadyFastPlannerCapabilityExecution | None:
+        """Accept safe, side-effect-free Fast Activities without waiting for GA.
+
+        These requests initially retain GI Responsibility references.  Once GA
+        returns, :meth:`bind_fast_planner_capability_execution` reindexes every
+        still-open task into the canonical per-Goal task lists and seeds terminal
+        Evidence into the final canonical response so Work is never executed twice.
+        """
+
+        if not activities:
+            return None
+        await self.ensure_capability_definitions(
+            activity.capability_id for activity in activities
+        )
+        requests: list[CapabilityRequest] = []
+        for activity in activities:
+            definition = self.capability_definition(activity.capability_id)
+            metadata = definition.metadata if isinstance(definition.metadata, dict) else {}
+            if (
+                not definition.available
+                or definition.requires_confirmation
+                or str(metadata.get("safety_class") or "") != "safe_read"
+                or metadata.get("side_effect_free") is not True
+            ):
+                raise ValueError(
+                    "Fast execution before GA completes is limited to available, "
+                    "side-effect-free safe-read Capabilities"
+                )
+            if activity.timing == "parallel":
+                if not definition.can_run_parallel:
+                    raise ValueError(
+                        f"Capability {activity.capability_id!r} is not parallel-safe"
+                    )
+                if metadata.get("parallel_metadata_declared") is not True:
+                    raise ValueError(
+                        f"Capability {activity.capability_id!r} lacks parallel metadata"
+                    )
+            schema_errors = validate_args_for_schema(
+                activity.args,
+                definition.input_schema,
+            )
+            if schema_errors:
+                raise ValueError(
+                    f"Fast Activity {activity.activity_id!r} has invalid args: "
+                    + "; ".join(schema_errors[:4])
+                )
+            request_id = fast_planner_activity_request_id(
+                turn_id,
+                activity.activity_id,
+            )
+            requests.append(
+                CapabilityRequest(
+                    request_id=request_id,
+                    capability_id=activity.capability_id,
+                    capability_version=definition.version,
+                    args=dict(activity.args),
+                    timing=activity.timing,
+                    timeout_ms=definition.timeout_ms,
+                    cancellable=definition.interruptible,
+                    requires_confirmation=False,
+                    idempotency_key=f"{turn_id}:fast_activity:{activity.activity_id}",
+                    committed_output_schema_sha256=output_schema_sha256(
+                        definition.output_schema
+                    ),
+                    metadata={
+                        "source": "fast_planner_advance",
+                        "turn_id": turn_id,
+                        "fast_activity_id": activity.activity_id,
+                        "source_responsibility_refs": list(
+                            activity.source_responsibility_refs
+                        ),
+                        "source_goal_ids": [],
+                        "canonical_goal_binding_pending": True,
+                        "task_list_revision": 1,
+                        "safety_class": "safe_read",
+                        "effectful": False,
+                        "execution_lane": str(
+                            metadata.get("execution_lane") or "activity"
+                        ),
+                    },
+                )
+            )
+        interaction_id = f"fast_activity_work_{turn_id}"
+        response = InteractionResponse(
+            interaction_id=interaction_id,
+            status="ok",
+            capabilities=requests,
+            metadata={
+                "source": "fast_planner_advance",
+                "session_id": session_id,
+                "turn_id": turn_id,
+                "planning_result": "execute",
+                "capability_decision": "execute",
+                "canonical_goal_binding_pending": True,
+            },
+        )
+        dispatch = await self.submit_response(response, session_id=session_id)
+        task = asyncio.create_task(self.wait_dispatch(dispatch))
+        return ReadyFastPlannerCapabilityExecution(
+            interaction_id=interaction_id,
+            turn_id=turn_id,
+            activities=list(activities),
+            dispatch=dispatch,
+            task=task,
+        )
+
+    async def bind_fast_planner_capability_execution(
+        self,
+        execution: ReadyFastPlannerCapabilityExecution,
+        *,
+        target_interaction_id: str,
+        canonical_plan_id: str,
+        canonical_plan_fingerprint: str,
+        goal_ids_by_responsibility: dict[str, list[str]],
+        task_list_revision: int = 1,
+    ) -> CapabilityRuntimeResult:
+        """Bind provisional Fast Work to Goal lists and preserve its Evidence."""
+
+        await self.runtime.bind_scheduled_tasks_to_goals(
+            execution.interaction_id,
+            goal_ids_by_responsibility=goal_ids_by_responsibility,
+            canonical_plan_id=canonical_plan_id,
+            canonical_plan_fingerprint=canonical_plan_fingerprint,
+            task_list_revision=task_list_revision,
+        )
+        result = await execution.task
+        traces_by_request = {
+            trace.request_id: trace for trace in result.traces
+        }
+        for capability_result in result.results:
+            matching_activity = next(
+                (
+                    activity
+                    for activity in execution.activities
+                    if fast_planner_activity_request_id(
+                        execution.turn_id,
+                        activity.activity_id,
+                    )
+                    == capability_result.request_id
+                ),
+                None,
+            )
+            source_goal_ids: list[str] = []
+            if matching_activity is not None:
+                for responsibility_ref in matching_activity.source_responsibility_refs:
+                    for goal_id in goal_ids_by_responsibility.get(
+                        responsibility_ref, []
+                    ):
+                        if goal_id not in source_goal_ids:
+                            source_goal_ids.append(goal_id)
+                capability_result = capability_result.model_copy(
+                    deep=True,
+                    update={
+                        "metadata": {
+                            **capability_result.metadata,
+                            "source_goal_ids": source_goal_ids,
+                            "source_responsibility_refs": list(
+                                matching_activity.source_responsibility_refs
+                            ),
+                            "canonical_plan_id": canonical_plan_id,
+                            "canonical_plan_fingerprint": canonical_plan_fingerprint,
+                            "task_list_revision": task_list_revision,
+                            "fast_activity_id": matching_activity.activity_id,
+                        }
+                    },
+                )
+            trace = traces_by_request.get(capability_result.request_id)
+            if trace is not None:
+                trace = trace.model_copy(
+                    deep=True,
+                    update={"interaction_id": target_interaction_id},
+                )
+            self._preexecuted[
+                (target_interaction_id, capability_result.request_id)
+            ] = (capability_result, trace)
+        return result
 
     def _consume_preexecuted(
         self, response: InteractionResponse

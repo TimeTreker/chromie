@@ -2560,6 +2560,11 @@ class ConversationStateManager:
                     confidence=resolved.confidence,
                     relationship="new",
                     goal=goal,
+                    information_gaps=[
+                        gap
+                        for ref in goal.source_responsibility_refs
+                        for gap in resolved.information_gaps.get(ref, [])
+                    ],
                     requires_replan=True,
                     reason_summary=resolved.reason_summary,
                     metadata={
@@ -2673,6 +2678,11 @@ class ConversationStateManager:
                     confidence=association.confidence,
                     relationship=association.relationship,
                     goal_update=association.goal_update,
+                    information_gaps=[
+                        gap
+                        for ref in association.source_responsibility_refs
+                        for gap in resolved.information_gaps.get(ref, [])
+                    ],
                     resolved_gap_ids=association.resolved_gap_ids,
                     requires_replan=association.requires_replan,
                     reason_summary=association.reason_summary,

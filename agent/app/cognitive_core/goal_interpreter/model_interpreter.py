@@ -67,18 +67,11 @@ _CONTEXT_OMIT_KEYS = {
 # route/intent compatibility architecture. They are never semantic evidence for GI.
 _FORBIDDEN_CONTEXT_KEYS = frozenset(
     {
-        "goal_id",
-        "goal_ids",
-        "source_goal_ids",
-        "target_goal_ids",
         "supersedes_goal_ids",
         "covers_goal_ids",
-        "task_id",
-        "task_ids",
         "plan_id",
         "canonical_plan_id",
         "canonical_plan_fingerprint",
-        "activity_id",
         "work_item_id",
         "execution_binding",
         "execution_lane",
@@ -243,6 +236,66 @@ def _reject_canonical_goal_identity_refs(
                 f"[{index}].local_ref reused canonical Goal identity {local_ref!r}; "
                 "local_ref must be turn-local and Goal Association alone owns "
                 "canonical Goal identity"
+            )
+
+
+def _reject_unknown_goal_and_gap_refs(
+    request: GoalInterpretationRequest,
+    parsed: dict[str, Any],
+) -> None:
+    """Require GI continuity references to copy supplied Context identity exactly."""
+
+    known_goal_ids: set[str] = set()
+    known_gap_ids: set[str] = set()
+    for key in (
+        "active_goal_snapshots",
+        "recent_goal_snapshots",
+        "active_task_snapshots",
+        "active_task_contexts",
+    ):
+        raw = request.context.get(key)
+        if not isinstance(raw, list):
+            continue
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            for id_key in ("goal_id", "task_id", "source_task_id"):
+                value = " ".join(str(item.get(id_key) or "").strip().split())
+                if value:
+                    known_goal_ids.add(value)
+            goal = item.get("goal") if isinstance(item.get("goal"), dict) else {}
+            value = " ".join(str(goal.get("goal_id") or "").strip().split())
+            if value:
+                known_goal_ids.add(value)
+            for gap in item.get("open_information_gaps") or []:
+                if not isinstance(gap, dict):
+                    continue
+                gap_id = " ".join(str(gap.get("gap_id") or "").strip().split())
+                if gap_id:
+                    known_gap_ids.add(gap_id)
+    responsibilities = parsed.get("responsibilities")
+    if not isinstance(responsibilities, list):
+        return
+    for index, item in enumerate(responsibilities):
+        if not isinstance(item, dict):
+            continue
+        target_ids = item.get("target_goal_ids") or []
+        unknown_goals = sorted(
+            str(value) for value in target_ids if str(value) not in known_goal_ids
+        )
+        if unknown_goals:
+            raise _GoalInterpretationAuthorityViolation(
+                f"responsibilities[{index}] targets unknown Goal IDs: "
+                + ",".join(unknown_goals)
+            )
+        resolved_ids = item.get("resolved_gap_ids") or []
+        unknown_gaps = sorted(
+            str(value) for value in resolved_ids if str(value) not in known_gap_ids
+        )
+        if unknown_gaps:
+            raise _GoalInterpretationAuthorityViolation(
+                f"responsibilities[{index}] resolves unknown InformationGap IDs: "
+                + ",".join(unknown_gaps)
             )
 
 
@@ -467,6 +520,11 @@ def _compact_active_task_snapshots(
             ]
         compact.append(
             {
+                "task_id": str(item.get("task_id") or ""),
+                "goal_id": str(
+                    semantic_goal.get("goal_id") or item.get("goal_id") or ""
+                ),
+                "goal_version": item.get("goal_version"),
                 "status": str(item.get("status") or "open"),
                 "goal": {
                     "description": str(semantic_goal.get("description") or "")[:240],
@@ -476,6 +534,7 @@ def _compact_active_task_snapshots(
                 },
                 "open_information_gaps": [
                     {
+                        "gap_id": str(gap.get("gap_id") or "")[:160],
                         "description": str(gap.get("description") or "")[:160],
                         "preferred_resolution": gap.get("preferred_resolution"),
                     }
@@ -509,6 +568,10 @@ def _compact_active_goal_snapshots(
             continue
         compact.append(
             {
+                "goal_id": str(
+                    item.get("goal_id") or goal.get("goal_id") or ""
+                ),
+                "goal_version": item.get("goal_version") or goal.get("version"),
                 "responsibility_status": str(
                     item.get("responsibility_status")
                     or goal.get("responsibility_status")
@@ -519,6 +582,15 @@ def _compact_active_goal_snapshots(
                     "object": goal.get("object") if isinstance(goal.get("object"), dict) else {},
                     "constraints": goal.get("constraints") if isinstance(goal.get("constraints"), dict) else {},
                 },
+                "open_information_gaps": [
+                    {
+                        "gap_id": str(gap.get("gap_id") or "")[:160],
+                        "description": str(gap.get("description") or "")[:160],
+                        "preferred_resolution": gap.get("preferred_resolution"),
+                    }
+                    for gap in (item.get("open_information_gaps") or [])[:4]
+                    if isinstance(gap, dict)
+                ],
                 "last_user_update": str(item.get("last_user_update") or "")[:220],
             }
         )
@@ -670,15 +742,21 @@ class OllamaGoalInterpreter:
             f"{_bounded_json(_without_goal_interpretation_authority(request.context.get('interaction_context') or {}), max_chars=2400)}\n"
             "Recent accepted dialogue JSON:"
             f"{_bounded_json_array(_compact_recent_dialogue(request.context), max_chars=1800)}\n"
-            "Active Goal semantics without canonical identity JSON:"
+            "Active Goal semantics with commit-safe identity and InformationGaps JSON:"
             f"{_bounded_json_array(_compact_active_goal_snapshots(request.context), max_chars=1400)}\n"
-            "Active Task/progress semantics without lifecycle identity JSON:"
+            "Active Task/Activity progress with identity and pending clarification JSON:"
             f"{_bounded_json_array(_compact_active_task_snapshots(request.context), max_chars=1400)}\n\n"
-            "Interpret only WHAT the human means. Return responsibilities, confidence, "
-            "and unresolved semantic uncertainty. For directly named entities, preserve "
+            "Interpret contextual WHAT. For every Responsibility, also state whether it "
+            "is new or modifies/continues/cancels a supplied Goal, copy exact target Goal "
+            "IDs, preserve unresolved InformationGaps, and copy any resolved gap IDs. A "
+            "short answer to a pending clarification modifies that Goal; it is not an "
+            "isolated new request. Goal Association will verify and commit this result. "
+            "Return responsibilities, confidence, and unresolved semantic uncertainty. "
+            "For directly named entities, preserve "
             "the exact current-turn user-language surface in bindings; never translate or "
             "provider-canonicalize it. No route, intent, response wording, Activity, Work, "
-            "Plan, Capability, Tool, provider, executable args, or IDs."
+            "Plan, Capability, Tool, provider, or executable args. Use only Goal, Task, "
+            "Activity, and InformationGap IDs explicitly supplied in Context."
         )
 
     @staticmethod
@@ -694,6 +772,10 @@ class OllamaGoalInterpreter:
                 "local_ref",
                 "outcome",
                 "bindings",
+                "relationship",
+                "target_goal_ids",
+                "information_gaps",
+                "resolved_gap_ids",
                 "completion_requires_work",
                 "completion_requires_fresh_evidence",
                 "confidence",
@@ -741,7 +823,8 @@ class OllamaGoalInterpreter:
                     "Remove every field outside the schema. Never translate a rejected "
                     "route/intent/Capability/Activity/Work/Plan/provider field into another "
                     "implementation hint. Preserve only the human outcome, material semantic "
-                    "bindings, work/fresh-evidence requirements, confidence, and genuine "
+                    "bindings, supplied Goal/InformationGap relationships, "
+                    "work/fresh-evidence requirements, confidence, and genuine "
                     "semantic uncertainty. A directly named entity binding must copy the exact "
                     "current-turn surface; never translate or transliterate it. Provider timezone "
                     "or clock-range choices for an already-preserved relative time are not semantic "
@@ -754,8 +837,9 @@ class OllamaGoalInterpreter:
                     self.build_interpretation_user_prompt(request)
                     + "\n\nThe previous output violated the WHAT-only typed contract. "
                     "Regenerate from the authoritative user meaning and bounded semantic "
-                    "context above. Do not copy any field, identifier, wording, or "
-                    "implementation hint from the rejected output. Return only the new "
+                    "context above. Copy identities only from supplied Context; do not copy "
+                    "any field, identifier, wording, or implementation hint from the "
+                    "rejected output. Return only the new "
                     "schema object."
                 ),
             },
@@ -782,6 +866,7 @@ class OllamaGoalInterpreter:
             parsed = _extract_json_object(content)
             _reject_planner_shaped_goal_interpretation(parsed)
             _reject_canonical_goal_identity_refs(request, parsed)
+            _reject_unknown_goal_and_gap_refs(request, parsed)
             _reject_unprovenanced_location_bindings(request, parsed)
             _reject_runtime_identity_bindings(request, parsed)
             return GoalInterpretationDecision.model_validate(parsed)
@@ -805,6 +890,7 @@ class OllamaGoalInterpreter:
                 parsed = _extract_json_object(str(repaired.get("message", {}).get("content") or ""))
                 _reject_planner_shaped_goal_interpretation(parsed)
                 _reject_canonical_goal_identity_refs(request, parsed)
+                _reject_unknown_goal_and_gap_refs(request, parsed)
                 _reject_unprovenanced_location_bindings(request, parsed)
                 _reject_runtime_identity_bindings(request, parsed)
                 return GoalInterpretationDecision.model_validate(parsed)

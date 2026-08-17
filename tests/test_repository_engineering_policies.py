@@ -236,9 +236,9 @@ class RepositoryEngineeringPolicyTests(unittest.TestCase):
                 'decision.speak_first = "What do you mean?"\n',
                 encoding="utf-8",
             )
-            route_contract = root / "shared" / "chromie_contracts" / "route.py"
-            route_contract.parent.mkdir(parents=True, exist_ok=True)
-            route_contract.write_text(
+            agent_schema = root / "agent" / "app" / "schema.py"
+            agent_schema.parent.mkdir(parents=True, exist_ok=True)
+            agent_schema.write_text(
                 "def reject_contract_marker_as_spoken_text(): pass\n",
                 encoding="utf-8",
             )
@@ -258,10 +258,10 @@ class RepositoryEngineeringPolicyTests(unittest.TestCase):
     def test_model_facing_skill_id_field_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            path = root / "shared" / "chromie_contracts" / "route.py"
+            path = root / "shared" / "chromie_contracts" / "social_attention.py"
             path.parent.mkdir(parents=True)
             path.write_text(
-                "class RouteItem:\n"
+                "class SocialAttentionBehavior:\n"
                 "    skill_id: str | None = None\n",
                 encoding="utf-8",
             )

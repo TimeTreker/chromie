@@ -3,7 +3,7 @@
   "id": "factual_sun_round_rules_only_fails_closed",
   "suite": "goal_interpretation",
   "level": "module",
-  "description": "Rules-only mode must fail closed when no deterministic rule can interpret a factual request; weak catalog overlap must never invent chat or motion semantics.",
+  "description": "A factual agreement question remains a provider-neutral conversational Responsibility and cannot be redirected by motion-word overlap.",
   "tags": [
     "factual",
     "rules-only",
@@ -14,35 +14,53 @@
     "language": "en-US"
   },
   "stub": {
-    "interpretation_mode": "rules_only",
-    "catalog": {
-      "matched": true,
-      "suggested_route": "robot_action",
-      "suggested_agents": [
-        "capability_agent",
-        "conversation_agent",
-        "safety_agent",
-        "speaker_agent"
-      ],
-      "catalog_version": 4,
-      "capabilities": [
+    "llm_decision": {
+      "confidence": 0.94,
+      "responsibilities": [
         {
-          "capability_id": "soridormi.turn_in_place",
-          "agent_id": "soridormi.skill",
-          "description": "Rotate left or right with near-zero forward velocity.",
-          "score": 0.165,
-          "available": true,
-          "interaction_executable": true
+          "schema_version": 1,
+          "local_ref": "r1",
+          "outcome": "answer whether the user is correct that the sun is hot and round",
+          "bindings": {
+            "proposition": "the sun is hot and round",
+            "speech_act": "request_agreement"
+          },
+          "relationship": "new",
+          "target_goal_ids": [],
+          "information_gaps": [],
+          "resolved_gap_ids": [],
+          "completion_requires_work": false,
+          "completion_requires_fresh_evidence": false,
+          "confidence": 0.94
         }
-      ]
+      ],
+      "unresolved": []
     }
   },
   "expect": {
-    "status": "interpretation_unavailable",
-    "failure_reason_contains": [
-      "catalog_and_rules_no_match"
+    "confidence": 0.94,
+    "llm_calls": 1,
+    "llm_stages": [
+      "goal_interpretation"
     ],
-    "llm_calls": 0,
-    "llm_stages": []
+    "unresolved": [],
+    "responsibilities": [
+      {
+        "schema_version": 1,
+        "local_ref": "r1",
+        "outcome": "answer whether the user is correct that the sun is hot and round",
+        "bindings": {
+          "proposition": "the sun is hot and round",
+          "speech_act": "request_agreement"
+        },
+        "relationship": "new",
+        "target_goal_ids": [],
+        "information_gaps": [],
+        "resolved_gap_ids": [],
+        "completion_requires_work": false,
+        "completion_requires_fresh_evidence": false,
+        "confidence": 0.94
+      }
+    ]
   }
 }

@@ -113,9 +113,12 @@ CancellationDomain = Literal["output", "media_output", "embodied_motion"]
 
 _RESULT_AUTHORITY_METADATA_KEYS = (
     "source_goal_ids",
+    "source_responsibility_refs",
     "covers_goal_ids",
     "canonical_plan_id",
     "canonical_plan_fingerprint",
+    "task_list_revision",
+    "fast_activity_id",
     "step_id",
     "execution_lane",
     "coordination_id",
@@ -350,8 +353,24 @@ class CapabilityRuntimeRequestObservation(CapabilityIdentityModel):
     request_id: str
     provider_id: str
     source_goal_ids: list[str] = Field(default_factory=list)
+    canonical_plan_id: str = ""
+    task_list_revision: int = Field(default=1, ge=1)
+    activity_id: str = ""
+    state: Literal["scheduled", "running"] = "scheduled"
     provider_started: bool
     task_done: bool
+
+
+class CapabilityRuntimeGoalTaskList(BaseModel):
+    """One Goal-indexed view over Runtime-owned Activity/Task instances.
+
+    A request that contributes to more than one Goal appears in each relevant
+    view with the same ``interaction_id`` and ``request_id``.  The Runtime still
+    owns and executes one request instance; this model never duplicates Work.
+    """
+
+    goal_id: str = Field(min_length=1)
+    tasks: list[CapabilityRuntimeRequestObservation] = Field(default_factory=list)
 
 
 class CapabilityRuntimeExecutionObservation(BaseModel):
@@ -359,6 +378,7 @@ class CapabilityRuntimeExecutionObservation(BaseModel):
     open_interaction_ids: list[str] = Field(default_factory=list)
     executing_interaction_ids: list[str] = Field(default_factory=list)
     requests: list[CapabilityRuntimeRequestObservation] = Field(default_factory=list)
+    goal_task_lists: list[CapabilityRuntimeGoalTaskList] = Field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -423,6 +443,7 @@ class CapabilityRuntime:
 
         async with self._active_lock:
             requests: list[CapabilityRuntimeRequestObservation] = []
+            tasks_by_goal: dict[str, list[CapabilityRuntimeRequestObservation]] = {}
             for interaction_id in sorted(self._scheduled):
                 for request_id in sorted(self._scheduled[interaction_id]):
                     request, definition = self._scheduled[interaction_id][request_id]
@@ -432,25 +453,123 @@ class CapabilityRuntime:
                     source_goal_ids = metadata.get("source_goal_ids") or []
                     if not isinstance(source_goal_ids, list):
                         source_goal_ids = []
-                    requests.append(
-                        CapabilityRuntimeRequestObservation(
-                            interaction_id=interaction_id,
-                            request_id=request.request_id,
-                            capability_id=request.capability_id,
-                            provider_id=definition.provider_id,
-                            source_goal_ids=[
-                                str(value) for value in source_goal_ids if str(value).strip()
-                            ],
-                            provider_started=bool(context is not None and context.provider_started),
-                            task_done=bool(active is not None and active[0].done()),
+                    try:
+                        task_list_revision = max(
+                            1,
+                            int(metadata.get("task_list_revision") or 1),
                         )
+                    except (TypeError, ValueError):
+                        task_list_revision = 1
+                    observation = CapabilityRuntimeRequestObservation(
+                        interaction_id=interaction_id,
+                        request_id=request.request_id,
+                        capability_id=request.capability_id,
+                        provider_id=definition.provider_id,
+                        source_goal_ids=[
+                            str(value) for value in source_goal_ids if str(value).strip()
+                        ],
+                        canonical_plan_id=str(
+                            metadata.get("canonical_plan_id") or ""
+                        ).strip(),
+                        task_list_revision=task_list_revision,
+                        activity_id=str(
+                            metadata.get("fast_activity_id")
+                            or metadata.get("step_id")
+                            or ""
+                        ).strip(),
+                        state=(
+                            "running"
+                            if context is not None and context.provider_started
+                            else "scheduled"
+                        ),
+                        provider_started=bool(
+                            context is not None and context.provider_started
+                        ),
+                        task_done=bool(active is not None and active[0].done()),
                     )
+                    requests.append(observation)
+                    for goal_id in observation.source_goal_ids:
+                        tasks_by_goal.setdefault(goal_id, []).append(observation)
             return CapabilityRuntimeExecutionObservation(
                 captured_at=datetime.now(timezone.utc),
                 open_interaction_ids=sorted(self._open_interactions),
                 executing_interaction_ids=sorted(self._executing_interactions),
                 requests=requests,
+                goal_task_lists=[
+                    CapabilityRuntimeGoalTaskList(
+                        goal_id=goal_id,
+                        tasks=list(tasks_by_goal[goal_id]),
+                    )
+                    for goal_id in sorted(tasks_by_goal)
+                ],
             )
+
+    async def bind_scheduled_tasks_to_goals(
+        self,
+        interaction_id: str,
+        *,
+        goal_ids_by_responsibility: dict[str, list[str]],
+        canonical_plan_id: str,
+        canonical_plan_fingerprint: str,
+        task_list_revision: int,
+    ) -> None:
+        """Reindex provisional Fast tasks under GA-authorized canonical Goals.
+
+        Only Runtime-owned scheduled request metadata changes. Provider work is
+        neither restarted nor duplicated, and completed Evidence remains in the
+        original dispatch result/event history.
+        """
+
+        if task_list_revision < 1:
+            raise ValueError("task_list_revision must be positive")
+        if not canonical_plan_id.strip() or not canonical_plan_fingerprint.strip():
+            raise ValueError("canonical Plan identity is required for Goal task binding")
+        async with self._active_lock:
+            scheduled = self._scheduled.get(interaction_id)
+            if not scheduled:
+                return
+            for request_id, (request, definition) in list(scheduled.items()):
+                metadata = dict(request.metadata or {})
+                refs = metadata.get("source_responsibility_refs")
+                if not isinstance(refs, list):
+                    refs = []
+                goal_ids: list[str] = []
+                for responsibility_ref in refs:
+                    mapped = goal_ids_by_responsibility.get(str(responsibility_ref))
+                    if not isinstance(mapped, list):
+                        continue
+                    for value in mapped:
+                        goal_id = str(value or "").strip()
+                        if goal_id and goal_id not in goal_ids:
+                            goal_ids.append(goal_id)
+                if not goal_ids:
+                    raise ValueError(
+                        "cannot bind scheduled Fast task without a canonical Goal: "
+                        + request_id
+                    )
+                rebound = request.model_copy(
+                    deep=True,
+                    update={
+                        "metadata": {
+                            **metadata,
+                            "source_goal_ids": goal_ids,
+                            "canonical_plan_id": canonical_plan_id,
+                            "canonical_plan_fingerprint": canonical_plan_fingerprint,
+                            "canonical_goal_binding_pending": False,
+                            "task_list_revision": task_list_revision,
+                        }
+                    },
+                )
+                scheduled[request_id] = (rebound, definition)
+                active_key = (interaction_id, request_id)
+                active = self._active.get(active_key)
+                if active is not None:
+                    self._active[active_key] = (
+                        active[0],
+                        rebound,
+                        active[2],
+                        active[3],
+                    )
 
     def begin_interaction(self, interaction_id: str) -> bool:
         """Keep scoped directives alive across one coordinator-owned execution."""
@@ -1880,6 +1999,7 @@ class CapabilityRuntime:
             (request.timeout_ms or definition.timeout_ms) / 1000.0 for request, definition in items
         )
         results: list[CapabilityResult]
+        authority_items = list(items)
         try:
             results = await asyncio.wait_for(task, timeout=timeout_s)
             active_scopes = [
@@ -1956,11 +2076,18 @@ class CapabilityRuntime:
         finally:
             async with self._active_lock:
                 interaction_scheduled = self._scheduled.get(interaction_id)
-                for active_key, (request, _) in zip(
+                authority_items = []
+                for active_key, (request, definition) in zip(
                     active_keys,
                     items,
                     strict=True,
                 ):
+                    scheduled_item = (
+                        interaction_scheduled.get(request.request_id)
+                        if interaction_scheduled is not None
+                        else None
+                    )
+                    authority_items.append(scheduled_item or (request, definition))
                     self._active.pop(active_key, None)
                     if interaction_scheduled is not None:
                         interaction_scheduled.pop(request.request_id, None)
@@ -1972,7 +2099,7 @@ class CapabilityRuntime:
         for result, trace, (request, definition) in zip(
             results,
             traces,
-            items,
+            authority_items,
             strict=True,
         ):
             self._bind_result_authority(request, result)
@@ -2250,6 +2377,7 @@ class CapabilityRuntime:
                 result=prestart_result,
             )
             return prestart_result, trace
+        authority_request = request
         try:
             result = await asyncio.wait_for(task, timeout=timeout_s)
             if context.cancellation_scope != "none":
@@ -2372,10 +2500,13 @@ class CapabilityRuntime:
                 self._active.pop(active_key, None)
                 interaction_scheduled = self._scheduled.get(interaction_id)
                 if interaction_scheduled is not None:
+                    scheduled_item = interaction_scheduled.get(request.request_id)
+                    if scheduled_item is not None:
+                        authority_request = scheduled_item[0]
                     interaction_scheduled.pop(request.request_id, None)
 
         result = self._canonicalize_provider_result(request, definition, result)
-        self._bind_result_authority(request, result)
+        self._bind_result_authority(authority_request, result)
         result.trace_id = trace.trace_id
         trace.status = result.status
         trace.finished_at = datetime.now(timezone.utc)

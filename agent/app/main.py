@@ -620,10 +620,9 @@ async def interpret_cognitive_turn(
 async def resolve_fast_advance(request: CognitiveWorkRequest):
     if fast_planner_resolver is None:
         raise HTTPException(status_code=503, detail="Fast planner is disabled")
-    # This is the same Fast Planner before canonical Goal binding.  Agent Skill
-    # disclosure remains deferred until canonical planning because pre-Goal
-    # advancement may author only a conversational Activity and continuation
-    # dispositions, never executable Capability steps.
+    # Fast Planner authors the first Activity Plan over GI Responsibility refs.
+    # Agent Skill disclosure remains deferred; the endpoint may select only the
+    # bounded common Capability catalog supplied by the Fast Planner resolver.
     return await fast_planner_resolver.resolve_advance(request)
 
 

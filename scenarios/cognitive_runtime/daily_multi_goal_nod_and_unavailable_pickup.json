@@ -195,6 +195,7 @@
     ],
     "requires_confirmation": false,
     "calls": [
+      "fast_advance",
       "goal_association",
       "fast_plan",
       "deep_plan",

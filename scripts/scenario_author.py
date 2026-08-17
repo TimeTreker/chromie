@@ -35,6 +35,11 @@ except ModuleNotFoundError:
 
 TEMPLATE_ROOT = DEFAULT_SCENARIO_ROOT / "templates"
 ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
+AUTHORABLE_SUITES = frozenset(
+    path.stem
+    for path in TEMPLATE_ROOT.glob("*.json")
+    if path.stem in SUPPORTED_SUITES
+)
 
 
 def _scenario_path(root: Path, suite: str, scenario_id: str) -> Path:
@@ -150,7 +155,7 @@ def command_validate_all(args: argparse.Namespace) -> int:
 
 
 def command_templates(args: argparse.Namespace) -> int:
-    for suite in sorted(SUPPORTED_SUITES):
+    for suite in sorted(AUTHORABLE_SUITES):
         path = args.template_root / f"{suite}.json"
         print(f"{suite}\t{path}")
         if args.show:
@@ -187,29 +192,13 @@ def command_edit(args: argparse.Namespace) -> int:
 def _scenario_schema_summary(suite: str) -> str:
     if suite == "goal_interpretation":
         return (
-            "Goal Interpretation scenarios must set stub.interpretation_mode, optional stub.catalog, "
-            "optional stub.llm_decision, and expect route/intent/source/task_types/"
-            "metadata/llm_calls. Use task_types_forbid for unsafe motion checks."
+            "Goal Interpretation scenarios must set a WHAT-only stub.llm_decision "
+            "with confidence, provider-neutral responsibilities, Goal relationships, "
+            "InformationGaps, and unresolved meaning. Expectations cover those fields "
+            "and llm_calls/llm_stages; route, Capability, Activity, and response wording "
+            "are forbidden at this boundary."
         )
-    if suite == "dialogue":
-        return (
-            "Dialogue scenarios must set turns[], where each turn has id, ask, "
-            "stub.route_decision, optional stub.ollama_reply/catalog_capabilities, "
-            "and expect fields. Expect speech_any/speech_all, forbidden_speech_any, "
-            "capabilities, forbidden_capabilities, no_capabilities, requires_confirmation, status, "
-            "skill_args, history_contains, session_memory_contains, "
-            "post_history_contains, post_session_memory_contains, "
-            "extracted_memory_contains, post_extracted_memory_contains, "
-            "memory_summary_contains, post_memory_summary_contains, and "
-            "current_task_context_contains. Prefer extracted_memory_contains "
-            "when checking refined memory rather than raw transcript context."
-        )
-    return (
-        "Interaction scenarios must set stub.route_decision and optional "
-        "stub.ollama_reply/catalog_capabilities. Expect speech_any/speech_all, "
-        "forbidden_speech_any, capabilities, forbidden_capabilities, no_capabilities, "
-        "skill_args, status, metadata booleans, and requires_confirmation."
-    )
+    raise ValueError(f"suite {suite!r} has no authoring template")
 
 
 def command_prompt(args: argparse.Namespace) -> int:
@@ -261,7 +250,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     new_parser = subparsers.add_parser("new", help="Create a scenario from a template.")
-    new_parser.add_argument("--suite", required=True, choices=sorted(SUPPORTED_SUITES))
+    new_parser.add_argument("--suite", required=True, choices=sorted(AUTHORABLE_SUITES))
     new_parser.add_argument("--id", required=True, help="Lowercase snake_case scenario id.")
     new_parser.add_argument("--text", default="", help="User utterance for input.text.")
     new_parser.add_argument("--description", default="")
@@ -286,7 +275,7 @@ def build_parser() -> argparse.ArgumentParser:
     templates_parser.set_defaults(func=command_templates)
 
     edit_parser = subparsers.add_parser("edit", help="Open an existing scenario in an editor.")
-    edit_parser.add_argument("--suite", required=True, choices=sorted(SUPPORTED_SUITES))
+    edit_parser.add_argument("--suite", required=True, choices=sorted(AUTHORABLE_SUITES))
     edit_parser.add_argument("--id", required=True)
     edit_parser.add_argument("--scenario-root", type=Path, default=DEFAULT_SCENARIO_ROOT)
     edit_parser.add_argument("--editor", help="Editor command. Defaults to $EDITOR.")
@@ -294,7 +283,7 @@ def build_parser() -> argparse.ArgumentParser:
     edit_parser.set_defaults(func=command_edit)
 
     prompt_parser = subparsers.add_parser("prompt", help="Print an LLM prompt for candidate scenarios.")
-    prompt_parser.add_argument("--suite", required=True, choices=sorted(SUPPORTED_SUITES))
+    prompt_parser.add_argument("--suite", required=True, choices=sorted(AUTHORABLE_SUITES))
     prompt_parser.add_argument("--count", type=int, default=10)
     prompt_parser.add_argument("--focus", default="")
     prompt_parser.add_argument("--scenario-root", type=Path, default=DEFAULT_SCENARIO_ROOT)

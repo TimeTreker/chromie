@@ -3,7 +3,7 @@
   "id": "physical_pending_work_rejects_stale_safety_prelude",
   "suite": "goal_interpretation",
   "level": "integration",
-  "description": "A physical request may carry one source-authored prospective Fast Response, while authoritative planning and confirmation remain downstream; no second speech reviewer exists.",
+  "description": "GI preserves pending physical meaning but authors no acknowledgement, progress wording, Capability, or confirmation.",
   "tags": [
     "pending-work",
     "claim-free",
@@ -16,43 +16,11 @@
     "language": "zh-CN"
   },
   "stub": {
-    "interpretation_mode": "hybrid",
-    "catalog": {
-      "catalog_version": 82,
-      "capabilities": [
-        {
-          "capability_id": "soridormi.walk_forward",
-          "agent_id": "soridormi.skill",
-          "description": "Walk forward for a bounded duration after confirmation and safety validation.",
-          "route": "robot_action",
-          "prompt_tier": "common",
-          "available": true,
-          "interaction_executable": true,
-          "effects": [
-            "physical_motion"
-          ],
-          "safety_class": "physical_motion",
-          "requires_confirmation": true
-        }
-      ]
-    },
     "llm_script": [
       {
-        "stage": "quick_intent",
+        "stage": "goal_interpretation",
         "decision": {
-          "route": "robot_action",
-          "intent": "walk_forward",
           "confidence": 0.96,
-          "language": "zh-CN",
-          "fast_speech": {
-            "text": "好呀，我知道啦。",
-            "purpose": "acknowledge",
-            "commitment": "prelude_only",
-            "claim_state": "none",
-            "claimed_capability_ids": [],
-            "claimed_goal_ids": [],
-            "must_not_claim_completion": true
-          },
           "responsibilities": [
             {
               "local_ref": "r1",
@@ -63,29 +31,25 @@
               },
               "completion_requires_work": true,
               "completion_requires_fresh_evidence": false,
-              "confidence": 0.96
+              "confidence": 0.96,
+              "relationship": "new",
+              "target_goal_ids": [],
+              "information_gaps": [],
+              "resolved_gap_ids": []
             }
           ],
-          "progress": []
+          "unresolved": []
         }
       }
     ]
   },
   "expect": {
-    "route": "robot_action",
-    "intent": "walk_forward",
-    "source": "llm",
+    "confidence": 0.96,
     "llm_calls": 1,
     "llm_stages": [
-      "quick_intent"
+      "goal_interpretation"
     ],
-    "fast_speech_present": true,
-    "task_types_include": [
-      "task.execute_robot_action"
-    ],
-    "fast_speech_purpose": "acknowledge",
-    "fast_speech_commitment": "prelude_only",
-    "fast_speech_must_not_claim_completion": true,
+    "unresolved": [],
     "responsibilities": [
       {
         "local_ref": "r1",
@@ -96,12 +60,12 @@
         },
         "completion_requires_work": true,
         "completion_requires_fresh_evidence": false,
-        "confidence": 0.96
+        "confidence": 0.96,
+        "relationship": "new",
+        "target_goal_ids": [],
+        "information_gaps": [],
+        "resolved_gap_ids": []
       }
-    ],
-    "actions": [],
-    "task_types_forbid": [
-      "task.execute_capability"
     ]
   }
 }

@@ -6,20 +6,17 @@
   "authority": "benchmark_suite",
   "source_strategy": "referenced_in_place",
   "runtime_policy_authority": false,
-  "expected_inventory_total": 703,
-  "expected_normalized_total": 702,
+  "expected_inventory_total": 349,
+  "expected_normalized_total": 348,
   "allowed_datasets": [
-    "adapter",
     "asr_noise",
     "bilingual",
     "cognitive_turn_loop",
     "daily_conversation",
-    "dialogue",
     "emotion",
     "general_ability",
     "goal_driven_runtime",
     "historical_regression",
-    "interaction",
     "interruptions",
     "multi_turn",
     "question_answering",
@@ -49,7 +46,7 @@
       ],
       "target_reference": "modules/goal_interpretation",
       "migration_state": "referenced_in_place",
-      "expected_inventory_count": 29
+      "expected_inventory_count": 27
     },
     {
       "name": "cognitive_turn_loop",
@@ -82,37 +79,6 @@
       "expected_inventory_count": 16
     },
     {
-      "name": "interaction",
-      "path": "scenarios/interaction",
-      "glob": "**/*.json",
-      "layer": "integration",
-      "datasets": [
-        "interaction"
-      ],
-      "evidence_levels": [
-        "replay"
-      ],
-      "target_reference": "integration/interaction",
-      "migration_state": "referenced_in_place",
-      "expected_inventory_count": 29
-    },
-    {
-      "name": "dialogue",
-      "path": "scenarios/dialogue",
-      "glob": "**/*.json",
-      "layer": "integration",
-      "datasets": [
-        "dialogue",
-        "multi_turn"
-      ],
-      "evidence_levels": [
-        "replay"
-      ],
-      "target_reference": "integration/multi_turn",
-      "migration_state": "referenced_in_place",
-      "expected_inventory_count": 319
-    },
-    {
       "name": "cognitive_core_dialogue",
       "path": "scenarios/cognitive_core_dialogue",
       "glob": "**/*.json",
@@ -127,22 +93,6 @@
       "target_reference": "integration/cognitive_core_dialogue",
       "migration_state": "referenced_in_place",
       "expected_inventory_count": 3
-    },
-    {
-      "name": "adapter",
-      "path": "scenarios/adapter",
-      "glob": "**/*.json",
-      "layer": "regression",
-      "datasets": [
-        "adapter",
-        "historical_regression"
-      ],
-      "evidence_levels": [
-        "static"
-      ],
-      "target_reference": "regression/adapter_contracts",
-      "migration_state": "referenced_in_place",
-      "expected_inventory_count": 4
     },
     {
       "name": "test_scenarios",

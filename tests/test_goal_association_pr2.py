@@ -123,6 +123,7 @@ def goal(
     **extra,
 ) -> dict:
     payload = {
+        "source_responsibility_refs": ["r1"],
         "description": description,
         "output_mode": output_mode,
         "bindings": list(bindings or []),
@@ -177,20 +178,23 @@ def request(
     active_goals=None,
     language: str = "zh-CN",
     discourse_referents=None,
+    responsibility_outcomes: list[str] | None = None,
 ) -> CognitiveWorkRequest:
+    outcomes = list(responsibility_outcomes or [text])
     return CognitiveWorkRequest(
         sid="sid-pr2",
         text=text,
         language=language,
         responsibilities=[
             {
-                "local_ref": "r1",
-                "outcome": text,
+                "local_ref": f"r{index}",
+                "outcome": outcome,
                 "bindings": {},
                 "completion_requires_work": True,
                 "completion_requires_fresh_evidence": False,
                 "confidence": 0.9,
             }
+            for index, outcome in enumerate(outcomes, start=1)
         ],
         interpretation_confidence=0.9,
         context={
@@ -437,6 +441,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             GoalSegmentationModelOutput,
             [],
             [],
+            responsibility_refs=["r1"],
         )
         Draft202012Validator.check_schema(goal_schema)
         goal_validator = Draft202012Validator(goal_schema)
@@ -473,11 +478,12 @@ class GoalExecutionContractTests(unittest.TestCase):
             [],
             [],
             responsibility_count=2,
+            responsibility_refs=["r1", "r2"],
         )
         bounded_goal_validator = Draft202012Validator(bounded_goal_schema)
         two_body_actions = create_goals(
             goal("Run forward for 15 seconds.", "body_action"),
-            goal("Blink.", "body_action"),
+            goal("Blink.", "body_action", source_responsibility_refs=["r2"]),
         )
         two_body_actions.update(
             referent_updates=[],
@@ -829,10 +835,10 @@ class GoalExecutionContractTests(unittest.TestCase):
 
         self.assertNotIn("这句 Planner 文案绝不能进入 GA。", prompt)
         self.assertNotIn("Planner HOW, not Goal meaning.", prompt)
-        self.assertIn('"activity_id":"vocal_1"', prompt)
-        self.assertIn('"role":"progress"', prompt)
-        self.assertIn("Response wording is intentionally absent", prompt)
-        self.assertIn("must never become or justify a sibling Goal", prompt)
+        self.assertNotIn('"activity_id":"vocal_1"', prompt)
+        self.assertNotIn('"role":"progress"', prompt)
+        self.assertIn("authored concurrently", prompt)
+        self.assertIn("must never become, justify, or be copied", prompt)
 
     def test_fresh_reinterpretation_keeps_fast_responsibility_evidence(self):
         req = request("你能往前走个100米，那边有个水瓶，帮我拿杯水可以吗？")
@@ -976,7 +982,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
                         # Simulate the retained live GI defect: the fast proposal
                         # generalized 大雨 to rain. GA coverage must not commit it.
                         "outcome": "确认重庆今晚是否下雨",
-                        "bindings": {"location": "重庆", "time": "tonight"},
+                        "bindings": {"location": "重庆", "time": "今天晚上"},
                         "completion_requires_work": True,
                         "completion_requires_fresh_evidence": True,
                         "confidence": 0.95,
@@ -1002,17 +1008,17 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             goal(
                 "Confirm whether it rains in Chongqing tonight.",
                 "capability_work",
+                source_responsibility_refs=["weather_1"],
                 resource=resource_responsibility(
                     kind="information",
                     description="Chongqing rain tonight",
                     attributes=[
                         binding("location", "place", "重庆"),
-                        binding("time", "day_part", "tonight"),
+                        binding("time", "day_part", "evening"),
                     ],
                     source_status="provider_resolved",
                 ),
             ),
-            goal("我看看今晚会不会有大雨～", "capability_work"),
         )
         rejected_coverage = certificate(
             coverage_item(
@@ -1033,12 +1039,14 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             goal(
                 "确认重庆今天晚上是否有大雨。",
                 "capability_work",
+                source_responsibility_refs=["weather_1"],
                 resource=resource_responsibility(
                     kind="information",
                     description="重庆今晚大雨情况",
                     attributes=[
                         binding("location", "place", "重庆"),
-                        binding("time", "day_part", "tonight"),
+                        binding("date", "date", "today"),
+                        binding("time", "day_part", "evening"),
                         binding(
                             "precipitation_severity",
                             "severity",
@@ -1071,6 +1079,8 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             resource.attributes["precipitation_severity"]["value"],
             "heavy",
         )
+        self.assertEqual(resource.attributes["date"]["value"], "today")
+        self.assertEqual(resource.attributes["time"]["value"], "evening")
         families = [kwargs["prompt_family"] for _, kwargs in ollama.prompts]
         self.assertEqual(
             families,
@@ -1083,6 +1093,8 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         )
         primary_prompt = str(ollama.prompts[0][0])
         self.assertNotIn("我看看今晚会不会有大雨～", primary_prompt)
+        self.assertIn("emit separate query_scope bindings for both", primary_prompt)
+        self.assertIn("separate date and day_part bindings", str(ollama.prompts[1][0]))
         fresh_prompt = str(ollama.prompts[2][0])
         self.assertIn("restore that source-grounded WHAT", fresh_prompt)
         self.assertIn("Planner Activity metadata is never a Responsibility source", fresh_prompt)
@@ -1176,6 +1188,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             goal(
                 "Blink.",
                 "body_action",
+                source_responsibility_refs=["r2"],
                 resource=resource_responsibility(
                     description="eye blinking motion",
                     quantity="",
@@ -1206,6 +1219,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             goal(
                 "Blink.",
                 "body_action",
+                source_responsibility_refs=["r2"],
                 bindings=[binding("action", "action", "blink")],
             ),
         )
@@ -1308,7 +1322,11 @@ class GoalAssociationTransactionTests(unittest.TestCase):
 
     def test_semantic_reject_allows_one_fresh_interpretation_and_final_audit(self):
         collapsed = create_goals(
-            goal("Walk, blink, and sing.", "body_action")
+            goal(
+                "Walk, blink, and sing.",
+                "body_action",
+                source_responsibility_refs=["r1", "r2", "r3"],
+            )
         )
         rejected = certificate(
             coverage_item("Walk", 0),
@@ -1317,8 +1335,8 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         )
         corrected = create_goals(
             goal("Walk.", "body_action"),
-            goal("Blink.", "body_action"),
-            goal("Sing.", "singing"),
+            goal("Blink.", "body_action", source_responsibility_refs=["r2"]),
+            goal("Sing.", "singing", source_responsibility_refs=["r3"]),
         )
         accepted = certificate(
             coverage_item("Walk", 0),
@@ -1331,6 +1349,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             request(
                 "Walk, blink, and sing.",
                 language="en-US",
+                responsibility_outcomes=["Walk.", "Blink.", "Sing."],
             ),
         )
 
@@ -1396,15 +1415,27 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         )
 
     def test_maximum_semantic_dag_is_five_calls(self):
-        invalid = create_goals(goal("Walk and sing.", "invalid_mode"))
-        collapsed = create_goals(goal("Walk and sing.", "body_action"))
+        invalid = create_goals(
+            goal(
+                "Walk and sing.",
+                "invalid_mode",
+                source_responsibility_refs=["r1", "r2"],
+            )
+        )
+        collapsed = create_goals(
+            goal(
+                "Walk and sing.",
+                "body_action",
+                source_responsibility_refs=["r1", "r2"],
+            )
+        )
         rejected = certificate(
             coverage_item("Walk", 0),
             coverage_item("sing", 0),
         )
         corrected = create_goals(
             goal("Walk.", "body_action"),
-            goal("sing.", "singing"),
+            goal("sing.", "singing", source_responsibility_refs=["r2"]),
         )
         accepted = certificate(
             coverage_item("Walk", 0),
@@ -1415,7 +1446,11 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         )
         result = self._resolve(
             ollama,
-            request("Walk and sing.", language="en-US"),
+            request(
+                "Walk and sing.",
+                language="en-US",
+                responsibility_outcomes=["Walk.", "Sing."],
+            ),
         )
 
         self.assert_transaction(
@@ -1432,7 +1467,13 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         )
 
     def test_fresh_interpretation_has_no_dto_repair(self):
-        first = create_goals(goal("Walk and sing.", "body_action"))
+        first = create_goals(
+            goal(
+                "Walk and sing.",
+                "body_action",
+                source_responsibility_refs=["r1", "r2"],
+            )
+        )
         rejected = certificate(
             coverage_item("Walk", 0),
             coverage_item("sing", 0),
@@ -1441,7 +1482,11 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         ollama = ScriptedOllama([first, rejected, invalid_fresh])
         result = self._resolve(
             ollama,
-            request("Walk and sing.", language="en-US"),
+            request(
+                "Walk and sing.",
+                language="en-US",
+                responsibility_outcomes=["Walk.", "Sing."],
+            ),
         )
 
         self.assert_transaction(
@@ -1456,14 +1501,20 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         )
 
     def test_final_coverage_reject_fails_closed(self):
-        first = create_goals(goal("Walk and sing.", "body_action"))
+        first = create_goals(
+            goal(
+                "Walk and sing.",
+                "body_action",
+                source_responsibility_refs=["r1", "r2"],
+            )
+        )
         rejected = certificate(
             coverage_item("Walk", 0),
             coverage_item("sing", 0),
         )
         corrected = create_goals(
             goal("Walk.", "body_action"),
-            goal("Sing.", "singing"),
+            goal("Sing.", "singing", source_responsibility_refs=["r2"]),
         )
         still_rejected = certificate(
             coverage_item("Walk", 0),
@@ -1472,7 +1523,11 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         ollama = ScriptedOllama([first, rejected, corrected, still_rejected])
         result = self._resolve(
             ollama,
-            request("Walk and sing.", language="en-US"),
+            request(
+                "Walk and sing.",
+                language="en-US",
+                responsibility_outcomes=["Walk.", "Sing."],
+            ),
         )
 
         self.assertEqual(result.new_goals, [])
@@ -1626,6 +1681,7 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
                     goal(
                         "Bring the bottle from the table to me.",
                         "body_action",
+                        source_responsibility_refs=["r2"],
                         resource=resource_responsibility(
                             description="the bottle",
                             source_status="known",
@@ -1644,6 +1700,10 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
             request(
                 "Walk 100 meters for exercise, then bring the bottle from the table to me.",
                 language="en-US",
+                responsibility_outcomes=[
+                    "Walk 100 meters for exercise.",
+                    "Bring the bottle from the table to me.",
+                ],
             ),
         )
 
@@ -1755,6 +1815,7 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
                     "associations": [
                         {
                             "relationship": "continue",
+                            "source_responsibility_refs": ["r1"],
                             "target_goal_ids": ["goal-a"],
                             "confidence": 0.95,
                             "reason_summary": "Continue the unfinished task.",

@@ -57,7 +57,11 @@ from shared.chromie_contracts.interaction import (
     media_capability_output_schema,
     vocal_performance_output_schema,
 )
-from shared.chromie_contracts.plan import CanonicalPlan
+from shared.chromie_contracts.core_interpretation import (
+    CognitiveResponsibilityProposal,
+    CoreInterpretationResult,
+)
+from shared.chromie_contracts.plan import CanonicalPlan, FastPlannerAdvance
 from shared.chromie_contracts.reflex import CancellationDirective
 from shared.chromie_contracts.response_composition import (
     CoordinatedResponsePlan,
@@ -65,15 +69,17 @@ from shared.chromie_contracts.response_composition import (
     canonical_plan_fingerprint,
 )
 from shared.chromie_contracts.semantic_task import ResponsePlan
-from agent.app.cognitive_core.goal_interpreter.capability_catalog import CapabilityCatalogResult
-from agent.app.cognitive_core.goal_interpreter.fallback import InterpretationUnavailableError
+from agent.app.cognitive_core.goal_interpreter.errors import InterpretationUnavailableError
 from agent.app.cognitive_core.goal_interpreter.model_interpreter import OllamaGoalInterpreter
-from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest
+from agent.app.cognitive_core.goal_interpreter.schema import (
+    GoalInterpretationDecision,
+    GoalInterpretationRequest,
+)
 
 DEFAULT_SCENARIO_ROOT = ROOT / "scenarios"
 DEFAULT_REPORT_ROOT = ROOT / ".chromie" / "reports" / "behavior-scenarios"
 SUPPORTED_SUITES = {
-    "goal_interpretation", "cognitive_core_dialogue", "dialogue",
+    "goal_interpretation", "cognitive_core_dialogue",
     "cognitive_runtime", "cognitive_turn_loop",
 }
 
@@ -97,34 +103,17 @@ class BehaviorScenario:
         return f"{self.suite}/{self.scenario_id}"
 
 
-class _GoalInterpretationCatalog:
-    def __init__(
-        self,
-        result: CapabilityCatalogResult,
-        *,
-        snapshot: dict[str, Any] | None = None,
-    ) -> None:
-        self.result = result
-        self.snapshot_data = snapshot or {}
-
-    async def search(self, **kwargs: Any) -> CapabilityCatalogResult:
-        del kwargs
-        return self.result
-
-    async def snapshot(self, *, refresh: bool = False) -> dict[str, Any]:
-        del refresh
-        return self.snapshot_data
-
-
 class _GoalInterpretationLlm:
-    def __init__(self, decision: RouteDecision | None) -> None:
+    def __init__(self, decision: GoalInterpretationDecision | None) -> None:
         self.decision = decision
         self.calls = 0
         self.stages: list[str] = []
 
-    async def route(self, request: RouteRequest) -> RouteDecision:
+    async def interpret_goal(
+        self, request: GoalInterpretationRequest
+    ) -> GoalInterpretationDecision:
         self.calls += 1
-        self.stages.append("quick_intent")
+        self.stages.append("goal_interpretation")
         if self.decision is None:
             raise AssertionError(f"Goal Interpretation model should not be called for {request.text!r}")
         return self.decision
@@ -134,7 +123,7 @@ class _ScriptedGoalInterpreter(OllamaGoalInterpreter):
     """Run the bounded Goal Interpretation transaction with scripted model output.
 
     The primary interpretation, optional one DTO repair, normalization, and
-    deterministic validators run through ``OllamaGoalInterpreter.route()``.
+    deterministic validators run through ``OllamaGoalInterpreter.interpret_goal()``.
     Only the external model completion is replaced by a file-backed script.
     """
 
@@ -146,8 +135,6 @@ class _ScriptedGoalInterpreter(OllamaGoalInterpreter):
             ollama_url="http://scenario.invalid",
             model="scenario-fast-goal-interpreter",
             timeout_ms=1000,
-            review_timeout_ms=1000,
-            confidence_threshold=0.55,
             num_predict=160,
         )
         self.script = [dict(item) for item in script]
@@ -159,7 +146,7 @@ class _ScriptedGoalInterpreter(OllamaGoalInterpreter):
         payload: dict[str, Any],
         *,
         stage: str,
-        request: RouteRequest | None = None,
+        request: GoalInterpretationRequest | None = None,
     ) -> dict[str, Any]:
         del payload, request
         self.calls += 1
@@ -522,9 +509,37 @@ class _CognitiveScenarioClient:
         self.calls: list[str] = []
 
     async def resolve_goal_association(self, *args: Any, **kwargs: Any) -> GoalAssociationResolution:
-        del args, kwargs
+        del args
         self.calls.append("goal_association")
-        return GoalAssociationResolution.model_validate(self.stub["goal_association"])
+        request = kwargs["request"]
+        raw = json.loads(json.dumps(self.stub["goal_association"]))
+        raw["turn_id"] = str(request.context.get("turn_id") or request.sid)
+        raw.setdefault("resolution_status", "resolved")
+        refs = [item.local_ref for item in request.responsibilities]
+        for index, goal in enumerate(raw.get("new_goals") or []):
+            if not goal.get("source_responsibility_refs") and refs:
+                goal["source_responsibility_refs"] = [refs[min(index, len(refs) - 1)]]
+        for association in raw.get("associations") or []:
+            if not association.get("source_responsibility_refs") and refs:
+                association["source_responsibility_refs"] = [refs[0]]
+        return GoalAssociationResolution.model_validate(raw)
+
+    async def resolve_fast_advance(self, *args: Any, **kwargs: Any) -> FastPlannerAdvance:
+        del args
+        self.calls.append("fast_advance")
+        request = kwargs["request"]
+        return FastPlannerAdvance(
+            turn_id=str(request.sid),
+            disposition="unavailable",
+            coverage="uncertain",
+            covered_responsibility_refs=[
+                item.local_ref for item in request.responsibilities
+            ],
+            confidence=0.99,
+            reason_summary=(
+                "The retained scenario supplies its canonical post-GA Fast Plan."
+            ),
+        )
 
     async def resolve_fast_plan(self, *args: Any, **kwargs: Any) -> CanonicalPlan:
         del args, kwargs
@@ -541,7 +556,10 @@ class _CognitiveScenarioClient:
     async def compose_response_plan(self, *args: Any, **kwargs: Any) -> ResponseCompositionResolution:
         del args
         self.calls.append("response_composer")
-        plan = CanonicalPlan.model_validate(kwargs["context"]["canonical_plan_resolution"])
+        request = kwargs["request"]
+        plan = CanonicalPlan.model_validate(
+            request.context["canonical_plan_resolution"]
+        )
         raw = self.stub.get("response_composition")
         if isinstance(raw, dict) and raw.get("status") not in {None, "resolved"}:
             return ResponseCompositionResolution.model_validate(raw)
@@ -668,7 +686,7 @@ def load_scenario_file(path: Path) -> BehaviorScenario:
     if not isinstance(stub, dict) or not isinstance(expect, dict):
         raise ValueError(f"{path}: stub and expect must be objects")
 
-    if suite in {"dialogue", "cognitive_core_dialogue"}:
+    if suite == "cognitive_core_dialogue":
         turns = _validate_dialogue_turns(
             raw.get("turns"),
             path=path,
@@ -748,59 +766,15 @@ def load_scenarios(
     return selected
 
 
-def _goal_interpretation_catalog_from_stub(scenario: BehaviorScenario) -> CapabilityCatalogResult:
-    catalog = scenario.stub.get("catalog") or {}
-    if not isinstance(catalog, dict):
-        raise ValueError(f"{scenario.key}: stub.catalog must be an object")
-    capabilities = catalog.get("capabilities") or []
-    matches = [
-        {
-            "capability_id": str(item.get("capability_id") or ""),
-            "agent_id": str(item.get("agent_id") or "soridormi.skill"),
-            "description": str(item.get("description") or ""),
-            "score": float(item.get("score", 0.9)),
-            "available": bool(item.get("available", True)),
-            "interaction_executable": bool(item.get("interaction_executable", True)),
-        }
-        for item in capabilities
-        if isinstance(item, dict) and item.get("capability_id")
-    ]
-    return CapabilityCatalogResult(
-        query=str(catalog.get("query") or scenario.text),
-        matched=bool(catalog.get("matched", bool(matches))),
-        suggested_route=str(catalog.get("suggested_route") or "robot_action"),
-        suggested_agents=list(catalog.get("suggested_agents") or ["capability_agent", "safety_agent", "speaker_agent"]),
-        catalog_version=int(catalog.get("catalog_version", 0)),
-        matches=matches,
-    )
-
-
-def _goal_interpretation_snapshot_from_stub(scenario: BehaviorScenario) -> dict[str, Any]:
-    catalog = scenario.stub.get("catalog") or {}
-    if not isinstance(catalog, dict):
-        raise ValueError(f"{scenario.key}: stub.catalog must be an object")
-    capabilities = catalog.get("capabilities") or []
-    if not isinstance(capabilities, list):
-        raise ValueError(f"{scenario.key}: stub.catalog.capabilities must be a list")
-    return {
-        "schema_version": "0.1",
-        "catalog_version": int(catalog.get("catalog_version", 0)),
-        "capabilities": [
-            item
-            for item in capabilities
-            if isinstance(item, dict) and item.get("capability_id")
-        ],
-        "live_refresh_error": catalog.get("live_refresh_error"),
-    }
-
-
-def _goal_interpretation_decision_from_stub(scenario: BehaviorScenario) -> RouteDecision | None:
+def _goal_interpretation_decision_from_stub(
+    scenario: BehaviorScenario,
+) -> GoalInterpretationDecision | None:
     raw = scenario.stub.get("llm_decision")
     if raw is None:
         return None
     if not isinstance(raw, dict):
         raise ValueError(f"{scenario.key}: stub.llm_decision must be an object or null")
-    return RouteDecision.model_validate(raw)
+    return GoalInterpretationDecision.model_validate(raw)
 
 
 def _goal_interpretation_script_from_stub(
@@ -822,14 +796,6 @@ def _goal_interpretation_script_from_stub(
     return script
 
 
-def _task_types_from_decision(decision: RouteDecision) -> list[str]:
-    return [
-        str(item.get("task_type") or "")
-        for item in decision.metadata.get("task_list", [])
-        if isinstance(item, dict)
-    ]
-
-
 def _expect_equal(errors: list[str], label: str, actual: Any, expected: Any) -> None:
     if expected is not None and actual != expected:
         errors.append(f"{label}={actual!r}, expected {expected!r}")
@@ -838,52 +804,21 @@ def _expect_equal(errors: list[str], label: str, actual: Any, expected: Any) -> 
 def _evaluate_goal_interpretation_expectations(
     scenario: BehaviorScenario,
     *,
-    decision: RouteDecision,
+    decision: GoalInterpretationDecision,
     llm_calls: int,
     llm_stages: list[str] | None = None,
     expect: dict[str, Any] | None = None,
 ) -> list[str]:
     expect = expect if isinstance(expect, dict) else scenario.expect
     errors: list[str] = []
-    _expect_equal(errors, "route", decision.route, expect.get("route"))
-    _expect_equal(errors, "intent", decision.intent, expect.get("intent"))
-    _expect_equal(errors, "source", decision.source, expect.get("source"))
+    _expect_equal(errors, "confidence", decision.confidence, expect.get("confidence"))
+    _expect_equal(errors, "unresolved", decision.unresolved, expect.get("unresolved"))
     _expect_equal(errors, "llm_calls", llm_calls, expect.get("llm_calls"))
     expected_stages = _tuple_of_strings(expect.get("llm_stages"))
     if expected_stages and list(expected_stages) != list(llm_stages or []):
         errors.append(
             f"llm_stages={list(llm_stages or [])!r}, expected {list(expected_stages)!r}"
         )
-    _expect_equal(errors, "interrupt_current", decision.interrupt_current, expect.get("interrupt_current"))
-    _expect_equal(errors, "should_speak", decision.should_speak, expect.get("should_speak"))
-    fast_speech = decision.fast_speech
-    if "fast_speech_present" in expect:
-        _expect_equal(
-            errors,
-            "fast_speech_present",
-            fast_speech is not None and bool(fast_speech.text.strip()),
-            bool(expect.get("fast_speech_present")),
-        )
-    if fast_speech is not None:
-        _expect_equal(
-            errors,
-            "fast_speech.purpose",
-            fast_speech.purpose,
-            expect.get("fast_speech_purpose"),
-        )
-        _expect_equal(
-            errors,
-            "fast_speech.commitment",
-            fast_speech.commitment,
-            expect.get("fast_speech_commitment"),
-        )
-        _expect_equal(
-            errors,
-            "fast_speech.must_not_claim_completion",
-            fast_speech.must_not_claim_completion,
-            expect.get("fast_speech_must_not_claim_completion"),
-        )
-
     expected_responsibilities = expect.get("responsibilities")
     if expected_responsibilities is not None:
         if not isinstance(expected_responsibilities, list):
@@ -906,8 +841,12 @@ def _evaluate_goal_interpretation_expectations(
                 for field in (
                     "local_ref",
                     "outcome",
+                    "relationship",
+                    "target_goal_ids",
+                    "resolved_gap_ids",
                     "completion_requires_work",
                     "completion_requires_fresh_evidence",
+                    "confidence",
                 ):
                     if field in expected_responsibility:
                         _expect_equal(
@@ -924,61 +863,6 @@ def _evaluate_goal_interpretation_expectations(
                                 f"responsibilities[{index}].bindings[{key!r}]="
                                 f"{actual.bindings.get(key)!r}, expected {value!r}"
                             )
-
-    task_types = _task_types_from_decision(decision)
-    for item in _tuple_of_strings(expect.get("task_types_include")):
-        if item not in task_types:
-            errors.append(f"missing task_type {item!r}; actual={task_types!r}")
-    for item in _tuple_of_strings(expect.get("task_types_forbid")):
-        if item in task_types:
-            errors.append(f"forbidden task_type {item!r} present")
-    for key in _tuple_of_strings(expect.get("metadata_false")):
-        if decision.metadata.get(key) is not False:
-            errors.append(f"metadata {key!r}={decision.metadata.get(key)!r}, expected False")
-    for key in _tuple_of_strings(expect.get("metadata_true")):
-        if decision.metadata.get(key) is not True:
-            errors.append(f"metadata {key!r}={decision.metadata.get(key)!r}, expected True")
-    metadata_json = json.dumps(decision.metadata, ensure_ascii=False, sort_keys=True, default=str)
-    for phrase in _tuple_of_strings(expect.get("metadata_json_contains")):
-        if phrase not in metadata_json:
-            errors.append(f"metadata JSON missing phrase {phrase!r}: {metadata_json!r}")
-    for phrase in _tuple_of_strings(expect.get("metadata_json_forbid")):
-        if phrase in metadata_json:
-            errors.append(f"metadata JSON contained forbidden phrase {phrase!r}")
-
-    expected_actions = expect.get("actions")
-    if expected_actions is not None:
-        if not isinstance(expected_actions, list):
-            errors.append("expect.actions must be a list")
-        else:
-            actual_actions = list(decision.actions or [])
-            if len(actual_actions) != len(expected_actions):
-                errors.append(
-                    f"actions count={len(actual_actions)}, expected {len(expected_actions)}; "
-                    f"actual={actual_actions!r}"
-                )
-            for index, expected_action in enumerate(expected_actions):
-                if index >= len(actual_actions) or not isinstance(expected_action, dict):
-                    continue
-                actual_action = actual_actions[index]
-                expected_capability = expected_action.get("capability_id")
-                if expected_capability is not None and actual_action.get("capability_id") != expected_capability:
-                    errors.append(
-                        f"actions[{index}].capability_id={actual_action.get('capability_id')!r}, "
-                        f"expected {expected_capability!r}"
-                    )
-                expected_args = expected_action.get("args")
-                if isinstance(expected_args, dict):
-                    actual_args = actual_action.get("args")
-                    if not isinstance(actual_args, dict):
-                        errors.append(f"actions[{index}].args={actual_args!r}, expected object")
-                    else:
-                        for key, value in expected_args.items():
-                            if actual_args.get(key) != value:
-                                errors.append(
-                                    f"actions[{index}].args[{key!r}]={actual_args.get(key)!r}, "
-                                    f"expected {value!r}"
-                                )
     return errors
 
 
@@ -986,7 +870,7 @@ def _scenario_goal_interpreter_from_stub(
     scenario_key: str,
     stub: dict[str, Any],
     *,
-    fallback_decision: RouteDecision | None = None,
+    fallback_decision: GoalInterpretationDecision | None = None,
 ) -> _GoalInterpretationLlm | _ScriptedGoalInterpreter:
     script = _goal_interpretation_script_from_stub(scenario_key, stub)
     if script is not None:
@@ -996,7 +880,9 @@ def _scenario_goal_interpreter_from_stub(
         return _GoalInterpretationLlm(fallback_decision)
     if not isinstance(raw_decision, dict):
         raise ValueError(f"{scenario_key}: stub.llm_decision must be an object or null")
-    return _GoalInterpretationLlm(RouteDecision.model_validate(raw_decision))
+    return _GoalInterpretationLlm(
+        GoalInterpretationDecision.model_validate(raw_decision)
+    )
 
 
 async def _run_goal_interpretation_turn(
@@ -1007,7 +893,7 @@ async def _run_goal_interpretation_turn(
     context: dict[str, Any] | None,
     stub: dict[str, Any],
 ) -> tuple[
-    RouteDecision | InterpretationUnavailableError,
+    GoalInterpretationDecision | InterpretationUnavailableError,
     _GoalInterpretationLlm | _ScriptedGoalInterpreter,
 ]:
     from agent.app.cognitive_core.goal_interpreter import engine as main
@@ -1017,30 +903,11 @@ async def _run_goal_interpretation_turn(
         stub,
         fallback_decision=_goal_interpretation_decision_from_stub(scenario),
     )
-    mode = str(stub.get("interpretation_mode") or "hybrid")
-    stub_scenario = BehaviorScenario(
-        path=scenario.path,
-        scenario_id=scenario.scenario_id,
-        suite="goal_interpretation",
-        level=scenario.level,
-        text=text,
-        language=language,
-        description=scenario.description,
-        tags=scenario.tags,
-        stub=stub,
-        expect=scenario.expect,
-    )
-    with patch.object(main.settings, "mode", mode), patch.object(
-        main,
-        "capability_catalog",
-        _GoalInterpretationCatalog(
-            _goal_interpretation_catalog_from_stub(stub_scenario),
-            snapshot=_goal_interpretation_snapshot_from_stub(stub_scenario),
-        ),
-    ), patch.object(main, "goal_interpreter", interpreter):
+    with patch.object(main, "goal_interpreter", interpreter):
         try:
-            decision = await main.interpret_turn(
-                RouteRequest(
+            decision = await main.interpret_goal(
+                GoalInterpretationRequest(
+                    sid=scenario.scenario_id,
                     text=text,
                     language=language,
                     context=dict(context or {}),
@@ -1114,7 +981,6 @@ async def evaluate_goal_interpretation_scenario(scenario: BehaviorScenario) -> d
             },
         }
 
-    task_types = _task_types_from_decision(decision)
     errors = _evaluate_goal_interpretation_expectations(
         scenario,
         decision=decision,
@@ -1125,32 +991,16 @@ async def evaluate_goal_interpretation_scenario(scenario: BehaviorScenario) -> d
         "ok": not errors,
         "errors": errors,
         "actual": {
-            "route": decision.route,
-            "intent": decision.intent,
-            "source": decision.source,
             "confidence": decision.confidence,
-            "interrupt_current": decision.interrupt_current,
-            "should_speak": decision.should_speak,
-            "fast_speech": (
-                decision.fast_speech.model_dump(mode="json")
-                if decision.fast_speech is not None
-                else None
-            ),
+            "unresolved": list(decision.unresolved),
             "llm_calls": interpreter.calls,
             "llm_stages": list(interpreter.stages),
-            "actions": list(decision.actions or []),
             "responsibilities": [
                 item.model_dump(mode="json", exclude_none=True)
                 for item in decision.responsibilities
             ],
-            "task_types": task_types,
-            "metadata": decision.metadata,
         },
     }
-
-
-def _speech_text(response: Any) -> str:
-    return "\n".join(item.text for item in response.speech)
 
 
 def _json_text(value: Any) -> str:
@@ -1167,118 +1017,6 @@ def _context_report(snapshot: dict[str, Any]) -> dict[str, Any]:
         "session_memory": _json_safe_copy(snapshot.get("session_memory") or {}),
         "current_task_context": _json_safe_copy(snapshot.get("current_task_context")),
     }
-
-
-def _evaluate_interaction_expectations(
-    scenario: BehaviorScenario,
-    *,
-    speech: str,
-    capability_ids: list[str],
-    skill_args: list[dict[str, Any]],
-    skill_timeout_ms: list[int | None],
-    skill_metadata: list[dict[str, Any]],
-    requires_confirmation: bool,
-    status: str,
-    reason: str | None,
-    metadata: dict[str, Any],
-) -> list[str]:
-    expect = scenario.expect
-    errors: list[str] = []
-    speech_all = _tuple_of_strings(expect.get("speech_all"))
-    speech_any = _tuple_of_strings(expect.get("speech_any"))
-    speech_forbid = _tuple_of_strings(expect.get("forbidden_speech_any"))
-    if speech_all and not _text_contains_all(speech, speech_all):
-        errors.append(f"speech missing required phrases {list(speech_all)!r}: {speech!r}")
-    if speech_any and not _text_contains_any(speech, speech_any):
-        errors.append(f"speech missing any expected phrase {list(speech_any)!r}: {speech!r}")
-    forbidden = [
-        phrase for phrase in speech_forbid if _text_contains_any(speech, (phrase,))
-    ]
-    if forbidden:
-        errors.append(f"speech contained forbidden phrases {forbidden!r}: {speech!r}")
-
-    expected_capabilities = _tuple_of_strings(expect.get("capabilities"))
-    if bool(expect.get("no_capabilities", False)) and capability_ids:
-        errors.append(f"capabilities={capability_ids!r}, expected none")
-    if expected_capabilities and capability_ids != list(expected_capabilities):
-        errors.append(f"capabilities={capability_ids!r}, expected {list(expected_capabilities)!r}")
-    for capability_id in _tuple_of_strings(expect.get("forbidden_capabilities")):
-        if capability_id in capability_ids:
-            errors.append(f"forbidden capability {capability_id!r} emitted")
-    expected_skill_args = expect.get("skill_args")
-    if expected_skill_args is not None and skill_args != expected_skill_args:
-        errors.append(f"skill_args={skill_args!r}, expected {expected_skill_args!r}")
-    expected_skill_timeout_ms = expect.get("skill_timeout_ms")
-    if expected_skill_timeout_ms is not None and skill_timeout_ms != expected_skill_timeout_ms:
-        errors.append(
-            f"skill_timeout_ms={skill_timeout_ms!r}, expected {expected_skill_timeout_ms!r}"
-        )
-    expected_confirmation = expect.get("requires_confirmation")
-    _expect_equal(errors, "requires_confirmation", requires_confirmation, expected_confirmation)
-    _expect_equal(errors, "status", status, expect.get("status"))
-    _expect_equal(errors, "reason", reason, expect.get("reason"))
-    skill_metadata_json = _json_text(skill_metadata)
-    for phrase in _tuple_of_strings(expect.get("skill_metadata_json_contains")):
-        if phrase not in skill_metadata_json:
-            errors.append(
-                f"skill metadata JSON missing phrase {phrase!r}: {skill_metadata_json!r}"
-            )
-    for phrase in _tuple_of_strings(expect.get("skill_metadata_json_forbid")):
-        if phrase in skill_metadata_json:
-            errors.append(
-                f"skill metadata JSON contained forbidden phrase {phrase!r}: {skill_metadata_json!r}"
-            )
-    for key in _tuple_of_strings(expect.get("metadata_true")):
-        if metadata.get(key) is not True:
-            errors.append(f"metadata {key!r}={metadata.get(key)!r}, expected True")
-    for key in _tuple_of_strings(expect.get("metadata_false")):
-        if metadata.get(key) is not False:
-            errors.append(f"metadata {key!r}={metadata.get(key)!r}, expected False")
-    metadata_json = _json_text(metadata)
-    for phrase in _tuple_of_strings(expect.get("metadata_json_contains")):
-        if phrase not in metadata_json:
-            errors.append(f"metadata JSON missing phrase {phrase!r}: {metadata_json!r}")
-    for phrase in _tuple_of_strings(expect.get("metadata_json_forbid")):
-        if phrase in metadata_json:
-            errors.append(f"metadata JSON contained forbidden phrase {phrase!r}: {metadata_json!r}")
-    return errors
-
-
-def _route_proposal_metadata_for_response(decision: RouteDecision) -> dict[str, Any]:
-    metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
-    out: dict[str, Any] = {
-        "route_final": decision.route,
-        "route_intent": decision.intent,
-        "route_source": decision.source,
-        "route_confidence": decision.confidence,
-    }
-    route_stage_outputs = metadata.get("route_stage_outputs")
-    if isinstance(route_stage_outputs, list):
-        out["route_stage_outputs"] = route_stage_outputs
-    task_proposals = metadata.get("task_proposals")
-    if isinstance(task_proposals, list):
-        out["route_task_proposals"] = task_proposals
-    task_list = metadata.get("task_list")
-    if isinstance(task_list, list):
-        out["route_task_list"] = task_list
-    route_merge = metadata.get("route_merge")
-    if isinstance(route_merge, dict):
-        out["route_merge"] = route_merge
-    superseded = metadata.get("superseded_task_proposals")
-    if isinstance(superseded, list):
-        out["superseded_task_proposals"] = superseded
-    revised = metadata.get("revised_task_proposals")
-    if isinstance(revised, list):
-        out["revised_task_proposals"] = revised
-    revisions = metadata.get("task_proposal_revisions")
-    if isinstance(revisions, list):
-        out["task_proposal_revisions"] = revisions
-    if metadata.get("truth_reconciled") is True:
-        out["truth_reconciled"] = True
-    truth_reason = metadata.get("truth_reconciliation_reason")
-    if isinstance(truth_reason, str) and truth_reason.strip():
-        out["truth_reconciliation_reason"] = truth_reason.strip()
-    return out
 
 
 def _merged_turn_stub(scenario: BehaviorScenario, turn: dict[str, Any]) -> dict[str, Any]:
@@ -1386,107 +1124,6 @@ def _evaluate_context_expectations(
         )
 
 
-def _route_metadata_for_state(route_decision: dict[str, Any]) -> dict[str, Any]:
-    metadata = dict(route_decision.get("metadata") or {})
-    if route_decision.get("source") is not None:
-        metadata.setdefault("source", route_decision.get("source"))
-    if route_decision.get("confidence") is not None:
-        metadata.setdefault("confidence", route_decision.get("confidence"))
-    return metadata
-
-
-async def evaluate_dialogue_scenario(scenario: BehaviorScenario) -> dict[str, Any]:
-    manager = ConversationStateManager(
-        base_conversation_id=scenario.scenario_id,
-        max_turns=int(scenario.stub.get("max_turns", 12)),
-        max_pending_tasks=int(scenario.stub.get("max_pending_tasks", 8)),
-        task_store_enabled=False,
-    )
-    turn_reports: list[dict[str, Any]] = []
-    all_errors: list[str] = []
-
-    for index, turn in enumerate(scenario.turns):
-        turn_id = str(turn.get("id") or f"turn_{index + 1}")
-        turn_key = f"{scenario.key}#{turn_id}"
-        text = _turn_text(turn, scenario_key=scenario.key, index=index)
-        language = _turn_language(turn, scenario.language)
-        manager.prepare_for_user_text(text, sid=turn_id)
-        pre_snapshot = manager.snapshot()
-        pre_context_report = _context_report(pre_snapshot)
-        stub = _merged_turn_stub(scenario, turn)
-        response = await _run_interaction_turn(
-            scenario_key=turn_key,
-            scenario_id=f"{scenario.scenario_id}:{turn_id}",
-            text=text,
-            language=language,
-            stub=stub,
-            context=_turn_context(scenario, turn, pre_snapshot),
-            history=manager.get_history(),
-        )
-        actual = _interaction_actual(response)
-        route_decision = stub["route_decision"]
-        route_metadata = _route_metadata_for_state(route_decision)
-        manager.record_user_turn(turn_id, text, metadata=route_metadata)
-        manager.record_agent_result(turn_id, response)
-        post_snapshot = manager.snapshot()
-        post_context_report = _context_report(post_snapshot)
-
-        expect = turn.get("expect") or {}
-        errors: list[str] = []
-        # Use the turn-local expectations for dialogue-specific checks and for
-        # any interaction assertions that differ from the scenario default.
-        if isinstance(expect, dict):
-            turn_scenario = BehaviorScenario(
-                path=scenario.path,
-                scenario_id=f"{scenario.scenario_id}:{turn_id}",
-                suite="interaction",
-                level=scenario.level,
-                text=text,
-                language=language,
-                expect=expect,
-            )
-            errors = _evaluate_interaction_expectations(
-                turn_scenario,
-                speech=actual["speech"],
-                capability_ids=actual["capabilities"],
-                skill_args=actual["skill_args"],
-                skill_timeout_ms=actual["skill_timeout_ms"],
-                skill_metadata=actual["skill_metadata"],
-                requires_confirmation=actual["requires_confirmation"],
-                status=actual["status"],
-                reason=actual["reason"],
-                metadata=actual["metadata"],
-            )
-            _evaluate_context_expectations(
-                errors,
-                expect,
-                pre_snapshot=pre_context_report,
-                post_snapshot=post_context_report,
-            )
-        if errors:
-            all_errors.extend(f"{turn_id}: {error}" for error in errors)
-        turn_reports.append(
-            {
-                "id": turn_id,
-                "ask": text,
-                "ok": not errors,
-                "errors": errors,
-                "actual": actual,
-                "pre_context": pre_context_report,
-                "post_context": post_context_report,
-            }
-        )
-
-    return {
-        "ok": not all_errors,
-        "errors": all_errors,
-        "actual": {
-            "turn_count": len(turn_reports),
-            "turns": turn_reports,
-        },
-    }
-
-
 async def evaluate_cognitive_core_dialogue_scenario(
     scenario: BehaviorScenario,
 ) -> dict[str, Any]:
@@ -1551,53 +1188,15 @@ async def evaluate_cognitive_core_dialogue_scenario(
             expect=expect if isinstance(expect, dict) else {},
         )
 
-        interaction_actual: dict[str, Any] | None = None
-        if bool(stub.get("run_interaction", False)):
-            interaction_stub = {
-                **stub,
-                "route_decision": decision.model_dump(mode="json", exclude_none=True),
-                "catalog_capabilities": stub.get("agent_capabilities")
-                or (stub.get("catalog") or {}).get("capabilities")
-                or [],
-            }
-            response = await _run_interaction_turn(
-                scenario_key=f"{scenario.key}#{turn_id}",
-                scenario_id=f"{scenario.scenario_id}:{turn_id}",
-                text=text,
-                language=language,
-                stub=interaction_stub,
-                context=context,
-                history=manager.get_history(),
-            )
-            interaction_actual = _interaction_actual(response)
-            turn_scenario = BehaviorScenario(
-                path=scenario.path,
-                scenario_id=f"{scenario.scenario_id}:{turn_id}",
-                suite="interaction",
-                level=scenario.level,
-                text=text,
-                language=language,
-                expect=expect if isinstance(expect, dict) else {},
-            )
-            errors.extend(
-                _evaluate_interaction_expectations(
-                    turn_scenario,
-                    speech=interaction_actual["speech"],
-                    capability_ids=interaction_actual["capabilities"],
-                    skill_args=interaction_actual["skill_args"],
-                    skill_timeout_ms=interaction_actual["skill_timeout_ms"],
-                    skill_metadata=interaction_actual["skill_metadata"],
-                    requires_confirmation=interaction_actual["requires_confirmation"],
-                    status=interaction_actual["status"],
-                    reason=interaction_actual["reason"],
-                    metadata=interaction_actual["metadata"],
+        manager.record_user_turn(
+            turn_id,
+            text,
+            metadata={
+                "goal_interpretation": decision.model_dump(
+                    mode="json", exclude_none=True
                 )
-            )
-
-        route_metadata = _route_metadata_for_state(
-            decision.model_dump(mode="json", exclude_none=True)
+            },
         )
-        manager.record_user_turn(turn_id, text, metadata=route_metadata)
         post_snapshot = manager.snapshot()
         if isinstance(expect, dict):
             _evaluate_context_expectations(
@@ -1615,19 +1214,15 @@ async def evaluate_cognitive_core_dialogue_scenario(
                 "ask": text,
                 "ok": not errors,
                 "errors": errors,
-                "route": {
-                    "route": decision.route,
-                    "intent": decision.intent,
+                "interpretation": {
                     "confidence": decision.confidence,
-                    "actions": list(decision.actions or []),
+                    "unresolved": list(decision.unresolved),
                     "responsibilities": [
                         item.model_dump(mode="json", exclude_none=True)
                         for item in decision.responsibilities
                     ],
-                    "metadata": decision.metadata,
                 },
                 "llm_stages": list(interpreter.stages),
-                "interaction": interaction_actual,
                 "pre_context": _context_report(pre_snapshot),
                 "post_context": _context_report(post_snapshot),
             }
@@ -1657,28 +1252,60 @@ async def evaluate_cognitive_runtime_scenario(
             fallback_policy=str(stub.get("fallback_policy") or "legacy"),
         ),
     )
-    decision_raw = stub.get("route_decision") or {
-        "route": "chat",
-        "intent": "conversation",
-        "language": scenario.language or "en-US",
-    }
-    decision = type(
-        "ScenarioDecision",
-        (),
-        {
-            "route": str(decision_raw.get("route") or "chat"),
-            "intent": str(decision_raw.get("intent") or "conversation"),
-            "language": str(decision_raw.get("language") or scenario.language or "en-US"),
-        },
-    )()
+    gateway = CognitiveGateway()
+    capture = gateway.capture(
+        scenario.text,
+        session_id=scenario.scenario_id,
+        conversation_id=f"level-a-{scenario.scenario_id}",
+        channel="text",
+        language=scenario.language or "en-US",
+    )
+    envelope = gateway.for_direct(
+        capture,
+        context=dict(stub.get("context") or {"history": []}),
+        source="level_a.cognitive_runtime",
+        reason="deterministic Level A scenario input",
+    )
+    goal_candidates = list(
+        (stub.get("goal_association") or {}).get("new_goals") or []
+    )
+    responsibilities = [
+        CognitiveResponsibilityProposal(
+            local_ref=f"r{index}",
+            outcome=str(item.get("description") or scenario.text),
+            completion_requires_work=True,
+            confidence=float(
+                (stub.get("goal_association") or {}).get("confidence", 0.9)
+            ),
+        )
+        for index, item in enumerate(goal_candidates, start=1)
+        if isinstance(item, dict)
+    ]
+    if not responsibilities:
+        responsibilities = [
+            CognitiveResponsibilityProposal(
+                local_ref="r1",
+                outcome=scenario.text,
+                completion_requires_work=True,
+                confidence=0.9,
+            )
+        ]
+    core_interpretation = CoreInterpretationResult(
+        turn_id=envelope.turn_id,
+        session_id=envelope.session_id,
+        confidence=min(item.confidence for item in responsibilities),
+        language=envelope.normalized_input.language,
+        responsibilities=responsibilities,
+    )
     resolution = await coordinator.resolve(
         object(),
         text=scenario.text,
         sid=scenario.scenario_id,
-        route_decision=decision,
+        core_interpretation=core_interpretation,
         context=dict(stub.get("context") or {"history": []}),
         history=list((stub.get("context") or {}).get("history") or []),
-        language=decision.language,
+        language=envelope.normalized_input.language,
+        turn_envelope=envelope,
     )
     terminal = resolution.terminal_plan
     interaction = resolution.interaction_response
@@ -1952,6 +1579,7 @@ async def evaluate_cognitive_turn_loop_scenario(
     manager.apply_goal_association_resolution(
         {
             "turn_id": envelope.turn_id,
+            "resolution_status": "resolved",
             "new_goals": [
                 {
                     "goal_id": goal_id,
@@ -1967,7 +1595,7 @@ async def evaluate_cognitive_turn_loop_scenario(
         user_text=scenario.text,
         atomic=True,
     )
-    manager.record_agent_result(session_id, response)
+    manager.record_interaction_response(session_id, response)
 
     evidence = _CognitiveTurnEvidenceRecorder()
     assistant = VoiceAssistant.__new__(VoiceAssistant)
@@ -2247,8 +1875,6 @@ async def evaluate_scenario(scenario: BehaviorScenario) -> dict[str, Any]:
         return await evaluate_goal_interpretation_scenario(scenario)
     if scenario.suite == "cognitive_core_dialogue":
         return await evaluate_cognitive_core_dialogue_scenario(scenario)
-    if scenario.suite == "dialogue":
-        return await evaluate_dialogue_scenario(scenario)
     if scenario.suite == "cognitive_runtime":
         return await evaluate_cognitive_runtime_scenario(scenario)
     if scenario.suite == "cognitive_turn_loop":

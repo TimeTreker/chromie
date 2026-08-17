@@ -910,6 +910,7 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                 "decision": "create_goals",
                 "new_goals": [
                     {
+                        "source_responsibility_refs": ["resource"],
                         "description": "Fetch a bottle of water and deliver it to the requester.",
                         "output_mode": "body_action",
                         "bindings": [],

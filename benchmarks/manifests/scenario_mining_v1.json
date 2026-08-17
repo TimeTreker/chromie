@@ -24,9 +24,6 @@
     "allowed_suites": [
       "goal_interpretation",
       "cognitive_core_dialogue",
-      "interaction",
-      "dialogue",
-      "adapter",
       "cognitive_runtime",
       "cognitive_turn_loop"
     ],

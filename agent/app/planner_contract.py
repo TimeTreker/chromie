@@ -2319,7 +2319,7 @@ def validate_goal_binding_argument_grounding(
                     for actual in argument_values
                 ):
                     continue
-                raise ValueError(
+                raise PlannerDTOContractError(
                     "information capability step omits authoritative temporal scope: "
                     f"goal_id={goal_id!r}, binding={name!r}, value={expected!r}"
                 )

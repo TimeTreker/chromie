@@ -9,7 +9,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision
+from pydantic import BaseModel, ConfigDict, Field
+
 from scripts.interaction_text_mujoco_check import (
     INTERNAL_SPEECH_PATTERNS,
     _apply_soridormi_skill_timeout,
@@ -32,6 +33,29 @@ from scripts.interaction_text_mujoco_check import (
 )
 from shared.chromie_contracts.interaction import InteractionResponse
 from shared.chromie_contracts.reflex import ReflexFilter
+
+
+class _HarnessDecision(BaseModel):
+    """Structural input used only to exercise the retained live-check helpers."""
+
+    model_config = ConfigDict(extra="allow")
+
+    route: str = "chat"
+    routes: list[dict[str, object]] = Field(default_factory=list)
+    agents: list[str] = Field(default_factory=list)
+    intent: str = "unknown"
+    confidence: float = 0.0
+    language: str = "auto"
+    priority: str = "normal"
+    interrupt_current: bool = False
+    needs_agent: bool = True
+    should_speak: bool = True
+    speak_first: str | None = None
+    actions: list[dict[str, object]] = Field(default_factory=list)
+    candidate_capabilities: list[dict[str, object]] = Field(default_factory=list)
+    reason: str | None = None
+    source: str = "fallback"
+    metadata: dict[str, object] = Field(default_factory=dict)
 
 
 class InteractionTextMujocoCheckTests(unittest.TestCase):
@@ -85,7 +109,6 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
                 text="停止音乐。",
                 sid="sid-reflex",
                 turn_capture=SimpleNamespace(reflex_candidate=outcome),
-                route_model=RouteDecision,
                 timeout_s=1.0,
             )
         )
@@ -95,19 +118,19 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
             [("停止音乐。", "sid-reflex", "text")],
         )
         self.assertEqual(errors, [])
-        self.assertEqual(route.route, "interrupt")
-        self.assertEqual(route.intent, "stop_media_output")
-        self.assertEqual(route.source, "rules")
-        self.assertEqual(route.metadata["cancellation_scope"], "media_output")
+        self.assertEqual(route["route"], "interrupt")
+        self.assertEqual(route["intent"], "stop_media_output")
+        self.assertEqual(route["source"], "rules")
+        self.assertEqual(route["metadata"]["cancellation_scope"], "media_output")
         self.assertFalse(response.speech)
         self.assertFalse(response.capabilities)
         self.assertTrue(evidence["goal_interpretation_bypassed"])
 
-    def test_goal_driven_runtime_is_default_with_explicit_legacy_opt_out(self) -> None:
-        self.assertTrue(build_parser().parse_args([]).cognitive_runtime)
-        self.assertFalse(
-            build_parser().parse_args(["--no-cognitive-runtime"]).cognitive_runtime
-        )
+    def test_goal_driven_runtime_is_the_only_runtime(self) -> None:
+        parser = build_parser()
+        parsed = parser.parse_args([])
+        self.assertTrue(parsed.cognitive_runtime)
+        self.assertNotIn("--no-cognitive-runtime", parser._option_string_actions)
         self.assertEqual(
             build_parser()
             .parse_args(["--soridormi-repo", "/tmp/soridormi-checkout"])
@@ -210,7 +233,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         self.assertFalse(semantic["cognitive_runtime_selected_for_route"])
 
     def test_cognitive_runtime_selection_matches_maintained_apply_lanes(self) -> None:
-        robot_route = RouteDecision.model_validate(
+        robot_route = _HarnessDecision.model_validate(
             {
                 "route": "robot_action",
                 "intent": "robot_action",
@@ -218,7 +241,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
                 "source": "llm",
             }
         )
-        clarify_route = RouteDecision.model_validate(
+        clarify_route = _HarnessDecision.model_validate(
             {
                 "route": "clarify",
                 "intent": "clarify",
@@ -249,16 +272,15 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
             )
         )
 
-    def test_voice_mujoco_wrapper_exposes_runtime_selection(self) -> None:
+    def test_voice_mujoco_wrapper_uses_the_canonical_runtime(self) -> None:
         source = (
             Path(__file__).resolve().parents[1]
             / "scripts"
             / "run_voice_mujoco_text_case.sh"
         ).read_text(encoding="utf-8")
 
-        self.assertIn("SEMANTIC_RUNTIME_FLAG=--cognitive-runtime", source)
-        self.assertIn("--legacy-agent-runtime", source)
-        self.assertIn('"$SEMANTIC_RUNTIME_FLAG"', source)
+        self.assertNotIn("--cognitive-runtime", source)
+        self.assertNotIn("--legacy-agent-runtime", source)
         self.assertIn("--grant-confirmation", source)
         self.assertNotIn("auto-confirm" + "-sim", source)
 
@@ -327,7 +349,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
             parse_expected_arg("vx_mps=0.2")
 
     def test_validate_contract_checks_ordered_skills_and_args(self) -> None:
-        route = RouteDecision.model_validate(
+        route = _HarnessDecision.model_validate(
             {
                 "route": "robot_action",
                 "intent": "compound_robot_action",
@@ -399,7 +421,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         self.assertEqual(errors, [])
 
     def test_validate_contract_accepts_agent_skills_when_goal_interpreter_has_no_actions(self) -> None:
-        route = RouteDecision.model_validate(
+        route = _HarnessDecision.model_validate(
             {
                 "route": "robot_action",
                 "intent": "robot_action",
@@ -445,7 +467,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         self.assertEqual(errors, [])
 
     def test_validate_contract_accepts_exact_local_tool_skill(self) -> None:
-        route = RouteDecision.model_validate(
+        route = _HarnessDecision.model_validate(
             {
                 "route": "tool",
                 "intent": "weather_lookup",
@@ -486,7 +508,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         self.assertEqual(errors, [])
 
     def test_build_debug_summary_describes_route_stages_tasks_and_skills(self) -> None:
-        route = RouteDecision.model_validate(
+        route = _HarnessDecision.model_validate(
             {
                 "route": "deep_thought",
                 "intent": "deep_thought_low_confidence",
@@ -569,7 +591,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         self.assertEqual(len(summary["errors"]), 1)
 
     def test_validate_contract_reports_mismatch(self) -> None:
-        route = RouteDecision.model_validate(
+        route = _HarnessDecision.model_validate(
             {
                 "route": "chat",
                 "intent": "general_conversation",
@@ -595,7 +617,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         self.assertTrue(any("interaction capabilities mismatch" in item for item in errors))
 
     def test_validate_contract_accepts_chat_without_soridormi_skills(self) -> None:
-        route = RouteDecision.model_validate(
+        route = _HarnessDecision.model_validate(
             {
                 "route": "chat",
                 "intent": "general_conversation",
@@ -684,7 +706,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         )
 
     def test_tts_speech_requirement_skips_interrupt_routes(self) -> None:
-        route = RouteDecision.model_validate(
+        route = _HarnessDecision.model_validate(
             {
                 "route": "interrupt",
                 "intent": "stop_current_output",
@@ -698,7 +720,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         self.assertFalse(should_require_tts_speech(route, require_speech=True))
 
     def test_tts_speech_requirement_keeps_normal_speech_routes(self) -> None:
-        route = RouteDecision.model_validate(
+        route = _HarnessDecision.model_validate(
             {
                 "route": "chat",
                 "intent": "general_conversation",

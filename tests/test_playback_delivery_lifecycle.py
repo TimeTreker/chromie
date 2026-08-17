@@ -46,8 +46,6 @@ class PlaybackDeliveryLifecycleTests(unittest.IsolatedAsyncioTestCase):
             normalized_text="I will check that.",
             stage="fast_first",
             purpose="acknowledge_and_check",
-            route="tool",
-            intent="weather_query",
             commitment="checking_only",
         )
         second = lifecycle.register_turn_speech_event(
@@ -57,8 +55,6 @@ class PlaybackDeliveryLifecycleTests(unittest.IsolatedAsyncioTestCase):
             normalized_text="Okay, let me look.",
             stage="fast_first",
             purpose="acknowledge_and_check",
-            route="tool",
-            intent="weather_query",
             commitment="checking_only",
         )
 
@@ -73,8 +69,6 @@ class PlaybackDeliveryLifecycleTests(unittest.IsolatedAsyncioTestCase):
             normalized_text="Okay, let me look.",
             stage="fast_first",
             purpose="acknowledge_and_check",
-            route="tool",
-            intent="weather_query",
             commitment="checking_only",
             source_goal_ids=["goal-other"],
         )

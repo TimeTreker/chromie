@@ -2970,8 +2970,7 @@ class VoiceAssistant:
             )
         fast_planner_vocal_scheduled = bool(
             resolution.fast_advance is not None
-            and resolution.fast_advance.immediate_vocal_activity is not None
-            and resolution.fast_advance.continuations
+            and resolution.metadata.get("fast_vocal_activity_ids")
         )
         summary = self._cognitive_resolution_summary(resolution)
         if resolution.status != "applied" or resolution.interaction_response is None:

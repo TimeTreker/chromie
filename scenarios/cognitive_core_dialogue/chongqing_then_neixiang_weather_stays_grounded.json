@@ -13,47 +13,7 @@
     "neixiang",
     "zh-CN"
   ],
-  "stub": {
-    "interpretation_mode": "hybrid",
-    "catalog": {
-      "catalog_version": 77,
-      "capabilities": [
-        {
-          "capability_id": "chromie.weather.lookup",
-          "agent_id": "chromie.weather",
-          "description": "Read current weather or forecast for an already-resolved named place.",
-          "route": "tool",
-          "prompt_tier": "common",
-          "available": true,
-          "interaction_executable": true,
-          "effects": [
-            "read_only",
-            "external_read",
-            "weather_lookup"
-          ],
-          "safety_class": "safe_read",
-          "requires_confirmation": false,
-          "input_schema": {
-            "type": "object",
-            "properties": {
-              "location": {
-                "type": "string"
-              },
-              "date": {
-                "type": "string"
-              },
-              "units": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "location"
-            ]
-          }
-        }
-      ]
-    }
-  },
+  "stub": {},
   "turns": [
     {
       "id": "chongqing_weather",
@@ -62,12 +22,9 @@
       "stub": {
         "llm_script": [
           {
-            "stage": "quick_intent",
+            "stage": "goal_interpretation",
             "decision": {
-              "route": "tool",
-              "intent": "weather_lookup",
               "confidence": 0.96,
-              "language": "zh-CN",
               "responsibilities": [
                 {
                   "local_ref": "r1",
@@ -83,25 +40,22 @@
                   },
                   "completion_requires_work": true,
                   "completion_requires_fresh_evidence": true,
-                  "confidence": 0.96
+                  "confidence": 0.96,
+                  "relationship": "new",
+                  "target_goal_ids": [],
+                  "information_gaps": [],
+                  "resolved_gap_ids": []
                 }
               ],
-              "fast_speech": null,
-              "progress": []
+              "unresolved": []
             }
           }
         ]
       },
       "expect": {
-        "route": "tool",
-        "intent": "weather_lookup",
-        "source": "llm",
         "llm_calls": 1,
         "llm_stages": [
-          "quick_intent"
-        ],
-        "task_types_include": [
-          "task.use_tool"
+          "goal_interpretation"
         ],
         "responsibilities": [
           {
@@ -130,12 +84,9 @@
       "stub": {
         "llm_script": [
           {
-            "stage": "quick_intent",
+            "stage": "goal_interpretation",
             "decision": {
-              "route": "tool",
-              "intent": "weather_lookup",
               "confidence": 0.97,
-              "language": "zh-CN",
               "responsibilities": [
                 {
                   "local_ref": "r1",
@@ -147,25 +98,22 @@
                   },
                   "completion_requires_work": true,
                   "completion_requires_fresh_evidence": true,
-                  "confidence": 0.97
+                  "confidence": 0.97,
+                  "relationship": "new",
+                  "target_goal_ids": [],
+                  "information_gaps": [],
+                  "resolved_gap_ids": []
                 }
               ],
-              "fast_speech": null,
-              "progress": []
+              "unresolved": []
             }
           }
         ]
       },
       "expect": {
-        "route": "tool",
-        "intent": "weather_lookup",
-        "source": "llm",
         "llm_calls": 1,
         "llm_stages": [
-          "quick_intent"
-        ],
-        "history_contains": [
-          "你好，今天重庆天气咋样？热不热，下雨了没？"
+          "goal_interpretation"
         ],
         "responsibilities": [
           {
@@ -181,15 +129,13 @@
             "confidence": 0.97
           }
         ],
-        "task_types_include": [
-          "task.use_tool"
-        ],
-        "metadata_json_forbid": [
-          "tool_name",
-          "weather_query",
-          "重庆"
+        "history_contains": [
+          "你好，今天重庆天气咋样？热不热，下雨了没？"
         ]
       }
     }
-  ]
+  ],
+  "expect": {
+    "llm_stages": []
+  }
 }

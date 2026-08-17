@@ -37,10 +37,15 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
                     turn_index=1,
                     user_text="Walk forward for 15 seconds, quickly.",
                     goal_interpretation={
-                        "route": "robot_action",
-                        "intent": "capability:soridormi.walk_forward",
-                        "source": "llm",
                         "confidence": 0.95,
+                        "responsibilities": [
+                            {
+                                "local_ref": "walk",
+                                "outcome": "Walk forward for 15 seconds, quickly.",
+                                "completion_requires_work": True,
+                                "confidence": 0.95,
+                            }
+                        ],
                         "latency_ms": 2736.7,
                     },
                     agent={
@@ -81,7 +86,7 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
         self.assertTrue(evaluation.candidate_scenario["recommended"])
 
         candidate = scenario_candidate_from_episode(episode, evaluation)
-        self.assertEqual(candidate["suite"], "dialogue")
+        self.assertEqual(candidate["suite"], "cognitive_runtime")
         self.assertEqual(candidate["review"]["source_episode_id"], "episode_badwalk")
         self.assertEqual(
             candidate["review"]["source_interaction_session_evidence"][
@@ -102,7 +107,16 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
                     sid="sid-1",
                     turn_index=1,
                     user_text="Hello.",
-                    goal_interpretation={"route": "chat", "intent": "general_conversation"},
+                    goal_interpretation={
+                        "confidence": 0.95,
+                        "responsibilities": [
+                            {
+                                "local_ref": "greeting",
+                                "outcome": "Respond naturally to the greeting.",
+                                "confidence": 0.95,
+                            }
+                        ],
+                    },
                     agent={
                         "status": "ok",
                         "speech": ["Hello."],
@@ -143,10 +157,15 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
                     turn_index=1,
                     user_text="Please blink your eyes 5 times.",
                     goal_interpretation={
-                        "route": "chat",
-                        "intent": "general_conversation",
-                        "source": "llm",
                         "confidence": 0.82,
+                        "responsibilities": [
+                            {
+                                "local_ref": "blink",
+                                "outcome": "Blink five times.",
+                                "completion_requires_work": True,
+                                "confidence": 0.82,
+                            }
+                        ],
                     },
                     agent={
                         "status": "ok",
@@ -164,12 +183,12 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
         self.assertLessEqual(evaluation.overall_score, 40)
         self.assertFalse(evaluation.passed)
         self.assertIn("missing_eye_skill", evaluation.failure_tags)
-        self.assertIn("action_request_as_chat", evaluation.failure_tags)
+        self.assertIn("activity_request_not_planned", evaluation.failure_tags)
         self.assertIn("claimed_action_without_skill", evaluation.failure_tags)
         self.assertTrue(evaluation.candidate_scenario["recommended"])
         candidate = scenario_candidate_from_episode(episode, evaluation)
         expect = candidate["turns"][0]["expect"]
-        self.assertTrue(expect["no_capabilities"])
+        self.assertEqual(expect["capabilities"], ["soridormi.blink_eyes"])
         self.assertIn("眨了", expect["forbidden_speech_any"])
 
     def test_offline_review_writes_owner_review_proposal_for_bad_case(self) -> None:
@@ -181,7 +200,17 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
                     sid="sid-blink",
                     turn_index=1,
                     user_text="Please blink your eyes 5 times.",
-                    goal_interpretation={"route": "chat", "intent": "general_conversation"},
+                    goal_interpretation={
+                        "confidence": 0.82,
+                        "responsibilities": [
+                            {
+                                "local_ref": "blink",
+                                "outcome": "Blink five times.",
+                                "completion_requires_work": True,
+                                "confidence": 0.82,
+                            }
+                        ],
+                    },
                     agent={
                         "status": "ok",
                         "speech": ["Okay, I blinked my eyes."],

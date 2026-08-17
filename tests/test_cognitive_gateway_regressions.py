@@ -57,16 +57,12 @@ class _ConversationState:
         sid: str,
         user_text: str,
         *,
-        route: str,
-        intent: str,
         metadata: dict[str, Any],
     ) -> None:
         self.user_turns.append(
             {
                 "sid": sid,
                 "text": user_text,
-                "route": route,
-                "intent": intent,
                 "metadata": metadata,
             }
         )
@@ -166,7 +162,6 @@ class CognitiveGatewayRegressionTests(unittest.IsolatedAsyncioTestCase):
                     1,
                 )
                 recorded = assistant.conversation_state.user_turns[0]
-                self.assertEqual(recorded["route"], "ignore")
                 envelope = recorded["metadata"]["user_turn_envelope"]
                 self.assertEqual(envelope["admission"], "suppress")
                 self.assertEqual(envelope["attention"]["disposition"], "suppress")

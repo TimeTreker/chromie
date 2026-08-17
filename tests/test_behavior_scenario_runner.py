@@ -19,22 +19,15 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
     def test_loads_one_file_per_scenario_and_filters_by_suite_or_key(self) -> None:
         all_cases = load_scenarios()
         goal_interpretation_cases = load_scenarios(suites={"goal_interpretation"})
-        adapter_cases = load_scenarios(suites={"adapter"})
-        dialogue_cases = load_scenarios(suites={"dialogue"})
         cognitive_core_dialogue_cases = load_scenarios(suites={"cognitive_core_dialogue"})
         cognitive_turn_loop_cases = load_scenarios(
             suites={"cognitive_turn_loop"}
         )
         selected = load_scenarios(only={"goal_interpretation/goal_interpretation_normal_greeting"})
 
-        dialogue_keys = [case.key for case in dialogue_cases]
-
-        self.assertEqual(len(all_cases), 406)
-        self.assertEqual(len(adapter_cases), 4)
-        self.assertEqual(len(goal_interpretation_cases), 29)
+        self.assertEqual(len(all_cases), 52)
+        self.assertEqual(len(goal_interpretation_cases), 27)
         self.assertEqual(len(cognitive_core_dialogue_cases), 3)
-        self.assertEqual(len(dialogue_cases), 319)
-        self.assertEqual(len(load_scenarios(suites={"interaction"})), 29)
         cognitive_cases = load_scenarios(suites={"cognitive_runtime"})
         self.assertEqual(len(cognitive_cases), 16)
         self.assertEqual(len(cognitive_turn_loop_cases), 6)
@@ -55,15 +48,9 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
             [case.key for case in cognitive_cases],
         )
         self.assertIn(
-            "goal_interpretation/stop_media_output_scope",
+            "goal_interpretation/weather_check",
             [case.key for case in goal_interpretation_cases],
         )
-        self.assertIn("dialogue/walk_then_followup_status", dialogue_keys)
-        self.assertIn("dialogue/raw_joint_command_refusal", dialogue_keys)
-        self.assertIn("dialogue/batch2_safety_117_walk_into_a_smoky_hallway", dialogue_keys)
-        self.assertIn("dialogue/voice_log_20260630_planner_regression", dialogue_keys)
-        self.assertIn("dialogue/daily_child_nearby_motion_hold", dialogue_keys)
-        self.assertIn("dialogue/daily_power_cable_motion_hold", dialogue_keys)
         self.assertEqual([case.key for case in selected], ["goal_interpretation/goal_interpretation_normal_greeting"])
         for case in all_cases:
             self.assertEqual(case.path.stem, case.scenario_id)
@@ -117,7 +104,7 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
                     "--suite",
                     "goal_interpretation",
                     "--only",
-                    "polite_stop",
+                    "weather_check",
                     "--report-dir",
                     temp_dir,
                 ]
@@ -127,19 +114,6 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
 
         self.assertEqual(code, 0)
         self.assertEqual(len(reports), 1)
-
-    def test_dialogue_scenario_runs_turns_with_history_context(self) -> None:
-        scenarios = load_scenarios(only={"dialogue/walk_then_followup_status"})
-
-        report = run_scenarios_sync(scenarios)
-        turns = report["cases"][0]["actual"]["turns"]
-
-        self.assertTrue(report["ok"], report["cases"][0]["errors"])
-        self.assertEqual(report["case_count"], 1)
-        self.assertEqual([turn["id"] for turn in turns], ["walk_request", "followup_status"])
-        self.assertIn("Walk forward slowly.", str(turns[1]["pre_context"]["history"]))
-        self.assertIn("soridormi.walk_velocity", str(turns[1]["pre_context"]["session_memory"]))
-
 
     def test_cognitive_core_dialogue_replays_weather_then_repeated_walk(self) -> None:
         scenarios = load_scenarios(
@@ -151,21 +125,11 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["cases"][0]["errors"])
         self.assertEqual(
-            [turn["route"]["route"] for turn in turns],
-            ["tool", "robot_action", "robot_action"],
-        )
-        self.assertEqual(
             turns[1]["llm_stages"],
-            ["quick_intent"],
-        )
-        self.assertIsNone(turns[2]["interaction"])
-        self.assertEqual(turns[2]["route"]["actions"], [])
-        self.assertNotIn(
-            "soridormi.walk_velocity",
-            str(turns[2]["route"]["metadata"].get("task_list") or []),
+            ["goal_interpretation"],
         )
         self.assertEqual(
-            turns[2]["route"]["responsibilities"][0]["bindings"],
+            turns[2]["interpretation"]["responsibilities"][0]["bindings"],
             {"direction": "forward", "duration_s": 15, "pace": "quickly"},
         )
         self.assertIn(
@@ -173,7 +137,7 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
             str(turns[1]["pre_context"]["history"]),
         )
 
-    def test_goal_interpretation_scenario_replays_inactive_direct_question_false_review(self) -> None:
+    def test_goal_interpretation_scenario_preserves_direct_weather_question(self) -> None:
         scenarios = load_scenarios(
             only={"goal_interpretation/inactive_direct_weather_question_false_addressedness"}
         )
@@ -182,13 +146,10 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
         actual = report["cases"][0]["actual"]
 
         self.assertTrue(report["ok"], report["cases"][0]["errors"])
-        self.assertEqual(actual["route"], "tool")
-        self.assertEqual(actual["intent"], "weather_lookup")
         self.assertEqual(actual["responsibilities"][0]["bindings"]["location"], "北京")
-        self.assertTrue(actual["should_speak"])
         self.assertEqual(
             actual["llm_stages"],
-            ["quick_intent", "addressedness_review"],
+            ["goal_interpretation"],
         )
 
     def test_cognitive_turn_loop_retains_outcomes_and_suppresses_unsafe_speech(
@@ -224,22 +185,6 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
                 "provider_cancelled_step_ids"
             ],
             ["active-first"],
-        )
-
-    def test_dialogue_scenario_checks_extracted_memory_context(self) -> None:
-        scenarios = load_scenarios(only={"dialogue/remember_tea_preference"})
-
-        report = run_scenarios_sync(scenarios)
-        turns = report["cases"][0]["actual"]["turns"]
-
-        self.assertTrue(report["ok"], report["cases"][0]["errors"])
-        self.assertIn(
-            "Current task: Remember the user's tea preference",
-            str(turns[1]["pre_context"]["session_memory"]["extracted_memory"]),
-        )
-        self.assertIn(
-            "Remember the user's tea preference",
-            turns[1]["pre_context"]["session_memory"]["memory_summary"],
         )
 
     def test_write_report_uses_timestamped_summary_path(self) -> None:

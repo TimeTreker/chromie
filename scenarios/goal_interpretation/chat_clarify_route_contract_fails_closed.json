@@ -3,7 +3,7 @@
   "id": "chat_clarify_route_contract_fails_closed",
   "suite": "goal_interpretation",
   "level": "integration",
-  "description": "A route=chat decision carrying intent=clarify is structurally inconsistent and must fail closed after the primary interpretation instead of entering a semantic repair workflow.",
+  "description": "Planner-shaped route fields are invalid in WHAT-only GI output; one mechanical DTO repair is allowed, then the turn fails closed.",
   "tags": [
     "goal-interpretation-contract",
     "fail-closed",
@@ -15,19 +15,21 @@
     "language": "en-US"
   },
   "stub": {
-    "interpretation_mode": "hybrid",
-    "catalog": {
-      "catalog_version": 75,
-      "capabilities": []
-    },
     "llm_script": [
       {
-        "stage": "quick_intent",
+        "stage": "goal_interpretation",
         "decision": {
           "route": "chat",
-          "intent": "clarify",
           "confidence": 0.95,
-          "language": "en-US"
+          "responsibilities": []
+        }
+      },
+      {
+        "stage": "goal_interpretation_contract_repair",
+        "decision": {
+          "route": "clarify",
+          "confidence": 0.95,
+          "responsibilities": []
         }
       }
     ]
@@ -35,12 +37,12 @@
   "expect": {
     "status": "interpretation_unavailable",
     "failure_reason_contains": [
-      "goal_interpreter_semantic_contract_failed",
-      "route_name_intent_mismatch"
+      "invalid_goal_interpretation_after_one_dto_repair"
     ],
-    "llm_calls": 1,
+    "llm_calls": 2,
     "llm_stages": [
-      "quick_intent"
+      "goal_interpretation",
+      "goal_interpretation_contract_repair"
     ]
   }
 }

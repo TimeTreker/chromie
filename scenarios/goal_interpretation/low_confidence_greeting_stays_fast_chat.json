@@ -3,7 +3,7 @@
   "id": "low_confidence_greeting_stays_fast_chat",
   "suite": "goal_interpretation",
   "level": "module",
-  "description": "A schema-valid low-confidence greeting stays on the non-effectful fast chat lane instead of paying for Deep Thinking.",
+  "description": "GI preserves a benign greeting as conversational meaning; Fast Planner can answer it without Deep Planner.",
   "tags": [
     "chat",
     "low-confidence",
@@ -15,33 +15,47 @@
     "language": "en-US"
   },
   "stub": {
-    "interpretation_mode": "hybrid",
-    "catalog": {
-      "matched": false,
-      "catalog_version": 91,
-      "capabilities": []
-    },
     "llm_decision": {
-      "route": "chat",
-      "agents": [],
-      "intent": "unknown",
-      "confidence": 0.0,
-      "language": "en-US",
-      "source": "llm",
-      "reason": "fine-grained conversational intent is uncertain"
+      "confidence": 0.72,
+      "responsibilities": [
+        {
+          "schema_version": 1,
+          "local_ref": "r1",
+          "outcome": "respond to the user greeting and wellbeing question",
+          "bindings": {},
+          "relationship": "new",
+          "target_goal_ids": [],
+          "information_gaps": [],
+          "resolved_gap_ids": [],
+          "completion_requires_work": false,
+          "completion_requires_fresh_evidence": false,
+          "confidence": 0.72
+        }
+      ],
+      "unresolved": []
     }
   },
   "expect": {
-    "route": "chat",
-    "intent": "general_conversation",
-    "source": "llm",
-    "task_types_include": [
-      "speech.answer"
+    "confidence": 0.72,
+    "llm_calls": 1,
+    "llm_stages": [
+      "goal_interpretation"
     ],
-    "task_types_forbid": [
-      "cognition.delegate_deep_thought",
-      "cognition.deep_think"
-    ],
-    "llm_calls": 1
+    "unresolved": [],
+    "responsibilities": [
+      {
+        "schema_version": 1,
+        "local_ref": "r1",
+        "outcome": "respond to the user greeting and wellbeing question",
+        "bindings": {},
+        "relationship": "new",
+        "target_goal_ids": [],
+        "information_gaps": [],
+        "resolved_gap_ids": [],
+        "completion_requires_work": false,
+        "completion_requires_fresh_evidence": false,
+        "confidence": 0.72
+      }
+    ]
   }
 }

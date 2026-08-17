@@ -37,8 +37,8 @@ def _candidate(text: str = "Walk forward, not a social gesture.") -> dict:
             "auto_promotion_allowed": False,
         },
         "id": "candidate_walk_not_social",
-        "suite": "dialogue",
-        "level": "integration",
+        "suite": "goal_interpretation",
+        "level": "module",
         "description": "Mined regression candidate.",
         "tags": ["candidate", "experience-mined", "wrong_action_class"],
         "review": {
@@ -57,14 +57,39 @@ def _candidate(text: str = "Walk forward, not a social gesture.") -> dict:
             "auto_promotion_allowed": False,
             "required_review_status": "approved",
         },
-        "turns": [
-            {
-                "id": "turn_1",
-                "ask": text,
-                "stub": {"route_decision": {"route": "robot_action"}},
-                "expect": {"forbidden_capabilities": ["soridormi.look_at_person"]},
+        "input": {"text": text},
+        "stub": {
+            "llm_decision": {
+                "confidence": 0.95,
+                "responsibilities": [
+                    {
+                        "local_ref": "r1",
+                        "outcome": "walk forward instead of making a social gesture",
+                        "bindings": {"direction": "forward"},
+                        "completion_requires_work": True,
+                        "completion_requires_fresh_evidence": False,
+                        "confidence": 0.95,
+                    }
+                ],
+                "unresolved": [],
             }
-        ],
+        },
+        "expect": {
+            "confidence": 0.95,
+            "llm_calls": 1,
+            "llm_stages": ["goal_interpretation"],
+            "unresolved": [],
+            "responsibilities": [
+                {
+                    "local_ref": "r1",
+                    "outcome": "walk forward instead of making a social gesture",
+                    "bindings": {"direction": "forward"},
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.95,
+                }
+            ],
+        },
     }
 
 

@@ -341,7 +341,7 @@ async def run_conformance(
         (
             item
             for item in skill_items
-            if isinstance(item, dict) and item.get("skill_id") == "nod_yes"
+            if isinstance(item, dict) and item.get("capability_id") == "nod_yes"
         ),
         None,
     )
@@ -365,7 +365,7 @@ async def run_conformance(
 
     planned = await traced.invoke(
         "soridormi.skill.create_plan",
-        {"capability_id": "nod_yes", "parameters": {"count": 2}},
+        {"skill_id": "nod_yes", "parameters": {"count": 2}},
     )
     if not record_outcome(checks, "plan call", planned):
         return report(
@@ -381,7 +381,7 @@ async def run_conformance(
             "opaque plan identity",
             isinstance(plan_id, str)
             and bool(plan_id)
-            and planned.output.get("skill_id") == "nod_yes",
+            and planned.output.get("capability_id") == "nod_yes",
             "plan_id is opaque and bound to nod_yes",
         )
     )
@@ -429,7 +429,7 @@ async def run_conformance(
             ConformanceCheck(
                 "explicit matching completion",
                 executed.output.get("completed") is True
-                and executed.output.get("skill_id") == "nod_yes",
+                and executed.output.get("capability_id") == "nod_yes",
                 "completed=true and capability_id=nod_yes",
             )
         )

@@ -4,17 +4,38 @@
   "suite": "cognitive_runtime",
   "level": "integration",
   "description": "A robot plan fails closed when its terminal lane is outside the authoritative apply allowlist.",
-  "tags": ["pr7", "rollback", "lane-gate"],
-  "input": {"text": "眨四下眼睛。", "language": "zh-CN"},
+  "tags": [
+    "pr7",
+    "rollback",
+    "lane-gate"
+  ],
+  "input": {
+    "text": "眨四下眼睛。",
+    "language": "zh-CN"
+  },
   "stub": {
     "mode": "apply",
-    "apply_lanes": ["chat"],
-    "route_decision": {"route": "robot_action", "intent": "capability:soridormi.blink_eyes", "language": "zh-CN"},
+    "apply_lanes": [
+      "chat"
+    ],
+    "route_decision": {
+      "route": "robot_action",
+      "intent": "capability:soridormi.blink_eyes",
+      "language": "zh-CN"
+    },
     "goal_association": {
       "turn_id": "turn-blink",
-      "new_goals": [{"goal_id": "goal-blink", "description": "Blink four times.", "source_text": "眨四下眼睛。"}],
+      "new_goals": [
+        {
+          "goal_id": "goal-blink",
+          "description": "Blink four times.",
+          "source_text": "眨四下眼睛。"
+        }
+      ],
       "confidence": 0.96,
-      "metadata": {"status": "resolved"}
+      "metadata": {
+        "status": "resolved"
+      }
     },
     "fast_plan": {
       "plan_id": "plan-blink",
@@ -22,14 +43,47 @@
       "disposition": "execute",
       "coverage": "complete",
       "confidence": 0.96,
-      "goal_ids": ["goal-blink"],
-      "steps": [{"step_id": "blink", "capability_id": "soridormi.blink_eyes", "args": {"count": 4}, "source_goal_ids": ["goal-blink"]}],
-      "goal_satisfaction": {"score": 1.0, "status": "exact", "satisfied_goal_ids": ["goal-blink"]}
+      "goal_ids": [
+        "goal-blink"
+      ],
+      "steps": [
+        {
+          "step_id": "blink",
+          "capability_id": "soridormi.blink_eyes",
+          "args": {
+            "count": 4
+          },
+          "source_goal_ids": [
+            "goal-blink"
+          ]
+        }
+      ],
+      "goal_satisfaction": {
+        "score": 1.0,
+        "status": "exact",
+        "satisfied_goal_ids": [
+          "goal-blink"
+        ]
+      }
     },
-    "capabilities": [{
-      "capability_id": "soridormi.blink_eyes",
-      "input_schema": {"type": "object", "properties": {"count": {"type": "integer", "minimum": 1, "maximum": 10}}, "required": ["count"]}
-    }]
+    "capabilities": [
+      {
+        "capability_id": "soridormi.blink_eyes",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "count"
+          ]
+        }
+      }
+    ]
   },
   "expect": {
     "status": "error",
@@ -39,6 +93,11 @@
     "coverage": "complete",
     "capability_ids": [],
     "requires_confirmation": false,
-    "calls": ["goal_association", "fast_plan", "response_composer"]
+    "calls": [
+      "fast_advance",
+      "goal_association",
+      "fast_plan",
+      "response_composer"
+    ]
   }
 }

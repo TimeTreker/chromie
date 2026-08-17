@@ -102,8 +102,7 @@ class SoridormiArchitectureIntegrationTests(unittest.IsolatedAsyncioTestCase):
                         "args": {"count": 2},
                         "metadata": {
                             "source_component": "agent.capability",
-                            "route_stage": "quick_intent",
-                            "route_confidence": 0.97,
+                            "goal_interpretation_source": "goal_interpreter.v1",
                         },
                     }
                 ],
@@ -134,8 +133,12 @@ class SoridormiArchitectureIntegrationTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertTrue(chromie_intent["requires_runtime_validation"])
         self.assertEqual(chromie_intent["source_component"], "agent.capability")
-        self.assertEqual(chromie_intent["route_stage"], "quick_intent")
-        self.assertEqual(chromie_intent["route_confidence"], 0.97)
+        self.assertEqual(
+            chromie_intent["goal_interpretation_source"],
+            "goal_interpreter.v1",
+        )
+        self.assertNotIn("route_stage", chromie_intent)
+        self.assertNotIn("route_confidence", chromie_intent)
 
     async def test_live_perception_contract_reaches_planning_without_coordinates(
         self,

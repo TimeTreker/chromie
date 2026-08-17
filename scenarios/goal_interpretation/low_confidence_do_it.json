@@ -3,38 +3,85 @@
   "id": "low_confidence_do_it",
   "suite": "goal_interpretation",
   "level": "module",
-  "description": "Low-confidence body-action handoff delegates to deep thought instead of letting catalog context authorize motion.",
-  "tags": ["deep-thought", "low-confidence", "filler-regression"],
+  "description": "GI preserves the referential action request and exposes the unidentified action as a user-resolvable InformationGap.",
+  "tags": [
+    "deep-thought",
+    "low-confidence",
+    "filler-regression"
+  ],
   "input": {
     "text": "Please do it."
   },
   "stub": {
-    "interpretation_mode": "hybrid",
-    "catalog": {
-      "matched": true,
-      "capabilities": [
-        {
-          "capability_id": "soridormi.walk_velocity",
-          "description": "Bounded walking velocity.",
-          "score": 0.9
-        }
-      ]
-    },
     "llm_decision": {
-      "route": "robot_action",
-      "agents": [],
-      "intent": "unknown",
       "confidence": 0.35,
-      "language": "en-US",
-      "source": "llm"
+      "responsibilities": [
+        {
+          "schema_version": 1,
+          "local_ref": "r1",
+          "outcome": "carry out the action the user refers to as it",
+          "bindings": {},
+          "relationship": "new",
+          "target_goal_ids": [],
+          "information_gaps": [
+            {
+              "gap_id": "referenced_action",
+              "description": "The action referred to by it is not identified.",
+              "blocking": true,
+              "required_for": [],
+              "preferred_resolution": "ask_user",
+              "candidate_values": [],
+              "resolved": false,
+              "resolution_value": null,
+              "metadata": {}
+            }
+          ],
+          "resolved_gap_ids": [],
+          "completion_requires_work": true,
+          "completion_requires_fresh_evidence": false,
+          "confidence": 0.35
+        }
+      ],
+      "unresolved": [
+        "The action referred to by it is not identified."
+      ]
     }
   },
   "expect": {
-    "route": "deep_thought",
-    "intent": "deep_thought_low_confidence",
-    "source": "llm",
-    "task_types_include": ["cognition.delegate_deep_thought", "cognition.deep_think"],
-    "task_types_forbid": ["speech.thinking_ack", "task.execute_capability"],
-    "llm_calls": 1
+    "confidence": 0.35,
+    "llm_calls": 1,
+    "llm_stages": [
+      "goal_interpretation"
+    ],
+    "unresolved": [
+      "The action referred to by it is not identified."
+    ],
+    "responsibilities": [
+      {
+        "schema_version": 1,
+        "local_ref": "r1",
+        "outcome": "carry out the action the user refers to as it",
+        "bindings": {},
+        "relationship": "new",
+        "target_goal_ids": [],
+        "information_gaps": [
+          {
+            "gap_id": "referenced_action",
+            "description": "The action referred to by it is not identified.",
+            "blocking": true,
+            "required_for": [],
+            "preferred_resolution": "ask_user",
+            "candidate_values": [],
+            "resolved": false,
+            "resolution_value": null,
+            "metadata": {}
+          }
+        ],
+        "resolved_gap_ids": [],
+        "completion_requires_work": true,
+        "completion_requires_fresh_evidence": false,
+        "confidence": 0.35
+      }
+    ]
   }
 }

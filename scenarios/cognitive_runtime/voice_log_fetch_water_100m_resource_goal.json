@@ -240,6 +240,7 @@
     ],
     "requires_confirmation": false,
     "calls": [
+      "fast_advance",
       "goal_association",
       "fast_plan",
       "response_composer"

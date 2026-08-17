@@ -34,13 +34,14 @@ Chromie uses a **manager-owned, evidence-driven cognitive turn loop**:
 ```text
 receive
   -> admit or protect
-  -> understand goals
-  -> select a direct grounded response for a complete non-effectful speech Goal
-     or plan complete goal coverage
-        -> validate and authorize
-        -> delegate bounded work
-        -> observe structured results
-        -> reconcile every goal against evidence
+  -> Goal Interpretation reads bounded Session Context
+  -> concurrently:
+       Fast Planner authors the first Activity Plan
+       Goal Association commits canonical Goal identity/updates
+  -> bind Activities into per-Goal task-list views
+  -> validate, authorize, and resource-schedule ready Work
+  -> ask the user for missing user information, or use Deep Planner for complex HOW
+  -> observe structured results and reconcile every Goal against Evidence
   -> compose the still-needed response from authoritative state
   -> close, wait, or reactivate later from new evidence/state
 ```
@@ -192,27 +193,30 @@ Interpretation itself stops at Responsibility evidence; once that WHAT is suffic
 Fast Planner is the first HOW owner. It must not be implemented as a greeting/weather
 phrase rule, route shortcut, or second semantic authority.
 
-Fast Planner has a bounded pre-Goal advancement phase. It may author one immediately
-ready provider-free conversational Activity and decide whether canonical Goal continuity
-and/or deeper HOW planning is additionally required. For a simple greeting, the Fast
-Plan may consist only of a complete conversational Activity such as greeting back; no
-persistent Goal is required. For weather, resource, effectful, or other continuing work,
-Fast Planner may start a short prospective progress Activity while requesting Goal
-Association. If HOW exceeds its bounded planning budget, it may also request Deep
-Planner. These are typed continuation dispositions: Fast Planner does not itself create
-Goals or invoke another semantic owner.
+One validated GI result fans out to Fast Planner and Goal Association concurrently.
+Fast Planner authors the first real Activity Plan over GI Responsibility references;
+GA independently remains the only canonical Goal commit authority. The Fast Plan may
+contain several speaking and Capability Activities with explicit sequential/parallel
+relations. A greeting can therefore be one complete speaking Activity while GA records
+the conversational Goal; a weather request can contain a progress speaking Activity and
+an exact weather-read Activity in parallel.
 
-Goal Association remains the only canonical Goal-continuity authority. A fully specified
-non-effectful read still needs canonical Goal grounding when the Responsibility must
-persist for fresh evidence. Goal Interpretation may already know the information
-Responsibility and material bindings such as location/date; Fast Planner may author
-immediate conversational progress, but that does not make an exact provider request
-pre-Goal output. Goal Association binds or creates the canonical Goal; canonical Fast or
-Deep Planner then selects the exact read Capability and executable arguments. Once that
-Plan is valid and the trusted runtime verifies read-only, schema, confirmation, and
-authorization constraints, the read may execute without waiting for unrelated later
-cognition. The resulting observation retains exact Goal/Plan, capability
-version, arguments, schema identity, timestamps, and provenance.
+A material value absent from user/context evidence is an InformationGap. Fast Planner
+asks the user through a clarification Activity when the missing value is user-resolvable;
+it does not send that case to Deep Planner. A short answer such as “Green tea” is read by
+the next GI against pending clarification and active Goal/Activity Context, emitted as a
+`modify`/`clarify` relationship with `resolved_gap_ids`, and committed by GA as a new Goal
+version. Deep Planner is reserved for complex HOW, dependencies, or consequence—not for
+asking a question Fast Planner already knows it must ask.
+
+Safe, side-effect-free, schema-valid reads may start before GA finishes. Their stable
+runtime request identity initially carries GI Responsibility refs. When GA returns, the
+same task is reindexed into each applicable canonical Goal's task-list view; it is not
+restarted. A task shared by multiple Goals appears in each view with the same request ID
+and executes once. Terminal Evidence retains exact Goal/Plan, task-list revision,
+Capability version, arguments, schema identity, timestamps, and provenance. If GA or a
+Deep Plan revision changes unfinished Work, Runtime cancels/replaces only pending or
+cancellable tasks and preserves completed Evidence.
 
 Effectful work is different. Physical motion, object manipulation, writes,
 message sending, media effects, and other committed side effects remain behind
@@ -242,18 +246,21 @@ existing Goal: go out for dinner tonight
 
 user: "Will it rain heavily in Chongqing today?"
 
-Fast Goal Interpretation
-  |-- Responsibility evidence: provide today's Chongqing weather
-  |-- bindings: location=Chongqing, time=today
-  `-- optional acknowledgement speech ------------------> Vocal
+Goal Interpretation
+  `-- Responsibility: provide today's Chongqing weather
+      bindings: location=Chongqing, time=today
+      relationship: new/reference existing dinner Goal as context
 
-Goal Association
-  `-- associate/create canonical weather Goal and its relationship to dinner
-
-Fast Planner
-  `-- select exact weather lookup Capability + executable args
+concurrent fan-out
+  |-- Fast Planner
+  |     |-- speaking Activity: prospective progress (parallel)
+  |     `-- Capability Activity: exact weather lookup (parallel)
+  `-- Goal Association
+        `-- commit canonical weather Goal and its relationship to dinner
 
 Trusted Capability Runtime
+  |-- start eligible safe read without waiting for GA
+  |-- bind the same request ID to the weather Goal task-list view
   `-- provider -> trusted observation
 
 trusted observation + canonical Goal relationships
@@ -354,27 +361,26 @@ envelopes cannot enter ordinary Core cognition.
 
 ## 5. Goal understanding and planning
 
-Goal Interpretation first emits provider-neutral Responsibility evidence. The maintained
-Core then asks Fast Planner for the smallest useful advancement **before** assuming a
-persistent Goal is needed. A simple clear greeting can therefore become one immediate
-Vocal Activity and finish without Goal Association. This is model-authored planning,
-never a Host greeting phrase table or `route == chat` shortcut.
-
-When continuity, fresh evidence, provider/effect work, retained-Goal modification, or
-broader planning is required, Fast Planner returns typed continuation dispositions. The
-Core mechanically follows them:
+Goal Interpretation emits provider-neutral contextual Responsibility evidence, including
+the proposed relationship to supplied Goals and pending InformationGaps. The same result
+enters Fast Planner and Goal Association concurrently. Fast Planner authors the complete
+first Activity Plan; GA alone commits the canonical Goal relation. This is model-authored
+planning, never a Host greeting phrase table or `route == chat` shortcut.
 
 ```text
-UserTurnEnvelope + Responsibility evidence
-  -> FastPlannerAdvance
-       |-> immediate safe conversational Activity (optional)
-       |-> Goal Association when persistent continuity is required
-       `-> Deep Planner requested when HOW exceeds fast budget
-  -> GoalAssociationResolution (when requested)
-  -> canonical Fast Planner, or direct Deep Planner when pre-Goal Fast Planner requested it
-  -> terminal CanonicalPlan
+UserTurnEnvelope + Session Context
+  -> Goal Interpretation
+  -> concurrent fan-out
+       |-> Fast Planner -> first Activity Plan
+       |     |-> speaking and Capability Activities
+       |     |-> clarification for missing user information
+       |     `-> Deep Planner only for complex HOW
+       `-> Goal Association -> canonical Goal commit/version
+  -> deterministic Responsibility-to-Goal binding
+  -> Goal-grouped Runtime task-list views
+  -> terminal CanonicalPlan / Plan revision
   -> deterministic validation
-  -> confirmation and commitment
+  -> resource-aware scheduling, confirmation, and commitment
 ```
 
 Fast and Deep canonical planning use the same `CanonicalPlan` contract. Fast Goal
@@ -382,7 +388,7 @@ Interpretation contributes provider-neutral Responsibility evidence; it does not
 response wording, Work, a Primary-Activity contract, Plan steps, execution lanes,
 realization, exact Capabilities, or executable arguments. `completion_requires_work` is
 only a need-for-work fact, never a Work description. Fast Planner owns HOW; Goal
-Association owns only canonical Goal continuity when requested. Planner model reasoning
+Association owns only canonical Goal continuity and commit. Planner model reasoning
 then chooses semantic Work/Primary Activities, Plan steps, parameters, ordering, and
 per-goal prospective outcomes. Deterministic
 code checks schemas, capability

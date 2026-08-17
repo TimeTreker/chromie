@@ -27,7 +27,7 @@ python -m benchmarks.scenarios check
 Run maintained file-backed scenarios through the Benchmark-native entrypoint:
 
 ```bash
-python -m benchmarks.scenarios run --suite dialogue --no-write
+python -m benchmarks.scenarios run --suite cognitive_core_dialogue --no-write
 ```
 
 The old scenario runner, authoring script, and general-ability acceptance

@@ -50,8 +50,9 @@ Core ability classes include:
 - **Natural uncertainty handling** that asks about the real ambiguity instead
   of producing generic missing-skill or internal-policy speech.
 - **Composable high-level action planning** for supported multi-step body
-  requests, while keeping physical TaskGraph and Trusted Capability Runtime execution
-  sequential and validated.
+  requests. Internal nodes of one physical TaskGraph remain sequential and
+  validated; independent Runtime Activities may overlap only when their declared
+  dependencies, provider concurrency, and resources allow it.
 - **Truthful embodied speech** that reflects proposal, confirmation,
   execution, failure, cancellation, and provider evidence.
 - **Broad evidence coverage** that samples an ability family, not only the
@@ -154,7 +155,8 @@ Use an architecture or policy fix when any of these are true:
 
 ## Human-like turn policy
 
-Every user turn should resolve to one primary user-facing act:
+Every user turn should account for every user-facing Responsibility through one or
+more coordinated Activities:
 
 - answer;
 - ask clarification;
@@ -163,8 +165,11 @@ Every user turn should resolve to one primary user-facing act:
 - refuse or explain a missing capability;
 - continue, cancel, or stop an existing task.
 
-The chosen act must be grounded in actual runtime state. The LLM may generate the
-natural wording, but it must not change the act type or invent authority.
+The chosen Activities must be grounded in actual runtime state. Speaking is an
+Activity, not a side channel: it follows the same identity, sequencing, parallelism,
+cancellation, and evidence rules as other Activities. A progress or clarification
+Activity may overlap independent safe Work; it must not claim completion before
+Evidence.
 
 An ordinary new turn is additional work, not an implicit cancellation signal.
 Chromie preserves independent in-flight turns and Goals even when another person
@@ -175,6 +180,22 @@ foreground interruption; that decision and the affected work remain auditable.
 For one simple conversational act, one natural response is usually enough. If
 fast-first already answered a simple greeting or clarification, the final agent
 must not answer the same act again.
+
+Goal Interpretation reads bounded Session Context: recent admitted dialogue,
+active/recent Goals and versions, current Activity/task state, pending
+clarifications, and relevant Evidence. It emits contextual Responsibility evidence
+with Goal relationship and InformationGap identity. The same GI result goes to Fast
+Planner and Goal Association concurrently. Fast Planner asks the user when a
+user-resolvable value is missing; Deep Planner is for complex HOW. GA alone commits
+the Goal creation or update.
+
+Trusted Capability Runtime exposes one task-list view per canonical Goal. A task
+serving multiple Goals appears in each applicable view under the same stable request
+identity and executes once. Runtime may execute independent tasks concurrently when
+declared resources and provider limits allow—for example several safe weather reads,
+or Vocal work alongside non-conflicting body work. A newer GA/Deep-authorized Plan
+may cancel or replace unfinished cancellable tasks, but completed Evidence remains
+immutable and is never converted into “did not happen.”
 
 ## Human-like cognition is selective, not perfectionist
 
@@ -283,8 +304,9 @@ claims, and completion restriction. Generated or queued speech is not delivery
 evidence. Only playback-started or playback-completed state satisfies the
 audible act. A later response stage may reference a queued event without
 resynthesizing it; if that exact event becomes `not_delivered`, Runtime may
-fulfill the same act once. Pre-Goal Fast speech remains explicitly unbound, but
-already Goal-bound speech cannot be reassigned to unrelated work. Literal text
+fulfill the same act once. Fast speech scheduled before GA finishes retains only
+GI Responsibility refs until GA binds it; Goal-bound speech cannot be reassigned
+to unrelated work. Literal text
 equality is only a payload-integrity check and never decides whether two
 conversational responsibilities are the same. Distinct result, failure,
 limitation, clarification, confirmation, progress, and completion acts remain

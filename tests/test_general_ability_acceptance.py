@@ -195,11 +195,11 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                                 "title": "Controls",
                                 "general_rule": "Stops must be deterministic.",
                                 "minimum_level_a_cases": 1,
-                                "root_cause_boundaries": ["GoalInterpreter/intent"],
+                                "root_cause_boundaries": ["Cognitive Gateway/reflex"],
                                 "level_a_scenarios": [
                                     {
-                                        "key": "goal_interpretation/polite_stop",
-                                        "rationale": "Polite stop remains interrupt.",
+                                        "key": "cognitive_turn_loop/active_stop_cancel_retains_outcome",
+                                        "rationale": "Active cancellation retains its outcome.",
                                     }
                                 ],
                                 "live_text_cases": [],
@@ -226,7 +226,10 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         self.assertIn("deterministic file-backed evidence", summary["claim_scope"])
         self.assertEqual(summary["case_count"], 1)
         self.assertEqual(summary["ability_classes"][0]["id"], "controls")
-        self.assertEqual(summary["ability_classes"][0]["cases"][0]["key"], "goal_interpretation/polite_stop")
+        self.assertEqual(
+            summary["ability_classes"][0]["cases"][0]["key"],
+            "cognitive_turn_loop/active_stop_cancel_retains_outcome",
+        )
 
 
     def test_daily_multi_goal_level_a_class_passes(self) -> None:

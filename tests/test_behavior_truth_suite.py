@@ -16,11 +16,10 @@ def _format_failures(report: dict[str, object]) -> str:
 class BehaviorTruthSuiteTests(unittest.IsolatedAsyncioTestCase):
     async def test_all_behavior_scenario_suites(self) -> None:
         expected_counts = {
-            "adapter": 4,
-            "goal_interpretation": 29,
+            "goal_interpretation": 27,
             "cognitive_core_dialogue": 3,
-            "interaction": 29,
-            "dialogue": 319,
+            "cognitive_runtime": 16,
+            "cognitive_turn_loop": 6,
         }
 
         for suite, expected_count in expected_counts.items():

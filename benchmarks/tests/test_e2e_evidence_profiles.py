@@ -348,7 +348,7 @@ def test_dialogue_turn_expectations_survive_normalization(tmp_path: Path) -> Non
     normalized = normalize_inventory(REPO_ROOT, inventory_path)
     case = next(
         item for item in normalized["cases"]
-        if item["id"] == "batch2_tool_boundary_100_share_live_location"
+        if item["id"] == "weather_then_repeated_walk_stays_grounded"
     )
     assert case["expectations"]["primary_outcomes"]
-    assert len(case["legacy_expectations"]["turn_expectations"]) == 2
+    assert len(case["legacy_expectations"]["turn_expectations"]) == 3

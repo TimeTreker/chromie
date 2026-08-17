@@ -251,9 +251,9 @@ class InterpreterSemanticTaskPromptTests(unittest.TestCase):
             )
         )
 
-        self.assertNotIn("task-coffee-001", prompt)
+        self.assertIn("task-coffee-001", prompt)
         self.assertIn("Prepare or obtain coffee", prompt)
-        self.assertIn("without lifecycle identity", prompt)
-        self.assertIn("Interpret only WHAT", prompt)
+        self.assertIn("Active Task/Activity progress with identity", prompt)
+        self.assertIn("Interpret contextual WHAT", prompt)
         self.assertNotIn('"route"', prompt)
         self.assertNotIn('"intent"', prompt)
