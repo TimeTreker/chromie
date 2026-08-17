@@ -344,7 +344,6 @@ class HealthResponse(BaseModel):
     legacy_capability_fallback_enabled: bool = False
     capability_catalog_enabled: bool = False
     capability_catalog_version: int = 0
-    task_continuity_enabled: bool = False
     goal_association_enabled: bool = False
     goal_association_model: str | None = None
     fast_planner_enabled: bool = False
@@ -355,7 +354,6 @@ class HealthResponse(BaseModel):
     response_composer_model: str | None = None
     tool_result_interpreter_enabled: bool = False
     tool_result_interpreter_model: str | None = None
-    task_continuity_model: str | None = None
     social_attention_mode: str = "on"
     social_attention_model: str | None = None
 

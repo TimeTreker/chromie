@@ -521,20 +521,6 @@
       ]
     },
     {
-      "path": "agent/app/main.py",
-      "symbol": "resolve_task_continuity",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "2a145a96a6f0d5b0c239711282d14900f29b9b0461e7fbc8dbef34e1798a59c1",
-      "failure_signals": [
-        "diagnostic",
-        "return"
-      ]
-    },
-    {
       "path": "agent/app/probe_capabilities.py",
       "symbol": "_run",
       "ordinal": 1,
@@ -701,20 +687,6 @@
       "body_sha256": "8f455c0206e62dd42c98728184b0f62878ab00caeadd10cce46e064a2359408a",
       "failure_signals": [
         "bare_reraise"
-      ]
-    },
-    {
-      "path": "agent/app/task_continuity.py",
-      "symbol": "TaskContinuityResolver.resolve",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "7c21fefd826e45f90cb28f776043ef5fb4930fb9fabfb5b4e9ac986a90f974db",
-      "failure_signals": [
-        "diagnostic",
-        "return"
       ]
     },
     {
@@ -1292,21 +1264,6 @@
     },
     {
       "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._review_task_continuity",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "47c62b7f15ab9d5f9c3309e4a17363966e7141426f921ff2e6cdfd6a145d9057",
-      "failure_signals": [
-        "diagnostic",
-        "return",
-        "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant._run_cognitive_runtime_pipeline",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
@@ -1316,20 +1273,6 @@
       "body_sha256": "5d10a17b5f9bab1d02ae43b9f692d81da56a589167535c37c1ebf1b48937ac44",
       "failure_signals": [
         "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._run_task_continuity_report",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "e31c98a4458f5e9b3b54b65f0487713f49c2936bda2fa08a25b49319bb6bef26",
-      "failure_signals": [
-        "diagnostic",
-        "return"
       ]
     },
     {

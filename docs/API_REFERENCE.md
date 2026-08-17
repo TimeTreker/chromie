@@ -138,7 +138,6 @@ caller-supplied disclosure context is removed before trusted injection.
 |---|---|---|
 | `POST` | `/run` | Established `AgentRequest -> AgentResult` compatibility path. CapabilityAgent semantic planning is emergency-only; deprecated caller-supplied exact `actions[]` are adapter input and are not current Fast Goal Interpretation output. |
 | `POST` | `/interaction` | Return a natively accumulated and strictly revalidated shared `InteractionResponse`; deprecated caller-supplied exact `actions[]` are materialized without LLM reinterpretation, and the legacy CapabilityAgent planner requires explicit emergency authority. |
-| `POST` | `/task-continuity` | Return a validated `SemanticTaskOperationSet` proposal for the current utterance and active-task snapshot. |
 | `POST` | `/agent-skills/select` | Return a typed optional method selection authored for the declared Agent role from bounded approved summaries. |
 | `POST` | `/agent-skills/disclose` | Return exact bounded role projections from one validated selection without Plan mutation or execution. |
 | `POST` | `/social-attention/plan` | Return an event-scoped auxiliary Social-Attention proposal with behavior IDs decoder-constrained to the reviewed live candidate set. |
@@ -264,8 +263,6 @@ authorize side effects, alter Cognitive Core interpretation output, or execute p
 in `report_only` observation or authoritative `apply`, and only the host may
 atomically commit the validated association.
 
-`POST /task-continuity` is available only when
-`AGENT_TASK_CONTINUITY_ENABLED=1` and Agent LLM use is enabled. It treats the
 Goal Interpretation decision as advisory context, replaces model-provided operation IDs with
 stable request-bound IDs, rejects below-threshold or unknown-task operations,
 and may return an immediate `ResponsePlan`. It never applies task changes,

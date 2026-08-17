@@ -278,8 +278,6 @@ class CognitionSettings:
     tool_result_interpreter_timeout_ms: int
     goal_association_mode: str
     goal_association_timeout_ms: int
-    task_continuity_mode: str
-    task_continuity_timeout_ms: int
     runtime_mode: str
     apply_lanes: frozenset[str]
     runtime_timeout_ms: int
@@ -698,18 +696,6 @@ class HostSettingsSnapshot:
                 goal_association_timeout_ms=_int(
                     values,
                     "ORCH_GOAL_ASSOCIATION_TIMEOUT_MS",
-                    3500,
-                    minimum=100,
-                ),
-                task_continuity_mode=_choice(
-                    values,
-                    "ORCH_TASK_CONTINUITY_MODE",
-                    "off",
-                    {"off", "report_only", "apply"},
-                ),
-                task_continuity_timeout_ms=_int(
-                    values,
-                    "ORCH_TASK_CONTINUITY_TIMEOUT_MS",
                     3500,
                     minimum=100,
                 ),

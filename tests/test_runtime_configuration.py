@@ -203,12 +203,6 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["ORCH_FAST_PLANNER_MODE"], "off")
         self.assertEqual(values["ORCH_DEEP_PLANNER_MODE"], "off")
         self.assertEqual(values["ORCH_RESPONSE_COMPOSER_MODE"], "off")
-        self.assertEqual(values["ORCH_TASK_CONTINUITY_MODE"], "off")
-        self.assertEqual(values["ORCH_TASK_CONTINUITY_TIMEOUT_MS"], "3500")
-        self.assertEqual(values["AGENT_TASK_CONTINUITY_MODEL"], "qwen3:4b")
-        self.assertEqual(values["AGENT_TASK_CONTINUITY_TIMEOUT_MS"], "3000")
-        self.assertEqual(values["AGENT_TASK_CONTINUITY_NUM_CTX"], "4096")
-        self.assertEqual(values["AGENT_TASK_CONTINUITY_NUM_PREDICT"], "256")
 
     def test_runtime_ready_greeting_precedes_live_microphone_loop(self) -> None:
         source = (ROOT / "orchestrator" / "orchestrator.py").read_text(
@@ -517,7 +511,6 @@ class RuntimeConfigurationTests(unittest.TestCase):
             "Deep Planner": "EFFECTIVE_DEEP_PLANNER_MODEL",
             "Response Composer": "EFFECTIVE_RESPONSE_COMPOSER_MODEL",
             "Tool Result Interpreter": "EFFECTIVE_TOOL_RESULT_INTERPRETER_MODEL",
-            "Task Continuity": "EFFECTIVE_TASK_CONTINUITY_MODEL",
             "Social Attention": "EFFECTIVE_SOCIAL_ATTENTION_MODEL",
             "Response Review": "EFFECTIVE_RESPONSE_REVIEW_MODEL",
         }

@@ -410,15 +410,6 @@ preparation. A technical failure after authority acquisition cannot execute a pa
 
 | Variable | Default or profile behavior |
 |---|---|
-| `AGENT_TASK_CONTINUITY_ENABLED` | `1`; exposes the dedicated Agent semantic task-continuity endpoint when Agent LLM use is enabled. This endpoint only proposes operations and never mutates task state. |
-| `AGENT_TASK_CONTINUITY_MODEL` | `qwen3:4b`; fast model used for bounded active-task association and semantic goal revisions. |
-| `AGENT_TASK_CONTINUITY_TIMEOUT_MS` | `3000`; endpoint model-call timeout. Model or parse failure returns an empty, non-authoritative operation set instead of HTTP 500. |
-| `AGENT_TASK_CONTINUITY_MIN_CONFIDENCE` | `0.65`; operations below this confidence are retained as rejected diagnostics and cannot reach host task state. |
-| `AGENT_TASK_CONTINUITY_MAX_ACTIVE_TASKS` | `8`; maximum bounded active-task snapshots supplied to one continuity call. Candidate selection is context projection only and does not decide semantic association. |
-| `AGENT_TASK_CONTINUITY_NUM_CTX` | `4096`; bounded context budget for active tasks, session summary, Goal Interpretation advisory output, and the structured contract. |
-| `AGENT_TASK_CONTINUITY_NUM_PREDICT` | `256`; compact JSON output budget. |
-| `ORCH_TASK_CONTINUITY_MODE` | `off` in `.env.common`; compatibility-only standalone resolver used when unified cognitive mode is `off`. `report_only` observes active-task snapshots without mutation, while `apply` makes a healthy dedicated resolution authoritative before deterministic host validation. |
-| `ORCH_TASK_CONTINUITY_TIMEOUT_MS` | `3500`; host timeout for the dedicated Agent endpoint. Failure records diagnostics and leaves the current Goal Interpretation proposal unchanged. |
 
 In `apply` mode, an authoritative empty result also suppresses legacy route-based
 task creation. This prevents an ordinary side conversation routed through

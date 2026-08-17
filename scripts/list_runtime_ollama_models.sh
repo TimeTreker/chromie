@@ -56,9 +56,6 @@ fi
 if is_enabled "${AGENT_TOOL_RESULT_INTERPRETER_ENABLED:-1}"; then
   append_model "${AGENT_TOOL_RESULT_INTERPRETER_MODEL:-}"
 fi
-if is_enabled "${AGENT_TASK_CONTINUITY_ENABLED:-1}"; then
-  append_model "${AGENT_TASK_CONTINUITY_MODEL:-}"
-fi
 if [ "${AGENT_SOCIAL_ATTENTION_MODE:-off}" != "off" ]; then
   append_model "${AGENT_SOCIAL_ATTENTION_MODEL:-}"
 fi

@@ -80,7 +80,6 @@ from .interaction import (
     NativeInteractionOutputError,
 )
 from .runtime import AgentRuntime, InteractionRuntime
-from .task_continuity import TaskContinuityResolver
 from .goal_association import GoalAssociationResolver
 from .fast_planner import FastPlannerResolver
 from .deep_planner import DeepPlannerResolver
@@ -120,11 +119,9 @@ from .tool_invocation import McpStreamableHttpInvoker
 try:
     from chromie_contracts.interaction import InteractionResponse
     from chromie_contracts.semantic_authority import semantic_authority_route_matrix
-    from chromie_contracts.semantic_task import SemanticTaskOperationSet
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.interaction import InteractionResponse
     from shared.chromie_contracts.semantic_authority import semantic_authority_route_matrix
-    from shared.chromie_contracts.semantic_task import SemanticTaskOperationSet
 
 
 
@@ -196,28 +193,6 @@ cognitive_gateway_attention_reviewer = AttentionReviewer(
     num_predict=settings.cognitive_gateway_attention_num_predict,
 )
 
-task_continuity_client = (
-    OllamaClient(
-        settings.ollama_url,
-        settings.task_continuity_model,
-        timeout_ms=settings.task_continuity_timeout_ms,
-        purpose="task_continuity",
-        service_settings=settings,
-    )
-    if settings.use_llm and settings.task_continuity_enabled
-    else None
-)
-task_continuity_resolver = (
-    TaskContinuityResolver(
-        task_continuity_client,
-        min_confidence=settings.task_continuity_min_confidence,
-        max_active_tasks=settings.task_continuity_max_active_tasks,
-        num_ctx=settings.task_continuity_num_ctx,
-        num_predict=settings.task_continuity_num_predict,
-    )
-    if task_continuity_client is not None
-    else None
-)
 configured_registry = build_configured_registry(
     parse_manifest_paths(settings.capability_manifests),
     environment=settings.environment,
@@ -614,7 +589,6 @@ async def health() -> HealthResponse:
         legacy_capability_fallback_enabled=settings.legacy_capability_fallback_enabled,
         capability_catalog_enabled=True,
         capability_catalog_version=capability_catalog.version,
-        task_continuity_enabled=task_continuity_resolver is not None,
         goal_association_enabled=goal_association_resolver is not None,
         goal_association_model=(
             settings.goal_association_model if goal_association_resolver is not None else None
@@ -630,9 +604,6 @@ async def health() -> HealthResponse:
             settings.tool_result_interpreter_model
             if tool_result_interpreter is not None
             else None
-        ),
-        task_continuity_model=(
-            settings.task_continuity_model if task_continuity_resolver is not None else None
         ),
         social_attention_mode=settings.social_attention_mode,
         social_attention_model=(
@@ -828,34 +799,6 @@ async def resolve_goal_association(request: CognitiveWorkRequest):
     )
     result = await goal_association_resolver.resolve(prepared)
     return attach_disclosure_metadata(result, disclosure)
-
-
-@app.post("/task-continuity", response_model=SemanticTaskOperationSet)
-async def resolve_task_continuity(request: AgentRunRequest) -> SemanticTaskOperationSet:
-    if task_continuity_resolver is None:
-        raise HTTPException(status_code=503, detail="Task continuity resolver is disabled")
-    try:
-        return await task_continuity_resolver.resolve(request)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    except Exception as exc:  # pragma: no cover - final service-boundary guard
-        logger.exception(
-            "task_continuity_endpoint_degraded sid=%s error_type=%s error=%s",
-            request.sid,
-            type(exc).__name__,
-            exc,
-        )
-        return SemanticTaskOperationSet(
-            confidence=0.0,
-            reason_summary="Task continuity service failed safely; no operation was accepted.",
-            metadata={
-                "resolver": "task_continuity_agent",
-                "status": "service_unavailable",
-                "error_type": type(exc).__name__,
-                "error": str(exc)[:300],
-                "sid": request.sid,
-            },
-        )
 
 
 @app.post(

@@ -1363,43 +1363,10 @@
       ]
     },
     {
-      "boolean": true,
-      "category": "service_internal",
-      "key": "AGENT_TASK_CONTINUITY_ENABLED",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
       "boolean": false,
-      "category": "service_internal",
-      "key": "AGENT_TASK_CONTINUITY_MAX_ACTIVE_TASKS",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "AGENT_TASK_CONTINUITY_MIN_CONFIDENCE",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
+      "category": "profile_constant",
       "key": "AGENT_TASK_CONTINUITY_MODEL",
       "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml",
         "env/profiles/default.env",
         "env/profiles/jetson_agx_orin.env",
         "env/profiles/jetson_orin_nano_super.env",
@@ -1416,9 +1383,6 @@
       "category": "acceptance_override",
       "key": "AGENT_TASK_CONTINUITY_NUM_CTX",
       "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml",
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
         "env/validation/architecture.env"
@@ -1429,9 +1393,6 @@
       "category": "acceptance_override",
       "key": "AGENT_TASK_CONTINUITY_NUM_PREDICT",
       "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml",
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
         "env/validation/architecture.env"
@@ -1442,9 +1403,6 @@
       "category": "acceptance_override",
       "key": "AGENT_TASK_CONTINUITY_TIMEOUT_MS",
       "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml",
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
         "env/validation/architecture.env"
@@ -3772,24 +3730,13 @@
       ]
     },
     {
-      "boolean": true,
-      "category": "profile_constant",
-      "key": "ORCH_TASK_CONTINUITY_MODE",
-      "owners": [
-        ".env.common",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
       "boolean": false,
       "category": "acceptance_override",
       "key": "ORCH_TASK_CONTINUITY_TIMEOUT_MS",
       "owners": [
-        ".env.common",
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
-        "env/validation/architecture.env",
-        "orchestrator/runtime/host_settings.py"
+        "env/validation/architecture.env"
       ]
     },
     {
@@ -4745,10 +4692,10 @@
       "bounded_compatibility_alias": 0,
       "profile_constant": 144,
       "public_choice": 9,
-      "service_internal": 238
+      "service_internal": 234
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 448
+    "total_keys": 444
   }
 }

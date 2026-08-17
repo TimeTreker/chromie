@@ -397,10 +397,6 @@ class VoiceAssistant:
         self.goal_association_timeout_ms = (
             cognition_settings.goal_association_timeout_ms
         )
-        self.task_continuity_mode = cognition_settings.task_continuity_mode
-        self.task_continuity_timeout_ms = (
-            cognition_settings.task_continuity_timeout_ms
-        )
         self.cognitive_runtime_mode = cognition_settings.runtime_mode
         self.cognitive_apply_lanes = cognition_settings.apply_lanes
         self.cognitive_runtime_timeout_ms = cognition_settings.runtime_timeout_ms
@@ -495,7 +491,6 @@ class VoiceAssistant:
         # Detached provider work is not an active foreground interaction task.
         # These tasks consume Runtime lifecycle/Evidence after submit() returned.
         self.active_capability_result_tasks: dict[asyncio.Task, str] = {}
-        self.task_continuity_report_tasks: set[asyncio.Task] = set()
         self.observability_tasks: set[asyncio.Task] = set()
         self.is_playing_audio = False
 
@@ -595,12 +590,11 @@ class VoiceAssistant:
             self.discard_playback_realtime,
         )
         logger.info(
-            "Control plane: cognitive_gateway=embedded cognitive_core=%s enabled=%s action_url=%s dry_run=%s task_continuity_mode=%s cognitive_runtime_mode=%s cognitive_apply_lanes=%s",
+            "Control plane: cognitive_gateway=embedded cognitive_core=%s enabled=%s action_url=%s dry_run=%s cognitive_runtime_mode=%s cognitive_apply_lanes=%s",
             self.agent_url,
             self.enable_agent,
             self.action_executor_url,
             self.action_dry_run,
-            self.task_continuity_mode,
             self.cognitive_runtime_mode,
             ",".join(sorted(self.cognitive_apply_lanes)) or "none",
         )
@@ -4136,161 +4130,6 @@ class VoiceAssistant:
 
 
 
-
-    async def _run_task_continuity_report(
-        self,
-        session: aiohttp.ClientSession,
-        *,
-        user_text: str,
-        session_id: str,
-        context: dict[str, Any],
-        decision: RouteDecision,
-    ) -> None:
-        started_ms = now_ms()
-        try:
-            resolution = await self.agent_client.resolve_task_continuity(
-                session,
-                text=user_text,
-                route_decision=decision,
-                sid=session_id,
-                context=context,
-                history=context.get("history", []),
-                timeout_ms=self.task_continuity_timeout_ms,
-            )
-        except Exception as exc:
-            self.session_log(
-                session_id,
-                "task_continuity_report_failed: ms=%.1f error_type=%s error=%s",
-                now_ms() - started_ms,
-                type(exc).__name__,
-                exc,
-            )
-            return
-        status = str((resolution.metadata or {}).get("status") or "resolved")
-        self.session_log(
-            session_id,
-            "task_continuity_report_done: ms=%.1f status=%s operations=%s confidence=%.2f",
-            now_ms() - started_ms,
-            status,
-            len(resolution.operations),
-            resolution.confidence,
-        )
-
-    async def _review_task_continuity(
-        self,
-        session: aiohttp.ClientSession,
-        *,
-        user_text: str,
-        session_id: str,
-        context: dict[str, Any],
-        decision: RouteDecision,
-    ) -> RouteDecision:
-        if (
-            self.task_continuity_mode == "off"
-            or not self.enable_agent
-            or decision.interrupt_current
-            or decision.route in {"interrupt", "ignore"}
-        ):
-            return decision
-        active_tasks = context.get("active_task_snapshots")
-        if not isinstance(active_tasks, list) or not active_tasks:
-            return decision
-
-        if self.task_continuity_mode == "report_only":
-            task = asyncio.create_task(
-                self._run_task_continuity_report(
-                    session,
-                    user_text=user_text,
-                    session_id=session_id,
-                    context=context,
-                    decision=decision,
-                )
-            )
-            tasks = getattr(self, "task_continuity_report_tasks", None)
-            if not isinstance(tasks, set):
-                tasks = set()
-                self.task_continuity_report_tasks = tasks
-            tasks.add(task)
-            task.add_done_callback(tasks.discard)
-            metadata = dict(decision.metadata or {})
-            metadata["task_continuity_resolution"] = {
-                "status": "scheduled",
-                "mode": "report_only",
-                "active_task_count": len(active_tasks),
-            }
-            metadata["task_continuity_mode"] = "report_only"
-            self.session_log(
-                session_id,
-                "task_continuity_report_scheduled: active_tasks=%s",
-                len(active_tasks),
-            )
-            return decision.model_copy(update={"metadata": metadata})
-
-        started_ms = now_ms()
-        try:
-            resolution = await self.agent_client.resolve_task_continuity(
-                session,
-                text=user_text,
-                route_decision=decision,
-                sid=session_id,
-                context=context,
-                history=context.get("history", []),
-                timeout_ms=self.task_continuity_timeout_ms,
-            )
-        except Exception as exc:
-            self.session_log(
-                session_id,
-                "task_continuity_failed: mode=%s ms=%.1f error_type=%s error=%s",
-                self.task_continuity_mode,
-                now_ms() - started_ms,
-                type(exc).__name__,
-                exc,
-            )
-            metadata = dict(decision.metadata or {})
-            metadata["task_continuity_resolution"] = {
-                "status": "failed",
-                "mode": self.task_continuity_mode,
-                "error_type": type(exc).__name__,
-                "error": str(exc)[:300],
-            }
-            return decision.model_copy(update={"metadata": metadata})
-
-        payload = resolution.model_dump(mode="json", exclude_none=True)
-        metadata = dict(decision.metadata or {})
-        metadata["task_continuity_resolution"] = payload
-        metadata["task_continuity_mode"] = self.task_continuity_mode
-        resolution_status = str((resolution.metadata or {}).get("status") or "resolved")
-        if self.task_continuity_mode == "apply" and resolution_status == "resolved":
-            for key in (
-                "semantic_task_operations",
-                "task_operations",
-                "semantic_task_operation",
-            ):
-                metadata.pop(key, None)
-            metadata["semantic_task_operations"] = [
-                operation.model_dump(mode="json", exclude_none=True)
-                for operation in resolution.operations
-            ]
-            metadata["semantic_task_resolution_authoritative"] = True
-            if resolution.response_plan is not None:
-                metadata["response_plan"] = resolution.response_plan.model_dump(
-                    mode="json",
-                    exclude_none=True,
-                )
-        elif self.task_continuity_mode == "apply":
-            metadata["task_continuity_apply_skipped"] = {
-                "reason": "resolver_not_healthy",
-                "status": resolution_status,
-            }
-        self.session_log(
-            session_id,
-            "task_continuity_done: mode=%s ms=%.1f operations=%s confidence=%.2f",
-            self.task_continuity_mode,
-            now_ms() - started_ms,
-            len(resolution.operations),
-            resolution.confidence,
-        )
-        return decision.model_copy(update={"metadata": metadata})
 
     async def handle_routed_text(
         self,

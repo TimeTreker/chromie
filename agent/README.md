@@ -72,7 +72,6 @@ Core endpoints:
 - `POST /deep-plan`
 - `POST /social-attention/plan`
 - `POST /compose-response-plan`
-- `POST /task-continuity`
 
 Catalog entries include `prompt_tier`, `prompt_tier_locked`,
 `prompt_tier_source`, and `prompt_tier_reason`. Unlocked `common` entries are
