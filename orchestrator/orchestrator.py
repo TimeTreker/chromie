@@ -6946,34 +6946,9 @@ class VoiceAssistant:
                     )
                 )
             else:
-                # Compatibility-only fallback for older injected runtimes.
-                # It is intentionally broad only for broad scopes.
-                if scope in {
-                    "current_interaction",
-                    "global_emergency",
-                }:
-                    cancel_all = getattr(
-                        self.interaction_runtime,
-                        "cancel_all",
-                        None,
-                    )
-                    if callable(cancel_all):
-                        runtime_operation_kind = "runtime_legacy"
-                        phase_operations.append(
-                            (runtime_operation_kind, cancel_all())
-                        )
-                    else:
-                        dispatch_failures.append(
-                            "capability_runtime:dispatch_unsupported"
-                        )
-                elif scope == "embodied_motion":
-                    dispatch_failures.append(
-                        "capability_runtime:scoped_dispatch_unsupported"
-                    )
-                elif scope == "media_output":
-                    dispatch_failures.append(
-                        "capability_runtime:scoped_dispatch_unsupported"
-                    )
+                dispatch_failures.append(
+                    "capability_runtime:scoped_dispatch_unsupported"
+                )
 
         if scope in {
             "output_only",
@@ -7014,20 +6989,6 @@ class VoiceAssistant:
                 else:
                     dispatch_failures.append(
                         "capability_runtime:invalid_dispatch_receipt"
-                    )
-            elif operation_kind == "runtime_legacy":
-                if isinstance(result, BaseException):
-                    dispatch_failures.append(
-                        "capability_runtime_legacy:"
-                        f"{type(result).__name__}:{str(result)[:300]}"
-                    )
-                elif active_interaction_id:
-                    receipt = receipt.model_copy(
-                        update={
-                            "interaction_ids": (
-                                active_interaction_id,
-                            )
-                        }
                     )
             elif operation_kind == "emergency_stop":
                 if isinstance(result, BaseException):
@@ -7216,10 +7177,6 @@ class VoiceAssistant:
                     reason="Core authorized interruption of foreground work",
                 )
             )
-        elif active is not None and not active.done():
-            cancel_all = getattr(self.interaction_runtime, "cancel_all", None)
-            if callable(cancel_all):
-                await cancel_all()
         if active is not None and not active.done():
             active.cancel()
         if new_session_id:

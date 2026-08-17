@@ -720,9 +720,6 @@ class InteractionRuntimeCoordinator:
             required.update(request.request_id for request in response.capabilities)
         return required
 
-    async def cancel_all(self) -> None:
-        await self.runtime.cancel_all()
-
     async def cancel_scope(
         self,
         directive: CancellationDirective,

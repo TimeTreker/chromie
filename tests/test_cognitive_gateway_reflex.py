@@ -333,9 +333,6 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         confirmation_dialogue = _ConfirmationDialogue()
 
         class _Runtime:
-            async def cancel_all(self) -> None:
-                events.append("capability_runtime_cancel_all")
-
             async def cancel_scope(self, directive: Any) -> Any:
                 events.append("capability_runtime_cancel_scope")
                 if with_pending_confirmation:

@@ -2084,9 +2084,7 @@ class ConversationStateManager:
             validated.host_task_cancel_requested_interaction_ids
         )
         runtime_dispatch_uncertain = any(
-            str(item).startswith(
-                ("capability_runtime:", "capability_runtime_legacy:")
-            )
+            str(item).startswith("capability_runtime:")
             for item in validated.dispatch_failures
         )
         output_dispatch_uncertain = any(

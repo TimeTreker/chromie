@@ -1407,6 +1407,26 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
                         )
                     )
 
+    for relative in (
+        "orchestrator/runtime/capability_runtime.py",
+        "orchestrator/runtime/interaction_coordinator.py",
+    ):
+        source = (root / relative).read_text(encoding="utf-8")
+        if "async def cancel_all(" in source:
+            findings.append(
+                _source_policy_finding(
+                    root=root,
+                    path=relative,
+                    rule_id=RULE_CANONICAL_CAPABILITY_ID,
+                    symbol="cancel_all",
+                    message=(
+                        "Capability cancellation must remain scope-qualified through "
+                        "CancellationDirective/cancel_scope; broad cancel_all compatibility "
+                        "must not be reintroduced"
+                    ),
+                )
+            )
+
     retired_runtime_paths = (
         "orchestrator/runtime/abilities.py",
         "orchestrator/runtime/skill_runtime.py",

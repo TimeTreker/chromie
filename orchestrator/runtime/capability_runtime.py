@@ -868,14 +868,6 @@ class CapabilityRuntime:
     def _is_runtime_cancellation(result: CapabilityResult) -> bool:
         return result.status == "cancelled" and result.reason_code == "cancelled"
 
-    async def cancel_all(self) -> None:
-        await self.cancel_scope(
-            CancellationDirective(
-                source_turn_id="capability_runtime_cancel_all",
-                requested_scope="global_emergency",
-            )
-        )
-
     async def cancel_interaction(self, interaction_id: str) -> None:
         await self.cancel_scope(
             CancellationDirective(

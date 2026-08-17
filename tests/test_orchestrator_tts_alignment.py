@@ -1102,8 +1102,13 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         class _Runtime:
             cancel_calls = 0
 
-            async def cancel_all(self) -> None:
+            async def cancel_scope(self, directive: Any) -> Any:
                 self.cancel_calls += 1
+                return CancellationDispatchReceipt(
+                    source_turn_id=directive.source_turn_id,
+                    requested_scope=directive.requested_scope,
+                    effective_scope=directive.requested_scope,
+                )
 
         async def abort_output_stream(self: VoiceAssistant) -> None:
             nonlocal aborts
