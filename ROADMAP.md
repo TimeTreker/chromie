@@ -164,9 +164,11 @@ baseline**, not another broad concept-expansion phase:
    copies the referenced Goal/Evidence/provider truth.
 3. **Goal materialization, refinement, and replacement are implemented.** Fully
    discharged provider-free native conversation stays transient; same-Responsibility
-   refinement preserves compatible Work unless `requires_replan=true`; genuine
-   replacement creates new Goal lineage, stops incompatible old Work through trusted
-   receipts, and supersedes the old Responsibility without rewriting history.
+   refinement changes Canonical Goal meaning only. Existing Fast Planner Work
+   Reconciliation compares that meaning with retained/provisional Work and explicitly
+   selects reuse or correction; GA and Host never decide compatibility. Genuine
+   replacement creates new Goal lineage, stops Planner-rejected old Work through
+   trusted receipts, and supersedes the old Responsibility without rewriting history.
 4. **Evidence-driven reactivation and selective Reflection are implemented.**
    Trusted non-completed execution evidence derives an ephemeral fast/slow opportunity.
    Only slow opportunities invoke typed Reflection; its Goal/evidence references are

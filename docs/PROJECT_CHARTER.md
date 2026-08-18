@@ -133,11 +133,14 @@ flowchart TD
     FP -->|"only user-resolvable blocker"| ASK["Clarification Activity"]
 
     GA --> GOALS["Canonical Goals<br/>each Goal has a Task-list view"]
-    GOALS --> BIND["Bind/reindex Fast Activities<br/>to Canonical Goal IDs"]
+    GOALS --> WREC["Fast Planner Work Reconciliation<br/>Canonical Goal + relevant actual Work"]
+    SAFE -. "provisional Activity state" .-> WREC
     SAFE --> TCR["Trusted Capability Runtime<br/>one task identity; Goal-grouped views"]
+    TCR -. "queued / running / completed state" .-> WREC
+    WREC --> BIND["Planner-selected exact Activity reuse<br/>Host validates identity/version/state"]
     BIND --> TCR
+    WREC -->|"corrected complete Plan"| TCR
     DP -->|"new Plan revision"| TCR
-    GA -->|"cancel/replace pending or cancellable Work"| TCR
 
     COMM --> ARB["Host validation + resource-aware scheduling"]
     ASK --> ARB
@@ -159,6 +162,69 @@ ownership and information flow, not a mandatory synchronous wall-clock pipeline.
 It does **not** add new semantic authorities between Planner and Provider:
 `planned Work`, semantic Primary Activities, and their realization are the
 explicit internal expansion of how Planner advances Goals.
+
+The following close-up is the normative flow for a clear, low-consequence
+information request such as a weather lookup. It makes the asynchronous join in
+the expanded diagram explicit:
+
+```mermaid
+flowchart TD
+    A["Person: Will it rain in Chongqing tonight?"] --> B["Goal Interpretation<br/>Responsibility + supplied semantic bindings"]
+    B --> C["Fast Planner<br/>check Capability inputs and early-execution policy"]
+
+    C --> D["Communicative Activity<br/>I will check"]
+    C --> E["weather.lookup Activity<br/>Chongqing + today + night"]
+    D --> F["Vocal Runtime starts immediately"]
+    E --> G["Trusted Capability Runtime starts the safe read<br/>under Responsibility refs"]
+    G --> N["Provisional execution result / trace"]
+
+    B --> H["Goal Association runs concurrently<br/>and commits Canonical Goal identity"]
+    H --> K["Canonical Fast Planner Work Reconciliation<br/>Goal + provisional Work/result state"]
+    G --> K
+    K --> L{"Planner selects the exact provisional Activity<br/>as still advancing the Goal?"}
+
+    L -- "Yes: explicit reuse" --> J["Host validates identity/version/state<br/>then binds the same task and Evidence"]
+    N --> J
+    L -- "No: replace or supplement" --> M["Runtime cancels pending/cancellable provisional Work<br/>only after the Planner decision"]
+    N -. "if the revised Plan rejects it" .-> Q["If incompatible and already completed:<br/>retain as unbound audit Evidence"]
+    M --> R["Trusted Runtime executes corrected Work"]
+
+    J --> O["Fast Planner Evidence re-entry"]
+    R --> S["Corrected trusted Evidence"]
+    S --> O
+    O --> P["Truth-qualified answer"]
+```
+
+“Before GA” is an authority statement, not a race against GA's wall-clock finish.
+Once Fast Planner has a complete, available, schema-valid safe read whose provider
+explicitly declares it side-effect-free and parallel-safe, Runtime submits it without
+awaiting GA. The request initially carries GI-local Responsibility refs, never a
+provisional Goal ID. Once GA commits Goal identity, the existing Fast Planner receives
+the Canonical Goal plus relevant provisional/retained Work state and semantically decides
+what still advances the Responsibility. GA neither chooses replanning nor compares Work;
+the Host never infers semantic compatibility from Goal IDs, relationship enums, argument
+equality, or a missing Plan step. Planner explicitly selects an existing Activity for
+reuse by reproducing its complete semantics and stable Activity identity. Orchestrator
+then checks only that the selected request, version, state, Capability, arguments,
+ownership, and timing are exactly the Work the Planner saw. A stale snapshot fails
+closed for the current dispatch; the corresponding Runtime/Evidence change is the next
+Planner-reactivation event, so Host never guesses. Runtime reuses a validated selection or
+cancels pending/cancellable Work only after the Planner decision and executes the
+corrected complete Plan. A completed
+observation cannot be undone; incompatible output remains immutable unbound audit
+Evidence and cannot support the Goal or user-facing claims. Effectful,
+confirmation-requiring, privacy-sensitive, materially costly, or undeclared-concurrency
+Work never uses this early path.
+
+The bounded Planner input `work_reconciliation_activities` covers both the provisional
+same-turn Activity above and still-owned retained Runtime requests from prior turns.
+Planner alone selects reuse through `CanonicalPlanStep.reuse_activity_id`. Same-turn
+provisional Work can be rebound into the current canonical Plan. Retained Work remains
+owned by its original submission: current Runtime reuse is atomic and
+reconciliation-only, so Planner selects the complete retained set with no additional
+step and Host dispatches nothing twice. If different or additional Work is needed,
+Planner emits one complete replacement Plan with no reuse selection; Runtime closes
+cancellable old Work through exact receipts before dispatching replacement Work.
 
 The runtime has several entry shapes, and **having no canonical Goal is not the
 same as having no turn**:
@@ -233,7 +299,11 @@ Read the diagram with these boundaries:
 - Goal Association remains the only canonical Responsibility/Goal-state authority.
   GA independently associates, creates, continues, corrects, merges, splits, or
   supersedes canonical Goals from the same GI result without waiting for or
-  rewriting Fast Planner output.
+  rewriting Fast Planner output. It emits no `requires_replan`, Work-compatibility,
+  Capability, cancellation, or next-action decision. A Canonical Goal commit that
+  intersects retained or provisional Work reactivates Fast Planner Work Reconciliation;
+  this is a structural continuation of an open Responsibility, not a Host semantic
+  judgment. This gives GA no Capability or planning authority.
 - Canonical Goal owns **what outcome Chromie still owes persistently**.
 - Fast/Deep Planner owns **what Work can advance those Goals now**, constrained by
   the currently available Capability/provider contracts. Fast Planner owns ordinary
@@ -247,9 +317,11 @@ Read the diagram with these boundaries:
 - Trusted Capability Runtime owns the executable task set. Every canonical Goal
   has a task-list view. A shared Activity may appear in more than one Goal view,
   but the pair of runtime interaction/request IDs denotes one task and it executes
-  only once. GA or Deep Planner may supply a newer authorized Plan revision;
-  Runtime cancels or replaces only pending/cancellable Work, preserves completed
-  Evidence, and never silently replays completed Work.
+  only once. A newer Fast/Deep Planner-authored canonical Plan revision may cause
+  Runtime to cancel or replace only pending/cancellable Work; Runtime preserves
+  completed Evidence and never silently replays completed Work. GA supplies Goal
+  continuity only; Fast Planner compares that Goal with relevant Work and supplies the
+  Plan revision.
 - Runtime schedules independent Activities according to declared dependencies,
   provider concurrency, and resource ownership. Vocal work, locomotion, and
   manipulation may overlap when their declared resources do not conflict. Multiple
@@ -604,9 +676,15 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    identity; Runtime initially indexes them by GI
    Responsibility and then reindexes the same task identity into each applicable
    Goal's task-list view. Effectful work still waits for canonical Goal binding and
-   retains confirmation, authorization, resource, and safety barriers. If GA or Deep
-   Planner corrects the Plan, Runtime cancels/replaces only pending or cancellable
-   tasks and preserves completed Evidence. A one-turn greeting still receives a
+   retains confirmation, authorization, resource, and safety barriers. GA never judges
+   Work compatibility. When Canonical Goal commit intersects retained or provisional
+   Work, Orchestrator structurally re-enters Fast Planner with the Goal and bounded
+   actual Work snapshot. Planner explicitly selects reuse by stable Activity ID or
+   authors replacement/supplemental Work; Runtime then validates exact identity,
+   version, state, Capability, arguments, ownership, and timing. Runtime reuses selected
+   Work and cancels/replaces only pending or cancellable unselected Work after that
+   decision. Evidence from incompatible provisional Work remains auditable
+   but unbound and cannot support Goal completion or response claims. A one-turn greeting still receives a
    canonical conversational Goal; it does not need a second planning pass merely to
    permit speech.
 26. **Stable Mind is cacheable; live context is projected.** Chromie's identity,

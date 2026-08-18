@@ -773,6 +773,10 @@ class ConversationStateManager:
                         "args": self._json_safe(
                             item.get("args") if isinstance(item.get("args"), dict) else {}
                         ),
+                        "timing": str(item.get("timing") or "sequential").strip(),
+                        "source_goal_ids": self._string_list(
+                            item.get("source_goal_ids")
+                        ),
                         "safety_class": str(
                             item.get("safety_class") or ""
                         ).strip(),
@@ -802,6 +806,13 @@ class ConversationStateManager:
             ),
             "execution_outcome_status": str(
                 metadata.get("execution_outcome_status") or ""
+            ).strip(),
+            "interaction_id": str(metadata.get("interaction_id") or "").strip(),
+            "canonical_plan_id": str(
+                metadata.get("canonical_plan_id") or ""
+            ).strip(),
+            "canonical_plan_fingerprint": str(
+                metadata.get("canonical_plan_fingerprint") or ""
             ).strip(),
         }
         return TaskContextSnapshot(
@@ -984,8 +995,6 @@ class ConversationStateManager:
             "waiting_for_user"
             if any(gap.blocking and gap.preferred_resolution == "ask_user" for gap in operation.information_gaps)
             else "planning"
-            if operation.requires_replan
-            else "open"
         )
         commitment = operation.commitment_state or (
             "waiting_for_user" if status == "waiting_for_user" else "evaluating"
@@ -1033,7 +1042,6 @@ class ConversationStateManager:
                 "semantic_operation_id": operation.operation_id,
                 "semantic_operation_confidence": operation.confidence,
                 "semantic_relationship": operation.relationship,
-                "requires_replan": operation.requires_replan,
             },
         }
         self._task_contexts.append(context)
@@ -1216,28 +1224,6 @@ class ConversationStateManager:
             ][:4]
 
             old_plan_version = max(0, int(context.get("plan_version") or 0))
-            if operation.requires_replan:
-                if old_plan_version:
-                    superseded = context.get("superseded_plan_versions")
-                    if not isinstance(superseded, list):
-                        superseded = []
-                    if old_plan_version not in superseded:
-                        superseded.append(old_plan_version)
-                    context["superseded_plan_versions"] = superseded[-12:]
-                context["plan_status"] = "superseded" if old_plan_version else "not_planned"
-                confirmation = context.get("confirmation")
-                if isinstance(confirmation, dict) and confirmation:
-                    invalidated = context.get("invalidated_confirmations")
-                    if not isinstance(invalidated, list):
-                        invalidated = []
-                    invalidated.append({
-                        **confirmation,
-                        "invalidated_ms": now,
-                        "reason": "semantic_incompatibility_requires_replan",
-                    })
-                    context["invalidated_confirmations"] = invalidated[-8:]
-                    context["confirmation"] = None
-
             blocking_user_gap = any(
                 bool(item.get("blocking", True))
                 and str(item.get("preferred_resolution") or "") == "ask_user"
@@ -1250,19 +1236,16 @@ class ConversationStateManager:
                 for item in context["open_information_gaps"]
             )
             preserve_work_state = (
-                not operation.requires_replan
-                and (
-                    old_plan_version > 0
-                    or previous_work_status
-                    in {
-                        "awaiting_confirmation",
-                        "committed",
-                        "scheduled",
-                        "running",
-                        "paused",
-                        "recoverable",
-                    }
-                )
+                old_plan_version > 0
+                or previous_work_status
+                in {
+                    "awaiting_confirmation",
+                    "committed",
+                    "scheduled",
+                    "running",
+                    "paused",
+                    "recoverable",
+                }
             )
             if preserve_work_state:
                 context["status"] = previous_work_status
@@ -1281,27 +1264,6 @@ class ConversationStateManager:
                     if context["status"] == "waiting_for_user"
                     else "evaluating"
                 )
-
-            compatibility_history = context.get("semantic_compatibility_history")
-            if not isinstance(compatibility_history, list):
-                compatibility_history = []
-            compatibility_history.append(
-                {
-                    "goal_version": revised.version,
-                    "previous_work_status": previous_work_status,
-                    "plan_version": old_plan_version,
-                    "decision": (
-                        "supersede" if operation.requires_replan else "preserve"
-                    ),
-                    "reason": (
-                        "requires_replan"
-                        if operation.requires_replan
-                        else "same_responsibility_compatible_revision"
-                    ),
-                    "ts_ms": now,
-                }
-            )
-            context["semantic_compatibility_history"] = compatibility_history[-12:]
 
         context["task_relation"] = {
             "modify": "modify_task",
@@ -1342,7 +1304,6 @@ class ConversationStateManager:
             "semantic_operation_id": operation.operation_id,
             "semantic_operation_confidence": operation.confidence,
             "semantic_relationship": operation.relationship,
-            "requires_replan": operation.requires_replan,
         }
         result.update(
             {
@@ -2706,7 +2667,6 @@ class ConversationStateManager:
                     confidence=resolved.confidence,
                     relationship="new",
                     goal=goal,
-                    requires_replan=True,
                     reason_summary=resolved.reason_summary,
                     metadata={
                         "goal_association_turn_id": resolved.turn_id,
@@ -2820,7 +2780,6 @@ class ConversationStateManager:
                     relationship=association.relationship,
                     goal_update=association.goal_update,
                     resolved_gap_ids=association.resolved_gap_ids,
-                    requires_replan=association.requires_replan,
                     reason_summary=association.reason_summary,
                     metadata={
                         "goal_association_turn_id": resolved.turn_id,
@@ -4908,6 +4867,19 @@ class ConversationStateManager:
         context = self._task_context_by_id(task_id) if task_id else self._current_task_context()
         if context is None:
             return
+        if metadata.get("retained_work_reconciliation_only") is True:
+            current_metadata = context.get("metadata")
+            if not isinstance(current_metadata, dict):
+                current_metadata = {}
+            context["metadata"] = {
+                **current_metadata,
+                "last_retained_work_reconciliation_plan_id": str(
+                    metadata.get("canonical_plan_id") or ""
+                ),
+                "last_retained_work_reconciliation_ms": _now_ms(),
+            }
+            self._persist_task_contexts_if_enabled()
+            return
         try:
             proposed_goal_version = int(metadata.get("goal_version") or context.get("goal_version") or 1)
         except (TypeError, ValueError):
@@ -5208,6 +5180,7 @@ class ConversationStateManager:
                         "args": self._json_safe(
                             item.get("args") if isinstance(item.get("args"), dict) else {}
                         ),
+                        "timing": str(item.get("timing") or "sequential"),
                         "source_goal_ids": self._string_list(
                             (item.get("metadata") or {}).get("source_goal_ids")
                         ),

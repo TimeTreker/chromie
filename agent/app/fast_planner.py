@@ -1705,6 +1705,10 @@ class FastPlannerResolver:
                         planner_tier="fast",
                         expected_goal_ids_for_turn=expected_goal_ids_for_turn,
                     )
+                    self._validate_work_reuse_selection(
+                        validated_model_output,
+                        context=request.context,
+                    )
                 except (ValidationError, ValueError) as exc:
                     raise PlannerDTOContractError(str(exc)) from exc
 
@@ -2161,6 +2165,79 @@ class FastPlannerResolver:
         )
         return text if len(text) <= limit else text[:limit].rstrip() + "..."
 
+    @staticmethod
+    def _validate_work_reuse_selection(
+        output: Any,
+        *,
+        context: dict[str, Any] | None,
+    ) -> None:
+        """Validate explicit Planner reuse references without choosing reuse.
+
+        Fast Planner owns the semantic decision by either citing a supplied
+        provisional Activity ID or omitting it. This check is deliberately
+        mechanical: cited IDs must exist and the selected step must preserve
+        the Activity's immutable Capability, arguments, and timing. The Host
+        later validates canonical Goal ownership and live runtime state.
+        """
+
+        raw_activities = (context or {}).get(
+            "work_reconciliation_activities"
+        )
+        activities = (
+            [item for item in raw_activities if isinstance(item, dict)]
+            if isinstance(raw_activities, list)
+            else []
+        )
+        by_id = {
+            str(item.get("activity_id") or "").strip(): item
+            for item in activities
+            if str(item.get("activity_id") or "").strip()
+        }
+        cited: set[str] = set()
+        for step in output.steps:
+            activity_id = str(step.reuse_activity_id or "").strip()
+            if not activity_id:
+                continue
+            if activity_id in cited:
+                raise PlannerDTOContractError(
+                    f"reuse_activity_id is duplicated: {activity_id}"
+                )
+            cited.add(activity_id)
+            activity = by_id.get(activity_id)
+            if activity is None:
+                raise PlannerDTOContractError(
+                    f"reuse_activity_id was not supplied by Runtime: {activity_id}"
+                )
+            if step.capability_id != str(activity.get("capability_id") or ""):
+                raise PlannerDTOContractError(
+                    f"reuse_activity_id {activity_id} changes capability_id"
+                )
+            if step.args != dict(activity.get("args") or {}):
+                raise PlannerDTOContractError(
+                    f"reuse_activity_id {activity_id} changes immutable args"
+                )
+            if step.timing != str(activity.get("timing") or "sequential"):
+                raise PlannerDTOContractError(
+                    f"reuse_activity_id {activity_id} changes timing"
+                )
+
+        # The supplied reconciliation projection is one bounded snapshot.
+        # Reusing any member currently requires selecting every member; extra
+        # newly planned steps remain legal and execute beside the reused set.
+        if cited and cited != set(by_id):
+            raise PlannerDTOContractError(
+                "Work reuse must select the complete supplied "
+                "Activity set"
+            )
+        if cited and any(
+            by_id[activity_id].get("origin") == "retained_runtime"
+            for activity_id in cited
+        ) and len(output.steps) != len(cited):
+            raise PlannerDTOContractError(
+                "retained Runtime Work reuse cannot add steps to the "
+                "reconciliation-only Plan"
+            )
+
     def _prompt(
         self,
         request: CognitiveWorkRequest,
@@ -2235,6 +2312,29 @@ class FastPlannerResolver:
             "repeat the user goal, catalog description, arguments, or the same "
             "justification across multiple fields. "
         )
+        provisional_fast_activities = context.get(
+            "work_reconciliation_activities"
+        )
+        provisional_work_contract = (
+            "The listed retained or provisional Runtime Activities may already be "
+            "running or completed. Decide from the canonical Goals whether their Work "
+            "is still required. To preserve and reuse the complete provisional plan, "
+            "set each corresponding step.reuse_activity_id to the supplied stable "
+            "activity_id and preserve the same Capability ID, exact arguments, Goal "
+            "ownership, and timing. Omitting reuse_activity_id means that Activity is "
+            "not selected for reuse. The Host will validate the explicit selection "
+            "mechanically and will not execute selected Work twice. If any Work is no "
+            "longer applicable or additional/different Work is required, author the "
+            "correct complete canonical Plan instead; Runtime will then cancel only "
+            "pending/cancellable provisional Work. Do not treat provisional execution "
+            "as Goal Evidence before Host binding. Reusing retained_runtime Work is a "
+            "reconciliation-only Plan and cannot add steps; when additional Work is "
+            "needed, omit all reuse_activity_id values and author the complete replacement "
+            "Plan so Runtime can cancel the old group before dispatch. "
+            if isinstance(provisional_fast_activities, list)
+            and provisional_fast_activities
+            else "This is prospective planning: no retained or provisional Runtime Work is supplied for reconciliation. "
+        )
         if len(expected_goal_ids(context)) > 1:
             return (
                 f"Goal association advisory JSON:\n{self._bounded(association, 3000)}\n\n"
@@ -2246,7 +2346,7 @@ class FastPlannerResolver:
                 f"Delivered evidence-bound dialogue JSON (trusted spoken projection, not the full provider result):\n{self._bounded(evidence_bound_dialogue(context, fallback_history=request.history), 3600)}\n\n"
                 f"Host-bound terminal Evidence JSON:\n{self._bounded(context.get('trusted_terminal_evidence') or [], 6000)}\n\n"
                 f"Active and recoverable task bindings JSON:\n{self._bounded(context.get('active_task_snapshots') or [], 5000)}\n\n"
-            f"Bounded live Situation projection JSON (soft/revisable relevance only; referenced owners remain authoritative):\n{self._bounded(situation_prompt_projection(context), 3600)}\n\n"
+                f"Retained or provisional Runtime Activities for Work reconciliation JSON:\n{self._bounded(provisional_fast_activities or [], 3500)}\n\n"
                 f"Bounded live Situation projection JSON (soft/revisable relevance only; referenced owners remain authoritative):\n{self._bounded(situation_prompt_projection(context), 3600)}\n\n"
                 f"{goal_progress_communication_prompt('Fast Planner')}\n\n"
                 f"Goal-scoped Interaction Context JSON:\n{self._bounded(context.get('interaction_context') or {}, 7000)}\n\n"
@@ -2261,8 +2361,9 @@ class FastPlannerResolver:
                 f"{PERSONALITY_SEMANTIC_CONTRACT}"
                 f"{result_evidence_contract}{goal_execution_contract}"
                 f"{concise_output_contract}"
+                f"{provisional_work_contract}"
                 "Author stable non-empty step_id values, exact source_goal_ids, and matching outcome step_ids yourself. "
-                "This is prospective planning: no action has executed yet. A planned step or response counts as satisfying its goal if it would succeed. For each keyed goal outcome, judge only that one goal; never put sibling goals or pending execution in unmet_goal_ids or unmet_requirements. Complete terminal outcomes use exact satisfaction with both unmet lists empty. "
+                "A planned step or response counts as satisfying its goal if it would succeed. For each keyed goal outcome, judge only that one goal; never put sibling goals or pending execution in unmet_goal_ids or unmet_requirements. Complete terminal outcomes use exact satisfaction with both unmet lists empty. "
                 "Fast terminal scope permits at most one executable step per goal. A count argument performs repetition inside one skill call; never duplicate a step to implement repeated blinks, nods, or similar motions. Respond goals have no executable step. "
                 "For a terminal plan, every per-goal outcome is execute or respond, coverage is complete, and the top-level disposition exactly aggregates the outcome dispositions. A respond outcome contains the actual answer now and references no steps. An execute outcome references every and only the model-authored steps owned by that goal. "
                 "For semantic escalation, author disposition=escalate, coverage=partial or uncertain, steps=[], a non-empty top-level escalation_reason, and one escalate outcome for every canonical goal. Each escalate outcome must explain its own unresolved need, reference no steps, carry no response_text, and include a non-exact prospective satisfaction judgment. Do not mix escalation outcomes with executable or response outcomes. "
@@ -2287,6 +2388,7 @@ class FastPlannerResolver:
             f"Delivered evidence-bound dialogue JSON (trusted spoken projection, not the full provider result):\n{self._bounded(evidence_bound_dialogue(context, fallback_history=request.history), 3600)}\n\n"
             f"Host-bound terminal Evidence JSON:\n{self._bounded(context.get('trusted_terminal_evidence') or [], 6000)}\n\n"
             f"Active and recoverable task bindings JSON:\n{self._bounded(context.get('active_task_snapshots') or [], 5000)}\n\n"
+            f"Retained or provisional Runtime Activities for Work reconciliation JSON:\n{self._bounded(provisional_fast_activities or [], 3500)}\n\n"
             f"Bounded live Situation projection JSON (soft/revisable relevance only; referenced owners remain authoritative):\n{self._bounded(situation_prompt_projection(context), 3600)}\n\n"
             f"{goal_progress_communication_prompt('Fast Planner')}\n\n"
                 f"Goal-scoped Interaction Context JSON:\n{self._bounded(context.get('interaction_context') or {}, 7000)}\n\n"
@@ -2305,6 +2407,7 @@ class FastPlannerResolver:
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
             f"{result_evidence_contract}{goal_execution_contract}"
             f"{concise_output_contract}"
+            f"{provisional_work_contract}"
             "Generic speech transport is not a plan step. A canonical Goal with responsibility_kind=vocal_output, output_mode=speech, and provider_required=false is a direct conversational responsibility: use disposition=respond with the actual response_text now. Executable outcomes may also carry response_text when it is a still-needed prospective conversational delta; use Interaction Context to omit equivalent delivered or pending speech, and never treat that text as execution evidence. A vocal_output Goal with provider_required=true is a mode-specific vocal performance and cannot be completed by response_text, chromie.speak, ordinary TTS, media playback, or a body gesture. Execute that Goal only when the supplied catalog contains exact capability_id chromie.vocal.perform and its mode enum contains the authoritative Goal output_mode; copy that exact mode and authored content into one owned step. Otherwise escalate for an exact unavailable, refused, or clarification outcome; never invent a vocal capability ID or silently choose another mode. A canonical executable_action/activity/media_playback Goal uses exactly one `chromie.media.<media_operation>` capability copied from the qualified catalog. Playback of existing music, recordings, streams, or sound effects is never a Vocal Goal and never evidence for singing. Preserve persistent playback_id controls and do not replace play, pause, resume, seek, stop, volume, or status with another operation. Greeting wording and length are ordinary model-authored conversational choices governed by the supplied scene, relationship context, and owner-approved personality. "
             "Every executable step must use capability_id plus source_goal_ids copied from the canonical goals. Do not use catalog-only parameters, action, input_schema, route, or step_type fields. "
             "goal_satisfaction measures prospective plan adequacy: planned steps count as satisfying their goals if successful, so pending execution alone is never an unmet requirement. A score from 0.95 through 1.0 requires status=exact; score=1.0 must never use substantial. If steps are present, top-level disposition cannot be respond. "

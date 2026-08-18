@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from agent.app.clients.ollama_client import OllamaGenerationError
 from agent.app.goal_association import (
+    GoalAssociationModelAssociation,
     GoalAssociationModelBinding,
     GoalAssociationModelGoal,
     GoalAssociationModelInformationResourceResponsibility,
@@ -2336,6 +2337,24 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
 
 
 class GoalAssociationResolutionContractTests(unittest.TestCase):
+    def test_goal_association_dto_has_no_work_replanning_authority(self):
+        self.assertNotIn(
+            "requires_replan",
+            GoalAssociationModelAssociation.model_json_schema()["properties"],
+        )
+        parsed = GoalAssociationModelAssociation.model_validate(
+            {
+                "relationship": "modify",
+                "source_responsibility_refs": ["weather"],
+                "target_goal_ids": ["goal-weather"],
+                "updated_description": "Check a corrected location.",
+                # Transport-noise compatibility must not restore authority that
+                # the decoder schema and canonical DTO deliberately removed.
+                "requires_replan": True,
+            }
+        )
+        self.assertNotIn("requires_replan", parsed.model_dump())
+
     def test_fail_closed_is_the_only_empty_terminal_resolution(self):
         failed = GoalAssociationResolution(
             turn_id="turn-1",

@@ -139,6 +139,8 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             require_speech=False,
             require_social_attention_opportunity=True,
             require_fast_planner_evidence_reentry=True,
+            require_pre_ga_safe_capability_dispatch=True,
+            require_canonical_work_reconciliation=True,
             max_warm_gi_handoff_to_fast_commit_ms=2000,
             max_warm_fast_commit_to_playback_start_ms=3000,
         )
@@ -149,7 +151,13 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             "interaction_response": {"speech": [], "capabilities": []},
             "cognitive_runtime": {
                 "timings_ms": {"fast_planner_commit": 600.0},
-                "metadata": {"social_attention_opportunity_count": 1},
+                "metadata": {
+                    "social_attention_opportunity_count": 1,
+                    "fast_capability_activity_status": (
+                        "completed_before_canonical_dispatch:completed"
+                    ),
+                    "work_reconciliation_required": True,
+                },
             },
             "session_state": {
                 "cognitive_workflow_stages": [
@@ -201,6 +209,26 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             1000.0,
         )
         self.assertFalse(evidence["claim_limits"]["audible_speaker_proven"])
+
+        deferred_summary = json.loads(json.dumps(summary))
+        deferred_summary["cognitive_runtime"]["metadata"][
+            "fast_capability_activity_status"
+        ] = "deferred_to_canonical_validation:ValueError"
+        errors = validate_live_text_result(case, deferred_summary)
+        self.assertTrue(
+            any("pre-GA Fast Activity dispatch" in item for item in errors),
+            errors,
+        )
+
+        unreconciled_summary = json.loads(json.dumps(summary))
+        unreconciled_summary["cognitive_runtime"]["metadata"][
+            "work_reconciliation_required"
+        ] = False
+        errors = validate_live_text_result(case, unreconciled_summary)
+        self.assertTrue(
+            any("Work reconciliation did not run" in item for item in errors),
+            errors,
+        )
 
         slow_summary = json.loads(json.dumps(summary))
         slow_summary["session_state"]["workflow_events"][-1]["elapsed_ms"] = 4500.0

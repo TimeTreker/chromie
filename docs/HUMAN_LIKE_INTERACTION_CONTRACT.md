@@ -224,9 +224,51 @@ Trusted Capability Runtime exposes one task-list view per canonical Goal. A task
 serving multiple Goals appears in each applicable view under the same stable request
 identity and executes once. Runtime may execute independent tasks concurrently when
 declared resources and provider limits allow—for example several safe weather reads,
-or Vocal work alongside non-conflicting body work. A newer GA/Deep-authorized Plan
-may cancel or replace unfinished cancellable tasks, but completed Evidence remains
-immutable and is never converted into “did not happen.”
+or Vocal work alongside non-conflicting body work. A newer Fast/Deep
+Planner-authored canonical Plan may cause Runtime to cancel or replace unfinished
+cancellable tasks, but completed Evidence remains immutable and is never converted
+into “did not happen.” GA supplies Goal continuity but never authors or selects that
+Plan.
+
+A clear observational request must not wait for Goal Association merely to learn its
+canonical Goal ID. After Fast Planner verifies complete arguments, availability,
+schema validity, no confirmation, `safe_read`, `side_effect_free=true`, and an explicit
+parallel-safety declaration, Trusted Runtime may start the lookup under GI-local
+Responsibility refs while GA runs. This is ordinary human-like anticipation: begin a
+cheap observation while deciding how it fits ongoing concerns. It is not permission to
+speculate with effects, private or materially costly access, or undeclared concurrency.
+
+A changed Goal ID, association relationship, or exact argument equality cannot by itself
+decide Work compatibility. GA emits only Canonical Goal continuity. When that commit
+intersects retained or provisional Work, the existing Fast Planner compares the Goal,
+Responsibility, Situation, Evidence, and queued/running/completed Activities and authors
+the complete desired Plan. To reuse provisional Work it explicitly sets
+`CanonicalPlanStep.reuse_activity_id` to the same stable Activity identity and
+reproduces its complete Capability, arguments, Goal ownership, and multi-Activity
+timing. Orchestrator validates that selection against the exact version and runtime
+state but never supplies the semantic decision. A stale selection fails closed for the
+current dispatch; its Runtime/Evidence change triggers the next bounded Planner entry
+rather than a Host repair. Runtime
+binds/reuses validated Work or cancels pending/cancellable Work only after the Planner
+decision and executes the corrected Plan. Already-completed
+incompatible observations remain immutable unbound audit Evidence and cannot ground
+Goal completion or speech.
+
+This behaves like a person continuing an already-started check rather than starting it
+again merely because they thought about it once more. Retained-work reuse is explicit
+and reconciliation-only at the current Runtime boundary: Planner selects the complete
+retained Activity set and Host preserves the original execution binding. If Planner
+needs different or additional Work, it authors one complete replacement Plan without
+reuse selections; Host closes cancellable old Work before starting that Plan. Host does
+not derive either choice from matching words or arguments.
+
+This is one iteration of the continuous Responsibility loop, not a turn-final repair.
+User corrections, provider Evidence, failure, timeout, dependency readiness, trusted
+Situation change, or another relevant event may reactivate the same Fast Planner while
+the Goal remains open. Routine runtime churn does not wake cognition, and passive waiting
+does not close the Responsibility. Continuous Mind means state-driven re-entry until all
+owned Responsibilities are satisfied, cancelled, refused, or superseded—not an unlimited
+background LLM loop.
 
 ## Human-like cognition is selective, not perfectionist
 

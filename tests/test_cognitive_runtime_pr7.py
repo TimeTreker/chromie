@@ -454,6 +454,289 @@ def walk_definition() -> CapabilityDefinition:
 
 
 class GoalDrivenRuntimeTests(unittest.TestCase):
+    @staticmethod
+    def _retained_weather_snapshot(*, location: str = "重庆") -> dict:
+        return {
+            "task_id": "task-weather",
+            "status": "running",
+            "semantic_goal": {
+                "goal_id": "goal-weather",
+                "version": 1,
+                "description": "Check the weather.",
+                "source_text": "Check the weather.",
+            },
+            "goal_version": 1,
+            "plan_version": 1,
+            "metadata": {
+                "execution_binding": {
+                    "planned_capabilities": [
+                        {
+                            "capability_id": "chromie.weather.lookup",
+                            "request_id": "request-weather-existing",
+                            "args": {"location": location, "date": "today"},
+                            "timing": "parallel",
+                            "source_goal_ids": ["goal-weather"],
+                        }
+                    ],
+                    "request_statuses": {
+                        "request-weather-existing": "running"
+                    },
+                    "remaining_request_ids": ["request-weather-existing"],
+                    "interaction_id": "interaction-weather-existing",
+                    "canonical_plan_id": "plan-weather-existing",
+                    "canonical_plan_fingerprint": "e" * 64,
+                }
+            },
+        }
+
+    def test_retained_running_work_is_reused_only_by_explicit_planner_selection(self):
+        class RetainedRuntime(FastAdvanceRuntime):
+            async def reusable_request_snapshot(self, *, interaction_id, request_id):
+                self.assertion = (interaction_id, request_id)
+                return {
+                    "interaction_id": interaction_id,
+                    "request_id": request_id,
+                    "capability_id": "chromie.weather.lookup",
+                    "capability_version": "1",
+                    "args": {"location": "重庆", "date": "today"},
+                    "timing": "parallel",
+                    "source_goal_ids": ["goal-weather"],
+                    "canonical_plan_id": "plan-weather-existing",
+                    "canonical_plan_fingerprint": "e" * 64,
+                    "state": "running",
+                }
+
+            async def cancel_scope(self, directive):
+                raise AssertionError(f"selected retained Work was cancelled: {directive}")
+
+        association = GoalAssociationResolution(
+            resolution_status="resolved",
+            turn_id="turn-weather-status",
+            associations=[
+                {
+                    "association_id": "association-weather-status",
+                    "relationship": "continue",
+                    "source_responsibility_refs": ["weather"],
+                    "target_goal_ids": ["goal-weather"],
+                    "confidence": 0.98,
+                }
+            ],
+            confidence=0.98,
+        )
+        plan = CanonicalPlan(
+            plan_id="plan-weather-reconciled",
+            planner_tier="fast",
+            disposition="execute",
+            coverage="complete",
+            confidence=0.98,
+            goal_ids=["goal-weather"],
+            goal_summary="Continue the existing weather lookup.",
+            steps=[
+                {
+                    "step_id": "reuse-weather",
+                    "capability_id": "chromie.weather.lookup",
+                    "args": {"location": "重庆", "date": "today"},
+                    "timing": "parallel",
+                    "source_goal_ids": ["goal-weather"],
+                    "reuse_activity_id": "request-weather-existing",
+                }
+            ],
+            goal_satisfaction={
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": ["goal-weather"],
+            },
+        )
+        runtime = RetainedRuntime([weather_definition()])
+        client = ScriptedClient(association=association, fast_plans=[plan])
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(runtime),
+            policy=CognitiveRuntimePolicy(
+                mode="apply",
+                apply_lanes=frozenset({"tool", "chat"}),
+            ),
+        )
+        core, envelope = admitted_core(
+            "继续刚才的天气查询。",
+            sid="turn-weather-status",
+            language="zh-CN",
+            responsibilities=[
+                {
+                    "local_ref": "weather",
+                    "outcome": "Continue the existing weather lookup.",
+                    "relationship": "continue",
+                    "target_goal_ids": ["goal-weather"],
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.98,
+                }
+            ],
+        )
+
+        result = asyncio.run(
+            coordinator.resolve(
+                object(),
+                text="继续刚才的天气查询。",
+                sid="turn-weather-status",
+                core_interpretation=core,
+                turn_envelope=envelope,
+                context={
+                    "history": [],
+                    "active_task_snapshots": [self._retained_weather_snapshot()],
+                },
+                history=[],
+                language="zh-CN",
+            )
+        )
+
+        self.assertEqual(result.status, "applied")
+        self.assertEqual(client.calls[-1], "fast")
+        self.assertEqual(
+            result.metadata["retained_work_reconciliation_status"],
+            "retained_work_reused",
+        )
+        self.assertTrue(
+            result.terminal_plan.steps[0].metadata["retained_work_reused"]
+        )
+        self.assertEqual(result.interaction_response.capabilities, [])
+
+    def test_changed_retained_work_is_cancelled_after_planner_before_replacement(self):
+        events: list[str] = []
+
+        class RetainedRuntime(FastAdvanceRuntime):
+            async def reusable_request_snapshot(self, *, interaction_id, request_id):
+                return {
+                    "interaction_id": interaction_id,
+                    "request_id": request_id,
+                    "capability_id": "chromie.weather.lookup",
+                    "capability_version": "1",
+                    "args": {"location": "重庆", "date": "today"},
+                    "timing": "parallel",
+                    "source_goal_ids": ["goal-weather"],
+                    "canonical_plan_id": "plan-weather-existing",
+                    "canonical_plan_fingerprint": "e" * 64,
+                    "state": "running",
+                }
+
+            async def cancel_scope(self, directive):
+                events.append("retained_cancelled")
+                binding = type(
+                    "Binding",
+                    (),
+                    {"request_id": "request-weather-existing"},
+                )()
+                return type(
+                    "Receipt",
+                    (),
+                    {
+                        "selected_request_bindings": [binding],
+                        "stale_binding_request_bindings": [],
+                        "shared_owner_conflict_request_bindings": [],
+                        "non_interruptible_request_bindings": [],
+                        "provider_cancel_failure_evidence": [],
+                        "dispatch_failures": [],
+                    },
+                )()
+
+        class ReplanningClient(ScriptedClient):
+            async def resolve_fast_plan(self, *args, **kwargs):
+                events.append("planner_decided")
+                return await super().resolve_fast_plan(*args, **kwargs)
+
+        association = GoalAssociationResolution(
+            resolution_status="resolved",
+            turn_id="turn-weather-change",
+            associations=[
+                {
+                    "association_id": "association-weather-change",
+                    "relationship": "modify",
+                    "source_responsibility_refs": ["weather"],
+                    "target_goal_ids": ["goal-weather"],
+                    "goal_update": {"description": "Check Neixiang weather."},
+                    "confidence": 0.98,
+                }
+            ],
+            confidence=0.98,
+        )
+        plan = CanonicalPlan(
+            plan_id="plan-weather-replacement",
+            planner_tier="fast",
+            disposition="execute",
+            coverage="complete",
+            confidence=0.98,
+            goal_ids=["goal-weather"],
+            goal_summary="Check Neixiang weather.",
+            steps=[
+                {
+                    "step_id": "replacement-weather",
+                    "capability_id": "chromie.weather.lookup",
+                    "args": {"location": "内乡", "date": "today"},
+                    "timing": "parallel",
+                    "source_goal_ids": ["goal-weather"],
+                }
+            ],
+            goal_satisfaction={
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": ["goal-weather"],
+            },
+        )
+        runtime = RetainedRuntime([weather_definition()])
+        client = ReplanningClient(association=association, fast_plans=[plan])
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(runtime),
+            policy=CognitiveRuntimePolicy(
+                mode="apply",
+                apply_lanes=frozenset({"tool", "chat"}),
+            ),
+        )
+        core, envelope = admitted_core(
+            "不是重庆，查内乡。",
+            sid="turn-weather-change",
+            language="zh-CN",
+            responsibilities=[
+                {
+                    "local_ref": "weather",
+                    "outcome": "Check Neixiang weather.",
+                    "bindings": {"location": "内乡", "date": "today"},
+                    "relationship": "modify",
+                    "target_goal_ids": ["goal-weather"],
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.98,
+                }
+            ],
+        )
+
+        result = asyncio.run(
+            coordinator.resolve(
+                object(),
+                text="不是重庆，查内乡。",
+                sid="turn-weather-change",
+                core_interpretation=core,
+                turn_envelope=envelope,
+                context={
+                    "history": [],
+                    "active_task_snapshots": [self._retained_weather_snapshot()],
+                },
+                history=[],
+                language="zh-CN",
+            )
+        )
+
+        self.assertEqual(result.status, "applied")
+        self.assertLess(events.index("planner_decided"), events.index("retained_cancelled"))
+        self.assertEqual(
+            result.metadata["retained_work_reconciliation_status"],
+            "retained_work_cancelled_before_replacement",
+        )
+        self.assertEqual(
+            result.interaction_response.capabilities[0].args["location"],
+            "内乡",
+        )
+
     def test_goal_association_refreshes_committed_continuity_and_excludes_current_dialogue(self):
         live_context = {
             "conversation_id": "conversation-weather",
@@ -823,19 +1106,147 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             "fast_planner",
         )
 
-    def test_safe_fast_capability_is_goal_bound_without_second_planner(self):
+    def test_ga_reconsideration_does_not_commit_stale_fast_planner_gap(self):
+        committed_gaps: list[dict] = []
+
+        def record_gaps(gaps_by_goal_id, **kwargs):
+            committed_gaps.append(
+                {
+                    "gaps_by_goal_id": gaps_by_goal_id,
+                    "kwargs": kwargs,
+                }
+            )
+            return []
+
+        gap = {
+            "gap_id": "gap-old-scope",
+            "description": "Which prior scope should be used?",
+            "blocking": True,
+            "required_for": ["scope"],
+            "preferred_resolution": "ask_user",
+            "source_kind": "execution_input",
+            "source_reference": "chromie.weather.lookup",
+            "resolution_sources_considered": [
+                "authoritative_context",
+                "capability_schema",
+            ],
+        }
+        association = GoalAssociationResolution(
+            resolution_status="resolved",
+            turn_id="turn-gap-reconsideration",
+            associations=[
+                {
+                    "association_id": "association-gap-reconsideration",
+                    "relationship": "modify",
+                    "source_responsibility_refs": ["r1"],
+                    "target_goal_ids": ["goal-1"],
+                    "confidence": 0.98,
+                    "reason_summary": (
+                        "Canonical Goal context resolves the provisional question."
+                    ),
+                    "goal_update": {
+                        "description": "Answer from the corrected canonical scope."
+                    },
+                }
+            ],
+            confidence=0.98,
+            reason_summary="The provisional clarification is no longer authoritative.",
+        )
+        advance = FastPlannerAdvance(
+            turn_id="turn-gap-reconsideration",
+            disposition="clarify",
+            coverage="uncertain",
+            covered_responsibility_refs=["r1"],
+            activities=[
+                FastPlannerClarificationAct(
+                    activity_id="ask-old-scope",
+                    role="clarification",
+                    text="你说的是哪个范围？",
+                    information_gaps=[gap],
+                    speech_act="ask_clarification",
+                    source_responsibility_refs=["r1"],
+                )
+            ],
+            unresolved=["scope"],
+            confidence=0.9,
+            reason_summary="The provisional view appears to need clarification.",
+        )
+        client = ScriptedClient(
+            association=association,
+            fast_plans=[respond_plan()],
+            fast_advances=[advance],
+        )
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(FastAdvanceRuntime()),
+            policy=CognitiveRuntimePolicy(
+                mode="apply",
+                apply_lanes=frozenset({"chat"}),
+            ),
+            planner_gap_apply=record_gaps,
+        )
+        core, envelope = admitted_core(
+            "按刚才修正后的范围回答。",
+            sid="turn-gap-reconsideration",
+            language="zh-CN",
+            responsibilities=[
+                {
+                    "local_ref": "r1",
+                    "outcome": "Answer from the corrected canonical scope.",
+                    "bindings": {},
+                    "relationship": "modify",
+                    "target_goal_ids": ["goal-1"],
+                    "completion_requires_work": False,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.98,
+                }
+            ],
+        )
+
+        result = asyncio.run(
+            coordinator.resolve(
+                object(),
+                text="按刚才修正后的范围回答。",
+                sid="turn-gap-reconsideration",
+                core_interpretation=core,
+                turn_envelope=envelope,
+                context={"history": [], "active_goal_snapshots": []},
+                history=[],
+                language="zh-CN",
+            )
+        )
+
+        self.assertEqual(result.status, "applied")
+        self.assertIn("fast", client.calls)
+        self.assertEqual(committed_gaps, [])
+        self.assertEqual(result.terminal_plan.plan_id, "plan-chat")
+
+    def test_safe_fast_capability_is_reconciled_and_goal_bound_by_canonical_planner(self):
         class ReadyRuntime(FastAdvanceRuntime):
             def __init__(self):
                 super().__init__([weather_definition()])
                 self.started = []
                 self.bound = []
+                self.runtime = self
+
+            async def cancel_interaction(self, interaction_id: str) -> None:
+                raise AssertionError(
+                    f"selected provisional Work was cancelled: {interaction_id}"
+                )
 
             async def start_fast_planner_capability_activities(
                 self, activities, *, session_id: str, turn_id: str
             ):
                 del session_id
                 self.started.append((turn_id, [item.activity_id for item in activities]))
-                return type("Ready", (), {"interaction_id": f"ready-{turn_id}"})()
+                return type(
+                    "Ready",
+                    (),
+                    {
+                        "interaction_id": f"ready-{turn_id}",
+                        "activities": list(activities),
+                    },
+                )()
 
             async def bind_fast_planner_capability_execution(
                 self,
@@ -898,9 +1309,33 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             reason_summary="The safe lookup is ready.",
         )
         runtime = ReadyRuntime()
+        canonical_plan = CanonicalPlan(
+            plan_id="canonical-weather-plan",
+            planner_tier="fast",
+            disposition="execute",
+            coverage="complete",
+            confidence=0.98,
+            goal_ids=["goal-weather"],
+            goal_summary="Check Chongqing weather today.",
+            steps=[
+                {
+                    "step_id": "canonical-weather-step",
+                    "capability_id": "chromie.weather.lookup",
+                    "args": {"location": "重庆", "date": "today"},
+                    "timing": "parallel",
+                    "source_goal_ids": ["goal-weather"],
+                    "reuse_activity_id": "weather-lookup",
+                }
+            ],
+            goal_satisfaction={
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": ["goal-weather"],
+            },
+        )
         client = ScriptedClient(
             association=association,
-            fast_plans=[],
+            fast_plans=[canonical_plan],
             fast_advances=[advance],
         )
         coordinator = GoalDrivenRuntimeCoordinator(
@@ -942,12 +1377,349 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         self.assertEqual(result.status, "applied")
         self.assertEqual(client.calls[0], "first_response")
-        self.assertCountEqual(client.calls[1:], ["advance", "association"])
+        self.assertCountEqual(client.calls[1:3], ["advance", "association"])
+        self.assertEqual(client.calls[3:], ["fast"])
         self.assertEqual(runtime.started, [(envelope.turn_id, ["weather-lookup"])])
         self.assertEqual(runtime.bound[0]["goal_map"], {"weather": ["goal-weather"]})
         self.assertEqual(
             result.interaction_response.capabilities[0].metadata["source_goal_ids"],
             ["goal-weather"],
+        )
+        self.assertTrue(
+            result.metadata["fast_capability_activity_status"].startswith(
+                "completed_before_canonical_dispatch"
+            )
+        )
+
+    def test_ga_reconsideration_cancels_changed_work_only_after_fast_planner_revision(self):
+        events: list[str] = []
+
+        class CancellationRuntime:
+            def __init__(self) -> None:
+                self.cancelled: list[str] = []
+
+            async def cancel_interaction(self, interaction_id: str) -> None:
+                self.cancelled.append(interaction_id)
+                events.append("provisional_cancelled")
+
+        class ReadyRuntime(FastAdvanceRuntime):
+            def __init__(self) -> None:
+                super().__init__([weather_definition()])
+                self.runtime = CancellationRuntime()
+                self.started: list[str] = []
+                self.bound: list[str] = []
+
+            async def start_fast_planner_capability_activities(
+                self, activities, *, session_id: str, turn_id: str
+            ):
+                del session_id
+                self.started.extend(item.activity_id for item in activities)
+                retained_activities = list(activities)
+                return type(
+                    "Ready",
+                    (),
+                    {
+                        "interaction_id": f"ready-{turn_id}",
+                        "activities": retained_activities,
+                    },
+                )()
+
+            async def bind_fast_planner_capability_execution(
+                self,
+                execution,
+                **kwargs,
+            ):
+                del kwargs
+                self.bound.append(execution.interaction_id)
+                return type("Result", (), {"status": "completed"})()
+
+        class ReplanningClient(ScriptedClient):
+            async def resolve_fast_plan(self, *args, **kwargs):
+                events.append("canonical_fast_revision")
+                return await super().resolve_fast_plan(*args, **kwargs)
+
+        association = GoalAssociationResolution(
+            resolution_status="resolved",
+            turn_id="turn-weather-correction",
+            associations=[
+                {
+                    "association_id": "association-weather-correction",
+                    "relationship": "modify",
+                    "source_responsibility_refs": ["weather"],
+                    "target_goal_ids": ["goal-weather"],
+                    "confidence": 0.98,
+                    "reason_summary": (
+                        "The canonical Goal revision invalidates its current Work."
+                    ),
+                    "goal_update": {
+                        "description": "Check the corrected weather scope."
+                    },
+                }
+            ],
+            confidence=0.98,
+            reason_summary="The existing Goal needs a new canonical Plan.",
+        )
+        advance = FastPlannerAdvance(
+            turn_id="turn-weather-correction",
+            disposition="execute",
+            coverage="complete",
+            covered_responsibility_refs=["weather"],
+            activities=[
+                FastPlannerCapabilityActivity(
+                    activity_id="provisional-weather-lookup",
+                    role="capability",
+                    capability_id="chromie.weather.lookup",
+                    args={"location": "重庆", "date": "today"},
+                    timing="parallel",
+                    source_responsibility_refs=["weather"],
+                )
+            ],
+            confidence=0.97,
+            reason_summary="A safe provisional lookup can start.",
+        )
+        revised_plan = CanonicalPlan(
+            plan_id="canonical-weather-revision",
+            planner_tier="fast",
+            disposition="execute",
+            coverage="complete",
+            confidence=0.98,
+            goal_ids=["goal-weather"],
+            goal_summary="Check the corrected weather scope.",
+            steps=[
+                {
+                    "step_id": "corrected-weather-lookup",
+                    "capability_id": "chromie.weather.lookup",
+                    "args": {"location": "内乡", "date": "today"},
+                    "source_goal_ids": ["goal-weather"],
+                }
+            ],
+            goal_satisfaction={
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": ["goal-weather"],
+            },
+        )
+        runtime = ReadyRuntime()
+        client = ReplanningClient(
+            association=association,
+            fast_plans=[revised_plan],
+            fast_advances=[advance],
+        )
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(runtime),
+            policy=CognitiveRuntimePolicy(
+                mode="apply",
+                apply_lanes=frozenset({"tool", "chat"}),
+            ),
+        )
+        core, envelope = admitted_core(
+            "不是重庆，我问内乡。",
+            sid="turn-weather-correction",
+            language="zh-CN",
+            responsibilities=[
+                {
+                    "local_ref": "weather",
+                    "outcome": "Check the corrected weather scope.",
+                    "bindings": {"location": "内乡", "date": "today"},
+                    "relationship": "modify",
+                    "target_goal_ids": ["goal-weather"],
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.98,
+                }
+            ],
+        )
+
+        result = asyncio.run(
+            coordinator.resolve(
+                object(),
+                text="不是重庆，我问内乡。",
+                sid="turn-weather-correction",
+                core_interpretation=core,
+                turn_envelope=envelope,
+                context={"history": [], "active_goal_snapshots": []},
+                history=[],
+                language="zh-CN",
+            )
+        )
+
+        self.assertEqual(result.status, "applied")
+        self.assertEqual(runtime.started, ["provisional-weather-lookup"])
+        self.assertEqual(
+            runtime.runtime.cancelled,
+            [f"ready-{envelope.turn_id}"],
+        )
+        self.assertEqual(runtime.bound, [])
+        self.assertIn("fast", client.calls)
+        self.assertLess(
+            events.index("canonical_fast_revision"),
+            events.index("provisional_cancelled"),
+        )
+        self.assertEqual(result.terminal_plan.plan_id, "canonical-weather-revision")
+        self.assertEqual(
+            result.metadata["fast_capability_activity_status"],
+            "cancelled_by_work_reconciliation",
+        )
+
+    def test_ga_reconsideration_reuses_exact_work_selected_by_fast_planner(self):
+        class CancellationRuntime:
+            def __init__(self) -> None:
+                self.cancelled: list[str] = []
+
+            async def cancel_interaction(self, interaction_id: str) -> None:
+                self.cancelled.append(interaction_id)
+
+        class ReadyRuntime(FastAdvanceRuntime):
+            def __init__(self) -> None:
+                super().__init__([weather_definition()])
+                self.runtime = CancellationRuntime()
+                self.bound: list[dict] = []
+
+            async def start_fast_planner_capability_activities(
+                self, activities, *, session_id: str, turn_id: str
+            ):
+                del session_id
+                return type(
+                    "Ready",
+                    (),
+                    {
+                        "interaction_id": f"ready-{turn_id}",
+                        "activities": list(activities),
+                    },
+                )()
+
+            async def bind_fast_planner_capability_execution(
+                self,
+                execution,
+                **kwargs,
+            ):
+                self.bound.append(
+                    {
+                        "interaction_id": execution.interaction_id,
+                        **kwargs,
+                    }
+                )
+                return type("Result", (), {"status": "completed"})()
+
+        association = GoalAssociationResolution(
+            resolution_status="resolved",
+            turn_id="turn-weather-reuse",
+            associations=[
+                {
+                    "association_id": "association-weather-reuse",
+                    "relationship": "modify",
+                    "source_responsibility_refs": ["weather"],
+                    "target_goal_ids": ["goal-weather"],
+                    "confidence": 0.98,
+                    "reason_summary": (
+                        "Canonical Goal context requires Planner reconsideration."
+                    ),
+                    "goal_update": {
+                        "description": "Check Chongqing weather today."
+                    },
+                }
+            ],
+            confidence=0.98,
+            reason_summary="Reconsider Work against the canonical Goal.",
+        )
+        advance = FastPlannerAdvance(
+            turn_id="turn-weather-reuse",
+            disposition="execute",
+            coverage="complete",
+            covered_responsibility_refs=["weather"],
+            activities=[
+                FastPlannerCapabilityActivity(
+                    activity_id="provisional-weather-lookup",
+                    role="capability",
+                    capability_id="chromie.weather.lookup",
+                    args={"location": "重庆", "date": "today"},
+                    timing="parallel",
+                    source_responsibility_refs=["weather"],
+                )
+            ],
+            confidence=0.97,
+            reason_summary="The safe lookup can start.",
+        )
+        revised_plan = CanonicalPlan(
+            plan_id="canonical-weather-reuse",
+            planner_tier="fast",
+            disposition="execute",
+            coverage="complete",
+            confidence=0.98,
+            goal_ids=["goal-weather"],
+            goal_summary="Check Chongqing weather today.",
+            steps=[
+                {
+                    "step_id": "canonical-weather-step",
+                    "capability_id": "chromie.weather.lookup",
+                    "args": {"location": "重庆", "date": "today"},
+                    "timing": "parallel",
+                    "source_goal_ids": ["goal-weather"],
+                    "reuse_activity_id": "provisional-weather-lookup",
+                }
+            ],
+            goal_satisfaction={
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": ["goal-weather"],
+            },
+        )
+        runtime = ReadyRuntime()
+        client = ScriptedClient(
+            association=association,
+            fast_plans=[revised_plan],
+            fast_advances=[advance],
+        )
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(runtime),
+            policy=CognitiveRuntimePolicy(
+                mode="apply",
+                apply_lanes=frozenset({"tool", "chat"}),
+            ),
+        )
+        core, envelope = admitted_core(
+            "继续查今天重庆的天气。",
+            sid="turn-weather-reuse",
+            language="zh-CN",
+            responsibilities=[
+                {
+                    "local_ref": "weather",
+                    "outcome": "Check Chongqing weather today.",
+                    "bindings": {"location": "重庆", "date": "today"},
+                    "relationship": "modify",
+                    "target_goal_ids": ["goal-weather"],
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.98,
+                }
+            ],
+        )
+
+        result = asyncio.run(
+            coordinator.resolve(
+                object(),
+                text="继续查今天重庆的天气。",
+                sid="turn-weather-reuse",
+                core_interpretation=core,
+                turn_envelope=envelope,
+                context={"history": [], "active_goal_snapshots": []},
+                history=[],
+                language="zh-CN",
+            )
+        )
+
+        self.assertEqual(result.status, "applied")
+        self.assertEqual(runtime.runtime.cancelled, [])
+        self.assertEqual(len(runtime.bound), 1)
+        self.assertEqual(
+            runtime.bound[0]["goal_ids_by_responsibility"],
+            {"weather": ["goal-weather"]},
+        )
+        self.assertEqual(
+            result.terminal_plan.steps[0].metadata["fast_activity_id"],
+            "provisional-weather-lookup",
         )
         self.assertTrue(
             result.metadata["fast_capability_activity_status"].startswith(

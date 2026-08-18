@@ -89,6 +89,13 @@ The Project Charter fixes the following **expanded flow** as Chromie's primary
 architecture and mental model. It is an ownership graph, not a requirement that
 every box run serially on every turn.
 
+The Charter's normative
+[safe-observation close-up](PROJECT_CHARTER.md#mission) additionally shows the
+asynchronous weather path: Fast Planner may start an eligible safe read under
+Responsibility refs while GA commits Goal identity; Canonical Fast Planner then compares
+that Goal with provisional Work, explicitly selects valid reuse or authors correction,
+and Runtime changes Work only after that semantic decision.
+
 ```text
                          WORLD / PERSON
                                │
@@ -177,11 +184,11 @@ allows Fast Planner to author an immediate safe Activity before or while that pe
 continuity is established.
 
 When that Activity communicates, it is a **Communicative Act**. Planner owns
-the act's function (`acknowledge`, `ask`, `answer`, `explain`, `refuse`, or no
-speech), semantic provenance, timing, and truth constraints. The act contains no
-surface sentence. Vocal Realization/language formulation owns the exact wording,
-and TTS/playback owns physical production and delivery Evidence. This refines the
-Activity expansion without adding another semantic manager.
+the act's exact wording, function (`acknowledge`, `ask`, `answer`, `explain`,
+`refuse`, or no speech), semantic provenance, timing, and truth constraints. The Host
+validates but does not rewrite it; TTS/playback owns acoustic production and delivery
+Evidence. This refines the Activity expansion without adding a Response Composer or
+another semantic manager.
 
 ### Human-like does not mean perfectionist
 
@@ -876,12 +883,13 @@ first real Activity Plan:
 exact Responsibility refs covered, zero or more Communicative Acts and Capability Activities,
 their sequential/parallel relation, and an optional `deep_planner` continuation for
 complex HOW. A Communicative Act records function, timing, Responsibility provenance,
-and exact typed reason provenance to GI unresolved meaning or a Planner-owned
-InformationGap, but never `response_text`. Fast Planner owns input-source resolution and
+exact text, and exact typed reason provenance to GI unresolved meaning or a Planner-owned
+InformationGap. Fast Planner owns input-source resolution and
 selects a clarification act only for a user-resolvable blocker; it does not send ordinary
-input completion to Deep GI or Deep Planner. A schema-valid safe, side-effect-free read may begin while GA
-commits canonical Goal identity. Effects remain gated by canonical Goal binding,
-confirmation, authorization, resource, and provider-safety checks.
+input completion to Deep GI or Deep Planner. An available schema-valid safe,
+side-effect-free read with explicit parallel-safety metadata may begin without awaiting
+GA and initially carries only Responsibility refs. Effects remain gated by canonical
+Goal binding, confirmation, authorization, resource, and provider-safety checks.
 
 The old Goal-Interpreter `CognitiveProgressCandidate` / `native_response` /
 `fast_speech` path has been removed rather than retained as compatibility. Goal
@@ -890,9 +898,18 @@ commitment and never waits for the remaining Fast Activity Plan. Fast Activities
 GI Responsibility refs until the
 deterministic join maps them to GA-owned canonical Goal IDs. Trusted Capability Runtime
 then exposes one task-list view per Goal. A task shared across Goals appears in every
-applicable view with the same request identity and executes once. GA/Deep-authorized Plan
-revisions may cancel or replace pending/cancellable Work while completed Evidence remains
-immutable.
+applicable view with the same request identity and executes once. Fast/Deep
+Planner-authored canonical Plan revisions may cause Runtime to cancel or replace
+pending/cancellable Work while completed Evidence remains immutable. GA commits only
+Goal continuity and never emits a Work-compatibility or replan decision. When Canonical
+Goal state intersects retained or provisional Work, the existing Fast Planner receives
+the Goal plus relevant actual Work state and decides semantic reuse, replacement,
+addition, or no further Work. Planner selects reusable Work by its stable Activity
+identity; Orchestrator validates exact request/version/state/Capability/arguments/
+ownership without interpreting meaning. Stale validation reactivates Planner instead of
+repairing its decision. Runtime cancels/replaces pending/cancellable Work only after the
+Planner decision. Already-completed incompatible
+observations remain unbound audit Evidence and cannot ground Goal completion or speech.
 
 ### 4.11 Continuous Mind candidate vocabulary — retained problem-space inventory
 

@@ -220,6 +220,7 @@ class PlannerModelStep(CapabilityIdentityModel):
     args: dict[str, Any]
     timing: PlanTiming = "sequential"
     source_goal_ids: list[str] = Field(default_factory=list)
+    reuse_activity_id: str = ""
     reason_summary: str = ""
 
 
@@ -504,7 +505,6 @@ def goal_association_prompt_projection(
         "ambiguity_summary",
         "goal_update",
         "resolved_gap_ids",
-        "requires_replan",
     )
     goal_keys = (
         "schema_version",

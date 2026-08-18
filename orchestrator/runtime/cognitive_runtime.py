@@ -36,6 +36,7 @@ from shared.chromie_contracts.interaction import (
     validate_output_schema_declaration,
 )
 from shared.chromie_contracts.reflection import ReflectionResolution
+from shared.chromie_contracts.reflex import CancellationDirective
 from shared.chromie_contracts.plan import (
     CanonicalPlan,
     CanonicalPlanStep,
@@ -2011,6 +2012,12 @@ class CanonicalPlanRuntimeAdapter:
 
         capabilities: list[CapabilityRequest] = []
         for step in plan.steps:
+            if (step.metadata or {}).get("retained_work_reused") is True:
+                # The exact live request remains owned by its original Runtime
+                # submission. Planner selected it explicitly and Host validated
+                # its identity above, so this canonical revision must not
+                # dispatch a duplicate request.
+                continue
             definition = self.interaction_runtime.capability_definition(step.capability_id)
             execution_lane = str(definition.metadata.get("execution_lane") or "activity").strip()
             if execution_lane not in {"vocal", "activity"}:
@@ -2205,6 +2212,9 @@ class CanonicalPlanRuntimeAdapter:
             ),
             "safe_read_parallel_execution": safe_read_parallel,
             "safe_read_speech_optional": safe_read_speech_optional,
+            "retained_work_reconciliation_only": (
+                plan.metadata.get("retained_work_reconciliation_only") is True
+            ),
         }
         runtime_context = context if isinstance(context, dict) else {}
         if isinstance(runtime_context.get("user_turn_envelope"), dict):
@@ -3327,6 +3337,383 @@ class GoalDrivenRuntimeCoordinator:
             },
         )
 
+    @classmethod
+    def _canonical_plan_reusing_fast_capability_execution(
+        cls,
+        *,
+        execution: Any,
+        plan: CanonicalPlan,
+        association: GoalAssociationResolution,
+    ) -> CanonicalPlan | None:
+        """Prove exact plan-level reuse without making a semantic judgment.
+
+        Fast Planner owns whether the canonical Goal still needs the provisional
+        Work by explicitly citing stable Activity IDs. The Host may reuse
+        already-started safe Work only when every provisional Activity is selected
+        exactly once and its Capability/argument/Goal/timing identity still matches.
+        Extra newly planned steps are allowed. Ambiguous, partial, or changed
+        selections return ``None`` and follow the normal cancel/replace path.
+        """
+
+        activities = list(getattr(execution, "activities", []) or [])
+        if (
+            plan.disposition not in {"execute", "mixed"}
+            or not activities
+        ):
+            return None
+        refs_to_goals = cls._goal_ids_by_responsibility(association)
+        updated_steps = list(plan.steps)
+        matched_step_indexes: set[int] = set()
+        for activity in activities:
+            activity_goal_ids = list(
+                dict.fromkeys(
+                    goal_id
+                    for responsibility_ref in activity.source_responsibility_refs
+                    for goal_id in refs_to_goals.get(responsibility_ref, [])
+                )
+            )
+            if not activity_goal_ids:
+                return None
+            candidates = [
+                index
+                for index, step in enumerate(plan.steps)
+                if index not in matched_step_indexes
+                and step.reuse_activity_id == activity.activity_id
+                and step.capability_id == activity.capability_id
+                and step.args == activity.args
+                and len(step.source_goal_ids) == len(activity_goal_ids)
+                and set(step.source_goal_ids) == set(activity_goal_ids)
+                and step.timing == activity.timing
+            ]
+            if len(candidates) != 1:
+                return None
+            index = candidates[0]
+            matched_step_indexes.add(index)
+            step = plan.steps[index]
+            updated_steps[index] = step.model_copy(
+                deep=True,
+                update={
+                    "metadata": {
+                        **step.metadata,
+                        "fast_activity_id": activity.activity_id,
+                        "source_responsibility_refs": list(
+                            activity.source_responsibility_refs
+                        ),
+                        "task_list_revision": int(
+                            plan.metadata.get("task_list_revision") or 1
+                        ),
+                    }
+                },
+            )
+        provisional_activity_ids = {
+            activity.activity_id for activity in activities
+        }
+        cited_activity_ids = {
+            step.reuse_activity_id
+            for step in plan.steps
+            if step.reuse_activity_id in provisional_activity_ids
+        }
+        if cited_activity_ids != provisional_activity_ids:
+            return None
+        return plan.model_copy(deep=True, update={"steps": updated_steps})
+
+    @staticmethod
+    def _retained_work_reconciliation_activities(
+        *,
+        context: dict[str, Any],
+        goal_ids: set[str],
+    ) -> list[dict[str, Any]]:
+        """Project still-owned retained Work for Planner comparison.
+
+        Conversation State supplies the trusted bounded task snapshot. This
+        projection adds no semantic judgment: it includes only request IDs still
+        listed as remaining for the canonical Goals in scope.
+        """
+
+        by_activity_id: dict[str, dict[str, Any]] = {}
+        snapshots = context.get("active_task_snapshots")
+        if not isinstance(snapshots, list):
+            return []
+        for snapshot in snapshots:
+            if not isinstance(snapshot, dict):
+                continue
+            semantic_goal = snapshot.get("semantic_goal")
+            if not isinstance(semantic_goal, dict):
+                continue
+            goal_id = str(semantic_goal.get("goal_id") or "").strip()
+            if not goal_id or goal_id not in goal_ids:
+                continue
+            metadata = snapshot.get("metadata")
+            binding = (
+                metadata.get("execution_binding")
+                if isinstance(metadata, dict)
+                else None
+            )
+            if not isinstance(binding, dict):
+                continue
+            remaining = {
+                str(item).strip()
+                for item in binding.get("remaining_request_ids") or []
+                if str(item).strip()
+            }
+            if not remaining:
+                continue
+            interaction_id = str(binding.get("interaction_id") or "").strip()
+            plan_id = str(binding.get("canonical_plan_id") or "").strip()
+            fingerprint = str(
+                binding.get("canonical_plan_fingerprint") or ""
+            ).strip()
+            if not interaction_id or not plan_id or not fingerprint:
+                continue
+            for item in binding.get("planned_capabilities") or []:
+                if not isinstance(item, dict):
+                    continue
+                request_id = str(item.get("request_id") or "").strip()
+                capability_id = str(item.get("capability_id") or "").strip()
+                if request_id not in remaining or not capability_id:
+                    continue
+                existing = by_activity_id.get(request_id)
+                source_goal_ids = list(
+                    dict.fromkeys(
+                        [
+                            *(
+                                existing.get("source_goal_ids", [])
+                                if existing is not None
+                                else []
+                            ),
+                            *(
+                                item.get("source_goal_ids")
+                                if isinstance(item.get("source_goal_ids"), list)
+                                else []
+                            ),
+                            goal_id,
+                        ]
+                    )
+                )
+                activity = {
+                    "activity_id": request_id,
+                    "origin": "retained_runtime",
+                    "capability_id": capability_id,
+                    "args": dict(item.get("args") or {}),
+                    "timing": str(item.get("timing") or "sequential"),
+                    "source_goal_ids": source_goal_ids,
+                    "runtime_binding": {
+                        "interaction_id": interaction_id,
+                        "canonical_plan_id": plan_id,
+                        "canonical_plan_fingerprint": fingerprint,
+                    },
+                    "state": str(
+                        (binding.get("request_statuses") or {}).get(request_id)
+                        or snapshot.get("status")
+                        or "scheduled"
+                    ),
+                }
+                if existing is not None and any(
+                    existing.get(key) != activity.get(key)
+                    for key in ("capability_id", "args", "timing", "runtime_binding")
+                ):
+                    raise ValueError(
+                        "retained Work identity conflicts across Goal snapshots: "
+                        + request_id
+                    )
+                by_activity_id[request_id] = activity
+        return list(by_activity_id.values())
+
+    async def _apply_retained_work_reconciliation(
+        self,
+        *,
+        plan: CanonicalPlan,
+        activities: list[dict[str, Any]],
+        turn_id: str,
+    ) -> tuple[CanonicalPlan, str]:
+        """Validate and apply Planner decisions for retained Runtime Work.
+
+        The Planner's explicit ``reuse_activity_id`` is the only semantic
+        selection. Runtime performs exact live-state validation, preserves every
+        selected request without redispatch, or cancels the complete unselected
+        retained set before replacement Work can start.
+        """
+
+        retained = [
+            item
+            for item in activities
+            if item.get("origin") == "retained_runtime"
+        ]
+        if not retained:
+            return plan, "not_applicable"
+        retained_by_id = {
+            str(item.get("activity_id") or ""): item for item in retained
+        }
+        selected_steps = {
+            step.reuse_activity_id: step
+            for step in plan.steps
+            if step.reuse_activity_id in retained_by_id
+        }
+        if selected_steps and set(selected_steps) != set(retained_by_id):
+            raise CognitiveStageFailure(
+                "work_reconciliation",
+                {
+                    "failure_class": "partial_retained_work_reuse",
+                    "failure_domain": "model_contract",
+                    "architecture_attribution": "planner",
+                    "retryable": False,
+                },
+            )
+
+        live_by_id: dict[str, dict[str, Any]] = {}
+        for activity_id, activity in retained_by_id.items():
+            runtime_binding = activity.get("runtime_binding")
+            if not isinstance(runtime_binding, dict):
+                raise ValueError("retained Work lacks trusted runtime binding")
+            live = await self.adapter.interaction_runtime.reusable_request_snapshot(
+                interaction_id=str(runtime_binding.get("interaction_id") or ""),
+                request_id=activity_id,
+            )
+            if live is None:
+                raise CognitiveStageFailure(
+                    "work_reconciliation",
+                    {
+                        "failure_class": "retained_work_state_changed",
+                        "failure_domain": "runtime_state",
+                        "architecture_attribution": "capability_runtime",
+                        "retryable": True,
+                        "request_id": activity_id,
+                    },
+                )
+            expected_goal_ids = set(activity.get("source_goal_ids") or [])
+            if (
+                live.get("capability_id") != activity.get("capability_id")
+                or live.get("args") != activity.get("args")
+                or live.get("timing") != activity.get("timing")
+                or set(live.get("source_goal_ids") or []) != expected_goal_ids
+                or live.get("canonical_plan_id")
+                != runtime_binding.get("canonical_plan_id")
+                or live.get("canonical_plan_fingerprint")
+                != runtime_binding.get("canonical_plan_fingerprint")
+            ):
+                raise CognitiveStageFailure(
+                    "work_reconciliation",
+                    {
+                        "failure_class": "retained_work_identity_changed",
+                        "failure_domain": "runtime_state",
+                        "architecture_attribution": "capability_runtime",
+                        "retryable": True,
+                        "request_id": activity_id,
+                    },
+                )
+            live_by_id[activity_id] = live
+
+        if selected_steps:
+            if len(selected_steps) != len(plan.steps):
+                raise CognitiveStageFailure(
+                    "work_reconciliation",
+                    {
+                        "failure_class": "retained_reuse_with_additional_steps",
+                        "failure_domain": "model_contract",
+                        "architecture_attribution": "planner",
+                        "retryable": False,
+                    },
+                )
+            updated_steps = list(plan.steps)
+            for index, step in enumerate(plan.steps):
+                activity = retained_by_id.get(step.reuse_activity_id)
+                if activity is None:
+                    continue
+                if (
+                    step.capability_id != activity.get("capability_id")
+                    or step.args != activity.get("args")
+                    or step.timing != activity.get("timing")
+                    or set(step.source_goal_ids)
+                    != set(activity.get("source_goal_ids") or [])
+                ):
+                    raise CognitiveStageFailure(
+                        "work_reconciliation",
+                        {
+                            "failure_class": "planner_reuse_identity_mismatch",
+                            "failure_domain": "model_contract",
+                            "architecture_attribution": "planner",
+                            "retryable": False,
+                            "request_id": step.reuse_activity_id,
+                        },
+                    )
+                updated_steps[index] = step.model_copy(
+                    deep=True,
+                    update={
+                        "metadata": {
+                            **step.metadata,
+                            "retained_work_reused": True,
+                            "retained_request_id": step.reuse_activity_id,
+                            "retained_runtime_state": live_by_id[
+                                step.reuse_activity_id
+                            ]["state"],
+                        }
+                    },
+                )
+            return (
+                plan.model_copy(
+                    deep=True,
+                    update={
+                        "steps": updated_steps,
+                        "metadata": {
+                            **plan.metadata,
+                            "retained_work_reconciliation_only": True,
+                        },
+                    },
+                ),
+                "retained_work_reused",
+            )
+
+        grouped: dict[tuple[str, str, str], dict[str, set[str]]] = {}
+        for activity_id, activity in retained_by_id.items():
+            runtime_binding = activity["runtime_binding"]
+            key = (
+                str(runtime_binding["interaction_id"]),
+                str(runtime_binding["canonical_plan_id"]),
+                str(runtime_binding["canonical_plan_fingerprint"]),
+            )
+            group = grouped.setdefault(
+                key,
+                {"goal_ids": set(), "request_ids": set()},
+            )
+            group["goal_ids"].update(activity.get("source_goal_ids") or [])
+            group["request_ids"].add(activity_id)
+
+        for (interaction_id, plan_id, fingerprint), group in grouped.items():
+            receipt = await self.adapter.interaction_runtime.cancel_scope(
+                CancellationDirective(
+                    source_turn_id=turn_id,
+                    requested_scope="specific_goal",
+                    foreground_interaction_id=interaction_id,
+                    target_goal_ids=tuple(sorted(group["goal_ids"])),
+                    expected_plan_id=plan_id,
+                    expected_plan_fingerprint=fingerprint,
+                    reason="Fast Planner replaced retained Work",
+                )
+            )
+            selected_request_ids = {
+                item.request_id for item in receipt.selected_request_bindings
+            }
+            failure = bool(
+                not group["request_ids"].issubset(selected_request_ids)
+                or receipt.stale_binding_request_bindings
+                or receipt.shared_owner_conflict_request_bindings
+                or receipt.non_interruptible_request_bindings
+                or receipt.provider_cancel_failure_evidence
+                or receipt.dispatch_failures
+            )
+            if failure:
+                raise CognitiveStageFailure(
+                    "work_reconciliation",
+                    {
+                        "failure_class": "retained_work_cancellation_not_closed",
+                        "failure_domain": "runtime_state",
+                        "architecture_attribution": "capability_runtime",
+                        "retryable": False,
+                        "interaction_id": interaction_id,
+                    },
+                )
+        return plan, "retained_work_cancelled_before_replacement"
+
     @staticmethod
     def _is_direct_spoken_association(
         association: GoalAssociationResolution,
@@ -3817,6 +4204,9 @@ class GoalDrivenRuntimeCoordinator:
         social_attention_opportunity_count = 0
         ready_fast_capability_execution: Any | None = None
         ready_fast_capability_status = "not_started"
+        retained_work_reconciliation_status = "not_applicable"
+        work_reconciliation_required = False
+        work_reconciliation_activity_count = 0
 
         def path_metadata() -> dict[str, Any]:
             first_deep_reason = (
@@ -3884,6 +4274,13 @@ class GoalDrivenRuntimeCoordinator:
                     social_attention_opportunity_count
                 ),
                 "fast_capability_activity_status": ready_fast_capability_status,
+                "retained_work_reconciliation_status": (
+                    retained_work_reconciliation_status
+                ),
+                "work_reconciliation_required": work_reconciliation_required,
+                "work_reconciliation_activity_count": (
+                    work_reconciliation_activity_count
+                ),
                 "gi_fanout_concurrent": True,
                 "goal_grouped_task_list": True,
             }
@@ -3900,7 +4297,8 @@ class GoalDrivenRuntimeCoordinator:
                 or ready_fast_capability_status.startswith(
                     "completed_before_canonical_dispatch"
                 )
-                or ready_fast_capability_status == "cancelled_by_replan"
+                or ready_fast_capability_status
+                == "cancelled_by_work_reconciliation"
             ):
                 return
             try:
@@ -4311,9 +4709,70 @@ class GoalDrivenRuntimeCoordinator:
             needs_deep_planner = "deep_planner" in fast_advance.continuations
 
             association_goal_ids = self._association_goal_ids(association)
-            planner_gaps_by_goal_id = self._planner_gaps_by_goal_id(
-                advance=fast_advance,
-                association=association,
+            retained_goal_work_reconciliation = any(
+                item.relationship != "cancel"
+                for item in association.associations
+            )
+            work_reconciliation_required = (
+                not has_named_goal_cancellation
+                and (
+                    ready_fast_capability_execution is not None
+                    or retained_goal_work_reconciliation
+                    or has_goal_replacement
+                )
+            )
+            retained_reconciliation_goal_ids = {
+                *association_goal_ids,
+                *(
+                    goal_id
+                    for goal in association.new_goals
+                    for goal_id in goal.supersedes_goal_ids
+                ),
+            }
+            retained_work_activities = (
+                self._retained_work_reconciliation_activities(
+                    context=planning_context,
+                    goal_ids=retained_reconciliation_goal_ids,
+                )
+                if work_reconciliation_required
+                else []
+            )
+            if work_reconciliation_required:
+                reconciliation_reason = (
+                    "provisional_work_goal_reconciliation"
+                    if ready_fast_capability_execution is not None
+                    else "goal_replacement_work_reconciliation"
+                    if has_goal_replacement
+                    else "retained_goal_work_reconciliation"
+                )
+                planning_context["canonical_fast_revision_reason"] = (
+                    reconciliation_reason
+                )
+                provisional_work_activities = (
+                    [
+                        {
+                            **item.model_dump(mode="json", exclude_none=True),
+                            "origin": "provisional_fast",
+                        }
+                        for item in ready_fast_capability_execution.activities
+                    ]
+                    if ready_fast_capability_execution is not None
+                    else []
+                )
+                planning_context["work_reconciliation_activities"] = [
+                    *retained_work_activities,
+                    *provisional_work_activities,
+                ]
+                work_reconciliation_activity_count = len(
+                    planning_context["work_reconciliation_activities"]
+                )
+            planner_gaps_by_goal_id = (
+                {}
+                if work_reconciliation_required
+                else self._planner_gaps_by_goal_id(
+                    advance=fast_advance,
+                    association=association,
+                )
             )
             if self.policy.mode == "apply" and planner_gaps_by_goal_id:
                 if self.planner_gap_apply is None:
@@ -4478,10 +4937,15 @@ class GoalDrivenRuntimeCoordinator:
                 )
                 if deep_failure is not None:
                     raise CognitiveStageFailure("deep_planner", deep_failure)
-            elif fast_advance.disposition in {"unavailable", "refused"}:
-                # A malformed/unavailable first Activity Plan is discarded.
-                # Fast Planner gets one canonical revision after GA supplies
-                # Goal identity; this is not a semantic handoff to Deep.
+            elif (
+                fast_advance.disposition in {"unavailable", "refused"}
+                or work_reconciliation_required
+            ):
+                # A malformed/unavailable first Activity Plan, or a committed Goal
+                # intersecting retained/provisional Work, receives one canonical Fast
+                # Planner revision. GA supplies Goal continuity only; it never decides
+                # Work compatibility. Provisional safe Work remains available until
+                # Planner explicitly selects reuse or authors replacement Work.
                 stage = time.perf_counter()
                 fast_plan = await self._observe_workflow_stage(
                     sid=sid,
@@ -4489,6 +4953,11 @@ class GoalDrivenRuntimeCoordinator:
                     input_payload={
                         "user_text": text,
                         "goal_association": association,
+                        "revision_reason": (
+                            reconciliation_reason
+                            if work_reconciliation_required
+                            else "fast_planner_advance_unavailable"
+                        ),
                         "interaction_context": planning_context.get(
                             "interaction_context", {}
                         ),
@@ -4585,37 +5054,6 @@ class GoalDrivenRuntimeCoordinator:
                 terminal_plan = fast_plan
                 fast_planner_path = "terminal"
 
-            if ready_fast_capability_execution is not None:
-                if terminal_plan.metadata.get("resolver") == "fast_planner_advance":
-                    refs_to_goals = terminal_plan.metadata.get(
-                        "goal_ids_by_responsibility"
-                    )
-                    if not isinstance(refs_to_goals, dict):
-                        raise ValueError(
-                            "Fast Activity Plan lacks canonical Goal grouping"
-                        )
-                    ready_result = await self.adapter.interaction_runtime.bind_fast_planner_capability_execution(
-                        ready_fast_capability_execution,
-                        target_interaction_id=f"cognitive_{sid}",
-                        canonical_plan_id=terminal_plan.plan_id,
-                        canonical_plan_fingerprint=canonical_plan_fingerprint(
-                            terminal_plan
-                        ),
-                        goal_ids_by_responsibility=refs_to_goals,
-                        task_list_revision=int(
-                            terminal_plan.metadata.get("task_list_revision") or 1
-                        ),
-                    )
-                    ready_fast_capability_status = (
-                        "completed_before_canonical_dispatch:"
-                        + ready_result.status
-                    )
-                else:
-                    await self.adapter.interaction_runtime.runtime.cancel_interaction(
-                        ready_fast_capability_execution.interaction_id
-                    )
-                    ready_fast_capability_status = "cancelled_by_replan"
-
             # Runtime authority starts from the validated canonical Plan and is
             # bounded by registered Capability, authorization, confirmation, resource,
             # and provider-safety contracts below. Goal Interpretation contributes WHAT only.
@@ -4649,6 +5087,65 @@ class GoalDrivenRuntimeCoordinator:
                     "runtime validation rejected terminal canonical plan: "
                     + json.dumps(runtime_errors, ensure_ascii=False)
                 )
+
+            if self.policy.mode == "apply" and retained_work_activities:
+                terminal_plan, retained_work_reconciliation_status = (
+                    await self._apply_retained_work_reconciliation(
+                        plan=terminal_plan,
+                        activities=retained_work_activities,
+                        turn_id=turn_id,
+                    )
+                )
+
+            if ready_fast_capability_execution is not None:
+                refs_to_goals: dict[str, list[str]] | None = None
+                if terminal_plan.metadata.get("resolver") == "fast_planner_advance":
+                    raw_refs_to_goals = terminal_plan.metadata.get(
+                        "goal_ids_by_responsibility"
+                    )
+                    if isinstance(raw_refs_to_goals, dict):
+                        refs_to_goals = raw_refs_to_goals
+                    else:
+                        raise ValueError(
+                            "Fast Activity Plan lacks canonical Goal grouping"
+                        )
+                elif work_reconciliation_required:
+                    reusable_plan = (
+                        self._canonical_plan_reusing_fast_capability_execution(
+                            execution=ready_fast_capability_execution,
+                            plan=terminal_plan,
+                            association=association,
+                        )
+                    )
+                    if reusable_plan is not None:
+                        terminal_plan = reusable_plan
+                        refs_to_goals = self._goal_ids_by_responsibility(
+                            association
+                        )
+                if refs_to_goals is not None:
+                    ready_result = await self.adapter.interaction_runtime.bind_fast_planner_capability_execution(
+                        ready_fast_capability_execution,
+                        target_interaction_id=f"cognitive_{sid}",
+                        canonical_plan_id=terminal_plan.plan_id,
+                        canonical_plan_fingerprint=canonical_plan_fingerprint(
+                            terminal_plan
+                        ),
+                        goal_ids_by_responsibility=refs_to_goals,
+                        task_list_revision=int(
+                            terminal_plan.metadata.get("task_list_revision") or 1
+                        ),
+                    )
+                    ready_fast_capability_status = (
+                        "completed_before_canonical_dispatch:"
+                        + ready_result.status
+                    )
+                else:
+                    await self.adapter.interaction_runtime.runtime.cancel_interaction(
+                        ready_fast_capability_execution.interaction_id
+                    )
+                    ready_fast_capability_status = (
+                        "cancelled_by_work_reconciliation"
+                    )
 
             if self.policy.mode == "apply" and self.interaction_ledger is not None:
                 self.interaction_ledger.record_plan(

@@ -190,7 +190,18 @@ Responsibility-to-Goal binding, the Host atomically attaches Planner gaps to the
 canonical Goal before clarification wording may be delivered. The Host may start only
 schema-valid, available, side-effect-free safe reads before GA finishes; effects remain
 behind canonical Goal, confirmation, authorization, resource, and provider-safety gates.
-The same task identity is then bound into applicable per-Goal Runtime task-list views.
+Parallel-timed early reads additionally require explicit provider parallel-safety
+metadata. The same task identity is then bound into applicable per-Goal Runtime task-list
+views only after semantic Work reconciliation when provisional Work exists. GA emits no
+replan or compatibility flag. `/fast-plan` receives the Canonical Goal plus a bounded
+`work_reconciliation_activities` projection of relevant retained/provisional Runtime
+Work and active task bindings without cancelling
+first. The Planner explicitly sets `CanonicalPlanStep.reuse_activity_id` to an existing
+stable Activity identity when it wants reuse and authors the complete desired Plan;
+omission means no reuse selection. Runtime reuses the task only after Host
+validation proves exact request/version/state, Capability IDs, arguments, Goal ownership,
+and multi-Activity timing; otherwise it cancels pending/cancellable provisional Work
+after the Planner decision and executes the corrected Plan.
 
 The single same-stage `/fast-advance` mechanical revision preserves the initial
 model-authored disposition. For an initial `execute` decision it constrains the repaired
@@ -212,7 +223,16 @@ semantic escalation for the existing Deep Planner (or fails closed); the Host ne
 rewrites the sentence. This prevents a forecast probability below 100% from being
 promoted to certainty without adding a Tool Result Interpreter or Response Composer.
 
-`POST /fast-plan` is the bounded canonical Fast Planner revision endpoint, available only when `AGENT_FAST_PLANNER_ENABLED=1` and Agent LLM use is enabled. The normal easy path does not call it after a valid `/fast-advance`; Runtime deterministically binds that first Activity Plan to GA-owned Goal IDs. `/fast-plan` remains the one same-owner revision path when the first Fast result is unavailable/refused or a canonical contract revision is required. It returns `CanonicalPlan`; the endpoint never executes by itself, and trusted Runtime revalidates every terminal plan.
+`POST /fast-plan` is the bounded re-entrant canonical Fast Planner endpoint, available only when `AGENT_FAST_PLANNER_ENABLED=1` and Agent LLM use is enabled. A valid `/fast-advance` may still finish a provider-free easy turn directly. Canonical Goal commit with provisional Work, association to retained Goal state, trusted Evidence/result re-entry, or another relevant open-Responsibility event calls `/fast-plan` with a bounded current Work snapshot. It decides whether existing Work remains in the complete desired Plan; GA and Orchestrator do not make that semantic choice. The endpoint never executes by itself, and trusted Runtime revalidates exact identity, version, authorization, resources, and safety before applying the Plan.
+
+For Work Reconciliation, `work_reconciliation_activities` is the single bounded input
+projection for same-turn provisional and retained Runtime Work. A Planner step selects
+reuse only by setting `reuse_activity_id` to one supplied stable identity while
+preserving Capability, arguments, Goal ownership, and timing. Retained-work reuse is
+currently atomic and reconciliation-only: it selects the complete retained set with no
+additional step, preserves the original Runtime submission/Goal execution binding, and
+dispatches nothing twice. A replacement Plan omits reuse IDs; Host validation and exact
+cancellation receipts must close cancellable old Work before replacement dispatch.
 
 Executable identity is canonicalized as `capability_id` in planner schemas,
 Canonical Plan steps, Interaction Capability requests/results/traces, and

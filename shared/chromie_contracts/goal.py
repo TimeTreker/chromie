@@ -56,7 +56,6 @@ class GoalAssociation(BaseModel):
     ambiguity_summary: str = ""
     goal_update: dict[str, Any] = Field(default_factory=dict)
     resolved_gap_ids: list[str] = Field(default_factory=list)
-    requires_replan: bool = False
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("association_id", "reason_summary", "ambiguity_summary", mode="before")

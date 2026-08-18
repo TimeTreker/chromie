@@ -632,7 +632,6 @@ class ConversationStateTests(unittest.TestCase):
                 "operation": "modify",
                 "target_task_ids": [task_id],
                 "goal_update": {"source_text": "Do you agree with me?"},
-                "requires_replan": False,
             }],
             sid="s3",
             user_text="Do you agree with me?",
@@ -1192,7 +1191,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
         self.assertEqual(before["plan_status"], "proposed")
         self.assertEqual(before["status"], "planning")
 
-        applied = manager.apply_goal_association_resolution({'resolution_status': 'resolved', 'turn_id': 'turn-blue-cup', 'associations': [{'association_id': 'assoc-blue-cup', 'relationship': 'modify', 'target_goal_ids': ['goal-cup'], 'goal_update': {'description': 'Pick up the blue cup.'}, 'requires_replan': False, 'confidence': 0.99, 'reason_summary': 'The user refined the same cup responsibility.'}], 'confidence': 0.99, 'reason_summary': 'Same responsibility, compatible refinement.'}, sid='sid-blue', user_text='The blue one.', atomic=True)
+        applied = manager.apply_goal_association_resolution({'resolution_status': 'resolved', 'turn_id': 'turn-blue-cup', 'associations': [{'association_id': 'assoc-blue-cup', 'relationship': 'modify', 'target_goal_ids': ['goal-cup'], 'goal_update': {'description': 'Pick up the blue cup.'}, 'confidence': 0.99, 'reason_summary': 'The user refined the same cup responsibility.'}], 'confidence': 0.99, 'reason_summary': 'Same responsibility refinement.'}, sid='sid-blue', user_text='The blue one.', atomic=True)
 
         self.assertTrue(all(item.get("applied") is True for item in applied))
         after = manager.snapshot()["task_contexts"][0]
@@ -1201,13 +1200,9 @@ class GoalScopedLifecycleTests(unittest.TestCase):
         self.assertEqual(after["plan_version"], 1)
         self.assertEqual(after["plan_status"], "proposed")
         self.assertEqual(after["status"], "planning")
-        self.assertEqual(
-            after["semantic_compatibility_history"][-1]["decision"],
-            "preserve",
-        )
         self.assertNotIn("superseded_plan_versions", after)
 
-    def test_incompatible_goal_refinement_supersedes_plan_only_when_replan_required(self) -> None:
+    def test_goal_refinement_defers_work_compatibility_to_planner(self) -> None:
         manager = ConversationStateManager(base_conversation_id="incompatible-refinement")
         self._create_goals(manager, "goal-cup")
         manager.record_interaction_response(
@@ -1230,19 +1225,53 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             ),
         )
 
-        applied = manager.apply_goal_association_resolution({'resolution_status': 'resolved', 'turn_id': 'turn-red-cup', 'associations': [{'association_id': 'assoc-red-cup', 'relationship': 'modify', 'target_goal_ids': ['goal-cup'], 'goal_update': {'description': 'Pick up the red cup instead.'}, 'requires_replan': True, 'confidence': 0.99, 'reason_summary': 'The changed target makes the old plan incompatible.'}], 'confidence': 0.99, 'reason_summary': 'Same responsibility, incompatible current Work.'}, sid='sid-red', user_text='Actually, the red one.', atomic=True)
+        applied = manager.apply_goal_association_resolution({'resolution_status': 'resolved', 'turn_id': 'turn-red-cup', 'associations': [{'association_id': 'assoc-red-cup', 'relationship': 'modify', 'target_goal_ids': ['goal-cup'], 'goal_update': {'description': 'Pick up the red cup instead.'}, 'confidence': 0.99, 'reason_summary': 'The user changed the target within the same responsibility.'}], 'confidence': 0.99, 'reason_summary': 'Same responsibility refinement; Planner owns Work compatibility.'}, sid='sid-red', user_text='Actually, the red one.', atomic=True)
 
         self.assertTrue(all(item.get("applied") is True for item in applied))
         after = manager.snapshot()["task_contexts"][0]
         self.assertEqual(after["semantic_goal"]["goal_id"], "goal-cup")
         self.assertEqual(after["goal_version"], 2)
         self.assertEqual(after["plan_version"], 1)
-        self.assertEqual(after["plan_status"], "superseded")
+        self.assertEqual(after["plan_status"], "proposed")
         self.assertEqual(after["status"], "planning")
-        self.assertEqual(after["superseded_plan_versions"], [1])
+        self.assertNotIn("superseded_plan_versions", after)
+
+    def test_reconciliation_only_plan_preserves_retained_runtime_binding(self) -> None:
+        manager = ConversationStateManager(
+            base_conversation_id="retained-reconciliation-only"
+        )
+        self._create_goals(manager, "goal-weather")
+        context = manager._task_contexts[0]
+        context["plan_version"] = 2
+        context["plan_status"] = "running"
+        context["status"] = "running"
+        context["metadata"] = {
+            **context.get("metadata", {}),
+            "canonical_plan_id": "plan-weather-existing",
+            "canonical_plan_fingerprint": "e" * 64,
+        }
+
+        manager.record_interaction_response(
+            "sid-weather-follow-up",
+            InteractionResponse(
+                metadata={
+                    "planning_result": "composed_plan",
+                    "canonical_plan_id": "plan-weather-reconciled",
+                    "retained_work_reconciliation_only": True,
+                }
+            ),
+        )
+
+        after = manager.snapshot()["task_contexts"][0]
+        self.assertEqual(after["plan_version"], 2)
+        self.assertEqual(after["plan_status"], "running")
         self.assertEqual(
-            after["semantic_compatibility_history"][-1]["decision"],
-            "supersede",
+            after["metadata"]["canonical_plan_id"],
+            "plan-weather-existing",
+        )
+        self.assertEqual(
+            after["metadata"]["last_retained_work_reconciliation_plan_id"],
+            "plan-weather-reconciled",
         )
 
     def test_execution_outcome_bundle_preserves_exact_mixed_goal_evidence(self) -> None:
@@ -1569,7 +1598,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             "satisfied",
         )
 
-        correction = manager.apply_goal_association_resolution({'resolution_status': 'resolved', 'turn_id': 'turn-correction', 'associations': [{'association_id': 'assoc-correction', 'relationship': 'modify', 'target_goal_ids': ['goal-cup'], 'goal_update': {'description': 'Pick up the blue cup, not the red cup.'}, 'requires_replan': True, 'confidence': 0.99, 'reason_summary': 'The user corrected the intended cup.'}], 'confidence': 0.99, 'reason_summary': 'The same responsibility was misunderstood.'}, sid='sid-correction', user_text='No, I meant the blue cup.', atomic=True)
+        correction = manager.apply_goal_association_resolution({'resolution_status': 'resolved', 'turn_id': 'turn-correction', 'associations': [{'association_id': 'assoc-correction', 'relationship': 'modify', 'target_goal_ids': ['goal-cup'], 'goal_update': {'description': 'Pick up the blue cup, not the red cup.'}, 'confidence': 0.99, 'reason_summary': 'The user corrected the intended cup.'}], 'confidence': 0.99, 'reason_summary': 'The same responsibility was misunderstood.'}, sid='sid-correction', user_text='No, I meant the blue cup.', atomic=True)
         self.assertTrue(all(item.get("applied") is True for item in correction))
         active = manager.active_goal_snapshots()
         self.assertEqual(len(active), 1)

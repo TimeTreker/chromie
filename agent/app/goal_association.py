@@ -231,7 +231,6 @@ class GoalAssociationModelAssociation(BaseModel):
     reason_summary: str = ""
     updated_description: str = ""
     resolved_gap_ids: list[str] = Field(default_factory=list)
-    requires_replan: bool = False
 
     @field_validator("reason_summary", "updated_description", mode="before")
     @classmethod
@@ -2495,7 +2494,7 @@ class GoalAssociationResolver:
         else:
             state_instructions = (
                 "Resolve continuity before creation using semantic reasoning. "
-                "For continuity with an existing goal, emit an associations item with source_responsibility_refs, relationship, target_goal_ids, confidence, reason_summary, the applicable updated_description, resolved_gap_ids, and requires_replan fields. "
+                "For continuity with an existing goal, emit an associations item with source_responsibility_refs, relationship, target_goal_ids, confidence, reason_summary, the applicable updated_description, and resolved_gap_ids fields. Goal Association owns canonical Goal continuity only: do not decide whether Work must be reused, replaced, cancelled, or replanned; Fast Planner owns that judgment from the committed Goal and actual Work state. "
                 "relationship must be copied exactly from [\"continue\",\"modify\",\"clarify\",\"confirm\",\"reject\",\"cancel\",\"pause\",\"resume\",\"merge\",\"split\",\"reference\"]. "
                 "Use continue only when the current turn advances unchanged unfinished active or recoverable work. Use reference when the current turn asks to retrieve, restate, explain, compare, verify, or otherwise answer from a retained Goal without changing its meaning or lifecycle. Do not use continue or reference merely because the topic overlaps with a previous Goal. When the latest turn is a social reaction, acknowledgement, personal feeling, practical decision, conversational evaluation, empathy-seeking comment, or another independently satisfiable communicative act, create a fresh vocal_output Goal that captures that latest intent; prior delivered information remains context for that answer. Use modify only when the same Responsibility is being refined and include updated_description or resolved_gap_ids. When the user abandons that Responsibility for a genuinely different outcome, return decision=create_goals with a new Goal whose supersedes_goal_ids names the old Goal; never mutate the old Goal through an association. The association relationship clarify means the current user turn supplies missing information for a Goal and must include updated_description or resolved_gap_ids; it never means that the user is asking Chromie for more explanation. When GI preserves unresolved material meaning, create or associate the narrowest source-grounded provisional Goal without inventing that meaning; Fast Planner alone decides whether and how to ask. "
                 "Use confirm only when the current turn approves a pending proposal for the targeted Goal, and use reject only when it declines that proposal. "
@@ -3519,11 +3518,6 @@ class GoalAssociationResolver:
                     reason_summary=item.reason_summary,
                     goal_update=goal_update,
                     resolved_gap_ids=item.resolved_gap_ids,
-                    requires_replan=(
-                        item.requires_replan
-                        or item.relationship
-                        in {"modify", "clarify", "merge", "split"}
-                    ),
                 )
             )
 

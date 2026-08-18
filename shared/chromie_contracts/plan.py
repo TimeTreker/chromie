@@ -687,10 +687,11 @@ class CanonicalPlanStep(CapabilityIdentityModel):
     args: dict[str, Any] = Field(default_factory=dict)
     timing: PlanTiming = "sequential"
     source_goal_ids: list[str] = Field(default_factory=list)
+    reuse_activity_id: str = ""
     reason_summary: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)
 
-    @field_validator("step_id", "reason_summary", mode="before")
+    @field_validator("step_id", "reuse_activity_id", "reason_summary", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
         return " ".join(value.strip().split()) if isinstance(value, str) else value

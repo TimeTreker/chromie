@@ -363,7 +363,6 @@ class SemanticTaskOperation(BaseModel):
     resolved_gap_ids: list[str] = Field(default_factory=list)
     status_update: TaskLifecycleStatus | None = None
     commitment_state: CommitmentState | None = None
-    requires_replan: bool = False
     response_plan: ResponsePlan | None = None
     reason_summary: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)

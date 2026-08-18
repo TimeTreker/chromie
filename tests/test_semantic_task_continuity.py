@@ -21,11 +21,14 @@ class SemanticTaskContractTests(unittest.TestCase):
                 description="Prepare or obtain a coffee for the current user.",
                 source_text="Bring me a coffee.",
             ),
-            requires_replan=True,
         )
 
         self.assertEqual(operation.operation, "create")
         self.assertEqual(operation.goal.description, "Prepare or obtain a coffee for the current user.")
+        self.assertNotIn(
+            "requires_replan",
+            SemanticTaskOperation.model_json_schema()["properties"],
+        )
 
     def test_semantic_goal_rejects_low_level_control_fields(self) -> None:
         with self.assertRaises(ValueError):
@@ -39,7 +42,7 @@ class SemanticTaskContractTests(unittest.TestCase):
 class ConversationSemanticTaskTests(unittest.TestCase):
     @staticmethod
     def _create_coffee(manager: ConversationStateManager) -> str:
-        manager.record_user_turn('s1', 'Bring me a coffee.', metadata={'source': 'llm', 'semantic_task_operations': [{'operation_id': 'op-create-coffee', 'operation': 'create', 'confidence': 0.98, 'relationship': 'new independent user goal', 'goal': {'description': 'Prepare or obtain a coffee and deliver it to the current user.', 'source_text': 'Bring me a coffee.', 'constraints': {}}, 'requires_replan': True}]})
+        manager.record_user_turn('s1', 'Bring me a coffee.', metadata={'source': 'llm', 'semantic_task_operations': [{'operation_id': 'op-create-coffee', 'operation': 'create', 'confidence': 0.98, 'relationship': 'new independent user goal', 'goal': {'description': 'Prepare or obtain a coffee and deliver it to the current user.', 'source_text': 'Bring me a coffee.', 'constraints': {}}}]})
         return manager.snapshot()["current_task_context"]["task_id"]
 
     def test_create_operation_builds_versioned_open_goal(self) -> None:
@@ -54,7 +57,7 @@ class ConversationSemanticTaskTests(unittest.TestCase):
         self.assertEqual(snapshot["status"], "planning")
         self.assertIn("coffee", snapshot["semantic_goal"]["description"].lower())
 
-    def test_modify_operation_revises_goal_and_supersedes_plan_and_confirmation(self) -> None:
+    def test_modify_operation_revises_goal_without_deciding_work_compatibility(self) -> None:
         manager = ConversationStateManager()
         task_id = self._create_coffee(manager)
         context = manager.snapshot()["current_task_context"]
@@ -65,17 +68,17 @@ class ConversationSemanticTaskTests(unittest.TestCase):
             "goal_version": 1,
         }
 
-        manager.record_user_turn('s2', 'Make the coffee iced.', metadata={'source': 'llm', 'semantic_task_operations': [{'operation_id': 'op-ice-coffee', 'operation': 'modify', 'target_task_ids': [task_id], 'confidence': 0.99, 'relationship': 'constraint refinement', 'goal_update': {'description': 'Prepare or obtain an iced coffee and deliver it to the current user.', 'constraint_updates': {'temperature': 'iced'}}, 'requires_replan': True}]})
+        manager.record_user_turn('s2', 'Make the coffee iced.', metadata={'source': 'llm', 'semantic_task_operations': [{'operation_id': 'op-ice-coffee', 'operation': 'modify', 'target_task_ids': [task_id], 'confidence': 0.99, 'relationship': 'constraint refinement', 'goal_update': {'description': 'Prepare or obtain an iced coffee and deliver it to the current user.', 'constraint_updates': {'temperature': 'iced'}}}]})
 
         updated = manager.snapshot()["current_task_context"]
 
         self.assertEqual(updated["task_id"], task_id)
         self.assertEqual(updated["goal_version"], 2)
         self.assertEqual(updated["semantic_goal"]["constraints"]["temperature"], "iced")
-        self.assertEqual(updated["plan_status"], "superseded")
-        self.assertIn(1, updated["superseded_plan_versions"])
-        self.assertIsNone(updated["confirmation"])
-        self.assertEqual(updated["invalidated_confirmations"][-1]["confirmation_id"], "confirm-v1")
+        self.assertEqual(updated["plan_status"], "proposed")
+        self.assertEqual(updated["plan_version"], 1)
+        self.assertEqual(updated["confirmation"]["confirmation_id"], "confirm-v1")
+        self.assertNotIn("superseded_plan_versions", updated)
 
     def test_planner_clarification_waits_and_answer_resumes_same_task(self) -> None:
         manager = ConversationStateManager()
@@ -108,7 +111,7 @@ class ConversationSemanticTaskTests(unittest.TestCase):
         self.assertEqual(waiting["status"], "waiting_for_user")
         self.assertEqual(waiting["open_information_gaps"][0]["gap_id"], "coffee-temperature")
 
-        manager.record_user_turn('s2', 'Iced, with no sugar.', metadata={'source': 'llm', 'semantic_task_operations': [{'operation_id': 'op-answer-temperature', 'operation': 'clarification_answer', 'target_task_ids': [task_id], 'confidence': 0.99, 'relationship': 'answers a blocking information gap', 'goal_update': {'constraint_updates': {'temperature': 'iced', 'sugar': 'none'}}, 'resolved_gap_ids': ['coffee-temperature'], 'requires_replan': True}]})
+        manager.record_user_turn('s2', 'Iced, with no sugar.', metadata={'source': 'llm', 'semantic_task_operations': [{'operation_id': 'op-answer-temperature', 'operation': 'clarification_answer', 'target_task_ids': [task_id], 'confidence': 0.99, 'relationship': 'answers a blocking information gap', 'goal_update': {'constraint_updates': {'temperature': 'iced', 'sugar': 'none'}}, 'resolved_gap_ids': ['coffee-temperature']}]})
 
         resumed = manager.snapshot()["current_task_context"]
         self.assertEqual(resumed["task_id"], task_id)
@@ -166,7 +169,6 @@ class ConversationSemanticTaskTests(unittest.TestCase):
                 "description": "Prepare or obtain an iced coffee for the current user.",
                 "constraint_updates": {"temperature": "iced"},
             },
-            "requires_replan": True,
         }
 
         first = manager.apply_semantic_task_operations([operation], sid='s2', user_text='Make it iced.', source='llm')
@@ -192,7 +194,6 @@ class ConversationSemanticTaskTests(unittest.TestCase):
                 "description": "Prepare or obtain coffee for the current user.",
                 "source_text": "Bring me coffee.",
             },
-            "requires_replan": True,
         }
 
         first = manager.apply_semantic_task_operations([operation], sid='s1', user_text='Bring me coffee.', source='llm')
@@ -216,7 +217,7 @@ class ConversationSemanticTaskTests(unittest.TestCase):
 
     def test_unknown_task_operation_is_retained_as_rejected_audit_result(self) -> None:
         manager = ConversationStateManager()
-        manager.record_user_turn('s1', 'Make it iced.', metadata={'semantic_task_operations': [{'operation_id': 'op-missing-target', 'operation': 'modify', 'target_task_ids': ['missing-task'], 'confidence': 0.8, 'goal_update': {'constraint_updates': {'temperature': 'iced'}}, 'requires_replan': True}]})
+        manager.record_user_turn('s1', 'Make it iced.', metadata={'semantic_task_operations': [{'operation_id': 'op-missing-target', 'operation': 'modify', 'target_task_ids': ['missing-task'], 'confidence': 0.8, 'goal_update': {'constraint_updates': {'temperature': 'iced'}}}]})
 
         result = manager.get_history()[-1]["metadata"]["semantic_task_operation_results"][0]
         self.assertFalse(result["applied"])

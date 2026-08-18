@@ -928,6 +928,19 @@ class InteractionRuntimeCoordinator:
     ) -> CancellationDispatchReceipt:
         return await self.runtime.cancel_scope(directive)
 
+    async def reusable_request_snapshot(
+        self,
+        *,
+        interaction_id: str,
+        request_id: str,
+    ) -> dict[str, Any] | None:
+        """Read the live Runtime identity used to validate Planner reuse."""
+
+        return await self.runtime.reusable_request_snapshot(
+            interaction_id=interaction_id,
+            request_id=request_id,
+        )
+
     async def emergency_stop(self, *, reason: str) -> dict[str, Any]:
         """Dispatch Soridormi's dedicated E-stop without model mediation."""
 

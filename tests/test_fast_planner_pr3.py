@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from agent.app.fast_planner import FastPlannerResolver
 from agent.app.planner_contract import (
+    PlannerDTOContractError,
     PlannerModelOutput,
     goal_association_prompt_projection,
     validate_external_response_evidence_boundary,
@@ -2858,6 +2859,95 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         self.assertIn("ledger-fast-marker", prompt)
         self.assertIn("plan only the still-needed conversational and effectful delta", prompt)
+
+    def test_canonical_revision_prompt_exposes_provisional_safe_work_for_reuse_decision(
+        self,
+    ):
+        planner_request = request(
+            "Check Chongqing weather today.",
+            goal_ids=["goal-weather"],
+        )
+        planner_request.context["work_reconciliation_activities"] = [
+            {
+                "activity_id": "weather-provisional",
+                "role": "capability",
+                "capability_id": "chromie.weather.lookup",
+                "args": {"location": "重庆", "date": "today"},
+                "timing": "parallel",
+                "source_responsibility_refs": ["weather"],
+            }
+        ]
+
+        prompt = FastPlannerResolver(
+            FakeOllama({}),
+            FakeCatalog(),
+        )._prompt(
+            planner_request,
+            [],
+            response_schema={},
+        )
+
+        self.assertIn("Runtime Activities for Work reconciliation JSON", prompt)
+        self.assertIn("weather-provisional", prompt)
+        self.assertIn("may already be running or completed", prompt)
+        self.assertIn("step.reuse_activity_id", prompt)
+        self.assertIn("validate the explicit selection mechanically", prompt)
+
+    def test_provisional_reuse_requires_explicit_exact_activity_identity(self):
+        output = PlannerModelOutput.model_validate(
+            multi_goal_plan(
+                disposition="execute",
+                coverage="complete",
+                goal_summary="Check Chongqing weather today.",
+                steps=[
+                    {
+                        **execute_step(
+                            "weather-step",
+                            "chromie.weather.lookup",
+                            {"location": "重庆", "date": "today"},
+                            ["goal-weather"],
+                            "Reuse the already-running exact lookup.",
+                        ),
+                        "timing": "parallel",
+                        "reuse_activity_id": "weather-provisional",
+                    }
+                ],
+                goal_outcomes={
+                    "goal-weather": execute_outcome(
+                        "goal-weather",
+                        ["weather-step"],
+                        "The selected lookup covers the Goal.",
+                    )
+                },
+                goal_satisfaction=exact_satisfaction(["goal-weather"]),
+            )
+        )
+        context = {
+            "work_reconciliation_activities": [
+                {
+                    "activity_id": "weather-provisional",
+                    "capability_id": "chromie.weather.lookup",
+                    "args": {"location": "重庆", "date": "today"},
+                    "timing": "parallel",
+                }
+            ]
+        }
+
+        FastPlannerResolver._validate_work_reuse_selection(
+            output,
+            context=context,
+        )
+
+        changed = output.model_copy(deep=True)
+        changed.steps[0].args["location"] = "内乡"
+        with self.assertRaisesRegex(
+            PlannerDTOContractError,
+            "changes immutable args",
+        ):
+            FastPlannerResolver._validate_work_reuse_selection(
+                changed,
+                context=context,
+            )
 
     def test_effectful_zero_step_false_satisfaction_escalates_without_same_tier_repair(self):
         invalid = {

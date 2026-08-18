@@ -75,6 +75,8 @@ class TextScenarioCase:
     expected_fast_speech_purposes: tuple[str, ...] = field(default_factory=tuple)
     require_social_attention_opportunity: bool = False
     require_fast_planner_evidence_reentry: bool = False
+    require_pre_ga_safe_capability_dispatch: bool = False
+    require_canonical_work_reconciliation: bool = False
     max_warm_gi_handoff_to_fast_commit_ms: float = 0.0
     max_warm_fast_commit_to_playback_start_ms: float = 0.0
     expected_terminal_planner_tier: str = ""
@@ -745,6 +747,24 @@ def validate_live_text_result(
         errors.append(
             "terminal Capability Evidence did not reactivate Fast Planner"
         )
+    if (
+        case.require_pre_ga_safe_capability_dispatch
+        and not bool(summary.get("preview_only"))
+        and not str(
+            runtime_metadata.get("fast_capability_activity_status") or ""
+        ).startswith("completed_before_canonical_dispatch")
+    ):
+        errors.append(
+            "safe Capability did not use the pre-GA Fast Activity dispatch path"
+        )
+    if (
+        case.require_canonical_work_reconciliation
+        and not bool(summary.get("preview_only"))
+        and runtime_metadata.get("work_reconciliation_required") is not True
+    ):
+        errors.append(
+            "canonical Fast Planner Work reconciliation did not run"
+        )
     timing_evidence = _fast_response_timing_evidence(summary)
     summary["fast_response_timing_evidence"] = timing_evidence
     timing_derived = timing_evidence["derived"]
@@ -932,6 +952,12 @@ def _text_scenario_case(
         ),
         require_fast_planner_evidence_reentry=bool(
             raw.get("require_fast_planner_evidence_reentry", False)
+        ),
+        require_pre_ga_safe_capability_dispatch=bool(
+            raw.get("require_pre_ga_safe_capability_dispatch", False)
+        ),
+        require_canonical_work_reconciliation=bool(
+            raw.get("require_canonical_work_reconciliation", False)
         ),
         max_warm_gi_handoff_to_fast_commit_ms=max(
             0.0,

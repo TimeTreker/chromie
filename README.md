@@ -27,7 +27,13 @@ experience artifacts. See
 > see `docs/STATUS.md` for its validation level.
 > Goal Association alone creates or modifies canonical Goals, and Runtime groups the
 > resulting task-list view by Goal while preserving one execution identity for shared
-> Work. Background Social Attention may prepare optional body decoration attached
+> Work. Every canonical Goal commit that intersects provisional or retained Work
+> reactivates Fast Planner Work Reconciliation; GA does not emit a replan or compatibility
+> decision. Fast Planner compares Goal, Responsibility, Situation, Evidence, and actual
+> Work, explicitly selects any stable Activity identity to reuse, and otherwise proposes
+> complete replacement Work. Runtime validates only exact identity/state/arguments and
+> cancels replaceable Work through trusted receipts before dispatching the revision.
+> Background Social Attention may prepare optional body decoration attached
 > to the same observable Main Activity without delaying speech. Trusted execution,
 > Host-bound Evidence re-entry to Fast Planner, and deterministic per-goal
 > reconciliation own completion truth. A frozen
@@ -92,9 +98,11 @@ Host Orchestrator
         -> same GI result, concurrent fan-out
            |-> Fast Planner -> input resolution + exact Communicative/Capability Activities --.
            |      |-> validated Communicative Activity -> Vocal/TTS      |
+           |      |-> eligible safe read -> provisional Runtime task ----|
            |      `-> Deep Planner only for complex HOW                  |
            |-> Goal Association -> canonical Goal state --------+-> Goal-bound tasks
            `-> background Social Attention decoration            |
+        -> Fast Planner Work Reconciliation over Canonical Goal + actual Work
         -> resource-aware Trusted Capability Runtime <-----------'
         -> named capability -> Soridormi / peer providers
         -> structured results and traces

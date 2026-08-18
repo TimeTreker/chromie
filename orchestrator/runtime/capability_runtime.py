@@ -571,6 +571,48 @@ class CapabilityRuntime:
                         active[3],
                     )
 
+    async def reusable_request_snapshot(
+        self,
+        *,
+        interaction_id: str,
+        request_id: str,
+    ) -> dict[str, Any] | None:
+        """Return the current trusted identity of one still-owned Runtime request.
+
+        This is a read-only staleness check for Planner-selected Work reuse. It
+        exposes no provider result and makes no semantic compatibility decision.
+        """
+
+        async with self._active_lock:
+            scheduled = self._scheduled.get(interaction_id, {})
+            item = scheduled.get(request_id)
+            if item is None:
+                return None
+            request, definition = item
+            active = self._active.get((interaction_id, request_id))
+            return {
+                "interaction_id": interaction_id,
+                "request_id": request_id,
+                "capability_id": request.capability_id,
+                "capability_version": definition.version,
+                "args": dict(request.args),
+                "timing": request.timing,
+                "source_goal_ids": sorted(self._request_goal_ids(request)),
+                "canonical_plan_id": str(
+                    request.metadata.get("canonical_plan_id") or ""
+                ),
+                "canonical_plan_fingerprint": str(
+                    request.metadata.get("canonical_plan_fingerprint") or ""
+                ),
+                "state": (
+                    "running"
+                    if active is not None and not active[0].done()
+                    else "terminal_pending_join"
+                    if active is not None
+                    else "scheduled"
+                ),
+            }
+
     def begin_interaction(self, interaction_id: str) -> bool:
         """Keep scoped directives alive across one coordinator-owned execution."""
 

@@ -13,6 +13,21 @@ from shared.chromie_contracts.semantic_task import SemanticGoal, TaskContextSnap
 
 
 class GoalContractTests(unittest.TestCase):
+    def test_goal_association_contract_excludes_work_replanning_decision(self) -> None:
+        self.assertNotIn(
+            "requires_replan",
+            GoalAssociation.model_json_schema()["properties"],
+        )
+        with self.assertRaises(ValueError):
+            GoalAssociation.model_validate(
+                {
+                    "association_id": "assoc-work-leak",
+                    "relationship": "modify",
+                    "target_goal_ids": ["goal-weather"],
+                    "requires_replan": True,
+                }
+            )
+
     def test_goal_association_requires_existing_target_except_new(self) -> None:
         with self.assertRaises(ValueError):
             GoalAssociation(
@@ -107,7 +122,7 @@ class GoalContractTests(unittest.TestCase):
 class ActiveGoalProjectionTests(unittest.TestCase):
     @staticmethod
     def _create_goal(manager: ConversationStateManager, operation_id: str, description: str) -> None:
-        manager.record_user_turn(operation_id, description, metadata={'source': 'llm', 'semantic_task_operations': [{'operation_id': operation_id, 'operation': 'create', 'confidence': 0.99, 'goal': {'description': description, 'source_text': description}, 'requires_replan': True}]})
+        manager.record_user_turn(operation_id, description, metadata={'source': 'llm', 'semantic_task_operations': [{'operation_id': operation_id, 'operation': 'create', 'confidence': 0.99, 'goal': {'description': description, 'source_text': description}}]})
 
     def test_active_goal_projection_is_bounded_and_goal_first(self) -> None:
         manager = ConversationStateManager(max_pending_tasks=4)

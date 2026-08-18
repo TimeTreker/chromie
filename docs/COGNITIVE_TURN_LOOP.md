@@ -38,13 +38,13 @@ receive
   -> concurrently:
        Fast Planner authors the first Activity Plan
        Goal Association commits canonical Goal identity/updates
-  -> formulate wording for Planner-selected Communicative Acts without
-     changing their function, timing, provenance, or constraints
+  -> realize the Planner's exact Communicative-Activity wording without
+     adding another semantic response author
   -> bind Activities into per-Goal task-list views
   -> validate, authorize, and resource-schedule ready Work
   -> resolve execution inputs or ask a user-resolvable clarification; use Deep Planner for complex HOW
   -> observe structured results and reconcile every Goal against Evidence
-  -> compose the still-needed response from authoritative state
+  -> re-enter Fast Planner on trusted Evidence for the still-needed response
   -> close, wait, or reactivate later from new evidence/state
 ```
 
@@ -121,6 +121,18 @@ Goal versions, a Canonical Plan, and evidence when each exists. This output
 scheduling does not transfer semantic or conversation authority to a response
 composer or execution specialist.
 
+### Maintained module I/O and non-ownership boundaries
+
+| Module | Authoritative input | Authoritative output | Must not decide |
+|---|---|---|---|
+| Cognitive Gateway | captured turn, bounded Host context, deterministic protective controls | admitted immutable `UserTurnEnvelope` or protective outcome | user Goal, Capability, Plan, or social expression |
+| Goal Interpretation | admitted turn plus bounded Situation/continuity context | provider-neutral Responsibilities, bindings, qualifiers, and unresolved meaning | Capability input gaps, clarification policy, Goal continuity, or Work |
+| Fast Planner first/advance phases | GI Responsibilities, applicable schemas/catalog, trusted context | exact early Communicative Activity and provisional safe Work where eligible | canonical Goal identity or result claims without Evidence |
+| Goal Association | unchanged GI result plus bounded retained Goals | Canonical Goal create/associate/update DTO | `requires_replan`, Work compatibility, Capability, cancellation, or next action |
+| Fast/Deep Planner Work Reconciliation | Canonical Goals, open Responsibilities, Situation, Evidence, and bounded queued/running/completed Work | complete desired `CanonicalPlan`; explicit `reuse_activity_id` selections | execution truth or Host/runtime mutation |
+| Host Orchestrator and Trusted Capability Runtime | validated Plan plus exact live request/version/state/resource/safety bindings | accepted/rejected dispatch, reuse/cancellation receipts, traces, and typed Evidence | semantic compatibility, Goal meaning, or rewritten Planner wording |
+| Evidence re-entry and Responsibility reconciliation | Host-bound terminal Evidence plus still-open Canonical Goal | truthful response, follow-on Plan, wait/failure state, and eventual Responsibility closure | fabricated completion or conversion of stale/unbound output into Goal Evidence |
+
 ## 3. Turn state machine
 
 Every received input has one stable `turn_id`. The normal path is:
@@ -129,12 +141,12 @@ Every received input has one stable `turn_id`. The normal path is:
 RECEIVED
   -> ADMITTED
   -> GOALS_RESOLVED
-     -> READY_TO_RESPOND -> RESPONSE_COMPOSED
+     -> COMMUNICATIVE_ACTIVITY_READY
      or
      -> PLAN_VALIDATED
-        -> WAITING_FOR_CONFIRMATION | EXECUTING | READY_TO_RESPOND
+        -> WAITING_FOR_CONFIRMATION | EXECUTING | COMMUNICATIVE_ACTIVITY_READY
         -> OUTCOMES_RECONCILED
-        -> RESPONSE_COMPOSED
+        -> EVIDENCE_RESPONSE_READY
   -> CLOSED | WAITING_FOR_USER | REPLAN_REQUIRED
 ```
 
@@ -233,14 +245,47 @@ ownership into GI. Deep Planner is reserved for complex HOW, dependencies, alter
 or consequential planning—not for asking a question Fast Planner already knows it must
 ask.
 
-Safe, side-effect-free, schema-valid reads may start before GA finishes. Their stable
-runtime request identity initially carries GI Responsibility refs. When GA returns, the
-same task is reindexed into each applicable canonical Goal's task-list view; it is not
-restarted. A task shared by multiple Goals appears in each view with the same request ID
-and executes once. Terminal Evidence retains exact Goal/Plan, task-list revision,
-Capability version, arguments, schema identity, timestamps, and provenance. If GA or a
-Deep Plan revision changes unfinished Work, Runtime cancels/replaces only pending or
-cancellable tasks and preserves completed Evidence.
+Safe, side-effect-free, schema-valid reads may start without awaiting GA once their
+Capability also explicitly declares parallel safety, needs no confirmation, and is
+available. Their stable runtime request identity initially carries GI Responsibility
+refs, never an inferred Goal ID. GA commits only Canonical Goal continuity and emits no
+Work/replan decision. When a Goal commit intersects retained or provisional Work, the
+canonical Fast Planner receives that Goal plus the relevant queued/running/completed
+Activity and result state. It semantically decides which existing Activities still
+advance the Responsibility and authors the complete desired Plan. A task shared by
+multiple Goals still has one request identity and executes once.
+
+Planner explicitly selects provisional Work for reuse through
+`CanonicalPlanStep.reuse_activity_id` and complete Capability/argument/Goal/timing
+semantics. Host validation checks that the
+selected Runtime request, version, state, ownership, and exact Work match the snapshot;
+it does not interpret Goal prose, relationship enums, result payloads, or Plan omission
+as a compatibility decision. A newer state fails closed for the current dispatch; the
+corresponding Runtime/Evidence change is the next bounded Planner-reactivation event
+rather than a Host repair.
+Runtime reuses validated Work or cancels pending/cancellable Work only after the Planner
+decision and executes the corrected Plan. An incompatible observation that completed
+before cancellation remains
+unbound audit Evidence and cannot support Goal completion or response claims. Deep Plan
+revisions follow the same cancel-pending/preserve-completed rule; neither result payloads
+nor the Host infer a semantic correction.
+
+Retained Runtime Work and same-turn provisional Work share the bounded
+`work_reconciliation_activities` Planner input. Each item exposes one stable Activity
+identity and its immutable Capability/argument/ownership/timing projection. A retained
+request may be reused only when Planner selects the complete retained set with no
+additional step; the new Plan is reconciliation-only, Runtime leaves the original
+submission and Goal execution binding in place, and Host records or dispatches no
+duplicate execution. If different or additional Work is needed, Planner omits all reuse
+selections and authors the complete replacement Plan; Runtime validates and cancels the
+old cancellable group before replacement dispatch. This atomic-group rule is the current
+safe Runtime boundary, not a semantic judgment by Host.
+
+This reconciliation repeats from meaningful state changes while Responsibility remains
+open. A user update may require GI/GA before planning; provider Evidence, failure,
+timeout, dependency readiness, or another trusted Work/Situation event can reactivate
+Planner directly with the already-canonical Goal. Ordinary progress churn is filtered,
+and an open Goal may wait passively without an always-running LLM.
 
 Effectful work is different. Physical motion, object manipulation, writes,
 message sending, media effects, and other committed side effects remain behind
