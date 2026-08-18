@@ -11,9 +11,12 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import fcntl
+import hashlib
 import json
 import os
 import sys
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -72,8 +75,8 @@ class TextScenarioCase:
     expected_fast_speech_purposes: tuple[str, ...] = field(default_factory=tuple)
     require_social_attention_opportunity: bool = False
     require_fast_planner_evidence_reentry: bool = False
-    max_warm_fast_response_commit_ms: float = 0.0
-    max_warm_first_playback_start_ms: float = 0.0
+    max_warm_gi_handoff_to_fast_commit_ms: float = 0.0
+    max_warm_fast_commit_to_playback_start_ms: float = 0.0
     expected_terminal_planner_tier: str = ""
     expected_fast_planner_path: str = ""
     expect_deep_planner_invoked: bool | None = None
@@ -121,6 +124,28 @@ class GeneralAbilityManifest:
 
 def acceptance_id() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+@contextmanager
+def _exclusive_orchestrator_lock() -> Any:
+    """Prevent a qualification Host from competing with the operator Host."""
+
+    lock_path = Path(
+        os.getenv("ORCH_LOCK_FILE", "/tmp/chromie-orchestrator.lock")
+    ).expanduser()
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+", encoding="utf-8") as handle:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise RuntimeError(
+                "live-text qualification requires the exclusive Host lock; "
+                f"another Orchestrator is running: {lock_path}"
+            ) from exc
+        try:
+            yield lock_path
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 def _tuple_of_strings(value: Any) -> tuple[str, ...]:
@@ -327,6 +352,119 @@ def _structured_case_metrics(
         "runtime_failure_class": runtime_failure_class,
         "runtime_integrity_failed": runtime_integrity_failed,
         "safe_idle": safe_idle,
+    }
+
+
+def _elapsed_ms(value: Any) -> float | None:
+    try:
+        elapsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return elapsed if elapsed >= 0 else None
+
+
+def _fast_response_timing_evidence(summary: dict[str, Any]) -> dict[str, Any]:
+    """Retain exact anchors and recomputable fast-response timing intervals."""
+
+    session_state = summary.get("session_state")
+    if not isinstance(session_state, dict):
+        session_state = {}
+    stages = [
+        item
+        for item in session_state.get("cognitive_workflow_stages") or []
+        if isinstance(item, dict)
+    ]
+    events = [
+        item
+        for item in session_state.get("workflow_events") or []
+        if isinstance(item, dict)
+    ]
+    fast_stage = next(
+        (
+            item
+            for item in stages
+            if item.get("stage") == "fast_planner_first_response"
+        ),
+        {},
+    )
+    fast_start = _elapsed_ms(fast_stage.get("started_elapsed_ms"))
+    fast_finish = _elapsed_ms(fast_stage.get("finished_elapsed_ms"))
+    fast_duration = _elapsed_ms(fast_stage.get("duration_ms"))
+
+    def first_event(name: str, *, not_before: float | None = None) -> float | None:
+        values = [
+            value
+            for item in events
+            if item.get("event") == name
+            and (value := _elapsed_ms(item.get("elapsed_ms"))) is not None
+            and (not_before is None or value >= not_before)
+        ]
+        return min(values, default=None)
+
+    top_timings = summary.get("timings_ms")
+    if not isinstance(top_timings, dict):
+        top_timings = {}
+    goal_interpretation_duration = _elapsed_ms(
+        top_timings.get("goal_interpretation_ms")
+    )
+    session_start = first_event("session_start")
+    interpretation_done = first_event("text_check_goal_interpretation_done")
+    tts_schedule = first_event("tts_schedule", not_before=fast_finish)
+    first_provider_pcm = first_event(
+        "tts_first_provider_pcm",
+        not_before=fast_finish,
+    )
+    playback_start = first_event("playback_start", not_before=fast_finish)
+
+    def interval(start: float | None, finish: float | None) -> float | None:
+        if start is None or finish is None or finish < start:
+            return None
+        return round(finish - start, 3)
+
+    duration_sum = None
+    if goal_interpretation_duration is not None and fast_duration is not None:
+        duration_sum = round(goal_interpretation_duration + fast_duration, 3)
+    return {
+        "schema_version": 1,
+        "clock": "session_relative_monotonic_elapsed_ms",
+        "fast_first_response_status": str(fast_stage.get("status") or ""),
+        "transport_evidence": (
+            "speaker_enabled_playback_start"
+            if summary.get("speaker") is True
+            else "headless_or_discard_playback_start"
+        ),
+        "raw": {
+            "session_start_elapsed_ms": session_start,
+            "goal_interpretation_done_elapsed_ms": interpretation_done,
+            "goal_interpretation_duration_ms": goal_interpretation_duration,
+            "fast_first_response_started_elapsed_ms": fast_start,
+            "fast_first_response_finished_elapsed_ms": fast_finish,
+            "fast_first_response_duration_ms": fast_duration,
+            "first_tts_schedule_elapsed_ms": tts_schedule,
+            "first_tts_provider_pcm_elapsed_ms": first_provider_pcm,
+            "first_playback_start_elapsed_ms": playback_start,
+        },
+        "derived": {
+            "gi_handoff_to_fast_commit_ms": interval(fast_start, fast_finish),
+            "fast_commit_to_tts_schedule_ms": interval(fast_finish, tts_schedule),
+            "fast_commit_to_first_provider_pcm_ms": interval(
+                fast_finish,
+                first_provider_pcm,
+            ),
+            "fast_commit_to_playback_start_ms": interval(
+                fast_finish,
+                playback_start,
+            ),
+            "session_start_to_fast_commit_ms": interval(
+                session_start,
+                fast_finish,
+            ),
+            "goal_interpretation_plus_fast_duration_ms": duration_sum,
+        },
+        "claim_limits": {
+            "audible_speaker_proven": summary.get("speaker") is True,
+            "duration_sum_is_absolute_anchor": False,
+        },
     }
 
 
@@ -582,11 +720,6 @@ def validate_live_text_result(
         for item in session_state.get("cognitive_workflow_stages") or []
         if isinstance(item, dict)
     ]
-    workflow_events = [
-        item
-        for item in session_state.get("workflow_events") or []
-        if isinstance(item, dict)
-    ]
     if case.require_social_attention_opportunity:
         opportunity_count = int(
             runtime_metadata.get("social_attention_opportunity_count") or 0
@@ -612,34 +745,38 @@ def validate_live_text_result(
         errors.append(
             "terminal Capability Evidence did not reactivate Fast Planner"
         )
-    if case.max_warm_fast_response_commit_ms > 0:
-        top_timings = summary.get("timings_ms")
-        if not isinstance(top_timings, dict):
-            top_timings = {}
-        interpretation_ms = float(top_timings.get("goal_interpretation_ms") or 0.0)
-        planner_commit_ms = float(timings.get("fast_planner_commit") or 0.0)
-        warm_commit_ms = interpretation_ms + planner_commit_ms
-        if interpretation_ms <= 0 or planner_commit_ms <= 0:
-            errors.append("warm fast-response Planner commitment timing is missing")
-        elif warm_commit_ms > case.max_warm_fast_response_commit_ms:
+    timing_evidence = _fast_response_timing_evidence(summary)
+    summary["fast_response_timing_evidence"] = timing_evidence
+    timing_derived = timing_evidence["derived"]
+    if case.max_warm_gi_handoff_to_fast_commit_ms > 0:
+        planner_commit_ms = timing_derived["gi_handoff_to_fast_commit_ms"]
+        if (
+            timing_evidence["fast_first_response_status"] != "accepted"
+            or planner_commit_ms is None
+        ):
             errors.append(
-                "warm fast-response Planner commitment exceeded target: "
-                f"{warm_commit_ms:.1f}ms > "
-                f"{case.max_warm_fast_response_commit_ms:.1f}ms"
+                "validated-GI-handoff to Fast-Planner commitment timing is missing"
             )
-    if case.max_warm_first_playback_start_ms > 0 and summary.get("speaker") is True:
-        playback_starts = [
-            float(item.get("elapsed_ms") or 0.0)
-            for item in workflow_events
-            if item.get("event") == "playback_start"
-        ]
-        if not playback_starts:
-            errors.append("warm first-playback-start timing is missing")
-        elif min(playback_starts) > case.max_warm_first_playback_start_ms:
+        elif planner_commit_ms > case.max_warm_gi_handoff_to_fast_commit_ms:
             errors.append(
-                "warm first playback start exceeded target: "
-                f"{min(playback_starts):.1f}ms > "
-                f"{case.max_warm_first_playback_start_ms:.1f}ms"
+                "validated-GI-handoff to Fast-Planner commitment exceeded target: "
+                f"{planner_commit_ms:.1f}ms > "
+                f"{case.max_warm_gi_handoff_to_fast_commit_ms:.1f}ms"
+            )
+    if (
+        case.max_warm_fast_commit_to_playback_start_ms > 0
+        and not bool(summary.get("preview_only"))
+    ):
+        playback_ms = timing_derived["fast_commit_to_playback_start_ms"]
+        if playback_ms is None:
+            errors.append(
+                "Fast-Planner commitment to first-playback-start timing is missing"
+            )
+        elif playback_ms > case.max_warm_fast_commit_to_playback_start_ms:
+            errors.append(
+                "Fast-Planner commitment to first playback start exceeded target: "
+                f"{playback_ms:.1f}ms > "
+                f"{case.max_warm_fast_commit_to_playback_start_ms:.1f}ms"
             )
     structured_metrics = _structured_case_metrics(case, summary)
     if structured_metrics["runtime_integrity_failed"]:
@@ -754,6 +891,15 @@ def _text_scenario_case(
         raise ValueError("live text turn is missing id")
     if not text:
         raise ValueError(f"live text turn {case_id!r} is missing text")
+    retired_latency_fields = {
+        "max_warm_fast_response_commit_ms",
+        "max_warm_first_playback_start_ms",
+    }.intersection(raw)
+    if retired_latency_fields:
+        raise ValueError(
+            "live text turn uses retired ambiguous latency field(s): "
+            + ", ".join(sorted(retired_latency_fields))
+        )
     expected_args = tuple(
         item if isinstance(item, tuple) else parse_expected_arg(str(item))
         for item in raw.get("expected_args", raw.get("expect_arg", []))
@@ -787,11 +933,15 @@ def _text_scenario_case(
         require_fast_planner_evidence_reentry=bool(
             raw.get("require_fast_planner_evidence_reentry", False)
         ),
-        max_warm_fast_response_commit_ms=max(
-            0.0, float(raw.get("max_warm_fast_response_commit_ms", 0.0))
+        max_warm_gi_handoff_to_fast_commit_ms=max(
+            0.0,
+            float(raw.get("max_warm_gi_handoff_to_fast_commit_ms", 0.0)),
         ),
-        max_warm_first_playback_start_ms=max(
-            0.0, float(raw.get("max_warm_first_playback_start_ms", 0.0))
+        max_warm_fast_commit_to_playback_start_ms=max(
+            0.0,
+            float(
+                raw.get("max_warm_fast_commit_to_playback_start_ms", 0.0)
+            ),
         ),
         expected_terminal_planner_tier=str(
             raw.get("expected_terminal_planner_tier") or ""
@@ -1031,6 +1181,173 @@ def _write_json(path: Path, payload: Any) -> None:
         json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _load_json_object(path: Path) -> dict[str, Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _write_reviewer_packet(
+    *,
+    root: Path,
+    run_summary: dict[str, Any],
+    runtime_identity_path: Path,
+) -> dict[str, Any]:
+    """Write a bounded, digest-bound packet suitable for later sanitization."""
+
+    packet = root / "reviewer-packet"
+    packet.mkdir(parents=True, exist_ok=True)
+    runtime_identity = _load_json_object(runtime_identity_path)
+    runtime_identity_copy = packet / "runtime-identity.json"
+    _write_json(runtime_identity_copy, runtime_identity)
+
+    case_summaries: list[dict[str, Any]] = []
+    timelines: list[dict[str, Any]] = []
+    for item in run_summary.get("cases") or []:
+        if not isinstance(item, dict):
+            continue
+        timing = item.get("fast_response_timing_evidence")
+        if not isinstance(timing, dict):
+            timing = _fast_response_timing_evidence(item)
+        case_id = str(item.get("case_id") or "")
+        case_summaries.append(
+            {
+                "case_id": case_id,
+                "ability_class": str(item.get("ability_class") or ""),
+                "ok": bool(item.get("ok")),
+                "errors": list(item.get("errors") or []),
+                "diagnostic_evaluation": item.get("diagnostic_evaluation") or {},
+                "timing_evidence": timing,
+            }
+        )
+        timelines.append({"case_id": case_id, **timing})
+
+    runtime_profile = runtime_identity.get("runtime_profile")
+    if not isinstance(runtime_profile, dict):
+        runtime_profile = {}
+    source_identity = runtime_identity.get("chromie")
+    if not isinstance(source_identity, dict):
+        source_identity = {}
+    bounded_summary = {
+        "schema_version": 1,
+        "kind": "chromie_general_ability_reviewer_summary",
+        "ok": bool(run_summary.get("ok")),
+        "mode": run_summary.get("mode"),
+        "evidence_level": run_summary.get("evidence_level"),
+        "claim_scope": run_summary.get("claim_scope"),
+        "input_channel": "injected_text",
+        "exclusive_host_lock": bool(
+            run_summary.get("exclusive_host_lock")
+        ),
+        "execute": bool(run_summary.get("execute")),
+        "speaker": bool(run_summary.get("speaker")),
+        "assertion_scope": run_summary.get("assertion_scope"),
+        "goal_driven_runtime": run_summary.get("goal_driven_runtime"),
+        "cognitive_apply_lanes": run_summary.get("cognitive_apply_lanes"),
+        "source_identity": source_identity,
+        "runtime_identity_sha256": runtime_identity.get("identity_sha256"),
+        "runtime_profile": {
+            "active_profile": runtime_profile.get("active_profile"),
+            "active_validation_profile": runtime_profile.get(
+                "active_validation_profile"
+            ),
+            "fingerprint": runtime_profile.get("fingerprint"),
+            "sha256": runtime_profile.get("sha256"),
+        },
+        "passed": int(run_summary.get("passed") or 0),
+        "failed": int(run_summary.get("failed") or 0),
+        "errors": list(run_summary.get("errors") or []),
+        "cases": case_summaries,
+        "claim_limits": {
+            "physical_microphone_proven": False,
+            "audible_speaker_proven": run_summary.get("speaker") is True,
+            "physical_robot_proven": False,
+            "source_clean": source_identity.get("dirty") is False,
+        },
+    }
+    summary_path = packet / "summary.json"
+    timeline_path = packet / "timeline.json"
+    collection_report_path = packet / "collection-report.json"
+    _write_json(summary_path, bounded_summary)
+    _write_json(
+        timeline_path,
+        {
+            "schema_version": 1,
+            "clock": "session_relative_monotonic_elapsed_ms",
+            "cases": timelines,
+        },
+    )
+    _write_json(
+        collection_report_path,
+        {
+            "schema_version": 1,
+            "kind": "chromie_general_ability_reviewer_collection",
+            "ok": bounded_summary["ok"],
+            "evidence_level": bounded_summary["evidence_level"],
+            "runtime_identity_sha256": bounded_summary[
+                "runtime_identity_sha256"
+            ],
+            "case_ids": [item["case_id"] for item in case_summaries],
+            "human_review_required": True,
+        },
+    )
+
+    artifact_paths = [
+        summary_path,
+        timeline_path,
+        runtime_identity_copy,
+        collection_report_path,
+    ]
+    manifest_path = packet / "manifest.json"
+    _write_json(
+        manifest_path,
+        {
+            "schema_version": 1,
+            "kind": "chromie_general_ability_reviewer_packet",
+            "source_revision": source_identity.get("revision"),
+            "source_tree_sha256": source_identity.get("source_tree_sha256"),
+            "runtime_identity_sha256": runtime_identity.get("identity_sha256"),
+            "artifacts": [
+                {
+                    "path": path.name,
+                    "size": path.stat().st_size,
+                    "sha256": _sha256_file(path),
+                }
+                for path in artifact_paths
+            ],
+            "external_transfer": {
+                "requires_separate_sanitized_copy": True,
+                "human_review_required": True,
+            },
+        },
+    )
+    checksum_paths = [*artifact_paths, manifest_path]
+    checksum_path = packet / "SHA256SUMS"
+    checksum_path.write_text(
+        "".join(
+            f"{_sha256_file(path)}  {path.name}\n"
+            for path in checksum_paths
+        ),
+        encoding="utf-8",
+    )
+    return {
+        "path": str(packet),
+        "manifest_sha256": _sha256_file(manifest_path),
+        "file_count": len(checksum_paths) + 1,
+        "sanitized_copy_required_for_external_transfer": True,
+    }
 
 
 def _evidence_root(args: argparse.Namespace, mode: str) -> Path:
@@ -1484,6 +1801,8 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
         "mode": "live-text",
         "evidence_level": "C" if args.execute else "C-preview",
         "claim_scope": LIVE_TEXT_EXECUTE_CLAIM if args.execute else LIVE_TEXT_PREVIEW_CLAIM,
+        "input_channel": "injected_text",
+        "exclusive_host_lock": True,
         "manifest": str(manifest.path),
         "goal_driven_runtime": args.goal_driven_runtime,
         "assertion_scope": args.assertion_scope,
@@ -1506,6 +1825,11 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
     if args.no_write:
         return summary
     summary = {**summary, "evidence_dir": str(root)}
+    summary["reviewer_packet"] = _write_reviewer_packet(
+        root=root,
+        run_summary=summary,
+        runtime_identity_path=Path(args.runtime_identity).expanduser().resolve(),
+    )
     _write_json(root / "summary.json", summary)
     return summary
 
@@ -1698,7 +2022,8 @@ def main(argv: list[str] | None = None) -> int:
         elif args.mode == "level-a":
             summary = run_level_a(args)
         else:
-            summary = asyncio.run(run_live_text(args))
+            with _exclusive_orchestrator_lock():
+                summary = asyncio.run(run_live_text(args))
     except Exception as exc:
         print(f"[general-ability][error] {exc}", file=sys.stderr)
         return 1

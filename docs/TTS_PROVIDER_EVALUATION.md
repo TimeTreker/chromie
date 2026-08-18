@@ -28,12 +28,14 @@ Its hard-cancellation recovery remains slower because synchronous inference may
 require a worker restart. Qwen3-TTS remains an explicit alternative and OuteTTS
 remains a low-resource GGUF fallback.
 
-Native provider chunking is not yet end-to-end audible streaming. The current
-Host receives the WebSocket `start` event and PCM chunks, accumulates the entire
-requested text chunk, and enqueues playback only after the provider `end`
-event. Transport streaming and `tts_stream_start` therefore do not prove that
-the user has heard audio. Incremental Host playback remains queued work under
-the existing playback-delivery lifecycle Issue.
+Native provider chunking does not by itself prove low-latency audible streaming.
+The current Host enqueues an ordered `ProviderPcmStream` when the first non-empty
+PCM chunk arrives and may begin transport before the provider `end` event. The
+maintained CosyVoice worker requests `stream=True`, but a short utterance may still
+arrive as one complete PCM chunk near generation completion. Therefore WebSocket
+`start`, native-streaming declarations, and provider generation time do not prove
+first audio or audible delivery. Retained evidence must distinguish provider-worker
+queue wait, first provider PCM, Host playback start, and physical speaker output.
 
 ## Ownership boundary
 

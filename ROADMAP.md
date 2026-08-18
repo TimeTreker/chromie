@@ -16,6 +16,30 @@ Soridormi/provider work and is not a Chromie milestone or release prerequisite.
 Sequential milestone codes are not part of the current project model. Work is
 organized by capability, risk, and retained evidence.
 
+## Current execution order
+
+The following order is binding until the current-revision target-evidence line is
+closed. It applies the already-approved architecture; it does not introduce another
+layer or cognitive term.
+
+1. **Make the evidence contract internally reproducible.** Correct the general-
+   ability latency assertions so the Planner-local and playback intervals use their
+   declared raw anchors. Retain a revision/runtime-bound reviewer packet containing
+   explicit profile, input, speaker, assertion-scope, evidence-level, and raw timing
+   data. Use the existing evidence sanitizer for external sharing.
+2. **Run the highest safe current-revision profile.** First retain the repaired
+   injected-text run, then perform supervised physical microphone/audible-speaker
+   proof and close the remaining default target-evidence profile. Headless/discarded
+   playback must never be promoted to audible evidence.
+3. **Resume structural simplification after evidence closure.** Decompose the Host
+   composition root along existing configuration, input-lifecycle, playback,
+   cognitive-dispatch, observability, cancellation, and cleanup ownership seams.
+   Do not create one service/manager per cognitive role, and do not use file or
+   method count as the architectural reason.
+4. **Then resume later semantic Issues in their existing order.** Richer durable
+   memory, affect/mood, and ambient autonomy remain separately governed work; they
+   are not bundled into the evidence or Host-decomposition patch.
+
 ## Immediate architecture line — consolidate the reviewed authority baseline
 
 The broad architecture-discovery phase is closed. New work starts from the canonical
@@ -51,9 +75,9 @@ Next design/implementation order:
    timing, truth/evidence provenance, and constraints. The Host validates and
    schedules it mechanically before Vocal/TTS delivery; there is no independent
    Response Composer semantic owner.
-3. **Planner-owned communication and Evidence re-entry — active implementation line.**
-   Remove the duplicate Response Composer and Tool Result Interpreter semantic
-   stages. Trusted Runtime/Host binds terminal Evidence through immutable request
+3. **Planner-owned communication and Evidence re-entry — implemented and source-guarded.**
+   The duplicate Response Composer and Tool Result Interpreter semantic stages are
+   removed. Trusted Runtime/Host binds terminal Evidence through immutable request
    provenance to exact Goal IDs, then reactivates Fast Planner with a bounded,
    version-consistent Goal/Evidence snapshot. Fast Planner chooses answer,
    follow-up Work, clarification, or silence. Social Attention remains optional

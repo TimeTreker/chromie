@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import tempfile
 import unittest
 from contextlib import redirect_stdout
@@ -14,7 +15,10 @@ from scripts.general_ability_acceptance import (
     DEFAULT_MANIFEST,
     LiveCaseRef,
     TextScenarioCase,
+    _exclusive_orchestrator_lock,
+    _fast_response_timing_evidence,
     _run_live_case,
+    _write_reviewer_packet,
     build_parser,
     level_a_keys,
     live_case_ids,
@@ -31,6 +35,21 @@ from scripts.interaction_text_mujoco_check import build_parser as build_text_che
 
 
 class GeneralAbilityAcceptanceTests(unittest.TestCase):
+    def test_live_runner_refuses_a_second_orchestrator_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            lock_path = Path(temp_dir) / "orchestrator.lock"
+            with patch.dict(
+                os.environ,
+                {"ORCH_LOCK_FILE": str(lock_path)},
+            ):
+                with _exclusive_orchestrator_lock():
+                    with self.assertRaisesRegex(
+                        RuntimeError,
+                        "another Orchestrator is running",
+                    ):
+                        with _exclusive_orchestrator_lock():
+                            self.fail("nested Host lock unexpectedly succeeded")
+
     def test_default_manifest_declares_core_ability_classes(self) -> None:
         manifest = load_manifest(DEFAULT_MANIFEST)
 
@@ -120,12 +139,12 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             require_speech=False,
             require_social_attention_opportunity=True,
             require_fast_planner_evidence_reentry=True,
-            max_warm_fast_response_commit_ms=2000,
-            max_warm_first_playback_start_ms=3000,
+            max_warm_gi_handoff_to_fast_commit_ms=2000,
+            max_warm_fast_commit_to_playback_start_ms=3000,
         )
         summary = {
             "preview_only": False,
-            "speaker": True,
+            "speaker": False,
             "timings_ms": {"goal_interpretation_ms": 400.0},
             "interaction_response": {"speech": [], "capabilities": []},
             "cognitive_runtime": {
@@ -134,6 +153,13 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             },
             "session_state": {
                 "cognitive_workflow_stages": [
+                    {
+                        "stage": "fast_planner_first_response",
+                        "status": "accepted",
+                        "started_elapsed_ms": 500.0,
+                        "duration_ms": 600.0,
+                        "finished_elapsed_ms": 1100.0,
+                    },
                     {
                         "stage": "social_attention_opportunity",
                         "status": "queued",
@@ -145,12 +171,180 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                     },
                 ],
                 "workflow_events": [
-                    {"event": "playback_start", "elapsed_ms": 1400.0}
+                    {"event": "session_start", "elapsed_ms": 0.0},
+                    {
+                        "event": "text_check_goal_interpretation_done",
+                        "elapsed_ms": 500.0,
+                    },
+                    {"event": "tts_schedule", "elapsed_ms": 1102.0},
+                    {
+                        "event": "tts_first_provider_pcm",
+                        "elapsed_ms": 3390.0,
+                    },
+                    {"event": "playback_start", "elapsed_ms": 3400.0},
                 ],
             },
         }
 
         self.assertEqual(validate_live_text_result(case, summary), [])
+        evidence = summary["fast_response_timing_evidence"]
+        self.assertEqual(
+            evidence["derived"]["gi_handoff_to_fast_commit_ms"],
+            600.0,
+        )
+        self.assertEqual(
+            evidence["derived"]["fast_commit_to_playback_start_ms"],
+            2300.0,
+        )
+        self.assertEqual(
+            evidence["derived"]["goal_interpretation_plus_fast_duration_ms"],
+            1000.0,
+        )
+        self.assertFalse(evidence["claim_limits"]["audible_speaker_proven"])
+
+        slow_summary = json.loads(json.dumps(summary))
+        slow_summary["session_state"]["workflow_events"][-1]["elapsed_ms"] = 4500.0
+        errors = validate_live_text_result(case, slow_summary)
+        self.assertTrue(
+            any("commitment to first playback" in item for item in errors),
+            errors,
+        )
+
+    def test_fast_timing_evidence_keeps_absolute_and_duration_axes_separate(self) -> None:
+        summary = {
+            "speaker": False,
+            "timings_ms": {"goal_interpretation_ms": 826.2},
+            "session_state": {
+                "cognitive_workflow_stages": [
+                    {
+                        "stage": "fast_planner_first_response",
+                        "status": "accepted",
+                        "started_elapsed_ms": 1300.879,
+                        "duration_ms": 1062.218,
+                        "finished_elapsed_ms": 2363.097,
+                    }
+                ],
+                "workflow_events": [
+                    {"event": "session_start", "elapsed_ms": 0.266},
+                    {
+                        "event": "text_check_goal_interpretation_done",
+                        "elapsed_ms": 1299.678,
+                    },
+                    {"event": "tts_schedule", "elapsed_ms": 2366.437},
+                    {
+                        "event": "tts_first_provider_pcm",
+                        "elapsed_ms": 4857.717,
+                    },
+                    {"event": "playback_start", "elapsed_ms": 4859.329},
+                ],
+            },
+        }
+
+        evidence = _fast_response_timing_evidence(summary)
+
+        self.assertEqual(
+            evidence["derived"]["gi_handoff_to_fast_commit_ms"],
+            1062.218,
+        )
+        self.assertEqual(
+            evidence["derived"]["fast_commit_to_playback_start_ms"],
+            2496.232,
+        )
+        self.assertEqual(
+            evidence["derived"]["session_start_to_fast_commit_ms"],
+            2362.831,
+        )
+        self.assertEqual(
+            evidence["derived"]["goal_interpretation_plus_fast_duration_ms"],
+            1888.418,
+        )
+        self.assertFalse(
+            evidence["claim_limits"]["duration_sum_is_absolute_anchor"]
+        )
+
+    def test_reviewer_packet_binds_source_runtime_profile_and_raw_timeline(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "evidence"
+            runtime_identity_path = Path(temp_dir) / "runtime-identity.json"
+            runtime_identity_path.write_text(
+                json.dumps(
+                    {
+                        "identity_sha256": "i" * 64,
+                        "chromie": {
+                            "revision": "a" * 40,
+                            "dirty": False,
+                            "source_tree_sha256": "s" * 64,
+                        },
+                        "runtime_profile": {
+                            "active_profile": "rtx5090",
+                            "active_validation_profile": "target",
+                            "fingerprint": "f" * 64,
+                            "sha256": "p" * 64,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            timing = {
+                "schema_version": 1,
+                "clock": "session_relative_monotonic_elapsed_ms",
+                "raw": {
+                    "fast_first_response_started_elapsed_ms": 100.0,
+                    "fast_first_response_finished_elapsed_ms": 900.0,
+                    "first_playback_start_elapsed_ms": 2500.0,
+                },
+                "derived": {
+                    "gi_handoff_to_fast_commit_ms": 800.0,
+                    "fast_commit_to_playback_start_ms": 1600.0,
+                },
+            }
+            metadata = _write_reviewer_packet(
+                root=root,
+                runtime_identity_path=runtime_identity_path,
+                run_summary={
+                    "ok": True,
+                    "mode": "live-text",
+                    "evidence_level": "C",
+                    "claim_scope": "injected text only",
+                    "execute": True,
+                    "speaker": False,
+                    "assertion_scope": "full",
+                    "goal_driven_runtime": "apply",
+                    "cognitive_apply_lanes": "tool",
+                    "passed": 1,
+                    "failed": 0,
+                    "cases": [
+                        {
+                            "case_id": "weather",
+                            "ability_class": "truthful_embodied_speech",
+                            "ok": True,
+                            "errors": [],
+                            "fast_response_timing_evidence": timing,
+                        }
+                    ],
+                },
+            )
+
+            packet = root / "reviewer-packet"
+            summary = json.loads((packet / "summary.json").read_text())
+            timeline = json.loads((packet / "timeline.json").read_text())
+            manifest = json.loads((packet / "manifest.json").read_text())
+            self.assertEqual(summary["input_channel"], "injected_text")
+            self.assertFalse(summary["speaker"])
+            self.assertEqual(
+                summary["source_identity"]["source_tree_sha256"],
+                "s" * 64,
+            )
+            self.assertEqual(
+                timeline["cases"][0]["raw"][
+                    "fast_first_response_finished_elapsed_ms"
+                ],
+                900.0,
+            )
+            self.assertEqual(manifest["source_revision"], "a" * 40)
+            self.assertTrue((packet / "collection-report.json").is_file())
+            self.assertTrue((packet / "SHA256SUMS").is_file())
+            self.assertEqual(metadata["file_count"], 6)
 
     def test_live_validation_can_forbid_pre_effect_fast_speech(self) -> None:
         case = TextScenarioCase(

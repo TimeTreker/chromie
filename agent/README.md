@@ -1,8 +1,18 @@
 # Chromie Agent Cognitive Service
 
-`chromie-agent` is Chromie's model-facing cognitive service. It exposes the current Cognitive Gateway / Goal Interpretation / Goal Association / Fast and Deep Planner / Social Attention / response composition / tool-result interpretation surfaces, plus deterministic capability-catalog and TaskGraph validation/execution diagnostics.
+`chromie-agent` is Chromie's single model-facing cognitive service. It exposes
+separately testable Goal Interpretation, Goal Association, Fast and Deep Planner,
+Reflection, Social Attention, capability-catalog, and TaskGraph diagnostic
+surfaces. These are module/contract boundaries inside one FastAPI service, not a
+microservice per cognitive role. The Cognitive Gateway itself remains Host-owned.
 
-The service is **not** a second orchestration runtime. The retired `AgentRuntime`, `InteractionRuntime`, specialized semantic Agent pipeline, `/run`, `/interaction`, and `/agents` compatibility surfaces have been removed. The Host Orchestrator owns turn coordination and the trusted asynchronous `CapabilityRuntime`; Soridormi remains an execution provider behind the Capability boundary.
+The service is **not** a second orchestration runtime. The retired `AgentRuntime`,
+`InteractionRuntime`, specialized semantic Agent pipeline, `/run`, `/interaction`,
+`/agents`, independent Response Composer, and Tool Result Interpreter compatibility
+surfaces have been removed. Fast Planner owns Communicative Activities and receives
+trusted terminal Evidence re-entry. The Host Orchestrator owns turn coordination
+and the trusted asynchronous `CapabilityRuntime`; Soridormi remains an execution
+provider behind the Capability boundary.
 
 ## Authority boundary
 

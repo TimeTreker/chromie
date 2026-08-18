@@ -160,6 +160,20 @@ It does **not** add new semantic authorities between Planner and Provider:
 `planned Work`, semantic Primary Activities, and their realization are the
 explicit internal expansion of how Planner advances Goals.
 
+The runtime has several entry shapes, and **having no canonical Goal is not the
+same as having no turn**:
+
+| Entry shape | Turn evidence | Canonical Goal | Authority and continuation |
+|---|---|---|---|
+| Startup orientation | None | None | Host lifecycle may offer one quiet baseline Activity. It is not a user interaction or Social Attention. |
+| Protective Reflex | A received `NormalizedTurnCapture` | Not required | Gateway applies deterministic pre-semantic stop/cancel/emergency/silence/unusable-input policy to the turn before GI exists, then retains the reflex evidence. |
+| Ordinary admitted interaction | An admitted `UserTurnEnvelope` | None until GA commits one | GI interprets Responsibility; Fast Planner advances HOW while GA independently owns canonical Goal continuity. |
+| `CognitiveOpportunity` reactivation | No fabricated new user turn; exact originating interaction/request provenance remains retained | One or more `goal_ids` are required | A meaningful trusted state transition may reactivate bounded cognition for those Goals. The opportunity is ephemeral and owns neither Goal nor Evidence truth. |
+
+Therefore Protective Reflex is a deterministic **pre-semantic turn path**, not a
+turn-free path. Result reactivation is an internal continuation of grounded prior
+work, not a synthetic person utterance.
+
 Read the diagram with these boundaries:
 
 - Goal Interpretation owns **provider-neutral contextual Responsibility evidence**:
@@ -317,6 +331,14 @@ A successful Chromie release lets an operator:
   transport-independent behind exact provider contracts;
 - evidence capture, acceptance tooling, deployment configuration, and release
   packaging.
+
+The model-facing cognitive roles are separate contract/module owners inside one
+maintained `chromie-agent` service boundary. GI, GA, Fast Planner, Deep Planner,
+Reflection, and Social Attention may have separate endpoints and failure
+contracts without becoming one microservice per human cognitive term. The Host
+Orchestrator remains the single lifecycle/co-ordination root on the other side of
+that service boundary; module separation does not transfer semantic authority to
+the Host.
 
 ### Soridormi owns
 
@@ -543,10 +565,14 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    long unexplained silence does not satisfy the interaction contract. Measurement
    distinguishes Planner commitment, TTS first PCM, and playback start and never
    bypasses validation to improve them. The current qualified warm targets owned by
-   the Human-Like Interaction Contract are at most 2.0 seconds to the first valid
-   Fast-Planner Communicative Activity commitment and at most 3.0 seconds to
-   playback start; cold model load and each downstream transport slice are reported
-   separately. Goal Interpretation never regains a speech side channel.
+   the Human-Like Interaction Contract are at most 2.0 seconds from the validated
+   GI handoff to the first valid Fast-Planner Communicative Activity commitment,
+   and at most 3.0 seconds from that commitment to playback start. Session start,
+   Gateway/GI, TTS generation, and playback startup remain separately reported
+   slices. A sum of GI duration plus Fast-Planner duration is useful diagnostic
+   evidence, but it is neither of those two qualified intervals and must not be
+   subtracted from an absolute session timestamp. Goal Interpretation never regains
+   a speech side channel.
 24. **Publish dialogue early; publish semantic state only after validation.**
    Goal Interpretation and Goal Association require a bounded view of the recent
    accepted conversation together with active/recent Goals, task/progress state,

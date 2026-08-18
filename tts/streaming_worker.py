@@ -86,7 +86,9 @@ class StreamingProcessWorker:
                 await self._start()
 
     async def stream(self, payload: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
+        queued_at = time.monotonic()
         async with self._lock():
+            queue_wait_seconds = time.monotonic() - queued_at
             if not self.is_alive:
                 await self._start()
             connection = self._connection
@@ -115,6 +117,10 @@ class StreamingProcessWorker:
                             raise RuntimeError(
                                 f"{self._name} returned a non-object stream event"
                             )
+                        event = {
+                            **event,
+                            "worker_queue_wait_seconds": queue_wait_seconds,
+                        }
                         event_type = str(event.get("type") or "")
                         if event_type == "error":
                             message = str(event.get("message") or "worker synthesis failed")

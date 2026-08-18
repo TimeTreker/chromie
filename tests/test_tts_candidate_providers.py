@@ -139,6 +139,7 @@ class TtsCandidateProviderTests(unittest.IsolatedAsyncioTestCase):
         assert isinstance(completed, TTSSynthesisCompleted)
         self.assertEqual(completed.metrics["audio_seconds"], 0.01)
         self.assertGreater(float(completed.metrics["total_seconds"]), 0.0)
+        self.assertEqual(completed.metrics["queue_wait_seconds"], 0.0)
 
         health = await provider.health()
         self.assertEqual(
@@ -222,6 +223,39 @@ class TtsCandidateProviderTests(unittest.IsolatedAsyncioTestCase):
                 ):
                     pass
             self.assertFalse(worker.is_alive)
+        finally:
+            await worker.stop()
+
+    async def test_streaming_worker_reports_wait_for_singleton_owner(self) -> None:
+        worker = StreamingProcessWorker(
+            stream_fixture_target,
+            name="candidate-test-queue-evidence-worker",
+            startup_timeout_s=5.0,
+        )
+        await worker.start()
+
+        async def consume_slow() -> list[dict[str, object]]:
+            return [
+                event
+                async for event in worker.stream(
+                    {"type": "synthesize", "text": "slow-complete"}
+                )
+            ]
+
+        try:
+            first = asyncio.create_task(consume_slow())
+            await asyncio.sleep(0.01)
+            second = [
+                event
+                async for event in worker.stream(
+                    {"type": "synthesize", "text": "recover"}
+                )
+            ]
+            await first
+            self.assertGreater(
+                float(second[-1]["worker_queue_wait_seconds"]),
+                0.05,
+            )
         finally:
             await worker.stop()
 

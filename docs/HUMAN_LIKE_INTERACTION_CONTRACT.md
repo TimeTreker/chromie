@@ -544,6 +544,17 @@ budget is retained as interaction evidence even when the eventual sentence is
 semantically correct; it must not be repaired by moving wording authority upstream
 or skipping provenance validation.
 
+The retained measurement must expose the raw anchors used to derive those budgets:
+Fast first-response stage start and finish, the stage duration, first TTS schedule,
+first PCM when available, and first playback start, all in one session-relative
+clock. The 2.0-second assertion is `fast_commit - validated_GI_handoff`; the
+3.0-second assertion is `first_playback_start - fast_commit`. Session-start-to-commit,
+GI duration, and `GI duration + Fast duration` may be reported as diagnostics but
+must not be relabelled as either qualified interval. When `speaker=false`, a
+`playback_start` event proves only that the generated stream reached the configured
+headless/discard transport; it may exercise the scheduling budget but is not audible
+speaker evidence.
+
 Communicative-Act wording uses a bounded owner-approved **fast voice projection**:
 Chromie's name, child age/role identity where relevant to expression, and the
 positive `spoken_style`, `maturity_boundary`, and `tool_use_style` guidance needed
@@ -963,3 +974,10 @@ Before submitting a fix for a user-visible interaction problem, write down:
 7. Was the failure caused by missing architecture/policy, or only by wording?
 8. What test would have caught this before a user heard it?
 9. Does the fix generalize beyond the exact phrase in the report?
+
+The report must also reconstruct the actual executed workflow, not only name the
+components. For every relevant module, state its authoritative input, its observed
+output, and the next consumer. Distinguish the initiating trigger, earliest wrong
+boundary/root cause, downstream symptoms, contributing conditions, and remaining
+evidence gaps. Derived timing claims must identify their raw timestamp anchors so an
+external reviewer can recompute them.

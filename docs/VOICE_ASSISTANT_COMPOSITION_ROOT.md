@@ -13,6 +13,12 @@ safety authority.
 The public runtime remains intentionally stable while internal responsibilities
 move behind narrow collaborators with explicit contracts and focused tests.
 
+There is one maintained Host-to-Agent service boundary. `chromie-agent` is one
+FastAPI service containing separately testable GI, GA, Fast Planner, Deep Planner,
+Reflection, and Social Attention modules/endpoints; those cognitive roles are not
+independent deployment services. `VoiceAssistant` coordinates their lifecycle and
+dataflow but cannot reinterpret one module's semantics or become a response author.
+
 TTS synthesis, playback transport, echo handling, audible-delivery ordering,
 and user-level barge-in remain Chromie-owned at the maintained boundary. The
 current vocal semantic defect must be fixed without relocating those
@@ -81,3 +87,10 @@ Further work is ordered by
 Each extraction must preserve ordering, cancellation, confirmation, and evidence
 semantics; add narrow regression tests; and lower or hold the mechanical
 ratchets. File size alone is not an acceptance criterion.
+
+This decomposition starts only after the active current-revision evidence closure.
+The first candidates are the existing ownership seams in the table, selected by
+independent testability, lifecycle, configuration authority, and failure semantics;
+method or file length alone does not justify a new manager. Durable memory, mood,
+ambient autonomy, or another cognitive service are not part of this structural
+work.

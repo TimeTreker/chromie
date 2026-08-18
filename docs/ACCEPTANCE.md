@@ -411,6 +411,12 @@ incomplete structured output is a hard case failure even when a later fallback
 produces a correct final action. Architecture-validation timeouts remain long so
 qualification first answers whether the complete workflow can succeed.
 
+Live-text qualification acquires the same exclusive Orchestrator lock as the
+operator runtime. If another Host is active, the runner fails before constructing
+a second `VoiceAssistant`; it must not create hidden TTS/provider contention and
+then attribute that queue delay to the product path. A resource-contention test is
+a separate declared profile and must retain its competing workload explicitly.
+
 Against deployed services, the same manifest can run live text probes:
 
 ```bash
@@ -438,6 +444,28 @@ acceptance-only score, hard-gate failures, objective Goal/provenance/integrity
 metrics, and the earliest suspect boundary. The score never overrides a hard
 failure. Use `--only-case CASE_ID` for the originating defect, then run the full
 ability class after the fix.
+
+Warm fast-response cases use two non-overlapping contract intervals. The Planner
+budget is measured from the retained `fast_planner_first_response.started_elapsed_ms`
+(the validated GI handoff) to its `finished_elapsed_ms` commitment. The delivery
+budget is measured from that commitment to the first retained `playback_start` on
+the same session-relative clock. The report also keeps session-start, GI duration,
+TTS schedule/first-PCM when available, and playback start as diagnostic slices.
+Do not add GI duration to the Planner-local budget or subtract a duration sum from
+an absolute elapsed timestamp. A headless `speaker=false` playback event may prove
+the configured discard transport was reached within budget, but only a supervised
+`speaker=true` run may support an audible-speaker claim.
+
+Every retained live general-ability root must contain a portable reviewer packet
+derived from the run rather than from prose. It includes a bounded `summary.json`,
+the exact Chromie/runtime/source identity available to the run, explicit input
+channel, execution/profile, assertion scope, evidence level, and speaker mode, plus
+raw per-stage/event timestamps and recomputable derived intervals. File digests bind
+the packet contents. Before external transfer, create a separate sanitized archive
+with `python -m benchmarks.evidence sanitize`; the Git diff is source provenance,
+not a substitute for ignored `.chromie/` live evidence. Sanitization removes known
+credentials and local identity but may retain private conversation content, so the
+report and archive still require human review before sharing.
 
 ### Fast Planner multi-goal qualification
 

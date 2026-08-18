@@ -9,6 +9,7 @@ an operator explicitly requests an incomplete diagnostic capture.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -65,13 +66,60 @@ def _run(command: Iterable[str], *, cwd: Path = ROOT) -> str:
 
 
 def _sha256_file(path: Path) -> str:
-    import hashlib
-
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _git_source_tree_identity(root: Path) -> dict[str, Any]:
+    """Digest tracked and non-ignored untracked files in the evaluated checkout."""
+
+    completed = subprocess.run(
+        [
+            "git",
+            "ls-files",
+            "-z",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+        ],
+        cwd=root,
+        check=False,
+        capture_output=True,
+    )
+    if completed.returncode != 0:
+        detail = completed.stderr.decode("utf-8", errors="replace").strip()
+        raise CaptureError(f"failed to enumerate source tree: {detail or 'unknown error'}")
+    paths = sorted(item for item in completed.stdout.split(b"\0") if item)
+    digest = hashlib.sha256(b"chromie-source-tree-v1\0")
+    for raw_path in paths:
+        relative = os.fsdecode(raw_path)
+        path = root / relative
+        digest.update(raw_path)
+        digest.update(b"\0")
+        if path.is_symlink():
+            payload = os.readlink(path).encode("utf-8", errors="surrogateescape")
+            kind = b"symlink"
+        elif path.is_file():
+            payload = path.read_bytes()
+            kind = b"file"
+        elif path.exists():
+            payload = b""
+            kind = b"other"
+        else:
+            payload = b""
+            kind = b"missing"
+        digest.update(kind)
+        digest.update(b"\0")
+        digest.update(len(payload).to_bytes(8, "big"))
+        digest.update(payload)
+    return {
+        "source_tree_sha256": digest.hexdigest(),
+        "source_tree_file_count": len(paths),
+        "source_tree_scope": "git_tracked_and_nonignored_untracked_files",
+    }
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -113,6 +161,7 @@ def _git_identity(root: Path) -> dict[str, Any]:
         "dirty": bool(status),
         "status_porcelain": status.splitlines(),
         "version": version,
+        **_git_source_tree_identity(root),
     }
 
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -7,11 +9,46 @@ from unittest.mock import patch
 from scripts.capture_runtime_identity import (
     DEFAULT_SERVICES,
     _deployment_identity,
+    _git_source_tree_identity,
     build_parser,
 )
 
 
 class RuntimeIdentityCaptureTests(unittest.TestCase):
+    def test_source_tree_digest_tracks_evaluated_nonignored_content(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            subprocess.run(
+                ["git", "init", "--quiet"],
+                cwd=root,
+                check=True,
+            )
+            (root / ".gitignore").write_text("ignored/\n", encoding="utf-8")
+            source = root / "source.py"
+            source.write_text("value = 1\n", encoding="utf-8")
+            (root / "ignored").mkdir()
+            ignored = root / "ignored" / "private.log"
+            ignored.write_text("first\n", encoding="utf-8")
+
+            first = _git_source_tree_identity(root)
+            ignored.write_text("second\n", encoding="utf-8")
+            ignored_change = _git_source_tree_identity(root)
+            source.write_text("value = 2\n", encoding="utf-8")
+            source_change = _git_source_tree_identity(root)
+
+        self.assertEqual(
+            first["source_tree_sha256"],
+            ignored_change["source_tree_sha256"],
+        )
+        self.assertNotEqual(
+            first["source_tree_sha256"],
+            source_change["source_tree_sha256"],
+        )
+        self.assertEqual(
+            first["source_tree_scope"],
+            "git_tracked_and_nonignored_untracked_files",
+        )
+
     def test_parser_uses_canonical_defaults_without_append_duplicates(self) -> None:
         args = build_parser().parse_args([])
         self.assertIsNone(args.service)

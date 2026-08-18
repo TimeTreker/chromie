@@ -102,6 +102,9 @@ class WorkerBackedCandidateProvider(TTSProvider):
                     **metrics,
                     "audio_seconds": audio_seconds,
                     "total_seconds": total_seconds,
+                    "queue_wait_seconds": float(
+                        event.get("worker_queue_wait_seconds") or 0.0
+                    ),
                     "realtime_factor": (
                         total_seconds / audio_seconds if audio_seconds > 0 else None
                     ),
