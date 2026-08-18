@@ -217,7 +217,7 @@ The unknown answer to an already-defined external lookup is never unresolved use
 meaning or a reason to ask the user for the result Chromie was asked to find. GA
 preserves the user's natural temporal wording in the Goal description while normalizing
 typed `day_part` scope to the shared canonical values `day`, `morning`, `afternoon`,
-`evening`, or `tonight`, and typed `date` scope to `today`, `tomorrow`, or an exact
+`evening`, or `night`, and typed `date` scope to `today`, `tomorrow`, or an exact
 ISO 8601 calendar date, so Planner and Capability contracts agree.
 
 Trusted Capability Runtime exposes one task-list view per canonical Goal. A task
@@ -508,7 +508,7 @@ and trusted code preserves the exact technical cause for debugging.
 The Cognitive Gateway admits a turn but does not author semantic speech. Fast Planner
 owns the first possible **Goal Progress Communication** milestone. It first uses a
 bounded, small-output phase to author the exact immediately realizable Communicative
-Activity. As soon as that commitment exists, the same Planner continues Capability,
+Activity. As soon as the bounded accept/reject qualification finishes, the same Planner continues Capability,
 input-completeness, and clarification planning while GA begins concurrently from the
 same immutable GI result. This is one Fast Planner with phased readiness, not a
 Response Composer or a Host acknowledgement template. Once a nontrivial
@@ -524,7 +524,14 @@ prospective wording. A pre-evidence progress Activity carries
 `truth_stage=pre_evidence`, no Evidence references, and wording that can acknowledge
 or prospectively describe the check but cannot state its result. The removed
 Goal-Interpreter `fast_speech`/`native_response` path is not accepted as compatibility.
-No second production LLM reviews, repairs, or re-decides ordinary progress wording.
+Before Runtime commits that immutable Activity, Fast Planner performs one bounded
+same-owner Epistemic Qualification over its wording, truth stage, Responsibility facts,
+and admitted Evidence. The check returns accept or reject only. It cannot rewrite,
+repair, retry, choose another act, select Work, or change Goal meaning. Rejection,
+timeout, malformed output, or model unavailability produces no first speech and lets
+the remaining Fast/GA work continue. Fast Advance cannot then salvage or author another
+progress Activity as a replacement for that completed first-response decision. No independent production LLM reviews, repairs,
+or re-decides ordinary progress wording, and no reviewer chain is permitted.
 Interaction Context remains the authority for whether any speech was actually heard or
 is still pending.
 
@@ -643,7 +650,13 @@ and reactivates Fast Planner with bounded Goal, Evidence, and Interaction Contex
 Planner speaks only the new grounded result/failure delta rather than replaying the
 pre-action acknowledgement. Host code validates capability safety, arguments,
 truth state, concurrency, evidence binding, and any required effect/delivery
-barrier.
+barrier. Before Runtime commits a post-Evidence answer, the same Fast Planner performs
+one bounded accept/reject Epistemic Qualification over the immutable wording and exact
+Goal/Evidence snapshot. The qualifier cannot rewrite or replace the answer. Rejection
+or qualifier failure uses the existing single Deep-Planner escalation or fails closed;
+there is no later wording owner or semantic repair chain. In particular, a forecast
+probability below 100% must remain a probability/possibility rather than becoming a
+claim of certainty.
 
 Natural:
 

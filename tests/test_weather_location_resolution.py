@@ -11,10 +11,11 @@ from agent.app.clients.weather_client import (
     WeatherLookupError,
     WeatherQuery,
 )
+from agent.app.local_tool_execution import _weather_output
 
 
 class WeatherLocationResolutionTests(unittest.IsolatedAsyncioTestCase):
-    async def test_tonight_query_returns_hourly_period_evidence(self) -> None:
+    async def test_night_query_returns_hourly_period_evidence(self) -> None:
         forecast_requests: list[httpx.Request] = []
 
         def handler(request: httpx.Request) -> httpx.Response:
@@ -74,7 +75,7 @@ class WeatherLocationResolutionTests(unittest.IsolatedAsyncioTestCase):
         )
 
         report = await client.lookup(
-            WeatherQuery(location="Chongqing", period="tonight")
+            WeatherQuery(location="Chongqing", period="night")
         )
 
         params = parse_qs(forecast_requests[0].url.query.decode())
@@ -82,7 +83,7 @@ class WeatherLocationResolutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(report.forecast_period)
         period = report.forecast_period
         assert period is not None
-        self.assertEqual(period.scope, "tonight")
+        self.assertEqual(period.scope, "night")
         self.assertEqual(period.start_local, "2026-08-13T18:00")
         self.assertEqual(period.end_local, "2026-08-13T23:00")
         self.assertEqual(period.temperature_min_c, 28.0)
@@ -90,6 +91,15 @@ class WeatherLocationResolutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(period.apparent_temperature_max_c, 36.0)
         self.assertEqual(period.precipitation_probability_max, 70.0)
         self.assertEqual(period.weather_code, 61)
+        output = _weather_output(report, units="metric", language="zh-CN")
+        self.assertEqual(output["condition"], "小雨")
+        self.assertEqual(output["weather_code"], 61)
+        self.assertEqual(output["high_c"], 32.0)
+        self.assertEqual(output["low_c"], 28.0)
+        self.assertEqual(output["precipitation_probability_max"], 70.0)
+        self.assertIsNone(output["precipitation_sum_mm"])
+        self.assertIn("所请求日期夜间小雨", output["summary"])
+        self.assertNotIn("当前", output["summary"])
 
     async def test_afternoon_query_returns_exact_hourly_period_evidence(self) -> None:
         forecast_requests: list[httpx.Request] = []
@@ -401,6 +411,69 @@ class WeatherLocationResolutionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(geocode_queries[:2], ["重庆", "Chongqing"])
         self.assertEqual(report.location_name, "Chongqing")
+        self.assertEqual(report.provider_admin1, "Chongqing Municipality")
+
+    async def test_provider_uses_suffix_stripped_equivalent_alias_for_municipality(
+        self,
+    ) -> None:
+        geocode_queries: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path.endswith("/search"):
+                query = parse_qs(request.url.query.decode())["name"][0]
+                geocode_queries.append(query)
+                if query == "Chongqing":
+                    return httpx.Response(
+                        200,
+                        json={
+                            "results": [
+                                {
+                                    "name": "Chongqing",
+                                    "admin1": "Chongqing Municipality",
+                                    "country": "China",
+                                    "latitude": 29.56026,
+                                    "longitude": 106.55771,
+                                }
+                            ]
+                        },
+                    )
+                return httpx.Response(200, json={"results": []})
+            return httpx.Response(
+                200,
+                json={
+                    "timezone": "Asia/Shanghai",
+                    "current": {"temperature_2m": 32.0, "weather_code": 2},
+                    "daily": {
+                        "time": ["2026-08-18", "2026-08-19"],
+                        "weather_code": [2, 3],
+                        "temperature_2m_max": [37.0, 36.0],
+                        "temperature_2m_min": [28.0, 27.0],
+                        "precipitation_sum": [0.0, 1.0],
+                        "precipitation_probability_max": [20.0, 40.0],
+                    },
+                },
+            )
+
+        client = OpenMeteoWeatherClient(
+            geocoding_url="https://example.test/v1/search",
+            forecast_url="https://example.test/v1/forecast",
+            transport=httpx.MockTransport(handler),
+        )
+        report = await client.lookup(
+            WeatherQuery(
+                location="重庆",
+                language="zh-CN",
+                location_context=WeatherLocationContext(
+                    admin1="Chongqing",
+                    country="China",
+                    aliases=("Chongqing City",),
+                ),
+            )
+        )
+
+        self.assertEqual(geocode_queries[:3], ["重庆", "Chongqing City", "Chongqing"])
+        self.assertEqual(report.location_name, "Chongqing")
+        self.assertEqual(report.provider_query, "Chongqing")
         self.assertEqual(report.provider_admin1, "Chongqing Municipality")
 
     async def test_fallback_rejects_same_named_locality_from_wrong_admin1(self) -> None:

@@ -107,7 +107,7 @@ def _information_weather_goal() -> dict:
     attributes = dict(goal["object"]["bindings"])
     attributes["time_frame"] = {
         "entity_type": "day_part",
-        "value": "tonight",
+        "value": "night",
     }
     goal["object"]["bindings"] = {}
     goal["resource_responsibility"] = {
@@ -553,7 +553,7 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
     def test_information_step_preserves_exact_day_part_argument(self):
         validate_goal_binding_argument_grounding(
             _weather_output(
-                extra_args={"date": "today", "period": "tonight"}
+                extra_args={"date": "today", "period": "night"}
             ),
             authoritative_goals=[_information_weather_goal()],
         )

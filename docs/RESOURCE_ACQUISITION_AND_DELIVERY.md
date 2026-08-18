@@ -213,7 +213,7 @@ Likewise, external search, evidence retrieval, evaluation, and natural
 explanation remain one information-resource responsibility. Weather therefore has
 `resource.kind=information`, while the Planner still selects the exact
 `chromie.weather.lookup` Capability rather than a generic hidden router.
-When the canonical information attributes include a day part such as `tonight`,
+When the canonical information attributes include a day part such as `night`,
 the Planner must preserve that exact scope in the Capability arguments. A date
 like `today` is not equivalent. Exact completion requires provider output scoped
 to the requested period; daily or current observations cannot be promoted into

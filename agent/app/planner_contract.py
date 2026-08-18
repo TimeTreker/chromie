@@ -66,6 +66,11 @@ except ImportError:  # pragma: no cover
         resource_semantic_bindings,
     )
 
+try:
+    from chromie_contracts.tool_result import ToolResultEvidence
+except ImportError:  # pragma: no cover
+    from shared.chromie_contracts.tool_result import ToolResultEvidence
+
 PlannerTier = Literal["fast", "deep"]
 PlannerPlanRelation = Literal["exact", "safe_adjustment", "alternative"]
 
@@ -863,6 +868,44 @@ def planner_provider_media_goal_operations(
     return result
 
 
+def result_evidence_reentry_goal_ids(
+    context: dict[str, Any] | None,
+) -> set[str]:
+    """Return Goals bound to Host-admitted terminal tool Evidence.
+
+    This boundary validates the immutable evidence DTO and its correlation refs;
+    it never interprets result content or decides response wording.  It gives the
+    same Planner that requested the work permission to answer the exact Goals
+    after Trusted Capability Runtime has returned their evidence.
+    """
+
+    if not isinstance(context, dict):
+        return set()
+    reentry = context.get("result_evidence_reentry")
+    raw_evidence = context.get("trusted_terminal_evidence")
+    if not isinstance(reentry, dict) or not isinstance(raw_evidence, list):
+        return set()
+    try:
+        evidence = [ToolResultEvidence.model_validate(item) for item in raw_evidence]
+    except (ValidationError, ValueError, TypeError):
+        return set()
+    if not evidence:
+        return set()
+    evidence_ids = {item.evidence_id for item in evidence}
+    referenced_ids = {
+        normalized
+        for value in reentry.get("evidence_refs") or []
+        if (normalized := " ".join(str(value or "").strip().split()))
+    }
+    if referenced_ids and not referenced_ids.issubset(evidence_ids):
+        return set()
+    return {
+        normalized
+        for value in reentry.get("source_goal_ids") or []
+        if (normalized := " ".join(str(value or "").strip().split()))
+    }
+
+
 def validate_goal_responsibility_outcomes(
     output: PlannerModelOutput,
     *,
@@ -892,6 +935,7 @@ def validate_goal_responsibility_outcomes(
         for item in evidence_bound_dialogue(context)
         for source_goal_id in item.get("source_goal_ids") or []
     }
+    evidence_goal_ids.update(result_evidence_reentry_goal_ids(context))
     valid_vocal_step_ids: set[str] = set()
     valid_media_step_ids: set[str] = set()
     for goal_id in sorted(response_goal_ids):
@@ -2523,22 +2567,7 @@ def validate_external_response_evidence_boundary(
         responding_goal_ids = set(unresolved_external_goal_ids)
 
     unsupported = responding_goal_ids & unresolved_external_goal_ids
-    reentry = context.get("result_evidence_reentry")
-    trusted_terminal_evidence = context.get("trusted_terminal_evidence")
-    if isinstance(reentry, dict) and isinstance(trusted_terminal_evidence, list):
-        reentry_goal_ids = {
-            normalized
-            for value in reentry.get("source_goal_ids") or []
-            if (normalized := " ".join(str(value or "").strip().split()))
-        }
-        evidence_ids = {
-            normalized
-            for item in trusted_terminal_evidence
-            if isinstance(item, dict)
-            and (normalized := " ".join(str(item.get("evidence_id") or "").strip().split()))
-        }
-        if evidence_ids:
-            unsupported -= reentry_goal_ids
+    unsupported -= result_evidence_reentry_goal_ids(context)
     if unsupported:
         raise ValueError(
             "external_read_response_requires_completed_or_verified_evidence: "

@@ -379,6 +379,19 @@ class FastPlannerFirstResponseModelOutput(BaseModel):
     activity: FastPlannerImmediateCommunicativeAct
 
 
+class FastPlannerFirstResponseTruthCertificate(BaseModel):
+    """Same-owner accept/reject qualification of immutable first-response wording.
+
+    The certificate has no wording, planning, Goal, or Capability authority.  It
+    cannot repair the candidate Activity; rejection means that no first-response
+    Activity is committed.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    decision: Literal["accept", "reject"]
+
+
 class FastPlannerFirstResponse(BaseModel):
     """Fast Planner's earliest independently realizable communicative decision.
 

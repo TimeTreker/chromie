@@ -120,11 +120,13 @@ flowchart TD
     GW --> CTX["Bounded Session Context<br/>dialogue, active Goals, Activities,<br/>pending clarification, Evidence"]
     CTX --> GI["Goal Interpretation (GI)<br/>Responsibility + Goal relation + unresolved meaning"]
 
-    GI --> FFR["Fast Planner<br/>first Communicative Activity"]
-    FFR -->|"after first commitment, concurrent fan-out"| FP["same Fast Planner<br/>remaining Activity Plan + input resolution"]
-    FFR -->|"after first commitment, concurrent fan-out"| GA["Goal Association (GA)<br/>sole Canonical Goal commit authority"]
+    GI --> FFA["Fast Planner<br/>authors first Communicative Activity"]
+    FFA --> EQ{"same-owner Epistemic Qualification<br/>accept or reject only"}
+    EQ -->|"accepted or rejected, concurrent fan-out"| FP["same Fast Planner<br/>remaining Activity Plan + input resolution"]
+    EQ -->|"accepted or rejected, concurrent fan-out"| GA["Goal Association (GA)<br/>sole Canonical Goal commit authority"]
 
-    FFR --> COMM["Immediate Communicative Activity<br/>exact text + truth provenance<br/>or explicit silence"]
+    EQ -->|"accepted"| COMM["Immediate Communicative Activity<br/>exact text + truth provenance"]
+    EQ -->|"rejected / unavailable"| SILENCE["No first speech<br/>remaining planning continues"]
     FP --> COMM["Later communicative deltas"]
     FP --> SAFE["ready safe/read-only<br/>Capability Activities"]
     FP -->|"complex HOW only"| DP["Deep Planner"]
@@ -146,6 +148,9 @@ flowchart TD
     EVIDENCE --> ATTACH["Host validates and binds<br/>request → Activity → exact Goal(s)"]
     ATTACH --> CTX
     ATTACH -->|"bounded Goal/Evidence snapshot"| FP
+    FP -->|"post-Evidence answer candidate"| POSTEQ{"same-owner Epistemic Qualification<br/>accept or reject only"}
+    POSTEQ -->|"accepted"| COMM
+    POSTEQ -->|"rejected / unavailable"| DP
     ATTACH --> RECON["Per-Goal reconciliation / Reflection"]
 ```
 
@@ -175,9 +180,17 @@ Read the diagram with these boundaries:
   `completion_requires_work` says only that work remains; it is not a description
   of that Work.
 - The same GI result first enters Fast Planner's bounded first-response phase. That
-  phase may commit one immediately realizable Communicative Activity, but it cannot
+  phase may author one immediately realizable Communicative Activity, but it cannot
   select a Capability, resolve an execution input, or ask a planning clarification.
-  As soon as that commitment exists, the same Fast Planner continues the remaining
+  Before commitment, one bounded **same-owner Epistemic Qualification** checks the
+  immutable wording against the Activity's truth stage, Responsibility facts, and
+  supplied Evidence. It may only accept or reject. It cannot rewrite, repair, retry,
+  select another Communicative Act, choose a Capability, or change Goal meaning.
+  Rejection or verifier unavailability commits no first speech and does not block the
+  remaining Planner/GA work. The remaining Advance cannot author or salvage a substitute
+  progress Activity for that completed first-response decision. This is a narrow truth gate inside Fast Planner, not a
+  Response Composer, new response author, or semantic-review chain. As soon as that
+  bounded decision exists, the same Fast Planner continues the remaining
   Activity Plan while Goal Association independently begins from the unchanged GI
   result. The two continuations run concurrently. This is one Planner with phased
   readiness, not a Response Composer followed by a Planner, and the progress sentence
@@ -634,8 +647,10 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    trusted Goal boundary may require a separate model-owned coverage audit over
    the authoritative user turn. That audit explicitly accounts for positive
    responsibilities, constraints, context, and conversational framing and maps
-   every covered positive responsibility to a zero-based Goal candidate. The
-   Host checks only mechanical invariants: every accepted Goal has positive
+   every covered positive responsibility to a zero-based Goal candidate. Coverage
+   items also make typed claims about temporal dimensions and required Goal shape;
+   the Host compares only those model-authored claims with candidate DTO types. The
+   Host checks mechanical invariants: every accepted Goal has positive
    responsibility ownership, missing or clarification-required meaning cannot
    be declared covered, and two independently satisfiable outcomes cannot share
    one Goal. Provider availability never erases a requested responsibility. A
@@ -795,9 +810,15 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    snapshot. Planner alone decides whether the human-relevant next Main Activity is
    an answer, follow-up Work, clarification, or silence; complex HOW may use the
    existing Deep escalation. Neither Host nor a separate Tool Result Interpreter may
-   infer Goal ownership from result contents or author result meaning. A mechanical
-   DTO regeneration may occur once without reconsidering meaning; consequential
-   evidence/provenance failure remains fail-closed.
+   infer Goal ownership from result contents or author result meaning. Before a
+   post-Evidence answer is committed, one bounded same-owner Epistemic Qualification
+   may only accept or reject its immutable wording against the exact Goal/Evidence
+   snapshot. It cannot rewrite the answer. Rejection or qualification unavailability
+   delegates once through the existing Deep-Planner path or fails closed; it never
+   creates a response-composition owner or repair chain. A mechanical DTO regeneration
+   may occur once without reconsidering meaning; it preserves the initial semantic
+   disposition and may make schema defaults explicit so Runtime never guesses omitted
+   scope. Consequential evidence/provenance failure remains fail-closed.
 
 39. **Reflection learns forward; it does not rewrite history.** Trusted observations,
    delivered speech, commitments, execution attempts, and outcomes remain historical

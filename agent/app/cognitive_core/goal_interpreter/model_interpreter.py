@@ -748,6 +748,7 @@ class OllamaGoalInterpreter:
     def _goal_interpretation_response_schema(
         *,
         forbidden_unresolved_values: tuple[str, ...] = (),
+        new_relationship_only: bool = False,
     ) -> dict[str, Any]:
         schema = GoalInterpretationDecision.model_json_schema()
         schema["additionalProperties"] = False
@@ -763,7 +764,7 @@ class OllamaGoalInterpreter:
             "CognitiveResponsibilityProposal"
         )
         if isinstance(responsibility, dict):
-            responsibility["required"] = [
+            required = [
                 "local_ref",
                 "outcome",
                 "bindings",
@@ -773,6 +774,18 @@ class OllamaGoalInterpreter:
                 "completion_requires_fresh_evidence",
                 "confidence",
             ]
+            if new_relationship_only:
+                properties = responsibility.get("properties")
+                if isinstance(properties, dict):
+                    properties.pop("relationship", None)
+                    properties.pop("target_goal_ids", None)
+                    properties.pop("schema_version", None)
+                required = [
+                    item
+                    for item in required
+                    if item not in {"relationship", "target_goal_ids"}
+                ]
+            responsibility["required"] = required
         return schema
 
     @staticmethod
@@ -840,7 +853,11 @@ class OllamaGoalInterpreter:
                 "num_ctx": self.num_ctx,
                 "num_predict": min(self.num_predict, 768),
             },
-            "format": self._goal_interpretation_response_schema(),
+            "format": self._goal_interpretation_response_schema(
+                new_relationship_only=not bool(
+                    _canonical_goal_ids_from_context(request.context)
+                ),
+            ),
         }
         if self.keep_alive:
             payload["keep_alive"] = self.keep_alive
@@ -860,6 +877,9 @@ class OllamaGoalInterpreter:
         payload = self.build_interpretation_payload(request)
         payload["format"] = self._goal_interpretation_response_schema(
             forbidden_unresolved_values=forbidden_unresolved_values,
+            new_relationship_only=not bool(
+                _canonical_goal_ids_from_context(request.context)
+            ),
         )
         bound_uncertainty_repair = (
             " The rejected DTO copied already-resolved binding values into top-level "

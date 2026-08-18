@@ -299,13 +299,16 @@ class GoalInterpreterPromptTests(unittest.TestCase):
                 "local_ref",
                 "outcome",
                 "bindings",
-                "relationship",
-                "target_goal_ids",
                 "completion_requires_work",
                 "completion_requires_fresh_evidence",
                 "confidence",
             },
         )
+        responsibility_schema = payload["format"]["$defs"][
+            "CognitiveResponsibilityProposal"
+        ]
+        self.assertNotIn("relationship", responsibility_schema["properties"])
+        self.assertNotIn("target_goal_ids", responsibility_schema["properties"])
         self.assertNotIn("InformationGap", payload["format"]["$defs"])
 
     def test_repair_schema_does_not_reintroduce_planning_gap_contract(self) -> None:
@@ -343,6 +346,34 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertNotIn("InformationGap", payload["format"]["$defs"])
         system_text, _, _ = _payload_message_texts(payload)
         self.assertIn("Never create/resolve an InformationGap", system_text)
+
+    def test_goal_relationship_fields_remain_model_owned_when_goal_context_exists(self) -> None:
+        interpreter = self._interpreter()
+        payload = interpreter.build_interpretation_payload(
+            GoalInterpretationRequest(
+                text="那就继续吧",
+                language="zh-CN",
+                context={
+                    "active_goal_snapshots": [
+                        {
+                            "goal_id": "goal-existing",
+                            "goal": {
+                                "goal_id": "goal-existing",
+                                "description": "continue the existing request",
+                            },
+                        }
+                    ]
+                },
+            )
+        )
+
+        responsibility = payload["format"]["$defs"][
+            "CognitiveResponsibilityProposal"
+        ]
+        self.assertIn("relationship", responsibility["properties"])
+        self.assertIn("target_goal_ids", responsibility["properties"])
+        self.assertIn("relationship", responsibility["required"])
+        self.assertIn("target_goal_ids", responsibility["required"])
 
     def test_repair_schema_excludes_bound_values_from_unresolved(self) -> None:
         interpreter = self._interpreter()

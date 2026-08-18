@@ -164,11 +164,14 @@ its maintained schema contains no planning-gap or resolution-policy fields.
 authoritative turn, GI Responsibilities, response language, bounded interaction state,
 and the small owner-approved speaking-style projection. It returns
 `FastPlannerFirstResponse`: zero or one exact `progress` or `complete_response`
-Communicative Activity. It cannot select a Capability, resolve an execution input,
-create a planning InformationGap, or ask a clarification. Runtime may validate and
-start its exact wording immediately; optional Social Attention receives that same
-Activity as its Main-Activity anchor and cannot delay it. This endpoint is a phase of
-Fast Planner, not an independent response-composition authority.
+Communicative Activity. Before returning a non-null Activity, Fast Planner performs
+exactly one bounded same-owner Epistemic Qualification and records its accept-only
+or reject-only certificate in metadata. The check cannot rewrite text, retry, select a Capability,
+resolve an execution input, create a planning InformationGap, or ask a clarification;
+rejection or checker failure returns a null Activity. Runtime may then structurally
+validate and start accepted exact wording immediately; optional Social Attention
+receives that same Activity as its Main-Activity anchor and cannot delay it. This
+endpoint is a phase of Fast Planner, not an independent response-composition authority.
 
 `POST /fast-advance` continues the same Fast Planner Activity decision after any first
 response commitment. It consumes the authoritative user turn plus contextual
@@ -189,12 +192,25 @@ schema-valid, available, side-effect-free safe reads before GA finishes; effects
 behind canonical Goal, confirmation, authorization, resource, and provider-safety gates.
 The same task identity is then bound into applicable per-Goal Runtime task-list views.
 
+The single same-stage `/fast-advance` mechanical revision preserves the initial
+model-authored disposition. For an initial `execute` decision it constrains the repaired
+Activity list to Capability work, requires the selected Capability's exact argument
+schema, and explicitly materializes schema defaults. It cannot choose the Capability,
+reinterpret the Responsibility, or grow into another revision.
+
 Fast Planner Communicative Activities carry exact text, truth stage, Goal or
 Responsibility provenance, and Evidence references in the Planner result. The
 Host mechanically validates those fields and sends accepted text to ordered TTS;
 it does not call a second wording model or rewrite the act. A pre-evidence act
 cannot cite Evidence or claim a result, while a post-evidence act must cite exact
 Host-admitted Evidence.
+
+On terminal Evidence re-entry, `/fast-plan` also performs one bounded same-owner
+accept/reject Epistemic Qualification over immutable result wording. The certificate
+has no wording or planning fields. Rejection or checker unavailability returns a
+semantic escalation for the existing Deep Planner (or fails closed); the Host never
+rewrites the sentence. This prevents a forecast probability below 100% from being
+promoted to certainty without adding a Tool Result Interpreter or Response Composer.
 
 `POST /fast-plan` is the bounded canonical Fast Planner revision endpoint, available only when `AGENT_FAST_PLANNER_ENABLED=1` and Agent LLM use is enabled. The normal easy path does not call it after a valid `/fast-advance`; Runtime deterministically binds that first Activity Plan to GA-owned Goal IDs. `/fast-plan` remains the one same-owner revision path when the first Fast result is unavailable/refused or a canonical contract revision is required. It returns `CanonicalPlan`; the endpoint never executes by itself, and trusted Runtime revalidates every terminal plan.
 
@@ -223,13 +239,16 @@ Capability authorization and execution.
 `POST /tools/execute` is a trusted provider boundary, not a semantic router. It accepts an exact `capability_id` and schema-valid arguments already produced by the Goal-driven planner. The Agent rejects unknown, unavailable, non-local, side-effecting, confirmation-gated, or non-`safe_read` capabilities and returns structured output without composing user speech. The Trusted Capability Runtime (`CapabilityRuntime`) remains responsible for provider registration, input validation, timing, cancellation, and correlated execution evidence. The first maintained binding is `chromie.weather.lookup`; additional local tools require an explicit manifest declaration and trusted provider binding rather than phrase rules.
 
 `chromie.weather.lookup` accepts the canonical place, `date=today|tomorrow`,
-and `period=day|tonight`. `tonight` is a narrower local day-part contract, not
-an alias for the calendar date. Its completed output therefore includes a
+and `period=day|morning|afternoon|evening|night`. Natural “tonight” is represented
+without conflating two dimensions: `date=today` plus `period=night`. Its completed output therefore includes a
 non-null `forecast_period` with local start/end timestamps and period-scoped
 temperature, apparent-temperature, precipitation-probability, and condition
-evidence. If the provider cannot supply that hourly slice, execution fails with
+evidence. When `forecast_period` is present, the top-level `condition`,
+`weather_code`, `high_c`, `low_c`, `precipitation_probability_max`, and `summary`
+are projections of that same requested period; explicitly named `current_*` fields
+remain current observations and cannot support a future-period claim. If the provider cannot supply that hourly slice, execution fails with
 `forecast_period_unavailable`; daily or current values are never relabeled as
-tonight evidence. For a day-wide request, `forecast_period` is null.
+night evidence. For a day-wide request, `forecast_period` is null.
 
 Terminal Capability results do not enter a separate interpretation endpoint. The
 Host validates and correlates the result, binds a `ToolResultEvidence` object to

@@ -621,13 +621,13 @@ def chromie_manifests(
                                 "morning",
                                 "afternoon",
                                 "evening",
-                                "tonight",
+                                "night",
                             ],
                             "default": "day",
                             "description": (
                                 "Local-day evidence scope. Use the exact canonical day-part "
                                 "binding when the Goal asks for morning, afternoon, evening, "
-                                "or tonight; a whole-day date is not equivalent evidence."
+                                "or night; a whole-day date is not equivalent evidence."
                             ),
                         },
                         "units": {
@@ -647,13 +647,32 @@ def chromie_manifests(
                         "country": {"type": ["string", "null"]},
                         "timezone": {"type": ["string", "null"]},
                         "date": {"type": ["string", "null"]},
-                        "condition": {"type": "string", "minLength": 1},
-                        "weather_code": {"type": ["integer", "null"]},
-                        "current_temperature_c": {"type": ["number", "null"]},
+                        "condition": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Condition for the requested forecast_period when present; otherwise the requested day scope.",
+                        },
+                        "weather_code": {
+                            "type": ["integer", "null"],
+                            "description": "Weather code for the same primary requested scope as condition.",
+                        },
+                        "current_temperature_c": {
+                            "type": ["number", "null"],
+                            "description": "Current observation only; not evidence for a requested future day part.",
+                        },
                         "apparent_temperature_c": {"type": ["number", "null"]},
-                        "high_c": {"type": ["number", "null"]},
-                        "low_c": {"type": ["number", "null"]},
-                        "precipitation_probability_max": {"type": ["number", "null"]},
+                        "high_c": {
+                            "type": ["number", "null"],
+                            "description": "Maximum temperature for forecast_period when present; otherwise the requested day.",
+                        },
+                        "low_c": {
+                            "type": ["number", "null"],
+                            "description": "Minimum temperature for forecast_period when present; otherwise the requested day.",
+                        },
+                        "precipitation_probability_max": {
+                            "type": ["number", "null"],
+                            "description": "Peak precipitation probability for forecast_period when present; otherwise the requested day.",
+                        },
                         "precipitation_sum_mm": {"type": ["number", "null"]},
                         "wind_speed_kmh": {"type": ["number", "null"]},
                         "forecast_period": {
@@ -665,7 +684,7 @@ def chromie_manifests(
                                                 "morning",
                                                 "afternoon",
                                                 "evening",
-                                                "tonight",
+                                                "night",
                                             ],
                                         },
                                         "start_local": {"type": "string", "minLength": 1},
@@ -765,7 +784,7 @@ def chromie_manifests(
                             "morning",
                             "afternoon",
                             "evening",
-                            "tonight",
+                            "night",
                             "tomorrow",
                             "near_term_forecast",
                         ],

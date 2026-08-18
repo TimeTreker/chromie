@@ -14,7 +14,7 @@ logger = logging.getLogger("chromie.agent.weather")
 
 WeatherDate = Literal["today", "tomorrow"]
 WeatherUnits = Literal["metric", "imperial", "auto"]
-WeatherPeriod = Literal["day", "morning", "afternoon", "evening", "tonight"]
+WeatherPeriod = Literal["day", "morning", "afternoon", "evening", "night"]
 
 
 @dataclass(slots=True)
@@ -137,6 +137,8 @@ _ENGLISH_ADMIN_SUFFIXES = (
     " territory",
     " region",
     " state",
+    " county",
+    " city",
 )
 
 
@@ -282,8 +284,15 @@ def _provider_query_candidates(
             seen.add(key)
             candidates.append(text)
 
-    for item in (location, context.locality, *context.aliases):
+    provider_forms = (location, context.locality, *context.aliases)
+    for item in provider_forms:
         add(item)
+    for item in context.aliases:
+        # An already admitted equivalent may contain a descriptive English
+        # administrative suffix that the provider does not index (for example
+        # ``Chongqing City``).  Removing only a known suffix is a transport
+        # normalization of that same alias, not selection of a new place.
+        add(_strip_admin_suffix(item))
 
     # Some providers index Chinese administrative places only by their Latin
     # names. This is transport normalization for the same authoritative Goal
@@ -391,10 +400,9 @@ def format_weather_brief(
 
     Normal spoken answers are composed by the evidence-bound LLM from the
     original question.  This bounded text exists only for the exceptional case
-    where interpretation is unavailable, so it deliberately reports at most
-    the condition, current temperature, and materially different apparent
-    temperature.  It never tries to decide whether the weather is hot, cold,
-    pleasant, or otherwise answer a qualitative question on the model's behalf.
+    where interpretation is unavailable.  Its primary condition always follows
+    the requested evidence scope: an explicit day part uses ``forecast_period``
+    rather than unrelated current/daily fields.
     """
 
     zh = language.lower().startswith("zh")
@@ -404,6 +412,37 @@ def format_weather_brief(
         if value is None:
             return None
         return value * 9.0 / 5.0 + 32.0 if imperial else value
+
+    period = report.forecast_period
+    if period is not None:
+        condition = weather_code_text(period.weather_code, zh=zh)
+        probability = _fmt_number(period.precipitation_probability_max)
+        if zh:
+            period_label = {
+                "morning": "所请求日期上午",
+                "afternoon": "所请求日期下午",
+                "evening": "所请求日期傍晚",
+                "night": "所请求日期夜间",
+            }[period.scope]
+            probability_text = (
+                f"，降水概率最高约{probability}%" if probability is not None else ""
+            )
+            return f"{report.location_name}{period_label}{condition}{probability_text}。"
+        period_label = {
+            "morning": "morning",
+            "afternoon": "afternoon",
+            "evening": "evening",
+            "night": "night",
+        }[period.scope]
+        probability_text = (
+            f", with a peak precipitation chance of about {probability}%"
+            if probability is not None
+            else ""
+        )
+        return (
+            f"During the requested {period_label} period in {report.location_name}, "
+            f"conditions are {condition}{probability_text}."
+        )
 
     current = temp(report.current_temperature_c)
     apparent = temp(report.apparent_temperature_c)
@@ -756,7 +795,9 @@ class OpenMeteoWeatherClient:
         requested_keys = _equivalent_place_keys(requested_location)
         query_keys = _equivalent_place_keys(query_candidate)
         name_keys = _equivalent_place_keys(name)
-        locality_keys = _equivalent_place_keys(context.locality)
+        locality_keys: set[str] = set()
+        for value in (context.locality, *context.aliases):
+            locality_keys.update(_equivalent_place_keys(value))
 
         score = 0
         if requested_keys & name_keys:
@@ -868,7 +909,7 @@ class OpenMeteoWeatherClient:
             "morning": ("06:00", "12:00"),
             "afternoon": ("12:00", "18:00"),
             "evening": ("18:00", "22:00"),
-            "tonight": ("18:00", "24:00"),
+            "night": ("18:00", "24:00"),
         }
         window = period_windows.get(period)
         if window is None:

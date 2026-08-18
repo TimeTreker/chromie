@@ -199,7 +199,11 @@ Fast Planner is the first HOW owner. It must not be implemented as a greeting/we
 phrase rule, route shortcut, or second semantic authority.
 
 One validated GI result first enters Fast Planner's bounded first-response phase. It
-may author one immediately realizable Communicative Act, then the same Fast Planner's
+may author one immediately realizable Communicative Act. One bounded same-owner
+Epistemic Qualification then accepts or rejects that immutable Act against the current
+truth stage and admitted Evidence. It cannot rewrite, repair, retry, choose another Act,
+or affect Goal/Capability decisions; failure is silence for this phase. After that
+decision, Fast Advance cannot author or salvage substitute progress wording, and the same Fast Planner's
 remaining Activity planning and Goal Association fan out concurrently from the
 unchanged GI result. GA independently remains the only canonical Goal commit authority.
 This is phased readiness inside one Planner, not an independent response author. The
@@ -273,7 +277,8 @@ Goal Interpretation
       relationship: new/reference existing dinner Goal as context
 
 Fast Planner first response
-  `-- speaking Activity: prospective progress
+  `-- authored speaking Activity: prospective progress
+        `-- same-owner truth qualification: accept or reject only
 
 concurrent continuation
   |-- same Fast Planner
@@ -756,13 +761,16 @@ stages that have not begun; speech already heard remains delivery evidence.
 
 ### 8.2 Evidence-bound post-execution speech
 
-For effectful work, the current deterministic post-execution composer runs only
-after terminal results have been joined and every executable goal has been
-reconciled and committed. It receives the immutable outcome bundle and bounded
-`ModelObservation` values, and returns speech only. It cannot add skills,
-actions, goal changes, retries, or authorizations. Its structured claims
-reference exact goal and evidence IDs, and the host validates them against the
-outcome bundle. A future model-assisted composer must obey this same boundary.
+After terminal results have been joined and every executable Goal reconciled, the Host
+reactivates Fast Planner with the immutable Goal/Evidence result bundle. Fast Planner,
+not a deterministic or model-backed post-execution composer, owns the human-relevant
+answer/follow-up/silence decision and exact wording. It cannot treat the result as a new
+user turn, reassign it to another Goal, or add execution authority. Before Runtime
+commits an answer, one bounded same-owner Epistemic Qualification accepts or rejects
+the immutable wording against the exact Goal/Evidence snapshot. It cannot rewrite the
+answer; rejection or unavailability delegates once through the existing Deep-Planner
+path or fails closed. The Host only validates provenance, structured claim boundaries,
+and delivery.
 
 The final response must:
 

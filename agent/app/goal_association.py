@@ -313,11 +313,11 @@ class GoalAssociationModelBinding(BaseModel):
             "morning",
             "afternoon",
             "evening",
-            "tonight",
+            "night",
         }:
             raise ValueError(
                 "day_part bindings require a canonical day-part value: "
-                "day, morning, afternoon, evening, or tonight"
+                "day, morning, afternoon, evening, or night"
             )
         if self.entity_type.casefold() == "date":
             if self.value in {"today", "tomorrow"}:
@@ -895,6 +895,16 @@ class GoalResponsibilityCoverageItem(BaseModel):
     coverage: Literal["covered", "missing", "clarification_required", "representation_mismatch"]
     independently_satisfiable: bool = False
     candidate_goal_indices: list[int] = Field(default_factory=list, max_length=8)
+    temporal_dimensions: list[Literal["date", "day_part"]] = Field(
+        default_factory=list,
+        max_length=2,
+    )
+    required_goal_shape: Literal[
+        "ordinary",
+        "information_resource",
+        "physical_resource",
+        "persistent_effect",
+    ] = "ordinary"
 
     @field_validator("source_excerpt", mode="before")
     @classmethod
@@ -910,8 +920,25 @@ class GoalResponsibilityCoverageItem(BaseModel):
             raise ValueError("candidate_goal_indices must be unique")
         return value
 
+    @field_validator("temporal_dimensions")
+    @classmethod
+    def unique_temporal_dimensions(
+        cls, value: list[Literal["date", "day_part"]]
+    ) -> list[Literal["date", "day_part"]]:
+        if len(value) != len(set(value)):
+            raise ValueError("temporal_dimensions must be unique")
+        return value
+
     @model_validator(mode="after")
     def validate_shape(self) -> "GoalResponsibilityCoverageItem":
+        if self.temporal_dimensions and self.role != "constraint":
+            raise ValueError(
+                "temporal_dimensions are valid only on constraint coverage items"
+            )
+        if self.required_goal_shape != "ordinary" and self.role != "responsibility":
+            raise ValueError(
+                "required_goal_shape is valid only on responsibility coverage items"
+            )
         if self.role != "responsibility" and self.independently_satisfiable:
             raise ValueError(
                 "only a responsibility may be independently_satisfiable"
@@ -1200,6 +1227,7 @@ class GoalAssociationResolver:
                     certificate_raw,
                     request=request,
                     goal_count=len(model_output.new_goals),
+                    candidate_goals=list(model_output.new_goals),
                 )
                 verdict, problems = self._coverage_verdict(
                     certificate,
@@ -1325,6 +1353,7 @@ class GoalAssociationResolver:
                             certificate_raw,
                             request=request,
                             goal_count=len(reconsidered_output.new_goals),
+                            candidate_goals=list(reconsidered_output.new_goals),
                         )
                         final_verdict, final_problems = self._coverage_verdict(
                             final_certificate,
@@ -1650,7 +1679,7 @@ class GoalAssociationResolver:
             if entity_type == "day_part":
                 value_schema = {
                     "type": "string",
-                    "enum": ["day", "morning", "afternoon", "evening", "tonight"],
+                    "enum": ["day", "morning", "afternoon", "evening", "night"],
                 }
             else:
                 value_schema = {
@@ -2250,7 +2279,7 @@ class GoalAssociationResolver:
                                 "morning",
                                 "afternoon",
                                 "evening",
-                                "tonight",
+                                "night",
                             ]
                         }
                     },
@@ -2497,7 +2526,7 @@ class GoalAssociationResolver:
             "A factual lookup and the user's requested interpretation of that same evidence are one Goal when one capability result can satisfy both, such as checking weather and judging whether it is hot. Multiple requested aspects of one information result, such as precipitation and whether the resulting temperature is cold, remain one information responsibility when the same result satisfies them. Do not split evidence acquisition, requested result aspects, or interpretation of that result into separate Goals. "
             "A physical action and a conversational answer or spoken performance are independent goals when the answer or performance is genuinely requested. Separate independently requested outcomes that can be accepted or rejected on their own. However, acquisition and delivery stages that together constitute one human responsibility are one Goal: navigating/searching, locating, grasping or retrieving, carrying, returning, and handing over are provider-owned stages of one physical resource delivery; external search, evidence retrieval, evaluation, and spoken explanation are stages of one information resource delivery. Do not split those implementation stages into separate Goals unless the user independently requests one stage as its own outcome. A simple acknowledgement, confirmation, willingness statement, or progress prelude for capability work is not a separate vocal_output Goal; it is prospective conversational output attached to the existing responsibility and every cognitive stage must use Interaction Context to avoid repeating an already fulfilled act. Before returning, verify that every independently satisfiable user responsibility appears in exactly one new_goals item: no merged unrelated outcomes and no duplicated responsibility across Goals. "
             "For a responsibility whose human-level outcome is to obtain something and make it available to a recipient, include exactly one nested resource_responsibility. It is the sole writable resource authority and is discriminated by top-level kind. A physical_object resource means a distinct concrete object that exists independently of Chromie's body motion and whose acquisition plus handover completes the human outcome. It is never a generic wrapper for embodied work: locomotion, body motion, gaze, blinking, waving, turning, posture, and gestures are non-resource body_action Goals, keep resource_responsibility absent, and preserve their material semantic parameters in top-level bindings. For kind=information, use output_mode=capability_work and write every requested query fact—location, time, requested aspect, comparison, threshold, or other answer-shaping scope—exactly once in query_scope. Its source object is intentionally narrow: source.status=provider_resolved delegates public/external source selection; source.status=unknown preserves an unavailable local/private/runtime source; source.status=known is only for a user- or discourse-named information source and then source_name is required. Never copy query_scope facts into source. For kind=physical_object, use output_mode=body_action and delivery_mode=physical_handover; identity and quantity live at resource_responsibility.description/quantity, while source.acquisition_bindings is the only writable location/distance/direction/route surface. Preserve explicit distance and direction separately; source.description is summary only and any numeric fact in it must also exist in acquisition_bindings. Resource Goals keep top-level bindings empty. No flat compatibility copy is created. resource_responsibility must never name or imply a Capability, provider implementation, website, search engine, coordinates, grasp pose, execution mode, or plan. Human-readable descriptions never override typed fields. "
-            "Also preserve semantic qualifiers such as temporal scope, comparison period, and requested answer shape. Temporal scope can contain more than one material dimension. When the user supplies a calendar or relative date together with a local day part, emit separate query_scope bindings for both: entity_type=date with the resolved date value such as today or tomorrow, and entity_type=day_part with exactly one canonical value from day, morning, afternoon, evening, or tonight. Use day for the whole local daylight period. Neither dimension covers or replaces the other. When only a local day part is semantically resolved, represent it provider-neutrally as entity_type=day_part with its canonical value; keep the user's natural wording in the Goal description rather than using a provider-specific clock interval. This is semantic normalization, not Capability selection. Never silently rewrite annual, seasonal, historical, comparative, or otherwise broad scope into current, today, tomorrow, or another narrower scope. If the intended scope is materially ambiguous, preserve it in a provisional Goal without choosing a narrower interpretation. "
+            "Also preserve semantic qualifiers such as temporal scope, comparison period, and requested answer shape. Temporal scope can contain more than one material dimension. When the user supplies a calendar or relative date together with a local day part, emit separate query_scope bindings for both: entity_type=date with the resolved date value such as today or tomorrow, and entity_type=day_part with exactly one canonical value from day, morning, afternoon, evening, or night. Natural 'tonight' therefore normalizes to date=today plus day_part=night; never put relative-date meaning inside day_part. Use day for the whole local daylight period. Neither dimension covers or replaces the other. When only a local day part is semantically resolved, represent it provider-neutrally as entity_type=day_part with its canonical value; keep the user's natural wording in the Goal description rather than using a provider-specific clock interval. This is semantic normalization, not Capability selection. Never silently rewrite annual, seasonal, historical, comparative, or otherwise broad scope into current, today, tomorrow, or another narrower scope. If the intended scope is materially ambiguous, preserve it in a provisional Goal without choosing a narrower interpretation. "
             "Resolve references, pronouns, demonstratives, ellipsis, and task mentions before planning. Authority order is: explicit current user meaning; foreground scoped discourse referents; candidate Goal bindings; recent dialogue. First identify every material indirect referring expression, then require a unique value from that authority order before writing a resolved binding or supplied referent. Imperative grammar and a plausible generic noun such as device, object, person, task, or setting are never reference evidence. If two or more contextual candidates remain plausible, or none is supplied, preserve the unresolved reference in the provisional Goal description without selecting a candidate; Fast Planner owns the narrow clarification decision. Phrases such as ‘the last task I told you’ may semantically associate with an active, recoverable, or retained recent terminal Goal, but the model must decide that relationship from the supplied Goal state and dialogue—not from a Host phrase table. Tool-result memory is not reference-resolution authority and must never decide what an unresolved expression refers to. "
             "When the user introduces or explicitly corrects a salient entity, emit referent_updates only when the required discourse-index provenance is available. Use operation=correct with non-empty target_referent_ids copied from supplied discourse context when a new value supersedes an earlier referent; never emit an unscoped correction when no target referent ID was supplied. The canonical Goal association and typed bindings still preserve a correction even when no discourse-index update can be authored. The old referent remains available in its own task scope but becomes background. Use operation=introduce for a new salient entity, and focus/background/retire only for supplied referent IDs. "
             "Use resolved_references only for indirect references whose denotation is uniquely selected from a supplied discourse referent or active Goal binding, such as pronouns, demonstratives, ellipsis, aliases, corrections, or task mentions. Do not emit resolved_references for an ordinary explicit entity mention such as a directly named place; represent that meaning in the new Goal bindings and, when it is salient for future dialogue, in referent_updates. Every resolved_references item must copy a supplied referent_id and include explicit confidence. If resolution is materially ambiguous, omit the invented binding/reference and preserve a provisional Goal instead. "
@@ -2639,7 +2668,7 @@ class GoalAssociationResolver:
             "only temporal binding value fields named by the validation errors. For "
             "entity_type=date, use today, tomorrow, or an exact ISO 8601 calendar "
             "date (YYYY-MM-DD). For entity_type=day_part, use day, morning, "
-            "afternoon, evening, or tonight. Return only a repairs array containing "
+            "afternoon, evening, or night. Return only a repairs array containing "
             "one object with path and normalized value for each authorized path. Do "
             "not return or rewrite the semantic DTO. The Host applies only those exact "
             "value fields and rejects missing, duplicate, or unauthorized paths.\n\n"
@@ -2763,6 +2792,8 @@ class GoalAssociationResolver:
                 "coverage",
                 "independently_satisfiable",
                 "candidate_goal_indices",
+                "temporal_dimensions",
+                "required_goal_shape",
             ]
             indices = item_schema.get("properties", {}).get(
                 "candidate_goal_indices"
@@ -2789,6 +2820,8 @@ class GoalAssociationResolver:
                                 },
                                 "independently_satisfiable": {"enum": [False]},
                                 "candidate_goal_indices": {"maxItems": 0},
+                                "temporal_dimensions": {"maxItems": 0},
+                                "required_goal_shape": {"const": "ordinary"},
                             }
                         },
                     },
@@ -2801,7 +2834,21 @@ class GoalAssociationResolver:
                         },
                         "then": {
                             "properties": {
-                                "independently_satisfiable": {"enum": [False]}
+                                "independently_satisfiable": {"enum": [False]},
+                                "required_goal_shape": {"const": "ordinary"},
+                            }
+                        },
+                    },
+                    {
+                        "if": {
+                            "properties": {
+                                "role": {"enum": ["responsibility"]}
+                            },
+                            "required": ["role"],
+                        },
+                        "then": {
+                            "properties": {
+                                "temporal_dimensions": {"maxItems": 0}
                             }
                         },
                     },
@@ -2898,6 +2945,7 @@ class GoalAssociationResolver:
         *,
         request: CognitiveWorkRequest,
         goal_count: int,
+        candidate_goals: list[GoalAssociationModelGoal] | None = None,
     ) -> GoalResponsibilityCoverageCertificate:
         if not isinstance(raw, dict):
             raise OllamaGenerationError(
@@ -2931,6 +2979,68 @@ class GoalAssociationResolver:
                             "candidate_goal_indices": list(indices),
                         }
                     )
+                if (
+                    item.get("coverage") == "covered"
+                    and candidate_goals is not None
+                    and isinstance(indices, list)
+                    and indices
+                ):
+                    temporal_dimensions = {
+                        str(value)
+                        for value in item.get("temporal_dimensions") or []
+                    }
+                    required_goal_shape = str(
+                        item.get("required_goal_shape") or "ordinary"
+                    )
+                    mismatch_reasons: list[str] = []
+                    for goal_index in indices:
+                        if not isinstance(goal_index, int) or not (
+                            0 <= goal_index < len(candidate_goals)
+                        ):
+                            continue
+                        candidate = candidate_goals[goal_index]
+                        binding_types = {
+                            binding.entity_type.casefold()
+                            for binding in candidate.semantic_bindings
+                        }
+                        if not temporal_dimensions.issubset(binding_types):
+                            mismatch_reasons.append(
+                                "missing_temporal_dimensions="
+                                + ",".join(
+                                    sorted(temporal_dimensions - binding_types)
+                                )
+                            )
+                        resource = candidate.resource_responsibility
+                        shape_matches = {
+                            "ordinary": True,
+                            "information_resource": (
+                                resource is not None
+                                and resource.kind == "information"
+                            ),
+                            "physical_resource": (
+                                resource is not None
+                                and resource.kind == "physical_object"
+                            ),
+                            "persistent_effect": (
+                                resource is None
+                                and candidate.output_mode == "capability_work"
+                            ),
+                        }.get(required_goal_shape, False)
+                        if not shape_matches:
+                            mismatch_reasons.append(
+                                "required_goal_shape=" + required_goal_shape
+                            )
+                    if mismatch_reasons:
+                        item["coverage"] = "representation_mismatch"
+                        recoveries.append(
+                            {
+                                "item_index": item_index,
+                                "from": "covered",
+                                "to": "representation_mismatch",
+                                "candidate_goal_indices": list(indices),
+                                "reasons": sorted(set(mismatch_reasons)),
+                            }
+                        )
         if recoveries:
             logger.warning(
                 "goal_association_coverage_shape_normalized sid=%s recoveries=%s",
@@ -2982,6 +3092,22 @@ class GoalAssociationResolver:
                 problems.append(
                     f"{item.coverage}:{item.role}:{item.source_excerpt}"
                 )
+                # Preserve the auditor's typed semantic proof as feedback for the
+                # one already-authorized fresh interpretation.  The Host does not
+                # infer these facts from user wording; it only forwards fields the
+                # GA-owned coverage model explicitly declared.
+                if item.temporal_dimensions:
+                    problems.append(
+                        "temporal_dimensions:"
+                        + ",".join(item.temporal_dimensions)
+                        + f":{item.role}:{item.source_excerpt}"
+                    )
+                if item.required_goal_shape != "ordinary":
+                    problems.append(
+                        "required_goal_shape:"
+                        + item.required_goal_shape
+                        + f":{item.role}:{item.source_excerpt}"
+                    )
             if item.role != "responsibility" or item.coverage not in {
                 "covered",
                 "clarification_required",
@@ -3049,6 +3175,14 @@ class GoalAssociationResolver:
             "Goal labels and not permission to copy a previous DTO:\n"
             + self._bounded_json(problems, 3000)
             + "\n"
+            + "Typed proof feedback is structural, not optional prose. When it says "
+            "required_goal_shape:information_resource, the corrected candidate must "
+            "carry one resource_responsibility object with kind=information; "
+            "output_mode=capability_work or a descriptive sentence alone does not "
+            "satisfy that shape. Its top-level bindings must be empty and all query "
+            "facts must live in resource_responsibility.query_scope. When feedback "
+            "lists temporal_dimensions, preserve every listed entity_type in the "
+            "candidate's authoritative binding surface.\n"
             + terminal_instruction
             + "Return one complete final DTO. This interpretation receives no "
             "contract repair; invalid or incomplete output fails closed."
@@ -3086,10 +3220,12 @@ class GoalAssociationResolver:
             "representation mismatch merely because a binding name differs from its "
             "entity_type or a source value is canonically normalized. Conversely, prose, "
             "a binding name, and a day_part value never imply a missing date binding. For a "
-            "compound date-plus-day-part expression, emit and audit one constraint item for "
-            "each temporal dimension even when their source excerpts are adjacent. Before "
-            "marking either covered, enumerate the candidate's actual entity_type values; "
-            "if date or day_part is absent, mark that dimension representation_mismatch. "
+            "compound date-plus-day-part expression, declare both dimensions explicitly in "
+            "temporal_dimensions. Adjacent separable excerpts such as 'today morning' may "
+            "use one item per excerpt; one inseparable relative expression such as 'tonight' "
+            "uses one constraint item with temporal_dimensions=[date,day_part]. Before "
+            "marking it covered, enumerate the candidate's actual entity_type values; if "
+            "date or day_part is absent, mark the item representation_mismatch. "
             "In that case identify "
             "the mismatched candidate index. Use coverage=missing only when no candidate attempts to own the fragment, "
             "with no candidate indices. A positive observable "
@@ -3146,7 +3282,10 @@ class GoalAssociationResolver:
             "an adjective, state directive, conjunction, or imperative grammar. Emit "
             "each semantic fragment once: never duplicate the same source_excerpt "
             "under both responsibility and constraint (or any other conflicting "
-            "roles); decide its one actual role.\n\n"
+            "roles); decide its one actual role. Every item must also set "
+            "temporal_dimensions to [] or the exact date/day_part dimensions carried by "
+            "that excerpt. Natural 'tonight' carries both date and day_part; a generic "
+            "night period without relative-date meaning carries only day_part.\n\n"
             "Set independently_satisfiable=true only when the user could reasonably "
             "judge that positive outcome completed even if sibling outcomes did not "
             "happen. A factual lookup and an interpretation requested from that same "
@@ -3195,7 +3334,16 @@ class GoalAssociationResolver:
             "something later) is represented as an information resource, when provider-"
             "backed evidence work is represented as ordinary speech, or when immediate "
             "reasoning/advice with no fresh evidence need is represented as external "
-            "information acquisition. Speech cannot cover requested body motion, media "
+            "information acquisition. Every responsibility item must set required_goal_shape: "
+            "information_resource for acquiring grounded external/private/runtime information, "
+            "physical_resource for acquiring and handing over an object, persistent_effect "
+            "for a deferred or state-changing Capability outcome, and ordinary otherwise. "
+            "Only role=responsibility classifies the Goal shape. Every constraint, "
+            "context, and framing item must set required_goal_shape=ordinary even when "
+            "it modifies a non-ordinary Goal; map it to that Goal with candidate indices "
+            "instead of repeating the Goal-shape classification. "
+            "A covered item is invalid when the typed candidate lacks that declared shape. "
+            "Speech cannot cover requested body motion, media "
             "control, external evidence work, or a vocal performance. Every Goal "
             "candidate must be "
             "justified by at least one covered role=responsibility item; a constraint "
@@ -3211,9 +3359,9 @@ class GoalAssociationResolver:
             "date and a local day part, the query scope must contain separate date and "
             "day_part bindings. Judge their types by entity_type regardless of binding "
             "name. If both typed bindings carry equivalent normalized values, mark both "
-            "source constraints covered. Emit separate coverage items for the date and "
-            "day-part source fragments; do not collapse a compound temporal expression into "
-            "one item whose coverage can be inferred from prose. Candidate prose or either binding alone does not "
+            "source constraints covered. Use temporal_dimensions=[date] and [day_part] for "
+            "separable source fragments, or temporal_dimensions=[date,day_part] on one item "
+            "when a single indivisible expression carries both. Candidate prose or either binding alone does not "
             "cover the missing dimension; use coverage=representation_mismatch. For a physical resource, an "
             "acquisition location, distance, direction, or route constraint is covered "
             "only by resource_responsibility.source.acquisition_bindings. Descriptions "

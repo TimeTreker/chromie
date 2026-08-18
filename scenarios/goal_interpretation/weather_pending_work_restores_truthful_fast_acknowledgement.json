@@ -3,7 +3,7 @@
   "id": "weather_pending_work_restores_truthful_fast_acknowledgement",
   "suite": "goal_interpretation",
   "level": "integration",
-  "description": "GI preserves the Beijing rain question and fresh-evidence requirement; Fast Planner separately selects any truthful progress Communicative Act while Response Composer owns wording.",
+  "description": "GI preserves the Beijing rain question and fresh-evidence requirement; Fast Planner separately authors a truthful progress Communicative Act and owns its exact wording.",
   "tags": [
     "reported-live-voice",
     "weather",

@@ -1609,7 +1609,9 @@ timescales, not a mandatory module pipeline:
 Admitted Observation / User Turn + bounded Session Context
   -> Goal Interpretation (GI)
        Responsibility + Goal relation + bounded unresolved meaning
-  -> Fast Planner -> first Communicative Activity or silence
+  -> Fast Planner -> author first Communicative Activity
+       -> one same-owner Epistemic Qualification -> accept or reject only
+       -> accepted Activity or silence
   -> concurrent continuation from the same GI result
        |-> same Fast Planner -> remaining Activity Plan + input resolution
        |     |-> ready Capability and still-needed speaking Activities
@@ -2050,7 +2052,10 @@ material current-turn fragment as one of:
 Each item carries a verbatim current-turn `source_excerpt`. A covered positive
 responsibility owns exactly one Goal candidate; constraints may bind to affected
 Goals; context and framing own none. The model also states whether a positive
-responsibility is independently satisfiable. The trusted Host then checks only
+responsibility is independently satisfiable, which `date`/`day_part` dimensions a
+temporal constraint carries, and whether a responsibility requires an information
+resource, physical resource, persistent effect, or ordinary Goal shape. The trusted
+Host compares those authored claims only with typed candidate fields, then checks
 structure and provenance:
 
 - every accepted Goal candidate is justified by at least one covered positive
@@ -2154,8 +2159,11 @@ coverage, satisfaction, response, information gaps, and execution evidence.
 
 The Fast Planner is the low-latency first HOW owner once Goal Interpretation has
 produced contextual Responsibility evidence. It authors one Activity Plan while GA
-independently establishes canonical Goal identity. This is one planner role and one
-planning pass in the normal easy case, not two lifecycle phases or two planner modules.
+independently establishes canonical Goal identity. Its first-response phase includes
+one bounded same-owner Epistemic Qualification before speech commitment. That check
+may only accept or reject the immutable act against available truth/Evidence; it cannot
+rewrite, repair, retry, plan Work, or become another response owner. This remains one
+planner role with phased readiness, not a second planner or response-composition module.
 Fast Planner may use:
 
 - the complete current canonical Goal;
@@ -3011,21 +3019,26 @@ an optional peer decoration lane and may choose `none`; speech never requires a
 gesture. Conversely, a tool lookup or an internal cognition milestone is not promoted
 into a Social Attention anchor merely because it happened.
 
-Each Communicative Act has one Planner owner and one downstream wording owner, with deterministic authority,
-evidence, cancellation, and delivery validation. The architecture does not add a
+Each Communicative Act has one Planner wording owner and one downstream delivery owner,
+with deterministic authority, evidence, cancellation, and delivery validation. The architecture does not add a
 second LLM to repair ordinary progress wording, and it does not retain a legacy
 Goal-Interpreter `fast_speech`/`native_response` compatibility path for maintained
 turns.
 
 ### 15.2 Post-execution response
 
-After execution, the host's deterministic closure reconciles every executable
-canonical goal against the `ExecutionOutcomeBundle` and commits the resulting
-goal state. The current conservative final composer receives the immutable plan
-and reconciled evidence. It returns speech only, with exact goal and evidence
-references. It cannot add a skill, action, retry, authorization, or goal
-change. A future model-assisted final composer must consume the same bounded
-contract and obey the same validator.
+After execution, the Host's deterministic closure reconciles every executable
+canonical Goal against the `ExecutionOutcomeBundle`, commits the resulting Goal
+state, and reactivates Fast Planner with an immutable Goal/Evidence snapshot. Fast
+Planner owns the new human-relevant answer/follow-up/silence decision and exact
+wording. It cannot add a skill, action, retry, authorization, Goal change, or result
+ownership inferred from content.
+
+Before Runtime commits a post-Evidence answer, one bounded same-owner Epistemic
+Qualification accepts or rejects its immutable wording. It cannot rewrite or replace
+the answer. Rejection or qualification unavailability uses the existing single
+Deep-Planner escalation or fails closed; it does not introduce a final composer,
+reviewer chain, or semantic retry. A probability below 100% remains uncertain.
 
 The host validates that:
 
@@ -3036,9 +3049,8 @@ The host validates that:
   cancelled, or `not_run` outcomes;
 - a stale or preempted interaction cannot emit final speech.
 
-If outcome-response validation or composition fails, the host retains the
-trusted outcome bundle and emits no unvalidated completion claim. The current
-deterministic composer is itself the conservative language-matched status path.
+If outcome-response validation or qualification fails, the Host retains the trusted
+outcome bundle and emits no unvalidated completion claim from that candidate.
 
 ### 15.3 Recovery child plans
 

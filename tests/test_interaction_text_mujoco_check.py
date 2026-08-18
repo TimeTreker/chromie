@@ -484,7 +484,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
                         "capability_id": "chromie.weather.lookup",
                         "args": {
                             "location": "chongqing",
-                            "period": "tonight",
+                            "period": "night",
                         },
                         "timing": "sequential",
                     }
@@ -500,7 +500,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
             expect_no_capabilities=False,
             expected_args=[
                 (0, "location", "chongqing"),
-                (0, "period", "tonight"),
+                (0, "period", "night"),
             ],
             arg_tolerance=1e-6,
         )

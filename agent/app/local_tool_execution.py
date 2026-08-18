@@ -249,22 +249,38 @@ def _weather_output(
             "apparent_temperature_max_c": period.apparent_temperature_max_c,
             "precipitation_probability_max": period.precipitation_probability_max,
         }
+    primary_weather_code = (
+        period.weather_code if period is not None else report.weather_code
+    )
+    primary_probability = (
+        period.precipitation_probability_max
+        if period is not None
+        else report.precipitation_probability_max
+    )
+    primary_high = (
+        period.temperature_max_c if period is not None else report.daily_high_c
+    )
+    primary_low = (
+        period.temperature_min_c if period is not None else report.daily_low_c
+    )
     return {
         "location": report.location_name,
         "country": report.country,
         "timezone": report.timezone,
         "date": report.date,
         "condition": weather_code_text(
-            report.weather_code,
+            primary_weather_code,
             zh=language.lower().startswith("zh"),
         ),
-        "weather_code": report.weather_code,
+        "weather_code": primary_weather_code,
         "current_temperature_c": report.current_temperature_c,
         "apparent_temperature_c": report.apparent_temperature_c,
-        "high_c": report.daily_high_c,
-        "low_c": report.daily_low_c,
-        "precipitation_probability_max": report.precipitation_probability_max,
-        "precipitation_sum_mm": report.precipitation_sum_mm,
+        "high_c": primary_high,
+        "low_c": primary_low,
+        "precipitation_probability_max": primary_probability,
+        "precipitation_sum_mm": (
+            None if period is not None else report.precipitation_sum_mm
+        ),
         "wind_speed_kmh": report.wind_speed_kmh,
         "forecast_period": period_output,
         # This is an exceptional user-safe fallback.  The normal answer is

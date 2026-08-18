@@ -204,6 +204,20 @@
       "path": "agent/app/fast_planner.py",
       "symbol": "FastPlannerResolver._resolve",
       "ordinal": 2,
+      "classification": "typed_failure_mapping",
+      "owner": "agent.fast_planner",
+      "contract": "Reject unqualified post-Evidence wording and return one observable semantic escalation without emitting or repairing the candidate answer.",
+      "review_status": "reviewed",
+      "body_sha256": "7a4468297d4bd5a185b2cb76daf533f82c4fc36f8ecb5d24c29533edc230822a",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
+    },
+    {
+      "path": "agent/app/fast_planner.py",
+      "symbol": "FastPlannerResolver._resolve",
+      "ordinal": 3,
       "classification": "fail_closed_boundary",
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
@@ -250,7 +264,7 @@
       "owner": "agent.fast_planner",
       "contract": "Map Fast Activity-Plan inference and contract failures into a typed unavailable FastPlannerAdvance without authorizing Work.",
       "review_status": "reviewed",
-      "body_sha256": "5e31671e82645625ee93f3f123a66ea04b2f772ea68c22884e7d266a1dc59347",
+      "body_sha256": "ff976e4ec01c8db2037d88454fa517bb10e5a4cf0fe42556fc49ff5d55f67ad9",
       "failure_signals": [
         "continue",
         "return",

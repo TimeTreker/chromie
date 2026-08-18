@@ -23,6 +23,7 @@ from shared.chromie_contracts.plan import (
     FastPlannerClarificationAct,
     FastPlannerCompleteResponseAct,
 )
+from shared.chromie_contracts.tool_result import canonical_value_sha256
 from shared.chromie_runtime.llm_diagnostics import ollama_prompt_preflight_diagnostics
 
 
@@ -96,8 +97,8 @@ class WeatherCatalog(FakeCatalog):
                     "type": "object",
                     "properties": {
                         "location": {"type": "string"},
-                        "date": {"type": "string"},
-                        "period": {"type": "string"},
+                        "date": {"type": "string", "default": "today"},
+                        "period": {"type": "string", "default": "day"},
                     },
                     "required": ["location"],
                     "additionalProperties": False,
@@ -820,6 +821,113 @@ class CanonicalPlanContractTests(unittest.TestCase):
             },
         )
 
+    def test_capability_dependent_goal_can_respond_from_exact_terminal_reentry(self):
+        raw = {
+            "disposition": "respond",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "goal_summary": "Answer with current weather evidence.",
+            "response_text": "今晚降雨概率最高约76%。",
+            "steps": [],
+            "escalation_reason": "",
+            "unresolved": [],
+            "parameter_resolutions": [],
+            "goal_outcomes": {},
+            "goal_satisfaction": exact_satisfaction(["goal-weather"]),
+            "plan_relation": "exact",
+            "user_confirmation_required": False,
+        }
+        output = validate_planner_model_output(
+            raw,
+            planner_tier="fast",
+            expected_goal_ids_for_turn=["goal-weather"],
+        )
+        data = {
+            "location": "重庆",
+            "forecast_period": {
+                "scope": "night",
+                "precipitation_probability_max": 76.0,
+            },
+        }
+
+        validate_goal_responsibility_outcomes(
+            output,
+            authoritative_goals=[
+                {
+                    "goal_id": "goal-weather",
+                    "metadata": {"responsibility_kind": "capability_dependent"},
+                }
+            ],
+            context={
+                "result_evidence_reentry": {
+                    "source_goal_ids": ["goal-weather"],
+                    "evidence_refs": ["evidence-weather"],
+                },
+                "trusted_terminal_evidence": [
+                    {
+                        "evidence_id": "evidence-weather",
+                        "tool_id": "chromie.weather.lookup",
+                        "status": "completed",
+                        "data": data,
+                        "output_sha256": canonical_value_sha256(data),
+                    }
+                ],
+            },
+        )
+
+    def test_terminal_reentry_with_bad_digest_cannot_authorize_response(self):
+        raw = {
+            "disposition": "respond",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "goal_summary": "Answer with current weather evidence.",
+            "response_text": "今晚降雨概率最高约76%。",
+            "steps": [],
+            "escalation_reason": "",
+            "unresolved": [],
+            "parameter_resolutions": [],
+            "goal_outcomes": {},
+            "goal_satisfaction": exact_satisfaction(["goal-weather"]),
+            "plan_relation": "exact",
+            "user_confirmation_required": False,
+        }
+        output = validate_planner_model_output(
+            raw,
+            planner_tier="fast",
+            expected_goal_ids_for_turn=["goal-weather"],
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "capability_dependent goal cannot use disposition=respond",
+        ):
+            validate_goal_responsibility_outcomes(
+                output,
+                authoritative_goals=[
+                    {
+                        "goal_id": "goal-weather",
+                        "metadata": {
+                            "responsibility_kind": "capability_dependent"
+                        },
+                    }
+                ],
+                context={
+                    "result_evidence_reentry": {
+                        "source_goal_ids": ["goal-weather"],
+                        "evidence_refs": ["evidence-weather"],
+                    },
+                    "trusted_terminal_evidence": [
+                        {
+                            "evidence_id": "evidence-weather",
+                            "tool_id": "chromie.weather.lookup",
+                            "status": "completed",
+                            "data": {"location": "重庆"},
+                            "output_sha256": "0" * 64,
+                        }
+                    ],
+                },
+            )
+
     def test_partial_plan_cannot_carry_steps(self):
         with self.assertRaises(ValueError):
             CanonicalPlan(plan_id="p", planner_tier="fast", disposition="escalate", coverage="partial", confidence=0.5, escalation_reason="compound", steps=[{"step_id":"s","capability_id":"soridormi.walk_forward","args":{"duration_s":15}}])
@@ -1031,17 +1139,158 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
 
 
 class FastPlannerResolverTests(unittest.TestCase):
-    def test_first_response_is_planner_authored_in_a_small_language_bound_contract(self):
-        ollama = FakeOllama(
+    def test_terminal_evidence_reentry_survives_final_plan_validation(self):
+        response_text = "今晚重庆降雨概率最高约76%，不是确定会下雨。"
+        raw = multi_goal_plan(
+            disposition="respond",
+            coverage="complete",
+            goal_summary="Answer the weather question from trusted terminal evidence.",
+            response_text=response_text,
+            steps=[],
+            goal_outcomes={
+                "goal-weather": respond_outcome(
+                    "goal-weather",
+                    response_text,
+                    "Trusted terminal weather evidence answers the Goal.",
+                )
+            },
+            goal_satisfaction=exact_satisfaction(["goal-weather"]),
+        )
+        data = {
+            "location": "重庆",
+            "forecast_period": {
+                "scope": "night",
+                "precipitation_probability_max": 76.0,
+            },
+        }
+        planner_request = request(
+            "今晚重庆会不会下雨？",
+            route="tool",
+            goal_ids=["goal-weather"],
+            goal_metadata={"responsibility_kind": "capability_dependent"},
+        )
+        context = dict(planner_request.context)
+        context.update(
             {
-                "activity": {
-                    "activity_id": "weather_ack",
-                    "role": "progress",
-                    "text": "我先查一下重庆今天上午的天气。",
-                    "progress_kind": "check_information",
-                    "source_responsibility_refs": ["weather"],
-                }
+                "result_evidence_reentry": {
+                    "source_goal_ids": ["goal-weather"],
+                    "evidence_refs": ["evidence-weather"],
+                },
+                "trusted_terminal_evidence": [
+                    {
+                        "evidence_id": "evidence-weather",
+                        "tool_id": "chromie.weather.lookup",
+                        "status": "completed",
+                        "data": data,
+                        "output_sha256": canonical_value_sha256(data),
+                    }
+                ],
             }
+        )
+        planner_request = planner_request.model_copy(update={"context": context})
+
+        ollama = ScriptedOllama([raw, {"decision": "accept"}])
+        plan = asyncio.run(
+            FastPlannerResolver(ollama, WeatherCatalog()).resolve(planner_request)
+        )
+
+        self.assertEqual(plan.disposition, "respond")
+        self.assertEqual(plan.response_text, response_text)
+        self.assertEqual(plan.steps, [])
+        self.assertEqual(plan.metadata["path_classification"], "terminal")
+        response_schema = ollama.prompts[0][1]["response_format"]
+        self.assertIn(
+            "a probability below 100% remains a possibility/probability",
+            response_schema["properties"]["response_text"]["description"],
+        )
+        self.assertEqual(
+            ollama.prompts[1][1]["prompt_family"],
+            "fast_planner.evidence_response.truth_check",
+        )
+        self.assertEqual(
+            plan.metadata["evidence_response_truth_qualification"],
+            {"decision": "accept"},
+        )
+
+    def test_terminal_evidence_wording_that_upgrades_probability_is_rejected(self):
+        response_text = "重庆今晚降雨概率76%，所以会下雨。"
+        raw = multi_goal_plan(
+            disposition="respond",
+            coverage="complete",
+            goal_summary="Answer the weather question from trusted evidence.",
+            response_text=response_text,
+            steps=[],
+            goal_outcomes={
+                "goal-weather": respond_outcome(
+                    "goal-weather",
+                    response_text,
+                    "Trusted weather evidence answers the Goal.",
+                )
+            },
+            goal_satisfaction=exact_satisfaction(["goal-weather"]),
+        )
+        data = {
+            "location": "重庆",
+            "forecast_period": {
+                "scope": "night",
+                "precipitation_probability_max": 76.0,
+            },
+        }
+        planner_request = request(
+            "今晚重庆会不会下雨？",
+            route="tool",
+            goal_ids=["goal-weather"],
+            goal_metadata={"responsibility_kind": "capability_dependent"},
+        )
+        context = dict(planner_request.context)
+        context.update(
+            {
+                "result_evidence_reentry": {
+                    "source_goal_ids": ["goal-weather"],
+                    "evidence_refs": ["evidence-weather"],
+                },
+                "trusted_terminal_evidence": [
+                    {
+                        "evidence_id": "evidence-weather",
+                        "tool_id": "chromie.weather.lookup",
+                        "status": "completed",
+                        "data": data,
+                        "output_sha256": canonical_value_sha256(data),
+                    }
+                ],
+            }
+        )
+        planner_request = planner_request.model_copy(update={"context": context})
+        ollama = ScriptedOllama([raw, {"decision": "reject"}])
+
+        plan = asyncio.run(
+            FastPlannerResolver(ollama, WeatherCatalog()).resolve(planner_request)
+        )
+
+        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(
+            plan.escalation_reason,
+            "fast_planner_evidence_response_truth_rejected",
+        )
+        self.assertEqual(plan.response_text, "")
+        self.assertEqual(
+            plan.metadata["evidence_response_truth_qualification"],
+            {"decision": "reject"},
+        )
+
+    def test_first_response_is_planner_authored_in_a_small_language_bound_contract(self):
+        ollama = ScriptedOllama(
+            [
+                {
+                    "activity": {
+                        "text": "我先查一下重庆今天上午的天气。",
+                        "progress_kind": "check_information",
+                    },
+                },
+                {
+                    "decision": "accept",
+                },
+            ]
         )
         request = _work_request(
             sid="turn-weather-first-response",
@@ -1070,6 +1319,8 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
 
         self.assertEqual(result.activity.text, "我先查一下重庆今天上午的天气。")
+        self.assertTrue(result.activity.activity_id.startswith("progress_"))
+        self.assertEqual(result.activity.role, "progress")
         self.assertEqual(result.activity.truth_stage, "pre_evidence")
         prompt, kwargs = ollama.prompts[0]
         rendered = prompt.render() if hasattr(prompt, "render") else str(prompt)
@@ -1077,8 +1328,204 @@ class FastPlannerResolverTests(unittest.TestCase):
         schema = kwargs["response_format"]
         progress = schema["$defs"]["FastPlannerProgressAct"]
         self.assertNotIn("timing", progress["properties"])
+        self.assertEqual(
+            list(progress["properties"])[:3],
+            ["progress_kind", "text"],
+        )
+        self.assertNotIn("source_responsibility_refs", progress["properties"])
+        self.assertNotIn("role", progress["properties"])
+        self.assertNotIn("activity_id", progress["properties"])
         self.assertNotIn("truth_stage", progress["properties"])
+        self.assertNotIn("speech_act", progress["properties"])
+        self.assertEqual(progress["properties"]["text"]["maxLength"], 32)
         self.assertLessEqual(kwargs["options"]["num_predict"], 192)
+        _, truth_kwargs = ollama.prompts[1]
+        self.assertEqual(
+            truth_kwargs["prompt_family"],
+            "fast_planner.first_response.truth_check",
+        )
+        self.assertLessEqual(truth_kwargs["options"]["num_predict"], 64)
+        self.assertEqual(result.metadata["truth_qualification_call_count"], 1)
+
+    def test_bundle_false_weather_result_is_rejected_without_rewriting_or_retry(self):
+        ollama = ScriptedOllama(
+            [
+                {
+                    "activity": {
+                        "activity_id": "weather_ack",
+                        "role": "progress",
+                        "text": "我刚刚查了天气，重庆今晚应该会下雨哦！",
+                        "progress_kind": "check_information",
+                        "source_responsibility_refs": ["weather"],
+                    }
+                },
+                {
+                    "decision": "reject",
+                },
+            ]
+        )
+        request = _work_request(
+            sid="turn-bundle-c6732fcc",
+            text="今晚重庆会不会下雨哦？",
+            language="zh-CN",
+            responsibilities=[
+                {
+                    "local_ref": "weather",
+                    "outcome": "determine whether it rains in Chongqing tonight",
+                    "bindings": {
+                        "location": "重庆",
+                        "date": "today",
+                        "day_part": "night",
+                    },
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.96,
+                }
+            ],
+        )
+
+        result = asyncio.run(
+            FastPlannerResolver(ollama, WeatherCatalog()).resolve_first_response(
+                request
+            )
+        )
+
+        self.assertIsNone(result.activity)
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(
+            result.metadata["semantic_authority"],
+            "fast_planner_truth_rejection",
+        )
+        self.assertEqual(
+            result.metadata["truth_qualification"],
+            {"decision": "reject"},
+        )
+        truth_prompt = str(ollama.prompts[1][0])
+        self.assertIn("immutable activity.text", truth_prompt)
+        self.assertIn(
+            "an intention to check next is not an execution claim",
+            truth_prompt,
+        )
+        self.assertIn("no replacement wording or reason prose", truth_prompt)
+        author_prompt = str(ollama.prompts[0][0])
+        self.assertIn(
+            "no check, execution, or fresh Evidence has happened",
+            author_prompt,
+        )
+        author_schema = ollama.prompts[0][1]["response_format"]
+        progress_schema = author_schema["$defs"]["FastPlannerProgressAct"]
+        self.assertIn("before any work or Evidence exists", progress_schema["properties"]["text"]["description"])
+
+    def test_first_response_truth_qualification_failure_fails_closed_once(self):
+        ollama = ScriptedOllama(
+            [
+                {
+                    "activity": {
+                        "activity_id": "weather_ack",
+                        "role": "progress",
+                        "text": "我先查一下。",
+                        "progress_kind": "check_information",
+                        "source_responsibility_refs": ["weather"],
+                    }
+                },
+                {
+                    "decision": "accept",
+                    "violations": [],
+                    "confidence": 0.4,
+                },
+            ]
+        )
+        request = _work_request(
+            sid="turn-weather-uncertain-truth",
+            text="今晚重庆会不会下雨？",
+            language="zh-CN",
+            responsibilities=[
+                {
+                    "local_ref": "weather",
+                    "outcome": "determine whether it rains in Chongqing tonight",
+                    "bindings": {"location": "重庆", "time": "tonight"},
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.96,
+                }
+            ],
+        )
+
+        result = asyncio.run(
+            FastPlannerResolver(ollama, WeatherCatalog()).resolve_first_response(
+                request
+            )
+        )
+
+        self.assertIsNone(result.activity)
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(result.metadata["execution_authority"], "none")
+        self.assertEqual(
+            result.metadata["failure_class"],
+            "fast_first_response_contract_invalid",
+        )
+
+    def test_rejected_first_response_cannot_be_replaced_by_advance_salvage(self):
+        raw = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "covered_responsibility_refs": ["weather"],
+            "activities": [
+                {
+                    "activity_id": "weather_repeat",
+                    "role": "progress",
+                    "text": "重庆今晚会下雨吗？",
+                    "progress_kind": "check_information",
+                    "source_responsibility_refs": ["weather"],
+                }
+            ],
+            "continuations": [],
+            "confidence": 0.91,
+            "unresolved": [],
+            "reason_summary": "Malformed executable output.",
+        }
+        request = _work_request(
+            sid="turn-weather-no-truth-bypass",
+            text="今晚重庆会不会下雨？",
+            language="zh-CN",
+            responsibilities=[
+                {
+                    "local_ref": "weather",
+                    "outcome": "determine whether it rains in Chongqing tonight",
+                    "bindings": {
+                        "location": "重庆",
+                        "date": "today",
+                        "day_part": "night",
+                    },
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.96,
+                }
+            ],
+            context={
+                "fast_planner_first_response": {
+                    "turn_id": "turn-weather-no-truth-bypass",
+                    "activity": None,
+                    "metadata": {
+                        "semantic_authority": "fast_planner_truth_rejection"
+                    },
+                }
+            },
+        )
+
+        result = asyncio.run(
+            FastPlannerResolver(
+                FakeOllama(raw), WeatherCatalog(), max_contract_repairs=0
+            ).resolve_advance(request)
+        )
+
+        self.assertEqual(result.disposition, "unavailable")
+        self.assertEqual(result.activities, [])
+        self.assertTrue(
+            result.metadata[
+                "progress_salvage_suppressed_by_first_response_decision"
+            ]
+        )
 
     def test_committed_first_response_is_merged_without_reauthoring(self):
         ollama = FakeOllama(
@@ -1418,6 +1865,85 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(advance.disposition, "unavailable")
         self.assertIn("required Capability inputs", advance.metadata["error"])
 
+    def test_bundle_weather_result_is_not_a_user_resolvable_input_gap(self):
+        invalid_clarification = self._clarification_output(
+            source_kind="execution_input",
+            source_reference="chromie.weather.lookup",
+            required_for=["weather_condition"],
+            sources_considered=["authoritative_context", "capability_schema"],
+        )
+        invalid_clarification["activities"][0]["text"] = (
+            "我已经查到重庆今晚的天气情况啦！"
+        )
+        repaired = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "covered_responsibility_refs": ["weather"],
+            "activities": [
+                {
+                    "activity_id": "weather_progress",
+                    "role": "progress",
+                    "text": "我来查一下重庆今晚的天气。",
+                    "progress_kind": "check_information",
+                    "source_responsibility_refs": ["weather"],
+                },
+                {
+                    "activity_id": "weather_lookup",
+                    "role": "capability",
+                    "capability_id": "chromie.weather.lookup",
+                    "args": {
+                        "location": "重庆",
+                        "date": "today",
+                        "period": "night",
+                    },
+                    "source_responsibility_refs": ["weather"],
+                },
+            ],
+            "continuations": [],
+            "confidence": 0.96,
+            "unresolved": [],
+            "reason_summary": "Retrieve the requested forecast.",
+        }
+        ollama = ScriptedOllama([invalid_clarification, repaired])
+        run_request = _work_request(
+            sid="turn-bundle-c6732fcc-advance",
+            text="今晚重庆会不会下雨哦？",
+            language="zh-CN",
+            responsibilities=[
+                {
+                    "local_ref": "weather",
+                    "outcome": "determine whether it rains in Chongqing tonight",
+                    "bindings": {
+                        "location": "重庆",
+                        "date": "today",
+                        "day_part": "night",
+                    },
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.96,
+                }
+            ],
+        )
+
+        advance = asyncio.run(
+            FastPlannerResolver(ollama, WeatherCatalog()).resolve_advance(
+                run_request
+            )
+        )
+
+        self.assertEqual(advance.disposition, "execute")
+        self.assertEqual(
+            [activity.role for activity in advance.activities],
+            ["progress", "capability"],
+        )
+        self.assertEqual(advance.activities[1].args["period"], "night")
+        self.assertTrue(advance.metadata["contract_revision_attempted"])
+        self.assertEqual(
+            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
+            ["fast_planner.advance", "fast_planner.advance.revision"],
+        )
+        self.assertIn("required Capability inputs", str(ollama.prompts[1][0]))
+
     def test_planner_cannot_ask_for_weather_location_already_bound_by_gi(self):
         raw = self._clarification_output(
             source_kind="execution_input",
@@ -1681,6 +2207,13 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(covered["minItems"], 1)
         self.assertEqual(covered["maxItems"], 1)
         self.assertTrue(covered["uniqueItems"])
+        gap = schema["$defs"]["PlannerInformationGap"]
+        self.assertEqual(
+            gap["properties"]["preferred_resolution"],
+            {"const": "ask_user", "type": "string"},
+        )
+        self.assertEqual(gap["properties"]["blocking"]["const"], True)
+        self.assertEqual(gap["properties"]["resolved"]["const"], False)
 
     def test_first_activity_plan_keeps_late_catalog_semantics_visible(self):
         resolver = FastPlannerResolver(FakeOllama({}), FakeCatalog())
@@ -1854,6 +2387,125 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "#/$defs/FastPlannerCapabilityActivity",
             },
         )
+
+    def test_execute_revision_preserves_disposition_and_requires_capability_activity(self):
+        initial = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "covered_responsibility_refs": ["weather"],
+            "activities": [
+                {
+                    "activity_id": "misclassified-progress",
+                    "role": "clarification",
+                    "text": "我先看看。",
+                    "source_responsibility_refs": ["weather"],
+                    "information_gaps": [
+                        {
+                            "gap_id": "weather-result",
+                            "description": "Weather result is not known yet.",
+                            "required_for": ["weather_result"],
+                            "preferred_resolution": "ask_user",
+                            "source_kind": "unresolved_meaning",
+                            "source_reference": "weather",
+                            "resolution_sources_considered": [
+                                "authoritative_context"
+                            ],
+                        }
+                    ],
+                }
+            ],
+            "continuations": [],
+            "confidence": 0.95,
+            "unresolved": [],
+            "reason_summary": "Execute the matching weather lookup.",
+        }
+        corrected = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "covered_responsibility_refs": ["weather"],
+            "activities": [
+                {
+                    "activity_id": "weather-lookup",
+                    "role": "capability",
+                    "capability_id": "chromie.weather.lookup",
+                    "args": {
+                        "location": "重庆",
+                        "date": "today",
+                        "period": "night",
+                    },
+                    "source_responsibility_refs": ["weather"],
+                    "timing": "parallel",
+                }
+            ],
+            "continuations": [],
+            "confidence": 0.95,
+            "unresolved": [],
+            "reason_summary": "Execute the matching weather lookup.",
+        }
+        first_response = {
+            "turn_id": "turn-weather-execute-revision",
+            "activity": {
+                "activity_id": "weather-progress",
+                "role": "progress",
+                "text": "我先查一下。",
+                "progress_kind": "check_information",
+                "source_responsibility_refs": ["weather"],
+            },
+        }
+        request = _work_request(
+            sid="turn-weather-execute-revision",
+            text="今晚重庆会不会下雨？",
+            language="zh-CN",
+            responsibilities=[
+                {
+                    "local_ref": "weather",
+                    "outcome": "determine whether it rains in Chongqing tonight",
+                    "bindings": {
+                        "location": "重庆",
+                        "date": "today",
+                        "day_part": "night",
+                    },
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.96,
+                }
+            ],
+            context={"fast_planner_first_response": first_response},
+        )
+        ollama = ScriptedOllama([initial, corrected])
+
+        advance = asyncio.run(
+            FastPlannerResolver(ollama, WeatherCatalog()).resolve_advance(request)
+        )
+
+        self.assertEqual(advance.disposition, "execute")
+        self.assertEqual(
+            [activity.role for activity in advance.activities],
+            ["progress", "capability"],
+        )
+        revision_schema = ollama.prompts[1][1]["response_format"]
+        self.assertEqual(
+            revision_schema["properties"]["disposition"]["enum"], ["execute"]
+        )
+        self.assertEqual(
+            revision_schema["properties"]["activities"]["items"]["oneOf"],
+            [{"$ref": "#/$defs/FastPlannerCapabilityActivity"}],
+        )
+        capability_branches = revision_schema["$defs"][
+            "FastPlannerCapabilityActivity"
+        ]["oneOf"]
+        weather_branch = next(
+            branch
+            for branch in capability_branches
+            if branch["properties"]["capability_id"]["enum"]
+            == ["chromie.weather.lookup"]
+        )
+        self.assertEqual(
+            weather_branch["properties"]["args"]["required"],
+            ["location", "date", "period"],
+        )
+        self.assertIn("args", weather_branch["required"])
+        self.assertTrue(advance.metadata["contract_revision_attempted"])
 
     def test_daytime_weather_can_check_and_speak_in_parallel(self):
         ollama = FakeOllama(
@@ -3466,7 +4118,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "date": {"type": "string", "enum": ["today", "tomorrow"]},
                         "period": {
                             "type": "string",
-                            "enum": ["day", "morning", "afternoon", "evening", "tonight"],
+                            "enum": ["day", "morning", "afternoon", "evening", "night"],
                         },
                         "units": {"type": "string", "enum": ["metric", "imperial", "auto"]},
                     },

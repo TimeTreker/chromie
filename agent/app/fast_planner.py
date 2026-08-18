@@ -48,6 +48,7 @@ from .planner_contract import (
     planner_goal_execution_requirements,
     planner_response_goal_ids,
     planner_contract_diagnostics,
+    result_evidence_reentry_goal_ids,
     review_coordinated_action_plan_coverage,
     situation_prompt_projection,
     validate_explicit_numeric_parameter_grounding,
@@ -80,9 +81,9 @@ try:
         FastPlannerAdvanceModelOutput,
         FastPlannerFirstResponse,
         FastPlannerFirstResponseModelOutput,
+        FastPlannerFirstResponseTruthCertificate,
         FastPlannerProgressAct,
     )
-    from chromie_contracts.tool_result import ToolResultEvidence
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
     from shared.chromie_contracts.plan import (
@@ -91,9 +92,9 @@ except ImportError:  # pragma: no cover
         FastPlannerAdvanceModelOutput,
         FastPlannerFirstResponse,
         FastPlannerFirstResponseModelOutput,
+        FastPlannerFirstResponseTruthCertificate,
         FastPlannerProgressAct,
     )
-    from shared.chromie_contracts.tool_result import ToolResultEvidence
 
 logger = logging.getLogger("chromie.agent.fast_planner")
 
@@ -174,6 +175,7 @@ class FastPlannerResolver:
         response_schema = self._first_response_schema(
             responsibility_refs,
             needs_work=needs_work,
+            language=str(request.language or ""),
         )
         try:
             raw = await self.ollama.generate(
@@ -198,6 +200,31 @@ class FastPlannerResolver:
                 turn_id=request.sid,
                 attempt=1,
             )
+            if needs_work and isinstance(raw, dict):
+                raw_activity = raw.get("activity")
+                if isinstance(raw_activity, dict):
+                    activity_payload = dict(raw_activity)
+                    if len(responsibility_refs) == 1:
+                        # There is no semantic association choice in the single-
+                        # Responsibility case.  Keep that mechanical provenance out
+                        # of the latency-critical model DTO and restore it before the
+                        # authoritative Activity contract is validated.
+                        activity_payload.setdefault(
+                            "source_responsibility_refs", responsibility_refs
+                        )
+                    activity_payload.setdefault("role", "progress")
+                    activity_payload.setdefault(
+                        "activity_id",
+                        "progress_"
+                        + hashlib.sha256(
+                            (
+                                str(request.sid or "turn")
+                                + "|"
+                                + "|".join(responsibility_refs)
+                            ).encode("utf-8")
+                        ).hexdigest()[:12],
+                    )
+                    raw = {**raw, "activity": activity_payload}
             output = FastPlannerFirstResponseModelOutput.model_validate(raw)
             activity = output.activity
             refs = set(activity.source_responsibility_refs)
@@ -213,6 +240,35 @@ class FastPlannerResolver:
                 raise PlannerDTOContractError(
                     "immediate conversational work requires a complete response"
                 )
+            truth_certificate = await self._qualify_first_response_truth(
+                request,
+                activity=activity,
+                responsibilities=responsibilities,
+            )
+            qualification_metadata = {
+                "truth_qualification_owner": "fast_planner",
+                "truth_qualification_call_count": 1,
+                "truth_qualification": truth_certificate.model_dump(
+                    mode="json",
+                    exclude_none=True,
+                ),
+            }
+            if truth_certificate.decision != "accept":
+                logger.warning(
+                    "fast_planner_first_response_truth_rejected sid=%s activity_id=%s",
+                    request.sid,
+                    activity.activity_id,
+                )
+                return FastPlannerFirstResponse(
+                    turn_id=str(request.sid or "turn-fast-first-response"),
+                    activity=None,
+                    metadata={
+                        "semantic_authority": "fast_planner_truth_rejection",
+                        "phase": "first_communicative_activity",
+                        "execution_authority": "none",
+                        **qualification_metadata,
+                    },
+                )
             return FastPlannerFirstResponse(
                 turn_id=str(request.sid or "turn-fast-first-response"),
                 activity=activity,
@@ -220,6 +276,7 @@ class FastPlannerResolver:
                     "semantic_authority": "fast_planner_model",
                     "phase": "first_communicative_activity",
                     "execution_authority": "host_communicative_runtime",
+                    **qualification_metadata,
                 },
             )
         except Exception as exc:
@@ -254,9 +311,197 @@ class FastPlannerResolver:
                 },
             )
 
+    async def _qualify_first_response_truth(
+        self,
+        request: CognitiveWorkRequest,
+        *,
+        activity: Any,
+        responsibilities: list[CognitiveResponsibilityProposal],
+    ) -> FastPlannerFirstResponseTruthCertificate:
+        """Accept or reject immutable wording without authoring a replacement.
+
+        This is the single owner-approved Epistemic Qualification inside Fast
+        Planner.  A failure, malformed certificate, or uncertain acceptance is
+        terminal for the first-response Activity and is never repaired.
+        """
+
+        schema = FastPlannerFirstResponseTruthCertificate.model_json_schema()
+        context = request.context if isinstance(request.context, dict) else {}
+        raw = await self.ollama.generate(
+            self._first_response_truth_prompt(
+                request,
+                activity=activity,
+                responsibilities=responsibilities,
+                trusted_evidence=context.get("trusted_terminal_evidence") or [],
+            ),
+            system=self._first_response_truth_system_prompt(),
+            options={
+                "temperature": 0,
+                "top_p": 0.9,
+                "num_ctx": self.num_ctx,
+                "num_predict": min(self.num_predict, 64),
+            },
+            response_format=schema,
+            prompt_family="fast_planner.first_response.truth_check",
+            turn_id=request.sid,
+            attempt=1,
+        )
+        certificate = FastPlannerFirstResponseTruthCertificate.model_validate(raw)
+        return certificate
+
+    async def _qualify_evidence_response_truth(
+        self,
+        request: CognitiveWorkRequest,
+        *,
+        plan: CanonicalPlan,
+    ) -> FastPlannerFirstResponseTruthCertificate:
+        """Accept or reject immutable post-Evidence wording without repairing it."""
+
+        schema = FastPlannerFirstResponseTruthCertificate.model_json_schema()
+        context = request.context if isinstance(request.context, dict) else {}
+        contract = (
+            "Fast Planner post-Evidence Epistemic Qualification contract: inspect every "
+            "candidate response string against only the admitted trusted terminal "
+            "Evidence and authoritative Goal scope. Return decision=accept only when "
+            "every material claim preserves the Evidence values, scope, and epistemic "
+            "strength. A forecast, estimate, or probability below 100% remains "
+            "uncertain even when a provider condition label names rain or showers. "
+            "Reject wording that turns it into certainty, including forms equivalent "
+            "to '所以会下雨' or 'it will rain'; wording such as '可能会下雨' or 'a 76% "
+            "chance of rain' preserves uncertainty. Reject unsupported duration, "
+            "severity, advice, reassurance, or facts from another period. Do not "
+            "rewrite the response, choose a Capability, or add an explanation. Return "
+            "only decision=accept or decision=reject."
+        )
+        candidate = {
+            "response_text": plan.response_text,
+            "goal_outcome_response_texts": [
+                {
+                    "goal_id": outcome.goal_id,
+                    "response_text": outcome.response_text,
+                }
+                for outcome in plan.goal_outcomes
+                if getattr(outcome, "response_text", "")
+            ],
+        }
+        rendered = (
+            contract
+            + "\n\nImmutable candidate response JSON:\n"
+            + json.dumps(
+                candidate,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            + "\n\nAdmitted trusted terminal Evidence JSON:\n"
+            + self._bounded(context.get("trusted_terminal_evidence") or [], 6000)
+            + "\n\nAuthoritative canonical Goal JSON:\n"
+            + self._bounded(canonical_goal_grounding(context), 3000)
+            + "\n\nCurrent user turn (scope only):\n"
+            + " ".join(str(request.text or "").split())[:700]
+        )
+        raw = await self.ollama.generate(
+            LayeredPrompt.promote(rendered, operating_contract=(contract,)),
+            system=(
+                "You are the same Fast Planner's bounded post-Evidence Epistemic "
+                "Qualification, not a response author. Accept or reject the immutable "
+                "candidate. Never repair, replace, or expand it."
+            ),
+            options={
+                "temperature": 0,
+                "top_p": 0.9,
+                "num_ctx": self.num_ctx,
+                "num_predict": min(self.num_predict, 64),
+            },
+            response_format=schema,
+            prompt_family="fast_planner.evidence_response.truth_check",
+            turn_id=request.sid,
+            attempt=1,
+        )
+        return FastPlannerFirstResponseTruthCertificate.model_validate(raw)
+
+    @staticmethod
+    def _first_response_truth_system_prompt() -> str:
+        return (
+            "You are the same Fast Planner's bounded Epistemic Qualification, "
+            "not a response author or reviewer with repair authority. Inspect the "
+            "immutable Communicative Activity semantically in its language. Return "
+            "only an accept/reject truth certificate. Never rewrite wording, propose "
+            "replacement text, choose a Capability, or change Goal meaning."
+        )
+
+    @staticmethod
+    def _first_response_truth_prompt(
+        request: CognitiveWorkRequest,
+        *,
+        activity: Any,
+        responsibilities: list[CognitiveResponsibilityProposal],
+        trusted_evidence: list[Any],
+    ) -> LayeredPrompt:
+        contract = (
+            "Fast Planner first-response Epistemic Qualification contract: decide "
+            "whether the exact immutable activity.text is fully supported at its "
+            "declared truth_stage. Ignore the role/progress_kind label when judging "
+            "the actual sentence. For pre_evidence wording, reject any statement, "
+            "implication, probability, or value of an external result; any claim that "
+            "checking, execution, or completion already happened; and any changed-world "
+            "claim. A prospective sentence may name what will be checked or say that "
+            "the check will answer the question; that is not itself a result claim. "
+            "Likewise, an intention to check next is not an execution claim. Only a "
+            "present acknowledgement or prospective intention to check, act, or think "
+            "is eligible. For context_grounded "
+            "wording, reject personal or world facts absent from the supplied "
+            "Responsibility/context. For post_evidence wording, every material result "
+            "claim must be supported by admitted Evidence refs. Reject on uncertainty. "
+            "Return only decision=accept or decision=reject, with no replacement "
+            "wording or reason prose. Examples: '我先查一下。' / 'Let me check.' are eligible "
+            "prospective intentions. '我查过了，结果是……' / 'I checked; the result "
+            "is ...' are completed-work/result claims and must be rejected."
+        )
+        rendered = (
+            contract
+            + "\n\nImmutable Communicative Activity JSON:\n"
+            + json.dumps(
+                activity.model_dump(mode="json", exclude_none=True),
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            + "\n\nAuthoritative Responsibility evidence JSON:\n"
+            + json.dumps(
+                [
+                    item.model_dump(mode="json", exclude_none=True)
+                    for item in responsibilities
+                ],
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )[:3000]
+            + "\n\nAdmitted trusted Evidence JSON:\n"
+            + json.dumps(
+                trusted_evidence,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )[:2200]
+            + "\n\nBounded Interaction Context JSON:\n"
+            + json.dumps(
+                (request.context or {}).get("interaction_context") or {},
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )[:900]
+            + "\n\nCurrent user turn (context only, never external-result Evidence):\n"
+            + " ".join(str(request.text or "").split())[:700]
+        )
+        return LayeredPrompt.promote(
+            rendered,
+            operating_contract=(contract,),
+        )
+
     @staticmethod
     def _first_response_schema(
-        responsibility_refs: list[str], *, needs_work: bool
+        responsibility_refs: list[str], *, needs_work: bool, language: str = ""
     ) -> dict[str, Any]:
         schema = copy.deepcopy(
             FastPlannerFirstResponseModelOutput.model_json_schema()
@@ -275,16 +520,37 @@ class FastPlannerResolver:
         if isinstance(contract, dict):
             properties = contract.get("properties")
             if isinstance(properties, dict):
-                for field_name in ("evidence_refs", "timing", "truth_stage"):
+                for field_name in (
+                    "evidence_refs",
+                    "timing",
+                    "speech_act",
+                    "truth_stage",
+                ):
                     properties.pop(field_name, None)
-                if needs_work:
-                    properties.pop("speech_act", None)
                 activity_id = properties.get("activity_id")
                 if isinstance(activity_id, dict):
                     activity_id["maxLength"] = 48
+                progress_kind = properties.get("progress_kind")
+                if isinstance(progress_kind, dict) and needs_work:
+                    progress_kind["description"] = (
+                        "Select check_information when the remaining work is a fresh "
+                        "external-information check; acknowledge_work is only a plain "
+                        "acknowledgement of non-check work."
+                    )
                 text_contract = properties.get("text")
                 if isinstance(text_contract, dict):
-                    text_contract["maxLength"] = 80
+                    text_contract["maxLength"] = (
+                        32 if str(language).casefold().startswith("zh") else 72
+                    )
+                    if needs_work:
+                        text_contract["description"] = (
+                            "Exact short speech before any work or Evidence exists. "
+                            "It may acknowledge and prospectively say what Chromie will "
+                            "check/do, but must not answer the request or imply a lookup, "
+                            "action, result, or completion already happened. Keep only "
+                            "the acknowledgement/intention; omit an explanation of what "
+                            "the check will reveal."
+                        )
                 source_refs = properties.get("source_responsibility_refs")
                 if isinstance(source_refs, dict):
                     source_refs["items"] = {
@@ -292,6 +558,42 @@ class FastPlannerResolver:
                         "enum": list(dict.fromkeys(responsibility_refs)),
                     }
                     source_refs["uniqueItems"] = True
+                    if needs_work and len(set(responsibility_refs)) == 1:
+                        properties.pop("source_responsibility_refs", None)
+                if needs_work:
+                    properties.pop("role", None)
+                    properties.pop("activity_id", None)
+                    # Ollama follows schema property order while decoding. Make the
+                    # Planner commit its semantic progress function before it authors
+                    # immutable wording. The bounded phase fixes mechanical role,
+                    # Activity ID, and truth_stage without choosing semantic HOW.
+                    preferred_order = (
+                        "progress_kind",
+                        "source_responsibility_refs",
+                        "text",
+                    )
+                    ordered = {
+                        name: properties[name]
+                        for name in preferred_order
+                        if name in properties
+                    }
+                    ordered.update(
+                        (name, value)
+                        for name, value in properties.items()
+                        if name not in ordered
+                    )
+                    properties.clear()
+                    properties.update(ordered)
+                    required = contract.get("required")
+                    if isinstance(required, list):
+                        required_names = set(required)
+                        if len(set(responsibility_refs)) == 1:
+                            required_names.discard("source_responsibility_refs")
+                        contract["required"] = [
+                            name
+                            for name in preferred_order
+                            if name in required_names
+                        ] + sorted(required_names - set(preferred_order))
         unused_contract = (
             "FastPlannerCompleteResponseAct"
             if needs_work
@@ -346,12 +648,13 @@ class FastPlannerResolver:
             separators=(",", ":"),
         )
         progress_contract = (
-            "Fast Planner first-response contract: author exact natural wording for "
-            "one immediately useful Main Activity. When work remains, acknowledge the "
-            "person and prospectively state what Chromie will do next without claiming "
-            "a result. This is the Main Activity to which optional Social Attention may "
-            "attach; it is not a standalone social gesture. Runtime may realize the "
-            "wording unchanged."
+            "Fast Planner first-response contract: author one immediately useful spoken "
+            "Main Activity and its exact wording. At truth_stage=pre_evidence, no check, "
+            "execution, or fresh Evidence has happened. When work remains, choose the "
+            "communicative progress function first, then write only a present "
+            "acknowledgement or prospective intention; never state or predict the "
+            "requested result or imply completed work. Optional Social Attention "
+            "attaches to this Main Activity."
         )
         rendered = (
             identity_section
@@ -361,15 +664,14 @@ class FastPlannerResolver:
             + " ".join(str(request.text or "").split())[:700]
             + "\nRequired response language: "
             + language
-            + "\nEvery word in activity.text must use that language. For zh or zh-CN, "
-            "write natural Chinese, not English or pinyin. Do not translate named "
-            "entities unless natural Chinese grammar requires no change.\n\n"
+            + "\nUse that language naturally in activity.text; zh/zh-CN requires "
+            "natural Chinese.\n\n"
             + role_contract
-            + " Keep text conversational and brief (normally one short sentence). "
-            "A progress text must state Chromie's prospective check, action, or thinking; "
-            "it must not merely repeat or paraphrase the user's question. "
-            "Use a short unique activity_id and cite only the applicable supplied "
-            "Responsibility refs.\n\nAuthoritative Responsibility evidence:\n"
+            + " Use one brief conversational sentence. Progress states the prospective "
+            "check, action, or thinking instead of repeating the question; omit a second "
+            "clause explaining what the check will reveal. When the response schema "
+            "offers Responsibility refs, cite only the applicable supplied refs.\n\n"
+            "Authoritative Responsibility evidence:\n"
             + json.dumps(
                 [
                     item.model_dump(mode="json", exclude_none=True)
@@ -386,6 +688,12 @@ class FastPlannerResolver:
                 sort_keys=True,
                 separators=(",", ":"),
             )[:700]
+            + (
+                "\n\nFINAL COUNTERFACTUAL CHECK: the exact sentence must remain true if "
+                "no checking has started and no result exists."
+                if needs_work
+                else ""
+            )
         )
         return LayeredPrompt.promote(
             rendered,
@@ -402,6 +710,7 @@ class FastPlannerResolver:
             for item in request.responsibilities
         ]
         committed_communicative_activities: list[Any] = []
+        first_response_decided = False
         raw_first_response = context.get("fast_planner_first_response")
         if isinstance(raw_first_response, dict):
             try:
@@ -410,8 +719,10 @@ class FastPlannerResolver:
                 )
             except ValidationError:
                 first_response = None
-            if first_response is not None and first_response.activity is not None:
-                committed_communicative_activities.append(first_response.activity)
+            if first_response is not None:
+                first_response_decided = True
+                if first_response.activity is not None:
+                    committed_communicative_activities.append(first_response.activity)
 
         responsibility_refs = [item.local_ref for item in responsibilities]
         capabilities = await self.catalog.prompt_entries(scope="common", refresh=False)
@@ -443,7 +754,10 @@ class FastPlannerResolver:
             responsibility_refs,
             responsibilities=responsibilities,
             capabilities=capability_payload,
-            committed_communicative=bool(committed_communicative_activities),
+            # A null first-response result is still a terminal decision for that
+            # bounded speech phase.  Advance must not author a substitute progress
+            # sentence and thereby bypass its one truth qualification.
+            committed_communicative=first_response_decided,
         )
         options = {
             "temperature": 0,
@@ -453,8 +767,19 @@ class FastPlannerResolver:
         }
         previous_errors = ""
         last_raw: Any = None
+        revision_source: Any = None
         for attempt in range(self.max_contract_repairs + 1):
             try:
+                active_response_schema = (
+                    self._advance_revision_response_schema(
+                        response_schema,
+                        revision_source,
+                        committed_communicative=first_response_decided,
+                        capabilities=capability_payload,
+                    )
+                    if attempt
+                    else response_schema
+                )
                 last_raw = await self.ollama.generate(
                     self._advance_layered_prompt(
                         request,
@@ -467,7 +792,7 @@ class FastPlannerResolver:
                     ),
                     system=self._advance_system_prompt(),
                     options=options,
-                    response_format=response_schema,
+                    response_format=active_response_schema,
                     prompt_family=(
                         "fast_planner.advance.revision"
                         if attempt
@@ -481,6 +806,13 @@ class FastPlannerResolver:
                         "Fast Planner advance response is not a JSON object"
                     )
                 output = FastPlannerAdvanceModelOutput.model_validate(last_raw)
+                if first_response_decided and any(
+                    activity.role == "progress" for activity in output.activities
+                ):
+                    raise PlannerDTOContractError(
+                        "Fast Planner advance cannot replace a completed first-response "
+                        "accept/reject decision with another progress Activity"
+                    )
                 combined_output = output.model_copy(
                     update={
                         "activities": [
@@ -519,6 +851,7 @@ class FastPlannerResolver:
                     exc,
                     (PlannerDTOContractError, ValidationError, json.JSONDecodeError),
                 ):
+                    revision_source = last_raw
                     previous_errors = self._validation_error_json(
                         exc,
                         raw=last_raw,
@@ -533,8 +866,129 @@ class FastPlannerResolver:
                     committed_communicative_activities=(
                         committed_communicative_activities
                     ),
+                    allow_progress_salvage=not first_response_decided,
                 )
         raise AssertionError("unreachable")
+
+    @staticmethod
+    def _advance_revision_response_schema(
+        schema: dict[str, Any],
+        initial_raw: Any,
+        *,
+        committed_communicative: bool,
+        capabilities: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Constrain one DTO revision to the model's initial disposition.
+
+        A malformed Activity list must not make the permitted same-stage repair
+        reconsider user meaning. In particular, an initial ``execute`` decision
+        already commits the model to Capability work; when the first Communicative
+        Activity was independently committed, the repaired list can contain only
+        Capability Activities. The model still owns which available Capability and
+        arguments satisfy the Responsibility.
+        """
+
+        if not isinstance(initial_raw, dict):
+            return schema
+        disposition_value = initial_raw.get("disposition")
+        allowed_contracts_by_disposition = {
+            "execute": ["FastPlannerCapabilityActivity"],
+            "respond": ["FastPlannerCompleteResponseAct"],
+            "clarify": ["FastPlannerClarificationAct"],
+        }
+        allowed_contracts = allowed_contracts_by_disposition.get(disposition_value)
+        if allowed_contracts is None:
+            return schema
+        if disposition_value == "execute" and not committed_communicative:
+            allowed_contracts.append("FastPlannerProgressAct")
+
+        narrowed = copy.deepcopy(schema)
+        properties = narrowed.get("properties", {})
+        disposition = properties.get("disposition")
+        if isinstance(disposition, dict):
+            disposition["enum"] = [disposition_value]
+            disposition["description"] = (
+                "Mechanical DTO revision: preserve the initial model-authored "
+                "disposition exactly."
+            )
+        activities = properties.get("activities")
+        activity_items = activities.get("items") if isinstance(activities, dict) else None
+        if not isinstance(activity_items, dict):
+            return narrowed
+        activity_items["oneOf"] = [
+            {"$ref": f"#/$defs/{contract_name}"}
+            for contract_name in allowed_contracts
+        ]
+        discriminator = activity_items.get("discriminator")
+        if isinstance(discriminator, dict):
+            mapping = discriminator.get("mapping")
+            if isinstance(mapping, dict):
+                discriminator["mapping"] = {
+                    role: ref
+                    for role, ref in mapping.items()
+                    if ref.rsplit("/", 1)[-1] in allowed_contracts
+                }
+        if isinstance(activities, dict):
+            activities["minItems"] = 1
+        if disposition_value == "execute":
+            definitions = narrowed.get("$defs", {})
+            capability_contract = definitions.get("FastPlannerCapabilityActivity")
+            capability_properties = (
+                capability_contract.get("properties")
+                if isinstance(capability_contract, dict)
+                else None
+            )
+            capability_required = (
+                list(capability_contract.get("required", []))
+                if isinstance(capability_contract, dict)
+                else []
+            )
+            if "args" not in capability_required:
+                capability_required.append("args")
+            branches: list[dict[str, Any]] = []
+            if isinstance(capability_properties, dict):
+                for capability in capabilities:
+                    capability_id = str(capability.get("capability_id") or "")
+                    input_schema = capability.get("input_schema")
+                    if not capability_id or not isinstance(input_schema, dict):
+                        continue
+                    branch_properties = copy.deepcopy(capability_properties)
+                    branch_properties["capability_id"] = {
+                        "type": "string",
+                        "enum": [capability_id],
+                    }
+                    explicit_input_schema = copy.deepcopy(input_schema)
+                    explicit_required = list(
+                        explicit_input_schema.get("required", [])
+                    )
+                    input_properties = explicit_input_schema.get("properties")
+                    if isinstance(input_properties, dict):
+                        for parameter_name, parameter_schema in input_properties.items():
+                            if (
+                                isinstance(parameter_schema, dict)
+                                and "default" in parameter_schema
+                                and parameter_name not in explicit_required
+                            ):
+                                # A mechanical revision materializes schema defaults
+                                # explicitly. This keeps the model-selected scope in
+                                # the DTO instead of making downstream Runtime guess
+                                # whether an omitted optional temporal/behavior field
+                                # was intentional.
+                                explicit_required.append(parameter_name)
+                    if explicit_required:
+                        explicit_input_schema["required"] = explicit_required
+                    branch_properties["args"] = explicit_input_schema
+                    branches.append(
+                        {
+                            "type": "object",
+                            "properties": branch_properties,
+                            "required": capability_required,
+                            "additionalProperties": False,
+                        }
+                    )
+            if isinstance(capability_contract, dict) and branches:
+                capability_contract["oneOf"] = branches
+        return narrowed
 
     @staticmethod
     def _advance_response_schema(
@@ -657,6 +1111,28 @@ class FastPlannerResolver:
             covered["maxItems"] = len(refs)
             covered["uniqueItems"] = True
         definitions = schema.get("$defs", {})
+        information_gap_contract = definitions.get("PlannerInformationGap")
+        if isinstance(information_gap_contract, dict):
+            gap_properties = information_gap_contract.get("properties")
+            if isinstance(gap_properties, dict):
+                # PlannerInformationGap appears only inside a clarification Act in
+                # this decoder contract.  Encode the Act invariant directly so the
+                # model's one mechanical revision receives the deeper input-schema
+                # error instead of failing first on a duplicate Pydantic invariant.
+                gap_properties["preferred_resolution"] = {
+                    "const": "ask_user",
+                    "type": "string",
+                }
+                gap_properties["blocking"] = {
+                    "const": True,
+                    "default": True,
+                    "type": "boolean",
+                }
+                gap_properties["resolved"] = {
+                    "const": False,
+                    "default": False,
+                    "type": "boolean",
+                }
         if all_need_fresh_evidence:
             activities = top_properties.get("activities")
             activity_items = (
@@ -889,6 +1365,7 @@ class FastPlannerResolver:
         error: Exception,
         raw_output: Any,
         committed_communicative_activities: list[Any] | None = None,
+        allow_progress_salvage: bool = True,
     ) -> FastPlannerAdvance:
         inference_failure = isinstance(error, OllamaGenerationError)
         failure = (
@@ -910,9 +1387,13 @@ class FastPlannerResolver:
             failure["failure_class"],
             cognition_text_reference(raw_output),
         )
-        progress_activities = FastPlannerResolver._validated_fail_safe_progress(
-            raw_output,
-            responsibility_refs=responsibility_refs,
+        progress_activities = (
+            FastPlannerResolver._validated_fail_safe_progress(
+                raw_output,
+                responsibility_refs=responsibility_refs,
+            )
+            if allow_progress_salvage
+            else []
         )
         retained_communicative_activities = list(
             committed_communicative_activities or []
@@ -951,6 +1432,9 @@ class FastPlannerResolver:
                 "salvaged_progress_activity_ids": [
                     item.activity_id for item in retained_communicative_activities
                 ],
+                "progress_salvage_suppressed_by_first_response_decision": (
+                    not allow_progress_salvage
+                ),
                 **failure,
             },
         )
@@ -1038,25 +1522,11 @@ class FastPlannerResolver:
         response_only, requires_execution = planner_goal_execution_requirements(
             authoritative_goals
         )
-        reentry = context.get("result_evidence_reentry")
-        trusted_terminal_evidence = context.get("trusted_terminal_evidence")
-        if isinstance(reentry, dict) and isinstance(trusted_terminal_evidence, list):
-            reentry_goal_ids = {
-                " ".join(str(item or "").strip().split())
-                for item in reentry.get("source_goal_ids") or []
-                if " ".join(str(item or "").strip().split())
-            }
-            validated_evidence = [
-                ToolResultEvidence.model_validate(item)
-                for item in trusted_terminal_evidence
-            ]
-            if (
-                validated_evidence
-                and reentry_goal_ids == set(expected_goal_ids_for_turn)
-            ):
-                response_only = True
-                requires_execution = False
-                response_goal_ids = list(expected_goal_ids_for_turn)
+        reentry_goal_ids = result_evidence_reentry_goal_ids(context)
+        if reentry_goal_ids == set(expected_goal_ids_for_turn):
+            response_only = True
+            requires_execution = False
+            response_goal_ids = list(expected_goal_ids_for_turn)
         capabilities = await self.catalog.prompt_entries(scope="common", refresh=False)
         executable = [
             item
@@ -1117,6 +1587,29 @@ class FastPlannerResolver:
             response_schema,
             authoritative_goals=authoritative_goals,
         )
+        if reentry_goal_ids:
+            evidence_wording_description = (
+                "Exact natural answer grounded only in trusted terminal Evidence for "
+                "the requested Goal scope. Preserve epistemic strength: a probability "
+                "below 100% remains a possibility/probability, never certainty. Do not "
+                "add unsupported duration, severity, reassurance, advice, or measurements "
+                "from another current/day/period scope."
+            )
+            top_response = response_schema.get("properties", {}).get(
+                "response_text"
+            )
+            if isinstance(top_response, dict):
+                top_response["description"] = evidence_wording_description
+                top_response["maxLength"] = 240
+            for definition in response_schema.get("$defs", {}).values():
+                if not isinstance(definition, dict):
+                    continue
+                outcome_response = definition.get("properties", {}).get(
+                    "response_text"
+                )
+                if isinstance(outcome_response, dict):
+                    outcome_response["description"] = evidence_wording_description
+                    outcome_response["maxLength"] = 240
         options = {
             "temperature": 0,
             "top_p": 0.9,
@@ -1393,6 +1886,59 @@ class FastPlannerResolver:
                 request=request,
                 expected_goal_ids_for_turn=expected_goal_ids_for_turn,
             )
+            if (
+                reentry_goal_ids
+                and validated.disposition == "respond"
+                and validated.response_text
+            ):
+                try:
+                    evidence_truth = await self._qualify_evidence_response_truth(
+                        request,
+                        plan=validated,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "fast_planner_evidence_response_truth_unavailable "
+                        "sid=%s error_type=%s error=%s",
+                        request.sid,
+                        type(exc).__name__,
+                        exc,
+                    )
+                    return self._escalation(
+                        plan_id,
+                        request,
+                        "fast_planner_evidence_response_truth_unavailable",
+                        error=exc,
+                        unresolved=[
+                            "Post-Evidence wording could not be truth-qualified."
+                        ],
+                        path_classification="semantic_escalation",
+                    )
+                qualification = evidence_truth.model_dump(
+                    mode="json", exclude_none=True
+                )
+                if evidence_truth.decision != "accept":
+                    logger.warning(
+                        "fast_planner_evidence_response_truth_rejected sid=%s",
+                        request.sid,
+                    )
+                    return self._escalation(
+                        plan_id,
+                        request,
+                        "fast_planner_evidence_response_truth_rejected",
+                        unresolved=[
+                            "Post-Evidence wording must preserve probability below "
+                            "100% as uncertainty rather than certainty."
+                        ],
+                        path_classification="semantic_escalation",
+                        metadata={
+                            "evidence_response_truth_qualification": qualification,
+                            "execution_allowed": False,
+                        },
+                    )
+                metadata = dict(validated.metadata)
+                metadata["evidence_response_truth_qualification"] = qualification
+                validated = validated.model_copy(update={"metadata": metadata})
             coordinated_goal_ids = coordinated_action_goal_ids(
                 canonical_goal_grounding(request.context)
             )
@@ -1647,7 +2193,11 @@ class FastPlannerResolver:
         result_evidence_contract = (
             "Host-bound terminal Evidence completes the provider-read prerequisite for "
             "the exact canonical Goals. Answer from trusted_terminal_evidence only, "
-            "preserve its values and scope, and return a respond Plan with zero steps. "
+            "preserve its values, scope, and epistemic strength, and return a respond "
+            "Plan with zero steps. An observation, forecast, estimate, and probability "
+            "are different claims. A probability below 100% must remain uncertain in "
+            "the answer and must not become an unqualified claim that the event will "
+            "occur. "
             if isinstance(context.get("result_evidence_reentry"), dict)
             else ""
         )
@@ -1769,7 +2319,8 @@ class FastPlannerResolver:
             f"FINAL ALLOWED EXECUTABLE CAPABILITY IDS JSON:\n{self._bounded([item['capability_id'] for item in capabilities], 2500)}\n\n"
             "FINAL AUTHORITATIVE CONTRACT REPAIR ERRORS JSON:\n"
             f"{validation_errors or '[]'}\n"
-            "When this list is non-empty, correct every listed defect in the fresh object. If an error reports an expected aggregate disposition, author exactly that disposition unless you also revise the underlying per-goal outcomes consistently."
+            "When this list is non-empty, correct every listed defect in the fresh object. If an error reports an expected aggregate disposition, author exactly that disposition unless you also revise the underlying per-goal outcomes consistently.\n"
+            f"FINAL RESULT-EVIDENCE WORDING CONTRACT:\n{result_evidence_contract or 'not_applicable'}"
         )
 
     def _advance_layered_prompt(
@@ -2208,6 +2759,10 @@ class FastPlannerResolver:
         _, requires_execution = planner_goal_execution_requirements(
             canonical_goal_grounding(request.context)
         )
+        if result_evidence_reentry_goal_ids(request.context) == set(
+            expected_goal_ids_for_turn
+        ):
+            requires_execution = False
         if (
             requires_execution
             and plan.disposition not in {"escalate", "clarify", "unavailable", "refused"}

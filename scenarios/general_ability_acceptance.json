@@ -419,7 +419,33 @@
           "rationale": "Mixed terminal evidence remains explicit in final speech."
         }
       ],
-      "live_text_cases": []
+      "live_text_cases": [
+        {
+          "id": "chongqing_tonight_weather_truth_gate_and_lookup",
+          "text": "今晚重庆会不会下雨哦？",
+          "language": "zh-CN",
+          "expected_capabilities": [
+            "chromie.weather.lookup"
+          ],
+          "expected_args": [
+            "0:location=重庆",
+            "0:date=today",
+            "0:period=night"
+          ],
+          "require_speech": true,
+          "require_fast_speech": true,
+          "expected_fast_speech_purposes": [
+            "acknowledge_and_check"
+          ],
+          "require_social_attention_opportunity": true,
+          "max_warm_fast_response_commit_ms": 2000,
+          "max_warm_first_playback_start_ms": 3000,
+          "expect_no_fast_contract_failure": true,
+          "min_new_goal_count": 1,
+          "min_goal_outcome_count": 1,
+          "description": "The originating Chongqing-tonight episode must either commit a truth-qualified prospective first response or remain silent, normalize tonight to date=today plus period=night, and schedule the trusted lookup without asking the user for the weather result."
+        }
+      ]
     },
     {
       "id": "tool_and_conversation_lane_discipline",
@@ -588,7 +614,7 @@
       "root_cause_boundaries": [
         "Goal Association",
         "Planner contract",
-        "Response Composer",
+        "Fast Planner communication",
         "Trusted runtime adapter",
         "Trusted Capability Runtime/provider",
         "Test evidence"
