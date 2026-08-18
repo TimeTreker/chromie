@@ -78,7 +78,26 @@ evidence-grounded report with all of the following:
    failing test, or deterministic code path that demonstrates the defect.
 3. **Expected contract and owner.** Name the contract that was violated and the
    component responsible for enforcing it.
-4. **Root cause at the earliest responsible boundary.** Explain the causal chain
+4. **Actual workflow and module I/O.** Reconstruct the case from admitted input
+   to the observed user-visible or system output. Include the actual synchronous,
+   concurrent, and asynchronous branches rather than presenting a false linear
+   pipeline. For every participating module through the first wrong boundary and
+   the downstream containment or symptom, record its authority/role, authoritative
+   input DTO or contract and material values/evidence, actual output DTO or effect,
+   expected output, correlation/handoff, and a `correct`, `incorrect`, or `unproven`
+   verdict. A compact report table should normally use this shape:
+
+   | Order/branch | Module and owner | Authoritative input | Actual output | Expected contract/output | Verdict and evidence |
+   |---|---|---|---|---|---|
+
+   Add a flow or sequence diagram when fan-out, concurrency, delayed results, or
+   Evidence re-entry matters. This must describe the reproduced episode, not just
+   paste the generic architecture. Mark unavailable artifacts or values as unknown
+   rather than inferring them; identify a materially absent/not-invoked stage; and
+   redact private prompt, memory, credential, and personal data. After the change,
+   state exactly which module input, output, validation, or handoff changed and why
+   the other ownership boundaries remain unchanged.
+5. **Root cause at the earliest responsible boundary.** Explain the causal chain
    from the initiating trigger to the first incorrect decision or state
    transition. Distinguish the root cause from downstream symptoms, unrelated
    failures, and contributing conditions. Use the benchmark attribution
@@ -89,15 +108,15 @@ evidence-grounded report with all of the following:
    `not_supported`, or `unresolved`. A wrong model response is an initiating or
    contributing failure, not sufficient proof of an LLM root cause, when an
    owned validation, fallback, or workflow boundary was required to contain it.
-5. **Fix mechanism.** Explain why the chosen change restores the violated
+6. **Fix mechanism.** Explain why the chosen change restores the violated
    contract, why it belongs at that boundary, and which behavior intentionally
    remains unchanged. Listing changed files or describing the diff is not a
    substitute for this explanation.
-6. **Regression and evidence.** Show the pre-fix failure where practical, the
+7. **Regression and evidence.** Show the pre-fix failure where practical, the
    focused post-fix regression, the broader gates run, and the highest evidence
    level actually reached. State any simulator, service, audio, or physical
    evidence still missing.
-7. **Operational impact.** Report safety, compatibility, rollout, rollback,
+8. **Operational impact.** Report safety, compatibility, rollout, rollback,
    configuration, and documentation consequences when applicable.
 
 A plausible story is not a root-cause finding. Each material claim must be tied
@@ -125,12 +144,19 @@ last spoken sentence.
    ./scripts/collect_debug_bundle.sh
    ```
 
-3. Reconstruct one chronological turn from the workflow artifacts: input and
-   Gateway admission, Goal Interpretation, Goal Association, Agent Skill
-   selection, planning, provider or tool work, result interpretation, Response
-   Composition and Review, then delivered speech or effect. Join records by
-   `session_id`, `turn_id`, `trace_id`, and `call_id`; do not attach an unrelated
-   startup warm-up or adjacent turn merely because it uses the same model.
+3. Reconstruct the actual turn from the workflow artifacts: admitted input and
+   Gateway decision; Goal Interpretation; the same-result Fast-Planner first
+   Communicative Activity and concurrent Goal Association/remaining Fast planning;
+   optional Deep planning when actually invoked; deterministic Goal binding;
+   Trusted Capability Runtime and provider work; Host-bound Evidence re-entry into
+   Fast Planner; and delivered speech or effect. Include optional Agent Skill and
+   Social Attention branches only when present or materially absent. Record every
+   participating module's authoritative input, actual output, expected output,
+   correlation/handoff, and evidence verdict using the report table above. Show
+   fan-out and asynchronous re-entry explicitly rather than forcing them into a
+   chronological pipeline. Join records by `session_id`, `turn_id`, `trace_id`, and
+   `call_id`; do not attach an unrelated startup warm-up or adjacent turn merely
+   because it uses the same model, and do not invent a deprecated or skipped stage.
 4. For every model call up to the first bad result, inspect the corresponding
    `llm_calls.jsonl` record and answer all of these questions:
 
@@ -210,6 +236,8 @@ verified, target validated, and release ready.
 A useful pull request description includes:
 
 - the observed failure, violated contract, and ownership boundary;
+- the actual workflow and per-module authoritative input/output up to the first
+  wrong boundary and its downstream symptom or containment;
 - the evidence-backed root cause at the earliest responsible boundary;
 - the fix mechanism and why it restores the contract;
 - safety impact;

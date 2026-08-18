@@ -411,7 +411,14 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    that expected model failure, the earliest missing or incorrect containment
    boundary owns the root cause. Conversely, call it a code defect only when the
    implementation violates an otherwise correct owned contract or workflow. A
-   patch without this explanation and regression evidence is incomplete.
+   patch without this explanation and regression evidence is incomplete. The
+   defect report must also reconstruct the actual case workflow and each
+   participating module's authoritative input, actual and expected output,
+   correlation/handoff, and evidence verdict as specified by `CONTRIBUTING.md`.
+   Concurrency and asynchronous Evidence re-entry must remain visible; missing
+   artifacts are reported as unknown rather than filled with inference. This
+   workflow/I/O account is required so the project owner can independently audit
+   both the root-cause boundary and whether the fix preserves module authority.
 5. **Risky behavior fails closed.** Disabled, unavailable, malformed, expired,
    or unconfirmed work does not execute.
 6. **Operational controls stay deterministic.** Stop, cancel, emergency,

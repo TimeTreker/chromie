@@ -59,6 +59,21 @@ semantics become clearer.
   change restores the contract. Distinguish the initiating trigger, root cause,
   downstream symptoms, contributing conditions, and remaining evidence gaps.
   Report the focused regression and broader validation that support the claim.
+- For every defect diagnosis or fix, reconstruct the actual case workflow before
+  claiming the root cause or correctness of the fix. Show the ordered and, where
+  applicable, concurrent/asynchronous path from admitted input to user-visible or
+  system output. For each participating module through the first wrong boundary
+  and its downstream containment or symptom, report: the module's owner/role; its
+  authoritative input contract and material input values/evidence; its output
+  contract and actual output; the expected output; the correlation or handoff to
+  the next module; and whether that boundary was correct, incorrect, or unproven.
+  Use a compact table and a flow/sequence diagram when they make concurrency or
+  re-entry clearer. Describe the actual episode, not only the generic architecture;
+  mark unavailable evidence as unknown instead of guessing, redact private payloads,
+  and identify modules that were not invoked when their absence is material. The
+  final handoff must also explain how the fix changes this workflow or module I/O so
+  the project owner can independently check that it repairs the earliest responsible
+  boundary without shifting authority.
 - Do not submit symptom-only interaction fixes. Before changing behavior for a
   user-reported robot problem, write or report the observed turn, the expected
   contract, the evidence or trace used, the earliest component that went wrong,
