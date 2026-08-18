@@ -98,9 +98,9 @@ Social Attention obeys all of the following:
    and Activity. Accepted Social Attention body requests execute through
    Activity.
 3. **Single semantic owner.** `SocialAttentionPlanner` alone authors the
-   optional `SocialAttentionPlan`. Response Composer, Goal/Planner stages, and the
-   Host may supply context or validate/materialize it but may not author a second
-   decoration decision.
+   optional `SocialAttentionPlan`. Goal/Planner stages and the Host may supply
+   context or validate/materialize it but may not author a second decoration
+   decision.
 4. **Not a speech owner.** It never authors, rewrites, paraphrases, or changes
    the semantic content of ResponsePlan/Vocal output.
 5. **Primary-Activity anchored.** A decoration must accompany one concrete

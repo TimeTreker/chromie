@@ -120,10 +120,12 @@ flowchart TD
     GW --> CTX["Bounded Session Context<br/>dialogue, active Goals, Activities,<br/>pending clarification, Evidence"]
     CTX --> GI["Goal Interpretation (GI)<br/>Responsibility + Goal relation + unresolved meaning"]
 
-    GI -->|"same GI result, concurrent fan-out"| FP["Fast Planner<br/>first Activity Plan + input resolution"]
-    GI -->|"same GI result, concurrent fan-out"| GA["Goal Association (GA)<br/>sole Canonical Goal commit authority"]
+    GI --> FFR["Fast Planner<br/>first Communicative Activity"]
+    FFR -->|"after first commitment, concurrent fan-out"| FP["same Fast Planner<br/>remaining Activity Plan + input resolution"]
+    FFR -->|"after first commitment, concurrent fan-out"| GA["Goal Association (GA)<br/>sole Canonical Goal commit authority"]
 
-    FP --> COMM["Communicative Acts<br/>acknowledge / ask / answer / explain / refuse / silence"]
+    FFR --> COMM["Immediate Communicative Activity<br/>exact text + truth provenance<br/>or explicit silence"]
+    FP --> COMM["Later communicative deltas"]
     FP --> SAFE["ready safe/read-only<br/>Capability Activities"]
     FP -->|"complex HOW only"| DP["Deep Planner"]
     FP -->|"only user-resolvable blocker"| ASK["Clarification Activity"]
@@ -135,15 +137,16 @@ flowchart TD
     DP -->|"new Plan revision"| TCR
     GA -->|"cancel/replace pending or cancellable Work"| TCR
 
-    COMM --> WORDS["Vocal Realization<br/>language formulation / wording"]
-    WORDS --> ARB["Resource-aware scheduling"]
+    COMM --> ARB["Host validation + resource-aware scheduling"]
     ASK --> ARB
     TCR --> ARB
     ARB --> PAR["Parallel when declared resources allow;<br/>sequential when dependency/resource requires"]
     PAR --> PROVIDERS["Vocal / tool / Soridormi Providers"]
     PROVIDERS --> EVIDENCE["Trusted Evidence"]
-    EVIDENCE --> CTX
-    EVIDENCE --> RECON["Per-Goal reconciliation / Response / Reflection"]
+    EVIDENCE --> ATTACH["Host validates and binds<br/>request → Activity → exact Goal(s)"]
+    ATTACH --> CTX
+    ATTACH -->|"bounded Goal/Evidence snapshot"| FP
+    ATTACH --> RECON["Per-Goal reconciliation / Reflection"]
 ```
 
 This expanded diagram is the stable architecture invariant. It describes
@@ -171,9 +174,15 @@ Read the diagram with these boundaries:
   selection, executable arguments, provider requests, or authorization.
   `completion_requires_work` says only that work remains; it is not a description
   of that Work.
-- The same GI result enters Fast Planner and Goal Association concurrently. Fast
-  Planner is the first **HOW / Work-advancement authority** and authors an actual
-  Activity Plan, not a progress sentence standing in for a Plan. Planner owns
+- The same GI result first enters Fast Planner's bounded first-response phase. That
+  phase may commit one immediately realizable Communicative Activity, but it cannot
+  select a Capability, resolve an execution input, or ask a planning clarification.
+  As soon as that commitment exists, the same Fast Planner continues the remaining
+  Activity Plan while Goal Association independently begins from the unchanged GI
+  result. The two continuations run concurrently. This is one Planner with phased
+  readiness, not a Response Composer followed by a Planner, and the progress sentence
+  does not stand in for the still-required Plan. Fast Planner is the first **HOW /
+  Work-advancement authority**. Planner owns
   execution-input completeness and source strategy against the immutable
   Responsibility, applicable Plan/Agent-Skill/Capability schemas, safety policy, and
   trusted context. It may use an explicit/contextual binding, trusted observation or
@@ -181,10 +190,11 @@ Read the diagram with these boundaries:
   clarification Activity. It asks only when a user-resolvable answer materially
   changes the next action and no safer authoritative source or permitted default is
   sufficient. When speech is useful, Planner selects a **Communicative Act**: a
-  semantic Primary Activity describing its function, timing, Responsibility/Goal
-  provenance, and truth or silence constraints, but containing no sentence wording.
-  Communicative Acts and Capability Activities share the same parallel/sequential
-  semantics. Only genuinely complex HOW goes to Deep Planner.
+  semantic Primary Activity containing its exact words together with function,
+  timing, Responsibility/Goal provenance, truth stage, and Evidence references
+  when facts depend on observed reality. Communicative Acts and Capability
+  Activities share the same parallel/sequential semantics. Only genuinely complex
+  HOW goes to Deep Planner.
 - Planner input resolution is not a second Goal Interpretation. Capability schemas
   constrain realization; they cannot redefine, widen, narrow, or invent what the
   person meant. A default is an explicit execution choice with source and consequence
@@ -223,17 +233,22 @@ Read the diagram with these boundaries:
 - `realization` describes **how** that Activity is carried out. Vocal Expression
   modes such as speaking, singing, humming, or recitation and Activity-lane
   Capability work belong here; they are not sibling Primary-Activity kinds.
-- Vocal Realization owns language formulation for a Planner-selected Communicative
-  Act. A closed progress act may use a deterministic bounded realization; open
-  answers and clarification questions use the existing Response Composer wording
-  owner. Neither path may add, remove, merge, suppress, or reinterpret the act.
-  TTS and playback own physical speech realization and delivery Evidence.
+- Planner owns both the semantic function and exact natural wording of a
+  Communicative Activity. The Host may only validate its typed provenance,
+  evidence/truth stage, safety, delivery lifecycle, and resource contract; it
+  must not rewrite ordinary meaning. TTS and playback own acoustic realization
+  and delivery Evidence, not wording or semantic response policy.
 - optional Social Attention is a subordinate, fail-soft sibling of primary
   realization around the same semantic Activity. It is not a Goal, Planner,
   execution lane, completion authority, or downstream stage after Vocal.
-- Providers own execution inside advertised contracts, Evidence owns reality,
-  Response expresses established meaning/truth, and Reflection improves future
-  cognition.
+- Providers own execution inside advertised contracts and Evidence owns reality.
+  On terminal Capability Evidence, the Host validates request/Plan/schema
+  provenance, binds it through the immutable request identity to the exact Goal(s),
+  updates Goal/task state, and reactivates Fast Planner with a bounded,
+  version-consistent Goal/Evidence snapshot. Planner then chooses the next Main
+  Activity—answer, follow-up Work, clarification, or silence. The Host and result
+  transport never infer Goal ownership from result contents and never author the
+  user-facing interpretation. Reflection improves future cognition.
 
 The shorter ownership chain
 `GI result → {Fast Planner || GA} → Goal-bound Activity Plan → Trusted Capability Runtime → Evidence`
@@ -488,9 +503,13 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    semantic inference, measure and attribute that model failure instead of
    automatically hiding it behind another example-specific instruction.
 
-23. **Goal Progress Communication is semantic courtesy, not a latency feature.**
+23. **Goal Progress Communication is semantic courtesy with a measured latency
+   obligation.**
    Once Goal Interpretation has emitted sufficient Responsibility evidence, Fast
-   Planner owns the first possible user-facing HOW advancement. Whenever cognition
+   Planner first runs a bounded communicative phase and owns the first possible
+   user-facing HOW advancement. It then continues Capability/input/clarification
+   planning from the same Responsibility evidence; no second wording owner is created.
+   Whenever cognition
    has a new trustworthy, user-relevant semantic delta, the current speech-capable
    owner may communicate it; when an equivalent act is already delivered or pending,
    it stays silent. This is Chromie's polite-response obligation, not a requirement
@@ -498,8 +517,16 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    satisfy the turn. If downstream work, fresh Evidence, retained continuity, or
    effects remain, that act is prospective progress only and Fast Planner requests
    Goal Association. Later owners communicate only genuinely new limitation, wait,
-   failure, correction, result, or completion meaning. Speed is desirable but is not
-   the semantic contract, and Goal Interpretation never regains a speech side channel.
+   failure, correction, result, or completion meaning. The first valid
+   Communicative Activity must also be produced and offered to Vocal delivery
+   within the qualified fast-response budget; a correct acknowledgement after a
+   long unexplained silence does not satisfy the interaction contract. Measurement
+   distinguishes Planner commitment, TTS first PCM, and playback start and never
+   bypasses validation to improve them. The current qualified warm targets owned by
+   the Human-Like Interaction Contract are at most 2.0 seconds to the first valid
+   Fast-Planner Communicative Activity commitment and at most 3.0 seconds to
+   playback start; cold model load and each downstream transport slice are reported
+   separately. Goal Interpretation never regains a speech side channel.
 24. **Publish dialogue early; publish semantic state only after validation.**
    Goal Interpretation and Goal Association require a bounded view of the recent
    accepted conversation together with active/recent Goals, task/progress state,
@@ -522,10 +549,13 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    Chromie does not wait for every cognitive stage to finish before every useful
    part of an interaction may advance, but local readiness never grants an upstream
    stage authority that belongs downstream. Goal Interpretation emits one contextual
-   Responsibility result to Fast Planner and GA concurrently. Fast Planner may
-   immediately author a complete Activity Plan containing speaking and Capability
-   Activities. Safe, side-effect-free, schema-valid read Activities may start while
-   GA establishes canonical Goal identity; Runtime initially indexes them by GI
+   Responsibility result. Fast Planner first commits any immediately useful
+   Communicative Activity; immediately afterward its remaining Activity planning and
+   GA consume that same immutable result concurrently. Fast Planner may then complete
+   the Activity Plan containing Capability and any still-needed clarification
+   Activities without re-authoring committed speech. Safe, side-effect-free,
+   schema-valid read Activities may start while GA establishes canonical Goal
+   identity; Runtime initially indexes them by GI
    Responsibility and then reindexes the same task identity into each applicable
    Goal's task-list view. Effectful work still waits for canonical Goal binding and
    retains confirmation, authorization, resource, and safety barriers. If GA or Deep
@@ -716,19 +746,19 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    but it must not convert Capability selection or response wording into Goal-
    Interpretation authority.
 
-35. **Response is expression, not a second semantic mind.** Once authoritative
-   responsibility, plan/evidence state, and a permitted Communicative Act are known,
-   Response composition chooses natural wording for the still-needed user-facing
-   delta. It may be mechanically validated and must be rejected if it claims
-   unsupported reality, but it may not reinterpret Goals, reopen planning, or gain
-   effect authority. **Planner owns the Communicative Act; Vocal Realization owns
-   its sentence wording.** Goal Interpretation owns neither. A Planner act contains
-   function, semantic/evidence inputs, timing, provenance, and constraints—not a
-   sentence. Response Composer/language formulation realizes the immutable act;
-   closed bounded acts may be realized deterministically. Tool Result Interpretation
-   supplies evidence-bound propositions and references but does not gain Planner
-   authority. Later stages may bind/reuse the same act or plan a genuinely different
-   act; they may not silently paraphrase one milestone into a second act.
+35. **Response is a Planner-owned Main Activity, not a second semantic mind.**
+   Once authoritative Responsibility and bounded Goal/evidence state are available,
+   Fast or Deep Planner chooses the still-needed user-facing delta and authors one
+   typed Communicative Activity containing both its semantic function and exact
+   natural wording. Goal Interpretation owns neither. The Activity also carries
+   timing, Goal/Responsibility provenance, a truth stage, and exact Evidence
+   references for facts that depend on observed reality. There is no independent
+   Response Composer or result-wording semantic owner between Planner and Runtime.
+   The Host validates these fields mechanically and rejects unsupported reality,
+   stale Goal binding, duplicate delivery, or unsafe commitment; it cannot author
+   replacement wording or reopen ordinary meaning. TTS realizes accepted text as
+   audio. Later planning may reuse the same act or plan a genuinely different act;
+   it may not silently paraphrase one milestone into a second act.
    Response-stage Goal coverage is not model-authored semantic truth:
    `covers_goal_ids` is mechanically projected from the immutable Plan/outcomes and
    exact reused-speech provenance after wording is accepted. A consequential response
@@ -747,7 +777,7 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    cost where being wrong matters; do not turn perfectionism into architecture.
 
 37. **Social Attention has one semantic writer.** `SocialAttentionPlanner` alone
-   decides optional decoration for one concrete semantic primary observable Activity. Response Composer never authors
+   decides optional decoration for one concrete semantic primary observable Activity. Planner never authors
    a `SocialAttentionPlan`; Goal/Planner stages do not decide it; the Host only
    supplies bounded context and validates/materializes accepted decoration. A valid
    `none` stands. Malformed, unavailable, conflicting, or unsafe decoration disappears
@@ -757,13 +787,17 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    distinct primary Activity in the same turn. Model-facing candidates exclude
    provider/backend/calibration identity so the social decision remains embodiment-independent.
 
-38. **Tool-result meaning has one writer and immutable truth proof.** Trusted tool/provider
-   evidence is authoritative reality, while Tool Result Interpreter owns one natural
-   evidence-bound wording pass. Only a mechanically invalid DTO may be retransmitted
-   once without reconsidering meaning. Evidence/scope/capability overclaim is terminal
-   for that interpretation. Consequential result wording may receive one immutable
-   accept/reject truth certificate, but the certificate cannot rewrite speech, selected
-   facts, Goals, Plans, or evidence and cannot enter a repair workflow.
+38. **Capability-result meaning returns to Planner through immutable Evidence.**
+   Trusted Capability Runtime emits a typed terminal event; the Host validates its
+   schema, request, Plan, and provider provenance, creates immutable Evidence, and
+   deterministically attaches it to the exact Goal(s) through the original request
+   identity. The result then reactivates Fast Planner with a bounded Goal/Evidence
+   snapshot. Planner alone decides whether the human-relevant next Main Activity is
+   an answer, follow-up Work, clarification, or silence; complex HOW may use the
+   existing Deep escalation. Neither Host nor a separate Tool Result Interpreter may
+   infer Goal ownership from result contents or author result meaning. A mechanical
+   DTO regeneration may occur once without reconsidering meaning; consequential
+   evidence/provenance failure remains fail-closed.
 
 39. **Reflection learns forward; it does not rewrite history.** Trusted observations,
    delivered speech, commitments, execution attempts, and outcomes remain historical

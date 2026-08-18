@@ -38,12 +38,9 @@ Important endpoints include:
 - Goal Interpretation / cognitive-core endpoints
 - `POST /goal-association`
 - `POST /fast-advance`
-- `POST /communicative-acts/realize`
 - `POST /fast-plan`
 - `POST /deep-plan`
 - `POST /social-attention/plan`
-- `POST /compose-response-plan`
-- tool-result interpretation endpoints
 - Agent Skill selection/disclosure endpoints
 - TaskGraph validate/dry-run/guarded execution/trace diagnostics
 
@@ -84,6 +81,6 @@ For project architecture and current status, see:
 
 Additional owned mechanical contracts:
 
-- [Tool Result Interpretation](../docs/TOOL_RESULT_INTERPRETATION.md)
+- [Capability Result Evidence Re-entry](../docs/CAPABILITY_RESULT_EVIDENCE_REENTRY.md)
 - [TaskGraph mechanics](../docs/agent_task_graph.md)
 - [TaskGraph concurrency decision](../docs/task_graph_concurrency_decision.md)

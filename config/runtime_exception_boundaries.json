@@ -208,20 +208,6 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "a0b8d6d69f45f8cccc4afaa8cb9aff391e29ebd19b5d167c774f8db3d1ec7727",
-      "failure_signals": [
-        "diagnostic",
-        "return"
-      ]
-    },
-    {
-      "path": "agent/app/fast_planner.py",
-      "symbol": "FastPlannerResolver._resolve",
-      "ordinal": 3,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
       "body_sha256": "527edf05070aa63ad983fcbe760d93779ce64e464abf0734473c1a3c1b6f1641",
       "failure_signals": [
         "diagnostic",
@@ -243,13 +229,28 @@
     },
     {
       "path": "agent/app/fast_planner.py",
+      "symbol": "FastPlannerResolver.resolve_first_response",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "agent.fast_planner",
+      "contract": "Map first-response inference or DTO failure to an explicit no-Activity FastPlannerFirstResponse without inventing speech or blocking remaining cognition.",
+      "review_status": "reviewed",
+      "body_sha256": "2a075f8bb26aea813252cad1f3014f04c800644f64dca9af1e9042d68a2dcf62",
+      "failure_signals": [
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
+    },
+    {
+      "path": "agent/app/fast_planner.py",
       "symbol": "FastPlannerResolver.resolve_advance",
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "agent.fast_planner",
       "contract": "Map Fast Activity-Plan inference and contract failures into a typed unavailable FastPlannerAdvance without authorizing Work.",
       "review_status": "reviewed",
-      "body_sha256": "7f7b8b1f0dc84dd9cd747076a5ae7c2a6818fafd07040d1ef24bc5cfdedc4494",
+      "body_sha256": "5e31671e82645625ee93f3f123a66ea04b2f772ea68c22884e7d266a1dc59347",
       "failure_signals": [
         "continue",
         "return",
@@ -309,64 +310,6 @@
       "body_sha256": "37554cecaec580a26a5da0cc105b17ca7d80cde7454a11745526ca01a578f160",
       "failure_signals": [
         "return"
-      ]
-    },
-    {
-      "path": "agent/app/response_composer.py",
-      "symbol": "ResponseComposerResolver._resolve",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "5a11334b4e11b20f5673fb52610cfd33c8a03ca35f540dd69809b1b982e7738a",
-      "failure_signals": [
-        "continue",
-        "diagnostic",
-        "return",
-        "state_update"
-      ]
-    },
-    {
-      "path": "agent/app/response_composer.py",
-      "symbol": "ResponseComposerResolver._resolve_direct",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "d0b5d711423c3b201288b7a9d580a64c8f7e4db74e7678dc24b178dbc0700d27",
-      "failure_signals": [
-        "continue",
-        "diagnostic",
-        "return",
-        "state_update"
-      ]
-    },
-    {
-      "path": "agent/app/response_composer.py",
-      "symbol": "ResponseComposerResolver._run_response_truth_audit",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "agent",
-      "contract": "Map truth-audit transport/schema failure into one terminal ResponseComposerSemanticValidationError; never author replacement wording or retry the proof.",
-      "review_status": "reviewed",
-      "body_sha256": "e5a49b6309951566cb77024309ff299f0eae2a2ef8e99fa8ec88042c9586fa76",
-      "failure_signals": [
-        "raise"
-      ]
-    },
-    {
-      "path": "agent/app/response_composer.py",
-      "symbol": "ResponseComposerResolver.resolve",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "a203b6cdc88beffddf0506313fabfcd97b29168194221a176495afb9970c67fa",
-      "failure_signals": [
-        "bare_reraise"
       ]
     },
     {
@@ -461,21 +404,6 @@
       "body_sha256": "8111eed9280a177970431434fc6161a728a985f752aa106ca0da37441857d6c6",
       "failure_signals": [
         "return"
-      ]
-    },
-    {
-      "path": "agent/app/tool_result_interpreter.py",
-      "symbol": "ToolResultInterpreter.interpret",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "55ba192a52ba4f859d7b94c98f16e909cf7dc4f61be6f13a02a3772b79058164",
-      "failure_signals": [
-        "diagnostic",
-        "return",
-        "state_update"
       ]
     },
     {
@@ -672,9 +600,9 @@
       "ordinal": 7,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "contract": "Fail closed when Fast-Planner Evidence re-entry and its mechanical outcome projection cannot produce a valid response; retain the trusted outcome and diagnostic without inventing speech, completion, or effect authority.",
       "review_status": "reviewed",
-      "body_sha256": "c3aa4f6cdba522eea0f98acfc392ba4f8b76ecbfa50dcce2568096039e5850fc",
+      "body_sha256": "12d339e6d275fa28ab09496d168f755a1d3316f2a1ff603d32ec7ea858a86d1c",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -682,13 +610,13 @@
     },
     {
       "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._compose_cognitive_failure_response",
+      "symbol": "VoiceAssistant._plan_evidence_bound_capability_result_response",
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "2970f53433433ecabb396e5112b1c6a59491126348259d4343452235c5d833f0",
+      "body_sha256": "a60c93e77f60d60363c6eef8d64bafac2c6b13deb9aaf41994d3c0a7b5e808ab",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -696,43 +624,29 @@
     },
     {
       "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._compose_cognitive_failure_response",
-      "ordinal": 2,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "c418275436b2423dc993256b7e33d99f27acea023b6af9f6228e2882addb291f",
-      "failure_signals": [
-        "diagnostic"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._compose_evidence_bound_tool_result_response",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "4bb7192d09b0d05e65ef9ddab2d9ae8701e017acebdaa7863a28db2fdfa77c79",
-      "failure_signals": [
-        "diagnostic",
-        "return"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._compose_incremental_terminal_result_response",
+      "symbol": "VoiceAssistant._plan_incremental_terminal_result_response",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Map Tool Result Interpreter failure to no incremental response with diagnostics; never speak an unvalidated provider result.",
+      "contract": "Map Planner Evidence re-entry failure to no incremental response with diagnostics; never speak an unvalidated provider result.",
       "review_status": "reviewed",
-      "body_sha256": "3b00d662c81eaecadef2f708e5ff074dd04b56444e79d18d8c960758918697cc",
+      "body_sha256": "39f3c55cb2a194294fbca3c660d612fb49ce80399ca41dffb788b68e790e7848",
       "failure_signals": [
         "diagnostic",
         "return"
+      ]
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._planner_evidence_reentry_response",
+      "ordinal": 1,
+      "classification": "narrow_reraise",
+      "owner": "orchestrator",
+      "contract": "Retain Fast Planner Evidence re-entry failure evidence, then re-raise so the caller fails closed without ungrounded speech.",
+      "review_status": "reviewed",
+      "body_sha256": "6366a7a0df40ca3ce33a3124c0b59af5d165fb54928640590482c0bc2501cd24",
+      "failure_signals": [
+        "bare_reraise"
       ]
     },
     {
@@ -960,9 +874,9 @@
       "ordinal": 2,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Reject failed incremental result interpretation, retain diagnostics, and emit no ungrounded speech; final aggregate closure remains available.",
+      "contract": "Reject failed incremental Planner Evidence re-entry, retain diagnostics, and emit no ungrounded speech; final aggregate closure remains available.",
       "review_status": "reviewed",
-      "body_sha256": "348186d30a2bd32e910ddd965a6ea6ce2b8ebd909418acc5a5780b0f0092ce4b",
+      "body_sha256": "bad080a0a41f78c19b922c939bd258613f48365ee794ca4e88d1d0bd0515475a",
       "failure_signals": [
         "diagnostic",
         "return"

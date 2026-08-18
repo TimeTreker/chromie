@@ -47,24 +47,29 @@
         "goal-chat"
       ],
       "goal_summary": "Respond naturally to the greeting.",
-      "response_text": "你好。",
+      "response_text": "",
       "goal_satisfaction": {
         "score": 1.0,
         "status": "exact",
         "satisfied_goal_ids": [
           "goal-chat"
         ]
-      }
-    },
-    "response_composition": {
-      "response_plan": {
-        "final": {
+      },
+      "communicative_acts": [
+        {
+          "activity_id": "scenario-final",
           "text": "你好，很高兴见到你。",
-          "covers_goal_ids": [
+          "role": "complete_response",
+          "timing": "parallel",
+          "speech_act": "inform",
+          "source_goal_ids": [
             "goal-chat"
-          ]
+          ],
+          "truth_stage": "context_grounded",
+          "evidence_refs": [],
+          "information_gaps": []
         }
-      }
+      ]
     }
   },
   "expect": {
@@ -78,8 +83,7 @@
     "calls": [
       "fast_advance",
       "goal_association",
-      "fast_plan",
-      "response_composer"
+      "fast_plan"
     ]
   }
 }

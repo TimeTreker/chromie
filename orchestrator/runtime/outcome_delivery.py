@@ -2,7 +2,7 @@
 
 The coordinator owns only runtime delivery eligibility and waiting.  It does not
 infer user intent, Goal relationships, or response wording.  Those remain with
-the Goal-driven Core and Response Composer.
+the Goal-driven Core and Planner-owned Communicative Activities.
 """
 
 from __future__ import annotations

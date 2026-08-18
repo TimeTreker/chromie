@@ -81,6 +81,11 @@ FastCommunicativeSpeechAct = Union[
     FastProgressSpeechAct,
     FastClarificationSpeechAct,
 ]
+CommunicativeTruthStage = Literal[
+    "context_grounded",
+    "pre_evidence",
+    "post_evidence",
+]
 
 _FAST_PROGRESS_SPEECH_ACT_BY_KIND: dict[
     FastProgressKind, FastProgressSpeechAct
@@ -93,30 +98,40 @@ _FAST_PROGRESS_SPEECH_ACT_BY_KIND: dict[
 
 
 class _FastPlannerCommunicativeActBase(BaseModel):
-    """Planner-owned communicative intention, before wording or Vocal realization.
+    """Planner-owned communicative Main Activity, including exact wording.
 
-    A Communicative Act is a semantic Activity: it records why speech should
-    happen, which Responsibility it advances, and when it may overlap other
-    Work.  It deliberately contains no surface sentence.  Response composition
-    owns wording and the Vocal runtime owns delivery.
+    Planner owns both the semantic function and the natural words. The Host may
+    validate provenance, truth stage, evidence binding, safety, and delivery,
+    but it does not rewrite the sentence. Vocal runtime owns acoustic delivery.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     activity_id: str = Field(min_length=1, max_length=160)
+    text: str = Field(min_length=1, max_length=600)
     timing: PlanTiming = "parallel"
     speech_act: str = Field(default="inform", min_length=1, max_length=120)
     source_responsibility_refs: list[str] = Field(min_length=1)
+    truth_stage: CommunicativeTruthStage
+    evidence_refs: list[str] = Field(default_factory=list, max_length=32)
 
-    @field_validator("activity_id", "speech_act", mode="before")
+    @field_validator("activity_id", "text", "speech_act", mode="before")
     @classmethod
     def normalize_communicative_act_text(cls, value: Any) -> Any:
         return " ".join(value.strip().split()) if isinstance(value, str) else value
 
-    @field_validator("source_responsibility_refs", mode="before")
+    @field_validator("source_responsibility_refs", "evidence_refs", mode="before")
     @classmethod
     def normalize_responsibility_refs(cls, value: Any) -> list[str]:
         return _normalize_ids(value)
+
+    @model_validator(mode="after")
+    def validate_truth_provenance(self) -> "_FastPlannerCommunicativeActBase":
+        if self.truth_stage == "pre_evidence" and self.evidence_refs:
+            raise ValueError("pre-evidence communication must not reference Evidence")
+        if self.truth_stage == "post_evidence" and not self.evidence_refs:
+            raise ValueError("post-evidence communication requires Evidence refs")
+        return self
 
 
 class FastPlannerCompleteResponseAct(_FastPlannerCommunicativeActBase):
@@ -124,6 +139,7 @@ class FastPlannerCompleteResponseAct(_FastPlannerCommunicativeActBase):
 
     role: Literal["complete_response"]
     speech_act: FastCompleteResponseSpeechAct = "respond"
+    truth_stage: Literal["context_grounded", "post_evidence"] = "context_grounded"
 
 
 class PlannerInformationGap(InformationGap):
@@ -176,6 +192,8 @@ class FastPlannerClarificationAct(_FastPlannerCommunicativeActBase):
 
     role: Literal["clarification"]
     speech_act: FastClarificationSpeechAct = "ask_clarification"
+    truth_stage: Literal["context_grounded"] = "context_grounded"
+    evidence_refs: list[str] = Field(default_factory=list, max_length=0)
     information_gaps: list[PlannerInformationGap] = Field(min_length=1, max_length=8)
 
     @field_validator("information_gaps", mode="after")
@@ -191,16 +209,11 @@ class FastPlannerClarificationAct(_FastPlannerCommunicativeActBase):
 
 
 class FastPlannerProgressAct(_FastPlannerCommunicativeActBase):
-    """Pre-evidence progress intention with no model-authored factual wording.
-
-    A progress Activity is deliberately not free text.  Before trusted Evidence
-    exists, allowing arbitrary response text lets a model hide an unsupported
-    result claim behind ``role=progress``.  The Planner therefore selects only a
-    bounded progress act; Response Composer's closed language realization renders
-    that act without inventing a result.
-    """
+    """Planner-authored prospective communication before fresh Evidence exists."""
 
     role: Literal["progress"]
+    truth_stage: Literal["pre_evidence"] = "pre_evidence"
+    evidence_refs: list[str] = Field(default_factory=list, max_length=0)
     progress_kind: FastProgressKind
     speech_act: str = Field(
         default="acknowledge",
@@ -259,20 +272,23 @@ class FastPlannerCapabilityActivity(CapabilityIdentityModel):
 
 
 class PlannedCommunicativeAct(BaseModel):
-    """Goal-bound semantic communication selected by Planner, without wording."""
+    """Goal-bound exact communication selected and worded by Planner."""
 
     model_config = ConfigDict(extra="forbid")
 
     activity_id: str = Field(min_length=1, max_length=160)
+    text: str = Field(min_length=1, max_length=2400)
     role: FastCommunicativeActRole
     timing: PlanTiming = "parallel"
     speech_act: FastCommunicativeSpeechAct
     source_goal_ids: list[str] = Field(min_length=1)
     source_responsibility_refs: list[str] = Field(default_factory=list)
+    truth_stage: CommunicativeTruthStage = "context_grounded"
+    evidence_refs: list[str] = Field(default_factory=list, max_length=32)
     information_gaps: list[PlannerInformationGap] = Field(default_factory=list, max_length=8)
     progress_kind: FastProgressKind | None = None
 
-    @field_validator("activity_id", "speech_act", mode="before")
+    @field_validator("activity_id", "text", "speech_act", mode="before")
     @classmethod
     def normalize_act_text(cls, value: Any) -> Any:
         return " ".join(value.strip().split()) if isinstance(value, str) else value
@@ -280,6 +296,7 @@ class PlannedCommunicativeAct(BaseModel):
     @field_validator(
         "source_goal_ids",
         "source_responsibility_refs",
+        "evidence_refs",
         mode="before",
     )
     @classmethod
@@ -288,6 +305,14 @@ class PlannedCommunicativeAct(BaseModel):
 
     @model_validator(mode="after")
     def validate_role_fields(self) -> "PlannedCommunicativeAct":
+        if self.truth_stage == "pre_evidence" and self.evidence_refs:
+            raise ValueError("pre-evidence communication must not reference Evidence")
+        if self.truth_stage == "post_evidence" and not self.evidence_refs:
+            raise ValueError("post-evidence communication requires Evidence refs")
+        if self.role == "progress" and self.truth_stage != "pre_evidence":
+            raise ValueError("progress Communicative Acts must be pre-evidence")
+        if self.role == "clarification" and self.truth_stage != "context_grounded":
+            raise ValueError("clarification Communicative Acts must be context-grounded")
         if self.role == "complete_response" and self.speech_act not in {
             "acknowledge",
             "answer",
@@ -336,6 +361,52 @@ FastPlannerCommunicativeAct = Annotated[
     ],
     Field(discriminator="role"),
 ]
+
+FastPlannerImmediateCommunicativeAct = Annotated[
+    Union[
+        FastPlannerCompleteResponseAct,
+        FastPlannerProgressAct,
+    ],
+    Field(discriminator="role"),
+]
+
+
+class FastPlannerFirstResponseModelOutput(BaseModel):
+    """Minimal model payload for Fast Planner's first-response latency phase."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    activity: FastPlannerImmediateCommunicativeAct
+
+
+class FastPlannerFirstResponse(BaseModel):
+    """Fast Planner's earliest independently realizable communicative decision.
+
+    This is a latency phase of Fast Planner, not a response-composition owner.
+    It carries the exact immutable wording that Runtime may start while the same
+    Planner continues Capability/clarification planning and Goal Association
+    independently commits canonical Goal state.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: int = Field(default=1, ge=1)
+    turn_id: str = Field(min_length=1, max_length=160)
+    planner_tier: Literal["fast"] = "fast"
+    activity: FastPlannerImmediateCommunicativeAct | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("turn_id", mode="before")
+    @classmethod
+    def normalize_turn_id(cls, value: Any) -> Any:
+        return " ".join(value.strip().split()) if isinstance(value, str) else value
+
+    @field_validator("metadata")
+    @classmethod
+    def reject_first_response_low_level_metadata(
+        cls, value: dict[str, Any]
+    ) -> dict[str, Any]:
+        return reject_forbidden_low_level_fields(value)
 
 FastPlannerActivity = Annotated[
     Union[

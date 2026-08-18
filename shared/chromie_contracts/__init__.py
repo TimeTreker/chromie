@@ -220,11 +220,7 @@ from .semantic_task import (
 )
 
 from .tool_result import (
-    ToolAnswerMode,
     ToolResultEvidence,
-    ToolResultFactReference,
-    ToolResultInterpretation,
-    ToolResultInterpretationRequest,
     ToolResultStatus,
     canonical_value_sha256,
 )
@@ -417,11 +413,7 @@ __all__ = [
     "PlanDisposition",
     "PlanParameterResolution",
     "PlannerTier",
-    "ToolAnswerMode",
     "ToolResultEvidence",
-    "ToolResultFactReference",
-    "ToolResultInterpretation",
-    "ToolResultInterpretationRequest",
     "ToolResultStatus",
     "canonical_value_sha256",
 ]

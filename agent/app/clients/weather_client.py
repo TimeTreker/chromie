@@ -512,9 +512,9 @@ class OpenMeteoWeatherClient:
     """Small no-key weather provider for Chromie's read-only weather tool.
 
     The client intentionally returns structured reports rather than choosing
-    the conversational answer. The Goal-driven Runtime and Response Composer
-    remain the semantic authority while this provider stays a read-only data
-    boundary.
+    the conversational answer. Host-bound Evidence reactivates the Goal-driven
+    Fast Planner, which remains the semantic answer authority while this
+    provider stays a read-only data boundary.
     """
 
     def __init__(

@@ -273,7 +273,6 @@ Supported component profiles are:
 
 - `cognitive_gateway`;
 - `planner`;
-- `response_composer`;
 - `mind_profile`;
 - `capability_projection`;
 - `social_attention`.
@@ -473,7 +472,7 @@ python -m benchmarks.e2e.run \
   --profile live_service_text \
   --adapter live_service_text \
   --dataset social_attention \
-  --effective-model response_composer=<resolved-model> \
+  --effective-model fast_planner=<resolved-model> \
   --mind-profile <approved-profile-revision> \
   --social-style courteous \
   --social-attention-mode on \

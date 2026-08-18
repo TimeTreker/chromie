@@ -488,6 +488,10 @@
           "expected_fast_speech_purposes": [
             "acknowledge_and_check"
           ],
+          "require_social_attention_opportunity": true,
+          "require_fast_planner_evidence_reentry": true,
+          "max_warm_fast_response_commit_ms": 2000,
+          "max_warm_first_playback_start_ms": 3000,
           "expect_no_fast_contract_failure": true,
           "min_new_goal_count": 1,
           "min_goal_outcome_count": 1,

@@ -14,12 +14,6 @@
       "callable_env": "CHROMIE_BENCHMARK_PLANNER_CALLABLE"
     },
     {
-      "name": "response_composer",
-      "layers": ["module", "integration"],
-      "url_env": "CHROMIE_BENCHMARK_RESPONSE_COMPOSER_URL",
-      "callable_env": "CHROMIE_BENCHMARK_RESPONSE_COMPOSER_CALLABLE"
-    },
-    {
       "name": "mind_profile",
       "layers": ["module", "integration"],
       "url_env": "CHROMIE_BENCHMARK_MIND_PROFILE_URL",

@@ -1031,6 +1031,127 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
 
 
 class FastPlannerResolverTests(unittest.TestCase):
+    def test_first_response_is_planner_authored_in_a_small_language_bound_contract(self):
+        ollama = FakeOllama(
+            {
+                "activity": {
+                    "activity_id": "weather_ack",
+                    "role": "progress",
+                    "text": "我先查一下重庆今天上午的天气。",
+                    "progress_kind": "check_information",
+                    "source_responsibility_refs": ["weather"],
+                }
+            }
+        )
+        request = _work_request(
+            sid="turn-weather-first-response",
+            text="今天上午重庆会不会下雨？",
+            language="zh-CN",
+            responsibilities=[
+                {
+                    "local_ref": "weather",
+                    "outcome": "determine whether it rains in Chongqing this morning",
+                    "bindings": {
+                        "location": "重庆",
+                        "date": "today",
+                        "day_part": "morning",
+                    },
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.96,
+                }
+            ],
+        )
+
+        result = asyncio.run(
+            FastPlannerResolver(ollama, WeatherCatalog()).resolve_first_response(
+                request
+            )
+        )
+
+        self.assertEqual(result.activity.text, "我先查一下重庆今天上午的天气。")
+        self.assertEqual(result.activity.truth_stage, "pre_evidence")
+        prompt, kwargs = ollama.prompts[0]
+        rendered = prompt.render() if hasattr(prompt, "render") else str(prompt)
+        self.assertIn("Required response language: zh-CN", rendered)
+        schema = kwargs["response_format"]
+        progress = schema["$defs"]["FastPlannerProgressAct"]
+        self.assertNotIn("timing", progress["properties"])
+        self.assertNotIn("truth_stage", progress["properties"])
+        self.assertLessEqual(kwargs["options"]["num_predict"], 192)
+
+    def test_committed_first_response_is_merged_without_reauthoring(self):
+        ollama = FakeOllama(
+            {
+                "disposition": "execute",
+                "coverage": "complete",
+                "covered_responsibility_refs": ["weather"],
+                "activities": [
+                    {
+                        "activity_id": "weather_lookup",
+                        "role": "capability",
+                        "capability_id": "chromie.weather.lookup",
+                        "args": {
+                            "location": "重庆",
+                            "date": "today",
+                            "period": "morning",
+                        },
+                        "source_responsibility_refs": ["weather"],
+                    }
+                ],
+                "continuations": [],
+                "confidence": 0.96,
+                "unresolved": [],
+                "reason_summary": "Check the requested weather.",
+            }
+        )
+        request = _work_request(
+            sid="turn-weather-merged",
+            text="今天上午重庆会不会下雨？",
+            language="zh-CN",
+            responsibilities=[
+                {
+                    "local_ref": "weather",
+                    "outcome": "determine whether it rains in Chongqing this morning",
+                    "bindings": {
+                        "location": "重庆",
+                        "date": "today",
+                        "day_part": "morning",
+                    },
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.96,
+                }
+            ],
+            context={
+                "fast_planner_first_response": {
+                    "turn_id": "turn-weather-merged",
+                    "activity": {
+                        "activity_id": "weather_ack",
+                        "role": "progress",
+                        "text": "我先查一下。",
+                        "progress_kind": "check_information",
+                        "source_responsibility_refs": ["weather"],
+                    },
+                }
+            },
+        )
+
+        result = asyncio.run(
+            FastPlannerResolver(ollama, WeatherCatalog()).resolve_advance(request)
+        )
+
+        self.assertEqual(
+            [activity.role for activity in result.activities],
+            ["progress", "capability"],
+        )
+        self.assertEqual(result.activities[0].text, "我先查一下。")
+        schema = ollama.prompts[0][1]["response_format"]
+        encoded_items = json.dumps(
+            schema["properties"]["activities"]["items"], sort_keys=True
+        )
+        self.assertNotIn("FastPlannerProgressAct", encoded_items)
+
     @staticmethod
     def _clarification_output(
         *,
@@ -1047,6 +1168,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 {
                     "activity_id": "clarify-weather",
                     "role": "clarification",
+                    "text": "你想查哪个地点的天气？",
                     "speech_act": "ask_clarification",
                     "source_responsibility_refs": ["weather"],
                     "information_gaps": [
@@ -1079,6 +1201,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     {
                         "activity_id": "activity-greeting",
                         "role": "complete_response",
+                        "text": "你好呀！",
                         "speech_act": "greeting",
                         "source_responsibility_refs": ["greeting"],
                     }
@@ -1125,6 +1248,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             FastPlannerCompleteResponseAct(
                 activity_id="activity-greeting",
                 role="complete_response",
+                text="你好呀，我很高兴见到你。",
                 speech_act="你好呀，我很高兴见到你。",
                 source_responsibility_refs=["greeting"],
             )
@@ -1134,6 +1258,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             FastPlannerClarificationAct(
                 activity_id="ask-tea",
                 role="clarification",
+                text="你想喝什么茶？",
                 speech_act="你想喝什么茶？",
                 source_responsibility_refs=["tea"],
                 information_gaps=[
@@ -1334,6 +1459,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     {
                         "activity_id": "activity-greeting",
                         "role": "complete_response",
+                        "text": "你好呀！",
                         "speech_act": "greeting",
                         "source_responsibility_refs": ["greeting"],
                     }
@@ -1382,6 +1508,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     {
                         "activity_id": "activity-greeting",
                         "role": "complete_response",
+                        "text": "你好呀！",
                         "speech_act": "greeting",
                         "source_responsibility_refs": ["greeting"],
                     }
@@ -1683,7 +1810,20 @@ class FastPlannerResolverTests(unittest.TestCase):
             ["chromie.weather.lookup"],
         )
         encoded_capability_schema = json.dumps(capability_schema, sort_keys=True)
-        self.assertIn('"period"', encoded_capability_schema)
+        self.assertNotIn('"period"', encoded_capability_schema)
+        self.assertNotIn('"reason_summary"', encoded_capability_schema)
+        self.assertNotIn('"allOf"', encoded_capability_schema)
+        self.assertIn('"args"', encoded_capability_schema)
+        self.assertTrue(
+            any(
+                item.get("then", {})
+                .get("properties", {})
+                .get("activities", {})
+                .get("minContains")
+                == 1
+                for item in schema["allOf"]
+            )
+        )
 
     def test_fresh_evidence_missing_input_keeps_planner_resolution_branches(self):
         responsibility = CognitiveResponsibilityProposal.model_validate(
@@ -1725,6 +1865,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     {
                         "activity_id": "activity-weather-progress",
                         "role": "progress",
+                        "text": "我看看。",
                         "progress_kind": "check_information",
                         "speech_act": "acknowledge_and_check",
                         "timing": "parallel",
@@ -1839,6 +1980,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 {
                     "activity_id": "weather-progress-1",
                     "role": "progress",
+                    "text": "我看看。",
                     "progress_kind": "check_information",
                     "speech_act": "acknowledge_and_check",
                     "timing": "parallel",
@@ -1847,6 +1989,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 {
                     "activity_id": "weather-progress-duplicate",
                     "role": "progress",
+                    "text": "我看看。",
                     "progress_kind": "check_information",
                     "speech_act": "acknowledge_and_check",
                     "timing": "parallel",
@@ -1910,6 +2053,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     {
                         "activity_id": "activity-weather-progress",
                         "role": "progress",
+                        "text": "我看看。",
                         "progress_kind": "check_information",
                         "speech_act": "acknowledge_and_check",
                         "timing": "parallel",
@@ -1978,6 +2122,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     {
                         "activity_id": "activity-weather-fake-result",
                         "role": "progress",
+                        "text": "重庆今天温度是28摄氏度哦！",
                         "progress_kind": "check_information",
                         "response_text": "重庆今天温度是28摄氏度哦！",
                         "speech_act": "inform",
@@ -4076,10 +4221,9 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("never begin by restating prior evidence", prompt)
         self.assertIn("at most one short supporting clause", prompt)
 
-    def test_retained_evidence_followup_gets_bounded_decision_first_review(self):
+    def test_retained_evidence_followup_is_owned_by_single_planner_pass(self):
         goal_id = "goal-weather"
         evidence_first = "重庆今天有雷雨和冰雹，而且降雨概率很大。所以需要带伞。"
-        decision_first = "需要带伞，因为重庆今天有雷雨和冰雹。"
         primary = {
             "disposition": "respond",
             "coverage": "complete",
@@ -4100,17 +4244,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             },
             "goal_satisfaction": exact_satisfaction([goal_id]),
         }
-        review = {
-            "decision": "revise",
-            "confidence": 1.0,
-            "response_text": decision_first,
-            "goal_responses": [
-                {"goal_id": goal_id, "response_text": decision_first}
-            ],
-            "reason": "The original response replayed evidence before answering the decision.",
-        }
         ollama = ScriptedOllama([primary])
-        reviewer = ScriptedOllama([review])
         planner_request = request(
             "那我出门需要带伞吗？",
             route="chat",
@@ -4158,59 +4292,19 @@ class FastPlannerResolverTests(unittest.TestCase):
             FastPlannerResolver(
                 ollama,
                 FakeCatalog(),
-                communication_reviewer=reviewer,
             ).resolve(
                 planner_request.model_copy(update={"context": context})
             )
         )
 
         self.assertEqual(plan.disposition, "respond")
-        self.assertEqual(plan.response_text, decision_first)
-        self.assertEqual(plan.goal_outcomes[0].response_text, decision_first)
-        self.assertEqual(plan.metadata["communication_review"]["status"], "revised")
+        self.assertEqual(plan.response_text, primary["response_text"])
+        self.assertEqual(
+            plan.goal_outcomes[0].response_text,
+            primary["goal_outcomes"][goal_id]["response_text"],
+        )
+        self.assertNotIn("communication_review", plan.metadata)
         self.assertEqual(len(ollama.prompts), 1)
-        self.assertEqual(len(reviewer.prompts), 1)
-        review_prompt, review_options = reviewer.prompts[0]
-        self.assertIn("communicative act directly", review_prompt)
-        self.assertIn("delivered_evidence_bound_dialogue", review_prompt)
-        self.assertEqual(
-            review_options["prompt_family"],
-            "fast_planner.communication_review",
-        )
-        review_schema = review_options["response_format"]
-        self.assertNotIn(
-            "minLength",
-            review_schema["properties"]["response_text"],
-        )
-        self.assertNotIn(
-            "minLength",
-            review_schema["$defs"]["PlannerCommunicationGoalResponse"][
-                "properties"
-            ]["response_text"],
-        )
-
-    def test_retained_evidence_review_failure_escalates_without_effects(self):
-        primary, planner_request = retained_weather_followup_fixture()
-
-        plan = asyncio.run(
-            FastPlannerResolver(
-                ScriptedOllama([primary]),
-                FakeCatalog(),
-                communication_reviewer=ScriptedOllama(
-                    [RuntimeError("review service unavailable")]
-                ),
-            ).resolve(planner_request)
-        )
-
-        self.assertEqual(plan.disposition, "escalate")
-        self.assertEqual(plan.steps, [])
-        self.assertEqual(
-            plan.escalation_reason,
-            "followup_communication_review_unavailable",
-        )
-        self.assertEqual(plan.unresolved, ["latest_communicative_act_unreviewed"])
-        self.assertFalse(plan.metadata["execution_allowed"])
-        self.assertEqual(plan.metadata["path_classification"], "coverage_review_failure")
 
     def test_multi_goal_prompt_preserves_explicit_in_range_arguments(self):
         raw = multi_goal_plan(

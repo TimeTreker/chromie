@@ -14,6 +14,7 @@ from orchestrator.runtime.capability_runtime import (
     schema_valid_completion_evidence_policy,
 )
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
+from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
 from shared.chromie_contracts.execution_outcome import claim_qualification_policy_sha256
 from shared.chromie_contracts.interaction import (
     CapabilityRequest,
@@ -23,7 +24,6 @@ from shared.chromie_contracts.interaction import (
 )
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.response_composition import canonical_plan_fingerprint
-from shared.chromie_contracts.tool_result import ToolResultInterpretation
 
 
 _SCHEMA = {
@@ -125,20 +125,33 @@ class _AgentClient:
     def __init__(self) -> None:
         self.requests = []
 
-    async def interpret_tool_result(self, _session, *, request, timeout_ms):
+    async def resolve_fast_plan(self, _session, *, request, timeout_ms):
         del timeout_ms
         self.requests.append(request)
-        evidence = request.evidence[0]
-        return ToolResultInterpretation(
-            status="resolved",
-            spoken_response=evidence.data["user_summary"],
-            selected_facts=[
-                {
-                    "evidence_id": evidence.evidence_id,
-                    "json_pointer": "/user_summary",
-                }
-            ],
+        evidence = request.context["trusted_terminal_evidence"][0]
+        goal_ids = request.context["result_evidence_reentry"]["source_goal_ids"]
+        return CanonicalPlan(
+            plan_id=f"plan-reentry-{evidence['evidence_id']}",
+            planner_tier="fast",
+            disposition="respond",
+            coverage="complete",
             confidence=1.0,
+            goal_ids=goal_ids,
+            response_text=evidence["data"]["user_summary"],
+            goal_outcomes=[
+                {
+                    "goal_id": goal_id,
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "response_text": evidence["data"]["user_summary"],
+                }
+                for goal_id in goal_ids
+            ],
+            goal_satisfaction={
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": goal_ids,
+            },
         )
 
 
@@ -235,6 +248,24 @@ def _response() -> InteractionResponse:
             "canonical_plan": plan.model_dump(mode="json"),
             "canonical_plan_id": plan.plan_id,
             "canonical_plan_fingerprint": fingerprint,
+            "goal_association": {
+                "resolution_status": "resolved",
+                "turn_id": "turn-detached-reentry",
+                "associations": [],
+                "new_goals": [
+                    {
+                        "goal_id": "goal-first",
+                        "description": "Run the first read.",
+                        "source_text": "Run both reads.",
+                    },
+                    {
+                        "goal_id": "goal-second",
+                        "description": "Run the second read.",
+                        "source_text": "Run both reads.",
+                    },
+                ],
+                "confidence": 1.0,
+            },
             "user_turn_envelope": {
                 "turn_id": "turn-detached-reentry",
                 "normalized_input": {
@@ -253,7 +284,11 @@ def _assistant(coordinator: InteractionRuntimeCoordinator) -> VoiceAssistant:
     assistant.sessions = _Sessions()
     assistant.conversation_state = _ConversationState()
     assistant.agent_client = _AgentClient()
-    assistant.tool_result_interpreter_timeout_ms = 1000
+    assistant.cognitive_runtime = SimpleNamespace(
+        adapter=CanonicalPlanRuntimeAdapter(coordinator),
+        interaction_ledger=None,
+    )
+    assistant.cognitive_runtime_policy = SimpleNamespace(fast_planner_timeout_ms=1000)
     assistant.active_interaction_task = None
     assistant.active_interaction_id = None
     assistant.active_interaction_tasks = {}
@@ -332,9 +367,12 @@ async def test_foreground_dispatch_finishes_while_provider_work_remains_running(
     assert "Both reads succeeded." not in spoken
     assert not provider.release_second.is_set()
     assert len(assistant.agent_client.requests) == 1
-    interpretation_request = assistant.agent_client.requests[0]
-    assert interpretation_request.context["incremental_terminal_evidence"] is True
-    assert interpretation_request.context["terminal_request_id"] == "request-first"
+    planner_request = assistant.agent_client.requests[0]
+    assert planner_request.context["incremental_terminal_evidence"] is True
+    assert planner_request.context["terminal_request_id"] == "request-first"
+    assert planner_request.context["result_evidence_reentry"]["source_goal_ids"] == [
+        "goal-first"
+    ]
     assert response.metadata.get("incremental_cognitive_opportunities") is None
 
     # The detached coordinator uses the prepared response for re-entry metadata;

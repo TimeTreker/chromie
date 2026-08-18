@@ -61,11 +61,14 @@ from shared.chromie_contracts.core_interpretation import (
     CognitiveResponsibilityProposal,
     CoreInterpretationResult,
 )
-from shared.chromie_contracts.plan import CanonicalPlan, FastPlannerAdvance
+from shared.chromie_contracts.plan import (
+    CanonicalPlan,
+    FastPlannerAdvance,
+    FastPlannerFirstResponse,
+)
 from shared.chromie_contracts.reflex import CancellationDirective
 from shared.chromie_contracts.response_composition import (
     CoordinatedResponsePlan,
-    ResponseCompositionResolution,
     canonical_plan_fingerprint,
 )
 from shared.chromie_contracts.semantic_task import ResponsePlan
@@ -508,6 +511,19 @@ class _CognitiveScenarioClient:
         self.deep_plans = list(stub.get("deep_plans") or [])
         self.calls: list[str] = []
 
+    async def resolve_fast_first_response(
+        self, *args: Any, **kwargs: Any
+    ) -> FastPlannerFirstResponse:
+        del args
+        request = kwargs["request"]
+        # File-backed Level A scenarios do not fabricate model-authored speech.
+        # Live-text evidence covers the real first-response Planner phase.
+        return FastPlannerFirstResponse(
+            turn_id=str(request.sid),
+            activity=None,
+            metadata={"semantic_authority": "level_a_fixture"},
+        )
+
     async def resolve_goal_association(self, *args: Any, **kwargs: Any) -> GoalAssociationResolution:
         del args
         self.calls.append("goal_association")
@@ -552,57 +568,6 @@ class _CognitiveScenarioClient:
         if not self.deep_plans:
             raise AssertionError("cognitive scenario deep-plan script exhausted")
         return CanonicalPlan.model_validate(self.deep_plans.pop(0))
-
-    async def compose_response_plan(self, *args: Any, **kwargs: Any) -> ResponseCompositionResolution:
-        del args
-        self.calls.append("response_composer")
-        request = kwargs["request"]
-        plan = CanonicalPlan.model_validate(
-            request.context["canonical_plan_resolution"]
-        )
-        raw = self.stub.get("response_composition")
-        if isinstance(raw, dict) and raw.get("status") not in {None, "resolved"}:
-            return ResponseCompositionResolution.model_validate(raw)
-        response_plan_raw = (raw or {}).get("response_plan") if isinstance(raw, dict) else None
-        if not isinstance(response_plan_raw, dict):
-            if plan.disposition == "execute":
-                response_plan_raw = {
-                    "pre_action": {
-                        "text": "好的，我先执行这个计划。",
-                        "speech_act": "inform",
-                        "commitment_state": "evaluating",
-                        "must_not_claim_completion": True,
-                        "covers_goal_ids": plan.goal_ids,
-                    }
-                }
-            elif plan.disposition == "clarify":
-                response_plan_raw = {
-                    "immediate": {
-                        "text": plan.response_text or "请补充必要信息。",
-                        "speech_act": "clarify",
-                        "commitment_state": "waiting_for_user",
-                        "must_not_claim_completion": True,
-                        "covers_goal_ids": plan.goal_ids,
-                    }
-                }
-            else:
-                response_plan_raw = {
-                    "final": {
-                        "text": plan.response_text or "好的。",
-                        "covers_goal_ids": plan.goal_ids,
-                    }
-                }
-        composition = CoordinatedResponsePlan(
-            composition_id=str((raw or {}).get("composition_id") or f"composition-{plan.plan_id}"),
-            canonical_plan_id=plan.plan_id,
-            canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
-            canonical_plan=plan,
-            response_plan=ResponsePlan.model_validate(response_plan_raw),
-            confidence=float((raw or {}).get("confidence", 0.9)),
-            rationale=str((raw or {}).get("rationale") or "scenario composition"),
-        )
-        return ResponseCompositionResolution(status="resolved", composition=composition)
-
 
 def _tuple_of_strings(value: Any) -> tuple[str, ...]:
     if value is None:

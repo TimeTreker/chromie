@@ -29,8 +29,6 @@ QUALITY_HEALTH_FIELDS = (
     "model",
     "deep_planner_model",
     "goal_association_model",
-    "response_composer_model",
-    "tool_result_interpreter_model",
 )
 FAST_HEALTH_FIELDS = (
     "fast_planner_model",

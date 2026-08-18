@@ -70,6 +70,10 @@ class TextScenarioCase:
     require_fast_speech: bool = False
     forbid_fast_speech: bool = False
     expected_fast_speech_purposes: tuple[str, ...] = field(default_factory=tuple)
+    require_social_attention_opportunity: bool = False
+    require_fast_planner_evidence_reentry: bool = False
+    max_warm_fast_response_commit_ms: float = 0.0
+    max_warm_first_playback_start_ms: float = 0.0
     expected_terminal_planner_tier: str = ""
     expected_fast_planner_path: str = ""
     expect_deep_planner_invoked: bool | None = None
@@ -481,9 +485,13 @@ def validate_live_text_result(
             realization_status = str(
                 metadata.get("fast_communicative_realization_status") or ""
             )
-            if not bool(summary.get("preview_only")) and realization_status != "resolved":
+            if (
+                not bool(summary.get("preview_only"))
+                and realization_status != "planner_owned"
+            ):
                 errors.append(
-                    "Fast progress Communicative Act was not realized before execution"
+                    "Fast progress Communicative Act was not retained as Planner-owned "
+                    "before execution"
                 )
         else:
             errors.append(
@@ -566,6 +574,73 @@ def validate_live_text_result(
     timings = cognitive.get("timings_ms")
     if not isinstance(timings, dict):
         timings = {}
+    session_state = summary.get("session_state")
+    if not isinstance(session_state, dict):
+        session_state = {}
+    workflow_stages = [
+        item
+        for item in session_state.get("cognitive_workflow_stages") or []
+        if isinstance(item, dict)
+    ]
+    workflow_events = [
+        item
+        for item in session_state.get("workflow_events") or []
+        if isinstance(item, dict)
+    ]
+    if case.require_social_attention_opportunity:
+        opportunity_count = int(
+            runtime_metadata.get("social_attention_opportunity_count") or 0
+        )
+        retained_opportunity = any(
+            item.get("stage") == "social_attention_opportunity"
+            and (item.get("metadata") or {}).get("attached_to_main_activity") is True
+            for item in workflow_stages
+        )
+        if opportunity_count < 1 and not retained_opportunity:
+            errors.append(
+                "Social Attention opportunity was not attached to the fast Main Activity"
+            )
+    if (
+        case.require_fast_planner_evidence_reentry
+        and not bool(summary.get("preview_only"))
+        and not any(
+            item.get("stage") == "fast_planner_evidence_reentry"
+            and item.get("status") == "resolved"
+            for item in workflow_stages
+        )
+    ):
+        errors.append(
+            "terminal Capability Evidence did not reactivate Fast Planner"
+        )
+    if case.max_warm_fast_response_commit_ms > 0:
+        top_timings = summary.get("timings_ms")
+        if not isinstance(top_timings, dict):
+            top_timings = {}
+        interpretation_ms = float(top_timings.get("goal_interpretation_ms") or 0.0)
+        planner_commit_ms = float(timings.get("fast_planner_commit") or 0.0)
+        warm_commit_ms = interpretation_ms + planner_commit_ms
+        if interpretation_ms <= 0 or planner_commit_ms <= 0:
+            errors.append("warm fast-response Planner commitment timing is missing")
+        elif warm_commit_ms > case.max_warm_fast_response_commit_ms:
+            errors.append(
+                "warm fast-response Planner commitment exceeded target: "
+                f"{warm_commit_ms:.1f}ms > "
+                f"{case.max_warm_fast_response_commit_ms:.1f}ms"
+            )
+    if case.max_warm_first_playback_start_ms > 0 and summary.get("speaker") is True:
+        playback_starts = [
+            float(item.get("elapsed_ms") or 0.0)
+            for item in workflow_events
+            if item.get("event") == "playback_start"
+        ]
+        if not playback_starts:
+            errors.append("warm first-playback-start timing is missing")
+        elif min(playback_starts) > case.max_warm_first_playback_start_ms:
+            errors.append(
+                "warm first playback start exceeded target: "
+                f"{min(playback_starts):.1f}ms > "
+                f"{case.max_warm_first_playback_start_ms:.1f}ms"
+            )
     structured_metrics = _structured_case_metrics(case, summary)
     if structured_metrics["runtime_integrity_failed"]:
         detail = ":".join(
@@ -705,6 +780,18 @@ def _text_scenario_case(
         forbid_fast_speech=bool(raw.get("forbid_fast_speech", False)),
         expected_fast_speech_purposes=_tuple_of_strings(
             raw.get("expected_fast_speech_purposes")
+        ),
+        require_social_attention_opportunity=bool(
+            raw.get("require_social_attention_opportunity", False)
+        ),
+        require_fast_planner_evidence_reentry=bool(
+            raw.get("require_fast_planner_evidence_reentry", False)
+        ),
+        max_warm_fast_response_commit_ms=max(
+            0.0, float(raw.get("max_warm_fast_response_commit_ms", 0.0))
+        ),
+        max_warm_first_playback_start_ms=max(
+            0.0, float(raw.get("max_warm_first_playback_start_ms", 0.0))
         ),
         expected_terminal_planner_tier=str(
             raw.get("expected_terminal_planner_tier") or ""
@@ -1542,7 +1629,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("off", "apply"),
         default="apply",
         help=(
-            "Use the goal-association, Fast/Deep Planner, response-composer, "
+            "Use Goal Association, Fast/Deep Planner-owned communication, "
             "and trusted runtime adapter for live-text cases (default: apply). "
             "Select off only for an explicit legacy Agent compatibility run."
         ),
@@ -1592,7 +1679,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=1200.0,
         help=(
             "Outer timeout for one live case. This must exceed the complete "
-            "Goal Association + Fast/Deep Planner + Response Composer path."
+            "Goal Association + Fast/Deep Planner path."
         ),
     )
     return parser

@@ -9,12 +9,7 @@ from typing import Any
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, CognitiveWorkRequest
 from shared.chromie_contracts.semantic_task import SemanticGoal
-from shared.chromie_contracts.tool_result import (
-    ToolResultEvidence,
-    ToolResultInterpretation,
-    ToolResultInterpretationRequest,
-    canonical_value_sha256,
-)
+from shared.chromie_contracts.plan import FastPlannerFirstResponse
 from shared.chromie_runtime.runtime_trace import TRACE_CARRIER_KEY, runtime_tracer
 
 try:
@@ -62,6 +57,50 @@ class _FakeSession:
 
 @unittest.skipIf(AgentClient is None, "aiohttp is unavailable")
 class AgentClientTests(unittest.IsolatedAsyncioTestCase):
+
+    async def test_fast_first_response_uses_dedicated_fast_planner_endpoint(self) -> None:
+        first_response = FastPlannerFirstResponse(
+            turn_id="turn-fast-first",
+            activity={
+                "activity_id": "ack",
+                "role": "progress",
+                "text": "我先看看。",
+                "progress_kind": "check_information",
+                "source_responsibility_refs": ["weather"],
+            },
+        )
+        session = _FakeSession(
+            _FakeResponse(text=first_response.model_dump_json())
+        )
+
+        result = await AgentClient(
+            "http://agent.local"
+        ).resolve_fast_first_response(
+            session,  # type: ignore[arg-type]
+            request=CognitiveWorkRequest(
+                sid="turn-fast-first",
+                text="查一下天气",
+                language="zh-CN",
+                responsibilities=[
+                    CognitiveResponsibilityProposal(
+                        local_ref="weather",
+                        outcome="check the weather",
+                        completion_requires_work=True,
+                        completion_requires_fresh_evidence=True,
+                        confidence=0.95,
+                    )
+                ],
+                interpretation_confidence=0.95,
+            ),
+            timeout_ms=1900,
+        )
+
+        self.assertEqual(result.activity.text, "我先看看。")
+        self.assertEqual(
+            session.posts[0]["url"],
+            "http://agent.local/fast-first-response",
+        )
+        self.assertAlmostEqual(session.posts[0]["timeout"].total, 1.9)
 
     async def test_goal_association_call_injects_runtime_trace_carrier(self) -> None:
         resolution = GoalAssociationResolution(
@@ -117,53 +156,6 @@ class AgentClientTests(unittest.IsolatedAsyncioTestCase):
             item["module"]["name"] for item in snapshot.trace["items"]
         }
         self.assertIn("orchestrator.agent_client", modules)
-
-    async def test_tool_result_interpretation_posts_complete_evidence(self) -> None:
-        data = {"temperature_c": 37.0, "apparent_temperature_c": 42.0}
-        request = ToolResultInterpretationRequest(
-            sid="tool-client",
-            user_request="Is it hot?",
-            language="en-US",
-            evidence=[
-                ToolResultEvidence(
-                    evidence_id="weather-result",
-                    tool_id="chromie.weather.lookup",
-                    status="completed",
-                    data=data,
-                    output_sha256=canonical_value_sha256(data),
-                )
-            ],
-        )
-        expected = ToolResultInterpretation(
-            status="resolved",
-            spoken_response="Yes, it is hot at 37°C.",
-            answer_mode="direct",
-            selected_facts=[
-                {
-                    "evidence_id": "weather-result",
-                    "json_pointer": "/temperature_c",
-                }
-            ],
-            confidence=0.95,
-        )
-        session = _FakeSession(_FakeResponse(text=expected.model_dump_json()))
-
-        result = await AgentClient("http://agent.local").interpret_tool_result(
-            session,  # type: ignore[arg-type]
-            request=request,
-            timeout_ms=5500,
-        )
-
-        self.assertEqual(result.spoken_response, expected.spoken_response)
-        self.assertEqual(
-            session.posts[0]["url"],
-            "http://agent.local/tool-result/interpret",
-        )
-        self.assertEqual(
-            session.posts[0]["json"]["evidence"][0]["data"],
-            data,
-        )
-        self.assertAlmostEqual(session.posts[0]["timeout"].total, 5.5)
 
     async def test_execute_planning_task_graph_posts_graph_payload(self) -> None:
         trace = {

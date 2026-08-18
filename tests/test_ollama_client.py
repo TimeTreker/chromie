@@ -184,7 +184,7 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
         with mock.patch("agent.app.clients.ollama_client.httpx.AsyncClient", return_value=context), mock.patch.dict("os.environ", {"CHROMIE_CLI_COLOR": "1"}, clear=False):
             with self.assertLogs("chromie.agent.ollama", level="ERROR") as error_logs:
                 with self.assertRaises(OllamaGenerationError) as raised:
-                    await OllamaClient(base_url="http://chromie-llm:11434", model="test-model", purpose="response_composer").generate("hello", options={"num_predict": 8})
+                    await OllamaClient(base_url="http://chromie-llm:11434", model="test-model", purpose="fast_planner").generate("hello", options={"num_predict": 8})
         metadata = raised.exception.metadata()
         self.assertEqual(metadata["failure_class"], "output_truncated")
         self.assertFalse(metadata["retryable"])
@@ -401,7 +401,7 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
                 await OllamaClient(
                     base_url="http://chromie-llm:11434",
                     model="test-model",
-                    purpose="response_composer",
+                    purpose="fast_planner",
                 ).generate(
                     "hello",
                     options={"num_ctx": 2048, "num_predict": 512},

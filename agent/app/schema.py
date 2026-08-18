@@ -39,10 +39,6 @@ class HealthResponse(BaseModel):
     fast_planner_model: str | None = None
     deep_planner_enabled: bool = False
     deep_planner_model: str | None = None
-    response_composer_enabled: bool = False
-    response_composer_model: str | None = None
-    tool_result_interpreter_enabled: bool = False
-    tool_result_interpreter_model: str | None = None
     social_attention_mode: str = "on"
     social_attention_model: str | None = None
 

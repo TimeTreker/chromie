@@ -101,7 +101,24 @@
           "goal-look",
           "goal-blink"
         ]
-      }
+      },
+      "response_text": "",
+      "communicative_acts": [
+        {
+          "activity_id": "scenario-pre_action",
+          "text": "Okay. I’ll look at you for two seconds, then blink twice.",
+          "role": "complete_response",
+          "timing": "parallel",
+          "speech_act": "inform",
+          "source_goal_ids": [
+            "goal-look",
+            "goal-blink"
+          ],
+          "truth_stage": "context_grounded",
+          "evidence_refs": [],
+          "information_gaps": []
+        }
+      ]
     },
     "capabilities": [
       {
@@ -148,21 +165,7 @@
           "eye_expression"
         ]
       }
-    ],
-    "response_composition": {
-      "response_plan": {
-        "pre_action": {
-          "text": "Okay. I’ll look at you for two seconds, then blink twice.",
-          "speech_act": "inform",
-          "commitment_state": "evaluating",
-          "must_not_claim_completion": true,
-          "covers_goal_ids": [
-            "goal-look",
-            "goal-blink"
-          ]
-        }
-      }
-    }
+    ]
   },
   "expect": {
     "status": "applied",
@@ -213,8 +216,7 @@
     "calls": [
       "fast_advance",
       "goal_association",
-      "fast_plan",
-      "response_composer"
+      "fast_plan"
     ]
   }
 }

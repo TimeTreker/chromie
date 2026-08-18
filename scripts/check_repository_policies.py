@@ -850,11 +850,6 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
             ("_DEPENDENCY_ALIASES",),
             "perception contracts must preserve exact typed dependencies instead of applying semantic aliases",
         ),
-        "agent/app/response_composer.py": (
-            RULE_HOST_SEMANTIC_AUTHORITY,
-            ("_pending_action_claim_errors",),
-            "Response Composer claim meaning must remain model-authored and typed",
-        ),
         "agent/app/schema.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
             (
@@ -877,14 +872,6 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
                 "contract_markers =",
             ),
             "Goal Interpretation contracts may preserve exact typed model output but may not synthesize wording or semantic aliases",
-        ),
-        "agent/app/tool_result_interpreter.py": (
-            RULE_HOST_SEMANTIC_AUTHORITY,
-            (
-                "_INTERNAL_NARRATION_MARKERS",
-                "_contains_unrequested_internal_narration",
-            ),
-            "tool-result meaning must not be accepted or rejected through phrase lists",
         ),
         "orchestrator/runtime/session.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
@@ -930,9 +917,7 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
         "agent/app/cognitive_core/goal_interpreter/engine.py",
         "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
         "agent/app/cognitive_core/goal_interpreter/schema.py",
-        "agent/app/response_composer.py",
         "agent/app/schema.py",
-        "agent/app/tool_result_interpreter.py",
         "orchestrator/orchestrator.py",
         "orchestrator/runtime/confirmation.py",
         "orchestrator/runtime/conversation_state.py",
@@ -945,7 +930,6 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
         "agent/app/agents/capability.py",
         "agent/app/capabilities/catalog.py",
         "agent/app/capabilities/validator.py",
-        "agent/app/response_composer.py",
         "orchestrator/runtime/confirmation.py",
         "orchestrator/runtime/conversation_state.py",
         "shared/chromie_contracts/semantic_task.py",

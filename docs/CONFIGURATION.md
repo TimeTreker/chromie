@@ -103,7 +103,7 @@ All risky or incomplete execution paths are default-off.
 | `ORCH_ENABLE_AGENT` | `1` | Enable the Agent-owned Cognitive Core and downstream runtime. |
 | `ORCH_ENABLE_INTERACTION_RESPONSE` | `1` | Enable strict structured responses. Unified cognitive `apply` requires this; the compatibility `/interaction` surface remains available for explicit diagnostics. |
 | `ORCH_ENABLE_SORIDORMI_CAPABILITIES` | `0` | Allow named Soridormi skills in the structured path. |
-| `ORCH_FAST_FIRST_RESPONSE_ENABLED` | `1` | Legacy/compatibility low-latency response gate. Maintained cognitive `apply` does not use Goal Interpretation as a speech owner; Fast Planner selects Communicative Acts, Response Composer realizes their wording, and Cognitive Runtime schedules them. |
+| `ORCH_FAST_FIRST_RESPONSE_ENABLED` | `1` | Legacy/compatibility low-latency response gate. Maintained cognitive `apply` does not use Goal Interpretation as a speech owner; Fast Planner authors exact Communicative Activities and Cognitive Runtime validates and schedules them. |
 | `ORCH_AGENT_GOAL_INTERPRETER_GENERATED_FAST_SPEECH_ENABLED` | `1` | Legacy compatibility gate for Goal-Interpreter-generated `fast_speech`. In maintained cognitive `apply`, Goal Interpretation emits Responsibility evidence only and this field is structurally `null`; Fast Planner owns any immediate Communicative-Act selection. |
 | `ORCH_FAST_FIRST_AUDIO_ENABLED` | `1` | Enable startup-primed in-memory PCM acknowledgements as a last-resort latency presentation path when dynamic speech is not admissible, absent, invalid, or cannot be scheduled. Cache entries are generic and cannot claim a tool result, memory commit, physical effect, or completion. |
 | `ORCH_FAST_FIRST_AUDIO_HEDGE_MS` | `750` | After dynamic fast speech cannot be scheduled, wait this long before playing the cached fallback; suppress it when the final response becomes ready first. |
@@ -118,7 +118,13 @@ All risky or incomplete execution paths are default-off.
 | `ORCH_ADDRESSEDNESS_GATE_ENABLED` | `1` | Supply bounded host engagement evidence to Cognitive Gateway and Goal Interpretation. Only high-confidence semantic `not_addressed`/`ambient_speech` decisions may use model route `ignore`; stop/cancel and unusable audio remain deterministic. |
 | `ORCH_ADDRESSEDNESS_ENGAGEMENT_TIMEOUT_SEC` | `45` | Keep natural follow-ups addressed after the last accepted exchange. Active tasks also keep engagement open; ignored ambient turns do not. |
 
-A successfully queued fast response is projected into downstream Response Composer context as a current-turn communicative commitment, never as provider, execution, result, completion, or proof-of-hearing evidence. When the later composition judges that acknowledgement sufficient, it copies the exact text with `reuse_current_turn_speech=true`. Runtime then reuses the existing TTS event and its playback-start barrier instead of synthesizing or speaking the acknowledgement a second time. Supplements, corrections, confirmations, results, and failures must set the field false and remain new speech.
+A successfully queued fast response is projected into downstream Planner
+Interaction Context as a current-turn communicative commitment, never as
+provider, execution, result, completion, or proof-of-hearing evidence. A later
+Planner pass omits an equivalent acknowledgement and may author only a genuine
+supplement, correction, confirmation, result, or failure delta. Runtime reuses
+the existing TTS event and its playback-start barrier rather than speaking it
+twice.
 | `ORCH_TTS_CJK_CHUNK_CHARS` | `36` | Smaller chunk target for CJK speech so long Chinese weather/status responses can begin playback while later chunks are still synthesized. |
 | `ORCH_TTS_CJK_MIN_CHUNK_CHARS` | `8` | Minimum CJK clause size used when grouping punctuation-bounded fragments. |
 | `ORCH_CONFIRMATION_TTL_SEC` | `20` | Expiry in seconds for one pending spoken, request-bound confirmation. |
@@ -416,7 +422,7 @@ retained. See
 | `AGENT_SKILL_SELECTION_TIMEOUT_MS` | Timeout for one Agent Skill selection or repair model call; default `10000`. |
 | `AGENT_SKILL_SELECTION_MAX_CANDIDATES` | Maximum approved projection-compatible summaries disclosed to one selection call; default `12`. Deterministic bounding is retrieval only, not semantic selection. |
 | `AGENT_SKILL_SELECTION_MAX_SELECTED` | Maximum Skills the model may select in one result; default `4`. |
-| `AGENT_SKILL_PROGRESSIVE_DISCLOSURE_ENABLED` | Enable role-specific selection plus trusted projection injection for Goal Association, Fast Planner, Deep Planner, Response Composer, and Tool Result Interpreter; default `1`. |
+| `AGENT_SKILL_PROGRESSIVE_DISCLOSURE_ENABLED` | Enable role-specific selection plus trusted projection injection for Goal Association, Fast Planner, and Deep Planner; default `1`. |
 | `AGENT_SKILL_PROJECTION_MAX_CHARS` | Maximum UTF-8 character count for one disclosed projection; default `3000`. Oversized content is omitted, never truncated. |
 | `AGENT_SKILL_PROJECTION_TOTAL_MAX_CHARS` | Maximum aggregate disclosed projection characters for one Agent boundary; default `6000`. |
 | `AGENT_SKILL_PROJECTION_COUNT_LIMIT` | Maximum selected projections disclosed to one Agent boundary; default `4`. |
@@ -908,19 +914,11 @@ certificate-repair fallback.
 | `AGENT_DEEP_PLANNER_MAX_CAPABILITIES` | `96`; maximum full catalog entries supplied. |
 | `ORCH_DEEP_PLANNER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Deep Planning remains terminal in the unified runtime. |
 | `ORCH_DEEP_PLANNER_TIMEOUT_MS` | `10000`; host timeout for report-only deep planning. |
-| `AGENT_RESPONSE_COMPOSER_ENABLED` | `1`; exposes language formulation for immutable Fast-Planner Communicative Acts and advisory expression of an immutable terminal `CanonicalPlan` as a goal-scoped `ResponsePlan`. It does not select Planner acts. Social Attention is owned independently by `SocialAttentionPlanner` and is not part of the Response Composer DTO. |
-| `AGENT_RESPONSE_COMPOSER_MODEL` | `gemma4:e2b`; model used for multi-goal user-facing response expression. |
-| `AGENT_RESPONSE_COMPOSER_TIMEOUT_MS` | `4500`; response-composer model timeout. Failure does not alter the canonical task plan. |
-| `AGENT_RESPONSE_COMPOSER_NUM_CTX` | `8192`; bounded composition context sized for an immutable multi-goal plan plus the exact response schema. |
-| `AGENT_RESPONSE_COMPOSER_NUM_PREDICT` | `1024`; structured response-expression JSON budget. |
-| `ORCH_RESPONSE_COMPOSER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Unified `apply` requires a validated composition bound to the terminal plan. |
-| `ORCH_RESPONSE_COMPOSER_TIMEOUT_MS` | `5000`; host timeout for report-only composition. |
-| `AGENT_TOOL_RESULT_INTERPRETER_ENABLED` | `1`; enables generic evidence-bound interpretation after tool retrieval and for post-execution observations. |
-| `AGENT_TOOL_RESULT_INTERPRETER_MODEL` | Hardware-profile-owned model, normally the same quality family as Response Composer. |
-| `AGENT_TOOL_RESULT_INTERPRETER_TIMEOUT_MS` | `4500`; model timeout for relevance selection and concise spoken synthesis. |
-| `AGENT_TOOL_RESULT_INTERPRETER_NUM_CTX` | `4096`; bounded user-request plus tool-evidence context. |
-| `AGENT_TOOL_RESULT_INTERPRETER_NUM_PREDICT` | `256`; compact structured answer and fact-reference budget. |
-| `ORCH_TOOL_RESULT_INTERPRETER_TIMEOUT_MS` | `5500`; Host-to-Agent deadline for post-execution tool-result interpretation. |
+
+There is no independent response-composition or tool-result-interpretation
+model, endpoint, timeout, or profile role. Fast/Deep Planner output carries exact
+Communicative Activity wording. Host-bound terminal Capability Evidence re-enters
+Fast Planner through the existing bounded `AGENT_FAST_PLANNER_*` budget.
 
 Fast and Deep Planning send an exact flat `PlannerModelOutput` schema to
 Ollama. The model does not author the canonical plan identity, schema version,
@@ -935,16 +933,11 @@ prospective plan adequacy if the proposed response and steps succeed, not
 already-completed execution.
 
 The planners exclude response-transport skills such as `chromie.speak` from
-their capability schemas. The maintained first-advance path represents conversational
-work as wording-free Communicative Acts and calls Response Composer's
-`/communicative-acts/realize` boundary before Vocal delivery. The older canonical
-Fast/Deep Planner DTO still carries `response_text`; migrating that remaining contract
-to the same act/wording separation is tracked explicitly in current status rather than
-treated as proof that Planner should own wording. The terminal composer sends the exact
-`ResponseComposerModelOutput` schema and constrains response-stage Goal IDs to
-the immutable canonical plan. It may make one bounded same-stage repair with
-the original output and exact validation errors. Composition identity, the
-canonical plan copy, and its fingerprint remain host-owned.
+their capability schemas. Conversational work is a Planner-owned Communicative
+Activity carrying exact text, truth stage, Goal/Responsibility provenance, and
+Evidence references. The Host mechanically validates that activity before
+Vocal delivery; there is no second wording model. Canonical Plan identity and
+the authoritative Goal/Evidence snapshots remain Host-owned.
 
 ## Unified goal-driven cognitive runtime
 
@@ -1189,7 +1182,7 @@ retained. See
 | `AGENT_SKILL_SELECTION_TIMEOUT_MS` | Timeout for one Agent Skill selection or repair model call; default `10000`. |
 | `AGENT_SKILL_SELECTION_MAX_CANDIDATES` | Maximum approved projection-compatible summaries disclosed to one selection call; default `12`. Deterministic bounding is retrieval only, not semantic selection. |
 | `AGENT_SKILL_SELECTION_MAX_SELECTED` | Maximum Skills the model may select in one result; default `4`. |
-| `AGENT_SKILL_PROGRESSIVE_DISCLOSURE_ENABLED` | Enable role-specific selection plus trusted projection injection for Goal Association, Fast Planner, Deep Planner, Response Composer, and Tool Result Interpreter; default `1`. |
+| `AGENT_SKILL_PROGRESSIVE_DISCLOSURE_ENABLED` | Enable role-specific selection plus trusted projection injection for Goal Association, Fast Planner, and Deep Planner; default `1`. |
 | `AGENT_SKILL_PROJECTION_MAX_CHARS` | Maximum UTF-8 character count for one disclosed projection; default `3000`. Oversized content is omitted, never truncated. |
 | `AGENT_SKILL_PROJECTION_TOTAL_MAX_CHARS` | Maximum aggregate disclosed projection characters for one Agent boundary; default `6000`. |
 | `AGENT_SKILL_PROJECTION_COUNT_LIMIT` | Maximum selected projections disclosed to one Agent boundary; default `4`. |

@@ -126,7 +126,37 @@
             "goal-blink",
             "goal-greet"
           ]
-        }
+        },
+        "response_text": "",
+        "communicative_acts": [
+          {
+            "activity_id": "scenario-immediate",
+            "text": "早上好！",
+            "role": "complete_response",
+            "timing": "parallel",
+            "speech_act": "inform",
+            "source_goal_ids": [
+              "goal-greet"
+            ],
+            "truth_stage": "context_grounded",
+            "evidence_refs": [],
+            "information_gaps": []
+          },
+          {
+            "activity_id": "scenario-pre_action",
+            "text": "我可以先往前走一秒，再眨两下眼睛。这样可以吗？你说“好”，我就开始啦！",
+            "role": "complete_response",
+            "timing": "parallel",
+            "speech_act": "inform",
+            "source_goal_ids": [
+              "goal-walk",
+              "goal-blink"
+            ],
+            "truth_stage": "context_grounded",
+            "evidence_refs": [],
+            "information_gaps": []
+          }
+        ]
       }
     ],
     "capabilities": [
@@ -175,30 +205,7 @@
           "eye_expression"
         ]
       }
-    ],
-    "response_composition": {
-      "response_plan": {
-        "immediate": {
-          "text": "早上好！",
-          "speech_act": "inform",
-          "commitment_state": "none",
-          "must_not_claim_completion": true,
-          "covers_goal_ids": [
-            "goal-greet"
-          ]
-        },
-        "pre_action": {
-          "text": "我可以先往前走一秒，再眨两下眼睛。这样可以吗？你说“好”，我就开始啦！",
-          "speech_act": "ask_confirmation",
-          "commitment_state": "waiting_for_user",
-          "must_not_claim_completion": true,
-          "covers_goal_ids": [
-            "goal-walk",
-            "goal-blink"
-          ]
-        }
-      }
-    }
+    ]
   },
   "expect": {
     "status": "applied",
@@ -270,8 +277,7 @@
       "fast_advance",
       "goal_association",
       "fast_plan",
-      "deep_plan",
-      "response_composer"
+      "deep_plan"
     ]
   }
 }

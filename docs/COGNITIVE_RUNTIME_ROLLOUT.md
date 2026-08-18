@@ -28,7 +28,6 @@ PR1 through PR6 introduced the Goal-driven pipeline as advisory stages:
 Goal Association
 → Fast Planner
 → Deep Planner when Fast coverage is incomplete
-→ Response Composer
 ```
 
 PR7 connects those stages to the existing trusted host boundary without making
@@ -37,7 +36,8 @@ any model an execution authority:
 ```text
 User Turn
 → deterministic emergency and interruption controls
-→ Goal Association
+→ Goal Interpretation (contextual WHAT only)
+→ concurrent Fast Planner / Goal Association fan-out
 → Fast Planner
    ├─ complete terminal CanonicalPlan
    └─ escalate
@@ -45,7 +45,7 @@ User Turn
 → trusted host CanonicalPlan validation
    ├─ valid
    └─ structured rejection → fail closed
-→ Response Composer
+→ mechanical validation/materialization of Planner-owned Communicative Activities
 → trusted runtime adapter
 → atomic Goal-state application
 → existing request-bound confirmation
@@ -91,11 +91,11 @@ pending execution alone is not an unmet planning requirement.
 User-facing response transport is outside task planning. `chromie.speak` is
 excluded from both planner capability schemas and rejected if a planner emits
 it as a step. A direct conversational part of a mixed goal is represented by a
-goal-scoped `respond` outcome and `response_text`. Executable outcomes may also
-carry prospective `response_text` when they add a still-needed conversational
-act. Response Composer coordinates and realizes that speech from the immutable
-Plan and Interaction Context; planner-authored text never becomes execution
-evidence.
+goal-scoped `respond` outcome and exact Planner-owned Communicative Activity.
+Executable outcomes may also carry a still-needed prospective communicative
+delta. The Host mechanically validates truth stage, evidence provenance,
+confirmation, and delivery coordination from the immutable Plan and Interaction
+Context; wording never becomes execution evidence.
 
 ## 2. Authority boundaries
 
@@ -238,7 +238,6 @@ ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS=25000
 ORCH_GOAL_ASSOCIATION_TIMEOUT_MS=3500
 ORCH_FAST_PLANNER_TIMEOUT_MS=3000
 ORCH_DEEP_PLANNER_TIMEOUT_MS=10000
-ORCH_RESPONSE_COMPOSER_TIMEOUT_MS=5000
 ```
 
 The total budget prevents a sequence of individually legal calls from creating
@@ -338,19 +337,13 @@ contract exists.
 Goal-state success does not imply effect execution success. Execution evidence
 is retained separately.
 
-## 10. Response composition and social attention
+## 10. Planner communication and social attention
 
-The Response Composer receives an immutable fingerprinted terminal
-CanonicalPlan and organizes only goal-scoped user-facing expression. It cannot
-change user-task steps and does not author Social Attention.
-
-Ollama receives the exact `ResponseComposerModelOutput` schema, containing only
-the model-owned `response_plan`, lane coordination, confidence, and rationale.
-Goal coverage IDs are constrained to the immutable plan's Goal IDs. The host
-creates the `CoordinatedResponsePlan` envelope, composition ID, canonical plan
-copy, and SHA-256 plan fingerprint after validation. A mechanically malformed
-model result may receive one same-meaning DTO regeneration; semantic/truth
-rejection is terminal for that response attempt.
+Fast/Deep Planner receives the versioned Goal snapshot and owns the exact
+goal-scoped Communicative Activities in its immutable Canonical Plan. There is
+no later model-backed wording owner. The Host may create an internal transport
+projection with the Plan fingerprint, but that projection cannot add, omit,
+rewrite, or reinterpret an Activity.
 
 Trusted checks ensure:
 
@@ -360,7 +353,9 @@ Trusted checks ensure:
 
 Social Attention is a separate background cognition owned by
 `SocialAttentionPlanner`. Its valid `none`, malformed output, target/resource
-validation, and optional execution never cause Response Composer to run again.
+validation, and optional execution never delay or rewrite the attached Main
+Activity. Every opportunity names that concrete observable Activity; `none` is
+a valid decision and late standalone decoration is suppressed.
 
 ## 11. Evidence records
 

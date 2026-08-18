@@ -32,8 +32,6 @@ MODEL_PLAN_KEYS = (
     "AGENT_GOAL_ASSOCIATION_MODEL",
     "AGENT_FAST_PLANNER_MODEL",
     "AGENT_DEEP_PLANNER_MODEL",
-    "AGENT_RESPONSE_COMPOSER_MODEL",
-    "AGENT_TOOL_RESULT_INTERPRETER_MODEL",
     "AGENT_SOCIAL_ATTENTION_MODEL",
 )
 
@@ -54,10 +52,6 @@ COGNITIVE_BUDGET_KEYS = (
     "AGENT_FAST_PLANNER_NUM_PREDICT",
     "AGENT_DEEP_PLANNER_NUM_CTX",
     "AGENT_DEEP_PLANNER_NUM_PREDICT",
-    "AGENT_RESPONSE_COMPOSER_NUM_CTX",
-    "AGENT_RESPONSE_COMPOSER_NUM_PREDICT",
-    "AGENT_TOOL_RESULT_INTERPRETER_NUM_CTX",
-    "AGENT_TOOL_RESULT_INTERPRETER_NUM_PREDICT",
     "AGENT_SOCIAL_ATTENTION_NUM_CTX",
     "AGENT_SOCIAL_ATTENTION_NUM_PREDICT",
     "AGENT_GOAL_INTERPRETER_TIMEOUT_MS",
@@ -65,15 +59,11 @@ COGNITIVE_BUDGET_KEYS = (
     "AGENT_GOAL_ASSOCIATION_TIMEOUT_MS",
     "AGENT_FAST_PLANNER_TIMEOUT_MS",
     "AGENT_DEEP_PLANNER_TIMEOUT_MS",
-    "AGENT_RESPONSE_COMPOSER_TIMEOUT_MS",
-    "AGENT_TOOL_RESULT_INTERPRETER_TIMEOUT_MS",
     "AGENT_SOCIAL_ATTENTION_TIMEOUT_MS",
     "ORCH_AGENT_TIMEOUT_MS",
     "ORCH_GOAL_ASSOCIATION_TIMEOUT_MS",
     "ORCH_FAST_PLANNER_TIMEOUT_MS",
     "ORCH_DEEP_PLANNER_TIMEOUT_MS",
-    "ORCH_RESPONSE_COMPOSER_TIMEOUT_MS",
-    "ORCH_TOOL_RESULT_INTERPRETER_TIMEOUT_MS",
     "ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS",
 )
 
@@ -449,10 +439,6 @@ def active_models(values: Mapping[str, str]) -> list[str]:
         append(values.get("AGENT_FAST_PLANNER_MODEL"))
     if enabled(values.get("AGENT_DEEP_PLANNER_ENABLED"), default=True):
         append(values.get("AGENT_DEEP_PLANNER_MODEL"))
-    if enabled(values.get("AGENT_RESPONSE_COMPOSER_ENABLED"), default=True):
-        append(values.get("AGENT_RESPONSE_COMPOSER_MODEL"))
-    if enabled(values.get("AGENT_TOOL_RESULT_INTERPRETER_ENABLED"), default=True):
-        append(values.get("AGENT_TOOL_RESULT_INTERPRETER_MODEL"))
     if values.get("AGENT_SOCIAL_ATTENTION_MODE", "off") != "off":
         append(values.get("AGENT_SOCIAL_ATTENTION_MODEL"))
     return models
@@ -612,8 +598,7 @@ def main(argv: list[str] | None = None) -> int:
         f"goal_interpreter={models['AGENT_GOAL_INTERPRETER_MODEL']} "
         f"association={models['AGENT_GOAL_ASSOCIATION_MODEL']} "
         f"fast={models['AGENT_FAST_PLANNER_MODEL']} "
-        f"deep={models['AGENT_DEEP_PLANNER_MODEL']} "
-        f"composer={models['AGENT_RESPONSE_COMPOSER_MODEL']}"
+        f"deep={models['AGENT_DEEP_PLANNER_MODEL']}"
     )
     budgets = manifest.get("cognitive_budgets")
     if not isinstance(budgets, dict):

@@ -194,11 +194,11 @@ class PlannerCommunicationReview(BaseModel):
 # Fast/Deep planners express conversational intent through ``response_text`` or
 # a ``respond`` outcome. Executable outcomes may also carry prospective
 # ``response_text``; that speech never authorizes or proves the effect.
-RESPONSE_COMPOSER_OWNED_CAPABILITY_IDS = frozenset({"chromie.speak"})
+NON_PLANNER_TRANSPORT_CAPABILITY_IDS = frozenset({"chromie.speak"})
 
 
 def is_planner_step_capability(capability_id: str) -> bool:
-    return str(capability_id or "").strip() not in RESPONSE_COMPOSER_OWNED_CAPABILITY_IDS
+    return str(capability_id or "").strip() not in NON_PLANNER_TRANSPORT_CAPABILITY_IDS
 
 
 
@@ -2523,6 +2523,22 @@ def validate_external_response_evidence_boundary(
         responding_goal_ids = set(unresolved_external_goal_ids)
 
     unsupported = responding_goal_ids & unresolved_external_goal_ids
+    reentry = context.get("result_evidence_reentry")
+    trusted_terminal_evidence = context.get("trusted_terminal_evidence")
+    if isinstance(reentry, dict) and isinstance(trusted_terminal_evidence, list):
+        reentry_goal_ids = {
+            normalized
+            for value in reentry.get("source_goal_ids") or []
+            if (normalized := " ".join(str(value or "").strip().split()))
+        }
+        evidence_ids = {
+            normalized
+            for item in trusted_terminal_evidence
+            if isinstance(item, dict)
+            and (normalized := " ".join(str(item.get("evidence_id") or "").strip().split()))
+        }
+        if evidence_ids:
+            unsupported -= reentry_goal_ids
     if unsupported:
         raise ValueError(
             "external_read_response_requires_completed_or_verified_evidence: "

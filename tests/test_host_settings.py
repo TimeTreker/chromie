@@ -54,11 +54,10 @@ class HostSettingsSnapshotTests(unittest.TestCase):
                 "OLLAMA_NUM_CTX": "4096",
                 "AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE": "2.5",
                 "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS": "1024",
-                "AGENT_RESPONSE_COMPOSER_NUM_CTX": "12288",
-                "AGENT_RESPONSE_COMPOSER_NUM_PREDICT": "512",
-                "AGENT_RESPONSE_COMPOSER_TIMEOUT_MS": "7000",
                 "AGENT_FAST_PLANNER_MODEL": "fast-model",
-                "AGENT_FAST_PLANNER_NUM_CTX": "6144",
+                "AGENT_FAST_PLANNER_NUM_CTX": "12288",
+                "AGENT_FAST_PLANNER_NUM_PREDICT": "512",
+                "AGENT_FAST_PLANNER_TIMEOUT_MS": "7000",
             },
         )
 
@@ -66,11 +65,8 @@ class HostSettingsSnapshotTests(unittest.TestCase):
         self.assertEqual(model.keep_alive, "8h")
         self.assertEqual(model.prompt_chars_per_token_estimate, 2.5)
         self.assertEqual(model.context_safety_margin_tokens, 1024)
-        self.assertEqual(model.failure_response_num_ctx, 12288)
-        self.assertEqual(model.failure_response_num_predict, 512)
-        self.assertEqual(model.failure_response_timeout_ms, 7000)
         self.assertEqual(model.ready_greeting_fallback_model, "fast-model")
-        self.assertEqual(model.ready_greeting_num_ctx, 6144)
+        self.assertEqual(model.ready_greeting_num_ctx, 12288)
 
 
     def test_extended_host_collaborator_settings_are_typed_once(self) -> None:

@@ -790,7 +790,8 @@ python scripts/general_ability_acceptance.py \
 
 The focused scenario must preserve `chromie.vocal.perform`, the exact requested
 mode, source Goal ownership, and `execution_lane=speaking` through Goal
-Association, both Planner tiers, Response Composer, and Host materialization.
+Association, both Planner tiers, Planner-owned Communicative Activities, and
+Host materialization.
 Provider tests must cover declaration evidence, unsupported-mode refusal before
 backend invocation, silent-downgrade rejection, exact request cancellation, and
 the final Trusted Capability Runtime/turn-closure evidence identity. Ordinary
@@ -827,7 +828,7 @@ progress, exact operation/state evidence, qualified catalog exposure without a
 backend-name leak, explicit speech-over-media ducking, and distinct
 stop-talking/media/all receipts. The mixed walk+media scenario must preserve two
 Activity Goals and the exact Soridormi and `chromie.media.play` steps through
-Goal Association, both Planner tiers, Response Composer, and Host
+Goal Association, both Planner tiers, Planner-owned Communicative Activities, and Host
 materialization. The stop-media scenario must take `media_output` with zero
 model calls.
 

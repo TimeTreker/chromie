@@ -137,7 +137,24 @@
           ],
           "unmet_goal_ids": [],
           "unmet_requirements": []
-        }
+        },
+        "response_text": "",
+        "communicative_acts": [
+          {
+            "activity_id": "scenario-immediate",
+            "text": "I can walk while the peer media provider starts that existing song.",
+            "role": "complete_response",
+            "timing": "parallel",
+            "speech_act": "inform",
+            "source_goal_ids": [
+              "goal-walk",
+              "goal-media"
+            ],
+            "truth_stage": "context_grounded",
+            "evidence_refs": [],
+            "information_gaps": []
+          }
+        ]
       }
     ],
     "capabilities": [
@@ -220,21 +237,7 @@
           "evidence_level": "source_test"
         }
       }
-    ],
-    "response_composition": {
-      "response_plan": {
-        "immediate": {
-          "text": "I can walk while the peer media provider starts that existing song.",
-          "speech_act": "inform",
-          "commitment_state": "evaluating",
-          "must_not_claim_completion": true,
-          "covers_goal_ids": [
-            "goal-walk",
-            "goal-media"
-          ]
-        }
-      }
-    }
+    ]
   },
   "expect": {
     "status": "applied",
@@ -307,8 +310,7 @@
       "fast_advance",
       "goal_association",
       "fast_plan",
-      "deep_plan",
-      "response_composer"
+      "deep_plan"
     ]
   }
 }

@@ -24,13 +24,12 @@ Chromie's cognitive stages have distinct responsibilities:
    not contain phrase rules or choose a semantic referent.
 4. **Fast/Deep Planner** receives resolved Goal bindings and decides whether to
    retrieve one exact verified prior result or execute a fresh read.
-5. **Response Composer** authors natural pre-result speech. It may say that
-   Chromie is checking a source or retrieving a recently checked result, but it
-   cannot state the result before trusted evidence returns. For a follow-up
-   that references one retained completed Goal, it may also receive the exact
-   evidence-bound dialogue that was already delivered to the user.
-6. **Tool Result Interpreter** produces the final grounded answer from the
-   executed memory-retrieval or external-read evidence.
+5. **Fast/Deep Planner** authors the exact natural pre-result Communicative
+   Activity. It may say that Chromie is checking a source or retrieving a
+   recently checked result, but cannot state the result before trusted Evidence.
+6. **Host Evidence binding** joins the exact request/result to its existing
+   Goal and reactivates Fast Planner, which authors any still-useful grounded
+   answer without fabricating another user turn.
 
 Tool-result memory is never reference-resolution authority.
 
@@ -183,8 +182,8 @@ this Goal while sending `location=重庆`.
 
 ## Verified memory retrieval
 
-Raw prior result contents are not injected into Goal Association, Planner, or
-Response Composer prompts. Instead, the Planner sees a bounded index containing
+Raw prior result contents are not injected into Goal Association or ordinary
+Planner prompts. Instead, the Planner sees a bounded index containing
 only:
 
 - `evidence_id`;
@@ -222,9 +221,9 @@ Goal. The Planner must use a fresh weather lookup for Neixiang instead.
 
 The verified-memory index proves only identity, arguments, freshness, and
 provenance. It is never answer evidence. Separately, conversation state may
-retain a bounded assistant turn only when the post-execution interpreter's
+retain a bounded assistant turn only when the post-execution Planner's
 speech was actually delivered and the Host marks it with its source Goal and
-Canonical Plan IDs. Fast Planner and Response Composer may use this delivered
+Canonical Plan IDs. Fast Planner may use this delivered
 evidence-bound dialogue to interpret or restate the same completed Goal without
 reopening it or repeating the external read.
 

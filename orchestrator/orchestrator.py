@@ -121,6 +121,7 @@ from shared.chromie_contracts.interaction import (
     CapabilityResult,
 )
 from shared.chromie_contracts.goal import GoalAssociationResolution
+from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.execution_outcome import (
     ExecutionEvidence,
     goal_completion_qualification_summary,
@@ -130,7 +131,6 @@ from shared.chromie_contracts.tool_result import (
     ToolExecutionRequest,
     ToolExecutionResponse,
     ToolResultEvidence,
-    ToolResultInterpretationRequest,
     canonical_value_sha256,
 )
 from shared.chromie_contracts.reflex import (
@@ -217,7 +217,6 @@ class VoiceAssistant:
         self.tts_url = playback_settings.tts_url
         self.llm_url = cognition_settings.llm_url
         self.ollama_model = cognition_settings.ollama_model
-        self.failure_response_model = cognition_settings.failure_response_model
 
         self.enable_agent = cognition_settings.enable_agent
         self.enable_interaction_response = (
@@ -279,13 +278,6 @@ class VoiceAssistant:
         self.fast_planner_timeout_ms = cognition_settings.fast_planner_timeout_ms
         self.deep_planner_mode = cognition_settings.deep_planner_mode
         self.deep_planner_timeout_ms = cognition_settings.deep_planner_timeout_ms
-        self.response_composer_mode = cognition_settings.response_composer_mode
-        self.response_composer_timeout_ms = (
-            cognition_settings.response_composer_timeout_ms
-        )
-        self.tool_result_interpreter_timeout_ms = (
-            cognition_settings.tool_result_interpreter_timeout_ms
-        )
         self.goal_association_mode = cognition_settings.goal_association_mode
         self.goal_association_timeout_ms = (
             cognition_settings.goal_association_timeout_ms
@@ -529,7 +521,6 @@ class VoiceAssistant:
             goal_association_timeout_ms=self.goal_association_timeout_ms,
             fast_planner_timeout_ms=self.fast_planner_timeout_ms,
             deep_planner_timeout_ms=self.deep_planner_timeout_ms,
-            response_composer_timeout_ms=self.response_composer_timeout_ms,
         )
         self.cognitive_evidence = CognitiveEvidenceRecorder(
             self.cognitive_evidence_path,
@@ -2996,19 +2987,7 @@ class VoiceAssistant:
         if resolution.status != "applied" or resolution.interaction_response is None:
             fallback_started_ms = now_ms()
             fast_first_scheduled = fast_planner_vocal_scheduled
-            safe_response = await self._compose_cognitive_failure_response(
-                resolution,
-                user_text=user_text,
-                session_id=session_id,
-            )
-            if safe_response is None:
-                safe_response = self._host_speech_response(
-                    "咦，刚才没弄成。"
-                    if self._looks_zh(user_text)
-                    else "Oh, that didn't work just now.",
-                    style="warning",
-                    source="host_cognitive_runtime_emergency_fallback",
-                )
+            safe_response = self._cognitive_core_exception_safe_response(user_text)
             record_session_workflow_stage(
                 self,
                 session_id,
@@ -4376,459 +4355,6 @@ class VoiceAssistant:
             }
         )
 
-    async def _compose_cognitive_failure_response(
-        self,
-        resolution: CognitiveRuntimeResolution,
-        *,
-        user_text: str,
-        session_id: str,
-        trusted_failure_facts: dict[str, Any] | None = None,
-        response_source: str = "llm_cognitive_failure_response",
-    ) -> InteractionResponse | None:
-        """Let the quality model verbalize Host-owned failure facts."""
-
-        language = "zh-CN" if self._looks_zh(user_text) else "en-US"
-        failure_response_model = (
-            str(getattr(self, "failure_response_model", "") or "").strip()
-            or str(getattr(self, "ollama_model", "") or "").strip()
-        )
-        llm_url = str(getattr(self, "llm_url", "") or "").strip()
-        if not failure_response_model or not llm_url:
-            return None
-        metadata = resolution.metadata if isinstance(resolution.metadata, dict) else {}
-        failure_facts = dict(trusted_failure_facts or {})
-        if not failure_facts:
-            failure_facts = {
-                "lane": resolution.lane,
-                "failure_stage": str(metadata.get("failure_stage") or "runtime"),
-                "failure_class": str(metadata.get("failure_class") or "runtime_failure"),
-                "execution_started": False,
-                "verified_result_available": False,
-                "retryable": bool(metadata.get("retryable")),
-            }
-        execution_started = failure_facts.get("execution_started") is True
-        selected_capability_ids = [
-            str(item).strip()
-            for item in failure_facts.get("selected_capability_ids", [])
-            if str(item).strip()
-        ]
-        missing_ability = bool(failure_facts.get("missing_ability"))
-        if selected_capability_ids:
-            missing_ability = False
-        understanding_completed = bool(
-            missing_ability
-            or selected_capability_ids
-            or resolution.goal_association is not None
-            or resolution.fast_plan is not None
-            or resolution.terminal_plan is not None
-        )
-        failure_domain = str(metadata.get("failure_domain") or "")
-        failure_stage = str(metadata.get("failure_stage") or "")
-        failure_facts.setdefault("user_input_understood", understanding_completed)
-        failure_facts.setdefault(
-            "user_should_repeat",
-            not understanding_completed
-            and failure_stage in {"gateway", "goal_interpretation"}
-            and failure_domain != "model_contract",
-        )
-        interaction_constructed = resolution.interaction_response is not None
-        failure_facts.setdefault(
-            "interaction_response_constructed", interaction_constructed
-        )
-        provider_request_count = (
-            len(resolution.interaction_response.capabilities)
-            if interaction_constructed
-            else 0
-        )
-        failure_facts.setdefault("provider_request_count", provider_request_count)
-        failure_facts.setdefault(
-            "selected_capability_ids", selected_capability_ids
-        )
-        failure_facts.setdefault(
-            "exact_capability_selected", bool(selected_capability_ids)
-        )
-        failure_facts.setdefault(
-            "capability_available_at_interpretation", bool(selected_capability_ids)
-        )
-        failure_facts.setdefault("missing_ability", missing_ability)
-        provider_dispatch_started = execution_started or provider_request_count > 0
-        capability_state = (
-            "unavailable"
-            if missing_ability
-            else "available"
-            if selected_capability_ids
-            else "unknown"
-        )
-        execution_state = (
-            "attempted" if provider_dispatch_started else "not_attempted"
-        )
-        result_state = (
-            "available"
-            if failure_facts.get("verified_result_available") is True
-            else "not_observed"
-        )
-        # These facts are derived from trusted runtime state and are not caller-
-        # or model-overridable wording hints. Keep one authoritative triplet.
-        failure_facts["capability_state"] = capability_state
-        failure_facts["execution_state"] = execution_state
-        failure_facts["result_state"] = result_state
-        failure_facts.setdefault("provider_dispatch_started", provider_dispatch_started)
-        failure_facts.setdefault(
-            "failure_before_provider_dispatch",
-            not provider_dispatch_started,
-        )
-        failure_facts.setdefault(
-            "system_retry_possible", bool(failure_facts.get("retryable"))
-        )
-        failure_facts.setdefault(
-            "user_action_required", bool(failure_facts.get("user_should_repeat"))
-        )
-        if not execution_started and not interaction_constructed:
-            failure_facts.setdefault(
-                "no_motion_reason",
-                "no_trusted_interaction_response_was_constructed",
-            )
-        phase = (
-            "after one or more requested actions were attempted but did not complete"
-            if execution_started
-            else "before any tool or body action started"
-        )
-        # The full typed failure record remains in response metadata for audit,
-        # but wording generation receives only facts a person could reasonably
-        # hear about. Internal stage/class/retry labels previously primed the
-        # model to translate a planner failure into unnatural speech such as
-        # "my plan went wrong" even though the prompt prohibited that leak.
-        user_visible_fact_keys = (
-            "user_input_understood",
-            "user_should_repeat",
-            "interaction_response_constructed",
-            "provider_request_count",
-            "exact_capability_selected",
-            "capability_available_at_interpretation",
-            "missing_ability",
-            "execution_started",
-            "verified_result_available",
-            "capability_state",
-            "execution_state",
-            "result_state",
-            "provider_dispatch_started",
-            "failure_before_provider_dispatch",
-            "user_action_required",
-            "reason_codes",
-            "goal_statuses",
-        )
-        user_visible_failure_facts = {
-            key: failure_facts[key]
-            for key in user_visible_fact_keys
-            if key in failure_facts
-        }
-        prompt = (
-            "Write the exact words Chromie should say after a request failed "
-            f"{phase}. The facts below are authoritative. "
-            "Do not diagnose beyond them and do not change them. Sound like a smart, "
-            "warm six-year-old girl, not a service status page or an adult engineer. "
-            f"Speak only in {language}. Use one short, complete natural sentence. "
-            "Do not mention models, planners, schemas, validation, services, APIs, "
-            "internal tools, evidence labels, or system components. Do not claim any "
-            "successful lookup, movement, or verified result that the facts do not prove. "
-            "Do not invent the requested result. Treat typed provider reason codes as exact "
-            "failure facts: location_not_found means the provider could not identify the "
-            "requested place, not that weather itself was unavailable or the network failed. "
-            "Say simply what failed in natural childlike language, preserve the honest "
-            "no-guess/no-forced-motion boundary. If user_input_understood is true, never "
-            "say that Chromie did not hear or understand the request. If user_should_repeat "
-            "is false, do not ask the user to repeat the same words; say only the "
-            "user-visible failure or missing result/effect that is supported by the facts. "
-            "Treat capability_state, execution_state, and result_state as separate, "
-            "non-interchangeable facts. In particular, unavailable + not_attempted + "
-            "not_observed is a capability limitation, not an empty search result or an "
-            "execution failure. When capability_state is unavailable, first acknowledge the "
-            "understood user outcome, then name the specific requested thing Chromie cannot "
-            "do now, with a brief apology when appropriate. Do not hide behind a generic "
-            "new ability, skill, feature, or merely say Chromie has not learned it yet. When "
-            "useful, add one concrete user-side next step that does not imply Chromie executed "
-            "anything. Future support may be described only as a possibility (for example, "
-            "when Chromie can do that someday), never as a promise that Chromie will learn or "
-            "gain the unavailable Capability. When provider_request_count "
-            "is zero, do not imply that Chromie tried to move, query, or contact a provider; "
-            "the request failed before dispatch. result_state=not_observed means no result was "
-            "obtained at all; it must never be rewritten as a successful query with zero "
-            "matches. Express only the user-visible boundary supported by these typed facts. "
-            "Do not expose internal planning, arrangement, schema, or workflow language. When "
-            "exact_capability_selected or capability_available_at_interpretation is true, "
-            "the ability exists: never say Chromie cannot do it, does not know how, has not "
-            "learned it, or lacks the ability. When capability_state is unknown, preserve that "
-            "uncertainty: never claim the ability exists or is missing, and never say Chromie "
-            "has not learned how. Say only that this attempt did not get the requested result "
-            "or effect when the facts support that. Do not invent a weather, network, or provider "
-            "failure when none was observed. system_retry_possible describes "
-            "an internal property and never by itself asks the user to repeat or approve. "
-            "Invite one retry only when user_action_required is true. Return only the "
-            "schema-valid JSON object and repeat the supplied capability_state, execution_state, "
-            "and result_state exactly alongside text.\n\n"
-            f"Owner-approved identity JSON: {self._owner_identity_json()}\n"
-            f"Owner-approved mind summary: {self._owner_mind_summary()}\n"
-            "User-visible failure facts JSON (the internal audit record was "
-            "intentionally withheld): "
-            f"{json.dumps(user_visible_failure_facts, ensure_ascii=False, sort_keys=True)}\n"
-            f"User turn: {user_text}\n"
-        )
-        payload = {
-            "model": failure_response_model,
-            "prompt": prompt,
-            "stream": False,
-            "think": False,
-            "format": self._spoken_text_response_schema(
-                max_chars=120,
-                semantic_state={
-                    "capability_state": capability_state,
-                    "execution_state": execution_state,
-                    "result_state": result_state,
-                },
-            ),
-            "keep_alive": self.host_settings.model_generation.keep_alive,
-            "options": {
-                "num_ctx": self.host_settings.model_generation.failure_response_num_ctx,
-                "num_predict": self.host_settings.model_generation.failure_response_num_predict,
-                "temperature": 0.35,
-                "top_p": 0.9,
-            },
-        }
-        try:
-            session = await self.get_http_session()
-            timeout_ms = self.host_settings.model_generation.failure_response_timeout_ms
-
-            async def request_text() -> dict[str, Any]:
-                async with session.post(llm_url, json=payload) as response:
-                    body = await response.text()
-                    if response.status != 200:
-                        raise RuntimeError(
-                            "failure response composer returned HTTP "
-                            f"{response.status}: {body[:300]}"
-                        )
-                    data = json.loads(body)
-                    if not isinstance(data, dict):
-                        raise RuntimeError(
-                            "failure response composer returned a non-object body"
-                        )
-                    return data
-
-            data = await asyncio.wait_for(
-                request_text(),
-                timeout=timeout_ms / 1000.0,
-            )
-            text = self._decode_spoken_text_envelope(
-                data,
-                purpose="cognitive failure response",
-                max_chars=120,
-                one_sentence=True,
-                require_terminal_punctuation=True,
-                language=language,
-                expected_semantic_state={
-                    "capability_state": capability_state,
-                    "execution_state": execution_state,
-                    "result_state": result_state,
-                },
-            )
-            cjk_count = sum(
-                1
-                for char in text
-                if (
-                    "\u3400" <= char <= "\u4dbf"
-                    or "\u4e00" <= char <= "\u9fff"
-                    or "\uf900" <= char <= "\ufaff"
-                )
-            )
-            latin_count = sum(
-                1
-                for char in text
-                if ("A" <= char <= "Z") or ("a" <= char <= "z")
-            )
-            if language.startswith("zh") and latin_count > max(12, cjk_count * 2):
-                raise RuntimeError(
-                    "cognitive failure response contains too much English for zh-CN"
-                )
-            if language.startswith("en") and cjk_count > max(2, latin_count // 4):
-                raise RuntimeError(
-                    "cognitive failure response contains too much Chinese for en-US"
-                )
-            truth_audit: dict[str, Any] = {
-                "attempted": False,
-                "accepted": False,
-                "violations": [],
-            }
-            if (
-                capability_state == "unknown"
-                and execution_state == "not_attempted"
-                and result_state == "not_observed"
-            ):
-                audit_prompt = (
-                    "Audit one candidate failure sentence against immutable runtime "
-                    "facts. This is a truth check, not a writing task: never provide "
-                    "replacement wording. capability_state=unknown means the sentence "
-                    "must not claim the ability exists, is absent, is unlearned, or is "
-                    "something Chromie does not know how to do. "
-                    "execution_state=not_attempted means it must not claim a lookup, "
-                    "movement, provider contact, or other execution was tried. "
-                    "result_state=not_observed means it must not claim a result, empty "
-                    "result, weather condition, provider failure, network failure, or "
-                    "other specific cause was observed. It may state only that this "
-                    "attempt did not obtain the requested result or effect, without "
-                    "guessing why. Reject an invitation to repeat unless "
-                    "user_action_required is true. Return only the audit JSON and do "
-                    "not rewrite the sentence.\n\n"
-                    "Immutable user-visible facts JSON: "
-                    f"{json.dumps(user_visible_failure_facts, ensure_ascii=False, sort_keys=True)}\n"
-                    f"Candidate sentence: {text}\n"
-                )
-                audit_payload = {
-                    "model": failure_response_model,
-                    "prompt": audit_prompt,
-                    "stream": False,
-                    "think": False,
-                    "format": {
-                        "type": "object",
-                        "properties": {
-                            "accepted": {"type": "boolean"},
-                            "violations": {
-                                "type": "array",
-                                "items": {
-                                    "type": "string",
-                                    "enum": [
-                                        "unsupported_capability_claim",
-                                        "unsupported_execution_claim",
-                                        "unsupported_result_claim",
-                                        "unsupported_failure_cause",
-                                        "unsupported_user_action",
-                                    ],
-                                },
-                                "maxItems": 5,
-                            },
-                            "reason_summary": {
-                                "type": "string",
-                                "maxLength": 240,
-                            },
-                        },
-                        "required": [
-                            "accepted",
-                            "violations",
-                            "reason_summary",
-                        ],
-                        "additionalProperties": False,
-                    },
-                    "keep_alive": self.host_settings.model_generation.keep_alive,
-                    "options": {
-                        "num_ctx": self.host_settings.model_generation.failure_response_num_ctx,
-                        "num_predict": min(
-                            160,
-                            self.host_settings.model_generation.failure_response_num_predict,
-                        ),
-                        "temperature": 0,
-                        "top_p": 0.9,
-                    },
-                }
-
-                async def request_truth_audit() -> dict[str, Any]:
-                    async with session.post(llm_url, json=audit_payload) as response:
-                        body = await response.text()
-                        if response.status != 200:
-                            raise RuntimeError(
-                                "failure response truth audit returned HTTP "
-                                f"{response.status}: {body[:300]}"
-                            )
-                        decoded = json.loads(body)
-                        if not isinstance(decoded, dict):
-                            raise RuntimeError(
-                                "failure response truth audit returned a non-object body"
-                            )
-                        return decoded
-
-                audit_data = await asyncio.wait_for(
-                    request_truth_audit(),
-                    timeout=timeout_ms / 1000.0,
-                )
-                if str(audit_data.get("done_reason") or "").strip().lower() not in {
-                    "",
-                    "stop",
-                }:
-                    raise RuntimeError(
-                        "failure response truth audit did not complete normally"
-                    )
-                raw_audit = audit_data.get("response")
-                if not isinstance(raw_audit, str):
-                    raise RuntimeError(
-                        "failure response truth audit returned no response string"
-                    )
-                audit = json.loads(raw_audit)
-                if not isinstance(audit, dict) or set(audit) != {
-                    "accepted",
-                    "violations",
-                    "reason_summary",
-                }:
-                    raise RuntimeError(
-                        "failure response truth audit returned an invalid envelope"
-                    )
-                violations = audit.get("violations")
-                if not isinstance(violations, list) or any(
-                    item
-                    not in {
-                        "unsupported_capability_claim",
-                        "unsupported_execution_claim",
-                        "unsupported_result_claim",
-                        "unsupported_failure_cause",
-                        "unsupported_user_action",
-                    }
-                    for item in violations
-                ):
-                    raise RuntimeError(
-                        "failure response truth audit returned invalid violations"
-                    )
-                if audit.get("accepted") is not True or violations:
-                    raise RuntimeError(
-                        "failure response truth audit rejected candidate: "
-                        + ",".join(str(item) for item in violations)
-                    )
-                truth_audit = {
-                    "attempted": True,
-                    "accepted": True,
-                    "violations": [],
-                    "reason_summary": str(audit.get("reason_summary") or "")[:240],
-                }
-            response = self._host_speech_response(
-                text,
-                style="warning",
-                source=response_source,
-            )
-            return response.model_copy(
-                update={
-                    "metadata": {
-                        **response.metadata,
-                        "failure_facts": failure_facts,
-                        "failure_response_model": failure_response_model,
-                        "failure_response_truth_audit": truth_audit,
-                        "semantic_fallback": False,
-                    }
-                }
-            )
-        except Exception as exc:
-            try:
-                self.session_log(
-                    session_id,
-                    "cognitive_failure_response_composer_failed: error_type=%s error=%s",
-                    type(exc).__name__,
-                    exc,
-                )
-            except Exception:
-                logger.warning(
-                    "cognitive_failure_response_composer_failed: error_type=%s error=%s",
-                    type(exc).__name__,
-                    exc,
-                )
-            return None
-
-
-
-
     @staticmethod
     def _looks_zh(text: str) -> bool:
         return any("\u4e00" <= ch <= "\u9fff" for ch in text or "")
@@ -5520,7 +5046,7 @@ class VoiceAssistant:
             return "incremental_result_delivery_completed"
 
         try:
-            final_response = await self._compose_evidence_bound_tool_result_response(
+            final_response = await self._plan_evidence_bound_capability_result_response(
                 source_response=response,
                 bundle=bundle,
                 plan=plan,
@@ -5529,84 +5055,17 @@ class VoiceAssistant:
             if final_response is None:
                 self.session_log(
                     session_id,
-                    "tool_result_spoken_interpretation_unavailable: "
-                    "aggregate=%s evidence=%s fallback=grounded_failure_response",
+                    "fast_planner_evidence_reentry_response_unavailable: "
+                    "aggregate=%s evidence=%s fallback=mechanical_outcome_projection",
                     bundle.aggregate_status,
                     len(bundle.evidence),
                 )
                 language = str(response.metadata.get("language") or "en-US")
-                route = self._execution_outcome_route(response, plan)
-                if bundle.aggregate_status != "completed":
-                    goal_statuses = [
-                        str(item.status) for item in bundle.goal_outcomes
-                    ]
-                    reason_codes = sorted(
-                        {
-                            str(code)
-                            for outcome in bundle.goal_outcomes
-                            for code in outcome.reason_codes
-                            if str(code or "").strip()
-                        }
-                    )
-                    failure_facts = {
-                        "route": route,
-                        "failure_stage": "skill_execution",
-                        "failure_class": "provider_execution_failed",
-                        "execution_started": True,
-                        "reason_codes": reason_codes,
-                        "verified_result_available": any(
-                            item.observation is not None
-                            and item.observation.status == "available"
-                            and item.observation.schema_validated
-                            for item in bundle.evidence
-                        ),
-                        "retryable": any(
-                            status in {"failed", "timed_out", "not_run"}
-                            for status in goal_statuses
-                        ),
-                        "aggregate_status": str(bundle.aggregate_status),
-                        "goal_statuses": goal_statuses,
-                        "requested_step_count": len(plan.steps),
-                        "completed_step_count": sum(
-                            item.status == "completed" for item in bundle.evidence
-                        ),
-                    }
-                    failure_resolution = CognitiveRuntimeResolution(
-                        mode="apply",
-                        status="error",
-                        lane=(
-                            "robot_action" if route == "robot_action" else "tool"
-                        ),
-                        metadata={
-                            "failure_stage": "skill_execution",
-                            "failure_class": "provider_execution_failed",
-                            "retryable": failure_facts["retryable"],
-                        },
-                    )
-                    failure_facts["selected_capability_ids"] = list(dict.fromkeys(
-                        str(step.capability_id).strip()
-                        for step in plan.steps
-                        if str(step.capability_id or "").strip()
-                    ))
-                    final_response = await self._compose_cognitive_failure_response(
-                        failure_resolution,
-                        user_text=self._execution_outcome_user_text(response, plan),
-                        session_id=str(session_id or ""),
-                        trusted_failure_facts=failure_facts,
-                        response_source="llm_execution_failure_response",
-                    )
-                    if final_response is None:
-                        final_response = compose_outcome_response(
-                            bundle,
-                            plan,
-                            language,
-                        )
-                else:
-                    final_response = compose_outcome_response(
-                        bundle,
-                        plan,
-                        language,
-                    )
+                final_response = compose_outcome_response(
+                    bundle,
+                    plan,
+                    language,
+                )
         except Exception as exc:
             self.session_log(
                 session_id,
@@ -5618,11 +5077,11 @@ class VoiceAssistant:
                 bundle,
                 session_id=session_id,
                 final_response=None,
-                delivery_status="composition_failed",
+                delivery_status="response_planning_failed",
                 suppression_reason=type(exc).__name__,
                 goal_state_results=goal_state_results,
             )
-            return "composition_failed"
+            return "response_planning_failed"
 
         detached_delivery = False
         if defer_for_ordinary_overlap:
@@ -5776,9 +5235,9 @@ class VoiceAssistant:
         """Turn one exact terminal Runtime result into an internal cognitive event.
 
         The result is never encoded as a user message. Runtime owns the lifecycle
-        fact, deterministic closure creates terminal Evidence, and the existing
-        Tool Result Interpreter may decide whether one grounded spoken update is
-        useful while sibling work continues.
+        fact, deterministic closure creates terminal Evidence, and Fast Planner
+        is reactivated with the exact Goal/request binding to decide whether one
+        grounded spoken update is useful while sibling work continues.
         """
 
         try:
@@ -5878,7 +5337,7 @@ class VoiceAssistant:
             return
 
         try:
-            result_response = await self._compose_incremental_terminal_result_response(
+            result_response = await self._plan_incremental_terminal_result_response(
                 source_response=response,
                 evidence=evidence,
                 opportunity=opportunity,
@@ -5887,7 +5346,7 @@ class VoiceAssistant:
         except Exception as exc:
             self.session_log(
                 session_id,
-                "incremental_tool_result_interpretation_rejected: request_id=%s "
+                "incremental_planner_evidence_reentry_rejected: request_id=%s "
                 "error_type=%s error=%s",
                 evidence.request_id,
                 type(exc).__name__,
@@ -5975,7 +5434,7 @@ class VoiceAssistant:
                 return False, "request_binding_superseded"
         return True, "current"
 
-    async def _compose_incremental_terminal_result_response(
+    async def _plan_incremental_terminal_result_response(
         self,
         *,
         source_response: InteractionResponse,
@@ -6025,102 +5484,226 @@ class VoiceAssistant:
             data=observation.data,
             output_sha256=canonical_value_sha256(observation.data),
         )
-        normal_char_budget = 72 if language.lower().startswith("zh") else 200
-        interpretation_request = ToolResultInterpretationRequest(
-            sid=str(session_id or ""),
-            user_request=user_request,
-            language=language,
-            evidence=[bounded_evidence],
-            fallback_response=self._trusted_tool_result_fallback(
-                [bounded_evidence],
-                max_chars=normal_char_budget,
-            ),
-            max_spoken_chars=normal_char_budget,
-            detailed_max_spoken_chars=(
-                260 if language.lower().startswith("zh") else 620
-            ),
-            max_sentences=2,
-            detailed_max_sentences=5,
-            context={
-                "incremental_terminal_evidence": True,
-                "terminal_request_id": evidence.request_id,
-                "terminal_capability_id": evidence.capability_id,
-                "terminal_status": evidence.status,
-                "source_goal_ids": list(evidence.source_goal_ids),
-                "cognitive_opportunity": opportunity.prompt_projection(),
-                "canonical_plan": metadata.get("canonical_plan") or {},
-            },
-        )
         try:
-            session = await self.get_http_session()
-            interpretation = await self.agent_client.interpret_tool_result(
-                session,
-                request=interpretation_request,
-                timeout_ms=self.tool_result_interpreter_timeout_ms,
+            canonical_plan = CanonicalPlan.model_validate(
+                metadata.get("canonical_plan") or {}
             )
         except Exception as exc:
             self.session_log(
                 session_id,
-                "incremental_tool_result_interpretation_failed: request_id=%s "
+                "incremental_evidence_reentry_rejected: request_id=%s "
                 "error_type=%s error=%s",
                 evidence.request_id,
                 type(exc).__name__,
                 exc,
             )
             return None
-        if interpretation.status not in {"resolved", "fallback"}:
-            return None
-        for reference in interpretation.selected_facts:
-            if reference.evidence_id != evidence.evidence_id:
-                raise ValueError(
-                    "incremental tool result interpretation references unknown evidence"
-                )
-            self._resolve_tool_result_pointer(
-                observation.data,
-                reference.json_pointer,
-            )
-        return InteractionResponse(
-            interaction_id=(
-                f"result_reentry_{evidence.evidence_id}"[:160]
-            ),
-            status="ok",
-            speech=[
-                InteractionSpeech(
-                    id=f"speech_result_reentry_{evidence.evidence_id}"[:160],
-                    text=interpretation.spoken_response,
-                    timing="immediate",
-                    style="brief",
-                    priority="normal",
-                    interruptible=True,
-                    metadata={
-                        "source": "evidence_bound_incremental_result_interpretation",
-                        "phase": "capability_result_reentry",
-                        "wait_for_playback_start": True,
-                        "playback_start_required_for_delivery": True,
-                        "source_goal_ids": list(evidence.source_goal_ids),
-                        "evidence_refs": [evidence.evidence_id],
-                        "selected_facts": [
-                            item.model_dump(mode="json")
-                            for item in interpretation.selected_facts
-                        ],
-                    },
-                )
-            ],
-            capabilities=[],
-            requires_confirmation=False,
-            metadata={
-                "source": "evidence_bound_incremental_result_interpretation",
-                "phase": "capability_result_reentry",
-                "language": language,
-                "source_interaction_id": source_response.interaction_id,
-                "source_goal_ids": list(evidence.source_goal_ids),
-                "evidence_refs": [evidence.evidence_id],
+        return await self._planner_evidence_reentry_response(
+            source_response=source_response,
+            canonical_plan=canonical_plan,
+            user_request=user_request,
+            language=language,
+            goal_ids=list(evidence.source_goal_ids),
+            evidence=[bounded_evidence],
+            session_id=session_id,
+            phase="capability_result_reentry",
+            extra_context={
+                "incremental_terminal_evidence": True,
+                "terminal_request_id": evidence.request_id,
+                "terminal_capability_id": evidence.capability_id,
+                "terminal_status": evidence.status,
                 "cognitive_opportunity": opportunity.prompt_projection(),
-                "interpretation": interpretation.model_dump(mode="json"),
             },
         )
 
-    async def _compose_evidence_bound_tool_result_response(
+    async def _planner_evidence_reentry_response(
+        self,
+        *,
+        source_response: InteractionResponse,
+        canonical_plan: CanonicalPlan,
+        user_request: str,
+        language: str,
+        goal_ids: list[str],
+        evidence: list[ToolResultEvidence],
+        session_id: str | None,
+        phase: str,
+        extra_context: dict[str, Any] | None = None,
+    ) -> InteractionResponse | None:
+        """Reactivate Fast Planner from Host-bound terminal Evidence."""
+
+        normalized_goal_ids = list(
+            dict.fromkeys(
+                str(item).strip() for item in goal_ids if str(item).strip()
+            )
+        )
+        if not normalized_goal_ids or not evidence:
+            return None
+        metadata = (
+            source_response.metadata
+            if isinstance(source_response.metadata, dict)
+            else {}
+        )
+        association = metadata.get("goal_association")
+        if not isinstance(association, dict):
+            self.session_log(
+                session_id,
+                "planner_evidence_reentry_rejected: reason=missing_goal_association",
+            )
+            return None
+        association_goal_ids = {
+            str(goal_id).strip()
+            for item in association.get("associations") or []
+            if isinstance(item, dict)
+            for goal_id in item.get("target_goal_ids") or []
+        } | {
+            str(item.get("goal_id") or "").strip()
+            for item in association.get("new_goals") or []
+            if isinstance(item, dict)
+        }
+        if not set(normalized_goal_ids).issubset(association_goal_ids):
+            raise ValueError(
+                "terminal Evidence Goal binding is not present in Goal Association"
+            )
+
+        sid = str(session_id or canonical_plan.plan_id)
+        context = self._goal_driven_authority_context(
+            self.build_context(sid),
+            session_id=sid,
+            observer=False,
+        )
+        context.update(
+            {
+                "goal_association_resolution": association,
+                "canonical_plan_resolution": canonical_plan.prompt_projection(),
+                "trusted_terminal_evidence": [
+                    item.model_dump(mode="json") for item in evidence
+                ],
+                "result_evidence_refs": [item.evidence_id for item in evidence],
+                "result_evidence_reentry": {
+                    "phase": phase,
+                    "source_goal_ids": normalized_goal_ids,
+                    "wording_owner": "fast_planner",
+                },
+            }
+        )
+        if isinstance(extra_context, dict):
+            context.update(extra_context)
+        interaction_ledger = getattr(
+            getattr(self, "cognitive_runtime", None),
+            "interaction_ledger",
+            None,
+        )
+        if interaction_ledger is not None:
+            context["interaction_context"] = interaction_ledger.context(
+                sid,
+                goal_ids=normalized_goal_ids,
+                turn_id=str(metadata.get("turn_id") or ""),
+            ).model_dump(mode="json")
+
+        request = CognitiveWorkRequest(
+            sid=f"{sid}:evidence:{evidence[0].evidence_id}"[:160],
+            text=user_request,
+            language=language,
+            responsibilities=[
+                CognitiveResponsibilityProposal(
+                    local_ref=f"evidence:{goal_id}"[:160],
+                    outcome=(
+                        "Choose the next Main Activity for the original request "
+                        "from Host-bound terminal Evidence."
+                    ),
+                    completion_requires_work=False,
+                    completion_requires_fresh_evidence=False,
+                    confidence=1.0,
+                )
+                for goal_id in normalized_goal_ids
+            ],
+            interpretation_confidence=1.0,
+            context=context,
+            history=list(context.get("history") or []),
+        )
+        session = await self.get_http_session()
+        planner_started_ms = now_ms()
+        try:
+            replanned = await self.agent_client.resolve_fast_plan(
+                session,
+                request=request,
+                timeout_ms=self.cognitive_runtime_policy.fast_planner_timeout_ms,
+            )
+        except Exception as exc:
+            record_session_workflow_stage(
+                self,
+                session_id,
+                stage="fast_planner_evidence_reentry",
+                started_monotonic_ms=planner_started_ms,
+                finished_monotonic_ms=now_ms(),
+                status="failed",
+                input_payload={
+                    "source_goal_ids": normalized_goal_ids,
+                    "evidence_refs": [item.evidence_id for item in evidence],
+                    "phase": phase,
+                },
+                output_payload=None,
+                errors=[{"error_type": type(exc).__name__, "error": str(exc)}],
+                metadata={"wording_owner": "fast_planner"},
+            )
+            raise
+        record_session_workflow_stage(
+            self,
+            session_id,
+            stage="fast_planner_evidence_reentry",
+            started_monotonic_ms=planner_started_ms,
+            finished_monotonic_ms=now_ms(),
+            status="resolved",
+            input_payload={
+                "source_goal_ids": normalized_goal_ids,
+                "evidence_refs": [item.evidence_id for item in evidence],
+                "phase": phase,
+            },
+            output_payload=replanned,
+            errors=[],
+            metadata={"wording_owner": "fast_planner"},
+        )
+        if set(replanned.goal_ids) != set(normalized_goal_ids):
+            raise ValueError("Evidence re-entry Plan changed the bound Goal set")
+        if replanned.steps or replanned.disposition != "respond":
+            self.session_log(
+                session_id,
+                "planner_evidence_reentry_no_response: disposition=%s steps=%s",
+                replanned.disposition,
+                len(replanned.steps),
+            )
+            return None
+        response = await self.cognitive_runtime.adapter.build_planner_owned_response(
+            plan=replanned,
+            session_id=sid,
+            language=language,
+            context=context,
+        )
+        evidence_refs = [item.evidence_id for item in evidence]
+        for speech in response.speech:
+            speech.metadata.update(
+                {
+                    "source": "fast_planner_evidence_reentry",
+                    "phase": phase,
+                    "truth_stage": "post_evidence",
+                    "source_goal_ids": normalized_goal_ids,
+                    "evidence_refs": evidence_refs,
+                }
+            )
+        response.metadata.update(
+            {
+                "source": "fast_planner_evidence_reentry",
+                "phase": phase,
+                "source_goal_ids": normalized_goal_ids,
+                "evidence_refs": evidence_refs,
+                "planner_reentry_plan": replanned.model_dump(
+                    mode="json", exclude_none=True
+                ),
+            }
+        )
+        return response
+
+    async def _plan_evidence_bound_capability_result_response(
         self,
         *,
         source_response: InteractionResponse,
@@ -6128,12 +5711,12 @@ class VoiceAssistant:
         plan: Any,
         session_id: str | None,
     ) -> InteractionResponse | None:
-        """Ask the Agent to interpret bounded tool output before speaking it.
+        """Reactivate Fast Planner from bounded terminal Evidence.
 
         Complete observations stay in the immutable ExecutionOutcomeBundle. The
-        model receives only schema-validated ModelObservation data and selects
-        exact fact pointers. The Host rechecks those pointers and correlations
-        before accepting one concise spoken answer.
+        Host preserves exact Goal/Plan/request binding, Fast Planner selects the
+        still-needed Communicative Activity, and Runtime validates its evidence
+        provenance before delivery.
         """
 
         metadata = source_response.metadata if isinstance(source_response.metadata, dict) else {}
@@ -6195,149 +5778,42 @@ class VoiceAssistant:
         )
         if not user_request:
             return None
-        mind_manager = getattr(self, "mind", None)
-        mind_context = (
-            mind_manager.context()
-            if mind_manager is not None and hasattr(mind_manager, "context")
-            else {}
-        )
-        normal_char_budget = 72 if language.lower().startswith("zh") else 200
         goal_ids = list(plan.executable_goal_ids())
-        interaction_context: dict[str, Any] = {}
-        interaction_ledger = getattr(
-            getattr(self, "cognitive_runtime", None),
-            "interaction_ledger",
-            None,
-        )
-        if interaction_ledger is not None:
-            interaction_context = interaction_ledger.context(
-                str(session_id or bundle.turn_id),
-                goal_ids=goal_ids,
-                turn_id=str(getattr(bundle, "turn_id", "") or ""),
-            ).model_dump(mode="json")
-        interpretation_request = ToolResultInterpretationRequest(
-            sid=str(session_id or ""),
-            user_request=user_request,
-            language=language,
-            evidence=evidence,
-            fallback_response=self._trusted_tool_result_fallback(
-                evidence,
-                max_chars=normal_char_budget,
-            ),
-            max_spoken_chars=normal_char_budget,
-            detailed_max_spoken_chars=260 if language.lower().startswith("zh") else 620,
-            max_sentences=2,
-            detailed_max_sentences=5,
-            context={
-                "aggregate_status": bundle.aggregate_status,
-                "effectful_result_review_required": (
-                    self._execution_outcome_route(source_response, plan)
-                    == "robot_action"
-                ),
-                "goal_statuses": [
-                    {
-                        "goal_id": item.goal_id,
-                        "status": item.status,
-                        "completion_qualification": (
-                            goal_completion_qualification_summary(bundle, item)
-                        ),
-                    }
-                    for item in bundle.goal_outcomes
-                ],
-                "identity": mind_context.get("identity") or {},
-                "self_model": mind_context.get("self_model") or {},
-                "personality_expression": mind_context.get(
-                    "personality_expression"
-                )
-                or {},
-                "social_interaction_style": mind_context.get(
-                    "social_interaction_style"
-                )
-                or {},
-                "canonical_plan_resolution": plan.prompt_projection(),
-                "interaction_context": interaction_context,
-            },
-        )
         try:
-            session = await self.get_http_session()
-            interpretation = await self.agent_client.interpret_tool_result(
-                session,
-                request=interpretation_request,
-                timeout_ms=self.tool_result_interpreter_timeout_ms,
+            return await self._planner_evidence_reentry_response(
+                source_response=source_response,
+                canonical_plan=plan,
+                user_request=user_request,
+                language=language,
+                goal_ids=goal_ids,
+                evidence=evidence,
+                session_id=session_id,
+                phase="post_execution",
+                extra_context={
+                    "execution_outcome_bundle": bundle.model_dump(
+                        mode="json", exclude_none=True
+                    ),
+                "aggregate_status": bundle.aggregate_status,
+                    "goal_statuses": [
+                        {
+                            "goal_id": item.goal_id,
+                            "status": item.status,
+                            "completion_qualification": (
+                                goal_completion_qualification_summary(bundle, item)
+                            ),
+                        }
+                        for item in bundle.goal_outcomes
+                    ],
+                },
             )
         except Exception as exc:
             self.session_log(
                 session_id,
-                "tool_result_interpretation_failed: error_type=%s error=%s",
+                "planner_evidence_reentry_failed: error_type=%s error=%s",
                 type(exc).__name__,
                 exc,
             )
             return None
-        if interpretation.status not in {"resolved", "fallback"}:
-            return None
-
-        evidence_by_id = {item.evidence_id: item for item in evidence}
-        for reference in interpretation.selected_facts:
-            selected = evidence_by_id.get(reference.evidence_id)
-            if selected is None:
-                raise ValueError("tool result interpretation references unknown evidence")
-            self._resolve_tool_result_pointer(selected.data, reference.json_pointer)
-
-        fingerprint = str(bundle.outcome_id).replace(" ", "")[:12] or "result"
-        status = (
-            "ok"
-            if bundle.aggregate_status == "completed"
-            else "refused"
-            if bundle.aggregate_status == "refused"
-            else "error"
-        )
-        return InteractionResponse(
-            interaction_id=bundle.interaction_id,
-            status=status,
-            speech=[
-                InteractionSpeech(
-                    id=f"speech_tool_result_{fingerprint}",
-                    text=interpretation.spoken_response,
-                    timing="immediate",
-                    style="brief" if status == "ok" else "warning",
-                    priority="normal",
-                    interruptible=True,
-                    metadata={
-                        "source": "evidence_bound_tool_result_interpretation",
-                        "phase": "post_execution",
-                        "wait_for_playback_start": True,
-                        "playback_start_required_for_delivery": True,
-                        "covers_goal_ids": goal_ids,
-                        "selected_facts": [
-                            item.model_dump(mode="json")
-                            for item in interpretation.selected_facts
-                        ],
-                        "answer_mode": interpretation.answer_mode,
-                        "full_tool_result_retained": True,
-                    },
-                )
-            ],
-            capabilities=[],
-            requires_confirmation=False,
-            reason=(
-                None
-                if bundle.aggregate_status == "completed"
-                else f"post_execution_{bundle.aggregate_status}"
-            ),
-            metadata={
-                "source": "evidence_bound_tool_result_interpretation",
-                "phase": "post_execution",
-                "language": language,
-                "canonical_plan_id": plan.plan_id,
-                "canonical_plan_fingerprint": bundle.canonical_plan_fingerprint,
-                "user_request": user_request,
-                "source_goal_ids": goal_ids,
-                "execution_outcome_bundle": bundle.model_dump(mode="json"),
-                "aggregate_status": bundle.aggregate_status,
-                "interpretation": interpretation.model_dump(mode="json"),
-                "full_tool_result_retained": True,
-            },
-        )
 
     @staticmethod
     def _resolve_tool_result_pointer(document: Any, pointer: str) -> Any:

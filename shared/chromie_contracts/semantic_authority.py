@@ -75,8 +75,9 @@ def semantic_authority_route_matrix() -> list[dict[str, Any]]:
             "role": "authoritative",
             "planner_path": (
                 "Goal Interpretation owns WHAT; Goal Association owns persistent Goal "
-                "identity and continuity; Fast/Deep Planner own HOW and Communicative "
-                "Act selection; Response Composer owns wording realization; CapabilityRuntime "
+                "identity and continuity; Fast/Deep Planner own HOW plus exact "
+                "Communicative Act selection and wording; the Host validates immutable "
+                "realization; CapabilityRuntime "
                 "owns trusted execution lifecycle; Evidence owns reality"
             ),
             "fallback": "fail_closed_without_legacy_reentry",

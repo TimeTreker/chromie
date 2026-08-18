@@ -187,8 +187,9 @@ clarifications, and relevant Evidence. It emits contextual Responsibility eviden
 with Goal relationship and bounded unresolved meaning. It may understand an answer
 against a pending clarification, but it does not decide that a Capability parameter is
 missing, create a planning `InformationGap`, classify one as blocking, or choose how it
-should be resolved. The same GI result goes to Fast Planner and Goal Association
-concurrently. Deep Goal Interpretation is reserved for genuine consequential ambiguity
+should be resolved. The same GI result first goes to Fast Planner's bounded
+first-response phase; after that commitment, remaining Fast planning and Goal
+Association consume it concurrently. Deep Goal Interpretation is reserved for genuine consequential ambiguity
 in the person's intended outcome, scope, or referent; it is not an external-evidence
 lookup or parameter-completion strategy. GA alone commits the Goal creation or update.
 
@@ -253,9 +254,10 @@ slightly imperfect phrase need not trigger another semantic call. Unsafe,
 unauthorized, irreversible, materially mis-grounded, or reality-falsifying output
 must stop before commitment. This is human-like restraint, not reduced safety.
 
-Response composition is expression of established meaning and evidence, not a
-second brain. Social Attention is optional parallel expression. Failure of either
-must remain local:
+Planner-authored communication expresses established meaning and evidence; Host
+presentation only validates and realizes it and is not a second brain. Social
+Attention is optional coordinated expression attached to the same observable Main
+Activity. Failure of either realization remains local:
 
 > **Optional presentation must never reopen primary cognition.**
 
@@ -318,12 +320,12 @@ Streaming changes delivery timing, not semantic authority. Raw model-token
 deltas, partial JSON, private reasoning, and incomplete sentences are not speech
 contracts and must never reach TTS. Goal Interpretation never authors maintained
 speech. Fast Planner is the first HOW owner and may select one complete typed
-immediate Communicative Act after Responsibility meaning is sufficient. A
-terminal or clarification act carries function, timing, semantic provenance, and
-truth constraints but no sentence wording. Response Composer/language formulation
-realizes it under its own truth contract; a pre-evidence `progress` act carries only a bounded
-`progress_kind`, its mechanically corresponding bounded `speech_act`, and the bounded
-language realizer renders the wording deterministically. An executable non-escalation Activity Plan
+immediate Communicative Activity after Responsibility meaning is sufficient. A
+progress, terminal, or clarification Activity carries its exact natural wording
+together with function, timing, semantic provenance, truth stage, and Evidence
+references when applicable. The Host mechanically rejects a pre-evidence Activity
+that claims an unobserved result; it does not author replacement wording. An
+executable non-escalation Activity Plan
 has no Deep continuation and must contain a live Capability Activity. Therefore a
 model cannot hide an unverified result inside a field merely labelled progress or
 claim execution while emitting only conversational status.
@@ -433,8 +435,9 @@ receives admitted evidence and emits provider-neutral Responsibility proposals,
 material semantic bindings, Goal relationships, and bounded unresolved meaning. It
 does not emit planning InformationGaps, input-source policy, conversational progress,
 route/intent labels, Activities, or Capabilities.
-The same GI result enters Fast Planner and Goal Association concurrently; Fast
-Planner is the first owner of conversational and executable Activities, execution-
+The same GI result enters Fast Planner's first-response phase, then remaining Fast
+planning and Goal Association concurrently; Fast Planner is the first owner of
+conversational and executable Activities, execution-
 input completeness, source/default policy, and clarification selection. Capability
 contracts constrain realization but cannot make Planner reinterpret Responsibility or
 invent a user preference. Gateway
@@ -503,7 +506,12 @@ and trusted code preserves the exact technical cause for debugging.
 ## Tool behavior
 
 The Cognitive Gateway admits a turn but does not author semantic speech. Fast Planner
-owns the first possible **Goal Progress Communication** milestone. Once a nontrivial
+owns the first possible **Goal Progress Communication** milestone. It first uses a
+bounded, small-output phase to author the exact immediately realizable Communicative
+Activity. As soon as that commitment exists, the same Planner continues Capability,
+input-completeness, and clarification planning while GA begins concurrently from the
+same immutable GI result. This is one Fast Planner with phased readiness, not a
+Response Composer or a Host acknowledgement template. Once a nontrivial
 Goal is sufficiently understood and still requires downstream work before a substantive
 answer or effect, it should normally author one typed, non-terminal progress Activity so
 the person knows Chromie got the Goal and is taking it forward. This is a polite progress notification, not Social
@@ -511,13 +519,23 @@ Attention and not task clarification/confirmation. Missing result Evidence limit
 what the wording may claim; it is not itself a reason for silence. A separate progress
 Activity is omitted when the substantive answer is immediate, an equivalent act is
 already delivered or pending, the user asked for silence, or another utterance would
-only repeat or add empty chatter. Fast Planner owns this HOW decision. Pre-evidence
-progress is represented only by a bounded `progress_kind`; the bounded language realizer renders the actual
-prospective wording and the schema provides no free-form result field. The removed
+only repeat or add empty chatter. Fast Planner owns this HOW decision and its exact
+prospective wording. A pre-evidence progress Activity carries
+`truth_stage=pre_evidence`, no Evidence references, and wording that can acknowledge
+or prospectively describe the check but cannot state its result. The removed
 Goal-Interpreter `fast_speech`/`native_response` path is not accepted as compatibility.
 No second production LLM reviews, repairs, or re-decides ordinary progress wording.
 Interaction Context remains the authority for whether any speech was actually heard or
 is still pending.
+
+In the qualified warm live profile, the Planner-local target is at most 2.0 seconds
+from validated GI handoff to the first valid Fast-Planner Communicative Activity
+commitment and at most 3.0 seconds from that commitment to playback start. Gateway/GI
+latency, cold model load, TTS first PCM, and playback startup are also retained as
+separate slices rather than hidden inside one duration. A missed
+budget is retained as interaction evidence even when the eventual sentence is
+semantically correct; it must not be repaired by moving wording authority upstream
+or skipping provenance validation.
 
 Communicative-Act wording uses a bounded owner-approved **fast voice projection**:
 Chromie's name, child age/role identity where relevant to expression, and the
@@ -570,8 +588,8 @@ what the user wanted, but runtime retains these facts unchanged:
 | empty result | available | attempted | empty, trusted | successful query produced no matches |
 | success | available | attempted | available, trusted | supported result/effect |
 
-These states are not stylistic alternatives. Response Composer and bounded failure speech
-may verbalize them but may not collapse one into another. A no-results claim therefore
+These states are not stylistic alternatives. Planner may verbalize them in a typed
+Communicative Activity but may not collapse one into another. A no-results claim therefore
 requires provider execution plus trusted empty-result evidence. When no provider request
 was dispatched, the response may state only understanding and the supported limitation or
 processing failure. Host/runtime code enforces the typed state and speech envelope without
@@ -603,8 +621,7 @@ expresses a genuinely new semantic act such as a correction, warning, clarificat
 evidence. Equivalent acknowledgement text is not regenerated merely because another cognitive
 stage was reached.
 
-Fast Planner, Deep Planner, Tool Result Interpreter, and Response Composer obey
-the same Goal Progress Communication rule. The initial acknowledgement is only the
+Fast Planner and Deep Planner obey the same Goal Progress Communication rule. The initial acknowledgement is only the
 first milestone. When a later stage owns a new, trustworthy and user-relevant
 progress delta, it may propose a concise update; when nothing meaningfully changed,
 it remains silent. Internal workflow boundaries and every low-level execution step
@@ -620,9 +637,10 @@ never be treated as already spoken.
 For a pure safe read, a new prospective
 acknowledgement may be scheduled when it adds a still-needed act, while an
 already delivered or pending equivalent is reused or omitted. The read itself
-need not wait for optional acknowledgement playback. After execution, Tool
-Result Interpretation receives trusted evidence plus Interaction Context and
-speaks only the new grounded result/failure delta rather than replaying the
+need not wait for optional acknowledgement playback. After execution, the Host
+binds trusted Evidence to the exact Goal(s) through immutable request provenance
+and reactivates Fast Planner with bounded Goal, Evidence, and Interaction Context.
+Planner speaks only the new grounded result/failure delta rather than replaying the
 pre-action acknowledgement. Host code validates capability safety, arguments,
 truth state, concurrency, evidence binding, and any required effect/delivery
 barrier.
@@ -642,14 +660,15 @@ Unnatural workflow narration:
 ```
 
 After execution, complete status, evidence, observations, and traces remain in
-logs. Tool Result Interpretation receives the original user question and trusted
-observation, selects only relevant facts, and answers the question first. A person
+logs. Reactivated Fast Planner receives the original user question, exact Goal
+binding, and trusted observation, selects only relevant facts, and answers the
+question first. A person
 asking “今天重庆热不热呀？” should hear something like “很热呀，现在大概36度，
 体感有41度。” rather than a task-completion announcement or a field-by-field
 weather report.
 
-If model interpretation is unavailable, the deterministic boundary may use only
-an explicit provider-authored user summary. It must not render arbitrary
+If Planner re-entry is unavailable, the deterministic boundary may use only an
+explicit provider-authored user summary. It must not render arbitrary
 structured fields, `任务已完成`, `观测结果`, evidence labels, or tool identifiers as
 ordinary speech.
 
@@ -698,7 +717,7 @@ expose internal fallback text such as:
 
 A required confirmation remains exact-request-bound and single-use, but it must
 sound like Chromie rather than an operator console. The prospective wording is
-authored by Response Composer from the same immutable high-level action plan
+authored by Planner in the same immutable high-level action plan
 that will execute and the typed runtime confirmation requirement. It names the
 user-facing actions, explains a material safe adjustment before asking, and says
 naturally how to approve it. The Host validates the structured confirmation
@@ -747,6 +766,14 @@ may add gaze toward the person, a natural blink, a small nod or wave, or another
 qualified subtle body cue. Social Attention must not rewrite what Chromie says,
 create an extra user task, or make the greeting fail if the decoration cannot
 run.
+
+The spoken fast response is itself the Planner-owned Communicative Main Activity;
+Social Attention is only optional coordinated expression attached to that same
+Activity while it is observable. It is not emitted merely because GI, GA,
+planning, waiting, or evidence arrival occurred. `decision=none` is a complete
+and valid result. A late decoration that misses the Main Activity's observable
+window is suppressed rather than performed alone as a delayed social gesture,
+and Social Attention planning or execution never delays Vocal scheduling.
 
 The Social Attention model receives the exact `primary_activity` anchor, recent
 context, owner-approved Social Interaction Style, bounded recent decoration

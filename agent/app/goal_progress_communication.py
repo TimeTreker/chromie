@@ -8,9 +8,9 @@ GOAL_PROGRESS_COMMUNICATION_PRINCIPLE = (
     "prospective Communicative Act when downstream work remains. Before trusted result "
     "Evidence exists, that Activity may acknowledge work, say that Chromie will check, say "
     "that Chromie will act, or say that Chromie will think; it must not state, imply, preview, "
-    "or paraphrase an unverified result. Response Composer's bounded language realization "
-    "renders progress wording from the "
-    "typed progress kind rather than accepting model-authored free-form result text. Omit a "
+    "or paraphrase an unverified result. The Planner authors the exact bounded progress "
+    "wording together with its typed progress kind; the Host validates truth stage and "
+    "provenance but never rewrites the sentence. Omit a "
     "separate progress act when the substantive answer is immediate, an equivalent act "
     "is already delivered or pending, the user asked for silence, or another line would only "
     "repeat or add empty chatter. Later cognitive stages may communicate a meaningful new "
@@ -31,7 +31,8 @@ def goal_progress_communication_prompt(stage: str) -> str:
         + GOAL_PROGRESS_COMMUNICATION_PRINCIPLE
         + f" At this boundary, {stage_name} must preserve this communication responsibility. "
         "A Planner stage may choose a Communicative Act only from facts and authority "
-        "already available there. A wording stage may only realize an immutable selected "
-        "act. Other stages preserve the milestone for the next qualified Planner. Later "
+        "already available there and owns its exact natural wording. Runtime may only "
+        "realize that immutable selected act. Other stages preserve the milestone for the "
+        "next qualified Planner. Later "
         "Evidence must not be anticipated."
     )

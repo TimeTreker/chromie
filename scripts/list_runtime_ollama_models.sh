@@ -48,12 +48,6 @@ fi
 if is_enabled "${AGENT_DEEP_PLANNER_ENABLED:-1}"; then
   append_model "${AGENT_DEEP_PLANNER_MODEL:-}"
 fi
-if is_enabled "${AGENT_RESPONSE_COMPOSER_ENABLED:-1}"; then
-  append_model "${AGENT_RESPONSE_COMPOSER_MODEL:-}"
-fi
-if is_enabled "${AGENT_TOOL_RESULT_INTERPRETER_ENABLED:-1}"; then
-  append_model "${AGENT_TOOL_RESULT_INTERPRETER_MODEL:-}"
-fi
 if [ "${AGENT_SOCIAL_ATTENTION_MODE:-off}" != "off" ]; then
   append_model "${AGENT_SOCIAL_ATTENTION_MODEL:-}"
 fi

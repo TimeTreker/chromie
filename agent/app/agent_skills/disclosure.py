@@ -20,12 +20,9 @@ try:
         AgentSkillSelectionGoalContext,
         AgentSkillSelectionRequest,
         AgentSkillSelectionResolution,
-        AgentSkillSummary,
         DisclosedAgentSkillProjection,
         PlanAgentSkillProvenance,
-        SelectedAgentSkill,
     )
-    from chromie_contracts.tool_result import ToolResultInterpretationRequest
     from chromie_contracts.plan import CanonicalPlan
     from chromie_contracts.core_interpretation import CognitiveWorkRequest
 except ImportError:  # pragma: no cover - repository development path
@@ -37,12 +34,9 @@ except ImportError:  # pragma: no cover - repository development path
         AgentSkillSelectionGoalContext,
         AgentSkillSelectionRequest,
         AgentSkillSelectionResolution,
-        AgentSkillSummary,
         DisclosedAgentSkillProjection,
         PlanAgentSkillProvenance,
-        SelectedAgentSkill,
     )
-    from shared.chromie_contracts.tool_result import ToolResultInterpretationRequest
     from shared.chromie_contracts.plan import CanonicalPlan
     from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 
@@ -731,134 +725,6 @@ def attach_disclosure_metadata(
     return result
 
 
-def _canonical_plan_from_context(context: dict[str, Any]) -> CanonicalPlan | None:
-    for key in (
-        "canonical_plan_resolution",
-        "deep_plan_resolution",
-        "fast_plan_resolution",
-        "canonical_plan",
-    ):
-        raw = context.get(key)
-        if isinstance(raw, CanonicalPlan):
-            return raw
-        if isinstance(raw, dict):
-            try:
-                return CanonicalPlan.model_validate(raw)
-            except ValidationError:
-                continue
-    return None
-
-
-def _planner_selection_for_role(
-    *,
-    sid: str,
-    text: str,
-    context: dict[str, Any],
-    agent_role: AgentSkillProjectionName,
-    registry: AgentSkillRegistry,
-) -> AgentSkillSelectionResolution | None:
-    """Reuse an exact planner-authored Skill choice for a downstream role.
-
-    The Host does not infer a new method. It validates immutable Canonical Plan
-    provenance against the owner-approved registry, then loads the same selected
-    Skill's role-specific passive projection. Invalid or incomplete provenance is
-    ignored so the normal model-owned selection path remains available.
-    """
-
-    if agent_role not in {"response_composer", "tool_result_interpreter"}:
-        return None
-    plan = _canonical_plan_from_context(context)
-    if plan is None or not plan.selected_agent_skills:
-        return None
-
-    summaries_by_id: dict[str, AgentSkillSummary] = {
-        item.agent_skill_id: item for item in registry.list_summaries()
-    }
-    # A terminal Deep Plan intentionally preserves ordered Fast provenance and
-    # appends Deep provenance. The same approved Skill may therefore appear once
-    # per planner role in the immutable Plan, while a downstream Agent may load
-    # only one projection for that Skill ID. Validate every retained provenance
-    # record first, then collapse it by package identity. The later (terminal)
-    # planner record supplies the rationale and confidence; relevant Goal scope
-    # is the stable union of every planner selection for the same method.
-    provenance_by_id: dict[str, PlanAgentSkillProvenance] = {}
-    goal_ids_by_id: dict[str, list[str]] = {}
-    confidence_by_id: dict[str, float] = {}
-    ordered_ids: list[str] = []
-    source_selection_ids: list[str] = []
-    for provenance in plan.selected_agent_skills:
-        summary = summaries_by_id.get(provenance.agent_skill_id)
-        if summary is None:
-            return None
-        if (
-            summary.version != provenance.version
-            or summary.content_digest != provenance.content_digest
-            or agent_role not in summary.available_projections
-        ):
-            return None
-        if provenance.agent_skill_id not in provenance_by_id:
-            ordered_ids.append(provenance.agent_skill_id)
-            goal_ids_by_id[provenance.agent_skill_id] = []
-            confidence_by_id[provenance.agent_skill_id] = provenance.selection_confidence
-        provenance_by_id[provenance.agent_skill_id] = provenance
-        confidence_by_id[provenance.agent_skill_id] = min(
-            confidence_by_id[provenance.agent_skill_id],
-            provenance.selection_confidence,
-        )
-        scoped_goal_ids = goal_ids_by_id[provenance.agent_skill_id]
-        for goal_id in provenance.relevant_goal_ids:
-            if goal_id not in scoped_goal_ids:
-                scoped_goal_ids.append(goal_id)
-        source_selection_ids.append(provenance.selection_id)
-
-    selected: list[SelectedAgentSkill] = []
-    candidates: list[AgentSkillSummary] = []
-    for agent_skill_id in ordered_ids:
-        provenance = provenance_by_id[agent_skill_id]
-        summary = summaries_by_id[agent_skill_id]
-        selected.append(
-            SelectedAgentSkill(
-                agent_skill_id=provenance.agent_skill_id,
-                version=provenance.version,
-                projection=agent_role,
-                content_digest=provenance.content_digest,
-                relevant_goal_ids=tuple(goal_ids_by_id[agent_skill_id]),
-                rationale=provenance.selection_rationale,
-                confidence=confidence_by_id[agent_skill_id],
-            )
-        )
-        candidates.append(summary)
-
-    if not selected:
-        return None
-    sid = str(sid or context.get("session_id") or "agent-turn")
-    turn_id = _turn_id(sid=sid, text=text, context=context)
-    digest = hashlib.sha256(
-        (
-            f"{plan.plan_id}|{agent_role}|"
-            + "|".join(source_selection_ids)
-        ).encode("utf-8")
-    ).hexdigest()[:20]
-    return AgentSkillSelectionResolution(
-        selection_id=f"agent-skill-plan-reuse-{digest}",
-        sid=sid,
-        turn_id=turn_id,
-        agent_role=agent_role,
-        decision="select_skills",
-        status="selected",
-        selected_agent_skills=tuple(selected),
-        candidate_summaries=tuple(candidates),
-        confidence=min(item.confidence for item in selected),
-        reason_summary=(
-            "Reused exact model-authored planner Agent Skill choices for the "
-            "same canonical Goals and loaded only the downstream role projections."
-        ),
-        candidate_total=len(candidates),
-        candidate_truncated=False,
-        model=None,
-    )
-
-
 class AgentSkillProgressiveDisclosureCoordinator:
     """Select and inject only one responsible Agent's approved projections."""
 
@@ -886,24 +752,7 @@ class AgentSkillProgressiveDisclosureCoordinator:
             if removed_untrusted
             else request
         )
-        reused_selection = _planner_selection_for_role(
-            sid=str(clean_request.sid or "agent-turn"),
-            text=clean_request.text,
-            context=clean_request.context,
-            agent_role=agent_role,
-            registry=self.disclosure_service.registry,
-        )
-        if reused_selection is not None:
-            selection = reused_selection
-            logger.info(
-                "agent_skill_selection_reused sid=%s turn_id=%s role=%s "
-                "selected_ids=%s",
-                selection.sid,
-                selection.turn_id,
-                selection.agent_role,
-                [item.agent_skill_id for item in selection.selected_agent_skills],
-            )
-        elif self.selection_service is None or not self.enabled:
+        if self.selection_service is None or not self.enabled:
             selection = AgentSkillSelectionResolution(
                 selection_id=f"agent-skill-selection-{uuid4().hex}",
                 sid=str(request.sid or "agent-turn"),
@@ -933,71 +782,3 @@ class AgentSkillProgressiveDisclosureCoordinator:
         context = dict(clean_request.context)
         context[_CONTEXT_KEY] = payload
         return clean_request.model_copy(update={"context": context}), disclosure
-
-    async def prepare_tool_result_request(
-        self,
-        request: ToolResultInterpretationRequest,
-    ) -> tuple[ToolResultInterpretationRequest, AgentSkillDisclosureResolution]:
-        raw_context = request.context if isinstance(request.context, dict) else {}
-        context, removed_untrusted = _strip_untrusted_disclosure_context(raw_context)
-        clean_request = (
-            request.model_copy(update={"context": context})
-            if removed_untrusted
-            else request
-        )
-        sid = str(context.get("sid") or context.get("session_id") or "tool-result")
-        reused_selection = _planner_selection_for_role(
-            sid=sid,
-            text=request.user_request,
-            context=context,
-            agent_role="tool_result_interpreter",
-            registry=self.disclosure_service.registry,
-        )
-        if reused_selection is not None:
-            selection = reused_selection
-            logger.info(
-                "agent_skill_selection_reused sid=%s turn_id=%s role=%s "
-                "selected_ids=%s",
-                selection.sid,
-                selection.turn_id,
-                selection.agent_role,
-                [item.agent_skill_id for item in selection.selected_agent_skills],
-            )
-        elif self.selection_service is None or not self.enabled:
-            selection = AgentSkillSelectionResolution(
-                selection_id=f"agent-skill-selection-{uuid4().hex}",
-                sid=sid,
-                turn_id=_turn_id(sid=sid, text=request.user_request, context=context),
-                agent_role="tool_result_interpreter",
-                decision="no_skill",
-                status="model_unavailable",
-                selected_agent_skills=(),
-                candidate_summaries=(),
-                confidence=1.0,
-                reason_summary="Agent Skill progressive disclosure is disabled.",
-            )
-        else:
-            selection = await self.selection_service.select(
-                AgentSkillSelectionRequest(
-                    sid=sid,
-                    turn_id=_turn_id(
-                        sid=sid,
-                        text=request.user_request,
-                        context=context,
-                    ),
-                    agent_role="tool_result_interpreter",
-                    text=request.user_request,
-                    language=request.language,
-                    goals=_goal_contexts(context),
-                    context_summary=("route=tool_result",),
-                )
-            )
-        disclosure = self.disclosure_service.disclose(
-            AgentSkillDisclosureRequest(selection=selection)
-        )
-        payload = _prompt_payload(disclosure)
-        if payload is None:
-            return clean_request, disclosure
-        enriched = dict(context)
-        enriched[_CONTEXT_KEY] = payload
-        return clean_request.model_copy(update={"context": enriched}), disclosure

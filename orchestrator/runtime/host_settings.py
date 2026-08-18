@@ -258,7 +258,6 @@ class TelemetrySettings:
 class CognitionSettings:
     llm_url: str
     ollama_model: str
-    failure_response_model: str
     agent_url: str
     action_executor_url: str
     agent_timeout_ms: int
@@ -273,9 +272,6 @@ class CognitionSettings:
     fast_planner_timeout_ms: int
     deep_planner_mode: str
     deep_planner_timeout_ms: int
-    response_composer_mode: str
-    response_composer_timeout_ms: int
-    tool_result_interpreter_timeout_ms: int
     goal_association_mode: str
     goal_association_timeout_ms: int
     runtime_mode: str
@@ -292,9 +288,6 @@ class ModelGenerationSettings:
     keep_alive: str
     prompt_chars_per_token_estimate: float
     context_safety_margin_tokens: int
-    failure_response_num_ctx: int
-    failure_response_num_predict: int
-    failure_response_timeout_ms: int
     ready_greeting_fallback_model: str
     ready_greeting_num_ctx: int
 
@@ -393,10 +386,6 @@ class HostSettingsSnapshot:
     ) -> "HostSettingsSnapshot":
         values = os.environ if environ is None else environ
         ollama_model = _text(values, "OLLAMA_MODEL", "gemma4:e2b") or "gemma4:e2b"
-        failure_model = (
-            _text(values, "AGENT_RESPONSE_COMPOSER_MODEL", ollama_model)
-            or ollama_model
-        )
         ollama_num_ctx = _int(values, "OLLAMA_NUM_CTX", 2048, minimum=512)
         ready_greeting_fallback_model = (
             _text(values, "AGENT_FAST_PLANNER_MODEL")
@@ -624,7 +613,6 @@ class HostSettingsSnapshot:
                     values, "LLM_URL", "http://localhost:11434/api/generate"
                 ),
                 ollama_model=ollama_model,
-                failure_response_model=failure_model,
                 agent_url=_text(values, "AGENT_URL", "http://127.0.0.1:8092"),
                 action_executor_url=_text(
                     values, "ACTION_EXECUTOR_URL", "http://127.0.0.1:8095"
@@ -668,24 +656,6 @@ class HostSettingsSnapshot:
                 ),
                 deep_planner_timeout_ms=_int(
                     values, "ORCH_DEEP_PLANNER_TIMEOUT_MS", 10000, minimum=100
-                ),
-                response_composer_mode=_choice(
-                    values,
-                    "ORCH_RESPONSE_COMPOSER_MODE",
-                    "off",
-                    {"off", "report_only"},
-                ),
-                response_composer_timeout_ms=_int(
-                    values,
-                    "ORCH_RESPONSE_COMPOSER_TIMEOUT_MS",
-                    5000,
-                    minimum=100,
-                ),
-                tool_result_interpreter_timeout_ms=_int(
-                    values,
-                    "ORCH_TOOL_RESULT_INTERPRETER_TIMEOUT_MS",
-                    5500,
-                    minimum=100,
                 ),
                 goal_association_mode=_choice(
                     values,
@@ -903,24 +873,6 @@ class HostSettingsSnapshot:
                     "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS",
                     512,
                     minimum=0,
-                ),
-                failure_response_num_ctx=_int(
-                    values,
-                    "AGENT_RESPONSE_COMPOSER_NUM_CTX",
-                    8192,
-                    minimum=2048,
-                ),
-                failure_response_num_predict=_int(
-                    values,
-                    "AGENT_RESPONSE_COMPOSER_NUM_PREDICT",
-                    256,
-                    minimum=64,
-                ),
-                failure_response_timeout_ms=_int(
-                    values,
-                    "AGENT_RESPONSE_COMPOSER_TIMEOUT_MS",
-                    4500,
-                    minimum=500,
                 ),
                 ready_greeting_fallback_model=ready_greeting_fallback_model,
                 ready_greeting_num_ctx=_int(

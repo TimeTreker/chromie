@@ -17,10 +17,8 @@ from agent.app.goal_association import (
     GoalAssociationResolver,
     GoalSegmentationModelOutput,
 )
-from agent.app.response_composer import ResponseComposerResolver
 from tests.cognitive_work_test_support import cognitive_work_request
 from shared.chromie_contracts.mind import default_mind_profile
-from shared.chromie_contracts.plan import CanonicalPlan
 
 
 class _Dummy:
@@ -120,55 +118,13 @@ class CognitiveIdentityContextTests(unittest.TestCase):
             self.assertIn("Owner-approved Personality Expression JSON", prompt)
             self.assertIn(PERSONALITY_SEMANTIC_CONTRACT, prompt)
 
-    def test_response_composer_receives_identity_as_final_wording_evidence(self) -> None:
-        plan = CanonicalPlan(
-            plan_id="plan-identity",
-            planner_tier="deep",
-            disposition="respond",
-            coverage="complete",
-            confidence=1.0,
-            goal_ids=["goal-identity"],
-            goal_summary="Answer the identity question.",
-            response_text="我叫 Chromie，今年 6 岁。",
-            steps=[],
-        )
-        request = self.request.model_copy(
-            update={
-                "context": {
-                    **self.context,
-                    "canonical_plan_resolution": plan.model_dump(mode="json"),
-                }
-            }
-        )
-        prompt = ResponseComposerResolver(_Dummy())._prompt(request, plan)
-        self.assertIn("Owner-approved Chromie identity JSON", prompt)
-        self.assertIn('"name":"Chromie"', prompt)
-        self.assertIn('"age_description":"6 years old"', prompt)
-        self.assertIn("identity.identity_answer_guidance", prompt)
-        self.assertIn("configured identity.name is an immutable proper name", prompt)
-        self.assertIn("never translate, transliterate, localize", prompt)
-        self.assertIn("Owner-approved Personality Expression JSON", prompt)
-        self.assertIn(PERSONALITY_SEMANTIC_CONTRACT, prompt)
-
     def test_cognitive_role_layers_stay_stable_when_only_turn_text_changes(
         self,
     ) -> None:
         changed = self.request.model_copy(update={"text": "第二个问题"})
-        plan = CanonicalPlan(
-            plan_id="plan-layered-prefix",
-            planner_tier="deep",
-            disposition="respond",
-            coverage="complete",
-            confidence=1.0,
-            goal_ids=["goal-identity"],
-            goal_summary="Answer the identity question.",
-            response_text="我叫 Chromie。",
-            steps=[],
-        )
         goal = GoalAssociationResolver(_Dummy())
         fast = FastPlannerResolver(_Dummy(), _Dummy())
         deep = DeepPlannerResolver(_Dummy(), _Dummy())
-        composer = ResponseComposerResolver(_Dummy())
         pairs = (
             (
                 goal._layered_prompt(
@@ -204,11 +160,6 @@ class CognitiveIdentityContextTests(unittest.TestCase):
                     expected_goal_ids=["goal-identity"],
                 ),
                 deep._system_prompt(),
-            ),
-            (
-                composer._layered_prompt(self.request, plan),
-                composer._layered_prompt(changed, plan),
-                composer._system_prompt(),
             ),
         )
 

@@ -240,7 +240,8 @@ alignment or residual-repair workflow.
 The acquisition and its evidence-dependent explanation also stay one semantic responsibility.
 Goal Association must not duplicate one information request into one capability Goal that
 retrieves evidence and another capability Goal whose only purpose is to answer from that same
-evidence. Response/Tool Result Interpretation owns the natural delivery after acquisition. If a model promotes an evidence-dependent answer into another provider-required Goal with no
+evidence. Host-bound Evidence reactivates Fast Planner for natural delivery after
+acquisition. If a model promotes an evidence-dependent answer into another provider-required Goal with no
 independent bindings/resource contract, the bounded coverage proof rejects that
 candidate set and permits one fresh interpretation from the authoritative user
 turn rather than allowing duplicate provider calls.
@@ -358,8 +359,7 @@ For physical handover, plan-level completion requires the resource state to esta
 both `resource_acquired` and `resource_delivered`. For information resources, the
 provider plan must establish acquisition of trusted information evidence; the
 resource contract may declare `final_delivery_owner=chromie_response_layer`, in
-which case Tool Result Interpretation and Response Composition own the final human
-delivery.
+which case Host Evidence binding and Fast Planner own the final human delivery.
 
 This makes the boundary evolve naturally. If Soridormi currently advertises only
 `acquire_resource` and `deliver_resource`, Deep Planning may compose them. If a later
@@ -557,8 +557,8 @@ The adapter rejects a nominally successful response with no source evidence or
 no retrieval timestamp. The provider result is evidence material only; it cannot
 supply final personality speech.
 
-Tool Result Interpreter verifies the evidence and Response Composer delivers it
-naturally. A more exact provider capability remains preferable when its scope
+The Host verifies exact Evidence provenance and reactivates Fast Planner to
+deliver it naturally. A more exact provider capability remains preferable when its scope
 matches, such as the structured weather contract.
 
 

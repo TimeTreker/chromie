@@ -50,12 +50,17 @@ ORCH_MIND_PROFILE_PATH=config/mind/chromie_default.json
 
 An owner may change the configured name, age, pronouns, self-description, identity-answer guidance, or personality expression without changing code. Increment the profile version and review the complete profile before retaining `owner_approved=true`. Fast progress speech is part of that personality expression: it should sound like Chromie talking naturally to a person, not like a status monitor narrating task, processing, execution, or workflow state.
 
-The Orchestrator turns the loaded profile into one bounded owner-approved identity snapshot. Goal Interpretation, Goal Association, Fast Planner, Deep Planner, Response Composer, conversation, and direct fallback prompts all receive that same snapshot. Models still infer whether a user is asking about identity and choose natural wording; the Host does not detect name or age questions with keywords or return a fixed answer.
+The Orchestrator turns the loaded profile into one bounded owner-approved
+identity snapshot. Goal Interpretation, Goal Association, Fast Planner, Deep
+Planner, Social Attention, conversation, and direct fallback prompts receive
+the applicable bounded projection. Models still infer whether a user is asking
+about identity and choose natural wording; the Host does not detect name or age
+questions with keywords or return a fixed answer.
 
 ## Social Interaction Style configuration
 
-`MindProfile.social_interaction_style` is implemented and supplied to Response
-Composer on every eligible turn. It carries owner-approved courtesy,
+`MindProfile.social_interaction_style` is implemented and supplied to Planner
+communication and Social Attention on every eligible turn. It carries owner-approved courtesy,
 expressiveness, initiative, restraint, cooldown, and repetition guidance. These
 fields describe personality and interaction style; they never describe whether
 the attached body is simulated or physical.

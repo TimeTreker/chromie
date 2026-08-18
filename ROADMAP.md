@@ -47,10 +47,20 @@ Next design/implementation order:
    Goal-continuity authority; commitment-bearing Capability work still requires
    applicable canonical Goal grounding and trusted validation. Retired Goal-Interpreter
    `native_response`/`fast_speech` compatibility vocabulary is not part of the
-   maintained path. A Communicative Act contains function, timing, semantic
-   provenance, and constraints but no wording; Response Composer/language formulation
-   realizes it before Vocal/TTS delivery.
-3. **Epistemic Qualification contract detail — first source slice implemented.** Do not add an `EpistemicManager`.
+   maintained path. A Communicative Activity contains function, exact wording,
+   timing, truth/evidence provenance, and constraints. The Host validates and
+   schedules it mechanically before Vocal/TTS delivery; there is no independent
+   Response Composer semantic owner.
+3. **Planner-owned communication and Evidence re-entry — active implementation line.**
+   Remove the duplicate Response Composer and Tool Result Interpreter semantic
+   stages. Trusted Runtime/Host binds terminal Evidence through immutable request
+   provenance to exact Goal IDs, then reactivates Fast Planner with a bounded,
+   version-consistent Goal/Evidence snapshot. Fast Planner chooses answer,
+   follow-up Work, clarification, or silence. Social Attention remains optional
+   decoration attached to the same observable Main Activity and never delays it.
+   Retain separate first-commit, TTS-first-PCM, playback-start, result-reentry,
+   and Social-Attention-opportunity timing evidence.
+4. **Epistemic Qualification contract detail — first source slice implemented.** Do not add an `EpistemicManager`.
    Extend existing capability/evidence contracts to represent claim-specific required
    observations, provenance/trust-domain independence, alternatives/corroboration,
    validity/freshness, closed-world coverage, and qualification state
@@ -58,20 +68,20 @@ Next design/implementation order:
    Gateway and semantic meaning in GI/GA. Principal recognition/authentication uses
    the ordinary Capability/Provider/Evidence path; authorization/consent remains Host
    policy.
-4. **Forward Adaptation contract detail — first source slice implemented.** Separate open-Responsibility actions from
+5. **Forward Adaptation contract detail — first source slice implemented.** Separate open-Responsibility actions from
    terminal-history learning proposals. Online Reflection may create only bounded
    advisory experience/calibration; trusted policy caps scope and lifetime and Memory
    materializes it with explicit expiry. It may not modify Stable Mind/shared prompts/models/global
    Fast/Deep policy, authorization/safety, Capability semantics, or cache semantic
    decisions. Shared/systemic changes remain offline and owner-governed.
-5. **Retention/negative-evidence consistency.** Make `immutable while retained !=
+6. **Retention/negative-evidence consistency.** Make `immutable while retained !=
    permanent` explicit across Evidence/Memory/Data Loop. No universal tombstone is
    required; absence supports a negative claim only under complete collection and
    retention coverage, otherwise Response must preserve `unknown`.
-6. **Machine guards and scenarios.** Only after contract text is stable, add the
+7. **Machine guards and scenarios.** Only after contract text is stable, add the
    smallest schema/runtime/audit changes needed to protect these boundaries. Tests
    should guard authority and observable semantics, not one incidental call sequence.
-7. **Qualification after implementation.** Source/test success, target qualification,
+8. **Qualification after implementation.** Source/test success, target qualification,
    and release readiness stay separate; relevant revision/model/provider/config changes
    invalidate the corresponding qualification claim before age-based review does.
 
@@ -210,7 +220,7 @@ Implement this line as separate focused Issues and separate patches:
   interaction task ends after Runtime acceptance while a Runtime-correlated result consumer owns
   lifecycle observation until terminal closure. Each non-final terminal Capability result may
   become exact incremental `ExecutionEvidence`, then an internal `CognitiveOpportunity`, then the
-  existing evidence-bound Tool Result Interpreter when current Goal responsibility is still open.
+  bounded Host Evidence binding and Fast Planner re-entry when current Goal responsibility is still open.
   Result arrival is never fabricated as a user turn. Planner-authored `after_capabilities` terminal
   wording is excluded from detached execution because completion language belongs to terminal
   Evidence. Final aggregate closure remains available for whole-scope truth and filters evidence
@@ -329,7 +339,7 @@ sequential milestone numbers. Earlier incremental work is represented by two com
   an open evidence track.
 - **Goal-driven control-plane foundation:** Cognitive Gateway admission,
   immutable turn envelopes, Core-owned Goal Interpretation, Goal Association,
-  Fast and Deep Planner contracts, Response Composer, Trusted Capability
+  Fast and Deep Planner contracts, Planner-owned Communicative Activities, Trusted Capability
   Runtime validation, outcome evidence, and fail-closed execution.
 
 These foundations are maintained only while their automated contracts remain
@@ -386,7 +396,7 @@ Exit criteria:
 
 Issue [#22](https://github.com/TimeTreker/chromie/issues/22) owns the append-only
 Interaction Ledger and bounded Goal-scoped Interaction Context supplied to Goal
-Association, Fast Planner, Deep Planner, and Response Composer. The Ledger
+Association, Fast Planner, and Deep Planner. The Ledger
 transports facts from existing owners; it does not replace or rewrite playback,
 Social Attention results, the canonical Plan, Goal state, static preflight
 diagnostics, or `ExecutionOutcomeBundle` evidence.

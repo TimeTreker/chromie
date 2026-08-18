@@ -29,8 +29,6 @@ projections:
   goal_association: projections/goal_association.md
   fast_planner: projections/fast_planner.md
   deep_planner: projections/deep_planner.md
-  response_composer: projections/response_composer.md
-  tool_result_interpreter: projections/tool_result_interpreter.md
 ```
 
 Only declared projections that actually exist are required. Projection paths

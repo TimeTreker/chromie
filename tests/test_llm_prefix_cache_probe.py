@@ -47,16 +47,16 @@ class PrefixCacheTrackerTests(unittest.TestCase):
 
     def test_prompt_families_do_not_pollute_each_other(self) -> None:
         primary = self.tracker.begin(
-            purpose="response_composer",
-            prompt_family="response_composer.primary",
+            purpose="fast_planner",
+            prompt_family="fast_planner.primary",
             model="gemma4:e2b",
             system="primary",
             prompt="same",
         )
         self.tracker.finish(primary.fields["call_id"], status="completed")
         review = self.tracker.begin(
-            purpose="response_composer",
-            prompt_family="response_composer.safe_read_review",
+            purpose="fast_planner",
+            prompt_family="fast_planner.evidence_reentry",
             model="gemma4:e2b",
             system="review",
             prompt="different",

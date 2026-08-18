@@ -2,257 +2,25 @@ from __future__ import annotations
 
 import unittest
 
-from pydantic import ValidationError
-
 from agent.app.goal_association import (
     GoalAssociationModelOutput,
     GoalAssociationResolver,
 )
 from agent.app.planner_contract import coordinated_action_goal_ids
-from agent.app.response_composer import (
-    ResponseComposerModelOutput,
-    ResponseComposerResolver,
-)
-from shared.chromie_contracts.plan import CanonicalPlan
-from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
 
 
-class ResponseComposerCoordinationRepairTests(unittest.TestCase):
-    @staticmethod
-    def _mixed_plan() -> CanonicalPlan:
-        return CanonicalPlan.model_validate(
-            {
-                "plan_id": "plan-concurrent-performance",
-                "planner_tier": "fast",
-                "disposition": "mixed",
-                "coverage": "complete",
-                "confidence": 1.0,
-                "goal_ids": ["goal-move", "goal-song"],
-                "goal_summary": "move while performing a song",
-                "steps": [
-                    {
-                        "step_id": "step-move",
-                        "capability_id": "soridormi.walk_forward",
-                        "args": {"duration_s": 15.0},
-                        "timing": "parallel",
-                        "source_goal_ids": ["goal-move"],
-                    }
-                ],
-                "goal_outcomes": [
-                    {
-                        "goal_id": "goal-move",
-                        "disposition": "execute",
-                        "coverage": "complete",
-                        "step_ids": ["step-move"],
-                    },
-                    {
-                        "goal_id": "goal-song",
-                        "disposition": "respond",
-                        "coverage": "complete",
-                        "response_text": "小星星，亮晶晶。",
-                        "step_ids": [],
-                    },
-                ],
-            }
-        )
-
-    def test_missing_references_are_copied_from_immutable_plan(self) -> None:
-        plan = self._mixed_plan()
-        raw = {
-            "response_plan": {
-                "immediate": {
-                    "text": "小星星，亮晶晶。",
-                    "speech_act": "perform",
-                    "commitment_state": "none",
-                    "must_not_claim_completion": True,
-                    "covers_goal_ids": ["goal-song"],
-                }
-            },
-            "lane_coordination": [
-                {
-                    "coordination_id": "coord-performance",
-                    "lanes": ["vocal", "activity"],
-                }
-            ],
-            "confidence": 1.0,
-            "rationale": "The user requested overlap.",
-        }
-
-        normalized = ResponseComposerResolver._canonicalize_lane_coordination_payload(
-            raw,
-            plan=plan,
-        )
-        output = ResponseComposerModelOutput.model_validate(normalized)
-
-        self.assertEqual(
-            output.lane_coordination[0].activity_step_ids,
-            ["step-move"],
-        )
-        assert output.response_plan.immediate is not None
-        self.assertEqual(
-            output.response_plan.immediate.coordination_id,
-            "coord-performance",
-        )
-        self.assertEqual(
-            output.response_plan.immediate.delivery_role,
-            "performance",
-        )
-
-    def test_optional_coordination_id_without_delivery_role_is_pruned(self) -> None:
-        plan = self._mixed_plan()
-        raw = {
-            "response_plan": {
-                "immediate": {
-                    "text": "Let me check that first.",
-                    "speech_act": "acknowledge",
-                    "commitment_state": "evaluating",
-                    "must_not_claim_completion": True,
-                    "covers_goal_ids": ["goal-move", "goal-song"],
-                    "coordination_id": "coord-malformed-optional",
-                }
-            },
-            "lane_coordination": [
-                {
-                    "coordination_id": "coord-malformed-optional",
-                    "lanes": ["vocal", "activity"],
-                }
-            ],
-            "confidence": 1.0,
-            "rationale": "Optional overlap omitted the required speech role.",
-        }
-
-        normalized = ResponseComposerResolver._canonicalize_lane_coordination_payload(
-            raw,
-            plan=plan,
-        )
-        output = ResponseComposerModelOutput.model_validate(normalized)
-
-        assert output.response_plan.immediate is not None
-        self.assertIsNone(output.response_plan.immediate.coordination_id)
-        self.assertEqual(output.response_plan.immediate.delivery_role, "response")
-        reconciled, kept, reasons = ResponseComposerResolver._reconcile_lane_coordination(
-            response_plan=output.response_plan,
-            lane_coordination=output.lane_coordination,
-            plan=plan,
-        )
-        self.assertEqual(kept, [])
-        self.assertTrue(reasons)
-        assert reconciled.immediate is not None
-        self.assertEqual(reconciled.immediate.text, "Let me check that first.")
-
-    def test_social_attention_is_pruned_from_execution_lane_coordination(self) -> None:
-        plan = self._mixed_plan()
-        raw = {
-            "response_plan": {
-                "immediate": {
-                    "text": "我准备好啦。",
-                    "speech_act": "affirmative",
-                    "commitment_state": "none",
-                    "must_not_claim_completion": True,
-                    "covers_goal_ids": ["goal-move", "goal-song"],
-                }
-            },
-            "lane_coordination": [
-                {
-                    "coordination_id": "coord-social-only",
-                    "lanes": ["vocal", "social_attention"],
-                }
-            ],
-        }
-
-        normalized = ResponseComposerResolver._canonicalize_lane_coordination_payload(
-            raw,
-            plan=plan,
-        )
-
-        self.assertEqual(normalized["lane_coordination"], [])
-
-    def test_activity_ids_without_activity_lane_are_removed_before_dto_validation(
-        self,
-    ) -> None:
-        plan = self._mixed_plan()
-        raw = {
-            "response_plan": {
-                "immediate": {
-                    "text": "小星星，亮晶晶。",
-                    "speech_act": "perform",
-                    "commitment_state": "none",
-                    "must_not_claim_completion": True,
-                    "covers_goal_ids": ["goal-song"],
-                }
-            },
-            "lane_coordination": [
-                {
-                    "coordination_id": "coord-invalid-activity-reference",
-                    "lanes": ["vocal", "social_attention"],
-                    "activity_step_ids": ["step-move"],
-                }
-            ],
-            "confidence": 1.0,
-            "rationale": "Optional coordination included an invalid activity reference.",
-        }
-
-        normalized = ResponseComposerResolver._canonicalize_lane_coordination_payload(
-            raw,
-            plan=plan,
-        )
-        output = ResponseComposerModelOutput.model_validate(normalized)
-
-        self.assertEqual(output.lane_coordination, [])
-
-    def test_response_composer_rejects_social_attention_authoring(self) -> None:
-        with self.assertRaises(ValidationError):
-            ResponseComposerModelOutput.model_validate(
-                {
-                    "response_plan": {
-                        "final": {
-                            "text": "好呀。",
-                            "speech_act": "acknowledge",
-                            "commitment_state": "completed",
-                            "must_not_claim_completion": False,
-                            "covers_goal_ids": ["goal-chat"],
-                        }
-                    },
-                    "social_attention_plan": {
-                        "decision": "express",
-                        "reason": "The scene feels friendly.",
-                    },
-                }
-            )
-
-    def test_response_composer_rejects_social_attention_speech_adaptation(self) -> None:
-        with self.assertRaises(ValidationError):
-            ResponseComposerModelOutput.model_validate(
-                {
-                    "response_plan": {
-                        "final": {
-                            "text": "好呀。",
-                            "speech_act": "acknowledge",
-                            "commitment_state": "completed",
-                            "must_not_claim_completion": False,
-                            "covers_goal_ids": ["goal-chat"],
-                        }
-                    },
-                    "social_attention_plan": {
-                        "decision": "express",
-                        "purpose": "engagement",
-                        "speech_expression": {
-                            "mode": "adapt",
-                            "style": "warm",
-                        },
-                    },
-                }
-            )
-
-    def test_failed_composition_reports_zero_provider_requests(self) -> None:
+class PlannerCommunicationBoundaryTests(unittest.TestCase):
+    def test_failed_planner_activity_validation_dispatches_no_provider(self) -> None:
         resolution = CognitiveRuntimeResolution(
             mode="apply",
             status="error",
             lane="robot_action",
-            fallback_reason="response composition invalid",
-            metadata={"failure_stage": "response_composer"},
+            fallback_reason="planner communicative activity invalid",
+            metadata={
+                "failure_stage": "planner_communicative_activity_validation"
+            },
         )
 
         summary = VoiceAssistant._cognitive_resolution_summary(resolution)
@@ -260,7 +28,6 @@ class ResponseComposerCoordinationRepairTests(unittest.TestCase):
         self.assertFalse(summary["interaction_response_constructed"])
         self.assertEqual(summary["provider_request_count"], 0)
         self.assertFalse(summary["provider_dispatch_possible"])
-
 
 
 class GoalAndCoverageRegressionTests(unittest.TestCase):
@@ -281,7 +48,7 @@ class GoalAndCoverageRegressionTests(unittest.TestCase):
 
         required = GoalAssociationResolver._responsibility_coverage_required(
             output,
-            request=object(),  # the trigger uses no request fields
+            request=object(),
         )
 
         self.assertTrue(required)

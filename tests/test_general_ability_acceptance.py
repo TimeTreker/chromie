@@ -106,8 +106,47 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                     ]
                 },
                 "metadata": {
-                    "fast_communicative_realization_status": "resolved"
+                    "fast_communicative_realization_status": "planner_owned"
                 },
+            },
+        }
+
+        self.assertEqual(validate_live_text_result(case, summary), [])
+
+    def test_live_validation_gates_fast_commit_social_attachment_and_reentry(self) -> None:
+        case = TextScenarioCase(
+            case_id="weather",
+            text="哎，今天上午重庆会不会下雨？",
+            require_speech=False,
+            require_social_attention_opportunity=True,
+            require_fast_planner_evidence_reentry=True,
+            max_warm_fast_response_commit_ms=2000,
+            max_warm_first_playback_start_ms=3000,
+        )
+        summary = {
+            "preview_only": False,
+            "speaker": True,
+            "timings_ms": {"goal_interpretation_ms": 400.0},
+            "interaction_response": {"speech": [], "capabilities": []},
+            "cognitive_runtime": {
+                "timings_ms": {"fast_planner_commit": 600.0},
+                "metadata": {"social_attention_opportunity_count": 1},
+            },
+            "session_state": {
+                "cognitive_workflow_stages": [
+                    {
+                        "stage": "social_attention_opportunity",
+                        "status": "queued",
+                        "metadata": {"attached_to_main_activity": True},
+                    },
+                    {
+                        "stage": "fast_planner_evidence_reentry",
+                        "status": "resolved",
+                    },
+                ],
+                "workflow_events": [
+                    {"event": "playback_start", "elapsed_ms": 1400.0}
+                ],
             },
         }
 

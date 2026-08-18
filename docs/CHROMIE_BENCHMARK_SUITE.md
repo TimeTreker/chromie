@@ -98,11 +98,11 @@ surroundings. Examples:
 - Cognitive Gateway attention/admission review;
 - Goal-Driven Cognitive Core goal interpretation and association;
 - Goal segmentation and association;
-- Fast and Deep Planner output;
-- Response Composer and Social Attention choice;
+- Fast and Deep Planner output, including exact Communicative Activities;
+- Activity-attached Social Attention choice;
 - MindProfile and Social Interaction Style prompt projection;
 - capability retrieval and model-facing catalog projection;
-- tool-result interpretation.
+- Host-bound terminal Evidence and Fast Planner re-entry.
 
 Module benchmarks may replay recorded model output to isolate validators, but
 model-quality runs must also support a live configured model.
@@ -113,10 +113,10 @@ Exercise meaningful component chains without requiring the entire deployed
 system. Examples:
 
 ```text
-MindProfile -> Response Composer -> Social Attention proposal
+MindProfile -> Planner Communicative Activity -> Social Attention proposal
 Cognitive Gateway -> Goal-Driven Cognitive Core -> Planner
 Capability catalog -> Planner -> Trusted Capability Runtime validation
-Tool result -> interpretation -> truthful final speech
+Tool result -> Host Evidence binding -> Fast Planner -> truthful final speech
 ```
 
 ### 4.3 End-to-end benchmarks
@@ -128,8 +128,8 @@ text or audio
 -> Cognitive Gateway
 -> Goal-Driven Cognitive Core
 -> tool and/or named-skill execution
--> Response Composer
--> speech and optional auxiliary behavior
+-> Planner-owned Communicative Activity
+-> speech and Activity-attached optional auxiliary behavior
 -> terminal evidence
 ```
 
@@ -239,8 +239,8 @@ the Human-Like Interaction Contract, the Goal-driven architecture, the current
 MindProfile and Social Interaction Style, retained failures, and the exact
 capability and evidence surfaces under qualification. Generic assistant trivia,
 abstract JSON obedience, or an unrelated agent benchmark is not evidence that a
-model can act as Chromie's Goal Association, Planner, Response Composer, Tool
-Result Interpreter, or Social Attention owner.
+model can act as Chromie's Goal Association, Fast/Deep Planner, or Social
+Attention owner.
 
 An LLM may generate candidate scenario variations, but generation does not make
 them authoritative. Review must reject candidates that merely paraphrase one

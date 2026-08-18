@@ -2116,7 +2116,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                     *events,
                     event(
                         "llm_output_truncated",
-                        "llm_output_truncated: purpose=response_composer",
+                        "llm_output_truncated: purpose=fast_planner",
                         "live-speech",
                     ),
                 ],

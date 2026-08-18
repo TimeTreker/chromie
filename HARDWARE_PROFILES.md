@@ -86,7 +86,6 @@ AGENT_GOAL_INTERPRETER_MODEL
 AGENT_GOAL_ASSOCIATION_MODEL
 AGENT_FAST_PLANNER_MODEL
 AGENT_DEEP_PLANNER_MODEL
-AGENT_RESPONSE_COMPOSER_MODEL
 AGENT_TASK_CONTINUITY_MODEL
 AGENT_SOCIAL_ATTENTION_MODEL
 ```
@@ -130,9 +129,9 @@ the detected profile.
 | `jetson_agx_orin` | AGX Orin | `gemma4:e2b` | `qwen3:4b` | 2048 |
 | `jetson_thor` | AGX Thor placeholder profile | `gemma4:12b` | `qwen3:4b` | 4096 |
 
-The quality model is used by Goal Association, Deep Planner, Response Composer,
-tool-result interpretation, and review. The fast model is used by Goal
-Interpretation, Fast Planner, Task Continuity, and Social Attention unless the
+The quality model is used by Goal Association and Deep Planner. The fast model
+is used by Goal Interpretation, Fast Planner (including terminal Evidence
+re-entry), Task Continuity, and Social Attention unless the
 profile explicitly states otherwise. RTX 5090 uses `gemma4:12b`; RTX 4090 Laptop
 uses `gemma4:e4b` so both maintained voice profiles preserve the same role
 boundaries within their different VRAM envelopes. Camera frames are not yet part

@@ -96,8 +96,7 @@
     "calls": [
       "fast_advance",
       "goal_association",
-      "fast_plan",
-      "response_composer"
+      "fast_plan"
     ]
   }
 }

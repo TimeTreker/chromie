@@ -19,7 +19,6 @@ MODEL_KEYS = (
     "AGENT_FAST_PLANNER_MODEL",
     "AGENT_GOAL_ASSOCIATION_MODEL",
     "AGENT_DEEP_PLANNER_MODEL",
-    "AGENT_RESPONSE_COMPOSER_MODEL",
     "AGENT_SOCIAL_ATTENTION_MODEL",
 )
 
@@ -202,7 +201,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
                 self.assertEqual(set(MODEL_KEYS) - values.keys(), set())
                 self.assertTrue(all(values[key] for key in MODEL_KEYS))
 
-    def test_rtx5090_is_detected_and_generates_12b_multimodal_quality_stages(self) -> None:
+    def test_rtx5090_is_detected_and_generates_12b_deliberate_stages(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = self._minimal_root(directory)
             system_info = root / "system.env"
@@ -222,8 +221,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["CHROMIE_HOST_TIMEZONE"], "Asia/Shanghai")
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_MODEL"], "gemma4:12b")
         self.assertEqual(values["AGENT_DEEP_PLANNER_MODEL"], "gemma4:12b")
-        self.assertEqual(values["AGENT_RESPONSE_COMPOSER_MODEL"], "gemma4:12b")
-        self.assertEqual(values["AGENT_TOOL_RESULT_INTERPRETER_MODEL"], "gemma4:12b")
         self.assertEqual(values["AGENT_FAST_PLANNER_MODEL"], "qwen3:4b")
         self.assertEqual(values["AGENT_SOCIAL_ATTENTION_MODEL"], "qwen3:4b")
         self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "0")
@@ -236,8 +233,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_GOAL_ASSOCIATION_NUM_CTX",
             "AGENT_FAST_PLANNER_NUM_CTX",
             "AGENT_DEEP_PLANNER_NUM_CTX",
-            "AGENT_RESPONSE_COMPOSER_NUM_CTX",
-            "AGENT_TOOL_RESULT_INTERPRETER_NUM_CTX",
         ):
             self.assertEqual(values[key], "32768", key)
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT"], "2048")
@@ -247,7 +242,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["AGENT_SOCIAL_ATTENTION_NUM_PREDICT"], "160")
         self.assertEqual(values["AGENT_SOCIAL_ATTENTION_TIMEOUT_MS"], "2500")
         self.assertEqual(values["AGENT_DEEP_PLANNER_NUM_PREDICT"], "4096")
-        self.assertEqual(values["AGENT_RESPONSE_COMPOSER_NUM_PREDICT"], "4096")
         self.assertEqual(values["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"], "2048")
         self.assertEqual(manifest["active_profile"], "rtx5090")
         self.assertEqual(manifest["active_operator_mode"], "speech")
@@ -297,8 +291,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["CHROMIE_ACTIVE_PROFILE"], "rtx4090_laptop")
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_MODEL"], "gemma4:e4b")
         self.assertEqual(values["AGENT_DEEP_PLANNER_MODEL"], "gemma4:e4b")
-        self.assertEqual(values["AGENT_RESPONSE_COMPOSER_MODEL"], "gemma4:e4b")
-        self.assertEqual(values["AGENT_TOOL_RESULT_INTERPRETER_MODEL"], "gemma4:e4b")
         self.assertEqual(values["AGENT_FAST_PLANNER_MODEL"], "qwen3:4b")
         self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "0")
         self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "32768")
@@ -315,8 +307,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_GOAL_ASSOCIATION_NUM_CTX",
             "AGENT_FAST_PLANNER_NUM_CTX",
             "AGENT_DEEP_PLANNER_NUM_CTX",
-            "AGENT_RESPONSE_COMPOSER_NUM_CTX",
-            "AGENT_TOOL_RESULT_INTERPRETER_NUM_CTX",
         ):
             self.assertEqual(values[key], "32768", key)
         self.assertEqual(values["AGENT_SOCIAL_ATTENTION_NUM_CTX"], "4096")
@@ -333,11 +323,9 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_GOAL_ASSOCIATION_TIMEOUT_MS": "120000",
             "AGENT_FAST_PLANNER_TIMEOUT_MS": "120000",
             "AGENT_DEEP_PLANNER_TIMEOUT_MS": "120000",
-            "AGENT_RESPONSE_COMPOSER_TIMEOUT_MS": "120000",
             "ORCH_GOAL_ASSOCIATION_TIMEOUT_MS": "150000",
             "ORCH_FAST_PLANNER_TIMEOUT_MS": "150000",
             "ORCH_DEEP_PLANNER_TIMEOUT_MS": "150000",
-            "ORCH_RESPONSE_COMPOSER_TIMEOUT_MS": "150000",
             "ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS": "900000",
         }
         for profile_name in ("rtx5090", "rtx4090_laptop"):
@@ -363,7 +351,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
                             "ORCH_GOAL_ASSOCIATION_TIMEOUT_MS",
                             "ORCH_FAST_PLANNER_TIMEOUT_MS",
                             "ORCH_DEEP_PLANNER_TIMEOUT_MS",
-                            "ORCH_RESPONSE_COMPOSER_TIMEOUT_MS",
                         )
                     ),
                 )

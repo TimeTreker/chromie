@@ -37,15 +37,10 @@ try:
         CoreInterpretationResult,
         CoreInterpretationUnavailable,
     )
-    from chromie_contracts.response_composition import (
-        CommunicativeActRealization,
-        CommunicativeActRealizationRequest,
-    )
     from chromie_contracts.social_attention import SocialAttentionPlan, SocialAttentionRequest
     from chromie_contracts.tool_result import (
         ToolExecutionRequest,
         ToolExecutionResponse,
-        ToolResultInterpretationRequest,
     )
     from chromie_contracts.user_turn import (
         AttentionReviewRequest,
@@ -65,15 +60,10 @@ except ImportError:  # pragma: no cover
         CoreInterpretationResult,
         CoreInterpretationUnavailable,
     )
-    from shared.chromie_contracts.response_composition import (
-        CommunicativeActRealization,
-        CommunicativeActRealizationRequest,
-    )
     from shared.chromie_contracts.social_attention import SocialAttentionPlan, SocialAttentionRequest
     from shared.chromie_contracts.tool_result import (
         ToolExecutionRequest,
         ToolExecutionResponse,
-        ToolResultInterpretationRequest,
     )
     from shared.chromie_contracts.user_turn import (
         AttentionReviewRequest,
@@ -89,8 +79,6 @@ from .social_attention import (
     SocialAttentionPlanner,
     SocialAttentionServices,
 )
-from .response_composer import ResponseComposerResolver
-from .tool_result_interpreter import ToolResultInterpreter
 from .schema import HealthResponse
 from .cognitive_core.goal_interpreter import (
     GoalInterpretationRequest,
@@ -254,26 +242,6 @@ social_attention_services = SocialAttentionServices(
 )
 social_attention_context_builder = SocialAttentionContextBuilder(social_attention_services)
 social_attention_planner = SocialAttentionPlanner(social_attention_services)
-tool_result_interpreter_client = (
-    OllamaClient(
-        settings.ollama_url,
-        settings.tool_result_interpreter_model,
-        timeout_ms=settings.tool_result_interpreter_timeout_ms,
-        purpose="tool_result_interpreter",
-        service_settings=settings,
-    )
-    if settings.use_llm and settings.tool_result_interpreter_enabled
-    else None
-)
-tool_result_interpreter = (
-    ToolResultInterpreter(
-        tool_result_interpreter_client,
-        num_ctx=settings.tool_result_interpreter_num_ctx,
-        num_predict=settings.tool_result_interpreter_num_predict,
-    )
-    if tool_result_interpreter_client is not None
-    else None
-)
 read_only_invoker = (
     McpStreamableHttpInvoker(capability_registry)
     if settings.enable_read_only_task_graph_execution
@@ -377,7 +345,6 @@ fast_planner_resolver = (
     FastPlannerResolver(
         fast_planner_client,
         capability_catalog,
-        communication_reviewer=ollama_client,
         min_confidence=settings.fast_planner_min_confidence,
         num_ctx=settings.fast_planner_num_ctx,
         num_predict=settings.fast_planner_num_predict,
@@ -429,28 +396,6 @@ reflection_resolver = (
     if reflection_client is not None
     else None
 )
-
-response_composer_client = (
-    OllamaClient(
-        settings.ollama_url,
-        settings.response_composer_model,
-        timeout_ms=settings.response_composer_timeout_ms,
-        purpose="response_composer",
-        service_settings=settings,
-    )
-    if settings.use_llm and settings.response_composer_enabled
-    else None
-)
-response_composer_resolver = (
-    ResponseComposerResolver(
-        response_composer_client,
-        num_ctx=settings.response_composer_num_ctx,
-        num_predict=settings.response_composer_num_predict,
-    )
-    if response_composer_client is not None
-    else None
-)
-
 
 app = FastAPI(
     title="Chromie Agent",
@@ -539,14 +484,6 @@ async def health() -> HealthResponse:
         fast_planner_model=(settings.fast_planner_model if fast_planner_resolver is not None else None),
         deep_planner_enabled=deep_planner_resolver is not None,
         deep_planner_model=(settings.deep_planner_model if deep_planner_resolver is not None else None),
-        response_composer_enabled=response_composer_resolver is not None,
-        response_composer_model=(settings.response_composer_model if response_composer_resolver is not None else None),
-        tool_result_interpreter_enabled=tool_result_interpreter is not None,
-        tool_result_interpreter_model=(
-            settings.tool_result_interpreter_model
-            if tool_result_interpreter is not None
-            else None
-        ),
         social_attention_mode=settings.social_attention_mode,
         social_attention_model=(
             settings.social_attention_model if social_attention_client is not None else None
@@ -634,6 +571,15 @@ async def resolve_fast_advance(request: CognitiveWorkRequest):
     return await fast_planner_resolver.resolve_advance(request)
 
 
+@app.post("/fast-first-response")
+async def resolve_fast_first_response(request: CognitiveWorkRequest):
+    if fast_planner_resolver is None:
+        raise HTTPException(status_code=503, detail="Fast planner is disabled")
+    # This is Fast Planner's latency phase, not a separate response author.
+    # Capability selection and parameter completeness remain in /fast-advance.
+    return await fast_planner_resolver.resolve_first_response(request)
+
+
 @app.post("/fast-plan")
 async def resolve_fast_plan(request: CognitiveWorkRequest):
     if fast_planner_resolver is None:
@@ -685,47 +631,10 @@ async def plan_social_attention(request: SocialAttentionRequest) -> SocialAttent
     return plan
 
 
-@app.post("/compose-response-plan")
-async def compose_response_plan(request: CognitiveWorkRequest):
-    if response_composer_resolver is None:
-        raise HTTPException(status_code=503, detail="Response composer is disabled")
-    prepared, disclosure = await agent_skill_progressive_disclosure.prepare_agent_request(
-        request,
-        "response_composer",
-    )
-    result = await response_composer_resolver.resolve(prepared)
-    return attach_disclosure_metadata(result, disclosure)
-
-
-@app.post(
-    "/communicative-acts/realize",
-    response_model=CommunicativeActRealization,
-)
-async def realize_communicative_acts(
-    request: CommunicativeActRealizationRequest,
-) -> CommunicativeActRealization:
-    """Formulate words for immutable Planner-selected Communicative Acts."""
-
-    if response_composer_resolver is None:
-        raise HTTPException(status_code=503, detail="Response composer is disabled")
-    return await response_composer_resolver.realize_communicative_acts(request)
-
-
 @app.post("/tools/execute", response_model=ToolExecutionResponse)
 async def execute_local_tool(request: ToolExecutionRequest) -> ToolExecutionResponse:
     """Execute one exact planner-selected local read-only capability."""
     return await local_tool_executor.execute(request)
-
-
-@app.post("/tool-result/interpret")
-async def interpret_tool_result(request: ToolResultInterpretationRequest):
-    if tool_result_interpreter is None:
-        raise HTTPException(status_code=503, detail="Tool result interpreter is disabled")
-    prepared, disclosure = (
-        await agent_skill_progressive_disclosure.prepare_tool_result_request(request)
-    )
-    result = await tool_result_interpreter.interpret(prepared)
-    return attach_disclosure_metadata(result, disclosure)
 
 
 @app.post("/goal-association")

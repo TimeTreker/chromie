@@ -51,7 +51,7 @@ def test_e2e_run_profile_retains_effective_runtime_identity() -> None:
         evidence_profile=evidence_profile,
         model="qwen3:4b",
         effective_model_topology={
-            "response_composer": "qwen3:4b",
+            "fast_planner": "qwen3:4b",
             "social_attention": "qwen3:4b",
         },
         mind_profile="owner-profile-v1",
@@ -62,7 +62,7 @@ def test_e2e_run_profile_retains_effective_runtime_identity() -> None:
         runtime_topology="launcher-effective-compact-cognition",
         sample_count=1,
     ).to_dict()
-    assert run["effective_model_topology"]["response_composer"] == "qwen3:4b"
+    assert run["effective_model_topology"]["fast_planner"] == "qwen3:4b"
     assert run["apply_lanes"] == ["chat", "robot_action"]
     assert run["semantic_authority_owner"] == "goal_driven_cognitive_core"
     assert run["social_attention_mode"] == "on"
@@ -223,10 +223,10 @@ def _passing_e2e_reports(cases: list[dict]) -> list[dict]:
                     "evidence_profile": "live_service_text",
                     "model": "qwen3:4b",
                     "code_revision": "deadbeef",
-                    "prompt_revision": "composer-prompt-v1",
+                    "prompt_revision": "planner-activity-prompt-v1",
                     "provider_revision": "provider-v1",
                     "hardware_profile": "rtx5090",
-                    "effective_model_topology": {"response_composer": "qwen3:4b"},
+                    "effective_model_topology": {"fast_planner": "qwen3:4b"},
                     "mind_profile": f"owner-profile-{style}-v1",
                     "social_interaction_style": style,
                     "social_attention_mode": mode,

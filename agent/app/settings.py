@@ -356,47 +356,6 @@ class Settings(BaseModel):
         default_factory=lambda: int(os.getenv("AGENT_DEEP_PLANNER_MAX_CAPABILITIES", "96")), ge=1, le=256
     )
     deep_planner_min_goal_satisfaction: float = Field(default_factory=lambda: float(os.getenv("AGENT_DEEP_PLANNER_MIN_GOAL_SATISFACTION", "0.75")), ge=0.0, le=1.0)
-    response_composer_enabled: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_RESPONSE_COMPOSER_ENABLED", "1").strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
-    response_composer_model: str = Field(
-        default_factory=lambda: os.getenv("AGENT_RESPONSE_COMPOSER_MODEL", "gemma4:e2b")
-    )
-    response_composer_timeout_ms: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_RESPONSE_COMPOSER_TIMEOUT_MS", "4500")), ge=100, le=120000
-    )
-    response_composer_num_ctx: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_RESPONSE_COMPOSER_NUM_CTX", "8192")), ge=2048, le=131072
-    )
-    response_composer_num_predict: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_RESPONSE_COMPOSER_NUM_PREDICT", "1024")), ge=128, le=4096
-    )
-    tool_result_interpreter_enabled: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_TOOL_RESULT_INTERPRETER_ENABLED", "1").strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
-    tool_result_interpreter_model: str = Field(
-        default_factory=lambda: os.getenv(
-            "AGENT_TOOL_RESULT_INTERPRETER_MODEL",
-            os.getenv("AGENT_RESPONSE_COMPOSER_MODEL", "gemma4:e2b"),
-        )
-    )
-    tool_result_interpreter_timeout_ms: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_TOOL_RESULT_INTERPRETER_TIMEOUT_MS", "4500")),
-        ge=100,
-        le=120000,
-    )
-    tool_result_interpreter_num_ctx: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_TOOL_RESULT_INTERPRETER_NUM_CTX", "4096")),
-        ge=2048,
-        le=131072,
-    )
-    tool_result_interpreter_num_predict: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_TOOL_RESULT_INTERPRETER_NUM_PREDICT", "256")),
-        ge=128,
-        le=4096,
-    )
     log_level: str = Field(default_factory=lambda: os.getenv("AGENT_LOG_LEVEL", os.getenv("LOG_LEVEL", "INFO")))
     ollama_fallback_url: str = Field(default_factory=lambda: os.getenv("OLLAMA_URL", "http://chromie-llm:11434"))
     ollama_fallback_model: str = Field(default_factory=lambda: os.getenv("OLLAMA_MODEL", "qwen3:4b"))

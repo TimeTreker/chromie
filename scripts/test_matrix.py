@@ -110,7 +110,7 @@ GROUPS: dict[str, TestGroup] = {
                 "tests.test_fast_planner_pr3",
                 "tests.test_deep_planner_pr4",
                 "tests.test_goal_satisfaction_pr5",
-                "tests.test_response_composer_pr6",
+                "tests.test_planner_communication_pr6",
                 "tests.test_cognitive_runtime_pr7",
                 "tests.test_cognitive_runtime_orchestrator_pr7",
                 "tests.test_cognitive_runtime_acceptance_pr7",

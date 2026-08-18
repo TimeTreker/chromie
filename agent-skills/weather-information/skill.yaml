@@ -6,7 +6,7 @@ description: Select for weather Goals involving location and time scope, rain, p
 authority: agent_method_only
 execution_authority: none
 owner_approved: true
-content_digest: sha256:b6582d694a3e8f22bbc30e242e71975066b16428e86cf7a265764d36eeeecf8d
+content_digest: sha256:6ac9a6074c002e94cda519e0943e5d879826184c2c724acc74374fa38d2bcd1d
 extends:
   - chromie.grounded-external-information
 required_capabilities:
@@ -16,10 +16,7 @@ optional_capabilities:
 applicable_routes:
   - tool
   - chat
-  - tool_result
 projections:
   goal_association: projections/goal_association.md
   fast_planner: projections/fast_planner.md
   deep_planner: projections/deep_planner.md
-  response_composer: projections/response_composer.md
-  tool_result_interpreter: projections/tool_result_interpreter.md

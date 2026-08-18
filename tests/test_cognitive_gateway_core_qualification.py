@@ -40,8 +40,6 @@ def write_identity(path: Path) -> dict:
                 "AGENT_GOAL_ASSOCIATION_MODEL": "qwen3:4b",
                 "AGENT_FAST_PLANNER_MODEL": "qwen3:4b",
                 "AGENT_DEEP_PLANNER_MODEL": "qwen3:4b",
-                "AGENT_RESPONSE_COMPOSER_MODEL": "qwen3:4b",
-                "AGENT_TOOL_RESULT_INTERPRETER_MODEL": "qwen3:4b",
             }
         },
         "capability_manifests": [
@@ -65,8 +63,6 @@ def write_identity(path: Path) -> dict:
                         "AGENT_GOAL_ASSOCIATION_MODEL": "qwen3:4b",
                         "AGENT_FAST_PLANNER_MODEL": "qwen3:4b",
                         "AGENT_DEEP_PLANNER_MODEL": "qwen3:4b",
-                        "AGENT_RESPONSE_COMPOSER_MODEL": "qwen3:4b",
-                        "AGENT_TOOL_RESULT_INTERPRETER_MODEL": "qwen3:4b",
                     },
                 },
                 "chromie-llm": {"image_id": "sha256:llm"},

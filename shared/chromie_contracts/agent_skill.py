@@ -14,8 +14,6 @@ AgentSkillProjectionName = Literal[
     "goal_association",
     "fast_planner",
     "deep_planner",
-    "response_composer",
-    "tool_result_interpreter",
 ]
 AgentSkillSelectionDecision = Literal["select_skills", "no_skill"]
 AgentSkillSelectionStatus = Literal[

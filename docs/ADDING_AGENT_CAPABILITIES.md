@@ -32,7 +32,7 @@ may cover latency without claiming selection, execution, evidence, or a commit.
 Every cognitive stage follows the same still-needed-delta rule. For a safe-read
 or other executable Plan, an equivalent audible or pending acknowledgement is
 referenced by exact speech-event identity rather than repeated. If no equivalent
-act exists, a Planner or Response Composer may author one new prospective
+act exists, a Planner may author one new prospective
 acknowledgement or correction, but provider evidence and Goal reconciliation still
 govern any result/completion claim. Reuse requires
 `reuse_current_turn_speech=true` plus the exact `reused_speech_event_id`; text

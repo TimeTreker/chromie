@@ -121,7 +121,53 @@
             "object reference",
             "destination reference"
           ]
-        }
+        },
+        "response_text": "",
+        "communicative_acts": [
+          {
+            "activity_id": "scenario-immediate",
+            "text": "你想移动哪个东西，放到哪里？",
+            "role": "clarification",
+            "timing": "parallel",
+            "speech_act": "ask_clarification",
+            "source_goal_ids": [
+              "goal-move"
+            ],
+            "truth_stage": "context_grounded",
+            "evidence_refs": [],
+            "information_gaps": [
+              {
+                "gap_id": "scenario-immediate-gap",
+                "description": "你想移动哪个东西，放到哪里？",
+                "blocking": true,
+                "required_for": [
+                  "goal-move"
+                ],
+                "preferred_resolution": "ask_user",
+                "owner": "fast_planner",
+                "source_kind": "execution_input",
+                "source_reference": "retained Level A parameter ambiguity",
+                "resolution_sources_considered": [
+                  "authoritative_context",
+                  "capability_schema"
+                ]
+              }
+            ]
+          },
+          {
+            "activity_id": "scenario-pre_action",
+            "text": "我可以先眨两下眼睛。",
+            "role": "complete_response",
+            "timing": "parallel",
+            "speech_act": "inform",
+            "source_goal_ids": [
+              "goal-blink"
+            ],
+            "truth_stage": "context_grounded",
+            "evidence_refs": [],
+            "information_gaps": []
+          }
+        ]
       }
     ],
     "capabilities": [
@@ -147,29 +193,7 @@
           "eye_expression"
         ]
       }
-    ],
-    "response_composition": {
-      "response_plan": {
-        "immediate": {
-          "text": "你想移动哪个东西，放到哪里？",
-          "speech_act": "clarify",
-          "commitment_state": "waiting_for_user",
-          "must_not_claim_completion": true,
-          "covers_goal_ids": [
-            "goal-move"
-          ]
-        },
-        "pre_action": {
-          "text": "我可以先眨两下眼睛。",
-          "speech_act": "inform",
-          "commitment_state": "evaluating",
-          "must_not_claim_completion": true,
-          "covers_goal_ids": [
-            "goal-blink"
-          ]
-        }
-      }
-    }
+    ]
   },
   "expect": {
     "status": "applied",
@@ -216,8 +240,7 @@
       "fast_advance",
       "goal_association",
       "fast_plan",
-      "deep_plan",
-      "response_composer"
+      "deep_plan"
     ]
   }
 }

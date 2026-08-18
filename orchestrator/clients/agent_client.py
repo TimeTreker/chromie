@@ -12,19 +12,16 @@ from shared.chromie_contracts.core_interpretation import (
 )
 from shared.chromie_contracts.interaction import InteractionResponse
 from shared.chromie_contracts.goal import GoalAssociationResolution
-from shared.chromie_contracts.plan import CanonicalPlan, FastPlannerAdvance
-from shared.chromie_contracts.reflection import ReflectionResolution
-from shared.chromie_contracts.response_composition import (
-    CommunicativeActRealization,
-    CommunicativeActRealizationRequest,
-    ResponseCompositionResolution,
+from shared.chromie_contracts.plan import (
+    CanonicalPlan,
+    FastPlannerAdvance,
+    FastPlannerFirstResponse,
 )
+from shared.chromie_contracts.reflection import ReflectionResolution
 from shared.chromie_contracts.social_attention import SocialAttentionPlan, SocialAttentionRequest
 from shared.chromie_contracts.tool_result import (
     ToolExecutionRequest,
     ToolExecutionResponse,
-    ToolResultInterpretation,
-    ToolResultInterpretationRequest,
 )
 from shared.chromie_contracts.user_turn import (
     AttentionReviewRequest,
@@ -153,22 +150,21 @@ class AgentClient:
             )
             return result
 
-    async def realize_communicative_acts(
+    async def resolve_fast_first_response(
         self,
         session: aiohttp.ClientSession,
         *,
-        request: CommunicativeActRealizationRequest,
+        request: CognitiveWorkRequest,
         timeout_ms: int | None = None,
-    ) -> CommunicativeActRealization:
+    ) -> FastPlannerFirstResponse:
         effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
         async with runtime_tracer.span(
             module=self.TRACE_MODULE,
-            operation="realize_communicative_acts",
+            operation="resolve_fast_first_response",
             kind="tool_call",
             attributes={
-                "endpoint": "/communicative-acts/realize",
+                "endpoint": "/fast-first-response",
                 "timeout_ms": effective_timeout_ms,
-                "act_count": len(request.acts),
             },
         ) as span:
             req = request.model_copy(
@@ -178,7 +174,7 @@ class AgentClient:
             )
             timeout = aiohttp.ClientTimeout(total=effective_timeout_ms / 1000.0)
             async with session.post(
-                f"{self.base_url}/communicative-acts/realize",
+                f"{self.base_url}/fast-first-response",
                 json=req.model_dump(mode="json"),
                 timeout=timeout,
             ) as resp:
@@ -186,12 +182,15 @@ class AgentClient:
                 span.set_attribute("http_status", resp.status)
                 if resp.status != 200:
                     raise RuntimeError(
-                        "Agent Communicative Act realization endpoint returned HTTP "
+                        "Agent fast-first-response endpoint returned HTTP "
                         f"{resp.status}: {body[:500]}"
                     )
-                result = CommunicativeActRealization.model_validate_json(body)
-            span.set_attribute("status", result.status)
-            span.set_attribute("wording_count", len(result.wordings))
+                result = FastPlannerFirstResponse.model_validate_json(body)
+            runtime_tracer.merge_fragment_from_metadata(result.metadata)
+            span.set_attribute(
+                "activity_role",
+                result.activity.role if result.activity is not None else "none",
+            )
             return result
 
     async def resolve_fast_plan(
@@ -303,45 +302,6 @@ class AgentClient:
             span.set_attribute("action_count", len(result.actions))
             return result
 
-    async def compose_response_plan(
-        self,
-        session: aiohttp.ClientSession,
-        *,
-        request: CognitiveWorkRequest,
-        timeout_ms: int | None = None,
-    ) -> ResponseCompositionResolution:
-        effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
-        async with runtime_tracer.span(
-            module=self.TRACE_MODULE,
-            operation="compose_response_plan",
-            kind="tool_call",
-            attributes={
-                "endpoint": "/compose-response-plan",
-                "timeout_ms": effective_timeout_ms,
-            },
-        ) as span:
-            req = request.model_copy(
-                update={
-                    "context": runtime_tracer.inject_carrier(request.context),
-                }
-            )
-            timeout = aiohttp.ClientTimeout(total=effective_timeout_ms / 1000.0)
-            async with session.post(
-                f"{self.base_url}/compose-response-plan",
-                json=req.model_dump(mode="json"),
-                timeout=timeout,
-            ) as resp:
-                body = await resp.text()
-                span.set_attribute("http_status", resp.status)
-                if resp.status != 200:
-                    raise RuntimeError(
-                        f"Agent response-composer endpoint returned HTTP {resp.status}: {body[:500]}"
-                    )
-                result = ResponseCompositionResolution.model_validate_json(body)
-            runtime_tracer.merge_fragment_from_metadata(result.metadata)
-            span.set_attribute("result_status", result.status)
-            return result
-
     async def execute_tool(
         self,
         session: aiohttp.ClientSession,
@@ -374,41 +334,6 @@ class AgentClient:
                     )
                 result = ToolExecutionResponse.model_validate_json(body)
             span.set_attribute("result_status", result.status)
-            return result
-
-    async def interpret_tool_result(
-        self,
-        session: aiohttp.ClientSession,
-        *,
-        request: ToolResultInterpretationRequest,
-        timeout_ms: int | None = None,
-    ) -> ToolResultInterpretation:
-        effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
-        async with runtime_tracer.span(
-            module=self.TRACE_MODULE,
-            operation="interpret_tool_result",
-            kind="tool_call",
-            attributes={
-                "endpoint": "/tool-result/interpret",
-                "timeout_ms": effective_timeout_ms,
-                "evidence_count": len(request.evidence),
-            },
-        ) as span:
-            timeout = aiohttp.ClientTimeout(total=effective_timeout_ms / 1000.0)
-            async with session.post(
-                f"{self.base_url}/tool-result/interpret",
-                json=request.model_dump(mode="json"),
-                timeout=timeout,
-            ) as resp:
-                body = await resp.text()
-                span.set_attribute("http_status", resp.status)
-                if resp.status != 200:
-                    raise RuntimeError(
-                        f"Agent tool-result endpoint returned HTTP {resp.status}: {body[:500]}"
-                    )
-                result = ToolResultInterpretation.model_validate_json(body)
-            span.set_attribute("result_status", result.status)
-            span.set_attribute("selected_fact_count", len(result.selected_facts))
             return result
 
     async def resolve_social_attention(

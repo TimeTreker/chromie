@@ -104,7 +104,36 @@
           "unmet_requirements": [
             "trusted mug pickup capability"
           ]
-        }
+        },
+        "response_text": "",
+        "communicative_acts": [
+          {
+            "activity_id": "scenario-immediate",
+            "text": "我现在没有可靠的拿杯子能力。",
+            "role": "complete_response",
+            "timing": "parallel",
+            "speech_act": "inform",
+            "source_goal_ids": [
+              "goal-pickup"
+            ],
+            "truth_stage": "context_grounded",
+            "evidence_refs": [],
+            "information_gaps": []
+          },
+          {
+            "activity_id": "scenario-pre_action",
+            "text": "我可以先点一下头。",
+            "role": "complete_response",
+            "timing": "parallel",
+            "speech_act": "inform",
+            "source_goal_ids": [
+              "goal-nod"
+            ],
+            "truth_stage": "context_grounded",
+            "evidence_refs": [],
+            "information_gaps": []
+          }
+        ]
       }
     ],
     "capabilities": [
@@ -130,29 +159,7 @@
           "head_motion"
         ]
       }
-    ],
-    "response_composition": {
-      "response_plan": {
-        "immediate": {
-          "text": "我现在没有可靠的拿杯子能力。",
-          "speech_act": "inform",
-          "commitment_state": "none",
-          "must_not_claim_completion": true,
-          "covers_goal_ids": [
-            "goal-pickup"
-          ]
-        },
-        "pre_action": {
-          "text": "我可以先点一下头。",
-          "speech_act": "inform",
-          "commitment_state": "evaluating",
-          "must_not_claim_completion": true,
-          "covers_goal_ids": [
-            "goal-nod"
-          ]
-        }
-      }
-    }
+    ]
   },
   "expect": {
     "status": "applied",
@@ -198,8 +205,7 @@
       "fast_advance",
       "goal_association",
       "fast_plan",
-      "deep_plan",
-      "response_composer"
+      "deep_plan"
     ]
   }
 }

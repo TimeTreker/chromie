@@ -16,9 +16,9 @@ experience artifacts. See
 > semantic authority with readiness-driven continuous progress. Goal Interpretation
 > emits contextual WHAT-only Responsibility evidence, and the same result enters
 > Fast Planner and Goal Association concurrently. Fast Planner authors the first
-> Communicative-Act/Capability Activity Plan. Response Composer/language formulation
-> turns each selected Communicative Act into wording without changing its function;
-> a complete realized answer may enter the Vocal runtime immediately, and a trusted side-effect-free read may start
+> Communicative-Act/Capability Activity Plan, including exact natural wording,
+> truth stage, and provenance for each Communicative Activity. The Host validates
+> it mechanically; a complete answer may enter the Vocal runtime immediately, and a trusted side-effect-free read may start
 > while Goal Association commits its canonical Goal. The approved contract makes Fast
 > Planner—not GI—the owner of execution-input completeness, source/default policy, and
 > clarification selection; it asks only for a user-resolvable blocker after applicable
@@ -27,10 +27,10 @@ experience artifacts. See
 > see `docs/STATUS.md` for its validation level.
 > Goal Association alone creates or modifies canonical Goals, and Runtime groups the
 > resulting task-list view by Goal while preserving one execution identity for shared
-> Work. Background Social Attention may independently prepare optional body
-> decoration for the same anchored interaction. Response Composition runs only when a new
-> presentation decision is still needed, then trusted execution and
-> deterministic per-goal reconciliation own completion truth. A frozen
+> Work. Background Social Attention may prepare optional body decoration attached
+> to the same observable Main Activity without delaying speech. Trusted execution,
+> Host-bound Evidence re-entry to Fast Planner, and deterministic per-goal
+> reconciliation own completion truth. A frozen
 > `UserTurnEnvelope` now preserves the admitted Gateway input through this loop.
 > The contracts and host path are automatically verified and default to
 > authoritative chat plus registered safe read-only tools in the common safe
@@ -90,16 +90,16 @@ Host Orchestrator
     `-> immutable admitted UserTurnEnvelope -> Goal-driven Cognitive Core
         -> Goal Interpretation (Responsibility + Goal relation + bounded unresolved meaning)
         -> same GI result, concurrent fan-out
-           |-> Fast Planner -> input resolution + Communicative Acts + Capability Activities --.
-           |      |-> Response Composer wording -> Vocal/TTS             |
+           |-> Fast Planner -> input resolution + exact Communicative/Capability Activities --.
+           |      |-> validated Communicative Activity -> Vocal/TTS      |
            |      `-> Deep Planner only for complex HOW                  |
            |-> Goal Association -> canonical Goal state --------+-> Goal-bound tasks
            `-> background Social Attention decoration            |
         -> resource-aware Trusted Capability Runtime <-----------'
-        -> Response Composer only when a new presentation decision is still needed
         -> named capability -> Soridormi / peer providers
         -> structured results and traces
-        -> exact plan/request/result join -> per-goal outcome reconciliation
+        -> exact request/Goal-bound Evidence -> Fast Planner re-entry
+        -> per-goal outcome reconciliation
         -> speech-only final response -> TTS -> speaker
 
 Docker: ASR, Agent (Cognitive Core), Ollama, TTS

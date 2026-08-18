@@ -10,8 +10,7 @@ The same event producer is used at all goal-driven cognitive boundaries:
 
 - Goal Association;
 - Fast Planner;
-- Deep Planner; and
-- Response Composer.
+- Deep Planner.
 
 Every captured truncation declares that the result is untrusted, automatic retry
 and context reduction are forbidden, and new execution is prevented.

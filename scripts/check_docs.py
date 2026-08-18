@@ -453,7 +453,6 @@ def check_configuration_reference(errors: list[str]) -> None:
         "ORCH_GOAL_ASSOCIATION_MODE",
         "ORCH_FAST_PLANNER_MODE",
         "ORCH_DEEP_PLANNER_MODE",
-        "ORCH_RESPONSE_COMPOSER_MODE",
         "ORCH_COGNITIVE_RUNTIME_MODE",
         "ORCH_COGNITIVE_APPLY_LANES",
         "ORCH_AGENT_TIMEOUT_MS",

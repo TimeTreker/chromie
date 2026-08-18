@@ -198,10 +198,13 @@ Interpretation itself stops at Responsibility evidence; once that WHAT is suffic
 Fast Planner is the first HOW owner. It must not be implemented as a greeting/weather
 phrase rule, route shortcut, or second semantic authority.
 
-One validated GI result fans out to Fast Planner and Goal Association concurrently.
-Fast Planner authors the first real Activity Plan over GI Responsibility references;
-GA independently remains the only canonical Goal commit authority. The Fast Plan may
-contain several Communicative Acts and Capability Activities with explicit
+One validated GI result first enters Fast Planner's bounded first-response phase. It
+may author one immediately realizable Communicative Act, then the same Fast Planner's
+remaining Activity planning and Goal Association fan out concurrently from the
+unchanged GI result. GA independently remains the only canonical Goal commit authority.
+This is phased readiness inside one Planner, not an independent response author. The
+resulting Fast Plan mechanically retains the already-committed Act and may contain
+additional Communicative Acts and Capability Activities with explicit
 sequential/parallel relations. A greeting can therefore be one complete Communicative
 Act while GA records the conversational Goal; a weather request can contain a progress
 Communicative Act and
@@ -242,8 +245,9 @@ provider-safety barriers. Sufficient understanding may allow cognition,
 clarification, safe preparation, refusal, or another harmless branch to advance,
 but it is not execution authorization.
 
-The same principle applies to optional presentation work. Response composition
-or semantic polishing must not become a barrier to already-authorized work. Social
+The same principle applies to optional presentation work. Mechanical validation
+and acoustic realization of a Planner-owned Communicative Activity must not become
+a barrier to already-authorized work. Social
 Attention is considered only when a concrete semantic primary human-observable
 Activity exists: for example greeting, telling a joke, walking, singing, handover,
 or show/play behavior. Vocal/Activity execution lanes, Vocal Expression modes,
@@ -268,9 +272,11 @@ Goal Interpretation
       bindings: location=Chongqing, time=today
       relationship: new/reference existing dinner Goal as context
 
-concurrent fan-out
-  |-- Fast Planner
-  |     |-- speaking Activity: prospective progress (parallel)
+Fast Planner first response
+  `-- speaking Activity: prospective progress
+
+concurrent continuation
+  |-- same Fast Planner
   |     `-- Capability Activity: exact weather lookup (parallel)
   `-- Goal Association
         `-- commit canonical weather Goal and its relationship to dinner
@@ -381,21 +387,23 @@ envelopes cannot enter ordinary Core cognition.
 Goal Interpretation emits provider-neutral contextual Responsibility evidence, including
 the proposed relationship to supplied Goals and bounded unresolved meaning interpreted
 against any pending clarification. It does not create planning InformationGaps. The same
-result enters Fast Planner and Goal Association concurrently. Fast Planner authors the
-complete first Activity Plan and owns execution-input resolution; GA alone commits the
+result first enters Fast Planner's bounded first-response phase; after that commitment,
+remaining Fast planning and Goal Association continue concurrently. Fast Planner authors
+the complete first Activity Plan and owns execution-input resolution; GA alone commits the
 canonical Goal relation. This is model-authored planning, never a Host greeting phrase
 table or `route == chat` shortcut.
 
 ```text
 UserTurnEnvelope + Session Context
   -> Goal Interpretation
-  -> concurrent fan-out
-       |-> Fast Planner -> first Activity Plan
-       |     |-> Communicative Acts and Capability Activities
+  -> Fast Planner -> first Communicative Activity or silence
+  -> concurrent continuation
+       |-> same Fast Planner -> remaining Activity Plan
+       |     |-> Capability and still-needed Communicative Activities
        |     |-> input resolution or a user-resolvable clarification
        |     `-> Deep Planner only for complex HOW
        `-> Goal Association -> canonical Goal commit/version
-  -> Vocal Realization formulates wording for each selected Communicative Act
+  -> Host validates and Vocal Runtime mechanically realizes exact Planner wording
   -> deterministic Responsibility-to-Goal binding
   -> Goal-grouped Runtime task-list views
   -> terminal CanonicalPlan / Plan revision
@@ -474,9 +482,10 @@ The live layer is projected by responsibility:
   candidates, schemas, dependencies, resource/confirmation facts, and current
   evidence. It is fast because the problem and live projection are bounded, not
   merely because a smaller model happens to be configured.
-- Tool Result Interpretation receives the user's question, relevant Goal
-  context, trusted observations, already-delivered interaction delta, and the
-  compact stable Mind rather than unrelated live state.
+- Fast Planner Evidence re-entry receives the existing Goal responsibility,
+  exact Host-bound terminal Evidence, already-delivered interaction delta, and
+  the compact stable Mind rather than unrelated live state. The result cannot
+  infer a new Goal from its contents.
 - Social Attention receives current interaction events, scene/target evidence,
   recent expressive history, primary activity state, eligible exact social
   capabilities, and the compact stable Mind.
@@ -649,7 +658,8 @@ Outcome reconciliation is a Core stage after execution. It:
 3. compares observed outcomes with goal success criteria;
 4. decides whether each goal is completed, waiting, recoverable, failed,
    cancelled, or needs a bounded replan;
-5. exposes one immutable result bundle to the final response composer.
+5. reactivates Fast Planner with one immutable, version-consistent
+   Goal/Evidence result bundle.
 
 Streaming changes scheduling, not authority. Raw model-token deltas, partial JSON,
 private reasoning, and incomplete sentences are not speech contracts and must never
@@ -697,8 +707,8 @@ boundary commits. Refreshed dialogue is causally cut at the current admitted tur
 so later speech can inform a follow-up but can never flow backward into an earlier turn.
 After canonical Goal IDs exist, Runtime projects only Interaction Ledger events
 bound to those Goals plus explicitly unbound Fast speech from the same turn. Fast
-Planner, Deep Planner, Tool Result Interpreter, Response Composer, and other later
-cognitive stages receive the bounded Goal-scoped projection to decide the
+Planner, Deep Planner, and other later cognitive stages receive the bounded
+Goal-scoped projection to decide the
 still-needed delta. Scheduled speech remains distinct from audible speech,
 committed work remains distinct from terminal evidence, and a speech event can
 never become execution or completion evidence.
@@ -730,9 +740,10 @@ When a structurally valid Fast Plan escalates for a separate validation defect, 
 source-authored candidate may be retained only as an undelivered advisory to Deep
 Planning; retention makes no truth claim, is never delivery evidence, and must be
 reconsidered against the Interaction Ledger and current Plan authority;
-`chromie.speak` still does not become a task-plan leaf. Response Composer uses
-the Plan and Interaction Context to realize, supplement, reuse, or omit that
-speech according to what is actually new. A non-effectful conversational turn
+`chromie.speak` still does not become a task-plan leaf. Planner uses the Plan and
+Interaction Context to author, reuse, or omit that exact Communicative Activity
+according to what is actually new; the Host validates but does not rewrite it. A
+non-effectful conversational turn
 may move directly to `READY_TO_RESPOND`; its Core-owned answer is final for that
 turn and is grounded in the admitted input and any validated context or retrieval
 evidence, not in a fictional execution result.

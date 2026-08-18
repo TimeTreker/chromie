@@ -78,7 +78,7 @@ python -m benchmarks.e2e.run \
   --profile live_service_text \
   --adapter live_service_text \
   --dataset social_attention \
-  --effective-model response_composer=qwen3:4b \
+  --effective-model fast_planner=qwen3:4b \
   --mind-profile owner-profile-v1 \
   --social-style courteous \
   --social-attention-mode on \

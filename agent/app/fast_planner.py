@@ -23,6 +23,8 @@ from .cognitive_identity import (
     PERSONALITY_SEMANTIC_CONTRACT,
     bounded_identity_json,
     bounded_personality_json,
+    owner_approved_identity_context,
+    owner_approved_personality_context,
 )
 from .planner_contract import (
     EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
@@ -46,9 +48,7 @@ from .planner_contract import (
     planner_goal_execution_requirements,
     planner_response_goal_ids,
     planner_contract_diagnostics,
-    retained_evidence_response_review_required,
     review_coordinated_action_plan_coverage,
-    review_retained_evidence_response,
     situation_prompt_projection,
     validate_explicit_numeric_parameter_grounding,
     validate_external_response_evidence_boundary,
@@ -78,16 +78,22 @@ try:
         CanonicalPlan,
         FastPlannerAdvance,
         FastPlannerAdvanceModelOutput,
+        FastPlannerFirstResponse,
+        FastPlannerFirstResponseModelOutput,
         FastPlannerProgressAct,
     )
+    from chromie_contracts.tool_result import ToolResultEvidence
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
     from shared.chromie_contracts.plan import (
         CanonicalPlan,
         FastPlannerAdvance,
         FastPlannerAdvanceModelOutput,
+        FastPlannerFirstResponse,
+        FastPlannerFirstResponseModelOutput,
         FastPlannerProgressAct,
     )
+    from shared.chromie_contracts.tool_result import ToolResultEvidence
 
 logger = logging.getLogger("chromie.agent.fast_planner")
 
@@ -129,7 +135,6 @@ class FastPlannerResolver:
         ollama: OllamaClient,
         catalog: CapabilityCatalog,
         *,
-        communication_reviewer: OllamaClient | None = None,
         min_confidence: float = 0.8,
         num_ctx: int = 8192,
         num_predict: int = 2048,
@@ -137,13 +142,256 @@ class FastPlannerResolver:
         max_contract_repairs: int = 1,
     ) -> None:
         self.ollama = ollama
-        self.communication_reviewer = communication_reviewer or ollama
         self.catalog = catalog
         self.min_confidence = max(0.0, min(1.0, float(min_confidence)))
         self.num_ctx = max(2048, int(num_ctx))
         self.num_predict = max(128, int(num_predict))
         self.max_capabilities = max(1, min(64, int(max_capabilities)))
         self.max_contract_repairs = max(0, min(1, int(max_contract_repairs)))
+
+    async def resolve_first_response(
+        self, request: CognitiveWorkRequest
+    ) -> FastPlannerFirstResponse:
+        """Author the earliest useful speech while Fast HOW planning continues.
+
+        This is deliberately a latency phase of Fast Planner. It neither selects a
+        Capability nor resolves an execution-input gap, and it never creates a
+        second response-authoring owner.
+        """
+
+        responsibilities = [
+            CognitiveResponsibilityProposal.model_validate(
+                item.model_dump(mode="json")
+            )
+            for item in request.responsibilities
+        ]
+        responsibility_refs = [item.local_ref for item in responsibilities]
+        needs_work = any(
+            item.completion_requires_work
+            or item.completion_requires_fresh_evidence
+            for item in responsibilities
+        )
+        response_schema = self._first_response_schema(
+            responsibility_refs,
+            needs_work=needs_work,
+        )
+        try:
+            raw = await self.ollama.generate(
+                self._first_response_prompt(
+                    request,
+                    responsibilities=responsibilities,
+                    needs_work=needs_work,
+                ),
+                system=self._first_response_system_prompt(),
+                options={
+                    "temperature": 0,
+                    "top_p": 0.9,
+                    # Keep the same resident Fast-Planner runner shape as GI/full
+                    # Fast planning. A smaller context window causes Ollama to
+                    # rebuild the runner and turns a sub-second warm response into
+                    # a multi-second model-load event.
+                    "num_ctx": self.num_ctx,
+                    "num_predict": min(self.num_predict, 192),
+                },
+                response_format=response_schema,
+                prompt_family="fast_planner.first_response",
+                turn_id=request.sid,
+                attempt=1,
+            )
+            output = FastPlannerFirstResponseModelOutput.model_validate(raw)
+            activity = output.activity
+            refs = set(activity.source_responsibility_refs)
+            if not refs or not refs.issubset(set(responsibility_refs)):
+                raise PlannerDTOContractError(
+                    "Fast first response must cite supplied Responsibility refs"
+                )
+            if needs_work and activity.role != "progress":
+                raise PlannerDTOContractError(
+                    "unfinished work requires a prospective progress response"
+                )
+            if not needs_work and activity.role != "complete_response":
+                raise PlannerDTOContractError(
+                    "immediate conversational work requires a complete response"
+                )
+            return FastPlannerFirstResponse(
+                turn_id=str(request.sid or "turn-fast-first-response"),
+                activity=activity,
+                metadata={
+                    "semantic_authority": "fast_planner_model",
+                    "phase": "first_communicative_activity",
+                    "execution_authority": "host_communicative_runtime",
+                },
+            )
+        except Exception as exc:
+            failure = (
+                llm_failure_metadata(exc)
+                if isinstance(exc, OllamaGenerationError)
+                else {
+                    "failure_class": "fast_first_response_contract_invalid",
+                    "failure_domain": "model_contract",
+                    "architecture_attribution": "not_evaluated",
+                    "retryable": True,
+                }
+            )
+            logger.warning(
+                "fast_planner_first_response_fail_safe sid=%s error_type=%s "
+                "error=%s failure_class=%s",
+                request.sid,
+                type(exc).__name__,
+                exc,
+                failure["failure_class"],
+            )
+            return FastPlannerFirstResponse(
+                turn_id=str(request.sid or "turn-fast-first-response"),
+                activity=None,
+                metadata={
+                    "semantic_authority": "deterministic_fail_safe",
+                    "phase": "first_communicative_activity",
+                    "execution_authority": "none",
+                    "error_type": type(exc).__name__,
+                    "error": str(exc)[:300],
+                    **failure,
+                },
+            )
+
+    @staticmethod
+    def _first_response_schema(
+        responsibility_refs: list[str], *, needs_work: bool
+    ) -> dict[str, Any]:
+        schema = copy.deepcopy(
+            FastPlannerFirstResponseModelOutput.model_json_schema()
+        )
+        definitions = schema.get("$defs", {})
+        allowed_contract = (
+            "FastPlannerProgressAct"
+            if needs_work
+            else "FastPlannerCompleteResponseAct"
+        )
+        activity = schema.get("properties", {}).get("activity")
+        if isinstance(activity, dict):
+            activity.clear()
+            activity["$ref"] = f"#/$defs/{allowed_contract}"
+        contract = definitions.get(allowed_contract)
+        if isinstance(contract, dict):
+            properties = contract.get("properties")
+            if isinstance(properties, dict):
+                for field_name in ("evidence_refs", "timing", "truth_stage"):
+                    properties.pop(field_name, None)
+                if needs_work:
+                    properties.pop("speech_act", None)
+                activity_id = properties.get("activity_id")
+                if isinstance(activity_id, dict):
+                    activity_id["maxLength"] = 48
+                text_contract = properties.get("text")
+                if isinstance(text_contract, dict):
+                    text_contract["maxLength"] = 80
+                source_refs = properties.get("source_responsibility_refs")
+                if isinstance(source_refs, dict):
+                    source_refs["items"] = {
+                        "type": "string",
+                        "enum": list(dict.fromkeys(responsibility_refs)),
+                    }
+                    source_refs["uniqueItems"] = True
+        unused_contract = (
+            "FastPlannerCompleteResponseAct"
+            if needs_work
+            else "FastPlannerProgressAct"
+        )
+        definitions.pop(unused_contract, None)
+        return schema
+
+    @staticmethod
+    def _first_response_system_prompt() -> str:
+        return (
+            "You are Chromie's low-latency Fast Planner authoring exactly one "
+            "immediately realizable Communicative Activity. You own its communicative "
+            "function and exact natural wording. Do not select a Capability, resolve "
+            "parameters, ask a clarification, claim execution, or invent external "
+            "Evidence in this latency phase. Return only schema-constrained JSON."
+        )
+
+    @staticmethod
+    def _first_response_prompt(
+        request: CognitiveWorkRequest,
+        *,
+        responsibilities: list[CognitiveResponsibilityProposal],
+        needs_work: bool,
+    ) -> LayeredPrompt:
+        context = request.context if isinstance(request.context, dict) else {}
+        language = str(request.language or "auto")[:32]
+        role_contract = (
+            "Author one short progress Activity that honestly acknowledges the work "
+            "without giving a result."
+            if needs_work
+            else "Author the complete natural response Activity now."
+        )
+        identity = owner_approved_identity_context(context).get("identity") or {}
+        personality = owner_approved_personality_context(context)
+        identity_projection = {
+            "identity": {
+                key: identity[key]
+                for key in ("name", "age_description", "family_role")
+                if identity.get(key) not in (None, "", [], {})
+            },
+            "voice": {
+                key: str(personality[key])[:360]
+                for key in ("spoken_style", "maturity_boundary", "tool_use_style")
+                if personality.get(key) not in (None, "", [], {})
+            },
+        }
+        identity_section = "Bounded owner-approved speaking style JSON:\n" + json.dumps(
+            identity_projection,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        progress_contract = (
+            "Fast Planner first-response contract: author exact natural wording for "
+            "one immediately useful Main Activity. When work remains, acknowledge the "
+            "person and prospectively state what Chromie will do next without claiming "
+            "a result. This is the Main Activity to which optional Social Attention may "
+            "attach; it is not a standalone social gesture. Runtime may realize the "
+            "wording unchanged."
+        )
+        rendered = (
+            identity_section
+            + "\n\n"
+            + progress_contract
+            + "\n\nCurrent user turn:\n"
+            + " ".join(str(request.text or "").split())[:700]
+            + "\nRequired response language: "
+            + language
+            + "\nEvery word in activity.text must use that language. For zh or zh-CN, "
+            "write natural Chinese, not English or pinyin. Do not translate named "
+            "entities unless natural Chinese grammar requires no change.\n\n"
+            + role_contract
+            + " Keep text conversational and brief (normally one short sentence). "
+            "A progress text must state Chromie's prospective check, action, or thinking; "
+            "it must not merely repeat or paraphrase the user's question. "
+            "Use a short unique activity_id and cite only the applicable supplied "
+            "Responsibility refs.\n\nAuthoritative Responsibility evidence:\n"
+            + json.dumps(
+                [
+                    item.model_dump(mode="json", exclude_none=True)
+                    for item in responsibilities
+                ],
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )[:2600]
+            + "\n\nAlready delivered or pending interaction summary:\n"
+            + json.dumps(
+                context.get("interaction_context") or {},
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )[:700]
+        )
+        return LayeredPrompt.promote(
+            rendered,
+            identity_world=(identity_section,),
+            operating_contract=(progress_contract,),
+        )
 
     async def resolve_advance(self, request: CognitiveWorkRequest) -> FastPlannerAdvance:
         """Produce Fast Planner's first Activity Plan from GI Responsibilities."""
@@ -153,6 +401,17 @@ class FastPlannerResolver:
             CognitiveResponsibilityProposal.model_validate(item.model_dump(mode="json"))
             for item in request.responsibilities
         ]
+        committed_communicative_activities: list[Any] = []
+        raw_first_response = context.get("fast_planner_first_response")
+        if isinstance(raw_first_response, dict):
+            try:
+                first_response = FastPlannerFirstResponse.model_validate(
+                    raw_first_response
+                )
+            except ValidationError:
+                first_response = None
+            if first_response is not None and first_response.activity is not None:
+                committed_communicative_activities.append(first_response.activity)
 
         responsibility_refs = [item.local_ref for item in responsibilities]
         capabilities = await self.catalog.prompt_entries(scope="common", refresh=False)
@@ -184,6 +443,7 @@ class FastPlannerResolver:
             responsibility_refs,
             responsibilities=responsibilities,
             capabilities=capability_payload,
+            committed_communicative=bool(committed_communicative_activities),
         )
         options = {
             "temperature": 0,
@@ -200,6 +460,9 @@ class FastPlannerResolver:
                         request,
                         responsibilities=responsibilities,
                         capabilities=capability_payload,
+                        committed_communicative_activities=(
+                            committed_communicative_activities
+                        ),
                         validation_errors=previous_errors,
                     ),
                     system=self._advance_system_prompt(),
@@ -218,22 +481,32 @@ class FastPlannerResolver:
                         "Fast Planner advance response is not a JSON object"
                     )
                 output = FastPlannerAdvanceModelOutput.model_validate(last_raw)
+                combined_output = output.model_copy(
+                    update={
+                        "activities": [
+                            *committed_communicative_activities,
+                            *output.activities,
+                        ]
+                    }
+                )
                 self._validate_advance_output(
-                    output,
+                    combined_output,
                     request=request,
                     responsibilities=responsibilities,
                     capabilities=capability_payload,
                 )
                 return FastPlannerAdvance(
                     turn_id=str(request.sid or "turn-fast-advance"),
-                    disposition=output.disposition,
-                    coverage=output.coverage,
-                    covered_responsibility_refs=output.covered_responsibility_refs,
-                    activities=output.activities,
-                    continuations=output.continuations,
-                    confidence=output.confidence,
-                    unresolved=output.unresolved,
-                    reason_summary=output.reason_summary,
+                    disposition=combined_output.disposition,
+                    coverage=combined_output.coverage,
+                    covered_responsibility_refs=(
+                        combined_output.covered_responsibility_refs
+                    ),
+                    activities=combined_output.activities,
+                    continuations=combined_output.continuations,
+                    confidence=combined_output.confidence,
+                    unresolved=combined_output.unresolved,
+                    reason_summary=combined_output.reason_summary,
                     metadata={
                         "semantic_authority": "fast_planner_model",
                         "phase": "responsibility_activity_planning",
@@ -257,6 +530,9 @@ class FastPlannerResolver:
                     responsibility_refs=responsibility_refs,
                     error=exc,
                     raw_output=last_raw,
+                    committed_communicative_activities=(
+                        committed_communicative_activities
+                    ),
                 )
         raise AssertionError("unreachable")
 
@@ -266,6 +542,7 @@ class FastPlannerResolver:
         *,
         responsibilities: list[CognitiveResponsibilityProposal] | None = None,
         capabilities: list[dict[str, Any]] | None = None,
+        committed_communicative: bool = False,
     ) -> dict[str, Any]:
         """Constrain Fast Activities to the authoritative WHAT and live catalog.
 
@@ -332,8 +609,44 @@ class FastPlannerResolver:
                         }
                     },
                 },
+                {
+                    "if": {
+                        "properties": {
+                            "disposition": {"enum": ["execute", "mixed"]}
+                        },
+                        "required": ["disposition"],
+                    },
+                    "then": {
+                        "properties": {
+                            "activities": {
+                                "contains": {
+                                    "type": "object",
+                                    "properties": {
+                                        "role": {
+                                            "enum": [
+                                                "progress",
+                                                "clarification",
+                                                "complete_response",
+                                            ]
+                                        }
+                                    },
+                                    "required": ["role"],
+                                },
+                                "minContains": (
+                                    1
+                                    if all_need_fresh_evidence
+                                    and not committed_communicative
+                                    else 0
+                                ),
+                            }
+                        }
+                    },
+                },
             ]
         )
+        reason_summary = top_properties.get("reason_summary")
+        if isinstance(reason_summary, dict):
+            reason_summary["maxLength"] = 100
         refs = list(dict.fromkeys(responsibility_refs))
         covered = schema.get("properties", {}).get(
             "covered_responsibility_refs"
@@ -350,10 +663,11 @@ class FastPlannerResolver:
                 activities.get("items") if isinstance(activities, dict) else None
             )
             allowed_activity_contracts = [
-                "FastPlannerProgressAct",
                 "FastPlannerClarificationAct",
                 "FastPlannerCapabilityActivity",
             ]
+            if not committed_communicative:
+                allowed_activity_contracts.insert(0, "FastPlannerProgressAct")
             if isinstance(activity_items, dict):
                 activity_items["oneOf"] = [
                     {"$ref": f"#/$defs/{contract_name}"}
@@ -386,25 +700,20 @@ class FastPlannerResolver:
         capability_contract = definitions.get("FastPlannerCapabilityActivity")
         progress_contract = definitions.get("FastPlannerProgressAct")
         if isinstance(progress_contract, dict):
-            progress_contract.setdefault("allOf", []).extend(
-                [
-                    {
-                        "if": {
-                            "properties": {"progress_kind": {"const": progress_kind}},
-                            "required": ["progress_kind"],
-                        },
-                        "then": {
-                            "properties": {"speech_act": {"const": speech_act}}
-                        },
-                    }
-                    for progress_kind, speech_act in (
-                        ("acknowledge_work", "acknowledge"),
-                        ("check_information", "acknowledge_and_check"),
-                        ("perform_action", "acknowledge"),
-                        ("think", "thinking"),
-                    )
-                ]
-            )
+            # These values are fixed by the selected progress_kind contract and
+            # Pydantic validation. Omitting their duplicate decoder properties
+            # keeps the low-latency response schema small without moving wording
+            # or semantic-function ownership out of Fast Planner.
+            progress_contract.pop("allOf", None)
+            progress_properties = progress_contract.get("properties")
+            if isinstance(progress_properties, dict):
+                for field_name in (
+                    "evidence_refs",
+                    "speech_act",
+                    "timing",
+                    "truth_stage",
+                ):
+                    progress_properties.pop(field_name, None)
         allowed_capabilities = [
             item
             for item in (capabilities or [])
@@ -419,24 +728,14 @@ class FastPlannerResolver:
                     str(item["capability_id"])
                     for item in allowed_capabilities
                 ]
-            capability_contract["allOf"] = [
-                {
-                    "if": {
-                        "properties": {
-                            "capability_id": {
-                                "const": str(item["capability_id"])
-                            }
-                        },
-                        "required": ["capability_id"],
-                    },
-                    "then": {
-                        "properties": {
-                            "args": copy.deepcopy(item.get("input_schema") or {})
-                        }
-                    },
-                }
-                for item in allowed_capabilities
-            ]
+            # The compact prompt projection already carries every allowed
+            # argument contract. Decoder-time duplication of every full schema
+            # inflated the first-response context. Host validation below remains
+            # the sole acceptance boundary for the Planner-authored args.
+            capability_contract.pop("allOf", None)
+            capability_properties = capability_contract.get("properties")
+            if isinstance(capability_properties, dict):
+                capability_properties.pop("reason_summary", None)
         return schema
 
     def _validate_advance_output(
@@ -468,6 +767,14 @@ class FastPlannerResolver:
         complete_response_activities = [
             item for item in output.activities if item.role == "complete_response"
         ]
+        if all(item.completion_requires_fresh_evidence for item in responsibilities) and not (
+            clarification_activities
+            or complete_response_activities
+            or any(item.role == "progress" for item in output.activities)
+        ):
+            raise PlannerDTOContractError(
+                "fresh-evidence Fast work requires a Communicative Main Activity"
+            )
         if clarification_activities:
             expected_disposition = "mixed" if capability_activities else "clarify"
             if output.disposition != expected_disposition:
@@ -581,6 +888,7 @@ class FastPlannerResolver:
         responsibility_refs: list[str],
         error: Exception,
         raw_output: Any,
+        committed_communicative_activities: list[Any] | None = None,
     ) -> FastPlannerAdvance:
         inference_failure = isinstance(error, OllamaGenerationError)
         failure = (
@@ -606,12 +914,23 @@ class FastPlannerResolver:
             raw_output,
             responsibility_refs=responsibility_refs,
         )
+        retained_communicative_activities = list(
+            committed_communicative_activities or []
+        )
+        retained_ids = {
+            item.activity_id for item in retained_communicative_activities
+        }
+        retained_communicative_activities.extend(
+            item
+            for item in progress_activities
+            if item.activity_id not in retained_ids
+        )
         return FastPlannerAdvance(
             turn_id=str(request.sid or "turn-fast-advance"),
             disposition="unavailable",
             coverage="uncertain",
             covered_responsibility_refs=responsibility_refs,
-            activities=progress_activities,
+            activities=retained_communicative_activities,
             continuations=[],
             confidence=0.0,
             unresolved=[
@@ -630,7 +949,7 @@ class FastPlannerResolver:
                 "error_type": type(error).__name__,
                 "error": str(error)[:300],
                 "salvaged_progress_activity_ids": [
-                    item.activity_id for item in progress_activities
+                    item.activity_id for item in retained_communicative_activities
                 ],
                 **failure,
             },
@@ -668,6 +987,7 @@ class FastPlannerResolver:
             key = (
                 activity.progress_kind,
                 activity.speech_act,
+                activity.text,
                 activity.timing,
                 tuple(sorted(refs)),
             )
@@ -718,6 +1038,25 @@ class FastPlannerResolver:
         response_only, requires_execution = planner_goal_execution_requirements(
             authoritative_goals
         )
+        reentry = context.get("result_evidence_reentry")
+        trusted_terminal_evidence = context.get("trusted_terminal_evidence")
+        if isinstance(reentry, dict) and isinstance(trusted_terminal_evidence, list):
+            reentry_goal_ids = {
+                " ".join(str(item or "").strip().split())
+                for item in reentry.get("source_goal_ids") or []
+                if " ".join(str(item or "").strip().split())
+            }
+            validated_evidence = [
+                ToolResultEvidence.model_validate(item)
+                for item in trusted_terminal_evidence
+            ]
+            if (
+                validated_evidence
+                and reentry_goal_ids == set(expected_goal_ids_for_turn)
+            ):
+                response_only = True
+                requires_execution = False
+                response_goal_ids = list(expected_goal_ids_for_turn)
         capabilities = await self.catalog.prompt_entries(scope="common", refresh=False)
         executable = [
             item
@@ -1054,75 +1393,6 @@ class FastPlannerResolver:
                 request=request,
                 expected_goal_ids_for_turn=expected_goal_ids_for_turn,
             )
-            if retained_evidence_response_review_required(request.context, validated):
-                try:
-                    communication_review = await review_retained_evidence_response(
-                        self.communication_reviewer,
-                        request_text=request.text,
-                        language=str(request.language or "und"),
-                        association=goal_association_prompt_projection(request.context),
-                        authoritative_goals=canonical_goal_grounding(request.context),
-                        delivered_evidence=evidence_bound_dialogue(
-                            request.context,
-                            fallback_history=request.history,
-                        ),
-                        plan=validated,
-                        num_ctx=self.num_ctx,
-                        turn_id=str(request.sid or ""),
-                    )
-                except Exception as exc:
-                    logger.warning(
-                        "fast_planner_communication_review_unavailable "
-                        "sid=%s error_type=%s error=%s",
-                        request.sid,
-                        type(exc).__name__,
-                        exc,
-                    )
-                    return self._escalation(
-                        plan_id,
-                        request,
-                        "followup_communication_review_unavailable",
-                        unresolved=["latest_communicative_act_unreviewed"],
-                        error=exc,
-                        path_classification="coverage_review_failure",
-                        metadata={"execution_allowed": False},
-                    )
-                reviewed_by_goal = {
-                    item.goal_id: item.response_text
-                    for item in communication_review.goal_responses
-                }
-                reviewed_outcomes = [
-                    item.model_copy(
-                        update={"response_text": reviewed_by_goal[item.goal_id]}
-                    )
-                    if item.disposition == "respond"
-                    else item
-                    for item in validated.goal_outcomes
-                ]
-                metadata = dict(validated.metadata)
-                metadata["communication_review"] = {
-                    "status": (
-                        "revised"
-                        if communication_review.decision == "revise"
-                        else "accepted"
-                    ),
-                    "confidence": communication_review.confidence,
-                    "reason": communication_review.reason,
-                    "semantic_authority": "planner_model",
-                    "execution_authority": "none",
-                }
-                validated = validated.model_copy(
-                    update={
-                        "response_text": communication_review.response_text,
-                        "goal_outcomes": reviewed_outcomes,
-                        "metadata": metadata,
-                    }
-                )
-                logger.info(
-                    "fast_planner_communication_review_done sid=%s decision=%s",
-                    request.sid,
-                    communication_review.decision,
-                )
             coordinated_goal_ids = coordinated_action_goal_ids(
                 canonical_goal_grounding(request.context)
             )
@@ -1374,6 +1644,13 @@ class FastPlannerResolver:
             "must be material_args and its value must equal the complete "
             "step.args.material_args object. "
         )
+        result_evidence_contract = (
+            "Host-bound terminal Evidence completes the provider-read prerequisite for "
+            "the exact canonical Goals. Answer from trusted_terminal_evidence only, "
+            "preserve its values and scope, and return a respond Plan with zero steps. "
+            if isinstance(context.get("result_evidence_reentry"), dict)
+            else ""
+        )
         goal_execution_contract = (
             "The canonical Goals are provider-free direct speech responsibilities. "
             "This plan is response-only: do not select executable capabilities or plan steps. "
@@ -1387,7 +1664,7 @@ class FastPlannerResolver:
                 else ""
             )
         )
-        semantic_scope_contract = "For a Goal with resource_responsibility, keep the entire acquire-and-deliver outcome as one semantic responsibility while treating the current capability catalog as the dynamic decomposition boundary. Fast Planner may terminally execute the Goal only when one exact registered Capability is a complete one-step cover. A provider's resource_contract.plan_requires/plan_provides declares public composition state; provider-internal stages remain private unless exposed as capabilities. If the catalog has only partial resource capabilities that could form a multi-step chain, escalate to Deep Planner rather than inventing hidden provider stages or claiming a partial primitive is complete. The Goal is provider-neutral: choose from the catalog by declared semantic scope and resource contract, never from capability-name conventions or a hardcoded provider rule. When resource_responsibility.source.status=unknown and the selected complete capability cannot resolve the source itself, return a specific context request and zero executable steps. Capability semantic_scope and resource_contract metadata are authoritative applicability evidence. When the selected Capability accepts resource, source, or recipient objects, copy each accepted object exactly from the canonical resource_responsibility, including nested quantity, source bindings, and recipient fields. Those complete structured arguments are already grounded by the Goal contract; do not emit parameter_resolutions for their nested fields or invent a top-level quantity/distance argument that the Capability does not accept. Canonical Goal typed semantics are authoritative: non-resource Goals use object.bindings, while resource Goals use resource_responsibility directly with no persisted flat compatibility copy. Every material tool argument, especially location, date, target, and entity identity, must equal the corresponding canonical binding; never reinterpret an original pronoun or replace a binding with an older memory entry. For chromie.weather.lookup, keep args.location exactly equal to the canonical location binding. When the user or discourse context clearly supplies a hierarchical place, you may also provide location_context with locality, admin1, country, and aliases for that same place; never use it to select a different place. Preserve every canonical-goal qualifier, including temporal scope, comparison period, answer shape, ordering, and concurrency. A calendar-date argument does not cover a finer day-part binding: exact coverage requires a capability argument and declared output evidence for that same day part. Never silently rewrite simultaneous independent actions as before/after actions. An explicit ordered relation must remain sequential. Capability parallel-safety is permission to honor user-requested concurrency, never evidence that concurrency was requested. Every executable step must explicitly include timing; omission is invalid because it would erase the model's ordering or concurrency decision. When the user requests compatible actions to happen together, assign timing=parallel only when each selected capability explicitly declares parallel_metadata_declared=true and can_run_parallel=true and their exclusive/resource claims are compatible. Never invent an unstated feature of a capability in a reason or outcome; in particular, a physical action cannot satisfy a conversational or spoken-performance Goal unless its supplied semantics explicitly say so. Use a respond outcome for speech authored by Response Composer. A user-requested spoken response or performance may still be simultaneous with an Activity-lane step. Preserve that relation without inventing a chromie.speak plan step: keep the spoken Goal as a respond outcome, set each participating Activity step to timing=parallel only when its provider declares safe parallel execution, and leave cross-lane speaking/activity coordination to Response Composer. Never satisfy a prohibition, negation, or hold-state constraint by invoking the positive action it forbids; if the catalog has no capability whose semantic scope actually enforces that negative state, clarify or report it unavailable. If safe parallel execution is unavailable or uncertain, escalate or propose an explicit safe adjustment rather than silently serializing the request. Never silently narrow a goal to fit a capability or its enum defaults. If the goal falls outside a capability's supported scope, escalate for clarification, another capability, or an honest unavailable result with zero steps. "
+        semantic_scope_contract = "For a Goal with resource_responsibility, keep the entire acquire-and-deliver outcome as one semantic responsibility while treating the current capability catalog as the dynamic decomposition boundary. Fast Planner may terminally execute the Goal only when one exact registered Capability is a complete one-step cover. A provider's resource_contract.plan_requires/plan_provides declares public composition state; provider-internal stages remain private unless exposed as capabilities. If the catalog has only partial resource capabilities that could form a multi-step chain, escalate to Deep Planner rather than inventing hidden provider stages or claiming a partial primitive is complete. The Goal is provider-neutral: choose from the catalog by declared semantic scope and resource contract, never from capability-name conventions or a hardcoded provider rule. When resource_responsibility.source.status=unknown and the selected complete capability cannot resolve the source itself, return a specific context request and zero executable steps. Capability semantic_scope and resource_contract metadata are authoritative applicability evidence. When the selected Capability accepts resource, source, or recipient objects, copy each accepted object exactly from the canonical resource_responsibility, including nested quantity, source bindings, and recipient fields. Those complete structured arguments are already grounded by the Goal contract; do not emit parameter_resolutions for their nested fields or invent a top-level quantity/distance argument that the Capability does not accept. Canonical Goal typed semantics are authoritative: non-resource Goals use object.bindings, while resource Goals use resource_responsibility directly with no persisted flat compatibility copy. Every material tool argument, especially location, date, target, and entity identity, must equal the corresponding canonical binding; never reinterpret an original pronoun or replace a binding with an older memory entry. For chromie.weather.lookup, keep args.location exactly equal to the canonical location binding. When the user or discourse context clearly supplies a hierarchical place, you may also provide location_context with locality, admin1, country, and aliases for that same place; never use it to select a different place. Preserve every canonical-goal qualifier, including temporal scope, comparison period, answer shape, ordering, and concurrency. A calendar-date argument does not cover a finer day-part binding: exact coverage requires a capability argument and declared output evidence for that same day part. Never silently rewrite simultaneous independent actions as before/after actions. An explicit ordered relation must remain sequential. Capability parallel-safety is permission to honor user-requested concurrency, never evidence that concurrency was requested. Every executable step must explicitly include timing; omission is invalid because it would erase the model's ordering or concurrency decision. When the user requests compatible actions to happen together, assign timing=parallel only when each selected capability explicitly declares parallel_metadata_declared=true and can_run_parallel=true and their exclusive/resource claims are compatible. Never invent an unstated feature of a capability in a reason or outcome; in particular, a physical action cannot satisfy a conversational or spoken-performance Goal unless its supplied semantics explicitly say so. Use a respond outcome for speech whose exact wording you own. A user-requested spoken response or performance may still be simultaneous with an Activity-lane step. Preserve that relation without inventing a chromie.speak plan step: keep the spoken Goal as a respond outcome, set each participating Activity step to timing=parallel only when its provider declares safe parallel execution, and leave cross-lane scheduling to trusted Runtime. Never satisfy a prohibition, negation, or hold-state constraint by invoking the positive action it forbids; if the catalog has no capability whose semantic scope actually enforces that negative state, clarify or report it unavailable. If safe parallel execution is unavailable or uncertain, escalate or propose an explicit safe adjustment rather than silently serializing the request. Never silently narrow a goal to fit a capability or its enum defaults. If the goal falls outside a capability's supported scope, escalate for clarification, another capability, or an honest unavailable result with zero steps. "
         current_turn_communication_contract = (
             "The FINAL AUTHORITATIVE USER TURN owns the current communicative act. "
             "Retained Goals, delivered evidence-bound dialogue, and verified memory "
@@ -1417,6 +1694,7 @@ class FastPlannerResolver:
                 f"Executable common capability catalog JSON:\n{self._bounded(capabilities, 9000)}\n\n"
                 f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{self._bounded(context.get('verified_tool_memory_index') or [], 5000)}\n\n"
                 f"Delivered evidence-bound dialogue JSON (trusted spoken projection, not the full provider result):\n{self._bounded(evidence_bound_dialogue(context, fallback_history=request.history), 3600)}\n\n"
+                f"Host-bound terminal Evidence JSON:\n{self._bounded(context.get('trusted_terminal_evidence') or [], 6000)}\n\n"
                 f"Active and recoverable task bindings JSON:\n{self._bounded(context.get('active_task_snapshots') or [], 5000)}\n\n"
             f"Bounded live Situation projection JSON (soft/revisable relevance only; referenced owners remain authoritative):\n{self._bounded(situation_prompt_projection(context), 3600)}\n\n"
                 f"Bounded live Situation projection JSON (soft/revisable relevance only; referenced owners remain authoritative):\n{self._bounded(situation_prompt_projection(context), 3600)}\n\n"
@@ -1431,7 +1709,7 @@ class FastPlannerResolver:
                 f"{current_turn_communication_contract}"
                 f"{IDENTITY_SEMANTIC_CONTRACT}"
                 f"{PERSONALITY_SEMANTIC_CONTRACT}"
-                f"{goal_execution_contract}"
+                f"{result_evidence_contract}{goal_execution_contract}"
                 f"{concise_output_contract}"
                 "Author stable non-empty step_id values, exact source_goal_ids, and matching outcome step_ids yourself. "
                 "This is prospective planning: no action has executed yet. A planned step or response counts as satisfying its goal if it would succeed. For each keyed goal outcome, judge only that one goal; never put sibling goals or pending execution in unmet_goal_ids or unmet_requirements. Complete terminal outcomes use exact satisfaction with both unmet lists empty. "
@@ -1457,6 +1735,7 @@ class FastPlannerResolver:
             f"Executable common capability catalog JSON:\n{self._bounded(capabilities, 9000)}\n\n"
             f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{self._bounded(context.get('verified_tool_memory_index') or [], 5000)}\n\n"
             f"Delivered evidence-bound dialogue JSON (trusted spoken projection, not the full provider result):\n{self._bounded(evidence_bound_dialogue(context, fallback_history=request.history), 3600)}\n\n"
+            f"Host-bound terminal Evidence JSON:\n{self._bounded(context.get('trusted_terminal_evidence') or [], 6000)}\n\n"
             f"Active and recoverable task bindings JSON:\n{self._bounded(context.get('active_task_snapshots') or [], 5000)}\n\n"
             f"Bounded live Situation projection JSON (soft/revisable relevance only; referenced owners remain authoritative):\n{self._bounded(situation_prompt_projection(context), 3600)}\n\n"
             f"{goal_progress_communication_prompt('Fast Planner')}\n\n"
@@ -1474,7 +1753,7 @@ class FastPlannerResolver:
             f"{current_turn_communication_contract}"
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
-            f"{goal_execution_contract}"
+            f"{result_evidence_contract}{goal_execution_contract}"
             f"{concise_output_contract}"
             "Generic speech transport is not a plan step. A canonical Goal with responsibility_kind=vocal_output, output_mode=speech, and provider_required=false is a direct conversational responsibility: use disposition=respond with the actual response_text now. Executable outcomes may also carry response_text when it is a still-needed prospective conversational delta; use Interaction Context to omit equivalent delivered or pending speech, and never treat that text as execution evidence. A vocal_output Goal with provider_required=true is a mode-specific vocal performance and cannot be completed by response_text, chromie.speak, ordinary TTS, media playback, or a body gesture. Execute that Goal only when the supplied catalog contains exact capability_id chromie.vocal.perform and its mode enum contains the authoritative Goal output_mode; copy that exact mode and authored content into one owned step. Otherwise escalate for an exact unavailable, refused, or clarification outcome; never invent a vocal capability ID or silently choose another mode. A canonical executable_action/activity/media_playback Goal uses exactly one `chromie.media.<media_operation>` capability copied from the qualified catalog. Playback of existing music, recordings, streams, or sound effects is never a Vocal Goal and never evidence for singing. Preserve persistent playback_id controls and do not replace play, pause, resume, seek, stop, volume, or status with another operation. Greeting wording and length are ordinary model-authored conversational choices governed by the supplied scene, relationship context, and owner-approved personality. "
             "Every executable step must use capability_id plus source_goal_ids copied from the canonical goals. Do not use catalog-only parameters, action, input_schema, route, or step_type fields. "
@@ -1499,6 +1778,7 @@ class FastPlannerResolver:
         *,
         responsibilities: list[CognitiveResponsibilityProposal],
         capabilities: list[dict[str, Any]],
+        committed_communicative_activities: list[Any] | None = None,
         validation_errors: str = "",
     ) -> LayeredPrompt:
         context = request.context if isinstance(request.context, dict) else {}
@@ -1507,9 +1787,9 @@ class FastPlannerResolver:
             "the first complete HOW decision over that evidence: speaking and Capability "
             "Activities plus their sequential/parallel timing. Goal Association runs at "
             "the same time from the same GI result and alone commits Canonical Goal state. "
-            "A speaking Activity is a Communicative Act: select its function and semantic "
-            "provenance, never its sentence wording. Response Composer owns language "
-            "formulation and Trusted Capability Runtime alone authorizes execution."
+            "A speaking Activity is a Communicative Act: select its function, exact natural "
+            "wording, truth stage, and semantic provenance. The Host validates and realizes "
+            "that immutable act; Trusted Capability Runtime alone authorizes execution."
         )
         responsibilities_json = self._bounded(
             [item.model_dump(mode="json", exclude_none=True) for item in responsibilities],
@@ -1527,6 +1807,21 @@ class FastPlannerResolver:
             separators=(",", ":"),
         )
         user_text = " ".join(str(request.text or "").split())[:700]
+        committed_communicative_json = self._bounded(
+            [
+                item.model_dump(mode="json", exclude_none=True)
+                for item in (committed_communicative_activities or [])
+            ],
+            900,
+        )
+        communication_instruction = (
+            "A Fast Planner Communicative Activity has already been committed and "
+            "is shown below. Do not repeat, replace, translate, or re-author it in "
+            "activities. Continue the same HOW decision with only the still-needed "
+            "Capability or clarification Activities."
+            if committed_communicative_activities
+            else "No Fast Planner Communicative Activity is committed yet."
+        )
         rendered = (
             advance_contract
             + "\n\nCurrent user turn:\n"
@@ -1541,6 +1836,10 @@ class FastPlannerResolver:
             + active_goals
             + "\n\nAlready-spoken/pending interaction summary only:\n"
             + interaction_context
+            + "\n\nAlready committed Fast Planner Communicative Activity JSON:\n"
+            + committed_communicative_json
+            + "\n"
+            + communication_instruction
             + "\n\nExecutable common Capability catalog JSON:\n"
             + capability_json
             + "\n\nThe catalog projection above is complete for this Fast decision; every "
@@ -1555,13 +1854,21 @@ class FastPlannerResolver:
             "missing inputs. When one matching Capability has every required input, use "
             "disposition=execute, coverage=complete, continuations=[], unresolved=[], and "
             "emit its schema-valid Capability Activity. For an external information read, "
-            "use progress_kind=check_information with speech_act=acknowledge_and_check when "
-            "a short concurrent progress act helps.\n\nCover every Responsibility ref exactly. Activities are one ordered list. "
+            "include one short progress Activity with progress_kind=check_information "
+            "for fresh external information work only when no committed Fast Planner "
+            "Communicative Activity is supplied above. Never fuse progress wording into "
+            "a Capability Activity or use a Capability ID as a progress activity_id.\n\n"
+            "Cover every Responsibility ref exactly. Activities are one ordered list. "
             "Speaking is an Activity and uses the same timing field as Capability work. "
             "Use parallel only when activities can genuinely overlap without a declared "
             "resource or safety conflict; list dependent work sequentially. A progress "
-            "Activity is bounded and has progress_kind rather than response_text. No "
-            "Communicative Act may contain response_text or other sentence wording. A "
+            "Activity has progress_kind, exact text, truth_stage=pre_evidence, and no "
+            "evidence_refs. Its text may acknowledge or prospectively describe the "
+            "check but must not state a result that has not been observed. Every "
+            "Communicative Activity owns its exact natural wording; do not emit "
+            "response_text inside an Activity. Use truth_stage=context_grounded for "
+            "ordinary answers and clarification, and truth_stage=post_evidence with "
+            "exact evidence_refs only when supplied trusted Evidence supports it. A "
             "complete_response Activity may satisfy only ordinary conversation that needs "
             "no fresh Evidence. You own execution-input completeness and planning "
             "InformationGaps. Before asking, consider authoritative context, applicable "
@@ -1589,9 +1896,14 @@ class FastPlannerResolver:
             "handover, body gestures, or attention motions cannot acquire external information. "
             "Do not add decorative Capability Activities that the Responsibility did not ask "
             "for. Preserve every GI binding, "
-            "including all independent temporal dimensions. Add a progress speaking "
-            "Activity in parallel only when it helps the interaction and does not claim a "
-            "result. Use disposition=escalate and continuation=deep_planner only when HOW "
+            "including all independent temporal dimensions. When fresh Evidence is still "
+            "needed and no committed Communicative Activity is supplied above, add one "
+            "concise progress speaking Activity that does not claim a result. Every "
+            "Communicative Activity must use the requested response language; zh or "
+            "zh-CN requires natural Chinese, never English or pinyin. Use short Activity "
+            "IDs, omit optional default fields, and keep "
+            "reason_summary under one brief clause. Use disposition=escalate and "
+            "continuation=deep_planner only when HOW "
             "itself exceeds the Fast planning budget; emit no Capability Activities in "
             "that case. Goal Association is always concurrent and is never a continuation. "
             "Never claim execution or external results before Evidence.\n\n"
@@ -1698,17 +2010,17 @@ class FastPlannerResolver:
             "You are Chromie's low-latency Fast Planner. Accept Goal Interpretation's "
             "Responsibility evidence as authoritative contextual WHAT. Produce the first "
             "Activity Plan, including speaking and exact available Capability Activities. "
-            "Speaking Activities are Communicative Acts: select their function, timing, "
-            "and Responsibility/InformationGap provenance, but never author sentence "
-            "wording; speech_act is a closed communicative-function enum, not a text "
-            "escape hatch. Ask through a clarification act when a required user-resolvable "
+            "Speaking Activities are Communicative Acts: select their function, exact "
+            "natural wording, timing, truth stage, and Responsibility/InformationGap "
+            "provenance; speech_act remains a closed communicative-function enum. Ask "
+            "through a clarification act when a required user-resolvable "
             "binding is genuinely absent after checking GI bindings and Capability defaults; "
             "never reinterpret a present normalized binding as missing or ambiguous. Select "
             "only a Capability whose declared description, effects, and semantic scope match "
             "the requested outcome; information reads are not physical-object delivery or "
             "decorative body motion. Delegate only genuinely complex HOW to Deep Planner. Goal "
             "Association separately owns Canonical Goal commits, and Trusted Capability "
-            "Runtime owns execution authority. Response Composer owns language formulation. "
+            "Runtime owns execution authority and mechanically realizes Planner wording. "
             "Return only schema-constrained JSON."
         )
 

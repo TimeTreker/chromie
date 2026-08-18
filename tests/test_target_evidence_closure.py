@@ -244,7 +244,7 @@ class TargetEvidenceClosureTests(unittest.TestCase):
                 hardware_profile="rtx5090",
                 mind_profile="mind-1",
                 runtime_topology="cognitive-runtime-apply",
-                effective_model=["response_composer=gemma4:12b"],
+                effective_model=["fast_planner=qwen3:4b"],
                 apply_lane=["chat", "robot_action"],
                 sample_count=1,
                 timeout_s=180.0,

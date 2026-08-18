@@ -6,7 +6,7 @@ description: Select for provider-neutral information-resource Goals including we
 authority: agent_method_only
 execution_authority: none
 owner_approved: true
-content_digest: sha256:6f4a101a5d619dae165947872527c15a7d2c29bc292e0f6de2071aec6e47d4e0
+content_digest: sha256:6e3c698ec6196970367ffd76c051ade10c7957ca03b03a681d4a7fbb4559191f
 extends: []
 required_capabilities: []
 optional_capabilities:
@@ -16,10 +16,7 @@ optional_capabilities:
 applicable_routes:
   - tool
   - chat
-  - tool_result
 projections:
   goal_association: projections/goal_association.md
   fast_planner: projections/fast_planner.md
   deep_planner: projections/deep_planner.md
-  response_composer: projections/response_composer.md
-  tool_result_interpreter: projections/tool_result_interpreter.md

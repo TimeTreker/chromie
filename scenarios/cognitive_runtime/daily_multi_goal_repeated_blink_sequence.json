@@ -103,7 +103,24 @@
           "goal-first-blink",
           "goal-second-blink"
         ]
-      }
+      },
+      "response_text": "",
+      "communicative_acts": [
+        {
+          "activity_id": "scenario-pre_action",
+          "text": "好，我会先眨两下，再单独眨一下。",
+          "role": "complete_response",
+          "timing": "parallel",
+          "speech_act": "inform",
+          "source_goal_ids": [
+            "goal-first-blink",
+            "goal-second-blink"
+          ],
+          "truth_stage": "context_grounded",
+          "evidence_refs": [],
+          "information_gaps": []
+        }
+      ]
     },
     "capabilities": [
       {
@@ -128,21 +145,7 @@
           "eye_expression"
         ]
       }
-    ],
-    "response_composition": {
-      "response_plan": {
-        "pre_action": {
-          "text": "好，我会先眨两下，再单独眨一下。",
-          "speech_act": "inform",
-          "commitment_state": "evaluating",
-          "must_not_claim_completion": true,
-          "covers_goal_ids": [
-            "goal-first-blink",
-            "goal-second-blink"
-          ]
-        }
-      }
-    }
+    ]
   },
   "expect": {
     "status": "applied",
@@ -197,8 +200,7 @@
     "calls": [
       "fast_advance",
       "goal_association",
-      "fast_plan",
-      "response_composer"
+      "fast_plan"
     ]
   }
 }

@@ -211,6 +211,8 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         prompt = self._interpreter().load_system_prompt()
         self.assertIn("exact contiguous surface", prompt)
         self.assertIn("Never translate, transliterate", prompt)
+        self.assertIn("emit a `date` binding and a `day_part` binding", prompt)
+        self.assertIn("contextual WHAT normalization only", prompt)
         self.assertIn("provider timezone", prompt)
         self.assertIn("never an unresolved WHAT question", prompt)
 

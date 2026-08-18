@@ -154,7 +154,23 @@
         "satisfied_goal_ids": [
           "goal-water"
         ]
-      }
+      },
+      "response_text": "",
+      "communicative_acts": [
+        {
+          "activity_id": "scenario-pre_action",
+          "text": "好呀，我去拿给你。",
+          "role": "complete_response",
+          "timing": "parallel",
+          "speech_act": "inform",
+          "source_goal_ids": [
+            "goal-water"
+          ],
+          "truth_stage": "context_grounded",
+          "evidence_refs": [],
+          "information_gaps": []
+        }
+      ]
     },
     "capabilities": [
       {
@@ -187,20 +203,7 @@
           "body.primary_motion"
         ]
       }
-    ],
-    "response_composition": {
-      "response_plan": {
-        "pre_action": {
-          "text": "好呀，我去拿给你。",
-          "speech_act": "inform",
-          "commitment_state": "evaluating",
-          "must_not_claim_completion": true,
-          "covers_goal_ids": [
-            "goal-water"
-          ]
-        }
-      }
-    }
+    ]
   },
   "expect": {
     "status": "applied",
@@ -242,8 +245,7 @@
     "calls": [
       "fast_advance",
       "goal_association",
-      "fast_plan",
-      "response_composer"
+      "fast_plan"
     ]
   }
 }

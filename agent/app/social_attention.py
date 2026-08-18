@@ -357,7 +357,7 @@ class SocialAttentionPlanner:
     would make that Activity more socially natural without changing its Goal, response
     text, or completion, and selects exact
     catalog capabilities for the scene. Response wording remains owned by the normal
-    cognitive/Response Composer path; this planner is body-only. Deterministic code validates
+    cognitive Fast/Deep Planner path; this planner is body-only. Deterministic code validates
     schemas, evidence, safety, and resource conflicts without choosing actions.
     """
 

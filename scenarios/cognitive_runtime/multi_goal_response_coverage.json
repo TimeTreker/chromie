@@ -53,7 +53,7 @@
         "goal-calendar"
       ],
       "goal_summary": "Answer both information goals.",
-      "response_text": "今天有雨，下午三点有会议。",
+      "response_text": "",
       "goal_outcomes": [
         {
           "goal_id": "goal-weather",
@@ -75,18 +75,23 @@
           "goal-weather",
           "goal-calendar"
         ]
-      }
-    },
-    "response_composition": {
-      "response_plan": {
-        "final": {
+      },
+      "communicative_acts": [
+        {
+          "activity_id": "scenario-final",
           "text": "今天有雨，下午三点有会议。",
-          "covers_goal_ids": [
+          "role": "complete_response",
+          "timing": "parallel",
+          "speech_act": "inform",
+          "source_goal_ids": [
             "goal-weather",
             "goal-calendar"
-          ]
+          ],
+          "truth_stage": "context_grounded",
+          "evidence_refs": [],
+          "information_gaps": []
         }
-      }
+      ]
     }
   },
   "expect": {
@@ -100,8 +105,7 @@
     "calls": [
       "fast_advance",
       "goal_association",
-      "fast_plan",
-      "response_composer"
+      "fast_plan"
     ]
   }
 }

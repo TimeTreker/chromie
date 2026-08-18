@@ -17,8 +17,9 @@ For authoritative architecture, status, and configuration, see:
 
 - ASR converts complete PCM utterances to final text.
 - Goal Interpretation produces typed WHAT-only goal interpretation decisions and Responsibility candidates.
-- Agent exposes schema-constrained Goal Association, Fast/Deep Planning, peer
-  Social-Attention proposals, Response Composition, and Tool Result Interpretation.
+- Agent exposes schema-constrained Goal Association, Fast/Deep Planning, and
+  Activity-attached Social-Attention proposals. Planner owns exact Communicative
+  Activity wording; terminal Evidence reactivates Fast Planner.
 - TTS delivers PCM synthesis chunks; the current Orchestrator buffers one
   complete request through the provider `end` event before ordered playback and
   interruption handling.
@@ -71,14 +72,14 @@ microphone -> host VAD -> ASR -> Cognitive Gateway
   -> otherwise: attention review -> admitted UserTurnEnvelope
   -> Goal Interpretation: contextual Responsibility + Goal relation + bounded unresolved meaning
   -> same GI result, concurrent fan-out
-       |-> Fast Planner: input resolution + first Communicative-Act/Capability Activity Plan
-       |     `-> Response Composer formulation -> Vocal/TTS realization
+       |-> Fast Planner: input resolution + exact Communicative/Capability Activity Plan
+       |     `-> Host truth/provenance validation -> Vocal/TTS realization
        |     `-> Deep Planner only when HOW exceeds the Fast budget
        |-> Goal Association: sole canonical Goal commit/version authority
-       `-> background Social Attention may prepare optional body decoration
+       `-> Social Attention may decorate one concrete observable Main Activity
   -> bind Activities into one Runtime task-list view per Goal
   -> start ready side-effect-free reads; hold effects for Goal/confirmation authority
-  -> Response Composer only for a still-needed presentation decision
+  -> Planner-owned exact communication is mechanically materialized when needed
   -> InteractionCoordinator -> Trusted Capability Runtime
       -> Soridormi or peer provider
   -> exact plan/request/result/trace join -> per-goal outcome commit
@@ -234,11 +235,11 @@ The Orchestrator has a fast-first presentation path for Goal Progress
 Communication, but Goal Interpretation does not author that speech. Goal
 Interpretation emits provider-neutral Responsibility only. Fast Planner is the
 first HOW owner and may select one immediate Communicative Act while
-canonical Goal/Plan work continues. Pre-evidence progress is not free-form text:
-Fast Planner selects a bounded `progress_kind`; Response Composer's bounded
-language realization renders prospective wording, so progress cannot smuggle an
-unverified result. Open answers and clarification acts also receive wording only
-after Planner selection. Interaction Context,
+canonical Goal/Plan work continues. Pre-evidence progress is one typed
+Planner-owned Activity: Fast Planner selects its bounded `progress_kind`, exact
+wording, truth stage, and provenance. The Host rejects unverified-result claims
+but does not rewrite the sentence. Open answers and clarification acts follow
+the same ownership. Interaction Context,
 claim/evidence checks, cancellation, and playback lifecycle remain the
 deterministic delivery boundaries. Maintained turns do not fall back to the old
 Goal-Interpreter `fast_speech`, route, or intent compatibility contract.
@@ -372,7 +373,8 @@ terminal behavior. Finished sessions also write `session_workflow` and
 `session_workflow_graph` events plus paired JSON/Markdown reports under
 `.chromie/evidence/cognitive-runtime/session-workflows/`. The reports show the
 ASR, Cognitive Gateway, Goal-Driven Cognitive Core, Goal Association,
-Fast/Deep Planner, canonical validation/rejection, Response Composer, Trusted
+Fast/Deep Planner, canonical validation/rejection, Planner communication
+validation, Trusted
 Capability Runtime, TTS, playback, per-stage input/output, diagnostics, and
 timing observed for that SID. They state whether validation blocked requested
 Work and scope provider-start trace evidence separately to requested Work,

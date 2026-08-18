@@ -113,9 +113,9 @@ actively listening may be Social Attention; an autonomous idle blink with no
 social interaction belongs to baseline embodiment/liveliness if that separate
 behavior is ever implemented.
 
-Response Composer never authors Social Attention. The background
+Fast/Deep Planner never authors Social Attention. The background
 `SocialAttentionPlanner` is the single semantic writer for optional decoration;
-wording, speech acts, and Vocal style remain with the applicable response owner.
+exact wording, speech acts, and Vocal style remain with the applicable Planner.
 Accepted decoration is validated independently and materialized through Activity.
 
 When the runtime knows the reviewed live set of eligible Social Attention body
@@ -263,7 +263,7 @@ runtime batch and provider concurrency/safety declarations. Cross-lane
 coordination IDs are not reused as embodied-provider grouping semantics.
 
 The referenced Canonical Plan Activity steps must already use
-`timing=parallel`. Response Composer cannot convert a sequential primary step
+`timing=parallel`. The Host cannot convert a sequential primary step
 into a parallel one.
 
 ## Playback and confirmation rules
@@ -276,8 +276,8 @@ say “我准备开始了”
 → effectful activity may begin
 ```
 
-Speech participates in Activity overlap only when the Response Composer
-explicitly marks it with a coordination group and
+Speech participates in Activity overlap only when the Planner explicitly marks
+it with a coordination group and
 `delivery_role=activity_companion` or `performance`.
 
 Confirmation and waiting speech never overlap the effect it is authorizing:
@@ -468,8 +468,8 @@ actions independently planable.
 
 An executable vocal-performance step remains a Vocal member during
 cross-lane coordination. `LaneCoordinationGroup.vocal_step_ids` binds those
-provider steps, while `activity_step_ids` binds Activity work. Response Composer
-may coordinate both in one parallel group, but it cannot relabel the vocal step
+provider steps, while `activity_step_ids` binds Activity work. Planner may
+coordinate both in one parallel group, but neither it nor the Host may relabel the vocal step
 as Activity or treat an acknowledgement through `chromie.speak` as performance
 evidence.
 

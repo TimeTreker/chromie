@@ -82,11 +82,10 @@ Skills, generate a Plan, evaluate results, and request replanning.
 Examples include:
 
 - Goal Association: resolve discourse and Goal relationships;
-- Fast Planner: produce a complete low-latency Plan when confidence is high;
-- Deep Planner: reason over broader context and alternatives;
-- Response Composer: produce natural speech under truth and commitment
-  constraints;
-- Tool Result Interpreter: select and explain facts from trusted evidence.
+- Fast Planner: produce a complete low-latency Plan, exact Communicative
+  Activities, and evidence-bound follow-up when confidence is high;
+- Deep Planner: reason over broader context and alternatives, including exact
+  communicative wording when escalation is necessary.
 
 An Agent is not defined merely by a prompt file. It is defined by its semantic
 responsibility, context boundary, typed output, and place in the cognitive loop.
@@ -256,7 +255,7 @@ through the existing authority path.
 ### One semantic authority per turn
 
 Agent Skills do not create sub-planners that compete with Goal Association,
-Fast Planner, Deep Planner, Response Composer, or Tool Result Interpreter.
+Fast Planner, or Deep Planner.
 
 A “weather skill” must not independently resolve `那边`, select an old Goal,
 query memory, execute a provider, and compose final speech behind the canonical
@@ -274,9 +273,7 @@ A weather Skill may expose:
 | Agent | Projection |
 |---|---|
 | Goal Association | Semantic Goal bindings such as location, date, and weather aspect; discourse resolution remains model-authored |
-| Fast/Deep Planner | Evidence strategy, capability options, freshness, alternatives, and failure recovery |
-| Response Composer | What may be said before evidence, how memory reuse differs from a fresh lookup, and user-facing failure semantics |
-| Tool Result Interpreter | Weather-field interpretation and relevance guidance |
+| Fast/Deep Planner | Evidence strategy, capability options, freshness, alternatives, failure recovery, exact pre/post-evidence wording, and result relevance |
 
 The Host selects the requested projection only after the responsible Agent has
 selected the Skill or after an earlier authoritative Agent has supplied the relevant
@@ -357,8 +354,6 @@ agent-skills/
       goal_association.md
       fast_planner.md
       deep_planner.md
-      response_composer.md
-      tool_result_interpreter.md
     references/
     examples/
   weather-information/
@@ -368,8 +363,6 @@ agent-skills/
       goal_association.md
       fast_planner.md
       deep_planner.md
-      response_composer.md
-      tool_result_interpreter.md
     references/
     examples/
 ```
@@ -395,13 +388,10 @@ optional_capabilities:
 applicable_routes:
   - tool
   - chat
-  - tool_result
 projections:
   goal_association: projections/goal_association.md
   fast_planner: projections/fast_planner.md
   deep_planner: projections/deep_planner.md
-  response_composer: projections/response_composer.md
-  tool_result_interpreter: projections/tool_result_interpreter.md
 ```
 
 This is now the implemented `skill.yaml` schema. `schema_version`, both

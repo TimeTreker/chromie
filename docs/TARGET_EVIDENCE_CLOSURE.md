@@ -201,7 +201,7 @@ python scripts/run_target_evidence_closure.py collect-social \
   --hardware-profile <hardware-profile> \
   --mind-profile <approved-mind-profile-revision> \
   --runtime-topology cognitive-runtime-apply \
-  --effective-model response_composer=<resolved-model> \
+  --effective-model fast_planner=<resolved-model> \
   --effective-model social_attention=<resolved-model>
 ```
 

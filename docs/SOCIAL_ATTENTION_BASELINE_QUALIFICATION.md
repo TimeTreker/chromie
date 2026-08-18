@@ -40,7 +40,8 @@ Missing, duplicate, unexpected, or scope-mismatched results fail closed.
 ### Default model topology
 
 The RTX 5090 hardware profile declares `qwen3:4b` for Goal Interpretation, Fast
-Planning, Tool Result Interpretation, and Response Composition use `gemma4:12b`. It explicitly opts out of CosyVoice compact cognition and keeps
+Planning, terminal Evidence re-entry, and Social Attention; Goal Association
+and Deep Planning use `gemma4:12b`. It explicitly opts out of CosyVoice compact cognition and keeps
 two Ollama models resident. Other profiles may retain the one-model compact
 topology when their committed profile leaves that setting enabled. Qualification
 therefore records launcher-effective component identities; a static
@@ -66,12 +67,10 @@ set. Candidate preparation removes any explicit primary Capability from the
 model's allowed enum. The Host independently repeats duplicate-primary and
 resource-conflict checks before the Trusted Capability Runtime.
 
-The Agent `/interaction` path still contains a request-local use of the same
-body-only planner for compatibility. Response Composer also retains the optional
-plan field in its schema, but the maintained goal-driven path marks Social
-Attention as background-owned and disables that duplicate decision source.
-Neither compatibility surface may be used to claim authoritative baseline
-evidence. The maintained live-service harness must prove that the goal-driven
+Every Social Attention opportunity is attached to one concrete observable Main
+Activity and retains that Activity ID. The Planner does not author a duplicate
+decoration, `decision=none` remains valid, and a late proposal cannot become
+standalone motion. The maintained live-service harness must prove that the goal-driven
 runtime acquired the turn and that the background planner was the proposal
 source.
 
@@ -151,7 +150,7 @@ least:
 - runtime topology, provider revision, hardware profile, and sample count;
 - evidence profile and operator identity where supervision is required.
 
-For example, compact cognition may override a profile-declared Response Composer
+For example, compact cognition may override a profile-declared Fast Planner
 model. The Benchmark report must record the resolved model actually used.
 
 ## First-party adapter boundary
@@ -177,9 +176,9 @@ python -m benchmarks.e2e.run \
   --adapter live_model_text \
   --dataset social_attention \
   --model qwen3:4b \
-  --effective-model response_composer=qwen3:4b \
+  --effective-model fast_planner=qwen3:4b \
   --effective-model social_attention=qwen3:4b \
-  --prompt-revision response-composer-prompt-v1 \
+  --prompt-revision planner-activity-prompt-v1 \
   --code-revision <commit-sha> \
   --mind-profile <approved-profile-revision> \
   --social-style courteous \
@@ -211,7 +210,7 @@ python -m benchmarks.e2e.run \
   --runtime-topology cognitive-runtime-apply \
   --code-revision <commit-sha> \
   --prompt-revision <prompt-revision> \
-  --effective-model response_composer=<resolved-model> \
+  --effective-model fast_planner=<resolved-model> \
   --mind-profile <approved-profile-revision> \
   --social-style courteous \
   --social-attention-mode on \

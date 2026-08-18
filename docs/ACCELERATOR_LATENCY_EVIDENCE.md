@@ -162,7 +162,7 @@ For each class, retained traces must distinguish:
 - TTS request to first PCM chunk;
 - first PCM chunk to `first_audio_playback`;
 - total `first_user_observable_latency_ms`;
-- Goal Association, Fast/Deep Planner, Response Composer, validation, execution
+- Goal Association, Fast/Deep Planner, Planner communication validation, execution
   start, terminal evidence, and final playback timing where applicable;
 - model queue/evaluation time and contract-repair count and duration;
 - request purpose, queue wait, resident model/resource state, and any compute

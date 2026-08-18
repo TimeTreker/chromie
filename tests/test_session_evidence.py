@@ -323,7 +323,7 @@ class SessionEvidenceTests(unittest.TestCase):
             started = now_ms()
             tracker.record_cognitive_stage(
                 sid,
-                stage="response_composer",
+                stage="planner_communicative_activity_validation",
                 started_monotonic_ms=started,
                 finished_monotonic_ms=started + 1.0,
                 status="accepted",

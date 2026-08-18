@@ -99,7 +99,36 @@
             "goal-blink",
             "goal-joke"
           ]
-        }
+        },
+        "response_text": "",
+        "communicative_acts": [
+          {
+            "activity_id": "scenario-immediate",
+            "text": "为什么机器人不怕冷？因为它有很多缓存。",
+            "role": "complete_response",
+            "timing": "parallel",
+            "speech_act": "inform",
+            "source_goal_ids": [
+              "goal-joke"
+            ],
+            "truth_stage": "context_grounded",
+            "evidence_refs": [],
+            "information_gaps": []
+          },
+          {
+            "activity_id": "scenario-pre_action",
+            "text": "我也会眨三下眼睛。",
+            "role": "complete_response",
+            "timing": "parallel",
+            "speech_act": "inform",
+            "source_goal_ids": [
+              "goal-blink"
+            ],
+            "truth_stage": "context_grounded",
+            "evidence_refs": [],
+            "information_gaps": []
+          }
+        ]
       }
     ],
     "capabilities": [
@@ -125,29 +154,7 @@
           "eye_expression"
         ]
       }
-    ],
-    "response_composition": {
-      "response_plan": {
-        "immediate": {
-          "text": "为什么机器人不怕冷？因为它有很多缓存。",
-          "speech_act": "inform",
-          "commitment_state": "none",
-          "must_not_claim_completion": true,
-          "covers_goal_ids": [
-            "goal-joke"
-          ]
-        },
-        "pre_action": {
-          "text": "我也会眨三下眼睛。",
-          "speech_act": "inform",
-          "commitment_state": "evaluating",
-          "must_not_claim_completion": true,
-          "covers_goal_ids": [
-            "goal-blink"
-          ]
-        }
-      }
-    }
+    ]
   },
   "expect": {
     "status": "applied",
@@ -193,8 +200,7 @@
       "fast_advance",
       "goal_association",
       "fast_plan",
-      "deep_plan",
-      "response_composer"
+      "deep_plan"
     ]
   }
 }

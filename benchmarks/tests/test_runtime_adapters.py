@@ -134,7 +134,6 @@ def test_manifest_matches_profiles() -> None:
     assert set(declared) == {
         "cognitive_gateway",
         "planner",
-        "response_composer",
         "mind_profile",
         "capability_projection",
         "social_attention",

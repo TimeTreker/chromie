@@ -799,7 +799,7 @@ def chromie_manifests(
             "Read-only adapter for a configured external-information provider. "
             "It retrieves grounded evidence for current facts, place or restaurant "
             "recommendations, how-to research, and other web-backed information; "
-            "Chromie's Tool Result Interpreter and Response Composer own the final answer."
+            "Host-bound Evidence reactivates Fast Planner, which owns the final answer."
         ),
         transport=TransportSpec(
             kind="local_python",

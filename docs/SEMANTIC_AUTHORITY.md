@@ -34,14 +34,13 @@ CapabilityAgent planner.
 
 Speech composition and user-task execution may be prepared or scheduled
 independently from immutable projections of that authoritative turn. Parallel
-output preparation does not create another semantic owner: a response composer
-cannot reinterpret Goals or authorize effects, and an execution specialist
-cannot become the conversation authority. Planner owns each Communicative Act's
-function, timing, provenance, and constraints; Response Composer/language
-formulation owns its exact words. Goal Interpretation owns neither. Tool Result
-Interpretation supplies grounded propositions/evidence references for a later act,
-not permission to bypass Planner. Later stages may bind/reuse the exact act or
-Planner may author a genuinely different delta.
+output preparation does not create another semantic owner. Planner owns each
+Communicative Activity's function, exact words, timing, truth stage, provenance,
+and constraints; Goal Interpretation owns none of those fields. Trusted Runtime
+and Host bind terminal results to exact request/Goal provenance as Evidence, then
+reactivate Fast Planner. Result contents cannot bypass Planner or infer their own
+Goal. A later Planner pass may omit an already-delivered act or author a genuinely
+different delta.
 
 Cross-cutting evidence qualification, retention/privacy policy, and bounded
 adaptation are not additional semantic owners. They refine factual/context input to
@@ -85,8 +84,8 @@ The maintained direct speech-only path is Fast-Planner-owned. Goal Interpretatio
 Responsibility evidence only. Fast Planner may determine that a simple non-effectful
 conversational Responsibility is completeable immediately, author the conversational
 Activity, and return no Goal/Deep continuation; Runtime then delivers it through the
-trusted Vocal path without creating a persistent Goal or invoking Response Composer for
-the same act. This changes latency, not effect authority. Capability-dependent reads are
+trusted Vocal path without creating a persistent Goal or invoking another wording
+model for the same act. This changes latency, not effect authority. Capability-dependent reads are
 not this terminal branch; Fast Planner requests Goal Association for their persistent
 fresh-evidence responsibility and factual speech follows trusted execution evidence.
 

@@ -172,7 +172,7 @@ class OutcomeObservationTests(unittest.TestCase):
                 {
                     "event": "llm_output_truncated",
                     "message": "done_reason=length",
-                    "stage": "response_composer",
+                    "stage": "planner_communicative_activity_validation",
                 }
             ]
         }

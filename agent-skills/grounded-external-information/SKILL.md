@@ -13,8 +13,12 @@ This Agent Skill does not resolve references by itself, call a provider, registe
 3. Reuse a result only through the verified-memory Capability when tool identity, every material argument, and freshness match the current Goal.
 4. Otherwise select the most exact fresh read Capability. Prefer a specialized contract such as weather when its semantic scope fits; use a general external-information provider for grounded web facts, recommendations, places, restaurants, news, or how-to research. Clarify an unresolved material binding or report the need unavailable rather than substituting a nearby topic.
 5. Before evidence exists, speech may acknowledge the pending read but must not claim a fact, measurement, conclusion, or completion.
-6. Interpret success and failure from trusted execution evidence, distinguishing binding, capability, retrieval, provider/network, and result-interpretation stages.
-7. Answer with only relevant supported facts, calibrated uncertainty, and natural wording for the user.
+6. The Host validates terminal execution output, binds it to the immutable request
+   and exact Goal set, and returns it to the Fast Planner as bounded Evidence.
+   The Planner distinguishes binding, capability, retrieval, and
+   provider/network failures without inferring a Goal from result contents.
+7. Answer with only relevant supported facts, calibrated uncertainty, natural
+   wording, and exact Evidence references on the Communicative Activity.
 
 ## Boundaries
 

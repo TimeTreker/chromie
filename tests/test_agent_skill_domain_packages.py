@@ -33,8 +33,6 @@ ROLES = (
     "goal_association",
     "fast_planner",
     "deep_planner",
-    "response_composer",
-    "tool_result_interpreter",
 )
 BASE_ID = "chromie.grounded-external-information"
 WEATHER_ID = "chromie.weather-information"
@@ -166,7 +164,7 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
             self.assertNotIn("source", encoded)
             self.assertNotIn("path", encoded)
 
-    def test_model_authors_base_then_weather_for_all_five_agents(self) -> None:
+    def test_model_authors_base_then_weather_for_all_semantic_agents(self) -> None:
         for role in ROLES:
             with self.subTest(role=role):
                 model = ScriptedModel([self._both_skill_output(role)])
@@ -238,7 +236,7 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
                 }
             ]
         )
-        payload = self._request("response_composer").model_dump(mode="python")
+        payload = self._request("fast_planner").model_dump(mode="python")
         payload.update(
             {
                 "text": "Tell me a short joke.",
@@ -318,32 +316,28 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
     def test_grounded_method_covers_memory_fresh_lookup_clarify_and_failure(self) -> None:
         fast = self.registry.load_projection(BASE_ID, "fast_planner").content
         deep = self.registry.load_projection(BASE_ID, "deep_planner").content
-        composer = self.registry.load_projection(BASE_ID, "response_composer").content
-        interpreter = self.registry.load_projection(
-            BASE_ID, "tool_result_interpreter"
-        ).content
+        method = self.registry.load_document(BASE_ID).content
         self.assertIn("chromie.memory.retrieve_verified_tool_result", fast)
         self.assertIn("fresh read", fast)
         self.assertIn("clarify", fast.lower())
         self.assertIn("report the unsupported need honestly", deep.lower())
-        self.assertIn("must not state or imply any result fact", composer)
-        self.assertIn("network/provider failure", interpreter)
-        self.assertNotIn("if user_text", "\n".join((fast, deep, composer, interpreter)))
+        self.assertIn("Before evidence exists", method)
+        self.assertIn("provider/network failures", method)
+        self.assertIn("exact Evidence references", method)
+        self.assertNotIn("if user_text", "\n".join((fast, deep, method)))
 
     def test_weather_method_preserves_binding_and_typed_weather_outcomes(self) -> None:
         goal = self.registry.load_projection(WEATHER_ID, "goal_association").content
         fast = self.registry.load_projection(WEATHER_ID, "fast_planner").content
         deep = self.registry.load_projection(WEATHER_ID, "deep_planner").content
-        interpreter = self.registry.load_projection(
-            WEATHER_ID, "tool_result_interpreter"
-        ).content
+        method = self.registry.load_document(WEATHER_ID).content
         self.assertIn("Resolve “there,”", goal)
         self.assertIn("args.location", fast)
         self.assertIn("exactly equal to the canonical Goal binding", fast)
         self.assertIn("mismatched location", deep)
-        self.assertIn("location_not_found", interpreter)
-        self.assertIn("successful zero precipitation", interpreter)
-        self.assertIn("apparent temperature", interpreter)
+        self.assertIn("location_not_found", method)
+        self.assertIn("no-rain/no-snow", method)
+        self.assertIn("apparent temperature", method)
 
     def test_domain_packages_fit_default_progressive_disclosure_budgets(self) -> None:
         for role in ROLES:

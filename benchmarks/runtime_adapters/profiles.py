@@ -37,13 +37,6 @@ COMPONENT_PROFILES: dict[str, ComponentProfile] = {
         callable_env="CHROMIE_BENCHMARK_PLANNER_CALLABLE",
         description="Canonical planning boundary",
     ),
-    "response_composer": ComponentProfile(
-        name="response_composer",
-        layers=("module", "integration"),
-        url_env="CHROMIE_BENCHMARK_RESPONSE_COMPOSER_URL",
-        callable_env="CHROMIE_BENCHMARK_RESPONSE_COMPOSER_CALLABLE",
-        description="Response composition and auxiliary proposal boundary",
-    ),
     "mind_profile": ComponentProfile(
         name="mind_profile",
         layers=("module", "integration"),

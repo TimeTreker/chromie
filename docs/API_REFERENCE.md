@@ -74,10 +74,7 @@ running.
 | `POST` | `/deep-plan` | Produce a terminal full-catalog `CanonicalPlan`; only one mechanical DTO regeneration is permitted. |
 | `POST` | `/reflection` | Run selective slow-cognition Reflection for one trusted evidence-bound `CognitiveOpportunity`; it may propose future replan, clarification, correction, or bounded task/session Memory for still-open Responsibility but cannot reopen completed outcomes, execution authority, or history. |
 | `POST` | `/social-attention/plan` | Produce one event-scoped auxiliary `SocialAttentionPlan` from the reviewed live social-capability set; it has no Goal, speech, or execution authority. |
-| `POST` | `/compose-response-plan` | Bind goal-scoped speech to an immutable terminal plan; optional Social Attention remains an advisory body-decoration surface and never becomes an execution lane. |
-| `POST` | `/communicative-acts/realize` | Formulate exact wording for immutable Fast-Planner Communicative Acts without changing their function, timing, or provenance. |
 | `POST` | `/tools/execute` | Execute one exact planner-selected, explicitly interaction-executable safe read-only local capability and return structured evidence only. |
-| `POST` | `/tool-result/interpret` | Select exact grounded facts from complete tool evidence and synthesize a concise spoken answer. |
 
 `GET /agent-skills` reports the passive read-only cognitive-content registry.
 The maintained repository root is mounted read-only and contains the approved
@@ -87,7 +84,7 @@ packages. Startup validates safe YAML, explicit
 approval, semantic version, deterministic package digest, projection paths,
 duplicate IDs, parent references, inheritance cycles, and normalized
 `applicable_routes`. The endpoint exposes only immutable bounded summaries. The
-two packages expose projections for all five maintained Agent roles; the
+two packages expose projections for all three maintained Agent roles; the
 weather package declares the grounded method as its parent and remains passive
 despite referencing required/optional Capabilities.
 
@@ -121,16 +118,16 @@ preset is data in `capabilities/prompt_tiers.json`, not a Python skill list.
 schemas exclude it as a task-plan response-transport leaf. A mixed
 conversational/body turn may use a goal-scoped `respond` outcome plus executable
 body steps, and executable planner outcomes may carry prospective
-`response_text` for a new conversational delta. Response Composer coordinates
-final delivery against Interaction Context; none of that speech authorizes or
+`response_text` for a new conversational delta. The Planner's Communicative
+Activity coordinates final delivery against Interaction Context; none of that speech authorizes or
 proves the body effect. Search scores are relevance signals for catalog
 inspection endpoints, not Goal Interpretation execution authorization.
 
 `POST /agent-skills/disclose` accepts a previously validated selection and loads
 only its exact matching role projections. The Loader rechecks package content,
 applies per-projection/aggregate/count budgets, omits rather than truncates
-oversized content, and returns typed failures plus a disclosure digest. The five
-maintained model endpoints perform this selection/disclosure automatically;
+oversized content, and returns typed failures plus a disclosure digest. The three
+maintained semantic model endpoints perform this selection/disclosure automatically;
 caller-supplied disclosure context is removed before trusted injection.
 
 ### Conversation and interaction
@@ -142,13 +139,10 @@ caller-supplied disclosure context is removed before trusted injection.
 | `POST` | `/agent-skills/select` | Return a typed optional method selection authored for the declared Agent role from bounded approved summaries. |
 | `POST` | `/agent-skills/disclose` | Return exact bounded role projections from one validated selection without Plan mutation or execution. |
 | `POST` | `/social-attention/plan` | Return an event-scoped auxiliary Social-Attention proposal with behavior IDs decoder-constrained to the reviewed live candidate set. |
-| `POST` | `/compose-response-plan` | Compose goal-scoped speech around an immutable terminal `CanonicalPlan`; optional Social Attention is an advisory body-decoration surface; background ownership remains separate from response wording. |
-| `POST` | `/communicative-acts/realize` | Realize immutable Fast-Planner Communicative Acts as exact wording; Planner authority is not transferred. |
 | `POST` | `/tools/execute` | Trusted execution boundary for exact local safe-read capability requests already selected by the Goal-driven planner. |
-| `POST` | `/tool-result/interpret` | Interpret complete bounded tool evidence for the user request without exposing the raw payload. |
 
-The maintained Goal-driven planning endpoints (`/fast-advance`, `/goal-association`,
-`/fast-plan`, `/deep-plan`, `/reflection`, `/compose-response-plan`) accept a typed
+The maintained Goal-driven planning endpoints (`/fast-first-response`, `/fast-advance`, `/goal-association`,
+`/fast-plan`, `/deep-plan`, and `/reflection`) accept a typed
 `CognitiveWorkRequest`: `sid`, original `text`, optional `language`, first-class
 `responsibilities`, interpretation confidence/unresolved meaning, bounded `context`, and
 `history`. They do not accept a Goal-Interpreter `route_decision`.
@@ -166,9 +160,41 @@ status, source/default selection, and clarification selection belong to Fast Pla
 GI carries only Responsibility meaning, Goal relation, and bounded unresolved meaning;
 its maintained schema contains no planning-gap or resolution-policy fields.
 
-`POST /fast-advance` is the maintained first Fast Planner Activity-Plan endpoint. It consumes the authoritative user turn plus contextual Responsibility evidence and returns `FastPlannerAdvance`: exact Responsibility refs covered, Communicative Acts and Capability Activities with explicit timing, and an optional `deep_planner` continuation for complex HOW. A clarification Communicative Act owns one or more typed Planner `InformationGap` records and no `response_text`. A semantic gap must cite one exact GI `unresolved` string; an execution-input gap must cite one exact available Capability ID and its genuinely absent, required, non-defaulted schema input. The gap records which authorized context, observation/query, preference, schema, or safe-default sources were considered. Goal Association concurrently consumes the same GI result and remains the sole canonical Goal commit owner; it does not author clarification wording. After deterministic Responsibility-to-Goal binding, the Host atomically attaches Planner gaps to the exact canonical Goal before clarification wording may be delivered. The Host may start only schema-valid, available, side-effect-free safe reads before GA finishes; effects remain behind canonical Goal, confirmation, authorization, resource, and provider-safety gates. The same task identity is then bound into applicable per-Goal Runtime task-list views.
+`POST /fast-first-response` is Fast Planner's bounded latency phase. It consumes the
+authoritative turn, GI Responsibilities, response language, bounded interaction state,
+and the small owner-approved speaking-style projection. It returns
+`FastPlannerFirstResponse`: zero or one exact `progress` or `complete_response`
+Communicative Activity. It cannot select a Capability, resolve an execution input,
+create a planning InformationGap, or ask a clarification. Runtime may validate and
+start its exact wording immediately; optional Social Attention receives that same
+Activity as its Main-Activity anchor and cannot delay it. This endpoint is a phase of
+Fast Planner, not an independent response-composition authority.
 
-`POST /communicative-acts/realize` accepts `CommunicativeActRealizationRequest`: immutable Fast-Planner acts, their exact Responsibility evidence, language, turn/session identity, and bounded continuity context. Response Composer returns one `CommunicativeActWording` per act ID. It cannot add, omit, merge, reorder, or reinterpret acts. Closed progress kinds use deterministic bounded wording inside this owner; complete answers and clarification questions use the configured response model. One mechanically malformed wording DTO may be regenerated once. Failure produces no speculative speech and does not reopen GI, GA, or Planner authority; the canonical response path may still realize the preserved act after Goal binding.
+`POST /fast-advance` continues the same Fast Planner Activity decision after any first
+response commitment. It consumes the authoritative user turn plus contextual
+Responsibility evidence and returns `FastPlannerAdvance`: exact Responsibility refs
+covered, the already-committed Communicative Act plus remaining Communicative/Capability
+Activities with explicit timing, and an optional `deep_planner` continuation for complex
+HOW. It must not re-author committed wording. A clarification Communicative Act owns one
+or more typed Planner `InformationGap` records and no `response_text`. A semantic gap
+must cite one exact GI `unresolved` string; an execution-input gap must cite one exact
+available Capability ID and its genuinely absent, required, non-defaulted schema input.
+The gap records which authorized context, observation/query, preference, schema, or
+safe-default sources were considered. After the first-response commitment, Goal
+Association concurrently consumes the same GI result and remains the sole canonical
+Goal commit owner; it does not author clarification wording. After deterministic
+Responsibility-to-Goal binding, the Host atomically attaches Planner gaps to the exact
+canonical Goal before clarification wording may be delivered. The Host may start only
+schema-valid, available, side-effect-free safe reads before GA finishes; effects remain
+behind canonical Goal, confirmation, authorization, resource, and provider-safety gates.
+The same task identity is then bound into applicable per-Goal Runtime task-list views.
+
+Fast Planner Communicative Activities carry exact text, truth stage, Goal or
+Responsibility provenance, and Evidence references in the Planner result. The
+Host mechanically validates those fields and sends accepted text to ordered TTS;
+it does not call a second wording model or rewrite the act. A pre-evidence act
+cannot cite Evidence or claim a result, while a post-evidence act must cite exact
+Host-admitted Evidence.
 
 `POST /fast-plan` is the bounded canonical Fast Planner revision endpoint, available only when `AGENT_FAST_PLANNER_ENABLED=1` and Agent LLM use is enabled. The normal easy path does not call it after a valid `/fast-advance`; Runtime deterministically binds that first Activity Plan to GA-owned Goal IDs. `/fast-plan` remains the one same-owner revision path when the first Fast result is unavailable/refused or a canonical contract revision is required. It returns `CanonicalPlan`; the endpoint never executes by itself, and trusted Runtime revalidates every terminal plan.
 
@@ -194,8 +220,6 @@ Capability authorization and execution.
 
 `POST /social-attention/plan` accepts a `SocialAttentionRequest` describing one concrete **semantic** `primary_activity` event in phase `ready` or `started`: what Chromie is doing, such as greeting somebody, telling a joke, walking, singing, handing something over, or showing/playing something. Responsibility/Goal meaning sits above Activity. Canonical Communicative Acts and Plan-step Work provide concrete Activity identity/granularity; one Goal may own several Activities, while a high-level provider capability may keep one behavior atomic. A Fast-Planner scheduled Communicative Act carries its own semantic identity. `primary_activity.realization` separately records how the Activity is currently realized through the Vocal/Activity execution lanes, Vocal Expression modes, execution-item IDs, and Capability IDs. `speech`, `singing`, `humming`, etc. are modes of one Vocal Expression and are not Primary-Activity kinds. Multiple realization items serving one semantic Activity do not create duplicate decoration opportunities. Internal cognition milestones (`understanding_ready`, Goal Association, planning, waiting, evidence arrival), lane transitions, and provider readiness are not valid anchors. Independent semantic Activities are independently eligible for optional decoration. It returns an auxiliary `SocialAttentionPlan`. `SocialAttentionPlanner` is the single semantic owner of that plan. The decoder constrains every behavior `capability_id` to the reviewed live candidate set and excludes provider-owned backend/calibration fields from the model-facing projection. A valid primary `decision=none` is terminal. A malformed primary DTO fails soft to no decoration; there is no second critic or same-stage semantic/DTO repair call. The endpoint only proposes; the Host independently validates target evidence, schemas, confirmation, resources, provider concurrency, and availability before the Trusted Capability Runtime may execute a behavior. The proposal owns no Goal state, speech meaning, or completion evidence.
 
-`POST /compose-response-plan` is available when `AGENT_RESPONSE_COMPOSER_ENABLED=1`. It requires a terminal `CanonicalPlan` in request context and returns `ResponseCompositionResolution`. Ollama receives the exact `ResponseComposerModelOutput` schema: a `ResponsePlan`, lane coordination, confidence, and rationale, with response-stage Goal IDs constrained to the immutable plan. Social Attention is intentionally absent from this DTO; `SocialAttentionPlanner` owns optional decoration independently. The Host constructs composition identity, embeds the immutable plan and its SHA-256 fingerprint, requires every plan goal to be covered by response stages, and forbids pre-execution completion claims. One mechanically invalid response DTO may receive one same-meaning regeneration; semantic/truth rejection is terminal and cannot author a replacement response through another reviewer. An immediate Fast-Planner Communicative Act is already one semantic act: Response Composer may formulate its words but cannot rewrite its function. Planned safe reads may use execution-only response materialization after canonical Goal/Plan binding instead of waiting for unrelated pre-evidence composition.
-
 `POST /tools/execute` is a trusted provider boundary, not a semantic router. It accepts an exact `capability_id` and schema-valid arguments already produced by the Goal-driven planner. The Agent rejects unknown, unavailable, non-local, side-effecting, confirmation-gated, or non-`safe_read` capabilities and returns structured output without composing user speech. The Trusted Capability Runtime (`CapabilityRuntime`) remains responsible for provider registration, input validation, timing, cancellation, and correlated execution evidence. The first maintained binding is `chromie.weather.lookup`; additional local tools require an explicit manifest declaration and trusted provider binding rather than phrase rules.
 
 `chromie.weather.lookup` accepts the canonical place, `date=today|tomorrow`,
@@ -207,7 +231,14 @@ evidence. If the provider cannot supply that hourly slice, execution fails with
 `forecast_period_unavailable`; daily or current values are never relabeled as
 tonight evidence. For a day-wide request, `forecast_period` is null.
 
-`POST /tool-result/interpret` is available when `AGENT_TOOL_RESULT_INTERPRETER_ENABLED=1`. It accepts the original user request plus one or more complete bounded `ToolResultEvidence` objects. The model returns a direct, summary, or detailed spoken response and exact evidence-ID/JSON-Pointer fact references. Trusted validation rejects stale or collection-valued references, unsupported numeric claims, internal identifiers, raw-payload narration, and speech outside the selected budgets. The full tool result remains in the execution bundle or Agent metadata; only the validated synthesis is spoken.
+Terminal Capability results do not enter a separate interpretation endpoint. The
+Host validates and correlates the result, binds a `ToolResultEvidence` object to
+the exact immutable request Goal IDs, updates Goal/task state, and reactivates
+`POST /fast-plan` with a bounded Goal/Evidence snapshot. The re-entry Plan cannot
+widen the Goal set or schedule duplicate execution. Any spoken answer is a
+Planner-owned post-evidence Communicative Activity with exact Evidence
+references; missing provenance fails closed rather than inferring a Goal from
+provider data.
 
 `POST /goal-association` is available only when
 `AGENT_GOAL_ASSOCIATION_ENABLED=1` and Agent LLM use is enabled. It applies
@@ -319,7 +350,7 @@ requested forward speeds above Soridormi's current runtime limit of `0.20 m/s`
 are normalized back to the normal speed and surfaced through `speak_first`.
 Requests to joke, recite, or otherwise author speech while walking use a
 `vocal_output` Goal coordinated with the walking step; `chromie.speak` is a
-Response Composer transport and is never a planner step. A request to sing still
+Host speech transport and is never a planner step. A request to sing still
 belongs to the Vocal lane, but it may be claimed as singing only when a
 registered vocal-performance capability can provide that evidence. The planner
 must otherwise report the limitation or propose an explicit alternative rather

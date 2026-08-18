@@ -95,7 +95,23 @@
         "metadata": {
           "plan_relation": "alternative",
           "user_confirmation_required": true
-        }
+        },
+        "response_text": "",
+        "communicative_acts": [
+          {
+            "activity_id": "scenario-pre_action",
+            "text": "我还不能边走边眨眼，不过我可以先往前走十五秒，再眨四下眼睛。这样可以吗？你说“好”，我就开始啦！",
+            "role": "complete_response",
+            "timing": "parallel",
+            "speech_act": "inform",
+            "source_goal_ids": [
+              "goal-compound"
+            ],
+            "truth_stage": "context_grounded",
+            "evidence_refs": [],
+            "information_gaps": []
+          }
+        ]
       }
     ],
     "capabilities": [
@@ -143,20 +159,7 @@
           "eye_expression"
         ]
       }
-    ],
-    "response_composition": {
-      "response_plan": {
-        "pre_action": {
-          "text": "我还不能边走边眨眼，不过我可以先往前走十五秒，再眨四下眼睛。这样可以吗？你说“好”，我就开始啦！",
-          "speech_act": "ask_confirmation",
-          "commitment_state": "waiting_for_user",
-          "must_not_claim_completion": true,
-          "covers_goal_ids": [
-            "goal-compound"
-          ]
-        }
-      }
-    }
+    ]
   },
   "expect": {
     "status": "applied",
@@ -187,8 +190,7 @@
       "fast_advance",
       "goal_association",
       "fast_plan",
-      "deep_plan",
-      "response_composer"
+      "deep_plan"
     ]
   }
 }

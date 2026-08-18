@@ -37,8 +37,6 @@ _ROLE_LABELS: dict[AgentSkillProjectionName, str] = {
     "goal_association": "Goal Association Agent",
     "fast_planner": "Fast Planner Agent",
     "deep_planner": "Deep Planner Agent",
-    "response_composer": "Response Composer Agent",
-    "tool_result_interpreter": "Tool Result Interpreter Agent",
 }
 
 

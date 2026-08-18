@@ -14,7 +14,10 @@ This Agent Skill does not resolve user references, geocode places, retry provide
 - Otherwise execute `chromie.weather.lookup` with the canonical location and requested scope.
 - Interpret successful no-rain/no-snow evidence as a valid negative observation, not a failure.
 - Distinguish `location_not_found`, network/provider failure, timeout, unavailable Capability, and successful weather evidence.
-- Summarize only the fields relevant to the question in natural user-focused speech.
+- When the Host returns exact Goal-bound terminal Evidence, the reactivated Fast
+  Planner summarizes only the fields relevant to the question in natural
+  user-focused speech and carries the Evidence references on the Communicative
+  Activity.
 
 ## Provider boundary
 

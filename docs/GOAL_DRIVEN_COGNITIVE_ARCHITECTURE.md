@@ -34,8 +34,8 @@ small optional embodied decoration around an already-anchored interaction.
 Accepted decoration executes through Activity with explicit auxiliary metadata
 and no Goal-completion authority.
 
-Response Composer may author explicit best-effort lane coordination only between
-Vocal and Activity around parallel Canonical Plan work. It does not author a
+Planner may author explicit best-effort lane coordination only between Vocal
+and Activity around parallel Canonical Plan work. It does not author a
 `SocialAttentionPlan`. `SocialAttentionPlanner` is the single semantic owner of
 optional decoration; Social Attention never appears in `LaneCoordinationGroup`,
 never authors response text, and never owns a user Responsibility. Provider metadata and the Trusted Capability Runtime remain
@@ -304,51 +304,36 @@ evidence is required. Local/private/device/sensor state without a supplied trust
 sensor or Provider remains epistemically unknown; a generic web or weather source is
 not silently promoted into authority for that state.
 
-### Response is how Chromie says established meaning
+### Planner owns how Chromie says established meaning
 
-Response composition is downstream expression. It receives an immutable
-Planner-selected Communicative Act plus authoritative conversation/Goal/Plan/Evidence
-state and chooses only its natural wording. It may verify that wording does not claim unobserved completion
-or contradict a trusted limitation, but it cannot reinterpret the Goal, invent a
-new responsibility, reopen Planner authority, or authorize an effect.
+Planner owns every complete Communicative Activity: function, exact natural
+wording, timing, truth stage, Goal/Responsibility provenance, Evidence
+references, and constraints. Goal Interpretation owns Responsibility meaning
+and does not author speech. Goal Association and Runtime may bind or exactly
+reuse an activity but may not rewrite it. The Host mechanically validates
+schema, truth/provenance, cancellation generation, and delivery bookkeeping; it
+does not invoke a second response author.
 
-If wording is mechanically malformed, the representation may be regenerated once
-without changing its meaning. Goal Interpretation owns Responsibility meaning and
-**does not author response wording or a Communicative Act**. Planner owns every
-Communicative Act; Response Composer/language formulation owns its surface sentence.
-Closed progress acts may use a deterministic bounded realization inside that same
-downstream wording boundary. Evidence interpreters supply grounded propositions and
-references, not permission to add another act. Goal Association and Runtime may bind
-or exactly reuse acts but may not rewrite them. Response stages do **not**
-author Goal coverage: `covers_goal_ids`
-is a read-only Host projection from the immutable CanonicalPlan, per-Goal outcomes,
-and exact reused-speech provenance. The model-facing schema permits no writable Goal
-IDs in response stages, and any supplied duplicate copy is discarded before typed
-validation. Consequential/evidence-sensitive wording may receive at most one
-immutable truth-proof audit whose output is only a bounded violation certificate;
-the proof may accept or reject the already-authored response, but it may not rewrite
-text, Goal coverage, Plans, Social Attention, or any upstream semantic state, and an
-invalid proof is terminal rather than repairable. Low-risk and mechanically bounded
-pure safe-read presentation may skip that proof. If a response violates trusted
-truth/evidence, reject it or use an already contract-defined fail-safe path; never
-launch a second response author or reviewer-of-reviewer. A presentation problem is
-local.
+Goal coverage such as `covers_goal_ids` remains a read-only Host projection from
+the immutable Canonical Plan, per-Goal outcomes, and exact reused-speech
+provenance. Speech never authorizes or proves a physical/provider effect. If a
+Communicative Activity violates trusted truth or provenance, reject it or use an
+already contract-defined deterministic fail-safe; do not repair semantics
+through a composer or reviewer chain.
 
-> Optional presentation must never reopen primary cognition.
+### Terminal Capability Evidence re-enters Fast Planner
 
-### Tool Result Interpretation has one evidence-bound writer
+Trusted Runtime publishes a correlated terminal event. The Host validates the
+immutable request/result join and schema, binds bounded Evidence only to the
+request's exact canonical Goal IDs, updates Goal/task state, and reactivates
+Fast Planner. Fast Planner selects relevant facts and decides answer, follow-up
+Work, clarification, retry Plan, or silence. It may not widen the supplied Goal
+set or duplicate the completed execution.
 
-Tool Result Interpreter turns trusted provider/tool evidence into the still-needed
-post-evidence conversational answer. It has one writer. A mechanically malformed
-model DTO may be retransmitted once with the same intended evidence selection and
-meaning, but evidence mismatch, unsupported numbers, scope overclaim, capability
-overclaim, or another semantic/truth violation is terminal for that interpretation.
-
-Effectful result wording may receive one immutable truth audit. The audit returns
-only bounded violations plus a reason; it cannot rewrite spoken_response, selected
-facts, Goal/Plan state, or evidence, and an invalid audit is terminal rather than
-repairable. An already-defined trusted fallback may still be used after rejection.
-This is the same one-writer/immutable-proof rule used by Response Composition.
+Result content, place names, provider fields, recency, or text similarity never
+infer Goal ownership. Missing or stale request/Goal provenance fails closed. A
+post-evidence Communicative Activity must cite exact admitted Evidence; a
+pre-evidence activity cannot cite Evidence or claim a result.
 
 ### Social Attention is optional parallel expression
 
@@ -645,13 +630,13 @@ ontology. Social Attention may decorate a semantic primary Activity, but it is n
 third responsibility or execution channel.
 
 Every admitted turn still has one Core-owned semantic and conversational
-authority. Speech composition and user-task execution may be prepared or
-scheduled independently, including through bounded parallel model calls, only
-from applicable immutable authoritative state: the same turn, plus Goal
-versions, a Canonical Plan, and evidence when each exists. A response composer
-cannot reinterpret the Goal or authorize an effect, and an execution specialist
-cannot become conversation authority. Every primary request remains correlated
-to its owning turn and, when they exist, Goal and Plan identities.
+authority. Fast Planner authors the exact Communicative Activity while user-task
+execution may be prepared or scheduled independently, only from applicable
+immutable authoritative state: the same turn, plus Goal versions, a Canonical
+Plan, and Evidence when each exists. Host presentation cannot rewrite the
+Planner-owned words or authorize an effect, and an execution specialist cannot
+become conversation authority. Every primary request remains correlated to its
+owning turn and, when they exist, Goal and Plan identities.
 
 Background Social Attention may additionally propose small body decoration for
 the same interaction. That decoration must not alter the primary response text,
@@ -672,10 +657,10 @@ also requires persistent work, a prospective Planner-authored progress Activity 
 while Goal Association establishes the canonical unfinished Responsibility.
 
 Fast and Deep Planning may still identify a later conversational delta when
-planning or new evidence makes one necessary, but Planner text never authorizes,
-executes, or proves an effect. Response composition coordinates only the
-still-needed user-facing delta and must not repeat a substantive act already
-delivered or pending for the same responsibility.
+planning or new Evidence makes one necessary, but Planner text never authorizes,
+executes, or proves an effect. Fast Planner receives the delivered-interaction
+delta and must not repeat a substantive act already delivered or pending for the
+same Responsibility; Host presentation only schedules the accepted delta.
 
 ### 3.11 Truth over guessing
 
@@ -880,8 +865,14 @@ the existing tea Goal; it is not interpreted as an isolated new request. This do
 make GI the owner of why Planner asked or which source policy it chose. GA remains the
 sole authority that commits that Goal version.
 
-The same immutable GI result fans out concurrently to Fast Planner and Goal Association.
-Fast Planner returns a typed `FastPlannerAdvance` that is the first real Activity Plan:
+The same immutable GI result first enters Fast Planner's bounded first-response phase,
+which returns `FastPlannerFirstResponse` containing zero or one exact immediately
+realizable Communicative Activity. It has no Capability, parameter-resolution, or
+clarification authority separate from Fast Planner. After that commitment, the same
+Planner continues the remaining Activity decision and Goal Association begins
+concurrently from the unchanged GI result. The continued Planner returns a typed
+`FastPlannerAdvance` that mechanically retains the committed act and completes the
+first real Activity Plan:
 exact Responsibility refs covered, zero or more Communicative Acts and Capability Activities,
 their sequential/parallel relation, and an optional `deep_planner` continuation for
 complex HOW. A Communicative Act records function, timing, Responsibility provenance,
@@ -894,8 +885,9 @@ confirmation, authorization, resource, and provider-safety checks.
 
 The old Goal-Interpreter `CognitiveProgressCandidate` / `native_response` /
 `fast_speech` path has been removed rather than retained as compatibility. Goal
-Association always consumes the same authoritative GI result concurrently and never
-waits for Fast Planner output. Fast Activities retain GI Responsibility refs until the
+Association consumes the same authoritative GI result after the bounded first-response
+commitment and never waits for the remaining Fast Activity Plan. Fast Activities retain
+GI Responsibility refs until the
 deterministic join maps them to GA-owned canonical Goal IDs. Trusted Capability Runtime
 then exposes one task-list view per Goal. A task shared across Goals appears in every
 applicable view with the same request identity and executes once. GA/Deep-authorized Plan
@@ -1617,9 +1609,10 @@ timescales, not a mandatory module pipeline:
 Admitted Observation / User Turn + bounded Session Context
   -> Goal Interpretation (GI)
        Responsibility + Goal relation + bounded unresolved meaning
-  -> concurrent fan-out of the same GI result
-       |-> Fast Planner -> first Activity Plan + input resolution
-       |     |-> speaking and ready Capability Activities
+  -> Fast Planner -> first Communicative Activity or silence
+  -> concurrent continuation from the same GI result
+       |-> same Fast Planner -> remaining Activity Plan + input resolution
+       |     |-> ready Capability and still-needed speaking Activities
        |     |-> user-resolvable clarification only when needed
        |     `-> Deep Planner only when HOW is complex
        `-> Goal Association -> sole canonical Goal commit/version authority
@@ -1640,8 +1633,8 @@ Goal Association is therefore always the sole canonical Responsibility/continuit
 boundary. It runs concurrently rather than acting as a wall-clock gate. Fast
 Planner is the
 exclusive intention-forming owner of Capability selection and executable arguments.
-Response Composer is a still-needed-delta expression coordinator and has no Social
-Attention authoring authority. Background `SocialAttentionPlanner` is the single
+Fast Planner owns each still-needed communicative delta. Background
+`SocialAttentionPlanner` is the single
 place that may decide optional decoration for a concrete primary observable
 Activity; cognition milestones do not create anchors. Social Attention still never
 owns response wording. Provider observations are cognition events, not merely
@@ -1809,7 +1802,7 @@ this order:
 |---|---|---|
 | 0. Constitutional foundation | Cognitive constitution | Stable Chromie identity, proposal/evidence rules, and authority invariants only; any contract revision invalidates the prefix. |
 | 1. Exact identity/world projection | Identity and world-context owners | Owner-approved identity, personality, relationship, and genuine world assumptions only while their exact rendered version is unchanged. Age, relationship, locale, policy, or world updates invalidate the projection. |
-| 2. Agent operating contract | Exact prompt family | Goal Association, Fast Planner, Deep Planner, Response Composer, safety, truthfulness, commitment, and output responsibilities. A role or schema-contract change invalidates the prefix. |
+| 2. Agent operating contract | Exact prompt family | Goal Association, Fast Planner, Deep Planner, safety, truthfulness, commitment, and output responsibilities. A role or schema-contract change invalidates the prefix. |
 | 3. Exact capability contract | Capability/Agent Skill/schema owners | Bounded catalog, schema, and Agent Skill projections only while exact availability, content, ordering, and version remain unchanged. Any difference invalidates the projection. |
 | 4. Session context | Core context assembly | Conversation, active and retained Goals, the Goal-scoped Interaction Context projection, discourse state, memory indexes, scene observations, runtime state, and evidence. Always volatile. |
 | 5. Current turn | Admitted turn and current attempt | Authoritative user input, current time, temporary observations, validation feedback, and attempt-local repair state. Always last and volatile. |
@@ -1985,7 +1978,7 @@ its owning task context and binds each canonical speech or skill request by
 `source_goal_ids`. Provider completion, refusal, failure, timeout, or
 cancellation updates every bound goal independently. A conversational
 `respond` goal likewise remains active until its scoped speech request has
-runtime delivery evidence; producing Response Composer text is not completion.
+runtime delivery evidence; producing Planner text is not completion.
 This prevents a completed compound action from remaining in the active-goal
 projection and being accidentally associated with a later turn.
 
@@ -2532,10 +2525,10 @@ Core-owned interpretation result supplies the turn's maximum source-effect
 envelope; that safety constraint is not semantic goal ownership or a Plan. A
 speech-only `chat` turn cannot become `robot_action` after Goal
 Association or planning merely because both lanes are enabled. Such escalation
-stops at the authority boundary before Response Composition, capability
+stops at the authority boundary before Communicative Activity validation, capability
 validation, or any CapabilityRequest is emitted.
 
-For an accepted effectful plan, executable wording from the Response Composer
+For an accepted effectful plan, executable wording from the Planner
 is not treated as execution evidence. The trusted adapter preserves that
 model-authored wording while validating the immutable plan fingerprint, goal
 coverage, structured speech act, commitment state, actual confirmation
@@ -2595,8 +2588,8 @@ recent decoration evidence, and exact catalog candidates tagged with the
 - the choice between a body decoration and `decision=none`.
 
 It does **not** own speech text, speech style, response semantics, Goal meaning,
-provider identity, or motor implementation. Response Composer / applicable
-cognitive owners retain language authority independently of Social Attention.
+provider identity, or motor implementation. Planner retains language authority
+independently of Social Attention.
 No other model stage may author a competing Social Attention decision.
 
 The Host does not map purposes or user phrases to gestures. It validates catalog
@@ -2832,8 +2825,8 @@ task after Runtime acceptance; a separately tracked, Runtime-correlated result
 consumer observes lifecycle events until terminal closure. That consumer is not a second
 execution manager: it owns no request identity, scheduling, semantic routing, or completion
 truth. It converts an exact terminal Runtime result through the existing deterministic closure
-into `ExecutionEvidence`, creates an internal `CognitiveOpportunity`, and may invoke the
-existing Tool Result Interpreter when current Goal responsibility is still relevant. Result
+into `ExecutionEvidence`, creates an internal `CognitiveOpportunity`, and may reactivate
+Fast Planner when current Goal responsibility is still relevant. Result
 arrival is never encoded as a synthetic user message and never resumes the original Python
 call stack. The legacy aggregate entry points `CapabilityRuntime.execute(...)`,
 `InteractionRuntimeCoordinator.execute(...)`, and `VoiceAssistant.execute_interaction_response(...)`
@@ -2891,15 +2884,14 @@ interaction with no Goal Association, Plan, or provider request. The interaction
 whose trusted result is empty. Speech delivery can express the distinction but cannot
 change it, and `chromie.speak` cannot stand in for the missing substantive Capability.
 
-The Host may schedule a complete, schema-valid, independently worded Fast-Planner
-Communicative Act or later `ResponseStage` only after mechanical validation authorizes it against
+The Host may schedule a complete, schema-valid, Planner-worded Communicative
+Activity only after mechanical validation authorizes it against
 the applicable turn correlation, commitment/evidence state, claim guards, and
 cancellation generation; it need not wait for unrelated later response fields. Raw
 model-token deltas, partial JSON, private reasoning, and incomplete sentences are not
 response contracts. Goal Interpretation owns Responsibility meaning, not dynamic reply
-wording. Fast Planner owns the semantic role, timing, and provenance of every
-Communicative Act it authors, while Response Composer/language formulation owns the
-exact wording. The Host derives transport/claim-envelope facts and
+wording. Fast Planner owns the semantic role, exact wording, timing, truth stage,
+and provenance of every Communicative Activity it authors. The Host derives transport/claim-envelope facts and
 may reject malformed or authority-violating output, but it does not become a second
 semantic writer. Progress speech carries no Capability/Goal completion claim.
 The old Goal-Interpreter `fast_speech`/`native_response` fields are removed rather than
@@ -2930,7 +2922,7 @@ completion responsibilities.
 `Interaction Ledger` is the bounded, append-only journal through which Chromie
 reports her own already-performed interaction history to later cognition. Its
 model-facing audience includes Goal Interpretation, Goal Association, Fast
-Planner, Deep Planner, Tool Result Interpretation, Response Composer, and any
+Planner, Deep Planner, and any
 later cognitive stage that can otherwise repeat a Goal-scoped conversational or
 effectful responsibility. Runtime owners append the qualified facts. This
 architecture document is the authoritative owner of the term because the
@@ -3070,23 +3062,24 @@ Examples:
 - “I’m walking” requires committed execution state.
 - “Done” requires completion evidence.
 
-### 15.5 Natural multi-goal composition
+### 15.5 Natural multi-goal communication
 
-The response composer may combine updates naturally:
+Fast Planner may author one natural Communicative Activity that covers several
+Goal updates:
 
 > 我已经记住你只喝美式。咖啡我先看看怎么拿，天气也在查。
 
 The individual goals remain separately tracked even when speech is consolidated.
 
-The model-facing pre-execution composer contract contains only response stages,
-Vocal/Activity lane coordination, confidence, and rationale, with response coverage
-constrained to the immutable plan's Goal IDs. Social Attention is absent and is
-authored independently by `SocialAttentionPlanner`. The post-execution contract
-contains only final text, exact goal/evidence claims, confidence, and rationale.
-The host owns both composition identities, the embedded canonical plan and
-fingerprint, and the execution-outcome fingerprint. A mechanically malformed
-Response DTO may be regenerated once with the same meaning; semantic/truth rejection
-is terminal and cannot trigger another semantic planner or response author.
+The model-facing Fast-Planner contract carries exact wording, truth stage,
+Evidence references, Vocal/Activity timing, and Goal coverage constrained to the
+immutable Goal/Plan snapshot. Social Attention is absent and is authored
+independently by `SocialAttentionPlanner` for that same Main Activity. On terminal
+Capability Evidence the Host reactivates Fast Planner with the exact Goal/Evidence
+snapshot; there is no post-execution wording model. The Host retains the Planner,
+canonical Plan, and execution-outcome fingerprints. A mechanically malformed Plan
+DTO may be regenerated once with the same meaning; semantic/truth rejection is
+terminal and cannot trigger another semantic planner or response author.
 
 ## 16. Scenario-driven development
 

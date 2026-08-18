@@ -170,7 +170,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["ORCH_GOAL_ASSOCIATION_MODE"], "off")
         self.assertEqual(values["ORCH_FAST_PLANNER_MODE"], "off")
         self.assertEqual(values["ORCH_DEEP_PLANNER_MODE"], "off")
-        self.assertEqual(values["ORCH_RESPONSE_COMPOSER_MODE"], "off")
+        self.assertNotIn("ORCH_RESPONSE_COMPOSER_MODE", values)
 
     def test_runtime_ready_greeting_precedes_live_microphone_loop(self) -> None:
         source = (ROOT / "orchestrator" / "orchestrator.py").read_text(
@@ -228,7 +228,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("AGENT_MODEL=gemma4:e4b", profile)
         self.assertIn("AGENT_GOAL_ASSOCIATION_MODEL=gemma4:e4b", profile)
         self.assertIn("AGENT_DEEP_PLANNER_MODEL=gemma4:e4b", profile)
-        self.assertIn("AGENT_RESPONSE_COMPOSER_MODEL=gemma4:e4b", profile)
+        self.assertNotIn("AGENT_RESPONSE_COMPOSER_MODEL", profile)
         self.assertIn("TTS_COSYVOICE_COMPACT_COGNITION=0", profile)
         self.assertIn("OLLAMA_MAX_LOADED_MODELS=1", profile)
         self.assertIn("AGENT_DEEP_PLANNER_NUM_PREDICT=4096", profile)
@@ -242,7 +242,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("AGENT_MODEL=gemma4:12b", rtx5090)
         self.assertIn("AGENT_GOAL_ASSOCIATION_MODEL=gemma4:12b", rtx5090)
         self.assertIn("AGENT_DEEP_PLANNER_MODEL=gemma4:12b", rtx5090)
-        self.assertIn("AGENT_RESPONSE_COMPOSER_MODEL=gemma4:12b", rtx5090)
+        self.assertNotIn("AGENT_RESPONSE_COMPOSER_MODEL", rtx5090)
         self.assertIn("TTS_COSYVOICE_COMPACT_COGNITION=0", rtx5090)
         self.assertIn("TTS_COSYVOICE_OLLAMA_NUM_CTX=32768", rtx5090)
         self.assertIn("OLLAMA_MAX_LOADED_MODELS=2", rtx5090)
@@ -250,9 +250,9 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX=32768", rtx5090)
         self.assertIn("AGENT_GOAL_INTERPRETER_LLM_NUM_CTX=32768", rtx5090)
         self.assertIn("AGENT_GOAL_ASSOCIATION_NUM_CTX=32768", rtx5090)
-        self.assertIn("AGENT_TOOL_RESULT_INTERPRETER_NUM_CTX=32768", rtx5090)
+        self.assertNotIn("AGENT_TOOL_RESULT_INTERPRETER_NUM_CTX", rtx5090)
         self.assertIn("AGENT_DEEP_PLANNER_NUM_PREDICT=4096", rtx5090)
-        self.assertIn("AGENT_RESPONSE_COMPOSER_NUM_PREDICT=4096", rtx5090)
+        self.assertNotIn("AGENT_RESPONSE_COMPOSER_NUM_PREDICT", rtx5090)
         self.assertIn("AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS=2048", rtx5090)
 
     def test_episode_recording_is_enabled_by_default(self) -> None:
@@ -382,23 +382,13 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("context=${COSYVOICE_BRAIN_NUM_CTX}", launcher)
         self.assertIn("TTS_COSYVOICE_OLLAMA_NUM_CTX:-8192", services)
         self.assertIn("context=$COSYVOICE_BRAIN_NUM_CTX", services)
-        self.assertIn(
-            'export AGENT_TOOL_RESULT_INTERPRETER_MODEL="$COSYVOICE_BRAIN_MODEL"',
-            services,
-        )
+        self.assertNotIn("AGENT_TOOL_RESULT_INTERPRETER_MODEL", services)
         self.assertIn("EFFECTIVE_OLLAMA_MAX_LOADED_MODELS=1", launcher)
-        self.assertIn(
-            'EFFECTIVE_TOOL_RESULT_INTERPRETER_MODEL="$COSYVOICE_BRAIN_MODEL"',
-            launcher,
-        )
-        self.assertIn(
-            'AGENT_TOOL_RESULT_INTERPRETER_MODEL=${EFFECTIVE_TOOL_RESULT_INTERPRETER_MODEL}',
-            launcher,
-        )
+        self.assertNotIn("EFFECTIVE_TOOL_RESULT_INTERPRETER_MODEL", launcher)
         verifier = (ROOT / "scripts" / "verify_runtime_profile.sh").read_text(
             encoding="utf-8"
         )
-        self.assertIn("AGENT_TOOL_RESULT_INTERPRETER_MODEL", verifier)
+        self.assertNotIn("AGENT_TOOL_RESULT_INTERPRETER_MODEL", verifier)
         self.assertIn('voice_root = root / voice_root', launcher)
         self.assertIn('voice_root = root / voice_root', services)
         self.assertIn("CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE", launcher)
@@ -475,8 +465,6 @@ class RuntimeConfigurationTests(unittest.TestCase):
             "Goal Association": "EFFECTIVE_GOAL_ASSOCIATION_MODEL",
             "Fast Planner": "EFFECTIVE_FAST_PLANNER_MODEL",
             "Deep Planner": "EFFECTIVE_DEEP_PLANNER_MODEL",
-            "Response Composer": "EFFECTIVE_RESPONSE_COMPOSER_MODEL",
-            "Tool Result Interpreter": "EFFECTIVE_TOOL_RESULT_INTERPRETER_MODEL",
             "Social Attention": "EFFECTIVE_SOCIAL_ATTENTION_MODEL",
         }
         for role, variable in expected_roles.items():
@@ -492,7 +480,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("background social-decoration loop", launcher)
         self.assertNotIn("EFFECTIVE_RESPONSE_REVIEW_MODEL", launcher)
         self.assertNotIn("Response Review                    |", launcher)
-        self.assertIn("skipped by pure ready reads", launcher)
+        self.assertIn("fallback when readiness does not fully cover Goals", launcher)
         summary_index = launcher.index("Effective cognitive model roles:")
         self.assertLess(summary_index, launcher.index('cat > "$SERVICE_OVERRIDE"'))
 
