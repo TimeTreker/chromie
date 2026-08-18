@@ -184,20 +184,40 @@ must not answer the same act again.
 Goal Interpretation reads bounded Session Context: recent admitted dialogue,
 active/recent Goals and versions, current Activity/task state, pending
 clarifications, and relevant Evidence. It emits contextual Responsibility evidence
-with Goal relationship and InformationGap identity. The same GI result goes to Fast
-Planner and Goal Association concurrently. Fast Planner asks the user when a
-user-resolvable value is missing; Deep Planner is for complex HOW. GA alone commits
-the Goal creation or update.
+with Goal relationship and bounded unresolved meaning. It may understand an answer
+against a pending clarification, but it does not decide that a Capability parameter is
+missing, create a planning `InformationGap`, classify one as blocking, or choose how it
+should be resolved. The same GI result goes to Fast Planner and Goal Association
+concurrently. Deep Goal Interpretation is reserved for genuine consequential ambiguity
+in the person's intended outcome, scope, or referent; it is not an external-evidence
+lookup or parameter-completion strategy. GA alone commits the Goal creation or update.
 
-An unresolved `ask_user` InformationGap names each specific missing semantic value
-in `required_for` using its exact lowercase-snake-case binding name; it cannot name
-an already-bound value or a natural-language result description. The unknown answer
-to an already-defined external lookup is not
-such a value: GI marks fresh Evidence as required, Fast Planner may schedule the
-trusted read, and nobody asks the user to provide the result Chromie was asked to
-find. GA preserves the user's natural temporal wording in the Goal description while
-normalizing typed `day_part` scope to the shared canonical values `day`, `morning`,
-`afternoon`, `evening`, or `tonight`, so Planner and Capability contracts agree.
+Fast Planner is the first stage that compares understood Responsibility with concrete
+Plan, Agent-Skill, Capability, safety, and provider contracts. It therefore owns
+execution-input completeness and any planning `InformationGap`. It tries authoritative
+context, trusted observation or query, an owner/schema default, and a safe bounded
+ordinary default as applicable. It asks the person only when their answer can resolve
+the need, materially changes the next action, and no safer authorized source is enough.
+The clarification Activity retains exact provenance to either GI's unresolved meaning
+or the planner-owned input need. The next GI uses that pending Activity as semantic
+context; it does not inherit the Planner's source-policy authority.
+
+The distinction must remain visible in ordinary behavior. “今天上午重庆会不会下雨？”
+has a clear outcome, location, date, and day part, so GI reports no unresolved meaning
+and Fast Planner schedules trusted weather Evidence. “今天会不会下雨？” can still be a
+clear weather question even though the selected lookup needs a location; Planner first
+uses trusted context or another permitted source and asks only if location remains a
+real blocker. “把它关掉” with several plausible referents is genuine unresolved meaning,
+so Planner may ask but cannot choose the referent. “往前走” expresses a clear outcome;
+duration and speed are Planner-owned execution inputs governed by safety, defaults, and
+clarification policy rather than GI-owned intent gaps.
+
+The unknown answer to an already-defined external lookup is never unresolved user
+meaning or a reason to ask the user for the result Chromie was asked to find. GA
+preserves the user's natural temporal wording in the Goal description while normalizing
+typed `day_part` scope to the shared canonical values `day`, `morning`, `afternoon`,
+`evening`, or `tonight`, and typed `date` scope to `today`, `tomorrow`, or an exact
+ISO 8601 calendar date, so Planner and Capability contracts agree.
 
 Trusted Capability Runtime exposes one task-list view per canonical Goal. A task
 serving multiple Goals appears in each applicable view under the same stable request
@@ -282,16 +302,15 @@ be committed without waiting for Deep. Deep is not a reviewer of a successful Fa
 Plan; a Fast contract/provenance failure also does not justify asking Deep to repair the
 same work. Different independent Responsibilities may progress at different depths, so a
 confirmation-free read with canonical Goal grounding and a valid Fast Plan need
-not wait for unrelated deeper thinking. Deep Planner
-is exceptional and is justified by
-semantic uncertainty, incomplete or compound coverage, nontrivial dependencies,
-material alternatives, novelty or broader context, or safety/resource reasoning
-that requires the wider planning boundary. A structured semantic or plan
-validation rejection may justify the one Fast-to-Deep escalation only when
-broader reasoning is actually warranted. A purely mechanical schema/DTO failure
-may be regenerated once under the same meaning. A Deep
-semantic/grounding/coverage rejection is terminal for that cognition attempt; it
-is not repaired by another same-tier semantic pass. A confidence number alone
+not wait for unrelated deeper thinking. Deep Goal Interpretation is exceptional and is
+justified by genuine consequential ambiguity in intended outcome, scope, or referent.
+Deep Planner is separately exceptional and is justified by incomplete or compound Plan
+coverage, nontrivial dependencies, material alternatives, novelty or broader planning
+context, or safety/resource reasoning. Each Fast stage may use its designated one-way
+Deep escalation only when broader reasoning inside that same authority is actually
+warranted. A purely mechanical schema/DTO failure may be regenerated once under the
+same meaning. A terminal Deep-GI meaning rejection or Deep-Planner grounding/coverage
+rejection is not repaired by another same-tier semantic pass. A confidence number alone
 neither permits a bypass nor requires escalation, and it never authorizes an
 effect.
 
@@ -411,10 +430,14 @@ and required arguments are sufficiently supported.
 
 Goal Interpretation is an internal stage of the Goal-Driven Cognitive Core. It
 receives admitted evidence and emits provider-neutral Responsibility proposals,
-material semantic bindings, Goal relationships, and InformationGaps. It does not
-emit conversational progress, route/intent labels, Activities, or Capabilities.
+material semantic bindings, Goal relationships, and bounded unresolved meaning. It
+does not emit planning InformationGaps, input-source policy, conversational progress,
+route/intent labels, Activities, or Capabilities.
 The same GI result enters Fast Planner and Goal Association concurrently; Fast
-Planner is the first owner of conversational and executable Activities. Gateway
+Planner is the first owner of conversational and executable Activities, execution-
+input completeness, source/default policy, and clarification selection. Capability
+contracts constrain realization but cannot make Planner reinterpret Responsibility or
+invent a user preference. Gateway
 reflex/admission evidence, canonical Goals, Planner output, Host validation,
 runtime results, and provider postconditions remain separate authorities.
 
@@ -479,12 +502,11 @@ and trusted code preserves the exact technical cause for debugging.
 
 ## Tool behavior
 
-The Cognitive Gateway admits a turn but does not author semantic speech. Goal
-Interpretation owns the first possible **Goal Progress Communication** milestone.
-Once a nontrivial Goal is sufficiently understood and still requires downstream
-work before a substantive answer or effect, it should normally author one typed,
-non-terminal Fast-Planner progress Activity so the person knows Chromie got the Goal
-and is taking it forward. This is a polite progress notification, not Social
+The Cognitive Gateway admits a turn but does not author semantic speech. Fast Planner
+owns the first possible **Goal Progress Communication** milestone. Once a nontrivial
+Goal is sufficiently understood and still requires downstream work before a substantive
+answer or effect, it should normally author one typed, non-terminal progress Activity so
+the person knows Chromie got the Goal and is taking it forward. This is a polite progress notification, not Social
 Attention and not task clarification/confirmation. Missing result Evidence limits
 what the wording may claim; it is not itself a reason for silence. A separate progress
 Activity is omitted when the substantive answer is immediate, an equivalent act is

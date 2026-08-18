@@ -57,6 +57,9 @@ class CognitiveFailureResponseComposerTests(unittest.IsolatedAsyncioTestCase):
         class FakeResponse:
             status = 200
 
+            def __init__(self, payload: dict[str, Any]) -> None:
+                self.payload = payload
+
             async def __aenter__(self) -> "FakeResponse":
                 return self
 
@@ -64,6 +67,21 @@ class CognitiveFailureResponseComposerTests(unittest.IsolatedAsyncioTestCase):
                 del args
 
             async def text(self) -> str:
+                if "Audit one candidate failure sentence" in self.payload["prompt"]:
+                    return json.dumps(
+                        {
+                            "response": json.dumps(
+                                {
+                                    "accepted": True,
+                                    "violations": [],
+                                    "reason_summary": "The sentence preserves the unknown pre-dispatch state.",
+                                },
+                                ensure_ascii=False,
+                            ),
+                            "done_reason": "stop",
+                        },
+                        ensure_ascii=False,
+                    )
                 return json.dumps(
                     {
                         "response": json.dumps(
@@ -83,8 +101,10 @@ class CognitiveFailureResponseComposerTests(unittest.IsolatedAsyncioTestCase):
         class FakeSession:
             def post(self, url: str, json: dict[str, Any]) -> FakeResponse:
                 self.url = url
-                self.payload = json
-                return FakeResponse()
+                if not hasattr(self, "payload"):
+                    self.payload = json
+                self.payloads = [*getattr(self, "payloads", []), json]
+                return FakeResponse(json)
 
         session = FakeSession()
         assistant.get_http_session = MethodType(
@@ -133,6 +153,111 @@ class CognitiveFailureResponseComposerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             response.metadata["failure_facts"]["result_state"],
             "not_observed",
+        )
+        self.assertTrue(
+            response.metadata["failure_response_truth_audit"]["accepted"]
+        )
+        self.assertEqual(len(session.payloads), 2)
+
+    async def test_unknown_pre_dispatch_failure_rejects_false_missing_ability_claim(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        self._configure_model_generation(assistant)
+        assistant.failure_response_model = "gemma4:e2b"
+        assistant.llm_url = "http://localhost:11434/api/generate"
+        assistant.normalize_tts_candidate = MethodType(
+            lambda self, text: str(text).strip(), assistant
+        )
+        assistant.is_valid_tts_text = MethodType(
+            lambda self, text: bool(str(text).strip()), assistant
+        )
+        assistant._owner_identity_json = MethodType(
+            lambda self: '{"name":"Chromie"}', assistant
+        )
+        assistant._owner_mind_summary = MethodType(
+            lambda self: "smart, warm, and six years old", assistant
+        )
+        assistant.session_log = MethodType(lambda self, *args: None, assistant)
+
+        class FakeResponse:
+            status = 200
+
+            def __init__(self, payload: dict[str, Any]) -> None:
+                self.payload = payload
+
+            async def __aenter__(self) -> "FakeResponse":
+                return self
+
+            async def __aexit__(self, *args: Any) -> None:
+                del args
+
+            async def text(self) -> str:
+                if "Audit one candidate failure sentence" in self.payload["prompt"]:
+                    return json.dumps(
+                        {
+                            "response": json.dumps(
+                                {
+                                    "accepted": False,
+                                    "violations": ["unsupported_capability_claim"],
+                                    "reason_summary": "The sentence converts unknown capability state into an unlearned ability claim.",
+                                },
+                                ensure_ascii=False,
+                            ),
+                            "done_reason": "stop",
+                        },
+                        ensure_ascii=False,
+                    )
+                return json.dumps(
+                    {
+                        "response": json.dumps(
+                            {
+                                "text": "对不起呀，我还没学会看天气预报呢。",
+                                "capability_state": "unknown",
+                                "execution_state": "not_attempted",
+                                "result_state": "not_observed",
+                            },
+                            ensure_ascii=False,
+                        ),
+                        "done_reason": "stop",
+                    },
+                    ensure_ascii=False,
+                )
+
+        class FakeSession:
+            def __init__(self) -> None:
+                self.payloads: list[dict[str, Any]] = []
+
+            def post(self, url: str, json: dict[str, Any]) -> FakeResponse:
+                del url
+                self.payloads.append(json)
+                return FakeResponse(json)
+
+        session = FakeSession()
+        assistant.get_http_session = MethodType(
+            lambda self: asyncio.sleep(0, result=session), assistant
+        )
+        resolution = CognitiveRuntimeResolution(
+            mode="apply",
+            status="error",
+            lane="tool",
+            fallback_reason="fast planner contract failed",
+            metadata={
+                "failure_stage": "fast_planner",
+                "failure_class": "structured_output_validation",
+                "retryable": True,
+            },
+        )
+
+        response = await assistant._compose_cognitive_failure_response(
+            resolution,
+            user_text="哎，今天上午重庆会不会下雨？",
+            session_id="weather-false-ability-claim",
+        )
+
+        self.assertIsNone(response)
+        self.assertEqual(len(session.payloads), 2)
+        self.assertIn(
+            "capability_state=unknown",
+            session.payloads[1]["prompt"],
         )
 
 

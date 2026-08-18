@@ -312,9 +312,10 @@ class ResponseComposerResolver:
                         )
                         for ref in act.source_responsibility_refs
                     ],
-                    "information_gap_ids": list(
-                        getattr(act, "information_gap_ids", [])
-                    ),
+                    "information_gaps": [
+                        item.model_dump(mode="json", exclude_none=True)
+                        for item in getattr(act, "information_gaps", [])
+                    ],
                 }
             )
         identity_world = (
@@ -330,8 +331,10 @@ class ResponseComposerResolver:
             "Capabilities, promise execution, claim external Evidence, change a Goal, "
             "or answer a clarification gap on the user's behalf. A complete_response "
             "may use only its supplied Responsibility and ordinary non-fresh reasoning. "
-            "A clarification must ask naturally for exactly its referenced unresolved "
-            "InformationGap. Preserve the requested language and Chromie's approved voice."
+            "A clarification must ask naturally for exactly the missing values in its "
+            "Planner-owned InformationGap records; source provenance is explanatory and "
+            "must not leak into the question. Preserve the requested language and "
+            "Chromie's approved voice."
         )
         rendered = (
             identity_world
@@ -1858,7 +1861,7 @@ class ResponseComposerResolver:
                 return None
         else:
             return None
-        if association.clarification or association.associations or not association.new_goals:
+        if association.associations or not association.new_goals:
             return None
         if any(
             str((goal.metadata or {}).get("responsibility_kind") or "") != "vocal_output"

@@ -10,6 +10,25 @@ except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
 
 
+def _normalized_scalar_texts(value: Any) -> set[str]:
+    if isinstance(value, str):
+        normalized = " ".join(value.strip().casefold().split())
+        return {normalized} if normalized else set()
+    if isinstance(value, dict):
+        return {
+            text
+            for item in value.values()
+            for text in _normalized_scalar_texts(item)
+        }
+    if isinstance(value, (list, tuple)):
+        return {
+            text
+            for item in value
+            for text in _normalized_scalar_texts(item)
+        }
+    return set()
+
+
 class GoalInterpretationRequest(BaseModel):
     """Internal request for already-admitted Goal Interpretation.
 
@@ -65,23 +84,19 @@ class GoalInterpretationDecision(BaseModel):
         refs = [item.local_ref for item in self.responsibilities]
         if len(refs) != len(set(refs)):
             raise ValueError("responsibility local_ref values must be unique")
-        external_evidence_descriptions = {
-            " ".join(gap.description.strip().casefold().split())
+        bound_values = {
+            value
             for item in self.responsibilities
-            for gap in item.information_gaps
-            if not gap.resolved
-            and gap.preferred_resolution
-            in {"observe_environment", "query_trusted_service"}
+            for value in _normalized_scalar_texts(item.bindings)
         }
-        repeated_external_evidence = sorted(
+        repeated_bound_values = sorted(
             text
             for text in self.unresolved
-            if " ".join(text.strip().casefold().split())
-            in external_evidence_descriptions
+            if " ".join(text.strip().casefold().split()) in bound_values
         )
-        if repeated_external_evidence:
+        if repeated_bound_values:
             raise ValueError(
-                "external Evidence acquisition is not unresolved semantic meaning: "
-                + ",".join(repeated_external_evidence)
+                "already-bound semantic values are not unresolved: "
+                + ",".join(repeated_bound_values)
             )
         return self

@@ -8,6 +8,11 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from .agent_skill import PlanAgentSkillProvenance
 from .interaction import CapabilityIdentityModel, reject_forbidden_low_level_fields
+from .semantic_task import (
+    InformationGap,
+    InformationGapResolutionSource,
+    InformationGapSourceKind,
+)
 
 PlanCoverage = Literal["complete", "partial", "uncertain"]
 PlannerTier = Literal["fast", "deep"]
@@ -69,6 +74,8 @@ FastCompleteResponseSpeechAct = Literal[
     "thank",
 ]
 FastClarificationSpeechAct = Literal["ask_clarification"]
+PlannerInformationGapSource = InformationGapSourceKind
+PlannerInformationSource = InformationGapResolutionSource
 FastCommunicativeSpeechAct = Union[
     FastCompleteResponseSpeechAct,
     FastProgressSpeechAct,
@@ -119,17 +126,68 @@ class FastPlannerCompleteResponseAct(_FastPlannerCommunicativeActBase):
     speech_act: FastCompleteResponseSpeechAct = "respond"
 
 
+class PlannerInformationGap(InformationGap):
+    """One Fast-Planner-owned input need with exact source provenance."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    owner: Literal["fast_planner"] = "fast_planner"
+    source_kind: PlannerInformationGapSource
+    source_reference: str = Field(min_length=1, max_length=500)
+    resolution_sources_considered: list[PlannerInformationSource] = Field(
+        min_length=1,
+        max_length=6,
+    )
+
+    @field_validator("source_reference", mode="before")
+    @classmethod
+    def normalize_source_reference(cls, value: Any) -> Any:
+        return " ".join(value.strip().split()) if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def validate_planner_gap(self) -> "PlannerInformationGap":
+        if not self.blocking or self.resolved:
+            raise ValueError(
+                "clarification InformationGap must be blocking and unresolved"
+            )
+        if self.preferred_resolution != "ask_user":
+            raise ValueError(
+                "clarification InformationGap must select preferred_resolution=ask_user"
+            )
+        if not self.required_for:
+            raise ValueError(
+                "Planner InformationGap must name at least one required input"
+            )
+        if "authoritative_context" not in self.resolution_sources_considered:
+            raise ValueError(
+                "Planner clarification must first consider authoritative context"
+            )
+        if self.source_kind == "execution_input" and (
+            "capability_schema" not in self.resolution_sources_considered
+        ):
+            raise ValueError(
+                "execution-input clarification must inspect the Capability schema"
+            )
+        return self
+
+
 class FastPlannerClarificationAct(_FastPlannerCommunicativeActBase):
-    """A question act bound to exact GI-declared InformationGap identities."""
+    """A Planner-selected question carrying its owned input-need records."""
 
     role: Literal["clarification"]
     speech_act: FastClarificationSpeechAct = "ask_clarification"
-    information_gap_ids: list[str] = Field(min_length=1, max_length=8)
+    information_gaps: list[PlannerInformationGap] = Field(min_length=1, max_length=8)
 
-    @field_validator("information_gap_ids", mode="before")
+    @field_validator("information_gaps", mode="after")
     @classmethod
-    def normalize_information_gap_ids(cls, value: Any) -> list[str]:
-        return _normalize_ids(value)
+    def unique_information_gap_ids(
+        cls,
+        value: list[PlannerInformationGap],
+    ) -> list[PlannerInformationGap]:
+        ids = [item.gap_id for item in value]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Planner InformationGap IDs must be unique")
+        return value
 
 
 class FastPlannerProgressAct(_FastPlannerCommunicativeActBase):
@@ -211,7 +269,7 @@ class PlannedCommunicativeAct(BaseModel):
     speech_act: FastCommunicativeSpeechAct
     source_goal_ids: list[str] = Field(min_length=1)
     source_responsibility_refs: list[str] = Field(default_factory=list)
-    information_gap_ids: list[str] = Field(default_factory=list, max_length=8)
+    information_gaps: list[PlannerInformationGap] = Field(default_factory=list, max_length=8)
     progress_kind: FastProgressKind | None = None
 
     @field_validator("activity_id", "speech_act", mode="before")
@@ -222,7 +280,6 @@ class PlannedCommunicativeAct(BaseModel):
     @field_validator(
         "source_goal_ids",
         "source_responsibility_refs",
-        "information_gap_ids",
         mode="before",
     )
     @classmethod
@@ -260,13 +317,13 @@ class PlannedCommunicativeAct(BaseModel):
             raise ValueError("progress Communicative Act requires progress_kind")
         if self.role != "progress" and self.progress_kind is not None:
             raise ValueError("only progress Communicative Acts carry progress_kind")
-        if self.role == "clarification" and not self.information_gap_ids:
+        if self.role == "clarification" and not self.information_gaps:
             raise ValueError(
-                "clarification Communicative Act requires InformationGap IDs"
+                "clarification Communicative Act requires Planner InformationGaps"
             )
-        if self.role != "clarification" and self.information_gap_ids:
+        if self.role != "clarification" and self.information_gaps:
             raise ValueError(
-                "only clarification Communicative Acts carry InformationGap IDs"
+                "only clarification Communicative Acts carry Planner InformationGaps"
             )
         return self
 
@@ -295,9 +352,9 @@ FastPlannerActivity = Annotated[
 # Communication can still choose progress/clarification without offering an
 # impossible complete_response branch and discarding useful communication after
 # inference.
-# When WHAT is already confident, fresh Evidence means the only honest immediate
-# act is bounded progress. A separate clarifiable contract is used only when Goal
-# Interpretation explicitly carries material uncertainty at low confidence.
+# When WHAT is already confident, fresh Evidence forbids a complete response. The
+# remaining honest branches include progress, applicable Capability work, or a
+# Planner-owned clarification for a real unresolved execution input.
 FastPlannerFreshEvidenceCommunicativeAct = FastPlannerProgressAct
 
 FastPlannerFreshEvidenceClarifiableCommunicativeAct = Annotated[

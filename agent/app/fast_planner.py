@@ -40,6 +40,7 @@ from .planner_contract import (
     is_planner_step_capability,
     materialize_goal_outcomes,
     materialize_planner_metadata,
+    normalize_detached_parameter_resolutions,
     normalize_schema_default_parameter_provenance,
     parallel_plan_contract_errors,
     planner_goal_execution_requirements,
@@ -77,6 +78,7 @@ try:
         CanonicalPlan,
         FastPlannerAdvance,
         FastPlannerAdvanceModelOutput,
+        FastPlannerProgressAct,
     )
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
@@ -84,6 +86,7 @@ except ImportError:  # pragma: no cover
         CanonicalPlan,
         FastPlannerAdvance,
         FastPlannerAdvanceModelOutput,
+        FastPlannerProgressAct,
     )
 
 logger = logging.getLogger("chromie.agent.fast_planner")
@@ -267,10 +270,9 @@ class FastPlannerResolver:
         """Constrain Fast Activities to the authoritative WHAT and live catalog.
 
         A Responsibility that only lacks fresh external Evidence cannot be decoded
-        as a clarification or a completed answer.  This keeps the small Fast model
-        on its actual planning choices: bounded progress, an available Capability,
-        or an honest escalation.  A genuine ``ask_user`` gap retains the separate
-        clarification branch.
+        as a completed answer. The Planner may clarify only a source-proven semantic
+        ambiguity or a real required Capability input after considering permitted
+        sources/defaults; host validation below enforces that provenance.
         """
 
         responsibility_items = list(responsibilities or [])
@@ -278,22 +280,18 @@ class FastPlannerResolver:
             item.completion_requires_fresh_evidence
             for item in responsibility_items
         )
-        has_blocking_user_gap = any(
-            gap.blocking
-            and not gap.resolved
-            and gap.preferred_resolution == "ask_user"
-            for item in responsibility_items
-            for gap in item.information_gaps
-        )
         schema = copy.deepcopy(FastPlannerAdvanceModelOutput.model_json_schema())
         top_properties = schema.get("properties", {})
         disposition = top_properties.get("disposition")
         if isinstance(disposition, dict) and all_need_fresh_evidence:
-            disposition["enum"] = (
-                ["clarify", "refused", "unavailable"]
-                if has_blocking_user_gap
-                else ["execute", "mixed", "escalate", "refused", "unavailable"]
-            )
+            disposition["enum"] = [
+                "execute",
+                "mixed",
+                "clarify",
+                "escalate",
+                "refused",
+                "unavailable",
+            ]
         schema.setdefault("allOf", []).extend(
             [
                 {
@@ -351,17 +349,11 @@ class FastPlannerResolver:
             activity_items = (
                 activities.get("items") if isinstance(activities, dict) else None
             )
-            allowed_activity_contracts = (
-                [
-                    "FastPlannerProgressAct",
-                    "FastPlannerClarificationAct",
-                ]
-                if has_blocking_user_gap
-                else [
-                    "FastPlannerProgressAct",
-                    "FastPlannerCapabilityActivity",
-                ]
-            )
+            allowed_activity_contracts = [
+                "FastPlannerProgressAct",
+                "FastPlannerClarificationAct",
+                "FastPlannerCapabilityActivity",
+            ]
             if isinstance(activity_items, dict):
                 activity_items["oneOf"] = [
                     {"$ref": f"#/$defs/{contract_name}"}
@@ -461,46 +453,42 @@ class FastPlannerResolver:
                 "Fast Planner must cover exactly the authoritative Responsibility refs"
             )
         by_ref = {item.local_ref: item for item in responsibilities}
-        blocking_user_gaps = {
-            item.local_ref
-            for item in responsibilities
-            if any(
-                gap.blocking
-                and not gap.resolved
-                and gap.preferred_resolution == "ask_user"
-                for gap in item.information_gaps
-            )
-        }
-        blocking_gap_ids_by_ref = {
-            item.local_ref: {
-                gap.gap_id
-                for gap in item.information_gaps
-                if gap.blocking
-                and not gap.resolved
-                and gap.preferred_resolution == "ask_user"
-            }
-            for item in responsibilities
-        }
-        if blocking_user_gaps:
-            clarification_refs = {
-                ref
-                for activity in output.activities
-                if activity.role == "clarification"
-                for ref in activity.source_responsibility_refs
-            }
-            if output.disposition != "clarify" or not blocking_user_gaps.issubset(
-                clarification_refs
-            ):
-                raise PlannerDTOContractError(
-                    "blocking user-resolvable InformationGaps require a clarification "
-                    "Activity for the owning Responsibilities"
-                )
-            if any(activity.role == "capability" for activity in output.activities):
-                raise PlannerDTOContractError(
-                    "a plan waiting for a blocking user clarification cannot execute "
-                    "Capability Activities"
-                )
         allowed = {item["capability_id"]: item for item in capabilities}
+        unresolved_meaning = {
+            " ".join(str(item or "").strip().split())
+            for item in request.interpretation_unresolved
+            if " ".join(str(item or "").strip().split())
+        }
+        clarification_activities = [
+            item for item in output.activities if item.role == "clarification"
+        ]
+        capability_activities = [
+            item for item in output.activities if item.role == "capability"
+        ]
+        complete_response_activities = [
+            item for item in output.activities if item.role == "complete_response"
+        ]
+        if clarification_activities:
+            expected_disposition = "mixed" if capability_activities else "clarify"
+            if output.disposition != expected_disposition:
+                raise PlannerDTOContractError(
+                    "clarification disposition must be clarify when it is the only "
+                    "terminal work, or mixed when independent Capability work proceeds"
+                )
+            if complete_response_activities and not capability_activities:
+                raise PlannerDTOContractError(
+                    "the current Fast contract cannot combine only response and "
+                    "clarification outcomes without executable Work"
+                )
+        all_gap_ids = [
+            gap.gap_id
+            for activity in clarification_activities
+            for gap in activity.information_gaps
+        ]
+        if len(all_gap_ids) != len(set(all_gap_ids)):
+            raise PlannerDTOContractError(
+                "Planner InformationGap IDs must be unique across the Activity Plan"
+            )
         for activity in output.activities:
             unknown_refs = set(activity.source_responsibility_refs) - set(by_ref)
             if unknown_refs:
@@ -517,16 +505,51 @@ class FastPlannerResolver:
                     "before trusted evidence"
                 )
             if activity.role == "clarification":
-                allowed_gap_ids = {
-                    gap_id
-                    for ref in activity.source_responsibility_refs
-                    for gap_id in blocking_gap_ids_by_ref.get(ref, set())
-                }
-                if set(activity.information_gap_ids) != allowed_gap_ids:
+                if output.disposition not in {"clarify", "mixed"}:
                     raise PlannerDTOContractError(
-                        "clarification Communicative Act must reference exactly the "
-                        "blocking GI InformationGap IDs for its Responsibilities"
+                        "a clarification Activity requires disposition=clarify or mixed"
                     )
+                for gap in activity.information_gaps:
+                    if gap.source_kind == "unresolved_meaning":
+                        if gap.source_reference not in unresolved_meaning:
+                            raise PlannerDTOContractError(
+                                "semantic clarification must cite exact GI unresolved "
+                                f"meaning: {gap.source_reference!r}"
+                            )
+                        continue
+                    definition = allowed.get(gap.source_reference)
+                    if definition is None:
+                        raise PlannerDTOContractError(
+                            "execution-input clarification must cite an available "
+                            f"Capability ID: {gap.source_reference!r}"
+                        )
+                    input_schema = definition.get("input_schema") or {}
+                    properties = input_schema.get("properties") or {}
+                    required = set(input_schema.get("required") or [])
+                    bound_names = {
+                        str(name)
+                        for ref in activity.source_responsibility_refs
+                        for name in by_ref[ref].bindings
+                    }
+                    for parameter in gap.required_for:
+                        parameter_schema = properties.get(parameter)
+                        if parameter not in required or not isinstance(
+                            parameter_schema, dict
+                        ):
+                            raise PlannerDTOContractError(
+                                "execution-input clarification may name only required "
+                                f"Capability inputs: {gap.source_reference}.{parameter}"
+                            )
+                        if "default" in parameter_schema:
+                            raise PlannerDTOContractError(
+                                "Planner cannot ask for an input with a Capability "
+                                f"schema default: {gap.source_reference}.{parameter}"
+                            )
+                        if parameter in bound_names:
+                            raise PlannerDTOContractError(
+                                "Planner cannot ask for an already-bound input: "
+                                f"{parameter}"
+                            )
             if activity.role != "capability":
                 continue
             definition = allowed.get(activity.capability_id)
@@ -579,12 +602,16 @@ class FastPlannerResolver:
             failure["failure_class"],
             cognition_text_reference(raw_output),
         )
+        progress_activities = FastPlannerResolver._validated_fail_safe_progress(
+            raw_output,
+            responsibility_refs=responsibility_refs,
+        )
         return FastPlannerAdvance(
             turn_id=str(request.sid or "turn-fast-advance"),
             disposition="unavailable",
             coverage="uncertain",
             covered_responsibility_refs=responsibility_refs,
-            activities=[],
+            activities=progress_activities,
             continuations=[],
             confidence=0.0,
             unresolved=[
@@ -602,9 +629,53 @@ class FastPlannerResolver:
                 "raw_output_ref": cognition_text_reference(raw_output),
                 "error_type": type(error).__name__,
                 "error": str(error)[:300],
+                "salvaged_progress_activity_ids": [
+                    item.activity_id for item in progress_activities
+                ],
                 **failure,
             },
         )
+
+    @staticmethod
+    def _validated_fail_safe_progress(
+        raw_output: Any,
+        *,
+        responsibility_refs: list[str],
+    ) -> list[FastPlannerProgressAct]:
+        """Retain independently valid, non-terminal progress from an invalid Plan.
+
+        Progress carries no result, completion, Capability, or execution claim.  The
+        invalid Plan wrapper and every terminal Activity remain discarded.  Exact
+        duplicates are collapsed so one malformed model response cannot schedule
+        repeated audible acknowledgements.
+        """
+
+        if not isinstance(raw_output, dict):
+            return []
+        allowed_refs = set(responsibility_refs)
+        retained: list[FastPlannerProgressAct] = []
+        seen: set[tuple[Any, ...]] = set()
+        for candidate in raw_output.get("activities") or []:
+            if not isinstance(candidate, dict) or candidate.get("role") != "progress":
+                continue
+            try:
+                activity = FastPlannerProgressAct.model_validate(candidate)
+            except ValidationError:
+                continue
+            refs = set(activity.source_responsibility_refs)
+            if not refs or not refs.issubset(allowed_refs):
+                continue
+            key = (
+                activity.progress_kind,
+                activity.speech_act,
+                activity.timing,
+                tuple(sorted(refs)),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            retained.append(activity)
+        return retained
 
     async def resolve(self, request: CognitiveWorkRequest) -> CanonicalPlan:
         trace_scope = runtime_tracer.continue_from_context(request.context)
@@ -754,6 +825,16 @@ class FastPlannerResolver:
                 )
                 if not isinstance(raw, dict):
                     raise ValueError("fast planner response is not a JSON object")
+                raw, detached_resolution_repairs = (
+                    normalize_detached_parameter_resolutions(raw)
+                )
+                if detached_resolution_repairs:
+                    logger.warning(
+                        "fast_planner_detached_parameter_resolutions_removed "
+                        "sid=%s repairs=%s",
+                        request.sid,
+                        self._bounded(detached_resolution_repairs, 2000),
+                    )
                 raw, provenance_repairs = (
                     normalize_schema_default_parameter_provenance(
                         raw,
@@ -1439,7 +1520,12 @@ class FastPlannerResolver:
             context.get("interaction_context") or {},
             1200,
         )
-        capability_json = self._bounded(capabilities, 8000)
+        capability_json = json.dumps(
+            self._advance_capability_prompt_projection(capabilities),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
         user_text = " ".join(str(request.text or "").split())[:700]
         rendered = (
             advance_contract
@@ -1449,28 +1535,60 @@ class FastPlannerResolver:
             + str(request.language or "auto")[:32]
             + "\n\nAuthoritative Responsibility evidence from Goal Interpretation:\n"
             + responsibilities_json
+            + "\n\nGI unresolved-meaning evidence (exact strings or empty):\n"
+            + self._bounded(request.interpretation_unresolved, 1200)
             + "\n\nActive Goal continuity summary only:\n"
             + active_goals
             + "\n\nAlready-spoken/pending interaction summary only:\n"
             + interaction_context
             + "\n\nExecutable common Capability catalog JSON:\n"
             + capability_json
-            + "\n\nCover every Responsibility ref exactly. Activities are one ordered list. "
+            + "\n\nThe catalog projection above is complete for this Fast decision; every "
+            "allowed Capability has a visible capability_id, arguments, effects, and "
+            "semantic scope. Compare the Responsibility outcome against all projected "
+            "descriptions, when_to_use guidance, effects, semantic_type, and semantic_scope "
+            "before claiming that no Capability matches. The absence of fresh result "
+            "Evidence is the reason to execute a matching read Capability, never a reason "
+            "to clarify. Match required arguments from GI bindings by meaning, not only by "
+            "identical field name; a clearly supplied named entity, relative date, or local "
+            "day part is resolved input. Optional arguments with schema defaults are not "
+            "missing inputs. When one matching Capability has every required input, use "
+            "disposition=execute, coverage=complete, continuations=[], unresolved=[], and "
+            "emit its schema-valid Capability Activity. For an external information read, "
+            "use progress_kind=check_information with speech_act=acknowledge_and_check when "
+            "a short concurrent progress act helps.\n\nCover every Responsibility ref exactly. Activities are one ordered list. "
             "Speaking is an Activity and uses the same timing field as Capability work. "
             "Use parallel only when activities can genuinely overlap without a declared "
             "resource or safety conflict; list dependent work sequentially. A progress "
             "Activity is bounded and has progress_kind rather than response_text. No "
             "Communicative Act may contain response_text or other sentence wording. A "
             "complete_response Activity may satisfy only ordinary conversation that needs "
-            "no fresh Evidence. When a blocking InformationGap has "
-            "preferred_resolution=ask_user, return disposition=clarify, zero Capability "
-            "Activities, and a clarification Communicative Act referencing every exact "
-            "blocking information_gap_id. "
-            "An observe_environment or query_trusted_service gap is work for Chromie, "
-            "not a reason to ask the user for the answer. Do not route a missing user "
-            "parameter to Deep Planner. When all required "
+            "no fresh Evidence. You own execution-input completeness and planning "
+            "InformationGaps. Before asking, consider authoritative context, applicable "
+            "trusted observation/query, owner preference, Capability schema default, and "
+            "a safe consequence-bounded default. Ask only when the user can resolve a "
+            "material blocker and no safer authorized source/default is enough. A "
+            "clarification must create its typed InformationGap: source_kind="
+            "unresolved_meaning cites one exact interpretation_unresolved string; "
+            "source_kind=execution_input cites the exact selected Capability ID in "
+            "source_reference and names only its genuinely absent required input keys in "
+            "required_for. Record every examined source in resolution_sources_considered. "
+            "Use disposition=clarify when only clarification remains; use mixed only when "
+            "independent safe Capability work also proceeds. Never ask the user for an "
+            "external result Chromie was asked to obtain. Do not route a missing user "
+            "parameter to Deep Planner. GI bindings are resolved input evidence, including "
+            "relative dates and local day parts normalized into canonical values. Never "
+            "treat an already supplied binding as ambiguous merely because its value is "
+            "relative to the current turn; when GI unresolved-meaning evidence is empty, "
+            "do not invent a semantic clarification. When all required "
             "bindings are present and one exact available Capability covers the work, emit "
-            "its exact capability_id and schema-valid args now. Preserve every GI binding, "
+            "its exact capability_id and schema-valid args now. Select a Capability only "
+            "when its description, effects, and projected semantic_scope directly match the "
+            "Responsibility's observable outcome. A read-only information request must use "
+            "an information-read Capability when one is supplied; physical-object acquisition, "
+            "handover, body gestures, or attention motions cannot acquire external information. "
+            "Do not add decorative Capability Activities that the Responsibility did not ask "
+            "for. Preserve every GI binding, "
             "including all independent temporal dimensions. Add a progress speaking "
             "Activity in parallel only when it helps the interaction and does not claim a "
             "result. Use disposition=escalate and continuation=deep_planner only when HOW "
@@ -1487,6 +1605,94 @@ class FastPlannerResolver:
         )
 
     @staticmethod
+    def _advance_capability_prompt_projection(
+        capabilities: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Keep every bounded catalog choice visible without slicing JSON mid-item."""
+
+        projected: list[dict[str, Any]] = []
+        for capability in capabilities:
+            input_schema = capability.get("input_schema") or {}
+            properties = input_schema.get("properties") or {}
+            required = {
+                str(item) for item in (input_schema.get("required") or [])
+            }
+            arguments: list[dict[str, Any]] = []
+            for name, raw_schema in properties.items():
+                if not isinstance(raw_schema, dict):
+                    continue
+                argument: dict[str, Any] = {
+                    "name": str(name),
+                    "required": str(name) in required,
+                }
+                for key in (
+                    "type",
+                    "enum",
+                    "const",
+                    "default",
+                    "minimum",
+                    "maximum",
+                    "minLength",
+                    "maxLength",
+                ):
+                    if key in raw_schema:
+                        value = raw_schema[key]
+                        argument[key] = value[:12] if isinstance(value, list) else value
+                arguments.append(argument)
+
+            hints = capability.get("hints") or {}
+            semantic_scope = hints.get("semantic_scope") or {}
+            bounded_scope = {
+                key: value[:12] if isinstance(value, list) else value
+                for key in (
+                    "responsibility_type",
+                    "resource_kinds",
+                    "delivery_modes",
+                    "domain",
+                    "acquisition",
+                    "supported_temporal_scopes",
+                    "unsupported_temporal_scopes",
+                )
+                if (value := semantic_scope.get(key)) not in (None, "", [])
+            }
+            resource_contract = hints.get("resource_contract") or {}
+            bounded_resource_contract = {
+                key: value[:12] if isinstance(value, list) else value
+                for key in (
+                    "provider_role",
+                    "plan_requires",
+                    "plan_provides",
+                    "completion_requires",
+                )
+                if (value := resource_contract.get(key)) not in (None, "", [])
+            }
+            projected.append(
+                {
+                    "capability_id": str(capability.get("capability_id") or ""),
+                    "description": str(capability.get("description") or "")[:360],
+                    "arguments": arguments,
+                    "requires_confirmation": bool(
+                        capability.get("requires_confirmation")
+                    ),
+                    "can_run_parallel": bool(capability.get("can_run_parallel")),
+                    "parallel_metadata_declared": bool(
+                        capability.get("parallel_metadata_declared")
+                    ),
+                    "resource_claims": list(
+                        capability.get("resource_claims") or []
+                    )[:12],
+                    "effects": list(capability.get("effects") or [])[:12],
+                    "safety_class": str(capability.get("safety_class") or ""),
+                    "side_effect_free": bool(capability.get("side_effect_free")),
+                    "when_to_use": str(hints.get("when_to_use") or "")[:360],
+                    "semantic_type": str(hints.get("semantic_type") or ""),
+                    "semantic_scope": bounded_scope,
+                    "resource_contract": bounded_resource_contract,
+                }
+            )
+        return projected
+
+    @staticmethod
     def _advance_system_prompt() -> str:
         return (
             "You are Chromie's low-latency Fast Planner. Accept Goal Interpretation's "
@@ -1496,7 +1702,11 @@ class FastPlannerResolver:
             "and Responsibility/InformationGap provenance, but never author sentence "
             "wording; speech_act is a closed communicative-function enum, not a text "
             "escape hatch. Ask through a clarification act when a required user-resolvable "
-            "binding is missing. Delegate only genuinely complex HOW to Deep Planner. Goal "
+            "binding is genuinely absent after checking GI bindings and Capability defaults; "
+            "never reinterpret a present normalized binding as missing or ambiguous. Select "
+            "only a Capability whose declared description, effects, and semantic scope match "
+            "the requested outcome; information reads are not physical-object delivery or "
+            "decorative body motion. Delegate only genuinely complex HOW to Deep Planner. Goal "
             "Association separately owns Canonical Goal commits, and Trusted Capability "
             "Runtime owns execution authority. Response Composer owns language formulation. "
             "Return only schema-constrained JSON."

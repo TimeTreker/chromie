@@ -19,8 +19,12 @@ experience artifacts. See
 > Communicative-Act/Capability Activity Plan. Response Composer/language formulation
 > turns each selected Communicative Act into wording without changing its function;
 > a complete realized answer may enter the Vocal runtime immediately, and a trusted side-effect-free read may start
-> while Goal Association commits its canonical Goal. Missing user information causes
-> a clarification Activity, while only genuinely complex HOW enters Deep Planner.
+> while Goal Association commits its canonical Goal. The approved contract makes Fast
+> Planner—not GI—the owner of execution-input completeness, source/default policy, and
+> clarification selection; it asks only for a user-resolvable blocker after applicable
+> trusted sources and permitted defaults are insufficient. Only genuinely complex HOW
+> enters Deep Planner. The source and typed Runtime continuity implement this ownership;
+> see `docs/STATUS.md` for its validation level.
 > Goal Association alone creates or modifies canonical Goals, and Runtime groups the
 > resulting task-list view by Goal while preserving one execution identity for shared
 > Work. Background Social Attention may independently prepare optional body
@@ -84,9 +88,9 @@ Host Orchestrator
   microphone -> VAD -> ASR -> Cognitive Gateway
     |-> Protective Reflex -> immediate stop/cancel (no model wait)
     `-> immutable admitted UserTurnEnvelope -> Goal-driven Cognitive Core
-        -> Goal Interpretation (Responsibility + Goal relation + InformationGaps)
+        -> Goal Interpretation (Responsibility + Goal relation + bounded unresolved meaning)
         -> same GI result, concurrent fan-out
-           |-> Fast Planner -> Communicative Acts + Capability Activities --.
+           |-> Fast Planner -> input resolution + Communicative Acts + Capability Activities --.
            |      |-> Response Composer wording -> Vocal/TTS             |
            |      `-> Deep Planner only for complex HOW                  |
            |-> Goal Association -> canonical Goal state --------+-> Goal-bound tasks

@@ -29,7 +29,17 @@ mechanism.
 
 Next design/implementation order:
 
-1. **Fast Planner first-advancement seam — implemented in the maintained path.** Keep
+1. **GI/Fast-Planner input-ownership boundary — implemented and source-guarded.** GI is
+   WHAT-only: Responsibility meaning, explicit/contextual semantic bindings, Goal
+   relation, fresh-evidence need, and bounded unresolved meaning. GI has no authority or
+   DTO fields to create/resolve planning InformationGaps, declare Capability inputs
+   missing/blocking, or choose `ask_user`, context, observation/query, or default. Fast
+   Planner owns execution-input completeness, source/default policy, gap provenance, and
+   clarification selection without reinterpreting Responsibility. The temporary Deep-GI
+   external-evidence/`ask_user` defense is removed; Deep GI is one source-based pass only
+   for genuine consequential semantic ambiguity. Runtime commits a Planner gap to its
+   exact GA-owned Goal before the question can be delivered.
+2. **Fast Planner first-advancement seam — implemented in the maintained path.** Keep
    Responsibility evidence as Goal Interpretation's provider-neutral WHAT handoff. The
    same Fast Planner is the first HOW owner: before canonical Goal binding it may author
    one immediate safe Communicative Act and typed continuation dispositions for
@@ -40,7 +50,7 @@ Next design/implementation order:
    maintained path. A Communicative Act contains function, timing, semantic
    provenance, and constraints but no wording; Response Composer/language formulation
    realizes it before Vocal/TTS delivery.
-2. **Epistemic Qualification contract detail — first source slice implemented.** Do not add an `EpistemicManager`.
+3. **Epistemic Qualification contract detail — first source slice implemented.** Do not add an `EpistemicManager`.
    Extend existing capability/evidence contracts to represent claim-specific required
    observations, provenance/trust-domain independence, alternatives/corroboration,
    validity/freshness, closed-world coverage, and qualification state
@@ -48,26 +58,28 @@ Next design/implementation order:
    Gateway and semantic meaning in GI/GA. Principal recognition/authentication uses
    the ordinary Capability/Provider/Evidence path; authorization/consent remains Host
    policy.
-3. **Forward Adaptation contract detail — first source slice implemented.** Separate open-Responsibility actions from
+4. **Forward Adaptation contract detail — first source slice implemented.** Separate open-Responsibility actions from
    terminal-history learning proposals. Online Reflection may create only bounded
    advisory experience/calibration; trusted policy caps scope and lifetime and Memory
    materializes it with explicit expiry. It may not modify Stable Mind/shared prompts/models/global
    Fast/Deep policy, authorization/safety, Capability semantics, or cache semantic
    decisions. Shared/systemic changes remain offline and owner-governed.
-4. **Retention/negative-evidence consistency.** Make `immutable while retained !=
+5. **Retention/negative-evidence consistency.** Make `immutable while retained !=
    permanent` explicit across Evidence/Memory/Data Loop. No universal tombstone is
    required; absence supports a negative claim only under complete collection and
    retention coverage, otherwise Response must preserve `unknown`.
-5. **Machine guards and scenarios.** Only after contract text is stable, add the
+6. **Machine guards and scenarios.** Only after contract text is stable, add the
    smallest schema/runtime/audit changes needed to protect these boundaries. Tests
    should guard authority and observable semantics, not one incidental call sequence.
-6. **Qualification after implementation.** Source/test success, target qualification,
+7. **Qualification after implementation.** Source/test success, target qualification,
    and release readiness stay separate; relevant revision/model/provider/config changes
    invalidate the corresponding qualification claim before age-based review does.
 
 Exit criteria for this line:
 
 - no reviewed case requires a new top-level semantic authority;
+- GI emits no planning InformationGap or resolution strategy, while Planner resolves
+  execution inputs without changing Responsibility meaning;
 - Planner-selected Communicative Acts and result propositions remain distinct from
   their single downstream wording owner;
 - evidence integrity and evidence sufficiency are explicitly distinct;
@@ -252,9 +264,11 @@ callbacks into a second planner.
 
 ## Current priorities
 
-1. Preserve the completed authority spine and implement only the contract detail now
-   proven necessary: Communicative-Act/wording ownership, claim-specific Epistemic
-   Qualification, and bounded Forward Adaptation. Multi-user identity is not a new owner:
+1. Implement the owner-approved GI/Fast-Planner input-ownership migration before
+   treating the Chongqing weather fix as architectural closure. Then preserve the
+   completed authority spine and implement only the contract detail now proven necessary:
+   Communicative-Act/wording ownership, claim-specific Epistemic Qualification, and
+   bounded Forward Adaptation. Multi-user identity is not a new owner:
    recognition/authentication is a factual Capability/Evidence claim and effect-specific
    authorization/consent stays in Host policy. New top-level architecture requires the
    Charter irreducibility review.
@@ -399,6 +413,12 @@ Exit criteria:
 
 ### Interpretation and capability grounding
 
+- Preserve the implemented ownership boundary: GI emits no planning InformationGap or
+  strategy fields; Fast Planner owns execution-input completeness, source/default choice,
+  blocking, gap provenance, and clarification selection. Keep GI bounded unresolved
+  meaning for genuine semantic ambiguity, GA-only canonical Goal commit, and exact
+  pending-clarification continuity. Keep clear weather, missing lookup input, ambiguous
+  referent, and movement regressions in the relevant general-ability classes.
 - Preserve one Fast Goal Interpretation transaction: one primary interpretation,
   at most one mechanical DTO repair, then accept, delegate low-confidence
   `tool`, `memory`, or `robot_action` work once to Deep Thinking, or fail closed.

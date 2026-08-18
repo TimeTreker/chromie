@@ -232,20 +232,17 @@ class GoalAssociationResolution(BaseModel):
     turn_id: str = Field(min_length=1)
     resolution_status: Literal[
         "resolved",
-        "needs_clarification",
         "fail_closed",
     ]
     associations: list[GoalAssociation] = Field(default_factory=list)
     new_goals: list[SemanticGoal] = Field(default_factory=list)
     referent_updates: list[DiscourseReferentUpdate] = Field(default_factory=list)
     resolved_references: list[ResolvedDiscourseReference] = Field(default_factory=list)
-    information_gaps: dict[str, list[InformationGap]] = Field(default_factory=dict)
-    clarification: str = ""
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reason_summary: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)
 
-    @field_validator("turn_id", "clarification", "reason_summary", mode="before")
+    @field_validator("turn_id", "reason_summary", mode="before")
     @classmethod
     def normalize_resolution_text(cls, value: Any) -> Any:
         if isinstance(value, str):
@@ -256,25 +253,6 @@ class GoalAssociationResolution(BaseModel):
     @classmethod
     def reject_resolution_low_level_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
         return reject_forbidden_low_level_fields(value)
-
-    @field_validator("information_gaps")
-    @classmethod
-    def validate_information_gap_map(
-        cls,
-        value: dict[str, list[InformationGap]],
-    ) -> dict[str, list[InformationGap]]:
-        normalized: dict[str, list[InformationGap]] = {}
-        for raw_ref, gaps in value.items():
-            ref = " ".join(str(raw_ref or "").strip().split())
-            if not ref:
-                raise ValueError("information_gaps requires non-empty Responsibility refs")
-            ids = [item.gap_id for item in gaps]
-            if len(ids) != len(set(ids)):
-                raise ValueError(
-                    f"information_gaps[{ref}] contains duplicate InformationGap IDs"
-                )
-            normalized[ref] = list(gaps)
-        return normalized
 
     @model_validator(mode="after")
     def validate_resolution_shape(self) -> "GoalAssociationResolution":
@@ -290,22 +268,6 @@ class GoalAssociationResolution(BaseModel):
         if existing_targets.intersection(new_ids):
             raise ValueError("new_goals must not reuse target existing goal IDs")
         new_id_set = set(new_ids)
-        responsibility_refs = {
-            ref
-            for association in self.associations
-            for ref in association.source_responsibility_refs
-        }
-        responsibility_refs.update(
-            ref
-            for goal in self.new_goals
-            for ref in goal.source_responsibility_refs
-        )
-        unknown_gap_owners = sorted(set(self.information_gaps) - responsibility_refs)
-        if unknown_gap_owners:
-            raise ValueError(
-                "information_gaps references unassociated Responsibilities: "
-                + ",".join(unknown_gap_owners)
-            )
         superseded_ids = {
             goal_id
             for goal in self.new_goals
@@ -317,49 +279,27 @@ class GoalAssociationResolution(BaseModel):
             raise ValueError(
                 "a retained Goal cannot be both associated and superseded in one resolution"
             )
-        if self.clarification and (
-            self.new_goals
-            or self.associations
-            or self.referent_updates
-            or self.resolved_references
-        ):
-            raise ValueError(
-                "clarification result must not also propose goal or discourse changes"
-            )
         if self.resolution_status == "fail_closed":
             if (
-                self.clarification
-                or self.new_goals
+                self.new_goals
                 or self.associations
                 or self.referent_updates
                 or self.resolved_references
-                or self.information_gaps
                 or self.confidence != 0.0
             ):
                 raise ValueError(
                     "fail-closed resolution must contain no semantic operation, "
-                    "clarification, or confidence"
+                    "or confidence"
                 )
             return self
         if (
-            self.resolution_status == "needs_clarification"
-            and not self.clarification
-        ):
-            raise ValueError(
-                "needs_clarification resolution requires a user-answerable question"
-            )
-        if self.resolution_status == "resolved" and self.clarification:
-            raise ValueError(
-                "resolved status cannot carry a clarification question"
-            )
-        if (
-            not self.clarification
-            and not self.new_goals
+            not self.new_goals
             and not self.associations
             and not self.referent_updates
         ):
             raise ValueError(
-                "resolution must contain associations, new_goals, referent_updates, or clarification"
+                "resolved Goal Association must contain associations, new_goals, "
+                "or referent_updates"
             )
         return self
 
@@ -423,18 +363,6 @@ class GoalAssociationResolution(BaseModel):
                 item.model_dump(mode="json", exclude_none=True)
                 for item in self.resolved_references
             ],
-            "information_gaps": {
-                ref: [
-                    gap.model_dump(
-                        mode="json",
-                        exclude={"metadata"},
-                        exclude_none=True,
-                    )
-                    for gap in gaps
-                ]
-                for ref, gaps in self.information_gaps.items()
-            },
-            "clarification": self.clarification,
             "confidence": self.confidence,
             "reason_summary": self.reason_summary,
         }

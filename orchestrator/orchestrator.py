@@ -555,6 +555,7 @@ class VoiceAssistant:
             # continue.  Effectful execution still remains behind the trusted
             # canonical-plan/runtime boundary.
             goal_state_apply=self._commit_goal_association_state,
+            planner_gap_apply=self._commit_planner_information_gaps,
             context_refresh=self.build_context,
             delivered_turn_speech_provider=self._delivered_turn_speech_events,
             workflow_stage_sink=host_support.sessions.record_cognitive_stage,
@@ -2929,6 +2930,25 @@ class VoiceAssistant:
                 )
         return results
 
+    def _commit_planner_information_gaps(
+        self,
+        gaps_by_goal_id: dict[str, list[Any]],
+        *,
+        turn_id: str,
+        sid: str | None,
+        user_text: str,
+        source: str,
+    ) -> list[dict[str, Any]]:
+        """Persist Fast-Planner gaps after deterministic Goal identity binding."""
+
+        return self.conversation_state.apply_planner_information_gaps(
+            gaps_by_goal_id,
+            turn_id=turn_id,
+            sid=sid,
+            user_text=user_text,
+            source=source,
+        )
+
     async def _try_apply_cognitive_runtime(
         self,
         session: aiohttp.ClientSession,
@@ -4632,6 +4652,148 @@ class VoiceAssistant:
                 raise RuntimeError(
                     "cognitive failure response contains too much Chinese for en-US"
                 )
+            truth_audit: dict[str, Any] = {
+                "attempted": False,
+                "accepted": False,
+                "violations": [],
+            }
+            if (
+                capability_state == "unknown"
+                and execution_state == "not_attempted"
+                and result_state == "not_observed"
+            ):
+                audit_prompt = (
+                    "Audit one candidate failure sentence against immutable runtime "
+                    "facts. This is a truth check, not a writing task: never provide "
+                    "replacement wording. capability_state=unknown means the sentence "
+                    "must not claim the ability exists, is absent, is unlearned, or is "
+                    "something Chromie does not know how to do. "
+                    "execution_state=not_attempted means it must not claim a lookup, "
+                    "movement, provider contact, or other execution was tried. "
+                    "result_state=not_observed means it must not claim a result, empty "
+                    "result, weather condition, provider failure, network failure, or "
+                    "other specific cause was observed. It may state only that this "
+                    "attempt did not obtain the requested result or effect, without "
+                    "guessing why. Reject an invitation to repeat unless "
+                    "user_action_required is true. Return only the audit JSON and do "
+                    "not rewrite the sentence.\n\n"
+                    "Immutable user-visible facts JSON: "
+                    f"{json.dumps(user_visible_failure_facts, ensure_ascii=False, sort_keys=True)}\n"
+                    f"Candidate sentence: {text}\n"
+                )
+                audit_payload = {
+                    "model": failure_response_model,
+                    "prompt": audit_prompt,
+                    "stream": False,
+                    "think": False,
+                    "format": {
+                        "type": "object",
+                        "properties": {
+                            "accepted": {"type": "boolean"},
+                            "violations": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "enum": [
+                                        "unsupported_capability_claim",
+                                        "unsupported_execution_claim",
+                                        "unsupported_result_claim",
+                                        "unsupported_failure_cause",
+                                        "unsupported_user_action",
+                                    ],
+                                },
+                                "maxItems": 5,
+                            },
+                            "reason_summary": {
+                                "type": "string",
+                                "maxLength": 240,
+                            },
+                        },
+                        "required": [
+                            "accepted",
+                            "violations",
+                            "reason_summary",
+                        ],
+                        "additionalProperties": False,
+                    },
+                    "keep_alive": self.host_settings.model_generation.keep_alive,
+                    "options": {
+                        "num_ctx": self.host_settings.model_generation.failure_response_num_ctx,
+                        "num_predict": min(
+                            160,
+                            self.host_settings.model_generation.failure_response_num_predict,
+                        ),
+                        "temperature": 0,
+                        "top_p": 0.9,
+                    },
+                }
+
+                async def request_truth_audit() -> dict[str, Any]:
+                    async with session.post(llm_url, json=audit_payload) as response:
+                        body = await response.text()
+                        if response.status != 200:
+                            raise RuntimeError(
+                                "failure response truth audit returned HTTP "
+                                f"{response.status}: {body[:300]}"
+                            )
+                        decoded = json.loads(body)
+                        if not isinstance(decoded, dict):
+                            raise RuntimeError(
+                                "failure response truth audit returned a non-object body"
+                            )
+                        return decoded
+
+                audit_data = await asyncio.wait_for(
+                    request_truth_audit(),
+                    timeout=timeout_ms / 1000.0,
+                )
+                if str(audit_data.get("done_reason") or "").strip().lower() not in {
+                    "",
+                    "stop",
+                }:
+                    raise RuntimeError(
+                        "failure response truth audit did not complete normally"
+                    )
+                raw_audit = audit_data.get("response")
+                if not isinstance(raw_audit, str):
+                    raise RuntimeError(
+                        "failure response truth audit returned no response string"
+                    )
+                audit = json.loads(raw_audit)
+                if not isinstance(audit, dict) or set(audit) != {
+                    "accepted",
+                    "violations",
+                    "reason_summary",
+                }:
+                    raise RuntimeError(
+                        "failure response truth audit returned an invalid envelope"
+                    )
+                violations = audit.get("violations")
+                if not isinstance(violations, list) or any(
+                    item
+                    not in {
+                        "unsupported_capability_claim",
+                        "unsupported_execution_claim",
+                        "unsupported_result_claim",
+                        "unsupported_failure_cause",
+                        "unsupported_user_action",
+                    }
+                    for item in violations
+                ):
+                    raise RuntimeError(
+                        "failure response truth audit returned invalid violations"
+                    )
+                if audit.get("accepted") is not True or violations:
+                    raise RuntimeError(
+                        "failure response truth audit rejected candidate: "
+                        + ",".join(str(item) for item in violations)
+                    )
+                truth_audit = {
+                    "attempted": True,
+                    "accepted": True,
+                    "violations": [],
+                    "reason_summary": str(audit.get("reason_summary") or "")[:240],
+                }
             response = self._host_speech_response(
                 text,
                 style="warning",
@@ -4643,6 +4805,7 @@ class VoiceAssistant:
                         **response.metadata,
                         "failure_facts": failure_facts,
                         "failure_response_model": failure_response_model,
+                        "failure_response_truth_audit": truth_audit,
                         "semantic_fallback": False,
                     }
                 }

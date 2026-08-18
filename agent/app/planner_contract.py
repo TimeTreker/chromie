@@ -486,7 +486,6 @@ def goal_association_prompt_projection(
     top_level_keys = (
         "schema_version",
         "turn_id",
-        "clarification",
         "confidence",
         "reason_summary",
     )
@@ -2933,6 +2932,82 @@ def normalize_schema_default_parameter_provenance(
                 "reason": "exact_declared_catalog_default_absent_from_cited_goals",
             }
         )
+    return normalized, repairs
+
+
+def normalize_detached_parameter_resolutions(
+    raw: dict[str, Any],
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Remove only non-blocking resolution records with no step argument.
+
+    A ``PlanParameterResolution`` is provenance for one exact executable argument;
+    it does not own the argument or any Goal meaning.  When a model attaches a
+    non-blocking resolution to a parameter absent from the referenced step while
+    the exact resolved value is already carried by another top-level argument, that
+    record cannot ground additional execution meaning and is mechanically detached.
+    Dropping it does not rewrite the selected Capability, step arguments, Goal
+    ownership, timing, or disposition.  All remaining authoritative binding and
+    numeric-grounding checks still run, so a missing or differently nested material
+    argument continues through the normal repair/fail-closed path.
+
+    Blocking resolutions are deliberately retained because they describe an
+    unresolved parameter that may not yet exist in executable ``args``.
+    """
+
+    normalized = copy.deepcopy(raw)
+    steps = {
+        str(item.get("step_id") or "").strip(): item
+        for item in normalized.get("steps") or []
+        if isinstance(item, dict) and str(item.get("step_id") or "").strip()
+    }
+    resolutions = normalized.get("parameter_resolutions")
+    if not isinstance(resolutions, list):
+        return normalized, []
+
+    retained: list[Any] = []
+    repairs: list[dict[str, Any]] = []
+    for resolution in resolutions:
+        if not isinstance(resolution, dict) or resolution.get("blocking") is True:
+            retained.append(resolution)
+            continue
+        step_id = str(resolution.get("step_id") or "").strip()
+        parameter = str(resolution.get("parameter") or "").strip()
+        step = steps.get(step_id)
+        args = step.get("args") if isinstance(step, dict) else None
+        if (
+            not step_id
+            or not parameter
+            or not isinstance(args, dict)
+            or parameter in args
+        ):
+            retained.append(resolution)
+            continue
+        equivalent_arguments = sorted(
+            str(name)
+            for name, value in args.items()
+            if _material_values_equal(
+                resolution.get("value"),
+                value,
+                list_compatible=(
+                    isinstance(resolution.get("value"), list)
+                    or isinstance(value, list)
+                ),
+            )
+        )
+        if not equivalent_arguments:
+            retained.append(resolution)
+            continue
+        repairs.append(
+            {
+                "normalization": "detached_parameter_resolution_removed",
+                "step_id": step_id,
+                "parameter": parameter,
+                "step_argument_keys": sorted(str(key) for key in args),
+                "equivalent_step_argument_keys": equivalent_arguments,
+            }
+        )
+
+    normalized["parameter_resolutions"] = retained
     return normalized, repairs
 
 

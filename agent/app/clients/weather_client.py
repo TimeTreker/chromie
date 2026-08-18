@@ -885,7 +885,6 @@ class OpenMeteoWeatherClient:
         if not target_date or not isinstance(times, list):
             return None
 
-        current_time = str(current.get("time") or "").strip()
         selected_indices: list[int] = []
         for index, raw_time in enumerate(times):
             local_time = str(raw_time or "").strip()
@@ -893,8 +892,6 @@ class OpenMeteoWeatherClient:
                 continue
             clock = local_time.split("T", 1)[1]
             if clock < start_clock or clock >= end_clock:
-                continue
-            if current_time.startswith(target_date + "T") and local_time < current_time:
                 continue
             selected_indices.append(index)
         if not selected_indices:

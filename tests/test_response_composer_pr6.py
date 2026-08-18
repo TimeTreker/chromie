@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import unittest
 
+from pydantic import ValidationError
+
 from agent.app.response_composer import (
     ResponseComposerModelOutput,
     ResponseComposerResolver,
@@ -122,21 +124,9 @@ def request(canonical_plan: CanonicalPlan, *, context=None):
 
 
 def communicative_act_request(*acts, language="zh-CN"):
-    gaps = []
-    if any(act.role == "clarification" for act in acts):
-        gaps = [
-            {
-                "gap_id": "gap-tea-kind",
-                "description": "Which kind of tea should be brought?",
-                "blocking": True,
-                "required_for": ["tea_kind"],
-                "preferred_resolution": "ask_user",
-            }
-        ]
     responsibility = CognitiveResponsibilityProposal(
         local_ref="tea",
         outcome="Bring the requester a cup of tea.",
-        information_gaps=gaps,
         completion_requires_work=True,
         confidence=0.96,
     )
@@ -150,6 +140,20 @@ def communicative_act_request(*acts, language="zh-CN"):
     )
 
 
+def planner_gap(gap_id="gap-tea-kind"):
+    return {
+        "gap_id": gap_id,
+        "description": "Which kind of tea should be brought?",
+        "blocking": True,
+        "required_for": ["tea_kind"],
+        "preferred_resolution": "ask_user",
+        "source_kind": "execution_input",
+        "source_reference": "chromie.tea.bring",
+        "resolution_sources_considered": [
+            "authoritative_context",
+            "capability_schema",
+        ],
+    }
 class CommunicativeActRealizationTests(unittest.TestCase):
     def test_response_composer_authors_words_for_planner_act(self):
         ollama = FakeOllama(
@@ -200,7 +204,7 @@ class CommunicativeActRealizationTests(unittest.TestCase):
         self.assertEqual(result.wordings[0].text, "我先看看能不能查到。")
         self.assertEqual(ollama.prompts, [])
 
-    def test_clarification_wording_receives_exact_gi_gap(self):
+    def test_clarification_wording_receives_exact_planner_gap(self):
         ollama = FakeOllama(
             {
                 "wordings": [
@@ -215,7 +219,7 @@ class CommunicativeActRealizationTests(unittest.TestCase):
             role="clarification",
             speech_act="ask_clarification",
             source_responsibility_refs=["tea"],
-            information_gap_ids=["gap-tea-kind"],
+            information_gaps=[planner_gap()],
         )
 
         result = asyncio.run(
@@ -227,17 +231,15 @@ class CommunicativeActRealizationTests(unittest.TestCase):
         self.assertEqual(result.wordings[0].text, "你想喝什么茶？")
         self.assertIn("gap-tea-kind", str(ollama.prompts[0][0]))
 
-    def test_clarification_wording_rejects_a_different_gap(self):
-        act = FastPlannerClarificationAct(
-            activity_id="ask-tea",
-            role="clarification",
-            speech_act="ask_clarification",
-            source_responsibility_refs=["tea"],
-            information_gap_ids=["gap-invented"],
-        )
-
-        with self.assertRaisesRegex(ValueError, "blocking GI InformationGap"):
-            communicative_act_request(act)
+    def test_clarification_act_requires_planner_gap(self):
+        with self.assertRaises(ValidationError):
+            FastPlannerClarificationAct(
+                activity_id="ask-tea",
+                role="clarification",
+                speech_act="ask_clarification",
+                source_responsibility_refs=["tea"],
+                information_gaps=[],
+            )
 
     def test_wording_language_mismatch_gets_one_dto_revision_then_stops(self):
         invalid = {

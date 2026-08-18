@@ -3,7 +3,7 @@
   "id": "missing_restaurant_recommendation_closes_truthfully",
   "suite": "goal_interpretation",
   "level": "integration",
-  "description": "GI preserves the nearby restaurant recommendation outcome, fresh-evidence need, and missing location; downstream capability availability remains Planner authority.",
+  "description": "GI preserves the nearby restaurant recommendation outcome and fresh-evidence need; sourcing the location and capability availability remain Planner authority.",
   "tags": [
     "missing-ability",
     "external-information",
@@ -29,30 +29,12 @@
           },
           "relationship": "new",
           "target_goal_ids": [],
-          "information_gaps": [
-            {
-              "gap_id": "restaurant_location",
-              "description": "The user location for nearby recommendations is not known.",
-              "blocking": true,
-              "required_for": [
-                "location"
-              ],
-              "preferred_resolution": "ask_user",
-              "candidate_values": [],
-              "resolved": false,
-              "resolution_value": null,
-              "metadata": {}
-            }
-          ],
-          "resolved_gap_ids": [],
           "completion_requires_work": true,
           "completion_requires_fresh_evidence": true,
           "confidence": 0.93
         }
       ],
-      "unresolved": [
-        "The user location for nearby recommendations is not known."
-      ]
+      "unresolved": []
     }
   },
   "expect": {
@@ -61,9 +43,7 @@
     "llm_stages": [
       "goal_interpretation"
     ],
-    "unresolved": [
-      "The user location for nearby recommendations is not known."
-    ],
+    "unresolved": [],
     "responsibilities": [
       {
         "schema_version": 1,
@@ -74,22 +54,6 @@
         },
         "relationship": "new",
         "target_goal_ids": [],
-        "information_gaps": [
-          {
-            "gap_id": "restaurant_location",
-            "description": "The user location for nearby recommendations is not known.",
-            "blocking": true,
-            "required_for": [
-              "location"
-            ],
-            "preferred_resolution": "ask_user",
-            "candidate_values": [],
-            "resolved": false,
-            "resolution_value": null,
-            "metadata": {}
-          }
-        ],
-        "resolved_gap_ids": [],
         "completion_requires_work": true,
         "completion_requires_fresh_evidence": true,
         "confidence": 0.93

@@ -118,15 +118,15 @@ model for Chromie:
 flowchart TD
     U["Person / world input"] --> GW["Cognitive Gateway"]
     GW --> CTX["Bounded Session Context<br/>dialogue, active Goals, Activities,<br/>pending clarification, Evidence"]
-    CTX --> GI["Goal Interpretation (GI)<br/>Responsibility + Goal relation + InformationGaps"]
+    CTX --> GI["Goal Interpretation (GI)<br/>Responsibility + Goal relation + unresolved meaning"]
 
-    GI -->|"same GI result, concurrent fan-out"| FP["Fast Planner<br/>first Activity Plan"]
+    GI -->|"same GI result, concurrent fan-out"| FP["Fast Planner<br/>first Activity Plan + input resolution"]
     GI -->|"same GI result, concurrent fan-out"| GA["Goal Association (GA)<br/>sole Canonical Goal commit authority"]
 
     FP --> COMM["Communicative Acts<br/>acknowledge / ask / answer / explain / refuse / silence"]
     FP --> SAFE["ready safe/read-only<br/>Capability Activities"]
     FP -->|"complex HOW only"| DP["Deep Planner"]
-    FP -->|"missing user information"| ASK["Clarification Activity"]
+    FP -->|"only user-resolvable blocker"| ASK["Clarification Activity"]
 
     GA --> GOALS["Canonical Goals<br/>each Goal has a Task-list view"]
     GOALS --> BIND["Bind/reindex Fast Activities<br/>to Canonical Goal IDs"]
@@ -157,33 +157,51 @@ Read the diagram with these boundaries:
 - Goal Interpretation owns **provider-neutral contextual Responsibility evidence**:
   what human outcome appears to be wanted, material semantic bindings already
   present in the turn/context, whether the Responsibility creates, continues,
-  modifies, clarifies, or otherwise relates to a supplied Goal, which pending
-  InformationGap it resolves or creates, whether downstream work or fresh evidence
-  is required, and bounded unresolved material meaning. It may propose those Goal
-  relationships but cannot commit canonical Goal state. Neither GI depth may author
-  conversational response wording, Work, a
+  modifies, clarifies, or otherwise relates to a supplied Goal, whether downstream
+  work or fresh evidence is required, and bounded unresolved material meaning such
+  as an ambiguous outcome, scope, or referent. It may interpret a reply against a
+  pending clarification in Session Context and propose the resulting Goal
+  relationship, but it does not create or resolve planning `InformationGap` objects,
+  declare Capability or execution inputs missing, classify them as blocking, or
+  choose `ask_user`, context, observation, query, or default as their resolution.
+  Absence of external result Evidence is not unresolved user meaning. GI may propose
+  Goal relationships but cannot commit canonical Goal state. Neither GI depth may
+  author conversational response wording, Work, a
   Primary-Activity contract, Plan steps, execution lanes, realization, Capability
   selection, executable arguments, provider requests, or authorization.
   `completion_requires_work` says only that work remains; it is not a description
   of that Work.
 - The same GI result enters Fast Planner and Goal Association concurrently. Fast
   Planner is the first **HOW / Work-advancement authority** and authors an actual
-  Activity Plan, not a progress sentence standing in for a Plan. When speech is
-  useful, Planner selects a **Communicative Act**: a semantic Primary Activity
-  describing its function, timing, Responsibility/Goal provenance, and truth or
-  silence constraints, but containing no sentence wording. Communicative Acts and
-  Capability Activities share the same parallel/sequential semantics. Missing
-  user-supplied information produces a clarification Activity; only genuinely
-  complex HOW goes to Deep Planner.
+  Activity Plan, not a progress sentence standing in for a Plan. Planner owns
+  execution-input completeness and source strategy against the immutable
+  Responsibility, applicable Plan/Agent-Skill/Capability schemas, safety policy, and
+  trusted context. It may use an explicit/contextual binding, trusted observation or
+  query, an owner/schema default, a consequence-bounded ordinary default, or a
+  clarification Activity. It asks only when a user-resolvable answer materially
+  changes the next action and no safer authoritative source or permitted default is
+  sufficient. When speech is useful, Planner selects a **Communicative Act**: a
+  semantic Primary Activity describing its function, timing, Responsibility/Goal
+  provenance, and truth or silence constraints, but containing no sentence wording.
+  Communicative Acts and Capability Activities share the same parallel/sequential
+  semantics. Only genuinely complex HOW goes to Deep Planner.
+- Planner input resolution is not a second Goal Interpretation. Capability schemas
+  constrain realization; they cannot redefine, widen, narrow, or invent what the
+  person meant. A default is an explicit execution choice with source and consequence
+  provenance, not a fabricated user preference. If GI reports material unresolved
+  meaning, Planner may select a clarification Activity but cannot choose the missing
+  meaning itself. The pending act and its exact semantic or planner-input provenance
+  remain in Interaction Context so the next GI can interpret the reply without
+  transferring planning policy back into GI.
 - Goal Association remains the only canonical Responsibility/Goal-state authority.
   GA independently associates, creates, continues, corrects, merges, splits, or
   supersedes canonical Goals from the same GI result without waiting for or
   rewriting Fast Planner output.
 - Canonical Goal owns **what outcome Chromie still owes persistently**.
 - Fast/Deep Planner owns **what Work can advance those Goals now**, constrained by
-  the currently available Capability/provider contracts. Deep Planner is used for
-  complex HOW, not for a missing parameter that Fast Planner can ask the user to
-  supply.
+  the currently available Capability/provider contracts. Fast Planner owns ordinary
+  input-source resolution; Deep Planner is used for complex HOW, not as a reviewer
+  for a missing input or as a way to make GI choose an execution strategy.
   Available Capabilities are therefore Planner input and realization constraints even
   though they are not drawn as a separate box in the expanded view.
 - A Primary Activity is a concrete semantic Work/Plan act describing **what
@@ -685,11 +703,14 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    **Fast outcome types do not borrow authority from each other.** Fast Goal
    Interpretation emits provider-neutral Responsibility evidence with material
    semantic bindings, bounded unresolved meaning, and whether work/fresh evidence
-   remains. It does not author the reply. Fast Planner is the first HOW owner and may
-   author a complete first Activity Plan with speaking and Capability Activities.
-   Goal Association concurrently receives the same GI result and commits canonical Goal
-   identity. Missing user information produces a clarification Activity; HOW that exceeds
-   the fast budget may request Deep Planner. Exact Capability IDs, executable arguments, and effectful
+   remains. It does not author the reply, declare execution inputs missing, create
+   planning InformationGaps, or choose their source/resolution policy. Fast Planner is
+   the first HOW owner and may author a complete first Activity Plan with speaking and
+   Capability Activities. It owns execution-input completeness and may use trusted
+   context, observation/query, an allowed bounded default, or a clarification Activity
+   without changing Responsibility meaning. Goal Association concurrently receives the
+   same GI result and commits canonical Goal identity. HOW that exceeds the fast budget
+   may request Deep Planner. Exact Capability IDs, executable arguments, and effectful
    actions remain canonical Planner-owned after applicable Goal grounding and are
    invalid Goal-Interpreter output. The Host may normalize representation-safe fields,
    but it must not convert Capability selection or response wording into Goal-

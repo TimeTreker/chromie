@@ -224,12 +224,37 @@ class RuntimeTraceTests(unittest.TestCase):
 
     def test_goal_association_continuation_emits_module_fragment(self) -> None:
         class FakeOllama:
+            def __init__(self):
+                self.calls = 0
+
             async def generate(self, prompt, **kwargs):
+                self.calls += 1
+                if self.calls == 1:
+                    return {
+                        "decision": "create_goals",
+                        "new_goals": [
+                            {
+                                "source_responsibility_refs": [
+                                    "test_responsibility"
+                                ],
+                                "description": "Respond to the user.",
+                                "output_mode": "speech",
+                            }
+                        ],
+                        "confidence": 0.95,
+                        "reason_summary": "One independent conversational goal.",
+                    }
                 return {
-                    "new_goals": [{"description": "Respond to the user."}],
-                    "clarification": "",
-                    "confidence": 0.95,
-                    "reason_summary": "One independent conversational goal.",
+                    "items": [
+                        {
+                            "source_excerpt": "hello",
+                            "role": "responsibility",
+                            "coverage": "covered",
+                            "independently_satisfiable": True,
+                            "candidate_goal_indices": [0],
+                        }
+                    ],
+                    "reason_summary": "The candidate covers the greeting.",
                 }
 
         async def run():

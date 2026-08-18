@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import re
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .goal import GoalRelationship
 from .interaction import reject_forbidden_low_level_fields
-from .semantic_task import InformationGap
 from .user_turn import normalize_turn_text
 
 
@@ -29,9 +27,6 @@ _PLANNER_OWNED_BINDING_FIELDS = frozenset({
     "coordination_id",
     "execution_item_ids",
 })
-
-_SEMANTIC_BINDING_NAME = re.compile(r"[a-z][a-z0-9_]{0,79}")
-
 
 def _reject_planner_owned_bindings(value: Any, *, path: str = "bindings") -> Any:
     if isinstance(value, dict):
@@ -74,9 +69,10 @@ class CognitiveResponsibilityProposal(BaseModel):
     The Responsibility remains provider-neutral and contains no Activity/Work,
     Capability, provider, execution, realization, or response wording.  It does,
     however, preserve the current turn's model-authored relationship to supplied
-    Goal and InformationGap context so a short clarification answer can update the
-    Responsibility it actually belongs to instead of becoming an isolated turn.
-    Goal Association remains the sole canonical Goal-state commit boundary.
+    Goal context so a short clarification answer can update the Responsibility it
+    actually belongs to instead of becoming an isolated turn. Planning
+    InformationGaps, their blocking state, and their resolution strategy belong to
+    Planner. Goal Association remains the sole canonical Goal-state commit boundary.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -101,8 +97,6 @@ class CognitiveResponsibilityProposal(BaseModel):
     )
     relationship: GoalRelationship = "new"
     target_goal_ids: list[str] = Field(default_factory=list, max_length=8)
-    information_gaps: list[InformationGap] = Field(default_factory=list, max_length=8)
-    resolved_gap_ids: list[str] = Field(default_factory=list, max_length=8)
     completion_requires_work: bool = Field(
         default=False,
         description="Whether Chromie still owes work before this outcome is satisfied.",
@@ -128,7 +122,7 @@ class CognitiveResponsibilityProposal(BaseModel):
         _reject_planner_owned_bindings(value)
         return value
 
-    @field_validator("target_goal_ids", "resolved_gap_ids", mode="before")
+    @field_validator("target_goal_ids", mode="before")
     @classmethod
     def normalize_context_ids(cls, value: Any) -> list[str]:
         if value is None:
@@ -136,7 +130,7 @@ class CognitiveResponsibilityProposal(BaseModel):
         if isinstance(value, str):
             value = [value]
         if not isinstance(value, list):
-            raise ValueError("Goal and InformationGap identity fields must be arrays")
+            raise ValueError("Goal identity fields must be arrays")
         return list(
             dict.fromkeys(
                 text
@@ -157,49 +151,6 @@ class CognitiveResponsibilityProposal(BaseModel):
             raise ValueError(
                 f"relationship={self.relationship} requires target_goal_ids"
             )
-        gap_ids = [item.gap_id for item in self.information_gaps]
-        if len(gap_ids) != len(set(gap_ids)):
-            raise ValueError("Responsibility InformationGap IDs must be unique")
-        overlap = set(gap_ids).intersection(self.resolved_gap_ids)
-        if overlap:
-            raise ValueError(
-                "a Responsibility cannot introduce and resolve the same InformationGap: "
-                + ",".join(sorted(overlap))
-            )
-        invalid_user_gaps = [
-            item.gap_id
-            for item in self.information_gaps
-            if item.preferred_resolution == "ask_user"
-            and not item.resolved
-            and not item.required_for
-        ]
-        if invalid_user_gaps:
-            raise ValueError(
-                "ask_user InformationGap must name the missing user-resolvable value "
-                "in required_for: "
-                + ",".join(invalid_user_gaps)
-            )
-        invalid_required_bindings: list[str] = []
-        already_bound: list[str] = []
-        for gap in self.information_gaps:
-            if gap.preferred_resolution != "ask_user" or gap.resolved:
-                continue
-            for binding_name in gap.required_for:
-                if _SEMANTIC_BINDING_NAME.fullmatch(binding_name) is None:
-                    invalid_required_bindings.append(binding_name)
-                elif binding_name in self.bindings:
-                    already_bound.append(binding_name)
-        if invalid_required_bindings:
-            raise ValueError(
-                "ask_user required_for entries must be unresolved semantic binding "
-                "names, not natural-language result descriptions: "
-                + ",".join(invalid_required_bindings)
-            )
-        if already_bound:
-            raise ValueError(
-                "ask_user required_for cannot name values already present in bindings: "
-                + ",".join(already_bound)
-            )
         return self
 
 
@@ -208,8 +159,9 @@ class CoreInterpretationResult(BaseModel):
 
     Goal Interpretation answers WHAT the human means in the current bounded
     Context, including whether the turn creates, continues, or modifies supplied
-    Goal meaning and which pending InformationGap it answers.  Fast/Deep depth may
-    change how much cognition is used, but not this authority boundary.  There is
+    Goal meaning. Pending clarification is semantic context, but GI neither owns nor
+    resolves its Planner-created InformationGap. Fast/Deep depth may change how much
+    cognition is used, but not this authority boundary. There is
     deliberately no compatibility RouteDecision projection and no GI-authored
     response/progress Activity, Capability choice, or Goal-state commit.
     """

@@ -42,7 +42,7 @@ receive
      changing their function, timing, provenance, or constraints
   -> bind Activities into per-Goal task-list views
   -> validate, authorize, and resource-schedule ready Work
-  -> ask the user for missing user information, or use Deep Planner for complex HOW
+  -> resolve execution inputs or ask a user-resolvable clarification; use Deep Planner for complex HOW
   -> observe structured results and reconcile every Goal against Evidence
   -> compose the still-needed response from authoritative state
   -> close, wait, or reactivate later from new evidence/state
@@ -156,19 +156,22 @@ Physical TaskGraph work remains sequential.
 
 ### 3.0 Fast/Deep escalation is cognition depth, not repair
 
-Fast handles meaning that is sufficiently obvious and cheap for the contemplated
-progress. Deep is exceptional and receives authoritative source meaning when
-remaining uncertainty or consequence justifies broader reasoning. A numeric
-confidence score is evidence, not the sole escalation switch. Harmless ordinary
-conversation should not pay a Deep-thinking tax merely because confidence is
-imperfectly calibrated.
+Fast handles cognition that is sufficiently obvious and cheap for the contemplated
+progress. Deep is exceptional and receives authoritative source evidence when
+remaining uncertainty or consequence justifies broader reasoning. A numeric confidence
+score is evidence, not the sole escalation switch. Harmless ordinary conversation
+should not pay a Deep-thinking tax merely because confidence is imperfectly calibrated.
 
-A mechanically malformed DTO may be regenerated once under the same meaning and
-schema. A semantic/grounding/coverage failure is not repaired by rewriting the
-previous model output: Fast may escalate once to its designated Deep cognition; a
-terminal Deep semantic rejection fails closed or asks a genuine user-resolvable
-clarification. The Host validates and contains; it does not become a third
-semantic planner.
+The stage boundary remains exact. Fast Goal Interpretation may escalate once to Deep
+Goal Interpretation for genuine consequential ambiguity in the person's intended
+outcome, scope, or referent. Fast Planner may escalate once to Deep Planner for complex
+HOW, dependencies, alternatives, or safety/resource reasoning. A missing execution
+input or external result is not by itself a reason for Deep GI, and Deep Planner cannot
+reinterpret Responsibility. A mechanically malformed DTO may be regenerated once under
+the same meaning and schema. A semantic/grounding/coverage failure is not repaired by
+rewriting previous model output; terminal Deep rejection fails closed or leads Planner
+to a genuine user-resolvable clarification. The Host validates and contains; it does
+not become a third semantic planner.
 
 ### 3.1 Continuous progress and the critical path
 
@@ -204,13 +207,24 @@ Act while GA records the conversational Goal; a weather request can contain a pr
 Communicative Act and
 an exact weather-read Activity in parallel.
 
-A material value absent from user/context evidence is an InformationGap. Fast Planner
-asks the user through a clarification Activity when the missing value is user-resolvable;
-it does not send that case to Deep Planner. A short answer such as “Green tea” is read by
-the next GI against pending clarification and active Goal/Activity Context, emitted as a
-`modify`/`clarify` relationship with `resolved_gap_ids`, and committed by GA as a new Goal
-version. Deep Planner is reserved for complex HOW, dependencies, or consequence—not for
-asking a question Fast Planner already knows it must ask.
+GI reports only bounded unresolved meaning; it does not turn every absent value into an
+InformationGap or decide which Capability inputs are required. Fast Planner compares the
+immutable Responsibility with applicable planning, Agent-Skill, Capability, safety, and
+provider contracts. It owns planning InformationGaps and the resolution order: explicit
+or contextual evidence, trusted observation/query, an owner/schema default, a permitted
+consequence-bounded ordinary default, user clarification, or fail closed. It asks only
+when the user can resolve the need, the answer materially changes the next action, and no
+safer authorized source is sufficient. Capability schemas constrain realization but
+cannot redefine user meaning.
+
+A short answer such as “Green tea” is read by the next GI against the pending
+clarification and active Goal/Activity Context, emitted as a `modify`/`clarify`
+relationship with the resolved semantic binding, and committed by GA as a new Goal
+version. The pending Activity retains whether the question came from GI unresolved
+meaning or a Planner-owned input need; this continuity does not transfer source-policy
+ownership into GI. Deep Planner is reserved for complex HOW, dependencies, alternatives,
+or consequential planning—not for asking a question Fast Planner already knows it must
+ask.
 
 Safe, side-effect-free, schema-valid reads may start before GA finishes. Their stable
 runtime request identity initially carries GI Responsibility refs. When GA returns, the
@@ -365,10 +379,12 @@ envelopes cannot enter ordinary Core cognition.
 ## 5. Goal understanding and planning
 
 Goal Interpretation emits provider-neutral contextual Responsibility evidence, including
-the proposed relationship to supplied Goals and pending InformationGaps. The same result
-enters Fast Planner and Goal Association concurrently. Fast Planner authors the complete
-first Activity Plan; GA alone commits the canonical Goal relation. This is model-authored
-planning, never a Host greeting phrase table or `route == chat` shortcut.
+the proposed relationship to supplied Goals and bounded unresolved meaning interpreted
+against any pending clarification. It does not create planning InformationGaps. The same
+result enters Fast Planner and Goal Association concurrently. Fast Planner authors the
+complete first Activity Plan and owns execution-input resolution; GA alone commits the
+canonical Goal relation. This is model-authored planning, never a Host greeting phrase
+table or `route == chat` shortcut.
 
 ```text
 UserTurnEnvelope + Session Context
@@ -376,7 +392,7 @@ UserTurnEnvelope + Session Context
   -> concurrent fan-out
        |-> Fast Planner -> first Activity Plan
        |     |-> Communicative Acts and Capability Activities
-       |     |-> clarification for missing user information
+       |     |-> input resolution or a user-resolvable clarification
        |     `-> Deep Planner only for complex HOW
        `-> Goal Association -> canonical Goal commit/version
   -> Vocal Realization formulates wording for each selected Communicative Act
@@ -404,15 +420,17 @@ Fast Planner owns complete bounded capability work. A terminal Fast Plan whose
 Goal grounding, exact Capability, arguments, deterministic safety/authorization, and
 confirmation policy validate may commit directly to Trusted Capability Runtime; Deep
 is not an execution prerequisite or reviewer. A Fast contract/grounding failure stops
-that path instead of being repaired by Deep. Deep Planner is invoked only for genuine
-semantic ambiguity or coverage, nontrivial dependency, material alternative,
-novelty/broader context, or safety/resource reasoning that truly requires wider
-cognition. Independent Responsibilities may therefore progress at different cognitive
+that path instead of being repaired by Deep. Deep Planner is invoked only for
+nontrivial dependency, material alternative, novelty/broader planning context,
+Plan-coverage difficulty, or safety/resource reasoning that truly requires wider
+cognition. Genuine ambiguity in Responsibility meaning belongs to Deep Goal
+Interpretation before planning; Deep Planner may not repair or reinterpret it.
+Independent Responsibilities may therefore progress at different cognitive
 depths; once each has canonical Goal grounding, a confirmation-free safe read may
 execute while unrelated deeper cognition continues. A purely mechanical Planner DTO/schema failure may be
-regenerated once under the same semantic meaning. Fast semantic/grounding/coverage
+regenerated once under the same semantic meaning. Fast planning-grounding/coverage
 rejection may escalate once to Deep when broader reasoning is warranted. Deep
-semantic/grounding/coverage rejection is terminal for that cognition attempt and
+planning-grounding/coverage rejection is terminal for that cognition attempt and
 must not trigger another same-tier semantic pass. A confidence number alone
 neither permits a bypass nor requires escalation, and it never authorizes an
 effect.
@@ -462,8 +480,8 @@ The live layer is projected by responsibility:
 - Social Attention receives current interaction events, scene/target evidence,
   recent expressive history, primary activity state, eligible exact social
   capabilities, and the compact stable Mind.
-- Deep Planner is the deliberate rich-context path. When escalation is semantic
-  rather than merely technical, it may receive broader Goal relationships,
+- Deep Planner is the deliberate rich-context HOW path. When planning complexity or
+  consequence warrants escalation, it may receive broader Goal relationships,
   relevant long-term memory, environment, capability state, trustworthy
   evidence, alternatives, long-horizon context, and the explicit reason deeper
   reasoning was required. Its stable Mind prefix remains the same owner-controlled

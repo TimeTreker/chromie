@@ -4,7 +4,9 @@
   "suite": "goal_interpretation",
   "level": "module",
   "description": "$description",
-  "tags": ["draft"],
+  "tags": [
+    "draft"
+  ],
   "input": {
     "text": "$text"
   },
@@ -19,8 +21,6 @@
           "bindings": {},
           "relationship": "new",
           "target_goal_ids": [],
-          "information_gaps": [],
-          "resolved_gap_ids": [],
           "completion_requires_work": false,
           "completion_requires_fresh_evidence": false,
           "confidence": 0.8
@@ -32,7 +32,9 @@
   "expect": {
     "confidence": 0.8,
     "llm_calls": 1,
-    "llm_stages": ["goal_interpretation"],
+    "llm_stages": [
+      "goal_interpretation"
+    ],
     "unresolved": [],
     "responsibilities": [
       {
@@ -41,7 +43,6 @@
         "bindings": {},
         "relationship": "new",
         "target_goal_ids": [],
-        "resolved_gap_ids": [],
         "completion_requires_work": false,
         "completion_requires_fresh_evidence": false,
         "confidence": 0.8

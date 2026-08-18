@@ -161,7 +161,12 @@ for downstream cognition; it is not a Goal, Plan, or Goal-Association-only DTO.
 Capability IDs, executable args/actions, provider identity, execution methods,
 Activities, response wording, `route`, and `intent` are forbidden.
 
-`POST /fast-advance` is the maintained first Fast Planner Activity-Plan endpoint. It consumes the authoritative user turn plus contextual Responsibility evidence and returns `FastPlannerAdvance`: exact Responsibility refs covered, Communicative Acts and Capability Activities with explicit timing, and an optional `deep_planner` continuation for complex HOW. A Communicative Act owns function, timing, Responsibility provenance, and applicable InformationGap IDs but contains no `response_text`. Missing user information is represented by a clarification act referencing the exact GI gap. Goal Association concurrently consumes the same GI result and remains the sole canonical Goal commit owner. The Host may start only schema-valid, available, side-effect-free safe reads before GA finishes; effects remain behind canonical Goal, confirmation, authorization, resource, and provider-safety gates. The same task identity is then bound into applicable per-Goal Runtime task-list views.
+Planning `InformationGap` creation/resolution, execution-input completeness, blocking
+status, source/default selection, and clarification selection belong to Fast Planner.
+GI carries only Responsibility meaning, Goal relation, and bounded unresolved meaning;
+its maintained schema contains no planning-gap or resolution-policy fields.
+
+`POST /fast-advance` is the maintained first Fast Planner Activity-Plan endpoint. It consumes the authoritative user turn plus contextual Responsibility evidence and returns `FastPlannerAdvance`: exact Responsibility refs covered, Communicative Acts and Capability Activities with explicit timing, and an optional `deep_planner` continuation for complex HOW. A clarification Communicative Act owns one or more typed Planner `InformationGap` records and no `response_text`. A semantic gap must cite one exact GI `unresolved` string; an execution-input gap must cite one exact available Capability ID and its genuinely absent, required, non-defaulted schema input. The gap records which authorized context, observation/query, preference, schema, or safe-default sources were considered. Goal Association concurrently consumes the same GI result and remains the sole canonical Goal commit owner; it does not author clarification wording. After deterministic Responsibility-to-Goal binding, the Host atomically attaches Planner gaps to the exact canonical Goal before clarification wording may be delivered. The Host may start only schema-valid, available, side-effect-free safe reads before GA finishes; effects remain behind canonical Goal, confirmation, authorization, resource, and provider-safety gates. The same task identity is then bound into applicable per-Goal Runtime task-list views.
 
 `POST /communicative-acts/realize` accepts `CommunicativeActRealizationRequest`: immutable Fast-Planner acts, their exact Responsibility evidence, language, turn/session identity, and bounded continuity context. Response Composer returns one `CommunicativeActWording` per act ID. It cannot add, omit, merge, reorder, or reinterpret acts. Closed progress kinds use deterministic bounded wording inside this owner; complete answers and clarification questions use the configured response model. One mechanically malformed wording DTO may be regenerated once. Failure produces no speculative speech and does not reopen GI, GA, or Planner authority; the canonical response path may still realize the preserved act after Goal binding.
 
@@ -254,11 +259,12 @@ immutable certificate as trace evidence without giving it Goal lifecycle
 authority.
 
 `GoalAssociationResolution.resolution_status` is the terminal contract:
-`resolved`, `needs_clarification`, or `fail_closed`. `fail_closed` contains no
-associations, new Goals, discourse mutations, progress bindings, clarification,
-or confidence and cannot be committed or passed to a Planner. A user-answerable
-semantic ambiguity uses `needs_clarification`; model, schema, audit, and retry
-failures never masquerade as such ambiguity.
+`resolved` or `fail_closed`. `fail_closed` contains no associations, new Goals,
+discourse mutations, progress bindings, clarification, or confidence and cannot be
+committed or passed to a Planner. When GI retains genuine semantic ambiguity, GA may
+commit the narrowest source-grounded provisional Goal without deciding the missing
+meaning; Fast Planner alone decides whether to create a question-bearing gap. Model,
+schema, audit, and retry failures never masquerade as user-resolvable ambiguity.
 Mode-specific vocal output remains Vocal but requires provider evidence; a
 generic `respond` outcome or ordinary TTS cannot close it. The eventual spoken
 delivery of a capability result remains part of that capability-dependent Goal

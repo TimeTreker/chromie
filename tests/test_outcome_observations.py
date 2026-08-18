@@ -77,6 +77,40 @@ class OutcomeObservationTests(unittest.TestCase):
 
         self.assertEqual(errors, [])
 
+    def test_external_capability_completion_is_observable_evidence(self) -> None:
+        summary = {
+            "interaction_response": {
+                "capabilities": [
+                    {
+                        "request_id": "req-weather",
+                        "capability_id": "chromie.weather.lookup",
+                        "args": {
+                            "location": "重庆",
+                            "date": "today",
+                            "period": "morning",
+                        },
+                        "metadata": {"source_goal_ids": ["goal-weather"]},
+                    }
+                ],
+                "speech": [],
+            },
+            "execution": {
+                "results": [
+                    {"request_id": "req-weather", "status": "completed"}
+                ]
+            },
+        }
+
+        observations = collect_observations(summary)
+
+        self.assertEqual(len(observations), 1)
+        self.assertEqual(
+            observations[0]["type"],
+            "capability.chromie.weather.lookup",
+        )
+        self.assertEqual(observations[0]["status"], "completed")
+        self.assertEqual(observations[0]["args"]["period"], "morning")
+
     def test_argument_ranges_capture_direction_without_freezing_safe_defaults(self) -> None:
         observations = [
             {

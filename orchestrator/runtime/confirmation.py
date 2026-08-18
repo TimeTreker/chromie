@@ -269,7 +269,6 @@ def confirmation_meaning_from_goal_association(
 
     if (
         not pending_goal_ids
-        or association.clarification
         or association.new_goals
         or not association.associations
     ):

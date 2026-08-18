@@ -86,18 +86,10 @@ class CommunicativeActRealizationRequest(BaseModel):
                     + ",".join(sorted(unknown))
                 )
             if act.role == "clarification":
-                expected_gap_ids = {
-                    gap.gap_id
-                    for ref in act.source_responsibility_refs
-                    for gap in responsibility_by_ref[ref].information_gaps
-                    if gap.blocking
-                    and not gap.resolved
-                    and gap.preferred_resolution == "ask_user"
-                }
-                if set(act.information_gap_ids) != expected_gap_ids:
+                gap_ids = [gap.gap_id for gap in act.information_gaps]
+                if not gap_ids or len(gap_ids) != len(set(gap_ids)):
                     raise ValueError(
-                        "clarification wording requires exactly the blocking GI "
-                        "InformationGap IDs for its Responsibility refs"
+                        "clarification wording requires unique Planner InformationGaps"
                     )
             if act.role == "complete_response" and any(
                 responsibility_by_ref[ref].completion_requires_fresh_evidence
@@ -433,8 +425,6 @@ class DirectResponseComposition(BaseModel):
     @model_validator(mode="after")
     def validate_direct_composition(self) -> "DirectResponseComposition":
         association = self.goal_association
-        if association.clarification:
-            raise ValueError("direct response composition cannot carry clarification")
         if self.goal_association_fingerprint != goal_association_fingerprint(association):
             raise ValueError("goal association fingerprint mismatch")
         if association.associations:

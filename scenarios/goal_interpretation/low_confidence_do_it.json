@@ -3,7 +3,7 @@
   "id": "low_confidence_do_it",
   "suite": "goal_interpretation",
   "level": "module",
-  "description": "GI preserves the referential action request and exposes the unidentified action as a user-resolvable InformationGap.",
+  "description": "Fast GI preserves the referential request, one Deep GI pass confirms the action remains semantically unidentified, and GI does not select a resolution policy.",
   "tags": [
     "deep-thought",
     "low-confidence",
@@ -13,47 +13,59 @@
     "text": "Please do it."
   },
   "stub": {
-    "llm_decision": {
-      "confidence": 0.35,
-      "responsibilities": [
-        {
-          "schema_version": 1,
-          "local_ref": "r1",
-          "outcome": "carry out the action the user refers to as it",
-          "bindings": {},
-          "relationship": "new",
-          "target_goal_ids": [],
-          "information_gaps": [
+    "llm_script": [
+      {
+        "stage": "goal_interpretation",
+        "decision": {
+          "confidence": 0.35,
+          "responsibilities": [
             {
-              "gap_id": "referenced_action",
-              "description": "The action referred to by it is not identified.",
-              "blocking": true,
-              "required_for": [
-                "referenced_action"
-              ],
-              "preferred_resolution": "ask_user",
-              "candidate_values": [],
-              "resolved": false,
-              "resolution_value": null,
-              "metadata": {}
+              "schema_version": 1,
+              "local_ref": "r1",
+              "outcome": "carry out the action the user refers to as it",
+              "bindings": {},
+              "relationship": "new",
+              "target_goal_ids": [],
+              "completion_requires_work": true,
+              "completion_requires_fresh_evidence": false,
+              "confidence": 0.35
             }
           ],
-          "resolved_gap_ids": [],
-          "completion_requires_work": true,
-          "completion_requires_fresh_evidence": false,
-          "confidence": 0.35
+          "unresolved": [
+            "The action referred to by it is not identified."
+          ]
         }
-      ],
-      "unresolved": [
-        "The action referred to by it is not identified."
-      ]
-    }
+      },
+      {
+        "stage": "goal_interpretation_deep",
+        "decision": {
+          "confidence": 0.35,
+          "responsibilities": [
+            {
+              "schema_version": 1,
+              "local_ref": "r1",
+              "outcome": "carry out the action the user refers to as it",
+              "bindings": {},
+              "relationship": "new",
+              "target_goal_ids": [],
+              "completion_requires_work": true,
+              "completion_requires_fresh_evidence": false,
+              "confidence": 0.35
+            }
+          ],
+          "unresolved": [
+            "The action referred to by it is not identified."
+          ]
+        }
+      }
+    ]
   },
   "expect": {
     "confidence": 0.35,
-    "llm_calls": 1,
+    "llm_calls": 2,
     "llm_stages": [
-      "goal_interpretation"
+      "goal_interpretation",
+      "goal_interpretation_deep"
     ],
     "unresolved": [
       "The action referred to by it is not identified."
@@ -66,22 +78,6 @@
         "bindings": {},
         "relationship": "new",
         "target_goal_ids": [],
-        "information_gaps": [
-          {
-            "gap_id": "referenced_action",
-            "description": "The action referred to by it is not identified.",
-            "blocking": true,
-            "required_for": [
-              "referenced_action"
-            ],
-            "preferred_resolution": "ask_user",
-            "candidate_values": [],
-            "resolved": false,
-            "resolution_value": null,
-            "metadata": {}
-          }
-        ],
-        "resolved_gap_ids": [],
         "completion_requires_work": true,
         "completion_requires_fresh_evidence": false,
         "confidence": 0.35

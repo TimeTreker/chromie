@@ -6,6 +6,7 @@ from unittest import mock
 
 from pydantic import ValidationError
 
+from agent.app.clients.ollama_client import OllamaGenerationError
 from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
 from agent.app.cognitive_core.goal_interpreter.engine import interpret_goal
 from agent.app.cognitive_core.goal_interpreter.errors import InterpretationUnavailableError
@@ -41,25 +42,18 @@ def _valid_output(*, local_ref: str = "r1") -> dict[str, object]:
 
 
 class GoalInterpreterContractTests(unittest.TestCase):
-    def test_user_resolvable_gap_names_the_missing_semantic_value(self) -> None:
-        with self.assertRaisesRegex(
-            ValueError,
-            "ask_user required_for entries must be unresolved semantic binding names",
-        ):
+    def test_responsibility_rejects_planner_owned_information_gap(self) -> None:
+        with self.assertRaisesRegex(ValidationError, "Extra inputs are not permitted"):
             CognitiveResponsibilityProposal(
                 local_ref="weather",
-                outcome="report today's daytime weather in Chongqing",
-                bindings={
-                    "location": "重庆",
-                    "date": "today",
-                    "time_of_day": "白天",
-                },
+                outcome="report today's weather at the user's location",
+                bindings={"date": "today"},
                 information_gaps=[
                     {
-                        "gap_id": "weather_result",
-                        "description": "The current weather result is not known yet.",
+                        "gap_id": "weather_location",
+                        "description": "The requested location is missing.",
                         "blocking": True,
-                        "required_for": ["weather data for Chongqing"],
+                        "required_for": ["location"],
                         "preferred_resolution": "ask_user",
                     }
                 ],
@@ -67,25 +61,6 @@ class GoalInterpreterContractTests(unittest.TestCase):
                 completion_requires_fresh_evidence=True,
                 confidence=0.95,
             )
-
-        valid = CognitiveResponsibilityProposal(
-            local_ref="weather",
-            outcome="report today's weather at the user's location",
-            bindings={"date": "today"},
-            information_gaps=[
-                {
-                    "gap_id": "weather_location",
-                    "description": "The requested location is missing.",
-                    "blocking": True,
-                    "required_for": ["location"],
-                    "preferred_resolution": "ask_user",
-                }
-            ],
-            completion_requires_work=True,
-            completion_requires_fresh_evidence=True,
-            confidence=0.9,
-        )
-        self.assertEqual(valid.information_gaps[0].required_for, ["location"])
 
     def test_responsibility_rejects_planner_owned_bindings(self) -> None:
         with self.assertRaisesRegex(ValueError, "Planner-owned field"):
@@ -102,35 +77,44 @@ class GoalInterpreterContractTests(unittest.TestCase):
             )
 
     def test_external_evidence_is_not_top_level_semantic_uncertainty(self) -> None:
+        decision = GoalInterpretationDecision.model_validate(
+            {
+                "confidence": 0.95,
+                "responsibilities": [
+                    {
+                        "local_ref": "weather",
+                        "outcome": "Describe today's daytime weather in Chongqing.",
+                        "bindings": {
+                            "location": "重庆",
+                            "date": "today",
+                            "time_of_day": "白天",
+                        },
+                        "completion_requires_work": True,
+                        "completion_requires_fresh_evidence": True,
+                        "confidence": 0.95,
+                    }
+                ],
+                "unresolved": [],
+            }
+        )
+        self.assertTrue(decision.responsibilities[0].completion_requires_fresh_evidence)
+        self.assertEqual(decision.unresolved, [])
+
+    def test_already_bound_values_are_not_top_level_uncertainty(self) -> None:
         with self.assertRaisesRegex(
             ValueError,
-            "external Evidence acquisition is not unresolved semantic meaning",
+            "already-bound semantic values are not unresolved",
         ):
             GoalInterpretationDecision.model_validate(
                 {
-                    "confidence": 0.95,
+                    **_valid_output(),
                     "responsibilities": [
                         {
-                            "local_ref": "weather",
-                            "outcome": "Describe today's daytime weather in Chongqing.",
-                            "bindings": {
-                                "location": "重庆",
-                                "date": "today",
-                                "time_of_day": "白天",
-                            },
-                            "information_gaps": [
-                                {
-                                    "gap_id": "weather_result",
-                                    "description": "current weather data for Chongqing",
-                                    "preferred_resolution": "query_trusted_service",
-                                }
-                            ],
-                            "completion_requires_work": True,
-                            "completion_requires_fresh_evidence": True,
-                            "confidence": 0.95,
+                            **_valid_output()["responsibilities"][0],
+                            "bindings": {"location": "重庆", "time": "今天上午"},
                         }
                     ],
-                    "unresolved": ["current weather data for Chongqing"],
+                    "unresolved": ["重庆", "今天上午"],
                 }
             )
 
@@ -237,6 +221,41 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("must not become an assertion", prompt)
         self.assertIn("does not become unresolved merely because its answer is unknown", prompt)
         self.assertIn("reasoning from facts already supplied by the user", prompt)
+        self.assertIn("do not create or resolve an informationgap", prompt)
+        self.assertIn("external or changing facts", prompt)
+
+    def test_current_turn_prompt_distinguishes_missing_binding_from_requested_evidence(self) -> None:
+        prompt = self._interpreter().build_interpretation_user_prompt(
+            GoalInterpretationRequest(
+                text="哎，今天上午重庆会不会下雨？",
+                language="zh-CN",
+            )
+        )
+
+        self.assertIn("Missing execution inputs belong to Fast Planner", prompt)
+        self.assertIn("External Evidence is fresh Evidence", prompt)
+
+    def test_deep_payload_reasons_from_source_without_prior_dto(self) -> None:
+        interpreter = OllamaGoalInterpreter(
+            ollama_url="http://example.invalid",
+            model="fast-model",
+            deep_model="deep-model",
+            timeout_ms=800,
+        )
+        payload = interpreter.build_deep_interpretation_payload(
+            GoalInterpretationRequest(
+                text="哎，今天上午重庆会不会下雨？",
+                language="zh-CN",
+            )
+        )
+
+        system_text, user_text, all_text = _payload_message_texts(payload)
+        self.assertFalse(payload["think"])
+        self.assertEqual(payload["model"], "deep-model")
+        self.assertIn("Deep Goal Interpretation", system_text)
+        self.assertIn("genuine consequential ambiguity", system_text)
+        self.assertIn("No prior interpretation DTO is supplied", user_text)
+        self.assertNotIn("previous output", all_text.casefold())
 
     def test_decision_confidence_is_required_model_evidence(self) -> None:
         schema = GoalInterpretationDecision.model_json_schema()
@@ -280,20 +299,14 @@ class GoalInterpreterPromptTests(unittest.TestCase):
                 "bindings",
                 "relationship",
                 "target_goal_ids",
-                "information_gaps",
-                "resolved_gap_ids",
                 "completion_requires_work",
                 "completion_requires_fresh_evidence",
                 "confidence",
             },
         )
-        gap_schema = payload["format"]["$defs"]["InformationGap"]
-        self.assertEqual(
-            gap_schema["properties"]["required_for"]["items"]["pattern"],
-            "^[a-z][a-z0-9_]{0,79}$",
-        )
+        self.assertNotIn("InformationGap", payload["format"]["$defs"])
 
-    def test_repair_schema_excludes_already_bound_user_gap_names(self) -> None:
+    def test_repair_schema_does_not_reintroduce_planning_gap_contract(self) -> None:
         interpreter = self._interpreter()
         request = GoalInterpretationRequest(
             text="你好，今天重庆白天天气怎么样啊？",
@@ -325,14 +338,45 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         else:  # pragma: no cover - protects the regression setup itself
             self.fail("invalid ask_user gap unexpectedly passed validation")
 
-        gap_schema = payload["format"]["$defs"]["InformationGap"]
-        encoded_schema = json.dumps(gap_schema, sort_keys=True)
-        self.assertIn('"enum": ["date", "location"]', encoded_schema)
-        self.assertIn('"not"', encoded_schema)
-        self.assertEqual(payload["format"]["properties"]["unresolved"]["maxItems"], 0)
+        self.assertNotIn("InformationGap", payload["format"]["$defs"])
         system_text, _, _ = _payload_message_texts(payload)
-        self.assertIn("already-bound value", system_text)
-        self.assertIn("open descriptive question", system_text)
+        self.assertIn("Never create/resolve an InformationGap", system_text)
+
+    def test_repair_schema_excludes_bound_values_from_unresolved(self) -> None:
+        interpreter = self._interpreter()
+        request = GoalInterpretationRequest(
+            text="哎，今天上午重庆会不会下雨？",
+            language="zh-CN",
+        )
+        try:
+            GoalInterpretationDecision.model_validate(
+                {
+                    **_valid_output(),
+                    "responsibilities": [
+                        {
+                            **_valid_output()["responsibilities"][0],
+                            "bindings": {"location": "重庆", "time": "今天上午"},
+                        }
+                    ],
+                    "unresolved": ["重庆", "今天上午"],
+                }
+            )
+        except ValidationError as exc:
+            payload = interpreter.build_interpretation_repair_payload(
+                request,
+                previous_content="rejected",
+                validation_error=exc,
+            )
+        else:  # pragma: no cover - protects the regression setup itself
+            self.fail("bound unresolved values unexpectedly passed validation")
+
+        unresolved_items = payload["format"]["properties"]["unresolved"]["items"]
+        self.assertEqual(
+            set(unresolved_items["not"]["enum"]),
+            {"重庆", "今天上午"},
+        )
+        system_text, _, _ = _payload_message_texts(payload)
+        self.assertIn("already-resolved binding values", system_text)
 
     def test_prompt_keeps_semantic_continuity_with_context_goal_identity_but_no_route(self) -> None:
         prompt = self._interpreter().build_interpretation_user_prompt(
@@ -434,7 +478,7 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.responsibilities[0].bindings["location"], "重庆")
         self.assertEqual(interpreter._chat.await_count, 2)
 
-    async def test_external_weather_result_gap_gets_one_dto_repair(self) -> None:
+    async def test_planner_gap_fields_get_one_mechanical_dto_repair(self) -> None:
         interpreter = self._interpreter()
         invalid = {
             "confidence": 0.95,
@@ -471,11 +515,21 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             "unresolved": ["The current weather result is not known yet."],
         }
         corrected = {
-            **invalid,
+            "confidence": 0.95,
             "responsibilities": [
                 {
-                    **invalid["responsibilities"][0],
-                    "information_gaps": [],
+                    "local_ref": "weather",
+                    "outcome": "report today's daytime weather in Chongqing",
+                    "bindings": {
+                        "location": "重庆",
+                        "date": "today",
+                        "time_of_day": "白天",
+                    },
+                    "relationship": "new",
+                    "target_goal_ids": [],
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.95,
                 }
             ],
             "unresolved": [],
@@ -495,9 +549,74 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         )
 
         responsibility = result.responsibilities[0]
-        self.assertEqual(responsibility.information_gaps, [])
+        self.assertFalse(hasattr(responsibility, "information_gaps"))
         self.assertTrue(responsibility.completion_requires_fresh_evidence)
         self.assertEqual(interpreter._chat.await_count, 2)
+
+    async def test_genuine_semantic_ambiguity_escalates_once_to_deep(self) -> None:
+        interpreter = self._interpreter()
+        fast = {
+            "confidence": 0.72,
+            "responsibilities": [
+                {
+                    "local_ref": "device_action",
+                    "outcome": "turn off the referenced device",
+                    "bindings": {},
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.72,
+                }
+            ],
+            "unresolved": ["which device the user means"],
+        }
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            side_effect=[
+                {"message": {"content": json.dumps(fast, ensure_ascii=False)}},
+                {"message": {"content": json.dumps(fast, ensure_ascii=False)}},
+            ]
+        )
+
+        result = await interpreter.interpret_goal(
+            GoalInterpretationRequest(
+                text="把它关掉。",
+                language="zh-CN",
+            )
+        )
+
+        self.assertFalse(hasattr(result.responsibilities[0], "information_gaps"))
+        self.assertEqual(result.unresolved, ["which device the user means"])
+        self.assertEqual(interpreter._chat.await_count, 2)
+        deep_call = interpreter._chat.await_args_list[1]
+        self.assertEqual(deep_call.kwargs["stage"], "goal_interpretation_deep")
+        self.assertFalse(deep_call.args[0]["think"])
+
+    async def test_missing_execution_location_stays_out_of_gi_uncertainty(self) -> None:
+        interpreter = self._interpreter()
+        missing_location = {
+            "confidence": 0.9,
+            "responsibilities": [
+                {
+                    "local_ref": "weather",
+                    "outcome": "provide today's weather for the requested location",
+                    "bindings": {"date": "today"},
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.9,
+                }
+            ],
+            "unresolved": [],
+        }
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            return_value={"message": {"content": json.dumps(missing_location)}}
+        )
+
+        result = await interpreter.interpret_goal(
+            GoalInterpretationRequest(text="What's the weather today?")
+        )
+
+        self.assertFalse(hasattr(result.responsibilities[0], "information_gaps"))
+        self.assertEqual(result.unresolved, [])
+        self.assertEqual(interpreter._chat.await_count, 1)
 
     async def test_external_query_gap_cannot_be_repeated_as_semantic_uncertainty(self) -> None:
         interpreter = self._interpreter()
@@ -530,11 +649,21 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             "unresolved": ["current weather data for Chongqing"],
         }
         corrected = {
-            **invalid,
+            "confidence": 0.95,
             "responsibilities": [
                 {
-                    **invalid["responsibilities"][0],
+                    "local_ref": "r1",
                     "outcome": "describe today's daytime weather in Chongqing",
+                    "bindings": {
+                        "location": "重庆",
+                        "time": "today",
+                        "time_of_day": "daytime",
+                    },
+                    "relationship": "new",
+                    "target_goal_ids": [],
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.95,
                 }
             ],
             "unresolved": [],
@@ -560,8 +689,9 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.unresolved, [])
         self.assertEqual(interpreter._chat.await_count, 2)
         repair_payload = interpreter._chat.await_args_list[1].args[0]
+        self.assertNotIn("InformationGap", repair_payload["format"]["$defs"])
         system_text, _, _ = _payload_message_texts(repair_payload)
-        self.assertIn("open descriptive question", system_text)
+        self.assertIn("Never create/resolve an InformationGap", system_text)
 
     async def test_context_backed_indirect_location_does_not_require_current_turn_surface(self) -> None:
         interpreter = self._interpreter()
@@ -653,6 +783,27 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
                 GoalInterpretationRequest(text="What's the weather today?")
             )
         self.assertEqual(interpreter._chat.await_count, 2)
+
+    async def test_llm_budget_failure_is_typed_interpretation_unavailable(self) -> None:
+        interpreter = self._interpreter()
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            side_effect=OllamaGenerationError(
+                "structured output budget exhausted",
+                failure_class="output_truncated",
+                failure_domain="llm_budget",
+                architecture_attribution="not_evaluated",
+                retryable=False,
+            )
+        )
+
+        with self.assertRaisesRegex(
+            InterpretationUnavailableError,
+            "structured output budget exhausted",
+        ):
+            await interpreter.interpret_goal(
+                GoalInterpretationRequest(text="What's the weather today?")
+            )
+        self.assertEqual(interpreter._chat.await_count, 1)
 
     async def test_engine_rejects_empty_admitted_input(self) -> None:
         with self.assertRaisesRegex(InterpretationUnavailableError, "empty admitted input"):

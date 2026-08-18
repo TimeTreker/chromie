@@ -68,6 +68,16 @@ InformationResolution = Literal[
     "use_safe_default",
     "unresolvable",
 ]
+InformationGapOwner = Literal["fast_planner"]
+InformationGapSourceKind = Literal["unresolved_meaning", "execution_input"]
+InformationGapResolutionSource = Literal[
+    "authoritative_context",
+    "trusted_observation",
+    "trusted_query",
+    "owner_preference",
+    "capability_schema",
+    "safe_default",
+]
 
 PlanningResultKind = Literal[
     "direct_capability",
@@ -187,9 +197,16 @@ class InformationGap(BaseModel):
     candidate_values: list[Any] = Field(default_factory=list)
     resolved: bool = False
     resolution_value: Any = None
+    owner: InformationGapOwner | None = None
+    source_kind: InformationGapSourceKind | None = None
+    source_reference: str = ""
+    resolution_sources_considered: list[InformationGapResolutionSource] = Field(
+        default_factory=list,
+        max_length=6,
+    )
     metadata: dict[str, Any] = Field(default_factory=dict)
 
-    @field_validator("gap_id", "description", mode="before")
+    @field_validator("gap_id", "description", "source_reference", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
         if isinstance(value, str):

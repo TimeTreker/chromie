@@ -416,6 +416,12 @@ class Settings(BaseModel):
 class GoalInterpreterSettings(BaseModel):
     ollama_url: str = Field(default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_OLLAMA_URL", "http://chromie-llm:11434"))
     model: str = Field(default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_MODEL", "qwen3:4b"))
+    deep_model: str = Field(
+        default_factory=lambda: os.getenv(
+            "AGENT_DEEP_PLANNER_MODEL",
+            os.getenv("AGENT_GOAL_INTERPRETER_MODEL", "qwen3:4b"),
+        )
+    )
     timeout_ms: int = Field(default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_TIMEOUT_MS", "5400")))
     llm_num_ctx: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_LLM_NUM_CTX", "4096")),

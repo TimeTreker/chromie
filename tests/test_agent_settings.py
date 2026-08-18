@@ -28,14 +28,20 @@ class AgentSettingsTests(unittest.TestCase):
         self.assertEqual(settings.weather_timeout_s, 12.5)
         self.assertFalse(settings.weather_enabled)
 
-    def test_goal_interpreter_settings_have_single_model_path(self) -> None:
+    def test_goal_interpreter_settings_reuse_existing_deep_cognition_model(self) -> None:
         with patch.dict(
             os.environ,
-            {"AGENT_GOAL_INTERPRETER_TIMEOUT_MS": "7777"},
+            {
+                "AGENT_GOAL_INTERPRETER_TIMEOUT_MS": "7777",
+                "AGENT_GOAL_INTERPRETER_MODEL": "fast-gi",
+                "AGENT_DEEP_PLANNER_MODEL": "deep-cognition",
+            },
             clear=False,
         ):
             settings = GoalInterpreterSettings()
         self.assertEqual(settings.timeout_ms, 7777)
+        self.assertEqual(settings.model, "fast-gi")
+        self.assertEqual(settings.deep_model, "deep-cognition")
         self.assertFalse(hasattr(settings, "mode"))
         self.assertFalse(hasattr(settings, "capability_catalog_url"))
         self.assertFalse(hasattr(settings, "review_timeout_ms"))

@@ -131,9 +131,10 @@ other turn-local facts. Ability descriptions and schemas are used for semantic
 generalization; they are not phrase tables.
 
 `Cost Function` states the local preference order, such as safe before
-obedient, honest before pleasing, small and reversible before broad, clarify
-when required parameters are missing, and use deep thought when quick routing is
-too uncertain.
+obedient, honest before pleasing, small and reversible before broad, resolve required
+execution inputs from trusted context/observation or permitted defaults before asking a
+specific user-resolvable clarification, and use deeper cognition only at the stage whose
+meaning or planning genuinely requires it.
 
 `Output Contract` defines the exact JSON/schema or response template. The model
 may propose routes, speech, task metadata, or skill plans only through this

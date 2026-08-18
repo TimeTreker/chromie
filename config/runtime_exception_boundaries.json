@@ -91,12 +91,25 @@
     {
       "classification": "fail_closed_boundary",
       "owner": "agent",
+      "contract": "Map bounded Deep Goal Interpretation transport, parse, schema, or authority failure to InterpretationUnavailableError; never accept the preliminary consequential user-gap decision.",
+      "review_status": "reviewed",
+      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
+      "symbol": "OllamaGoalInterpreter._accept_or_deepen_interpretation",
+      "ordinal": 1,
+      "body_sha256": "f893a3cc536ab61f957b020189a860c5d2adaec2be77b656e4bbc7ccdc9a5aa6",
+      "failure_signals": [
+        "raise"
+      ]
+    },
+    {
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
       "contract": "Map model transport/runtime failures to InterpretationUnavailableError; never continue with untrusted semantic output.",
       "review_status": "reviewed",
       "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
       "symbol": "OllamaGoalInterpreter.interpret_goal",
       "ordinal": 1,
-      "body_sha256": "94e9774028745a00b95897ef0014197d0db0648d9b32232fa8107afaaf3600e5",
+      "body_sha256": "fc2c1188d8b6e45ac4d53fd59f1e2cdf765f0e88cd97091151dbe3c6bfde0056",
       "failure_signals": [
         "raise"
       ]
@@ -109,7 +122,7 @@
       "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
       "symbol": "OllamaGoalInterpreter.interpret_goal",
       "ordinal": 2,
-      "body_sha256": "b1353699afa12843ffe1fb72f282e66b385b009bcb718f65f609ea4b45314b62",
+      "body_sha256": "26fdefcac95c3cebfc18d38a28f735638bf203cbdfa90483ac8dbf29dfe15f77",
       "failure_signals": [
         "raise"
       ]
@@ -1269,8 +1282,21 @@
       "symbol": "GoalDrivenRuntimeCoordinator._resolve",
       "ordinal": 2,
       "classification": "fail_closed_boundary",
+      "owner": "orchestrator.cognitive_runtime",
+      "contract": "Record Planner InformationGap commit rejection and raise a typed cognitive-stage failure; never ask before the Planner-owned gap is atomically attached to its canonical Goal.",
+      "review_status": "reviewed",
+      "body_sha256": "04507ba51c21aba82ba2f6a3207dfb9236ab3b2687924817be7a61e5a08b65c7",
+      "failure_signals": [
+        "raise"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/cognitive_runtime.py",
+      "symbol": "GoalDrivenRuntimeCoordinator._resolve",
+      "ordinal": 3,
+      "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "contract": "Contain the owned runtime boundary and return an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
       "body_sha256": "91c61be3ea85ab9b60e1d618cf7a2708d0e3769449332f5bc649d5e86fe82250",
       "failure_signals": [

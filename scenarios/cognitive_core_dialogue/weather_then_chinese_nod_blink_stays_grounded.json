@@ -36,9 +36,7 @@
                   "completion_requires_fresh_evidence": true,
                   "confidence": 0.96,
                   "relationship": "new",
-                  "target_goal_ids": [],
-                  "information_gaps": [],
-                  "resolved_gap_ids": []
+                  "target_goal_ids": []
                 }
               ],
               "unresolved": []
@@ -88,9 +86,7 @@
                   "completion_requires_fresh_evidence": false,
                   "confidence": 0.98,
                   "relationship": "new",
-                  "target_goal_ids": [],
-                  "information_gaps": [],
-                  "resolved_gap_ids": []
+                  "target_goal_ids": []
                 },
                 {
                   "local_ref": "r2",
@@ -103,9 +99,7 @@
                   "completion_requires_fresh_evidence": false,
                   "confidence": 0.98,
                   "relationship": "new",
-                  "target_goal_ids": [],
-                  "information_gaps": [],
-                  "resolved_gap_ids": []
+                  "target_goal_ids": []
                 }
               ],
               "unresolved": []

@@ -41,6 +41,7 @@ try:
     from chromie_contracts.situation import CognitiveOpportunity
     from chromie_contracts.reflex import CancellationDispatchReceipt
     from chromie_contracts.reflection import ReflectionResolution
+    from chromie_contracts.plan import PlannerInformationGap
     from chromie_contracts.semantic_task import (
         InformationGap,
         SemanticGoal,
@@ -66,6 +67,7 @@ except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.situation import CognitiveOpportunity
     from shared.chromie_contracts.reflex import CancellationDispatchReceipt
     from shared.chromie_contracts.reflection import ReflectionResolution
+    from shared.chromie_contracts.plan import PlannerInformationGap
     from shared.chromie_contracts.semantic_task import (
         InformationGap,
         SemanticGoal,
@@ -2513,6 +2515,150 @@ class ConversationStateManager:
             self._persist_task_contexts_if_enabled()
         return results
 
+    def apply_planner_information_gaps(
+        self,
+        gaps_by_goal_id: dict[str, list[PlannerInformationGap | dict[str, Any]]],
+        *,
+        turn_id: str,
+        sid: str | None,
+        user_text: str,
+        source: str = "fast_planner_information_gap",
+    ) -> list[dict[str, Any]]:
+        """Attach Planner-owned blocking needs without revising Goal meaning.
+
+        Goal Association has already committed semantic identity. This atomic
+        host adapter only joins Planner Responsibility provenance to those exact
+        Goal IDs and exposes the pending question to the next turn's Context.
+        """
+
+        if not self.enabled or not gaps_by_goal_id:
+            return []
+        normalized: dict[str, list[PlannerInformationGap]] = {}
+        for raw_goal_id, raw_gaps in gaps_by_goal_id.items():
+            goal_id = " ".join(str(raw_goal_id or "").strip().split())
+            if not goal_id:
+                raise ValueError("Planner InformationGap requires a canonical Goal ID")
+            gaps = [
+                item
+                if isinstance(item, PlannerInformationGap)
+                else PlannerInformationGap.model_validate(item)
+                for item in raw_gaps
+            ]
+            gap_ids = [item.gap_id for item in gaps]
+            if not gaps or len(gap_ids) != len(set(gap_ids)):
+                raise ValueError(
+                    f"Planner InformationGaps for {goal_id!r} must be non-empty and unique"
+                )
+            normalized[goal_id] = gaps
+
+        def mutate() -> list[dict[str, Any]]:
+            results: list[dict[str, Any]] = []
+            now = _now_ms()
+            for ordinal, (goal_id, gaps) in enumerate(normalized.items()):
+                operation_id = stable_goal_operation_id(
+                    turn_id=turn_id,
+                    ordinal=ordinal,
+                    relationship="planner_information_gap",
+                    target_goal_ids=[goal_id, *[item.gap_id for item in gaps]],
+                )
+                context = self._task_context_by_goal_id(goal_id)
+                if context is None:
+                    results.append(
+                        {
+                            "operation_id": operation_id,
+                            "operation": "planner_information_gap",
+                            "goal_id": goal_id,
+                            "applied": False,
+                            "reason": "unknown_target_goal",
+                        }
+                    )
+                    continue
+                if self._context_has_operation_id(context, operation_id):
+                    results.append(
+                        {
+                            "operation_id": operation_id,
+                            "operation": "planner_information_gap",
+                            "goal_id": goal_id,
+                            "task_id": context.get("task_id"),
+                            "applied": False,
+                            "replayed": True,
+                            "reason": "operation_already_applied",
+                        }
+                    )
+                    continue
+
+                raw_existing = context.get("open_information_gaps")
+                by_id = {
+                    str(item.get("gap_id") or ""): dict(item)
+                    for item in raw_existing
+                    if isinstance(item, dict) and str(item.get("gap_id") or "")
+                } if isinstance(raw_existing, list) else {}
+                for gap in gaps:
+                    by_id[gap.gap_id] = gap.model_dump(mode="json", exclude_none=True)
+                context["open_information_gaps"] = list(by_id.values())
+                context["pending_questions"] = [
+                    str(item.get("description") or "")
+                    for item in context["open_information_gaps"]
+                    if item.get("blocking") is not False
+                    and str(item.get("description") or "")
+                ][:4]
+                context["status"] = "waiting_for_user"
+                context["commitment_state"] = "waiting_for_user"
+                context["task_relation"] = "clarify_task"
+                context["updated_ms"] = now
+                context["last_meaningful_user_turn"] = self._compact_text(
+                    user_text,
+                    limit=220,
+                )
+                if sid:
+                    related = context.get("related_sids")
+                    if not isinstance(related, list):
+                        related = []
+                    if sid not in related:
+                        related.append(sid)
+                    context["related_sids"] = related[-12:]
+                history = context.get("operation_history")
+                if not isinstance(history, list):
+                    history = []
+                history.append(
+                    {
+                        "operation_id": operation_id,
+                        "operation": "planner_information_gap",
+                        "goal_version": int(context.get("goal_version") or 1),
+                        "ts_ms": now,
+                        "reason_summary": "Fast Planner selected user clarification.",
+                    }
+                )
+                context["operation_history"] = history[-24:]
+                metadata = context.get("metadata")
+                if not isinstance(metadata, dict):
+                    metadata = {}
+                context["metadata"] = {
+                    **metadata,
+                    "source": source,
+                    "planner_information_gap_owner": "fast_planner",
+                    "planner_information_gap_turn_id": turn_id,
+                }
+                results.append(
+                    {
+                        "operation_id": operation_id,
+                        "operation": "planner_information_gap",
+                        "goal_id": goal_id,
+                        "task_id": context.get("task_id"),
+                        "gap_ids": [item.gap_id for item in gaps],
+                        "applied": True,
+                        "goal_version": int(context.get("goal_version") or 1),
+                        "status": context.get("status"),
+                    }
+                )
+            return results
+
+        return self._commit_semantic_state_transaction(
+            mutate,
+            rollback_reason="atomic_planner_gap_transaction_rolled_back",
+            persistence_failure_reason="atomic_planner_gap_persistence_failed",
+        )
+
     def _apply_goal_association_resolution_in_memory(
         self,
         resolution: GoalAssociationResolution | dict[str, Any],
@@ -2560,11 +2706,6 @@ class ConversationStateManager:
                     confidence=resolved.confidence,
                     relationship="new",
                     goal=goal,
-                    information_gaps=[
-                        gap
-                        for ref in goal.source_responsibility_refs
-                        for gap in resolved.information_gaps.get(ref, [])
-                    ],
                     requires_replan=True,
                     reason_summary=resolved.reason_summary,
                     metadata={
@@ -2678,11 +2819,6 @@ class ConversationStateManager:
                     confidence=association.confidence,
                     relationship=association.relationship,
                     goal_update=association.goal_update,
-                    information_gaps=[
-                        gap
-                        for ref in association.source_responsibility_refs
-                        for gap in resolved.information_gaps.get(ref, [])
-                    ],
                     resolved_gap_ids=association.resolved_gap_ids,
                     requires_replan=association.requires_replan,
                     reason_summary=association.reason_summary,

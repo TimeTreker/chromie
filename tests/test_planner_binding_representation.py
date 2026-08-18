@@ -6,6 +6,7 @@ from agent.app.planner_contract import (
     EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
     PlannerDTOContractError,
     PlannerModelOutput,
+    normalize_detached_parameter_resolutions,
     normalize_schema_default_parameter_provenance,
     validate_explicit_numeric_parameter_grounding,
     validate_goal_binding_argument_grounding,
@@ -193,6 +194,87 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
         self.assertEqual(resolution["source_goal_ids"], [])
         self.assertEqual(len(repairs), 1)
         self.assertEqual(raw["parameter_resolutions"][0]["strategy"], "user_supplied")
+
+    def test_detached_weather_time_resolution_is_removed_without_rewriting_step(self):
+        raw = {
+            "steps": [
+                {
+                    "step_id": "weather",
+                    "capability_id": "chromie.weather.lookup",
+                    "args": {
+                        "location": "重庆",
+                        "date": "today",
+                        "period": "morning",
+                        "units": "metric",
+                    },
+                }
+            ],
+            "parameter_resolutions": [
+                {
+                    "step_id": "weather",
+                    "parameter": "location",
+                    "strategy": "user_supplied",
+                    "value": "重庆",
+                    "blocking": False,
+                    "source_goal_ids": ["goal-weather"],
+                },
+                {
+                    "step_id": "weather",
+                    "parameter": "time",
+                    "strategy": "user_supplied",
+                    "value": "morning",
+                    "blocking": False,
+                    "source_goal_ids": ["goal-weather"],
+                },
+            ],
+        }
+
+        normalized, repairs = normalize_detached_parameter_resolutions(raw)
+
+        self.assertEqual(normalized["steps"], raw["steps"])
+        self.assertEqual(
+            [item["parameter"] for item in normalized["parameter_resolutions"]],
+            ["location"],
+        )
+        self.assertEqual(
+            repairs,
+            [
+                {
+                    "normalization": "detached_parameter_resolution_removed",
+                    "step_id": "weather",
+                    "parameter": "time",
+                    "step_argument_keys": ["date", "location", "period", "units"],
+                    "equivalent_step_argument_keys": ["period"],
+                }
+            ],
+        )
+        self.assertEqual(len(raw["parameter_resolutions"]), 2)
+
+    def test_blocking_resolution_without_step_argument_is_not_removed(self):
+        raw = {
+            "steps": [
+                {
+                    "step_id": "weather",
+                    "capability_id": "chromie.weather.lookup",
+                    "args": {"date": "today"},
+                }
+            ],
+            "parameter_resolutions": [
+                {
+                    "step_id": "weather",
+                    "parameter": "location",
+                    "strategy": "ask_user",
+                    "value": None,
+                    "blocking": True,
+                    "source_goal_ids": ["goal-weather"],
+                }
+            ],
+        }
+
+        normalized, repairs = normalize_detached_parameter_resolutions(raw)
+
+        self.assertEqual(normalized, raw)
+        self.assertEqual(repairs, [])
 
     def test_nondefault_value_does_not_repair_false_user_provenance(self):
         raw = {

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import unittest
 
 from jsonschema import Draft202012Validator
@@ -180,6 +181,7 @@ def request(
     language: str = "zh-CN",
     discourse_referents=None,
     responsibility_outcomes: list[str] | None = None,
+    interpretation_unresolved: list[str] | None = None,
 ) -> CognitiveWorkRequest:
     outcomes = list(responsibility_outcomes or [text])
     return CognitiveWorkRequest(
@@ -198,6 +200,7 @@ def request(
             for index, outcome in enumerate(outcomes, start=1)
         ],
         interpretation_confidence=0.9,
+        interpretation_unresolved=list(interpretation_unresolved or []),
         context={
             "active_goal_snapshots": active_goals or [],
             "recent_goal_snapshots": [],
@@ -244,6 +247,21 @@ class GoalExecutionContractTests(unittest.TestCase):
             binding("time", "day_part", "day")
         )
         self.assertEqual(parsed.value, "day")
+
+    def test_date_binding_uses_canonical_runtime_vocabulary(self):
+        for noncanonical in ("今天", "明天", "next Tuesday", "2026-8-19"):
+            with self.subTest(noncanonical=noncanonical):
+                with self.assertRaisesRegex(ValueError, "canonical relative date"):
+                    GoalAssociationModelBinding.model_validate(
+                        binding("date", "date", noncanonical)
+                    )
+
+        for canonical in ("today", "tomorrow", "2026-08-19"):
+            with self.subTest(canonical=canonical):
+                parsed = GoalAssociationModelBinding.model_validate(
+                    binding("date", "date", canonical)
+                )
+                self.assertEqual(parsed.value, canonical)
 
     def test_host_execution_projection_is_derived_from_output_mode(self):
         item = GoalAssociationModelGoal.model_validate(
@@ -474,7 +492,6 @@ class GoalExecutionContractTests(unittest.TestCase):
         weather.update(
             referent_updates=[],
             resolved_references=[],
-            clarification="",
         )
         self.assertTrue(list(goal_validator.iter_errors(weather)))
         weather["new_goals"][0]["output_mode"] = "capability_work"
@@ -492,6 +509,14 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertTrue(list(goal_validator.iter_errors(weather)))
         weather_scope[-1]["value"] = "day"
         self.assertEqual(list(goal_validator.iter_errors(weather)), [])
+        weather_scope.append(binding("date", "date", "今天"))
+        self.assertTrue(list(goal_validator.iter_errors(weather)))
+        weather_scope[-1]["value"] = "today"
+        self.assertEqual(list(goal_validator.iter_errors(weather)), [])
+        weather_scope[-1]["value"] = "2026-08-19"
+        self.assertEqual(list(goal_validator.iter_errors(weather)), [])
+        weather_scope[-1]["value"] = "2026-8-19"
+        self.assertTrue(list(goal_validator.iter_errors(weather)))
 
         bounded_goal_schema = GoalAssociationResolver._response_schema(
             GoalSegmentationModelOutput,
@@ -508,7 +533,6 @@ class GoalExecutionContractTests(unittest.TestCase):
         two_body_actions.update(
             referent_updates=[],
             resolved_references=[],
-            clarification="",
         )
         self.assertEqual(
             list(bounded_goal_validator.iter_errors(two_body_actions)),
@@ -521,7 +545,6 @@ class GoalExecutionContractTests(unittest.TestCase):
         three_goals.update(
             referent_updates=[],
             resolved_references=[],
-            clarification="",
         )
         self.assertTrue(list(bounded_goal_validator.iter_errors(three_goals)))
 
@@ -539,7 +562,6 @@ class GoalExecutionContractTests(unittest.TestCase):
         untyped_known_source.update(
             referent_updates=[],
             resolved_references=[],
-            clarification="",
         )
         self.assertTrue(list(goal_validator.iter_errors(untyped_known_source)))
 
@@ -561,7 +583,6 @@ class GoalExecutionContractTests(unittest.TestCase):
         typed_physical_attribute.update(
             referent_updates=[],
             resolved_references=[],
-            clarification="",
         )
         self.assertTrue(list(goal_validator.iter_errors(typed_physical_attribute)))
 
@@ -644,6 +665,30 @@ class GoalExecutionContractTests(unittest.TestCase):
             "requested location, time, and result aspects are covered only by "
             "resource_responsibility.query_scope",
             coverage_prompt,
+        )
+        coverage_system = resolver._responsibility_coverage_system_prompt()
+        self.assertIn(
+            "Binding entity_type, not the arbitrary binding name",
+            coverage_system,
+        )
+        self.assertIn(
+            "one entity_type=date binding plus one entity_type=day_part binding preserves "
+            "both dimensions",
+            coverage_system,
+        )
+        self.assertIn(
+            "If both typed bindings carry equivalent normalized values, mark both source "
+            "constraints covered",
+            coverage_prompt,
+        )
+        self.assertIn(
+            "Emit separate coverage items for the date and day-part source fragments",
+            coverage_prompt,
+        )
+        self.assertIn(
+            "prose, a binding name, and a day_part value never imply a missing date "
+            "binding",
+            coverage_system,
         )
         self.assertIn("Reference grounding is part of responsibility coverage", coverage_prompt)
         self.assertIn("silently invents a generic object", coverage_prompt)
@@ -800,8 +845,11 @@ class GoalExecutionContractTests(unittest.TestCase):
             problems,
         )
 
-    def test_coverage_normalizes_clarification_with_named_candidate_by_dropping_owner(self):
-        req = request("把那个拿过来")
+    def test_coverage_keeps_provisional_owner_for_gi_unresolved_meaning(self):
+        req = request(
+            "把那个拿过来",
+            interpretation_unresolved=["那个 refers to more than one object"],
+        )
         parsed = GoalAssociationResolver._validate_coverage_certificate(
             certificate(
                 coverage_item(
@@ -816,7 +864,13 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
         self.assertEqual(parsed.items[0].coverage, "clarification_required")
-        self.assertEqual(parsed.items[0].candidate_goal_indices, [])
+        self.assertEqual(parsed.items[0].candidate_goal_indices, [0])
+        verdict, problems = GoalAssociationResolver._coverage_verdict(
+            parsed,
+            goal_count=1,
+        )
+        self.assertEqual(verdict, "accept")
+        self.assertEqual(problems, [])
 
     def test_goal_association_projection_omits_fast_planner_response_wording(self):
         req = request("今天晚上有大雨吗？")
@@ -1306,7 +1360,6 @@ class GoalAssociationTransactionTests(unittest.TestCase):
 
         self.assertEqual(result.new_goals, [])
         self.assertEqual(result.associations, [])
-        self.assertEqual(result.clarification, "")
         self.assert_transaction(
             result,
             ollama,
@@ -1389,48 +1442,42 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             ],
         )
 
-    def test_ungrounded_reference_reconsideration_can_end_in_clarification(self):
+    def test_ungrounded_reference_commits_provisional_goal_for_planner(self):
         initial = create_goals(
-            goal("Turn off the current device.", "body_action")
+            goal("Turn off the unresolved referenced device.", "body_action")
         )
-        rejected = certificate(
+        provisional = certificate(
             coverage_item(
                 "Turn it off",
+                0,
                 role="responsibility",
                 coverage="clarification_required",
                 independently_satisfiable=False,
             )
         )
-        clarified = {
-            "decision": "clarify",
-            "clarification": "Which device do you mean?",
-            "confidence": 0.95,
-            "reason_summary": "The device reference is unresolved.",
-        }
-        ollama = ScriptedOllama([initial, rejected, clarified])
+        ollama = ScriptedOllama([initial, provisional])
         result = self._resolve(
             ollama,
-            request("Turn it off.", language="en-US"),
+            request(
+                "Turn it off.",
+                language="en-US",
+                interpretation_unresolved=["which device the user means"],
+            ),
         )
 
-        self.assertEqual(result.resolution_status, "needs_clarification")
-        self.assertEqual(result.clarification, "Which device do you mean?")
-        self.assertEqual(
-            ollama.prompts[2][1]["response_format"]["properties"]["decision"]["enum"],
-            ["clarify"],
-        )
+        self.assertEqual(result.resolution_status, "resolved")
+        self.assertEqual(len(result.new_goals), 1)
         self.assertEqual(
             result.metadata["responsibility_coverage"]["final_verdict"],
-            "clarification",
+            "accept",
         )
         self.assert_transaction(
             result,
             ollama,
-            terminal="needs_clarification",
+            terminal="resolved",
             families=[
                 "goal_association.primary",
                 "goal_association.responsibility_coverage",
-                "goal_association.fresh_interpretation",
             ],
         )
 
@@ -1486,7 +1533,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             ],
         )
 
-    def test_fresh_interpretation_has_no_dto_repair(self):
+    def test_fresh_interpretation_has_no_semantic_dto_repair(self):
         first = create_goals(
             goal(
                 "Walk and sing.",
@@ -1517,6 +1564,139 @@ class GoalAssociationTransactionTests(unittest.TestCase):
                 "goal_association.primary",
                 "goal_association.responsibility_coverage",
                 "goal_association.fresh_interpretation",
+            ],
+        )
+
+    def test_fresh_interpretation_allows_one_checked_temporal_dto_repair(self):
+        first = create_goals(
+            goal(
+                "Check Chongqing weather this morning.",
+                "capability_work",
+                bindings=[
+                    binding("location", "location", "重庆"),
+                    binding("date", "date", "today"),
+                    binding("day_part", "day_part", "morning"),
+                ],
+            )
+        )
+        rejected = certificate(
+            coverage_item(
+                "今天上午",
+                0,
+                role="constraint",
+                coverage="representation_mismatch",
+                independently_satisfiable=False,
+            )
+        )
+        invalid_fresh = create_goals(
+            goal(
+                "Check Chongqing weather this morning.",
+                "capability_work",
+                bindings=[
+                    binding("location", "location", "重庆"),
+                    binding("date", "date", "今天"),
+                    binding("day_part", "day_part", "morning"),
+                ],
+            )
+        )
+        repaired = {
+            "repairs": [
+                {
+                    "path": "$.new_goals[0].bindings[1].value",
+                    "value": "today",
+                }
+            ]
+        }
+        accepted = certificate(
+            coverage_item("今天上午重庆会不会下雨", 0)
+        )
+        ollama = ScriptedOllama(
+            [first, rejected, invalid_fresh, repaired, accepted]
+        )
+
+        result = self._resolve(
+            ollama,
+            request("哎，今天上午重庆会不会下雨？"),
+        )
+
+        self.assertEqual(result.resolution_status, "resolved")
+        self.assertEqual(
+            result.new_goals[0].object["bindings"]["date"]["value"],
+            "today",
+        )
+        self.assertEqual(
+            result.metadata["fresh_temporal_contract_repair"],
+            {
+                "strategy": "bounded_same_stage_dto_repair",
+                "changed_fields": ["$.new_goals[0].bindings[1].value"],
+                "semantic_fields_unchanged": True,
+            },
+        )
+        self.assert_transaction(
+            result,
+            ollama,
+            terminal="resolved",
+            families=[
+                "goal_association.primary",
+                "goal_association.responsibility_coverage",
+                "goal_association.fresh_interpretation",
+                "goal_association.fresh_temporal_contract_repair",
+                "goal_association.responsibility_coverage_final",
+            ],
+        )
+
+    def test_fresh_temporal_repair_rejects_any_unauthorized_path(self):
+        first = create_goals(
+            goal(
+                "Check Chongqing weather this morning.",
+                "capability_work",
+                bindings=[binding("date", "date", "today")],
+            )
+        )
+        rejected = certificate(
+            coverage_item(
+                "今天上午",
+                0,
+                role="constraint",
+                coverage="representation_mismatch",
+                independently_satisfiable=False,
+            )
+        )
+        invalid_fresh = create_goals(
+            goal(
+                "Check Chongqing weather this morning.",
+                "capability_work",
+                bindings=[binding("date", "date", "今天")],
+            )
+        )
+        changed = {
+            "repairs": [
+                {
+                    "path": "$.new_goals[0].bindings[0].value",
+                    "value": "today",
+                },
+                {
+                    "path": "$.new_goals[0].description",
+                    "value": "A changed responsibility.",
+                },
+            ]
+        }
+        ollama = ScriptedOllama([first, rejected, invalid_fresh, changed])
+
+        result = self._resolve(
+            ollama,
+            request("哎，今天上午重庆会不会下雨？"),
+        )
+
+        self.assert_transaction(
+            result,
+            ollama,
+            terminal="fail_closed",
+            families=[
+                "goal_association.primary",
+                "goal_association.responsibility_coverage",
+                "goal_association.fresh_interpretation",
+                "goal_association.fresh_temporal_contract_repair",
             ],
         )
 
@@ -1577,27 +1757,34 @@ class GoalAssociationTransactionTests(unittest.TestCase):
 
         self.assertEqual(result.resolution_status, "fail_closed")
         self.assertEqual(result.new_goals, [])
-        self.assertEqual(result.clarification, "")
 
-    def test_user_answerable_ambiguity_is_not_fail_closed(self):
+    def test_user_answerable_ambiguity_commits_provisional_goal(self):
         ollama = ScriptedOllama(
             [
-                {
-                    "decision": "clarify",
-                    "clarification": "Which cup do you mean?",
-                    "confidence": 0.9,
-                    "reason_summary": "The intended cup is ambiguous.",
-                }
+                create_goals(
+                    goal("Bring the unresolved referenced cup.", "body_action")
+                ),
+                certificate(
+                    coverage_item(
+                        "Bring me that cup",
+                        0,
+                        coverage="clarification_required",
+                    )
+                ),
             ]
         )
         result = self._resolve(
             ollama,
-            request("Bring me that cup.", language="en-US"),
+            request(
+                "Bring me that cup.",
+                language="en-US",
+                interpretation_unresolved=["which cup the user means"],
+            ),
         )
 
-        self.assertEqual(result.resolution_status, "needs_clarification")
-        self.assertEqual(result.clarification, "Which cup do you mean?")
-        self.assertEqual(len(ollama.prompts), 1)
+        self.assertEqual(result.resolution_status, "resolved")
+        self.assertEqual(len(result.new_goals), 1)
+        self.assertEqual(len(ollama.prompts), 2)
 
 
 class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
@@ -1738,7 +1925,7 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
             quantity="",
             attributes=[
                 binding("location", "location", "重庆"),
-                binding("date", "date", "明天"),
+                binding("date", "date", "tomorrow"),
             ],
             source_status="provider_resolved",
         )
@@ -1757,6 +1944,7 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
         canonical = result.new_goals[0].resource_responsibility
         self.assertEqual(canonical.resource.kind, "information")
         self.assertEqual(set(canonical.resource.attributes), {"location", "date"})
+        self.assertEqual(canonical.resource.attributes["date"]["value"], "tomorrow")
         self.assertEqual(canonical.source.status, "provider_resolved")
         self.assertEqual(canonical.source.bindings, {})
 
@@ -1898,31 +2086,12 @@ class GoalAssociationResolutionContractTests(unittest.TestCase):
             GoalAssociationResolution.model_fields["resolution_status"].is_required()
         )
 
-    def test_clarification_requires_explicit_terminal_status(self):
-        resolution = GoalAssociationResolution(
-            resolution_status="needs_clarification",
-            turn_id="turn-1",
-            clarification="Which one?",
-        )
-        self.assertEqual(resolution.resolution_status, "needs_clarification")
-
-    def test_clarification_cannot_mix_with_goal_changes(self):
-        with self.assertRaises(ValueError):
+    def test_goal_association_cannot_author_clarification(self):
+        with self.assertRaises(ValidationError):
             GoalAssociationResolution(
                 resolution_status="needs_clarification",
                 turn_id="turn-1",
                 clarification="Which one?",
-                new_goals=[
-                    {
-                        "goal_id": "goal-new",
-                        "description": "New goal",
-                        "source_text": "New goal",
-                        "beneficiary": "user",
-                        "constraints": {},
-                        "success_criteria": [],
-                        "metadata": {},
-                    }
-                ],
             )
 
 

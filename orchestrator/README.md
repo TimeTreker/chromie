@@ -69,9 +69,9 @@ microphone -> host VAD -> ASR -> Cognitive Gateway
   -> matched stop/cancel: interrupt current work and retain the envelope/outcome
   -> local suppression: record the envelope and start no ordinary cognition
   -> otherwise: attention review -> admitted UserTurnEnvelope
-  -> Goal Interpretation: contextual Responsibility + Goal relation + InformationGaps
+  -> Goal Interpretation: contextual Responsibility + Goal relation + bounded unresolved meaning
   -> same GI result, concurrent fan-out
-       |-> Fast Planner: first Communicative-Act/Capability Activity Plan
+       |-> Fast Planner: input resolution + first Communicative-Act/Capability Activity Plan
        |     `-> Response Composer formulation -> Vocal/TTS realization
        |     `-> Deep Planner only when HOW exceeds the Fast budget
        |-> Goal Association: sole canonical Goal commit/version authority

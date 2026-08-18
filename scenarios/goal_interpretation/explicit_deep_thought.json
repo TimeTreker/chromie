@@ -24,8 +24,6 @@
           },
           "relationship": "new",
           "target_goal_ids": [],
-          "information_gaps": [],
-          "resolved_gap_ids": [],
           "completion_requires_work": true,
           "completion_requires_fresh_evidence": false,
           "confidence": 0.92
@@ -51,8 +49,6 @@
         },
         "relationship": "new",
         "target_goal_ids": [],
-        "information_gaps": [],
-        "resolved_gap_ids": [],
         "completion_requires_work": true,
         "completion_requires_fresh_evidence": false,
         "confidence": 0.92

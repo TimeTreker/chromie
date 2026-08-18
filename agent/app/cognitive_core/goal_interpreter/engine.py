@@ -19,6 +19,7 @@ logger = logging.getLogger("chromie.agent.goal_interpreter")
 goal_interpreter = OllamaGoalInterpreter(
     ollama_url=settings.ollama_url,
     model=settings.model,
+    deep_model=settings.deep_model,
     timeout_ms=settings.timeout_ms,
     num_ctx=settings.llm_num_ctx,
     num_predict=settings.llm_num_predict,
@@ -61,6 +62,7 @@ def interpretation_profile() -> dict[str, Any]:
     return {
         "authority": "what_only",
         "model": settings.model,
+        "deep_model": settings.deep_model,
         "output": ["responsibilities", "confidence", "unresolved"],
         "forbidden_authority": [
             "route",

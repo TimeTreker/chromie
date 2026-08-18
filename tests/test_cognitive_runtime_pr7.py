@@ -69,6 +69,7 @@ def admitted_core(
     sid: str,
     language: str,
     responsibilities: list[dict] | None = None,
+    interpretation_unresolved: list[str] | None = None,
 ):
     gateway = CognitiveGateway()
     capture = gateway.capture(
@@ -109,6 +110,7 @@ def admitted_core(
         confidence=min(float(item.get("confidence", 0.95)) for item in rows),
         language=language,
         responsibilities=rows,
+        unresolved=list(interpretation_unresolved or []),
     )
     return core, envelope
 
@@ -821,6 +823,12 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             "blocking": True,
             "required_for": ["tea_kind"],
             "preferred_resolution": "ask_user",
+            "source_kind": "execution_input",
+            "source_reference": "chromie.tea.bring",
+            "resolution_sources_considered": [
+                "authoritative_context",
+                "capability_schema",
+            ],
         }
         association = GoalAssociationResolution(
             resolution_status="resolved",
@@ -839,7 +847,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     },
                 )
             ],
-            information_gaps={"tea": [gap]},
             confidence=0.96,
             reason_summary="The Goal is defined but tea kind is missing.",
         )
@@ -852,7 +859,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 FastPlannerClarificationAct(
                     activity_id="ask-tea-kind",
                     role="clarification",
-                    information_gap_ids=["gap-tea-kind"],
+                    information_gaps=[gap],
                     speech_act="ask_clarification",
                     source_responsibility_refs=["tea"],
                 )
@@ -876,6 +883,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 apply_lanes=frozenset({"chat"}),
             ),
             goal_state_apply=manager.apply_goal_association_resolution,
+            planner_gap_apply=manager.apply_planner_information_gaps,
         )
         core, envelope = admitted_core(
             "Bring me a cup of tea.",
@@ -886,7 +894,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "local_ref": "tea",
                     "outcome": "Bring the requester a cup of tea.",
                     "bindings": {},
-                    "information_gaps": [gap],
                     "completion_requires_work": True,
                     "completion_requires_fresh_evidence": True,
                     "confidence": 0.96,
@@ -909,13 +916,17 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         self.assertEqual(result.status, "applied")
         self.assertEqual(result.terminal_plan.disposition, "clarify")
-        self.assertEqual(runtime.started_fast_activities[0][1], "你想喝什么茶？")
-        self.assertEqual(result.interaction_response.speech, [])
+        self.assertEqual(runtime.started_fast_activities, [])
+        self.assertEqual(result.interaction_response.speech[0].text, "你想喝什么茶？")
         snapshot = manager.active_goal_snapshots()[0]
         self.assertEqual(snapshot["goal_id"], "goal-tea")
         self.assertEqual(
             snapshot["open_information_gaps"][0]["gap_id"],
             "gap-tea-kind",
+        )
+        self.assertEqual(
+            snapshot["open_information_gaps"][0]["owner"],
+            "fast_planner",
         )
 
     def test_safe_fast_capability_is_goal_bound_without_second_planner(self):
@@ -1479,29 +1490,97 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(result.metadata["failure_stage"], "goal_association")
         self.assertCountEqual(client.calls, ["advance", "association"])
 
-    def test_goal_association_clarification_skips_planners_and_composes_directly(self):
+    def test_fast_planner_owns_semantic_clarification_after_provisional_goal(self):
         association = GoalAssociationResolution(
-            resolution_status="needs_clarification",
+            resolution_status="resolved",
             turn_id="turn-needs-clarification",
-            clarification="Which direction should I move?",
+            new_goals=[
+                SemanticGoal(
+                    goal_id="goal-direction",
+                    source_responsibility_refs=["r1"],
+                    description="Move toward the unresolved referenced destination.",
+                    source_text="move over there",
+                    metadata={
+                        "responsibility_kind": "executable_action",
+                        "execution_lane": "activity",
+                        "output_mode": "body_action",
+                        "provider_required": True,
+                    },
+                )
+            ],
             confidence=0.8,
-            reason_summary="Direction is ambiguous.",
-            metadata={"status": "needs_clarification"},
+            reason_summary="Preserve the provisional movement Goal.",
+            metadata={"status": "resolved"},
         )
-        client = ScriptedClient(association=association, fast_plans=[])
+        gap = {
+            "gap_id": "gap-destination",
+            "description": "Which destination does 'there' refer to?",
+            "blocking": True,
+            "required_for": ["destination"],
+            "preferred_resolution": "ask_user",
+            "source_kind": "unresolved_meaning",
+            "source_reference": "which destination 'there' refers to",
+            "resolution_sources_considered": ["authoritative_context"],
+        }
+        advance = FastPlannerAdvance(
+            turn_id="turn-needs-clarification",
+            disposition="clarify",
+            coverage="uncertain",
+            covered_responsibility_refs=["r1"],
+            activities=[
+                FastPlannerClarificationAct(
+                    activity_id="ask-destination",
+                    role="clarification",
+                    information_gaps=[gap],
+                    source_responsibility_refs=["r1"],
+                )
+            ],
+            confidence=0.8,
+            unresolved=["which destination 'there' refers to"],
+            reason_summary="The user can resolve the ambiguous referent.",
+        )
+        manager = ConversationStateManager(enabled=True)
+        client = ScriptedClient(
+            association=association,
+            fast_plans=[],
+            fast_advances=[advance],
+        )
         coordinator = GoalDrivenRuntimeCoordinator(
             agent_client=client,
             adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
             policy=CognitiveRuntimePolicy(mode="apply", apply_lanes=frozenset({"chat"})),
+            goal_state_apply=manager.apply_goal_association_resolution,
+            planner_gap_apply=manager.apply_planner_information_gaps,
         )
 
-        result = self.run_resolution(coordinator, client, text="move over there")
+        core, envelope = admitted_core(
+            "move over there",
+            sid="sid-pr7",
+            language="en-US",
+            interpretation_unresolved=["which destination 'there' refers to"],
+        )
+        result = asyncio.run(
+            coordinator.resolve(
+                object(),
+                text="move over there",
+                sid="sid-pr7",
+                core_interpretation=core,
+                context={"history": [], "active_goal_snapshots": []},
+                history=[],
+                language="en-US",
+                turn_envelope=envelope,
+            )
+        )
 
         self.assertEqual(result.status, "applied")
         self.assertEqual(result.terminal_plan.disposition, "clarify")
-        self.assertEqual(result.interaction_response.speech[0].text, "Which direction should I move?")
-        self.assertCountEqual(client.calls[:2], ["advance", "association"])
-        self.assertEqual(client.calls[2:], ["compose"])
+        self.assertEqual(result.interaction_response.speech[0].text, "你想喝什么茶？")
+        self.assertCountEqual(client.calls, ["advance", "realize", "association"])
+        snapshot = manager.active_goal_snapshots()[0]
+        self.assertEqual(
+            snapshot["open_information_gaps"][0]["source_kind"],
+            "unresolved_meaning",
+        )
 
     def test_resolved_empty_goal_set_fails_closed_before_planning(self):
         association = GoalAssociationResolution(

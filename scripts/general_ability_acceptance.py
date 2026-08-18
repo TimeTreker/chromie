@@ -154,9 +154,30 @@ def _capability_items(summary: dict[str, Any]) -> list[dict[str, Any]]:
         item
         for item in capabilities
         if isinstance(item, dict)
-        and str(
-            item.get("capability_id") or ""
-        ).startswith("soridormi.")
+        and str(item.get("capability_id") or "").strip()
+    ]
+
+
+def _fast_progress_activities(summary: dict[str, Any]) -> list[dict[str, Any]]:
+    cognitive = summary.get("cognitive_runtime")
+    if not isinstance(cognitive, dict):
+        return []
+    advance = cognitive.get("fast_advance")
+    if not isinstance(advance, dict):
+        metadata = cognitive.get("metadata")
+        advance = (
+            metadata.get("fast_planner_advance")
+            if isinstance(metadata, dict)
+            else None
+        )
+    if not isinstance(advance, dict):
+        return []
+    return [
+        item
+        for item in advance.get("activities") or []
+        if isinstance(item, dict)
+        and item.get("role") == "progress"
+        and str(item.get("speech_act") or "").strip()
     ]
 
 
@@ -412,18 +433,17 @@ def validate_live_text_result(
             internal_diagnostics.append(message)
 
     fast_speech = route.get("fast_speech") if isinstance(route, dict) else None
-    if case.forbid_fast_speech and isinstance(fast_speech, dict) and str(
-        fast_speech.get("text") or ""
-    ).strip():
-        errors.append("Core route emitted forbidden pre-effect fast_speech")
+    fast_progress = _fast_progress_activities(summary)
+    legacy_fast_speech_present = (
+        isinstance(fast_speech, dict)
+        and bool(str(fast_speech.get("text") or "").strip())
+    )
+    if case.forbid_fast_speech and (
+        legacy_fast_speech_present or fast_progress
+    ):
+        errors.append("Core emitted forbidden pre-effect progress speech")
     if case.require_fast_speech:
-        if not isinstance(fast_speech, dict) or not str(
-            fast_speech.get("text") or ""
-        ).strip():
-            errors.append(
-                "Core route omitted the required pending-work fast_speech"
-            )
-        else:
+        if legacy_fast_speech_present:
             purpose = str(fast_speech.get("purpose") or "").strip()
             if (
                 case.expected_fast_speech_purposes
@@ -437,6 +457,38 @@ def validate_live_text_result(
                 errors.append(
                     "fast_speech did not retain must_not_claim_completion=true"
                 )
+        elif fast_progress:
+            purposes = {
+                str(item.get("speech_act") or "").strip()
+                for item in fast_progress
+            }
+            if (
+                case.expected_fast_speech_purposes
+                and not purposes.intersection(case.expected_fast_speech_purposes)
+            ):
+                errors.append(
+                    "Fast progress Communicative Act purpose mismatch: expected one of "
+                    f"{list(case.expected_fast_speech_purposes)!r}, got "
+                    f"{sorted(purposes)!r}"
+                )
+            cognitive = summary.get("cognitive_runtime")
+            metadata = (
+                cognitive.get("metadata")
+                if isinstance(cognitive, dict)
+                and isinstance(cognitive.get("metadata"), dict)
+                else {}
+            )
+            realization_status = str(
+                metadata.get("fast_communicative_realization_status") or ""
+            )
+            if not bool(summary.get("preview_only")) and realization_status != "resolved":
+                errors.append(
+                    "Fast progress Communicative Act was not realized before execution"
+                )
+        else:
+            errors.append(
+                "Core omitted the required pending-work progress Communicative Act"
+            )
 
     speech = _speech_text(summary)
     speech_lower = speech.lower()

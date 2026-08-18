@@ -3,14 +3,14 @@
   "id": "chongqing_daytime_weather_is_evidence_not_user_gap",
   "suite": "goal_interpretation",
   "level": "module",
-  "description": "A fully scoped daytime weather request requires fresh external Evidence and no user clarification.",
+  "description": "The retained fully scoped Chongqing morning-rain question requires fresh external Evidence and no user clarification.",
   "tags": [
     "tool",
     "normal",
     "regression"
   ],
   "input": {
-    "text": "你好，今天重庆白天天气怎么样啊？",
+    "text": "哎，今天上午重庆会不会下雨？",
     "language": "zh-CN"
   },
   "stub": {
@@ -20,16 +20,14 @@
         {
           "schema_version": 1,
           "local_ref": "weather",
-          "outcome": "告知用户今天重庆白天的天气情况",
+          "outcome": "判断并告知用户今天上午重庆会不会下雨",
           "bindings": {
             "location": "重庆",
             "date": "today",
-            "time_of_day": "白天"
+            "time_of_day": "上午"
           },
           "relationship": "new",
           "target_goal_ids": [],
-          "information_gaps": [],
-          "resolved_gap_ids": [],
           "completion_requires_work": true,
           "completion_requires_fresh_evidence": true,
           "confidence": 0.95
@@ -49,16 +47,14 @@
       {
         "schema_version": 1,
         "local_ref": "weather",
-        "outcome": "告知用户今天重庆白天的天气情况",
+        "outcome": "判断并告知用户今天上午重庆会不会下雨",
         "bindings": {
           "location": "重庆",
           "date": "today",
-          "time_of_day": "白天"
+          "time_of_day": "上午"
         },
         "relationship": "new",
         "target_goal_ids": [],
-        "information_gaps": [],
-        "resolved_gap_ids": [],
         "completion_requires_work": true,
         "completion_requires_fresh_evidence": true,
         "confidence": 0.95

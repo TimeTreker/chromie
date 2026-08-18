@@ -45,6 +45,7 @@ from .planner_contract import (
     is_planner_step_capability,
     materialize_goal_outcomes,
     materialize_planner_metadata,
+    normalize_detached_parameter_resolutions,
     normalize_schema_default_parameter_provenance,
     parallel_plan_contract_errors,
     planner_goal_execution_requirements,
@@ -215,6 +216,16 @@ class DeepPlannerResolver:
                 )
                 if not isinstance(raw, dict):
                     raise PlannerDTOContractError("deep planner response is not a JSON object")
+                raw, detached_resolution_repairs = (
+                    normalize_detached_parameter_resolutions(raw)
+                )
+                if detached_resolution_repairs:
+                    logger.warning(
+                        "deep_planner_detached_parameter_resolutions_removed "
+                        "sid=%s repairs=%s",
+                        request.sid,
+                        self._bounded(detached_resolution_repairs, 2000),
+                    )
                 raw, provenance_repairs = (
                     normalize_schema_default_parameter_provenance(
                         raw,

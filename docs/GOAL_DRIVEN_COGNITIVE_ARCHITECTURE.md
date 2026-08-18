@@ -772,21 +772,37 @@ Supported relationships should include:
 These relationships are model-proposed and deterministically validated against
 known goal IDs and lifecycle state.
 
-### 4.5 Information gap
+### 4.5 Planner information gap
 
-A structured fact required to continue planning.
+A Planner-owned record of an input that remains necessary for a concrete Activity
+Plan after applicable sources have been considered. It is not emitted by Goal
+Interpretation and is not evidence that user intent was incomplete.
 
 ```json
 {
-  "gap_id": "goal_123:duration_s",
+  "gap_id": "plan_456:duration_s",
+  "responsibility_refs": ["responsibility_123"],
+  "input_name": "duration_s",
   "description": "walking duration in seconds",
   "importance": "material",
   "blocking": true,
-  "preferred_resolution": "ask_user"
+  "considered_sources": ["explicit_or_contextual", "trusted_observation"],
+  "selected_resolution": "ask_user"
 }
 ```
 
-Information gaps remain attached to the original goal and survive turns.
+The Planner may select trusted context, observation/query, an owner/schema default,
+a permitted consequence-bounded ordinary default, user clarification, or no valid
+source. A user question is selected only when the answer materially changes the next
+action and the person can resolve it. Information gaps retain exact Responsibility,
+Plan/Activity, source, and consequence provenance and may survive turns through the
+Goal-scoped Interaction Context. They do not give Planner authority to change
+Responsibility meaning.
+
+GI's bounded `unresolved_meaning` is different: it records genuine ambiguity in the
+person's intended outcome, scope, or referent without declaring a Capability parameter,
+blocking state, or resolution policy. Planner may select a clarification Activity from
+that semantic evidence but may not choose the intended meaning itself.
 
 ### 4.6 Canonical plan
 
@@ -816,8 +832,10 @@ planner tier.
       "timing": "parallel"
     }
   ],
-  "information_gaps": [],
-  "requires_confirmation": true
+  "metadata": {
+    "plan_relation": "exact",
+    "user_confirmation_required": true
+  }
 }
 ```
 
@@ -844,11 +862,12 @@ core principles.
 
 ### 4.10 Contextual Responsibility evidence and Fast Activity Planning
 
-`CognitiveResponsibilityProposal` is the implemented provider-neutral Goal-
-Interpretation evidence for what human outcome appears to be owed. It carries a local
-reference, outcome, material semantic bindings, its proposed relation to supplied Goal
-IDs, introduced/resolved InformationGap IDs, whether work remains, and whether fresh
-evidence is required. It is not a canonical Goal commit, Plan, Capability selection, or execution
+`CognitiveResponsibilityProposal` is the provider-neutral Goal-Interpretation evidence
+for what human outcome appears to be owed. It carries a local reference, outcome,
+material semantic bindings, its proposed relation to supplied Goal IDs, whether work
+remains, whether fresh evidence is required, and bounded unresolved meaning. It does
+not introduce, resolve, prioritize, or select a source for planning InformationGaps. It
+is not a canonical Goal commit, Plan, Capability selection, or execution
 authorization. Capability IDs, executable arguments, actions, providers, realization,
 and execution methods are forbidden in its bindings. Responsibility evidence must
 preserve every explicit material qualifier that changes what would satisfy the human
@@ -856,18 +875,20 @@ outcome—such as severity, intensity, magnitude, threshold, subtype, negation,
 comparison, quantity, or temporal scope—rather than generalizing a narrower request
 into a broader category. GI must read bounded Session Context, including pending
 clarifications and active Goal/Activity state. A reply such as “Green tea” therefore
-resolves the identified tea-kind gap and proposes modification of the existing tea Goal;
-it is not interpreted as an isolated new request. GA remains the sole authority that
-commits that Goal version.
+supplies a semantic binding for the pending clarification and proposes modification of
+the existing tea Goal; it is not interpreted as an isolated new request. This does not
+make GI the owner of why Planner asked or which source policy it chose. GA remains the
+sole authority that commits that Goal version.
 
 The same immutable GI result fans out concurrently to Fast Planner and Goal Association.
 Fast Planner returns a typed `FastPlannerAdvance` that is the first real Activity Plan:
 exact Responsibility refs covered, zero or more Communicative Acts and Capability Activities,
 their sequential/parallel relation, and an optional `deep_planner` continuation for
 complex HOW. A Communicative Act records function, timing, Responsibility provenance,
-and applicable InformationGap IDs but never `response_text`. Missing user information
-produces a clarification act; it is not a
-Deep-Planner escalation. A schema-valid safe, side-effect-free read may begin while GA
+and exact typed reason provenance to GI unresolved meaning or a Planner-owned
+InformationGap, but never `response_text`. Fast Planner owns input-source resolution and
+selects a clarification act only for a user-resolvable blocker; it does not send ordinary
+input completion to Deep GI or Deep Planner. A schema-valid safe, side-effect-free read may begin while GA
 commits canonical Goal identity. Effects remain gated by canonical Goal binding,
 confirmation, authorization, resource, and provider-safety checks.
 
@@ -1595,11 +1616,11 @@ timescales, not a mandatory module pipeline:
 ```text
 Admitted Observation / User Turn + bounded Session Context
   -> Goal Interpretation (GI)
-       Responsibility + Goal relation + InformationGaps
+       Responsibility + Goal relation + bounded unresolved meaning
   -> concurrent fan-out of the same GI result
-       |-> Fast Planner -> first Activity Plan
+       |-> Fast Planner -> first Activity Plan + input resolution
        |     |-> speaking and ready Capability Activities
-       |     |-> clarification when user information is missing
+       |     |-> user-resolvable clarification only when needed
        |     `-> Deep Planner only when HOW is complex
        `-> Goal Association -> sole canonical Goal commit/version authority
   -> bind each Activity to the applicable per-Goal Runtime task-list views
@@ -2155,7 +2176,9 @@ It may:
 
 - complete a simple conversational Responsibility with a speaking Activity;
 - combine prospective conversational progress with independent Capability Activities;
-- ask a user-resolvable clarification for a GI-declared InformationGap;
+- derive execution-input needs only from the immutable Responsibility and applicable
+  Plan/Agent-Skill/Capability/safety contracts, then resolve them from an authoritative
+  source or ask a user-resolvable clarification;
 - select exact safe/read-only Capability Activities before GA finishes, subject to
   trusted Runtime validation and later canonical Goal binding;
 - request Deep Planner when HOW exceeds the fast planning budget;
@@ -2225,14 +2248,16 @@ The Deep Planner receives:
 - memory and trusted services;
 - current information gaps and confirmations.
 
-Deep Planner is exceptional. It is invoked when semantic uncertainty,
-incomplete or compound coverage, nontrivial dependencies, material alternatives,
-novelty or broader context, or safety/resource reasoning requires the wider
-planning boundary. Fast-to-Deep is the one **semantic** planning escalation, not
-repair of a Fast contract/provenance failure, already committed Goal, or execution
-result. A Responsibility that is already completely and safely resolved by Fast does
-not enter Deep in parallel for reassurance. Deep Planner receives the original Goal
-truth, the Fast semantic escalation evidence, and the full planning boundary.
+Deep Planner is exceptional. It is invoked when incomplete or compound Plan coverage,
+nontrivial dependencies, material alternatives, novelty or broader planning context,
+or safety/resource reasoning requires the wider planning boundary. Fast-Planner-to-
+Deep-Planner is one **HOW** escalation, not repair of a Fast contract/provenance
+failure, already committed Goal, or execution result. Genuine ambiguity in the
+person's intended outcome, scope, or referent belongs to Deep Goal Interpretation
+before planning; Deep Planner cannot reinterpret it. A Responsibility that is already
+completely and safely resolved by Fast does not enter Deep in parallel for reassurance.
+Deep Planner receives the original Goal truth, the Fast planning-escalation evidence,
+and the full planning boundary.
 It may regenerate once only when its structured DTO is mechanically malformed;
 semantic grounding, coverage, confidence/satisfaction, capability, or safety
 rejection is terminal and fails closed. Model confidence alone neither grants a direct/Fast
@@ -2384,9 +2409,12 @@ but it must not silently turn all-or-nothing behavior back on.
 
 ## 10. Parameter resolution
 
-### 10.1 Semantic ownership
+### 10.1 Planning ownership
 
-The planner decides whether a missing parameter can be supplied by:
+Goal Interpretation supplies only understood Responsibility meaning, explicit/contextual
+semantic bindings, and bounded unresolved meaning. It does not decide whether a
+Capability parameter is missing. The Planner owns that comparison and decides whether
+a required execution input can be supplied by:
 
 - explicit user language;
 - schema default;
@@ -2396,6 +2424,10 @@ The planner decides whether a missing parameter can be supplied by:
 - trusted service;
 - user clarification;
 - or no valid source.
+
+The need must be grounded in the selected Plan/Agent-Skill/Capability/safety contract.
+Planner cannot use a schema to redefine, widen, narrow, or invent the person's intended
+outcome. A default is recorded as a Planner execution choice, never as a user preference.
 
 ### 10.2 Consequence-aware choice
 
@@ -2431,8 +2463,12 @@ When useful, the model may offer bounded choices naturally.
 
 ### 10.4 Persistence
 
-A blocking information gap keeps the original goal active in
-`waiting_for_user`. A later answer updates that goal and triggers replanning.
+A Planner-selected blocking information gap keeps the original Responsibility/Goal
+active in `waiting_for_user` and remains in Goal-scoped Interaction Context with its
+exact Activity and source provenance. A later answer is interpreted by GI against that
+pending clarification, committed by GA as the applicable Goal update, and triggers
+replanning. GI understands the answer; it does not retroactively own the gap or its
+resolution policy.
 
 ## 11. Alternative planning
 
@@ -3381,8 +3417,10 @@ Evolution rules:
   confidence, fresh-evidence need, and unresolved meaning;
 - make `CognitiveWorkRequest` the typed WHAT-to-HOW handoff; do not tunnel semantic
   authority through anonymous context dictionaries;
-- keep Fast Planner as the first HOW owner and Goal Association as the sole canonical
-  Goal-continuity owner;
+- keep Fast Planner as the first HOW owner, including execution-input completeness,
+  source/default policy, and clarification selection; Capability schemas constrain
+  realization but cannot turn Planner into a second Goal Interpreter;
+- keep Goal Association as the sole canonical Goal-continuity owner;
 - expose exact Capability identity only after applicable canonical Goal grounding;
 - after Core authority is acquired, fail closed rather than falling through to an older
   route/intent or Agent semantic path;

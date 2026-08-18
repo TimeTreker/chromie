@@ -425,7 +425,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             },
         )
 
-    async def test_preassociation_clarify_is_advisory_to_goal_association(self) -> None:
+    async def test_preassociation_uncertainty_does_not_give_ga_question_authority(self) -> None:
         ollama = _SequenceOllama(
             [
                 {
@@ -437,7 +437,6 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                             "output_mode": "speech",
                         }
                     ],
-                    "clarification": "",
                     "confidence": 1.0,
                     "reason_summary": "Treat the fragment as conversation.",
                 },
@@ -460,7 +459,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(resolution.associations, [])
-        self.assertEqual(resolution.clarification, "")
+        self.assertFalse(hasattr(resolution, "clarification"))
         self.assertEqual(len(resolution.new_goals), 1)
         self.assertEqual(
             resolution.new_goals[0].description,
@@ -469,7 +468,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(ollama.schemas), 2)
         self.assertEqual(
             ollama.schemas[0]["properties"]["decision"]["enum"],
-            ["create_goals", "clarify"],
+            ["create_goals"],
         )
         self.assertGreater(
             ollama.schemas[0]["properties"]["new_goals"]["maxItems"],

@@ -1031,6 +1031,44 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
 
 
 class FastPlannerResolverTests(unittest.TestCase):
+    @staticmethod
+    def _clarification_output(
+        *,
+        source_kind: str,
+        source_reference: str,
+        required_for: list[str],
+        sources_considered: list[str],
+    ) -> dict:
+        return {
+            "disposition": "clarify",
+            "coverage": "partial",
+            "covered_responsibility_refs": ["weather"],
+            "activities": [
+                {
+                    "activity_id": "clarify-weather",
+                    "role": "clarification",
+                    "speech_act": "ask_clarification",
+                    "source_responsibility_refs": ["weather"],
+                    "information_gaps": [
+                        {
+                            "gap_id": "gap-weather",
+                            "description": "A material input is still missing.",
+                            "blocking": True,
+                            "required_for": required_for,
+                            "preferred_resolution": "ask_user",
+                            "source_kind": source_kind,
+                            "source_reference": source_reference,
+                            "resolution_sources_considered": sources_considered,
+                        }
+                    ],
+                }
+            ],
+            "continuations": [],
+            "confidence": 0.91,
+            "unresolved": ["A material input is still missing."],
+            "reason_summary": "The user can resolve the remaining blocker.",
+        }
+
     def test_first_activity_plan_can_complete_clear_greeting_while_ga_runs(self):
         ollama = FakeOllama(
             {
@@ -1098,8 +1136,193 @@ class FastPlannerResolverTests(unittest.TestCase):
                 role="clarification",
                 speech_act="你想喝什么茶？",
                 source_responsibility_refs=["tea"],
-                information_gap_ids=["gap-tea-kind"],
+                information_gaps=[
+                    {
+                        "gap_id": "gap-tea-kind",
+                        "description": "Which kind of tea should be brought?",
+                        "blocking": True,
+                        "required_for": ["tea_kind"],
+                        "preferred_resolution": "ask_user",
+                        "source_kind": "execution_input",
+                        "source_reference": "chromie.tea.bring",
+                        "resolution_sources_considered": [
+                            "authoritative_context",
+                            "capability_schema",
+                        ],
+                    }
+                ],
             )
+
+    def test_semantic_clarification_must_cite_exact_gi_unresolved_meaning(self):
+        unresolved = "The intended device is not identified."
+        raw = self._clarification_output(
+            source_kind="unresolved_meaning",
+            source_reference=unresolved,
+            required_for=["device_referent"],
+            sources_considered=["authoritative_context"],
+        )
+        run_request = _work_request(
+            sid="turn-semantic-gap",
+            text="Turn it off.",
+            responsibilities=[
+                {
+                    "local_ref": "weather",
+                    "outcome": "turn off the device the user means",
+                    "bindings": {},
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.72,
+                }
+            ],
+            interpretation_unresolved=[unresolved],
+        )
+
+        advance = asyncio.run(
+            FastPlannerResolver(
+                FakeOllama(raw), FakeCatalog(), max_contract_repairs=0
+            ).resolve_advance(run_request)
+        )
+
+        self.assertEqual(advance.disposition, "clarify")
+        gap = advance.activities[0].information_gaps[0]
+        self.assertEqual(gap.source_kind, "unresolved_meaning")
+        self.assertEqual(gap.source_reference, unresolved)
+
+    def test_invented_semantic_clarification_source_fails_closed(self):
+        raw = self._clarification_output(
+            source_kind="unresolved_meaning",
+            source_reference="A device color is unknown.",
+            required_for=["device_color"],
+            sources_considered=["authoritative_context"],
+        )
+        run_request = _work_request(
+            sid="turn-invented-semantic-gap",
+            text="Turn it off.",
+            responsibilities=[
+                {
+                    "local_ref": "weather",
+                    "outcome": "turn off the device the user means",
+                    "bindings": {},
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.72,
+                }
+            ],
+            interpretation_unresolved=["The intended device is not identified."],
+        )
+
+        advance = asyncio.run(
+            FastPlannerResolver(
+                FakeOllama(raw), FakeCatalog(), max_contract_repairs=0
+            ).resolve_advance(run_request)
+        )
+
+        self.assertEqual(advance.disposition, "unavailable")
+        self.assertEqual(
+            advance.metadata["failure_class"], "fast_advance_contract_invalid"
+        )
+        self.assertIn("exact GI unresolved meaning", advance.metadata["error"])
+
+    def test_missing_weather_location_is_a_planner_execution_input_gap(self):
+        raw = self._clarification_output(
+            source_kind="execution_input",
+            source_reference="chromie.weather.lookup",
+            required_for=["location"],
+            sources_considered=[
+                "authoritative_context",
+                "trusted_observation",
+                "capability_schema",
+            ],
+        )
+        run_request = _work_request(
+            sid="turn-weather-missing-location",
+            text="Will it rain today?",
+            responsibilities=[
+                {
+                    "local_ref": "weather",
+                    "outcome": "tell the user whether it will rain today",
+                    "bindings": {"date": "today"},
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.94,
+                }
+            ],
+            interpretation_unresolved=[],
+        )
+
+        advance = asyncio.run(
+            FastPlannerResolver(
+                FakeOllama(raw), WeatherCatalog(), max_contract_repairs=0
+            ).resolve_advance(run_request)
+        )
+
+        self.assertEqual(advance.disposition, "clarify")
+        gap = advance.activities[0].information_gaps[0]
+        self.assertEqual(gap.source_kind, "execution_input")
+        self.assertEqual(gap.source_reference, "chromie.weather.lookup")
+        self.assertEqual(gap.required_for, ["location"])
+
+    def test_execution_input_gap_must_name_real_unbound_required_parameter(self):
+        raw = self._clarification_output(
+            source_kind="execution_input",
+            source_reference="chromie.weather.lookup",
+            required_for=["humidity"],
+            sources_considered=["authoritative_context", "capability_schema"],
+        )
+        run_request = _work_request(
+            sid="turn-weather-fake-required-input",
+            text="Will it rain today?",
+            responsibilities=[
+                {
+                    "local_ref": "weather",
+                    "outcome": "tell the user whether it will rain today",
+                    "bindings": {"date": "today"},
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.94,
+                }
+            ],
+        )
+
+        advance = asyncio.run(
+            FastPlannerResolver(
+                FakeOllama(raw), WeatherCatalog(), max_contract_repairs=0
+            ).resolve_advance(run_request)
+        )
+
+        self.assertEqual(advance.disposition, "unavailable")
+        self.assertIn("required Capability inputs", advance.metadata["error"])
+
+    def test_planner_cannot_ask_for_weather_location_already_bound_by_gi(self):
+        raw = self._clarification_output(
+            source_kind="execution_input",
+            source_reference="chromie.weather.lookup",
+            required_for=["location"],
+            sources_considered=["authoritative_context", "capability_schema"],
+        )
+        run_request = _work_request(
+            sid="turn-weather-location-bound",
+            text="Will it rain in Chongqing today?",
+            responsibilities=[
+                {
+                    "local_ref": "weather",
+                    "outcome": "tell the user whether it will rain in Chongqing today",
+                    "bindings": {"location": "重庆", "date": "today"},
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.96,
+                }
+            ],
+        )
+
+        advance = asyncio.run(
+            FastPlannerResolver(
+                FakeOllama(raw), WeatherCatalog(), max_contract_repairs=0
+            ).resolve_advance(run_request)
+        )
+
+        self.assertEqual(advance.disposition, "unavailable")
+        self.assertIn("already-bound input", advance.metadata["error"])
 
     def test_first_activity_plan_preserves_profile_context_topology(self):
         ollama = FakeOllama(
@@ -1287,6 +1510,17 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         self.assertNotIn("identity_answer_guidance", str(prompt))
         self.assertIn("Executable common Capability catalog", str(prompt))
+        self.assertIn(
+            "GI bindings are resolved input evidence, including relative dates and local "
+            "day parts normalized into canonical values",
+            str(prompt),
+        )
+        self.assertIn(
+            "physical-object acquisition, handover, body gestures, or attention motions "
+            "cannot acquire external information",
+            str(prompt),
+        )
+        self.assertIn("do not invent a semantic clarification", str(prompt))
 
     def test_first_activity_plan_schema_requires_explicit_decision_fields(self):
         schema = FastPlannerResolver._advance_response_schema(["weather"])
@@ -1321,7 +1555,88 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(covered["maxItems"], 1)
         self.assertTrue(covered["uniqueItems"])
 
-    def test_fresh_external_evidence_schema_excludes_clarification_and_completion(self):
+    def test_first_activity_plan_keeps_late_catalog_semantics_visible(self):
+        resolver = FastPlannerResolver(FakeOllama({}), FakeCatalog())
+        responsibility = CognitiveResponsibilityProposal.model_validate(
+            {
+                "local_ref": "weather",
+                "outcome": "Determine whether it will rain this morning.",
+                "bindings": {
+                    "location": "重庆",
+                    "date": "today",
+                    "day_part": "morning",
+                },
+                "completion_requires_work": True,
+                "completion_requires_fresh_evidence": True,
+                "confidence": 0.96,
+            }
+        )
+        bulky = [
+            {
+                "capability_id": f"soridormi.synthetic_{index}",
+                "description": "Physical action. " + ("x" * 1200),
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"duration_s": {"type": "number", "default": 1}},
+                },
+                "effects": ["physical_motion"],
+                "hints": {"when_to_use": "A body action. " + ("y" * 1200)},
+            }
+            for index in range(14)
+        ]
+        weather = WeatherCatalog().items[-1]
+        capabilities = bulky + [
+            {
+                "capability_id": weather.capability_id,
+                "description": weather.description,
+                "input_schema": weather.input_schema,
+                "requires_confirmation": weather.requires_confirmation,
+                "can_run_parallel": weather.can_run_parallel,
+                "parallel_metadata_declared": weather.parallel_metadata_declared,
+                "resource_claims": list(weather.resource_claims),
+                "effects": list(weather.effects),
+                "safety_class": weather.safety_class,
+                "side_effect_free": True,
+                "hints": {
+                    "when_to_use": "Use for weather forecast questions.",
+                    "semantic_type": "weather_lookup",
+                    "semantic_scope": {
+                        "domain": "weather_forecast",
+                        "resource_kinds": ["information"],
+                        "supported_temporal_scopes": ["morning"],
+                    },
+                },
+            }
+        ]
+        run_request = _work_request(
+            sid="turn-late-weather-capability",
+            text="今天上午重庆会不会下雨？",
+            responsibilities=[responsibility.model_dump(mode="json")],
+        )
+
+        prompt = str(
+            resolver._advance_layered_prompt(
+                run_request,
+                responsibilities=[responsibility],
+                capabilities=capabilities,
+            )
+        )
+
+        self.assertIn('\"capability_id\":\"chromie.weather.lookup\"', prompt)
+        self.assertIn('\"domain\":\"weather_forecast\"', prompt)
+        self.assertNotIn("...\n\nCover every Responsibility", prompt)
+        self.assertIn(
+            "The absence of fresh result Evidence is the reason to execute a matching "
+            "read Capability",
+            prompt,
+        )
+        self.assertIn(
+            "Match required arguments from GI bindings by meaning, not only by identical "
+            "field name",
+            prompt,
+        )
+
+    def test_fresh_external_evidence_schema_excludes_only_completion(self):
         responsibility = CognitiveResponsibilityProposal.model_validate(
             {
                 "local_ref": "weather",
@@ -1331,13 +1646,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "date": "today",
                     "time_of_day": "白天",
                 },
-                "information_gaps": [
-                    {
-                        "gap_id": "weather_result",
-                        "description": "Current weather data for Chongqing",
-                        "preferred_resolution": "query_trusted_service",
-                    }
-                ],
                 "completion_requires_work": True,
                 "completion_requires_fresh_evidence": True,
                 "confidence": 0.96,
@@ -1365,6 +1673,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             activity_refs,
             {
                 "#/$defs/FastPlannerProgressAct",
+                "#/$defs/FastPlannerClarificationAct",
                 "#/$defs/FastPlannerCapabilityActivity",
             },
         )
@@ -1376,20 +1685,12 @@ class FastPlannerResolverTests(unittest.TestCase):
         encoded_capability_schema = json.dumps(capability_schema, sort_keys=True)
         self.assertIn('"period"', encoded_capability_schema)
 
-    def test_fresh_evidence_with_user_gap_keeps_clarification_not_capability(self):
+    def test_fresh_evidence_missing_input_keeps_planner_resolution_branches(self):
         responsibility = CognitiveResponsibilityProposal.model_validate(
             {
                 "local_ref": "weather",
                 "outcome": "Describe today's weather at the requested location.",
                 "bindings": {"date": "today"},
-                "information_gaps": [
-                    {
-                        "gap_id": "weather_location",
-                        "description": "The location is missing.",
-                        "required_for": ["location"],
-                        "preferred_resolution": "ask_user",
-                    }
-                ],
                 "completion_requires_work": True,
                 "completion_requires_fresh_evidence": True,
                 "confidence": 0.96,
@@ -1410,6 +1711,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             {
                 "#/$defs/FastPlannerProgressAct",
                 "#/$defs/FastPlannerClarificationAct",
+                "#/$defs/FastPlannerCapabilityActivity",
             },
         )
 
@@ -1526,6 +1828,76 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(
             advance.metadata["failure_class"],
             "fast_advance_contract_invalid",
+        )
+
+    def test_invalid_advance_retains_one_independently_valid_progress_act(self):
+        invalid = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "covered_responsibility_refs": ["weather"],
+            "activities": [
+                {
+                    "activity_id": "weather-progress-1",
+                    "role": "progress",
+                    "progress_kind": "check_information",
+                    "speech_act": "acknowledge_and_check",
+                    "timing": "parallel",
+                    "source_responsibility_refs": ["weather"],
+                },
+                {
+                    "activity_id": "weather-progress-duplicate",
+                    "role": "progress",
+                    "progress_kind": "check_information",
+                    "speech_act": "acknowledge_and_check",
+                    "timing": "parallel",
+                    "source_responsibility_refs": ["weather"],
+                },
+            ],
+            "continuations": ["deep_planner"],
+            "confidence": 0.94,
+            "unresolved": [],
+            "reason_summary": "The weather lookup should continue in Deep Planner.",
+        }
+        run_request = _work_request(
+            sid="turn-weather-invalid-continuation",
+            text="哎，今天上午重庆会不会下雨？",
+            language="zh-CN",
+            context={
+                "responsibility_proposals": [
+                    {
+                        "local_ref": "weather",
+                        "outcome": "Determine whether it will rain in Chongqing this morning.",
+                        "bindings": {
+                            "location": "重庆",
+                            "date": "today",
+                            "time_of_day": "上午",
+                        },
+                        "completion_requires_work": True,
+                        "completion_requires_fresh_evidence": True,
+                        "confidence": 0.96,
+                    }
+                ]
+            },
+            history=[],
+        )
+
+        advance = asyncio.run(
+            FastPlannerResolver(FakeOllama(invalid), WeatherCatalog()).resolve_advance(
+                run_request
+            )
+        )
+
+        self.assertEqual(advance.disposition, "unavailable")
+        self.assertEqual(advance.continuations, [])
+        self.assertEqual(len(advance.activities), 1)
+        self.assertEqual(advance.activities[0].role, "progress")
+        self.assertEqual(
+            advance.activities[0].speech_act,
+            "acknowledge_and_check",
+        )
+        self.assertEqual(
+            advance.metadata["salvaged_progress_activity_ids"],
+            ["weather-progress-1"],
         )
 
     def test_first_activity_plan_can_check_weather_and_speak_in_parallel(self):

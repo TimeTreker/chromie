@@ -5,21 +5,15 @@ Base main before this delivery: `ba4dc8b` (`fix fast weather activity execution`
 ## Project in one minute
 Chromie is a local-first realtime interaction control plane for a voice assistant that can use embodied capabilities safely. Chromie owns user-facing cognition, Goal meaning and continuity, cross-provider planning, personal Vocal behavior, trusted authorization, coordination, and evidence reconciliation.
 Soridormi is a peer embodied Capability Provider beneath Activity; its advertised granularity may be one atomic workflow or smaller capabilities that Chromie composes.
-The core separation is: **models reason about meaning; trusted mechanisms own
-authorization, execution, resources, and evidence.** Capability unavailable,
-execution failed, empty result, and successful result are different truths.
-Read first: [Project Charter](docs/PROJECT_CHARTER.md),
-[Goal-Driven Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
-(the canonical expanded flow is frozen there and in the Charter: Session Context → GI → concurrent Fast Planner Activity Plan and GA → deterministic Goal binding → Goal-grouped Trusted Capability Runtime → Evidence/Response, with Deep Planner only for complex HOW),
-[Execution Lanes](docs/EXECUTION_LANES_AND_COORDINATION.md),
-[Current Status](docs/STATUS.md), and [Roadmap](ROADMAP.md).
+The core separation is: **models reason about meaning; trusted mechanisms own authorization, execution, resources, and evidence.** Capability unavailable, execution failed, empty result, and successful result are different truths.
+Read first: [Project Charter](docs/PROJECT_CHARTER.md), [Goal-Driven Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md) (the canonical expanded flow is frozen there and in the Charter: Session Context → GI → concurrent Fast Planner Activity Plan and GA → deterministic Goal binding → Goal-grouped Trusted Capability Runtime → Evidence/Response, with Deep Planner only for complex HOW), [Execution Lanes](docs/EXECUTION_LANES_AND_COORDINATION.md), [Current Status](docs/STATUS.md), and [Roadmap](ROADMAP.md).
 ## Current architecture
 ```text
 admitted UserTurnEnvelope + bounded Session Context
-  -> Goal Interpretation (Responsibility + Goal relation + InformationGaps)
+  -> Goal Interpretation (Responsibility + Goal relation + bounded unresolved meaning)
   -> same-result concurrent fan-out
-       |-> Fast Planner -> Communicative Acts (no wording) + Capability Activities
-       |     |-> Response Composer wording -> Vocal/TTS; or ask clarification
+       |-> Fast Planner -> input resolution + Communicative Acts (no wording) + Capability Activities
+       |     |-> Response Composer wording -> Vocal/TTS; or user-resolvable clarification
        |     `-> Deep Planner only for complex HOW
        `-> Goal Association -> sole canonical Goal commit/version authority
   -> bind Activities into one task-list view per Goal
@@ -32,10 +26,7 @@ Situation is bounded, revisable, mostly reconstructable live soft state.
 Evidence/Ledger plus Plan/Request/Execution/Outcome ground Work; `Responsibility` and
 `Work` are architecture vocabulary, not parallel manager objects.
 ## Settled boundaries
-- **Goal Interpretation stops at Responsibility evidence.** GI may not author response
-  wording, Work, Primary Activities, Plan/execution/realization contracts, or Capabilities.
-  Fast Planner first owns HOW/Activity and may request Deep continuation without absorbing
-  Deep authority; GA independently consumes the same GI result without waiting for Fast.
+- **Goal Interpretation stops at Responsibility evidence.** GI may not author response wording, Work, Primary Activities, Plan/execution/realization contracts, Capabilities, planning InformationGaps, execution-input completeness, blocking state, or input-source/default/clarification policy. It may report bounded unresolved meaning for a genuinely ambiguous outcome, scope, or referent. Fast Planner first owns HOW/Activity and input resolution without changing Responsibility meaning; it may request Deep Planner continuation for complex HOW without absorbing Deep authority. GA independently consumes the same GI result without waiting for Fast.
 - **Goal = canonical unfinished Responsibility.** Planning, waiting, confirmation,
   scheduling, running, retry/recovery, and provider state belong to Work/runtime.
 - **Responsibility completeness is contained.** Every newly proposed Goal set
@@ -70,11 +61,7 @@ Evidence/Ledger plus Plan/Request/Execution/Outcome ground Work; `Responsibility
   commissioning is optional provider work rather than a Chromie completion gate.
 - **Reality enters through evidence.** Provider evidence and reconciliation own
   runtime truth; evidence integrity is not automatically claim sufficiency.
-- **Planner owns Communicative Acts; language formulation owns wording.** Maintained
-  GI owns neither. Fast Planner selects an immediate act's function, timing,
-  Responsibility/InformationGap provenance, and truth constraints without a sentence.
-  Response Composer realizes open wording; closed progress acts use its bounded
-  deterministic realization. TTS/playback owns physical delivery Evidence.
+- **Planner owns Communicative Acts; language formulation owns wording.** Maintained GI owns neither. Fast Planner selects an immediate act's function, timing, Responsibility provenance, exact reason provenance to GI unresolved meaning or a Planner-owned InformationGap, and truth constraints without a sentence. Response Composer realizes open wording; closed progress acts use its bounded deterministic realization. TTS/playback owns physical delivery Evidence.
 - **Cross-cutting contracts are inputs, not authorities.** Claim qualification,
   retention/privacy, and bounded adaptation cannot inherit Goal/Plan/effect authority.
 - **Readiness is local, not pipeline-global.** A branch advances when its own
@@ -109,7 +96,7 @@ normalization. The canonical gate passes 1,900 tests, all 44 Level A cases pass,
 real-network provider probe resolves `重庆`. The five-cycle limit leaves no sixth
 combined proof; the fifth-run GI also narrowed the open question to sunny/not-sunny,
 so that semantic fidelity remains an explicit evidence gap.
-The current daily-life source correction also closes the general boundaries exposed by the generated-voice suite: Capability choice requires declared semantic entailment rather than topical proximity; state mutations are not information resources; local/private sensor state stays unknown without a trusted Provider; unavailable persistent work cannot be phrased as a future promise; and Gateway Attention uses bounded recent dialogue for temporary user-authored addressedness policy with one fail-open judgment and no online repair/reviewer chain. The follow-up authority correction makes the weather case explicit: Goal Interpretation preserves typed provider-neutral information scope and Goal/InformationGap relationship as Responsibility evidence; the same result enters Fast Planner and GA concurrently. Fast Planner is the first HOW owner and authors Communicative Acts plus Capability Activities; safe side-effect-free reads may start while GA commits canonical Goal identity, while effects remain Goal/confirmation/authorization gated. Trusted Capability Runtime presents one task-list view per Goal and never duplicates a shared task identity. Social Attention is now keyed to semantic primary human-observable Activity meaning rather than to cognition milestones, execution modalities, or a once-per-turn budget. Responsibility/Goal sits above Activity; one Goal may own several semantic Activities/Work items, and a high-level provider Capability may realize one Activity atomically. Final `InteractionResponse` transport objects, Vocal modes, body/media requests, and Capability IDs are realization evidence only. Canonical Communicative Acts and Plan-step meaning provide Activity granularity; execution modality never does. Planner execution eligibility is derived from canonical Goal completion semantics. The maintained Goal Interpretation handoff has no route/intent compatibility fields; Responsibility moves into downstream cognition through typed `CognitiveWorkRequest`.
+The current daily-life source correction also closes the general boundaries exposed by the generated-voice suite: Capability choice requires declared semantic entailment rather than topical proximity; state mutations are not information resources; local/private sensor state stays unknown without a trusted Provider; unavailable persistent work cannot be phrased as a future promise; and Gateway Attention uses bounded recent dialogue for temporary user-authored addressedness policy with one fail-open judgment and no online repair/reviewer chain. The owner-approved GI/Fast-Planner boundary is now implemented: Goal Interpretation preserves typed provider-neutral Responsibility meaning, Goal relation, and bounded unresolved meaning only; Fast Planner owns planning InformationGaps, execution-input completeness, source/default/blocking policy, and clarification selection. The temporary Deep-GI external-evidence defense and GI gap strategy fields are removed. One source-based Deep GI pass remains only for genuine semantic ambiguity. The same GI result enters Fast Planner and GA concurrently; GA commits the narrowest source-grounded Goal but cannot author the question. Runtime deterministically binds each Planner gap to that exact Goal and commits it before clarification delivery. Fast Planner remains the first HOW owner and authors Communicative Acts plus Capability Activities; safe side-effect-free reads may start while GA commits canonical Goal identity, while effects remain Goal/confirmation/authorization gated. Trusted Capability Runtime presents one task-list view per Goal and never duplicates a shared task identity. Social Attention is keyed to semantic primary human-observable Activity meaning rather than to cognition milestones, execution modalities, or a once-per-turn budget. Responsibility/Goal sits above Activity; one Goal may own several semantic Activities/Work items, and a high-level provider Capability may realize one Activity atomically. Final `InteractionResponse` transport objects, Vocal modes, body/media requests, and Capability IDs are realization evidence only. Canonical Communicative Acts and Plan-step meaning provide Activity granularity; execution modality never does. Planner execution eligibility is derived from canonical Goal completion semantics. The maintained Goal Interpretation handoff has no route/intent compatibility fields; Responsibility moves into downstream cognition through typed `CognitiveWorkRequest`.
 These are source claims only; no new target evidence is implied.
 ## Do not resurrect
 - independent Router semantic authority;
@@ -136,7 +123,7 @@ Do not silently downgrade because authority is absent.
 This checkpoint does **not** grant blanket architecture authority to later
 sessions; use Charter governance when new authority is needed.
 ## Resume point
-The approved next execution seam is the asynchronous transport-independent `CapabilityRuntime`: first delete executable-Skill naming/aliases, then separate dispatch from completion and route correlated lifecycle events back through existing Evidence/cognitive owners. Do not add a Work/Result/Event manager or second planner. Historical target evidence remains revision-bound.
+The GI/Fast-Planner input-ownership migration is source-closed. Preserve its regressions and finish evidence closure: rerun the canonical gate after any remaining documentation/test migration, retain the relevant Level A ability results, and run the highest safe current-revision live-text profile only if the configured Agent/provider services are available. Historical target evidence remains revision-bound and does not validate this new boundary. After that closure, resume the semantic Issue order in `ROADMAP.md`; do not reopen this owner split through prompts, compatibility fields, or GA-authored questions.
 ## Resume and verification commands
 `docs/STATUS.md` owns implementation/evidence claims. Do not claim live-model,
 audio, MuJoCo, GPU, or physical-provider qualification unless that exact gate ran

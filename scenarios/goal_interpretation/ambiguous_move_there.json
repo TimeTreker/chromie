@@ -3,7 +3,7 @@
   "id": "ambiguous_move_there",
   "suite": "goal_interpretation",
   "level": "module",
-  "description": "GI preserves the requested movement and exposes the unidentified destination as an InformationGap; asking the user is Fast Planner work.",
+  "description": "Fast GI preserves the requested movement, one Deep GI pass confirms the unresolved referent, and Fast Planner alone decides whether to create a clarification gap.",
   "tags": [
     "clarify",
     "motion-safety",
@@ -13,49 +13,63 @@
     "text": "Can you move over there a little?"
   },
   "stub": {
-    "llm_decision": {
-      "confidence": 0.78,
-      "responsibilities": [
-        {
-          "schema_version": 1,
-          "local_ref": "r1",
-          "outcome": "move a short distance to the location the user indicates",
-          "bindings": {
-            "distance": "a little"
-          },
-          "relationship": "new",
-          "target_goal_ids": [],
-          "information_gaps": [
+    "llm_script": [
+      {
+        "stage": "goal_interpretation",
+        "decision": {
+          "confidence": 0.78,
+          "responsibilities": [
             {
-              "gap_id": "target_location",
-              "description": "The intended destination is not identified.",
-              "blocking": true,
-              "required_for": [
-                "destination"
-              ],
-              "preferred_resolution": "ask_user",
-              "candidate_values": [],
-              "resolved": false,
-              "resolution_value": null,
-              "metadata": {}
+              "schema_version": 1,
+              "local_ref": "r1",
+              "outcome": "move a short distance to the location the user indicates",
+              "bindings": {
+                "distance": "a little"
+              },
+              "relationship": "new",
+              "target_goal_ids": [],
+              "completion_requires_work": true,
+              "completion_requires_fresh_evidence": false,
+              "confidence": 0.78
             }
           ],
-          "resolved_gap_ids": [],
-          "completion_requires_work": true,
-          "completion_requires_fresh_evidence": false,
-          "confidence": 0.78
+          "unresolved": [
+            "The intended destination is not identified."
+          ]
         }
-      ],
-      "unresolved": [
-        "The intended destination is not identified."
-      ]
-    }
+      },
+      {
+        "stage": "goal_interpretation_deep",
+        "decision": {
+          "confidence": 0.78,
+          "responsibilities": [
+            {
+              "schema_version": 1,
+              "local_ref": "r1",
+              "outcome": "move a short distance to the location the user indicates",
+              "bindings": {
+                "distance": "a little"
+              },
+              "relationship": "new",
+              "target_goal_ids": [],
+              "completion_requires_work": true,
+              "completion_requires_fresh_evidence": false,
+              "confidence": 0.78
+            }
+          ],
+          "unresolved": [
+            "The intended destination is not identified."
+          ]
+        }
+      }
+    ]
   },
   "expect": {
     "confidence": 0.78,
-    "llm_calls": 1,
+    "llm_calls": 2,
     "llm_stages": [
-      "goal_interpretation"
+      "goal_interpretation",
+      "goal_interpretation_deep"
     ],
     "unresolved": [
       "The intended destination is not identified."
@@ -70,22 +84,6 @@
         },
         "relationship": "new",
         "target_goal_ids": [],
-        "information_gaps": [
-          {
-            "gap_id": "target_location",
-            "description": "The intended destination is not identified.",
-            "blocking": true,
-            "required_for": [
-              "destination"
-            ],
-            "preferred_resolution": "ask_user",
-            "candidate_values": [],
-            "resolved": false,
-            "resolution_value": null,
-            "metadata": {}
-          }
-        ],
-        "resolved_gap_ids": [],
         "completion_requires_work": true,
         "completion_requires_fresh_evidence": false,
         "confidence": 0.78

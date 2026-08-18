@@ -82,6 +82,37 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         }
         self.assertEqual(validate_live_text_result(case, summary), [])
 
+    def test_live_validation_accepts_current_progress_communicative_act(self) -> None:
+        case = TextScenarioCase(
+            case_id="weather",
+            text="哎，今天上午重庆会不会下雨？",
+            require_speech=False,
+            require_fast_speech=True,
+            expected_fast_speech_purposes=("acknowledge_and_check",),
+        )
+        summary = {
+            "interaction_response": {"speech": [], "capabilities": []},
+            "preview_only": False,
+            "cognitive_runtime": {
+                "fast_advance": {
+                    "activities": [
+                        {
+                            "activity_id": "a1",
+                            "role": "progress",
+                            "speech_act": "acknowledge_and_check",
+                            "progress_kind": "check_information",
+                            "source_responsibility_refs": ["r1"],
+                        }
+                    ]
+                },
+                "metadata": {
+                    "fast_communicative_realization_status": "resolved"
+                },
+            },
+        }
+
+        self.assertEqual(validate_live_text_result(case, summary), [])
+
     def test_live_validation_can_forbid_pre_effect_fast_speech(self) -> None:
         case = TextScenarioCase(
             case_id="weather",
@@ -110,6 +141,17 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
 
         summary["route"]["fast_speech"] = None
         self.assertEqual(validate_live_text_result(case, summary), [])
+
+        summary["cognitive_runtime"]["fast_advance"] = {
+            "activities": [
+                {
+                    "role": "progress",
+                    "speech_act": "acknowledge_and_check",
+                }
+            ]
+        }
+        errors = validate_live_text_result(case, summary)
+        self.assertTrue(any("forbidden pre-effect" in item for item in errors))
 
     def test_manifest_rejects_contradictory_fast_speech_policy(self) -> None:
         manifest = load_manifest(DEFAULT_MANIFEST)

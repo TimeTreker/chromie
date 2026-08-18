@@ -132,16 +132,8 @@ _CANONICAL_GOAL_ID_KEYS = frozenset(
     }
 )
 
-_SEMANTIC_BINDING_NAME = re.compile(r"[a-z][a-z0-9_]{0,79}")
-
-
 class _GoalInterpretationAuthorityViolation(ValueError):
     """Goal Interpretation attempted to claim downstream identity/authority."""
-
-
-def _raise_if_llm_budget_failure(exc: Exception) -> None:
-    if isinstance(exc, OllamaGenerationError) and exc.failure_domain == "llm_budget":
-        raise exc
 
 
 def _without_goal_interpretation_authority(value: Any) -> Any:
@@ -241,14 +233,13 @@ def _reject_canonical_goal_identity_refs(
             )
 
 
-def _reject_unknown_goal_and_gap_refs(
+def _reject_unknown_goal_refs(
     request: GoalInterpretationRequest,
     parsed: dict[str, Any],
 ) -> None:
-    """Require GI continuity references to copy supplied Context identity exactly."""
+    """Require GI Goal-continuity references to copy supplied Context exactly."""
 
     known_goal_ids: set[str] = set()
-    known_gap_ids: set[str] = set()
     for key in (
         "active_goal_snapshots",
         "recent_goal_snapshots",
@@ -269,12 +260,6 @@ def _reject_unknown_goal_and_gap_refs(
             value = " ".join(str(goal.get("goal_id") or "").strip().split())
             if value:
                 known_goal_ids.add(value)
-            for gap in item.get("open_information_gaps") or []:
-                if not isinstance(gap, dict):
-                    continue
-                gap_id = " ".join(str(gap.get("gap_id") or "").strip().split())
-                if gap_id:
-                    known_gap_ids.add(gap_id)
     responsibilities = parsed.get("responsibilities")
     if not isinstance(responsibilities, list):
         return
@@ -289,15 +274,6 @@ def _reject_unknown_goal_and_gap_refs(
             raise _GoalInterpretationAuthorityViolation(
                 f"responsibilities[{index}] targets unknown Goal IDs: "
                 + ",".join(unknown_goals)
-            )
-        resolved_ids = item.get("resolved_gap_ids") or []
-        unknown_gaps = sorted(
-            str(value) for value in resolved_ids if str(value) not in known_gap_ids
-        )
-        if unknown_gaps:
-            raise _GoalInterpretationAuthorityViolation(
-                f"responsibilities[{index}] resolves unknown InformationGap IDs: "
-                + ",".join(unknown_gaps)
             )
 
 
@@ -696,6 +672,7 @@ class OllamaGoalInterpreter:
         *,
         ollama_url: str,
         model: str,
+        deep_model: str | None = None,
         timeout_ms: int,
         num_ctx: int = 4096,
         num_predict: int = 512,
@@ -704,6 +681,7 @@ class OllamaGoalInterpreter:
     ) -> None:
         self.ollama_url = ollama_url.rstrip("/")
         self.model = model
+        self.deep_model = str(deep_model or model).strip() or model
         self.timeout_s = max(0.1, timeout_ms / 1000.0)
         self.num_ctx = max(2048, int(num_ctx))
         self.num_predict = max(32, num_predict)
@@ -744,44 +722,43 @@ class OllamaGoalInterpreter:
             f"{_bounded_json(_without_goal_interpretation_authority(request.context.get('interaction_context') or {}), max_chars=2400)}\n"
             "Recent accepted dialogue JSON:"
             f"{_bounded_json_array(_compact_recent_dialogue(request.context), max_chars=1800)}\n"
-            "Active Goal semantics with commit-safe identity and InformationGaps JSON:"
+            "Active Goal semantics with commit-safe identity and Planner-owned pending gaps JSON:"
             f"{_bounded_json_array(_compact_active_goal_snapshots(request.context), max_chars=1400)}\n"
             "Active Task/Activity progress with identity and pending clarification JSON:"
             f"{_bounded_json_array(_compact_active_task_snapshots(request.context), max_chars=1400)}\n\n"
             "Interpret contextual WHAT. For every Responsibility, also state whether it "
-            "is new or modifies/continues/cancels a supplied Goal, copy exact target Goal "
-            "IDs, preserve unresolved InformationGaps, and copy any resolved gap IDs. A "
-            "short answer to a pending clarification modifies that Goal; it is not an "
-            "isolated new request. Goal Association will verify and commit this result. "
-            "An ask_user InformationGap must name each specific missing user-resolvable "
-            "semantic binding in required_for using its lowercase snake_case binding "
-            "name; natural-language result descriptions and already-bound values are "
-            "invalid. An external result that Chromie must query is fresh Evidence, not "
-            "a value to ask the user for. "
+            "is new or modifies/continues/clarifies/cancels a supplied Goal and copy exact "
+            "target Goal IDs. A short answer to a pending clarification supplies the "
+            "applicable semantic binding and relates to that Goal; it is not an isolated "
+            "new request. Do not create, resolve, classify, or copy an InformationGap. "
+            "Do not decide that a Capability/execution parameter is missing or choose "
+            "ask_user, context, observation, query, or default. Missing execution inputs "
+            "belong to Fast Planner. External Evidence is fresh Evidence, not semantic "
+            "uncertainty or a value to ask the user for. Goal Association will verify and "
+            "commit the Goal relationship. "
             "Return responsibilities, confidence, and unresolved semantic uncertainty. "
             "For directly named entities, preserve "
             "the exact current-turn user-language surface in bindings; never translate or "
             "provider-canonicalize it. No route, intent, response wording, Activity, Work, "
-            "Plan, Capability, Tool, provider, or executable args. Use only Goal, Task, "
-            "Activity, and InformationGap IDs explicitly supplied in Context."
+            "Plan, Capability, Tool, provider, executable args, or input-resolution "
+            "strategy. Copy only Goal IDs explicitly supplied in Context."
         )
 
     @staticmethod
     def _goal_interpretation_response_schema(
         *,
-        forbidden_ask_user_binding_names: tuple[str, ...] = (),
+        forbidden_unresolved_values: tuple[str, ...] = (),
     ) -> dict[str, Any]:
         schema = GoalInterpretationDecision.model_json_schema()
         schema["additionalProperties"] = False
         schema["required"] = ["confidence", "responsibilities", "unresolved"]
-        if forbidden_ask_user_binding_names:
+        if forbidden_unresolved_values:
             unresolved = schema.get("properties", {}).get("unresolved")
             if isinstance(unresolved, dict):
-                # The rejected DTO treated already-bound values as semantic
-                # uncertainty.  One mechanical repair must remove that false
-                # uncertainty completely rather than move it to an external-result
-                # paraphrase and require a forbidden repair chain.
-                unresolved["maxItems"] = 0
+                unresolved["items"] = {
+                    "type": "string",
+                    "not": {"enum": list(forbidden_unresolved_values)},
+                }
         responsibility = schema.get("$defs", {}).get(
             "CognitiveResponsibilityProposal"
         )
@@ -792,72 +769,59 @@ class OllamaGoalInterpreter:
                 "bindings",
                 "relationship",
                 "target_goal_ids",
-                "information_gaps",
-                "resolved_gap_ids",
                 "completion_requires_work",
                 "completion_requires_fresh_evidence",
                 "confidence",
             ]
-        information_gap = schema.get("$defs", {}).get("InformationGap")
-        if isinstance(information_gap, dict):
-            required_for = information_gap.get("properties", {}).get(
-                "required_for"
-            )
-            if isinstance(required_for, dict):
-                required_for["items"] = {
-                    "type": "string",
-                    "pattern": "^[a-z][a-z0-9_]{0,79}$",
-                }
-            if forbidden_ask_user_binding_names:
-                information_gap.setdefault("allOf", []).append(
-                    {
-                        "if": {
-                            "properties": {
-                                "preferred_resolution": {"const": "ask_user"}
-                            },
-                            "required": ["preferred_resolution"],
-                        },
-                        "then": {
-                            "properties": {
-                                "required_for": {
-                                    "items": {
-                                        "type": "string",
-                                        "pattern": "^[a-z][a-z0-9_]{0,79}$",
-                                        "not": {
-                                            "enum": list(
-                                                forbidden_ask_user_binding_names
-                                            )
-                                        },
-                                    }
-                                }
-                            }
-                        },
-                    }
-                )
         return schema
 
     @staticmethod
-    def _already_bound_ask_user_names(
+    def _already_bound_unresolved_values(
         validation_error: Exception,
     ) -> tuple[str, ...]:
         if not isinstance(validation_error, ValidationError):
             return ()
-        names: set[str] = set()
+
+        def scalar_texts(value: Any) -> set[str]:
+            if isinstance(value, str):
+                normalized = " ".join(value.strip().casefold().split())
+                return {normalized} if normalized else set()
+            if isinstance(value, dict):
+                return {
+                    text
+                    for item in value.values()
+                    for text in scalar_texts(item)
+                }
+            if isinstance(value, (list, tuple)):
+                return {
+                    text
+                    for item in value
+                    for text in scalar_texts(item)
+                }
+            return set()
+
+        rejected_values: set[str] = set()
         for error in validation_error.errors(include_url=False):
-            message = str(error.get("msg") or "")
-            if "ask_user" not in message:
+            if "already-bound semantic values are not unresolved" not in str(
+                error.get("msg") or ""
+            ):
                 continue
             rejected = error.get("input")
             if not isinstance(rejected, dict):
                 continue
-            bindings = rejected.get("bindings")
-            if isinstance(bindings, dict):
-                names.update(
-                    str(name)
-                    for name in bindings
-                    if _SEMANTIC_BINDING_NAME.fullmatch(str(name)) is not None
-                )
-        return tuple(sorted(names))
+            bound_values = {
+                text
+                for item in rejected.get("responsibilities") or []
+                if isinstance(item, dict)
+                for text in scalar_texts(item.get("bindings") or {})
+            }
+            rejected_values.update(
+                value
+                for item in rejected.get("unresolved") or []
+                if (value := " ".join(str(item or "").strip().split()))
+                and value.casefold() in bound_values
+            )
+        return tuple(sorted(rejected_values))
 
     def build_interpretation_payload(
         self, request: GoalInterpretationRequest
@@ -890,36 +854,18 @@ class OllamaGoalInterpreter:
         validation_error: Exception,
     ) -> dict[str, Any]:
         del previous_content
-        forbidden_binding_names = self._already_bound_ask_user_names(
+        forbidden_unresolved_values = self._already_bound_unresolved_values(
             validation_error
         )
         payload = self.build_interpretation_payload(request)
         payload["format"] = self._goal_interpretation_response_schema(
-            forbidden_ask_user_binding_names=forbidden_binding_names,
+            forbidden_unresolved_values=forbidden_unresolved_values,
         )
-        ask_user_repair = (
-            " The rejected DTO encoded an ask_user gap incorrectly. Re-evaluate the "
-            "authoritative turn: ask_user is only for a genuinely absent semantic "
-            "binding and must never request an already-bound value. An external result "
-            "Chromie was asked to find requires fresh Evidence; represent any retained "
-            "external acquisition gap with query_trusted_service, or omit the gap when "
-            "completion_requires_fresh_evidence already expresses that need. Top-level "
-            "unresolved must be empty in this repair because the rejected items were "
-            "already-bound values, not uncertainty about user meaning. Re-read the "
-            "current question form and preserve its full requested answer scope; an "
-            "open descriptive question must not become a guessed yes/no condition."
-            if forbidden_binding_names
-            else ""
-        )
-        external_evidence_repair = (
-            " The rejected DTO listed external Evidence acquisition as unresolved "
-            "semantic meaning. Keep completion_requires_fresh_evidence=true and, when "
-            "useful, a query_trusted_service or observe_environment InformationGap, "
-            "but remove that acquisition need from top-level unresolved. Re-read the "
-            "current question form and preserve its full requested answer scope; an "
-            "open descriptive question must not become a guessed yes/no condition."
-            if "external Evidence acquisition is not unresolved semantic meaning"
-            in str(validation_error)
+        bound_uncertainty_repair = (
+            " The rejected DTO copied already-resolved binding values into top-level "
+            "unresolved. Preserve those bindings and remove those exact values from "
+            "unresolved; retain only genuine uncertainty about WHAT the user means."
+            if forbidden_unresolved_values
             else ""
         )
         payload["messages"] = [
@@ -931,14 +877,15 @@ class OllamaGoalInterpreter:
                     "Remove every field outside the schema. Never translate a rejected "
                     "route/intent/Capability/Activity/Work/Plan/provider field into another "
                     "implementation hint. Preserve only the human outcome, material semantic "
-                    "bindings, supplied Goal/InformationGap relationships, "
+                    "bindings, supplied Goal relationships, "
                     "work/fresh-evidence requirements, confidence, and genuine "
-                    "semantic uncertainty. A directly named entity binding must copy the exact "
+                    "semantic uncertainty. Never create/resolve an InformationGap or "
+                    "choose input-source/default/clarification policy. A directly named "
+                    "entity binding must copy the exact "
                     "current-turn surface; never translate or transliterate it. Provider timezone "
                     "or clock-range choices for an already-preserved relative time are not semantic "
                     "uncertainty."
-                    + ask_user_repair
-                    + external_evidence_repair
+                    + bound_uncertainty_repair
                     + " Return JSON only."
                 ),
             },
@@ -957,6 +904,101 @@ class OllamaGoalInterpreter:
         ]
         return payload
 
+    def build_deep_interpretation_payload(
+        self,
+        request: GoalInterpretationRequest,
+    ) -> dict[str, Any]:
+        """Build one source-based Deep GI escalation with unchanged authority.
+
+        The accepted Fast DTO is deliberately absent.  Deep Goal Interpretation
+        re-reads the authoritative turn and bounded semantic context instead of
+        reviewing or repairing prior model wording.
+        """
+
+        payload = self.build_interpretation_payload(request)
+        payload["model"] = self.deep_model
+        # The deeper source-based pass is a separate semantic invocation, not
+        # provider chain-of-thought. Qwen can spend the entire bounded structured-
+        # output budget in provider thinking and return no DTO, so keep that
+        # transport mode disabled just like every other maintained JSON boundary.
+        payload["think"] = False
+        payload["messages"] = [
+            {
+                "role": "system",
+                "content": (
+                    self.load_system_prompt()
+                    + "\n\nDeep Goal Interpretation: use broader reasoning over the "
+                    "authoritative turn and bounded semantic context, but keep exactly "
+                    "the same WHAT-only authority and output schema. Reconsider only "
+                    "genuine consequential ambiguity in the person's intended outcome, "
+                    "scope, Goal relationship, or referent. Preserve unresolved meaning "
+                    "when the source does not determine it. A missing execution input or "
+                    "external answer is not semantic ambiguity. Do not create or resolve "
+                    "an InformationGap; do not choose ask_user, context, observation, "
+                    "query, default, Work, a Capability, provider, or executable arguments. "
+                    "Return one final JSON object only."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    self.build_interpretation_user_prompt(request)
+                    + "\n\nPerform one fresh Deep interpretation from the source above. "
+                    "No prior interpretation DTO is supplied or authoritative."
+                ),
+            },
+        ]
+        return payload
+
+    @staticmethod
+    def _requires_deep_semantic_interpretation(
+        decision: GoalInterpretationDecision,
+    ) -> bool:
+        """Escalate only model-declared unresolved Responsibility meaning."""
+
+        return bool(decision.unresolved)
+
+    @staticmethod
+    def _validate_interpretation_content(
+        request: GoalInterpretationRequest,
+        content: str,
+    ) -> GoalInterpretationDecision:
+        parsed = _extract_json_object(content)
+        _reject_planner_shaped_goal_interpretation(parsed)
+        _reject_canonical_goal_identity_refs(request, parsed)
+        _reject_unknown_goal_refs(request, parsed)
+        _reject_unprovenanced_location_bindings(request, parsed)
+        _reject_runtime_identity_bindings(request, parsed)
+        return GoalInterpretationDecision.model_validate(parsed)
+
+    async def _accept_or_deepen_interpretation(
+        self,
+        request: GoalInterpretationRequest,
+        decision: GoalInterpretationDecision,
+    ) -> GoalInterpretationDecision:
+        if not self._requires_deep_semantic_interpretation(decision):
+            return decision
+        logger.info(
+            "goal_interpretation_deep_escalation sid=%s reason=%s",
+            request.sid,
+            "material_unresolved_responsibility_meaning",
+        )
+        try:
+            data = await self._chat_logged(
+                self.build_deep_interpretation_payload(request),
+                stage="goal_interpretation_deep",
+                request=request,
+            )
+            return self._validate_interpretation_content(
+                request,
+                str(data.get("message", {}).get("content") or ""),
+            )
+        except Exception as exc:
+            raise InterpretationUnavailableError(
+                "invalid_deep_goal_interpretation: "
+                f"{type(exc).__name__}: {exc}"
+            ) from exc
+
     async def interpret_goal(
         self, request: GoalInterpretationRequest
     ) -> GoalInterpretationDecision:
@@ -967,20 +1009,14 @@ class OllamaGoalInterpreter:
                 request=request,
             )
         except Exception as exc:
-            _raise_if_llm_budget_failure(exc)
             raise InterpretationUnavailableError(
                 f"goal_interpreter_error:{type(exc).__name__}: {exc}"
             ) from exc
 
         content = str(data.get("message", {}).get("content") or "")
         try:
-            parsed = _extract_json_object(content)
-            _reject_planner_shaped_goal_interpretation(parsed)
-            _reject_canonical_goal_identity_refs(request, parsed)
-            _reject_unknown_goal_and_gap_refs(request, parsed)
-            _reject_unprovenanced_location_bindings(request, parsed)
-            _reject_runtime_identity_bindings(request, parsed)
-            return GoalInterpretationDecision.model_validate(parsed)
+            decision = self._validate_interpretation_content(request, content)
+            return await self._accept_or_deepen_interpretation(request, decision)
         except (_GoalInterpretationAuthorityViolation, ValueError, ValidationError) as exc:
             logger.warning(
                 "Invalid WHAT-only Goal Interpretation DTO sid=%s error=%s content=%r",
@@ -998,15 +1034,12 @@ class OllamaGoalInterpreter:
                     stage="goal_interpretation_contract_repair",
                     request=request,
                 )
-                parsed = _extract_json_object(str(repaired.get("message", {}).get("content") or ""))
-                _reject_planner_shaped_goal_interpretation(parsed)
-                _reject_canonical_goal_identity_refs(request, parsed)
-                _reject_unknown_goal_and_gap_refs(request, parsed)
-                _reject_unprovenanced_location_bindings(request, parsed)
-                _reject_runtime_identity_bindings(request, parsed)
-                return GoalInterpretationDecision.model_validate(parsed)
+                decision = self._validate_interpretation_content(
+                    request,
+                    str(repaired.get("message", {}).get("content") or ""),
+                )
+                return await self._accept_or_deepen_interpretation(request, decision)
             except Exception as repair_exc:
-                _raise_if_llm_budget_failure(repair_exc)
                 raise InterpretationUnavailableError(
                     "invalid_goal_interpretation_after_one_dto_repair: "
                     f"{type(repair_exc).__name__}: {repair_exc}"

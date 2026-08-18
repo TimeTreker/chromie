@@ -58,7 +58,7 @@ def collect_observations(
     *,
     behavior_map: dict[str, dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    """Normalize user-observable speech and embodied effects.
+    """Normalize user-observable speech and completed Capability effects.
 
     The map translates runtime capability receipts into stable behavior types.
     It is a test oracle only; production planning never reads it.
@@ -92,7 +92,7 @@ def collect_observations(
         capability_id = str(
             skill.get("capability_id") or ""
         )
-        if not capability_id.startswith("soridormi."):
+        if not capability_id:
             continue
         definition = behavior_map.get(capability_id, {})
         metadata = skill.get("metadata") if isinstance(skill.get("metadata"), dict) else {}

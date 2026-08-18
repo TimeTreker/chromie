@@ -937,7 +937,6 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                 ],
                 "referent_updates": [],
                 "resolved_references": [],
-                "clarification": "",
                 "confidence": 1.0,
                 "reason_summary": "One complete resource responsibility.",
             }

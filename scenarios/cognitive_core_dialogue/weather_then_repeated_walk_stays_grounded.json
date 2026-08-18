@@ -36,9 +36,7 @@
                   "completion_requires_fresh_evidence": true,
                   "confidence": 0.96,
                   "relationship": "new",
-                  "target_goal_ids": [],
-                  "information_gaps": [],
-                  "resolved_gap_ids": []
+                  "target_goal_ids": []
                 }
               ],
               "unresolved": []
@@ -89,9 +87,7 @@
                   "completion_requires_fresh_evidence": false,
                   "confidence": 0.97,
                   "relationship": "new",
-                  "target_goal_ids": [],
-                  "information_gaps": [],
-                  "resolved_gap_ids": []
+                  "target_goal_ids": []
                 }
               ],
               "unresolved": []
@@ -146,9 +142,7 @@
                   "completion_requires_fresh_evidence": false,
                   "confidence": 0.97,
                   "relationship": "new",
-                  "target_goal_ids": [],
-                  "information_gaps": [],
-                  "resolved_gap_ids": []
+                  "target_goal_ids": []
                 }
               ],
               "unresolved": []

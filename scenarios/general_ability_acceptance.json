@@ -173,7 +173,7 @@
       "level_a_scenarios": [
         {
           "key": "goal_interpretation/ambiguous_move_there",
-          "rationale": "An unidentified destination becomes a user-resolvable InformationGap."
+          "rationale": "GI retains the unidentified destination only as unresolved meaning; it does not create a planning gap or choose to ask."
         },
         {
           "key": "goal_interpretation/low_confidence_do_it",
@@ -185,7 +185,7 @@
         },
         {
           "key": "goal_interpretation/weather_check",
-          "rationale": "A weather request without location asks for that missing user parameter."
+          "rationale": "A weather request without location remains clear at GI; Capability-input completeness and any question belong downstream to Planner."
         },
         {
           "key": "goal_interpretation/chongqing_daytime_weather_is_evidence_not_user_gap",
@@ -193,7 +193,7 @@
         },
         {
           "key": "goal_interpretation/missing_restaurant_recommendation_closes_truthfully",
-          "rationale": "A nearby recommendation request preserves the missing location as an InformationGap."
+          "rationale": "A nearby recommendation remains clear at GI; sourcing a location and choosing whether to ask belong to Planner."
         }
       ],
       "live_text_cases": [
@@ -443,7 +443,7 @@
         },
         {
           "key": "goal_interpretation/weather_check",
-          "rationale": "Weather meaning requires fresh evidence and preserves its missing location."
+          "rationale": "Weather meaning requires fresh evidence without turning a missing Capability location input into GI uncertainty."
         },
         {
           "key": "goal_interpretation/chongqing_daytime_weather_is_evidence_not_user_gap",
@@ -451,7 +451,7 @@
         },
         {
           "key": "goal_interpretation/missing_restaurant_recommendation_closes_truthfully",
-          "rationale": "External recommendation meaning retains its evidence and location requirements."
+          "rationale": "External recommendation meaning retains its evidence need while Planner owns location-input resolution."
         },
         {
           "key": "goal_interpretation/goal_interpretation_remember_preference",
@@ -473,7 +473,7 @@
       "live_text_cases": [
         {
           "id": "chongqing_daytime_weather_progress_and_lookup",
-          "text": "你好，今天重庆白天天气怎么样啊？",
+          "text": "哎，今天上午重庆会不会下雨？",
           "language": "zh-CN",
           "expected_capabilities": [
             "chromie.weather.lookup"
@@ -481,7 +481,7 @@
           "expected_args": [
             "0:location=重庆",
             "0:date=today",
-            "0:period=day"
+            "0:period=morning"
           ],
           "require_speech": true,
           "require_fast_speech": true,
@@ -491,7 +491,7 @@
           "expect_no_fast_contract_failure": true,
           "min_new_goal_count": 1,
           "min_goal_outcome_count": 1,
-          "description": "The reported Chongqing daytime request should speak prompt progress and perform the safe weather lookup without asking the user for the answer."
+          "description": "The retained Chongqing morning-rain request should speak prompt progress and perform the safe weather lookup without asking the user for the answer."
         },
         {
           "id": "beijing_rain_evidence_bound_result",

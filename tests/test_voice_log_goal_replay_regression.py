@@ -193,7 +193,7 @@ class VoiceLogGoalReplayRegressionTests(unittest.TestCase):
             request=request,
         )
 
-        self.assertEqual(validated.resolution_status, "needs_clarification")
+        self.assertEqual(validated.resolution_status, "fail_closed")
         self.assertEqual(validated.associations, [])
         self.assertEqual(validated.new_goals, [])
         self.assertEqual(

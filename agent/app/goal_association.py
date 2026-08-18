@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .goal_progress_communication import goal_progress_communication_prompt
 import copy
+from datetime import date
 import hashlib
 import json
 import logging
@@ -94,8 +95,8 @@ except ImportError:  # pragma: no cover
 logger = logging.getLogger("chromie.agent.goal_association")
 
 
-GoalSegmentationDecision = Literal["create_goals", "clarify"]
-GoalAssociationDecision = Literal["associate", "create_goals", "clarify"]
+GoalSegmentationDecision = Literal["create_goals"]
+GoalAssociationDecision = Literal["associate", "create_goals"]
 GoalResponsibilityKind = Literal[
     "executable_action",
     "vocal_output",
@@ -291,7 +292,8 @@ class GoalAssociationModelBinding(BaseModel):
             "Resolved semantic value. A directly named entity must preserve the exact "
             "contiguous user-language surface from the authoritative current turn; "
             "only an indirect reference backed by supplied discourse provenance may "
-            "use a contextual canonical value."
+            "use a contextual canonical value. Typed temporal bindings are the explicit "
+            "exception: day_part and date use the shared canonical temporal vocabulary."
         ),
     )
     referent_id: str = ""
@@ -305,7 +307,7 @@ class GoalAssociationModelBinding(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def validate_canonical_day_part(self) -> "GoalAssociationModelBinding":
+    def validate_canonical_temporal_value(self) -> "GoalAssociationModelBinding":
         if self.entity_type.casefold() == "day_part" and self.value not in {
             "day",
             "morning",
@@ -317,6 +319,21 @@ class GoalAssociationModelBinding(BaseModel):
                 "day_part bindings require a canonical day-part value: "
                 "day, morning, afternoon, evening, or tonight"
             )
+        if self.entity_type.casefold() == "date":
+            if self.value in {"today", "tomorrow"}:
+                return self
+            try:
+                parsed = date.fromisoformat(self.value)
+            except ValueError as exc:
+                raise ValueError(
+                    "date bindings require a canonical relative date (today or "
+                    "tomorrow) or an ISO 8601 calendar date (YYYY-MM-DD)"
+                ) from exc
+            if parsed.isoformat() != self.value:
+                raise ValueError(
+                    "date bindings require a canonical relative date (today or "
+                    "tomorrow) or an ISO 8601 calendar date (YYYY-MM-DD)"
+                )
         return self
 
 
@@ -771,7 +788,6 @@ class GoalSegmentationModelOutput(BaseModel):
         default_factory=list,
         max_length=12,
     )
-    clarification: str = ""
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reason_summary: str = ""
 
@@ -782,18 +798,10 @@ class GoalSegmentationModelOutput(BaseModel):
             return value
         normalized = dict(value)
         decision = str(normalized.get("decision") or "").strip()
-        if decision not in {"create_goals", "clarify"}:
-            decision = "create_goals" if normalized.get("new_goals") else "clarify"
-        normalized["decision"] = decision
-        if decision == "create_goals":
-            normalized["clarification"] = ""
-        else:
-            normalized["new_goals"] = []
-            normalized["referent_updates"] = []
-            normalized["resolved_references"] = []
+        normalized["decision"] = "create_goals"
         return normalized
 
-    @field_validator("clarification", "reason_summary", mode="before")
+    @field_validator("reason_summary", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
         if isinstance(value, str):
@@ -804,15 +812,13 @@ class GoalSegmentationModelOutput(BaseModel):
     def validate_shape(self) -> "GoalSegmentationModelOutput":
         if self.decision == "create_goals" and not self.new_goals:
             raise ValueError("decision=create_goals requires new_goals")
-        if self.decision == "clarify" and not self.clarification:
-            raise ValueError("decision=clarify requires clarification")
         return self
 
 
 class GoalAssociationModelOutput(BaseModel):
     """Small discriminated semantic DTO returned by Goal Association."""
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     decision: GoalAssociationDecision | None = None
     associations: list[GoalAssociationModelAssociation] = Field(default_factory=list)
@@ -825,7 +831,6 @@ class GoalAssociationModelOutput(BaseModel):
         default_factory=list,
         max_length=12,
     )
-    clarification: str = ""
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reason_summary: str = ""
 
@@ -836,13 +841,11 @@ class GoalAssociationModelOutput(BaseModel):
             return value
         normalized = dict(value)
         decision = str(normalized.get("decision") or "").strip()
-        if decision not in {"associate", "create_goals", "clarify"}:
+        if decision not in {"associate", "create_goals"}:
             if normalized.get("associations"):
                 decision = "associate"
-            elif normalized.get("new_goals"):
-                decision = "create_goals"
             else:
-                decision = "clarify"
+                decision = "create_goals"
         elif (
             decision == "create_goals"
             and not normalized.get("new_goals")
@@ -856,18 +859,11 @@ class GoalAssociationModelOutput(BaseModel):
         ):
             decision = "create_goals"
         normalized["decision"] = decision
-        if decision == "clarify":
+        if decision == "create_goals":
             normalized["associations"] = []
-            normalized["new_goals"] = []
-            normalized["referent_updates"] = []
-            normalized["resolved_references"] = []
-        else:
-            normalized["clarification"] = ""
-            if decision == "create_goals":
-                normalized["associations"] = []
         return normalized
 
-    @field_validator("clarification", "reason_summary", mode="before")
+    @field_validator("reason_summary", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
         if isinstance(value, str):
@@ -876,8 +872,6 @@ class GoalAssociationModelOutput(BaseModel):
 
     @model_validator(mode="after")
     def validate_shape(self) -> "GoalAssociationModelOutput":
-        if self.decision == "clarify" and not self.clarification:
-            raise ValueError("decision=clarify requires clarification")
         if self.decision == "associate" and not self.associations:
             raise ValueError("decision=associate requires associations")
         if self.decision == "create_goals" and not self.new_goals:
@@ -928,10 +922,11 @@ class GoalResponsibilityCoverageItem(BaseModel):
                     "context and framing are acknowledged without Goal ownership"
                 )
             return self
-        if self.coverage == "covered":
+        if self.coverage in {"covered", "clarification_required"}:
             if not self.candidate_goal_indices:
                 raise ValueError(
-                    "covered responsibility or constraint requires Goal ownership"
+                    "covered or clarification-required responsibility/constraint "
+                    "requires provisional Goal ownership"
                 )
             if self.role == "responsibility" and len(self.candidate_goal_indices) != 1:
                 raise ValueError(
@@ -948,7 +943,7 @@ class GoalResponsibilityCoverageItem(BaseModel):
                 )
         elif self.candidate_goal_indices:
             raise ValueError(
-                "missing or clarification-required meaning cannot claim Goal ownership"
+                "missing meaning cannot claim Goal ownership"
             )
         return self
 
@@ -1039,7 +1034,7 @@ class GoalAssociationResolver:
                     span.set_attribute("result_status", status)
                     span.set_attribute("association_count", len(result.associations))
                     span.set_attribute("new_goal_count", len(result.new_goals))
-                    if status not in {"resolved", "needs_clarification"}:
+                    if status != "resolved":
                         span.set_status("error")
         except BaseException:
             trace_scope.finish(state="abandoned")
@@ -1064,7 +1059,6 @@ class GoalAssociationResolver:
             output_type,
             candidate_goals,
             self._discourse_referents(request),
-            clarification_only=False,
             responsibility_count=len(request.responsibilities),
             responsibility_refs=[item.local_ref for item in request.responsibilities],
         )
@@ -1081,6 +1075,7 @@ class GoalAssociationResolver:
         certificate_raw: dict[str, Any] | None = None
         contract_repair_attempted = False
         semantic_reconsideration_attempted = False
+        fresh_temporal_contract_repair: list[str] = []
         optional_referent_recovery: list[dict[str, Any]] = []
         redundant_resource_binding_recovery: list[dict[str, Any]] = []
 
@@ -1228,39 +1223,86 @@ class GoalAssociationResolver:
                                 candidate_goals=candidate_goals,
                                 output_type=output_type,
                                 problems=problems,
-                                force_clarification=clarification_required,
+                                preserve_unresolved_meaning=clarification_required,
                             ),
                             system=self._semantic_review_system_prompt(
                                 output_type,
                                 fresh_resegmentation=True,
                             ),
-                            response_format=(
-                                self._response_schema(
-                                    output_type,
-                                    candidate_goals,
-                                    self._discourse_referents(request),
-                                    clarification_only=True,
-                                    responsibility_count=len(request.responsibilities),
-                                    responsibility_refs=[
-                                        item.local_ref for item in request.responsibilities
-                                    ],
-                                )
-                                if clarification_required
-                                else response_schema
-                            ),
+                            response_format=response_schema,
                             prompt_family="goal_association.fresh_interpretation",
                         ),
                         stage="fresh interpretation",
                     )
-                    # A semantic reconsideration is the final interpretation.  It
-                    # receives no DTO repair.
-                    resolution = await self._validate_contract_output(
-                        reconsidered_raw,
-                        request=request,
-                        turn_id=turn_id,
-                        output_type=output_type,
-                    )
-                    accepted_raw = reconsidered_raw
+                    # Semantic reconsideration receives no semantic repair.  One
+                    # still-unused DTO repair may normalize only non-canonical
+                    # temporal value fields.  The Host proves that every other
+                    # byte-semantic JSON field is unchanged before accepting it.
+                    try:
+                        resolution = await self._validate_contract_output(
+                            reconsidered_raw,
+                            request=request,
+                            turn_id=turn_id,
+                            output_type=output_type,
+                        )
+                        accepted_raw = reconsidered_raw
+                    except ValidationError as fresh_exc:
+                        temporal_paths = self._noncanonical_temporal_binding_paths(
+                            reconsidered_raw
+                        )
+                        if not (
+                            not contract_repair_attempted
+                            and logical_invocations <= 3
+                            and temporal_paths
+                            and self._only_canonical_temporal_validation_errors(
+                                fresh_exc
+                            )
+                        ):
+                            raise
+                        contract_repair_attempted = True
+                        temporal_repaired = normalize_raw(
+                            self._apply_temporal_value_repairs(
+                                before=reconsidered_raw,
+                                repair_output=await invoke(
+                                    self._build_temporal_contract_repair_prompt(
+                                        raw=reconsidered_raw,
+                                        validation_error=self._validation_error_json(
+                                            fresh_exc
+                                        ),
+                                        temporal_paths=temporal_paths,
+                                    ),
+                                    system=self._temporal_contract_repair_system_prompt(),
+                                    response_format=self._temporal_value_repair_response_schema(
+                                        reconsidered_raw,
+                                        temporal_paths,
+                                    ),
+                                    prompt_family=(
+                                        "goal_association.fresh_temporal_contract_repair"
+                                    ),
+                                ),
+                                temporal_paths=temporal_paths,
+                            ),
+                            stage="fresh temporal contract repair",
+                        )
+                        if not self._temporal_repair_preserves_semantics(
+                            before=reconsidered_raw,
+                            after=temporal_repaired,
+                            temporal_paths=temporal_paths,
+                        ):
+                            raise ValueError(
+                                "fresh temporal DTO repair changed non-temporal "
+                                "semantic content"
+                            )
+                        resolution = await self._validate_contract_output(
+                            temporal_repaired,
+                            request=request,
+                            turn_id=turn_id,
+                            output_type=output_type,
+                        )
+                        accepted_raw = temporal_repaired
+                        fresh_temporal_contract_repair = [
+                            self._json_path_text(path) for path in temporal_paths
+                        ]
                     reconsidered_output = output_type.model_validate(accepted_raw)
                     if self._responsibility_coverage_required(
                         reconsidered_output,
@@ -1332,6 +1374,12 @@ class GoalAssociationResolver:
                     "strategy": "drop_inactive_resource_binding_branch",
                     "dropped_count": len(redundant_resource_binding_recovery),
                     "entries": redundant_resource_binding_recovery,
+                }
+            if fresh_temporal_contract_repair:
+                metadata["fresh_temporal_contract_repair"] = {
+                    "strategy": "bounded_same_stage_dto_repair",
+                    "changed_fields": fresh_temporal_contract_repair,
+                    "semantic_fields_unchanged": True,
                 }
             resolution = resolution.model_copy(update={"metadata": metadata})
             return self._validate(
@@ -1512,6 +1560,181 @@ class GoalAssociationResolver:
             )
         return normalized, dropped
 
+    @staticmethod
+    def _only_canonical_temporal_validation_errors(exc: ValidationError) -> bool:
+        errors = exc.errors()
+        if not errors:
+            return False
+        return all(
+            "bindings require a canonical" in str(item.get("msg") or "")
+            for item in errors
+        )
+
+    @classmethod
+    def _noncanonical_temporal_binding_paths(
+        cls,
+        raw: dict[str, Any],
+    ) -> list[tuple[str | int, ...]]:
+        """Locate model-declared temporal bindings with invalid DTO values.
+
+        This inspects typed fields already authored by the model.  It does not
+        infer a date or day part from user wording.
+        """
+
+        paths: list[tuple[str | int, ...]] = []
+
+        def visit(value: Any, path: tuple[str | int, ...]) -> None:
+            if isinstance(value, dict):
+                entity_type = str(value.get("entity_type") or "").casefold()
+                if entity_type in {"date", "day_part"} and "value" in value:
+                    try:
+                        GoalAssociationModelBinding.model_validate(value)
+                    except ValidationError as exc:
+                        if cls._only_canonical_temporal_validation_errors(exc):
+                            paths.append((*path, "value"))
+                for key, item in value.items():
+                    visit(item, (*path, key))
+            elif isinstance(value, list):
+                for index, item in enumerate(value):
+                    visit(item, (*path, index))
+
+        visit(raw, ())
+        return paths
+
+    @staticmethod
+    def _value_at_json_path(value: Any, path: tuple[str | int, ...]) -> Any:
+        current = value
+        for part in path:
+            current = current[part]
+        return current
+
+    @classmethod
+    def _temporal_repair_preserves_semantics(
+        cls,
+        *,
+        before: dict[str, Any],
+        after: dict[str, Any],
+        temporal_paths: list[tuple[str | int, ...]],
+    ) -> bool:
+        if not temporal_paths:
+            return False
+        normalized_before = copy.deepcopy(before)
+        try:
+            for path in temporal_paths:
+                repaired_value = cls._value_at_json_path(after, path)
+                parent = cls._value_at_json_path(after, path[:-1])
+                if not isinstance(parent, dict):
+                    return False
+                if str(parent.get("entity_type") or "").casefold() not in {
+                    "date",
+                    "day_part",
+                }:
+                    return False
+                target = cls._value_at_json_path(normalized_before, path[:-1])
+                target[path[-1]] = repaired_value
+        except (KeyError, IndexError, TypeError):
+            return False
+        return normalized_before == after
+
+    @classmethod
+    def _temporal_value_repair_response_schema(
+        cls,
+        raw: dict[str, Any],
+        temporal_paths: list[tuple[str | int, ...]],
+    ) -> dict[str, Any]:
+        path_schemas: list[dict[str, Any]] = []
+        for path in temporal_paths:
+            parent = cls._value_at_json_path(raw, path[:-1])
+            entity_type = str(parent.get("entity_type") or "").casefold()
+            value_schema: dict[str, Any]
+            if entity_type == "day_part":
+                value_schema = {
+                    "type": "string",
+                    "enum": ["day", "morning", "afternoon", "evening", "tonight"],
+                }
+            else:
+                value_schema = {
+                    "type": "string",
+                    "pattern": (
+                        r"^(?:today|tomorrow|"
+                        r"[0-9]{4}-[0-9]{2}-[0-9]{2})$"
+                    ),
+                }
+            path_schemas.append(
+                {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "path": {"const": cls._json_path_text(path)},
+                        "value": value_schema,
+                    },
+                    "required": ["path", "value"],
+                }
+            )
+        return {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "repairs": {
+                    "type": "array",
+                    "items": {"oneOf": path_schemas},
+                    "minItems": len(temporal_paths),
+                    "maxItems": len(temporal_paths),
+                }
+            },
+            "required": ["repairs"],
+        }
+
+    @classmethod
+    def _apply_temporal_value_repairs(
+        cls,
+        *,
+        before: dict[str, Any],
+        repair_output: Any,
+        temporal_paths: list[tuple[str | int, ...]],
+    ) -> dict[str, Any]:
+        if not isinstance(repair_output, dict):
+            raise ValueError("temporal value repair output must be an object")
+        repairs = repair_output.get("repairs")
+        if not isinstance(repairs, list):
+            raise ValueError("temporal value repair output requires repairs")
+        expected = {
+            cls._json_path_text(path): path for path in temporal_paths
+        }
+        authored: dict[str, Any] = {}
+        for item in repairs:
+            if not isinstance(item, dict) or set(item) != {"path", "value"}:
+                raise ValueError("temporal value repair entries require only path and value")
+            path_text = str(item.get("path") or "")
+            if path_text not in expected or path_text in authored:
+                raise ValueError(
+                    "temporal value repair must cover each authorized path exactly once"
+                )
+            authored[path_text] = item.get("value")
+        if set(authored) != set(expected):
+            raise ValueError(
+                "temporal value repair must cover each authorized path exactly once"
+            )
+
+        repaired = copy.deepcopy(before)
+        for path_text, path in expected.items():
+            parent = cls._value_at_json_path(repaired, path[:-1])
+            candidate = dict(parent)
+            candidate["value"] = authored[path_text]
+            GoalAssociationModelBinding.model_validate(candidate)
+            parent[path[-1]] = authored[path_text]
+        return repaired
+
+    @staticmethod
+    def _json_path_text(path: tuple[str | int, ...]) -> str:
+        rendered = "$"
+        for part in path:
+            if isinstance(part, int):
+                rendered += f"[{part}]"
+            else:
+                rendered += f".{part}"
+        return rendered
+
     async def _validate_contract_output(
         self,
         raw: dict[str, Any],
@@ -1523,6 +1746,32 @@ class GoalAssociationResolver:
         ),
     ) -> GoalAssociationResolution:
         model_output = output_type.model_validate(raw)
+        gaps_by_goal_id = {
+            str(goal.get("goal_id") or "").strip(): {
+                str(gap.get("gap_id") or "").strip()
+                for gap in (goal.get("open_information_gaps") or [])
+                if isinstance(gap, dict) and str(gap.get("gap_id") or "").strip()
+            }
+            for goal in self._candidate_goals(request)
+            if str(goal.get("goal_id") or "").strip()
+        }
+        invalid_resolved_gaps = [
+            gap_id
+            for association in getattr(model_output, "associations", [])
+            for gap_id in association.resolved_gap_ids
+            if gap_id
+            not in {
+                candidate_gap
+                for goal_id in association.target_goal_ids
+                for candidate_gap in gaps_by_goal_id.get(goal_id, set())
+            }
+        ]
+        if invalid_resolved_gaps:
+            raise ValueError(
+                "Goal Association may resolve only pending Planner gaps on its exact "
+                "target Goals: "
+                + ",".join(sorted(set(invalid_resolved_gaps)))
+            )
         collection_bindings = self._action_collection_bindings(model_output)
         if collection_bindings:
             raise ValueError(
@@ -1807,7 +2056,6 @@ class GoalAssociationResolver:
         candidate_goals: list[dict[str, Any]],
         discourse_referents: list[dict[str, Any]],
         *,
-        clarification_only: bool = False,
         responsibility_count: int | None = None,
         responsibility_refs: list[str] | None = None,
     ) -> dict[str, Any]:
@@ -1821,6 +2069,13 @@ class GoalAssociationResolver:
             " ".join(str(item.get("referent_id") or "").strip().split())
             for item in discourse_referents
             if " ".join(str(item.get("referent_id") or "").strip().split())
+        ]
+        gap_ids = [
+            " ".join(str(gap.get("gap_id") or "").strip().split())
+            for goal in candidate_goals
+            for gap in (goal.get("open_information_gaps") or [])
+            if isinstance(gap, dict)
+            and " ".join(str(gap.get("gap_id") or "").strip().split())
         ]
         responsibility_refs = list(responsibility_refs or [])
         properties = schema.get("properties", {})
@@ -1881,6 +2136,16 @@ class GoalAssociationResolver:
                             "enum": referent_ids,
                         }
                         target_referents["uniqueItems"] = True
+                    resolved_gaps = node_properties.get("resolved_gap_ids")
+                    if isinstance(resolved_gaps, dict):
+                        if gap_ids:
+                            resolved_gaps["items"] = {
+                                "type": "string",
+                                "enum": gap_ids,
+                            }
+                            resolved_gaps["uniqueItems"] = True
+                        else:
+                            resolved_gaps["maxItems"] = 0
                     referent_id = node_properties.get("referent_id")
                     if isinstance(referent_id, dict):
                         referent_id["type"] = "string"
@@ -1899,21 +2164,20 @@ class GoalAssociationResolver:
         if output_type is GoalSegmentationModelOutput:
             properties["decision"] = {
                 "type": "string",
-                "enum": ["create_goals", "clarify"],
+                "enum": ["create_goals"],
             }
             ordered_required = [
                 "decision",
                 "new_goals",
                 "referent_updates",
                 "resolved_references",
-                "clarification",
                 "confidence",
                 "reason_summary",
             ]
         else:
             properties["decision"] = {
                 "type": "string",
-                "enum": ["associate", "create_goals", "clarify"],
+                "enum": ["associate", "create_goals"],
             }
             ordered_required = [
                 "decision",
@@ -1921,28 +2185,10 @@ class GoalAssociationResolver:
                 "new_goals",
                 "referent_updates",
                 "resolved_references",
-                "clarification",
                 "confidence",
                 "reason_summary",
             ]
         schema["required"] = list(dict.fromkeys([*ordered_required, *required]))
-        if clarification_only:
-            properties["decision"] = {"type": "string", "enum": ["clarify"]}
-            clarification = properties.get("clarification")
-            if isinstance(clarification, dict):
-                clarification["minLength"] = 1
-            new_goals = properties.get("new_goals")
-            if isinstance(new_goals, dict):
-                new_goals["maxItems"] = 0
-            associations = properties.get("associations")
-            if isinstance(associations, dict):
-                associations["maxItems"] = 0
-            referent_updates = properties.get("referent_updates")
-            if isinstance(referent_updates, dict):
-                referent_updates["maxItems"] = 0
-            resolved_references = properties.get("resolved_references")
-            if isinstance(resolved_references, dict):
-                resolved_references["maxItems"] = 0
         schema.pop("oneOf", None)
         schema.pop("anyOf", None)
         return GoalAssociationResolver._resource_semantic_contract_response_schema(
@@ -2006,6 +2252,25 @@ class GoalAssociationResolver:
                                 "evening",
                                 "tonight",
                             ]
+                        }
+                    },
+                    "required": ["value"],
+                },
+            }
+        )
+        clauses.append(
+            {
+                "if": {
+                    "properties": {"entity_type": {"const": "date"}},
+                    "required": ["entity_type"],
+                },
+                "then": {
+                    "properties": {
+                        "value": {
+                            "pattern": (
+                                r"^(?:today|tomorrow|"
+                                r"[0-9]{4}-[0-9]{2}-[0-9]{2})$"
+                            )
                         }
                     },
                     "required": ["value"],
@@ -2191,11 +2456,11 @@ class GoalAssociationResolver:
         if output_type is GoalSegmentationModelOutput:
             state_instructions = (
                 "There are no active or retained recent Goals, so no existing-goal relationship is possible and the contract intentionally has no associations field. "
-                "Segment the authoritative user turn into independent new Goals, or return a clarification if the human-level outcome is materially ambiguous or still lacks semantic information required to define what Chromie owes. "
+                "Segment the authoritative user turn into independent new Goals. When GI preserves unresolved material meaning, create the narrowest source-grounded provisional Goal without inventing the missing referent or scope; Fast Planner owns any clarification decision. "
             )
             output_instructions = (
-                "Return only JSON with decision, new_goals, referent_updates, resolved_references, clarification, confidence, and reason_summary. "
-                "Use decision=create_goals when every material part of the owed outcome is semantically defined. Use decision=clarify for genuinely ambiguous meaning or unresolved material semantic information required to define that outcome; do not clarify for provider or execution details of an already-defined outcome. "
+                "Return only JSON with decision, new_goals, referent_updates, resolved_references, confidence, and reason_summary. "
+                "Use decision=create_goals and preserve each source-grounded Responsibility, including a provisional Goal whose exact referent or scope remains unresolved. Do not author a question or decide input-resolution policy. "
                 "The decoder enforces the exact GoalSegmentationModelOutput JSON Schema. "
             )
         else:
@@ -2203,22 +2468,22 @@ class GoalAssociationResolver:
                 "Resolve continuity before creation using semantic reasoning. "
                 "For continuity with an existing goal, emit an associations item with source_responsibility_refs, relationship, target_goal_ids, confidence, reason_summary, the applicable updated_description, resolved_gap_ids, and requires_replan fields. "
                 "relationship must be copied exactly from [\"continue\",\"modify\",\"clarify\",\"confirm\",\"reject\",\"cancel\",\"pause\",\"resume\",\"merge\",\"split\",\"reference\"]. "
-                "Use continue only when the current turn advances unchanged unfinished active or recoverable work. Use reference when the current turn asks to retrieve, restate, explain, compare, verify, or otherwise answer from a retained Goal without changing its meaning or lifecycle. Do not use continue or reference merely because the topic overlaps with a previous Goal. When the latest turn is a social reaction, acknowledgement, personal feeling, practical decision, conversational evaluation, empathy-seeking comment, or another independently satisfiable communicative act, create a fresh vocal_output Goal that captures that latest intent; prior delivered information remains context for that answer. Use modify only when the same Responsibility is being refined and include updated_description or resolved_gap_ids. When the user abandons that Responsibility for a genuinely different outcome, return decision=create_goals with a new Goal whose supersedes_goal_ids names the old Goal; never mutate the old Goal through an association. The association relationship clarify means the current user turn supplies missing information for a Goal and must include updated_description or resolved_gap_ids; it never means that the user is asking Chromie for more explanation. When Chromie still lacks material semantic information required to define the current owed outcome, or the user's meaning itself is ambiguous, use top-level decision=clarify instead of guessing or deferring that meaning to planning. "
+                "Use continue only when the current turn advances unchanged unfinished active or recoverable work. Use reference when the current turn asks to retrieve, restate, explain, compare, verify, or otherwise answer from a retained Goal without changing its meaning or lifecycle. Do not use continue or reference merely because the topic overlaps with a previous Goal. When the latest turn is a social reaction, acknowledgement, personal feeling, practical decision, conversational evaluation, empathy-seeking comment, or another independently satisfiable communicative act, create a fresh vocal_output Goal that captures that latest intent; prior delivered information remains context for that answer. Use modify only when the same Responsibility is being refined and include updated_description or resolved_gap_ids. When the user abandons that Responsibility for a genuinely different outcome, return decision=create_goals with a new Goal whose supersedes_goal_ids names the old Goal; never mutate the old Goal through an association. The association relationship clarify means the current user turn supplies missing information for a Goal and must include updated_description or resolved_gap_ids; it never means that the user is asking Chromie for more explanation. When GI preserves unresolved material meaning, create or associate the narrowest source-grounded provisional Goal without inventing that meaning; Fast Planner alone decides whether and how to ask. "
                 "Use confirm only when the current turn approves a pending proposal for the targeted Goal, and use reject only when it declines that proposal. "
                 "Associations may target only IDs from the bounded candidate-goal list. A recent terminal Goal may be referenced without reopening or changing its terminal lifecycle state. "
                 "An association cannot rewrite an existing Goal's typed material bindings. When your semantic judgment is that the current user meaning changes a material entity or parameter, preserve the old Goal and return decision=create_goals with a complete replacement Goal and authoritative bindings. "
             )
             output_instructions = (
-                "Return only JSON with decision, associations, new_goals, referent_updates, resolved_references, clarification, confidence, and reason_summary. "
-                "Use decision=associate for continuity, decision=create_goals for semantically defined independent work, or decision=clarify when meaning is genuinely ambiguous or material semantic information required to define the owed outcome is unresolved. New Goals may copy related_goal_ids from the bounded active Goal list when that relationship helps later reasoning; this contextual relationship does not itself reopen or add the retained Goal to the current responsibility. "
+                "Return only JSON with decision, associations, new_goals, referent_updates, resolved_references, confidence, and reason_summary. "
+                "Use decision=associate for continuity or decision=create_goals for independent work, including provisional source-grounded Goals with unresolved meaning retained outside this DTO for Planner. New Goals may copy related_goal_ids from the bounded active Goal list when that relationship helps later reasoning; this contextual relationship does not itself reopen or add the retained Goal to the current responsibility. "
                 "The decoder enforces the exact GoalAssociationModelOutput JSON Schema. "
             )
         return (
             state_instructions
             + "Goal Association receives provider-neutral Responsibility evidence, not a route or intent classification. "
-            "Each Responsibility also carries GI's context-grounded Goal relationship, target_goal_ids, InformationGaps, and resolved_gap_ids. Verify those proposals against the complete candidate Goal list and authoritative turn; preserve a correct obvious clarification answer instead of interpreting its short surface as a new Goal. Goal Association remains the sole canonical commit authority. "
+            "Each Responsibility also carries GI's context-grounded Goal relationship and target_goal_ids. Verify those proposals against the complete candidate Goal list and authoritative turn; preserve a correct answer to a pending Planner clarification as a Goal update instead of interpreting its short surface as a new Goal. Goal Association remains the sole canonical commit authority and may resolve a supplied pending gap only through its canonical association update. "
             "No compatibility label may force a clarification branch or attach the turn to an existing Goal. "
-            "Create or associate a Goal whenever the human-level owed outcome is defined, even when one execution binding is represented by a GI InformationGap. That incomplete Goal must persist while Fast Planner asks the user. Use top-level clarification only when the human outcome or its Goal relationship itself remains ambiguous; never use it merely because a supplied InformationGap still needs an ordinary user value. The Planner owns the clarification Activity and executable realization. "
+            "Create or associate a Goal for every source-grounded human Responsibility even when GI reports bounded unresolved meaning or Fast Planner later finds a missing execution input. That provisional Goal persists while Fast Planner asks the user. Goal Association never selects or words a clarification Activity and never creates a planning InformationGap. "
             + "The model-facing contract is deliberately small. "
             "The host owns all IDs, versions, source text, constraints, metadata, persistence fields, and canonical object construction. "
             "Never emit id, goal_id, association_id, turn_id, schema_version, source_text, constraints, object, metadata, success_criteria, capabilities, or plans. Referent IDs may only be copied from the supplied discourse context; new referent IDs are Host-generated.\n\n"
@@ -2232,16 +2497,16 @@ class GoalAssociationResolver:
             "A factual lookup and the user's requested interpretation of that same evidence are one Goal when one capability result can satisfy both, such as checking weather and judging whether it is hot. Multiple requested aspects of one information result, such as precipitation and whether the resulting temperature is cold, remain one information responsibility when the same result satisfies them. Do not split evidence acquisition, requested result aspects, or interpretation of that result into separate Goals. "
             "A physical action and a conversational answer or spoken performance are independent goals when the answer or performance is genuinely requested. Separate independently requested outcomes that can be accepted or rejected on their own. However, acquisition and delivery stages that together constitute one human responsibility are one Goal: navigating/searching, locating, grasping or retrieving, carrying, returning, and handing over are provider-owned stages of one physical resource delivery; external search, evidence retrieval, evaluation, and spoken explanation are stages of one information resource delivery. Do not split those implementation stages into separate Goals unless the user independently requests one stage as its own outcome. A simple acknowledgement, confirmation, willingness statement, or progress prelude for capability work is not a separate vocal_output Goal; it is prospective conversational output attached to the existing responsibility and every cognitive stage must use Interaction Context to avoid repeating an already fulfilled act. Before returning, verify that every independently satisfiable user responsibility appears in exactly one new_goals item: no merged unrelated outcomes and no duplicated responsibility across Goals. "
             "For a responsibility whose human-level outcome is to obtain something and make it available to a recipient, include exactly one nested resource_responsibility. It is the sole writable resource authority and is discriminated by top-level kind. A physical_object resource means a distinct concrete object that exists independently of Chromie's body motion and whose acquisition plus handover completes the human outcome. It is never a generic wrapper for embodied work: locomotion, body motion, gaze, blinking, waving, turning, posture, and gestures are non-resource body_action Goals, keep resource_responsibility absent, and preserve their material semantic parameters in top-level bindings. For kind=information, use output_mode=capability_work and write every requested query fact—location, time, requested aspect, comparison, threshold, or other answer-shaping scope—exactly once in query_scope. Its source object is intentionally narrow: source.status=provider_resolved delegates public/external source selection; source.status=unknown preserves an unavailable local/private/runtime source; source.status=known is only for a user- or discourse-named information source and then source_name is required. Never copy query_scope facts into source. For kind=physical_object, use output_mode=body_action and delivery_mode=physical_handover; identity and quantity live at resource_responsibility.description/quantity, while source.acquisition_bindings is the only writable location/distance/direction/route surface. Preserve explicit distance and direction separately; source.description is summary only and any numeric fact in it must also exist in acquisition_bindings. Resource Goals keep top-level bindings empty. No flat compatibility copy is created. resource_responsibility must never name or imply a Capability, provider implementation, website, search engine, coordinates, grasp pose, execution mode, or plan. Human-readable descriptions never override typed fields. "
-            "Also preserve semantic qualifiers such as temporal scope, comparison period, and requested answer shape. Temporal scope can contain more than one material dimension. When the user supplies a calendar or relative date together with a local day part, emit separate query_scope bindings for both: entity_type=date with the resolved date value such as today or tomorrow, and entity_type=day_part with exactly one canonical value from day, morning, afternoon, evening, or tonight. Use day for the whole local daylight period. Neither dimension covers or replaces the other. When only a local day part is semantically resolved, represent it provider-neutrally as entity_type=day_part with its canonical value; keep the user's natural wording in the Goal description rather than using a provider-specific clock interval. This is semantic normalization, not Capability selection. Never silently rewrite annual, seasonal, historical, comparative, or otherwise broad scope into current, today, tomorrow, or another narrower scope. If the intended scope is materially ambiguous, return clarification instead of choosing a narrower interpretation. "
-            "Resolve references, pronouns, demonstratives, ellipsis, and task mentions before planning. Authority order is: explicit current user meaning; foreground scoped discourse referents; candidate Goal bindings; recent dialogue. First identify every material indirect referring expression, then require a unique value from that authority order and preserve it in a typed binding or supplied referent. Imperative grammar and a plausible generic noun such as device, object, person, task, or setting are never reference evidence. If two or more contextual candidates remain plausible, or none is supplied, ask a narrow clarification. Phrases such as ‘the last task I told you’ may semantically associate with an active, recoverable, or retained recent terminal Goal, but the model must decide that relationship from the supplied Goal state and dialogue—not from a Host phrase table. Tool-result memory is not reference-resolution authority and must never decide what an unresolved expression refers to. "
+            "Also preserve semantic qualifiers such as temporal scope, comparison period, and requested answer shape. Temporal scope can contain more than one material dimension. When the user supplies a calendar or relative date together with a local day part, emit separate query_scope bindings for both: entity_type=date with the resolved date value such as today or tomorrow, and entity_type=day_part with exactly one canonical value from day, morning, afternoon, evening, or tonight. Use day for the whole local daylight period. Neither dimension covers or replaces the other. When only a local day part is semantically resolved, represent it provider-neutrally as entity_type=day_part with its canonical value; keep the user's natural wording in the Goal description rather than using a provider-specific clock interval. This is semantic normalization, not Capability selection. Never silently rewrite annual, seasonal, historical, comparative, or otherwise broad scope into current, today, tomorrow, or another narrower scope. If the intended scope is materially ambiguous, preserve it in a provisional Goal without choosing a narrower interpretation. "
+            "Resolve references, pronouns, demonstratives, ellipsis, and task mentions before planning. Authority order is: explicit current user meaning; foreground scoped discourse referents; candidate Goal bindings; recent dialogue. First identify every material indirect referring expression, then require a unique value from that authority order before writing a resolved binding or supplied referent. Imperative grammar and a plausible generic noun such as device, object, person, task, or setting are never reference evidence. If two or more contextual candidates remain plausible, or none is supplied, preserve the unresolved reference in the provisional Goal description without selecting a candidate; Fast Planner owns the narrow clarification decision. Phrases such as ‘the last task I told you’ may semantically associate with an active, recoverable, or retained recent terminal Goal, but the model must decide that relationship from the supplied Goal state and dialogue—not from a Host phrase table. Tool-result memory is not reference-resolution authority and must never decide what an unresolved expression refers to. "
             "When the user introduces or explicitly corrects a salient entity, emit referent_updates only when the required discourse-index provenance is available. Use operation=correct with non-empty target_referent_ids copied from supplied discourse context when a new value supersedes an earlier referent; never emit an unscoped correction when no target referent ID was supplied. The canonical Goal association and typed bindings still preserve a correction even when no discourse-index update can be authored. The old referent remains available in its own task scope but becomes background. Use operation=introduce for a new salient entity, and focus/background/retire only for supplied referent IDs. "
-            "Use resolved_references only for indirect references whose denotation must be selected from a supplied discourse referent or active Goal binding, such as pronouns, demonstratives, ellipsis, aliases, corrections, or task mentions. Do not emit resolved_references for an ordinary explicit entity mention such as a directly named place; represent that meaning in the new Goal bindings and, when it is salient for future dialogue, in referent_updates. Every resolved_references item must copy a supplied referent_id and include explicit confidence. If resolution is materially ambiguous, return decision=clarify rather than selecting a value from stale evidence or recency alone. "
+            "Use resolved_references only for indirect references whose denotation is uniquely selected from a supplied discourse referent or active Goal binding, such as pronouns, demonstratives, ellipsis, aliases, corrections, or task mentions. Do not emit resolved_references for an ordinary explicit entity mention such as a directly named place; represent that meaning in the new Goal bindings and, when it is salient for future dialogue, in referent_updates. Every resolved_references item must copy a supplied referent_id and include explicit confidence. If resolution is materially ambiguous, omit the invented binding/reference and preserve a provisional Goal instead. "
             "Each non-resource Goal must include top-level typed bindings for material entities and parameters already resolved here, including explicit counts, durations, speeds, directions, and targets. A resource Goal keeps top-level bindings empty and owns every material resource fact only in resource_responsibility. For information, query_scope is the one query-fact surface; for weather, a resolved place is a query_scope binding named location, with time and requested result aspects as separate bindings. Preserve every explicit severity, intensity, magnitude, threshold, subtype, negation, or comparison qualifier that changes satisfactory completion. Never generalize a narrower request. Downstream planners read the canonical resource directly; no persisted flat projection exists. "
-            "For a location named directly in the final authoritative user turn, copy the complete location value verbatim as one contiguous span in the user's language. Never translate, transliterate, shorten, or expand a directly named location. A directly supplied location is a resolved semantic binding, not a claim that provider canonicalization has already succeeded. Do not ask the user for administrative granularity merely because multiple real-world places might share that value; create the fully bound Goal and let the downstream Capability resolve the exact value or report provider ambiguity. Clarify only when the user's intended location is genuinely underdetermined in the dialogue. Only an indirect reference resolved from a supplied referent may use the referent's canonical value instead. For an indirect location, copy the supplied referent_id into both the location binding and resolved_references, and copy the indirect user surface into resolved_references.surface_form. "
+            "For a location named directly in the final authoritative user turn, copy the complete location value verbatim as one contiguous span in the user's language. Never translate, transliterate, shorten, or expand a directly named location. A directly supplied location is a resolved semantic binding, not a claim that provider canonicalization has already succeeded. Do not ask the user for administrative granularity merely because multiple real-world places might share that value; create the fully bound Goal and let the downstream Capability resolve the exact value or report provider ambiguity. When the user's intended location is genuinely underdetermined in the dialogue, preserve that unresolved scope in the provisional Goal and leave clarification selection to Fast Planner. Only an indirect reference resolved from a supplied referent may use the referent's canonical value instead. For an indirect location, copy the supplied referent_id into both the location binding and resolved_references, and copy the indirect user surface into resolved_references.surface_form. "
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
             "Do not split implementation steps into goals. Do not create goals for implementation mechanics, safety checks, status lookups, capability calls, or other internal work.\n\n"
-            "The clarification field is only a concise user-facing question. Never put analysis, rationale, translation, route labels, validator errors, model failures, or system diagnostics in clarification. Put optional compact rationale in reason_summary. If the user meaning is materially ambiguous or a material semantic part of the owed outcome remains unresolved, use decision=clarify; otherwise keep clarification empty.\n\n"
+            "Goal Association must not author a clarification question, input-source policy, or planning InformationGap. Put only compact Goal-state rationale in reason_summary.\n\n"
             "Abstract decomposition example: a request to perform action A, then action B, and answer question C produces three new_goals descriptions: perform action A; perform action B; answer question C. "
             "This example is structural, not a phrase-matching rule.\n\n"
             + output_instructions
@@ -2299,12 +2564,12 @@ class GoalAssociationResolver:
             revision_action = "Re-evaluate the independent goal segmentation"
             state_instructions = (
                 "There are no active or retained recent Goals. Existing-goal associations are structurally invalid and must not appear. "
-                "Re-segment every independently satisfiable responsibility into new_goals, or return only a clarification when the human-level outcome is materially ambiguous or still lacks material semantic information required to define what Chromie owes. "
+                "Re-segment every independently satisfiable responsibility into new_goals. Preserve unresolved human-level meaning in the narrowest provisional Goal without inventing it; Fast Planner owns any question. "
                 "A standalone social interaction is one conversational Goal and must not be returned as an empty goal list. A greeting attached to substantive work is framing, not a second Goal. Identity and personality shape wording only and never create a Goal. A lookup plus an interpretation derived from the same result is one Goal. "
             )
             output_instructions = (
                 "The exact GoalSegmentationModelOutput JSON Schema is enforced by the Ollama decoder out-of-band. "
-                "Return only decision, new_goals, referent_updates, resolved_references, clarification, confidence, and reason_summary. "
+                "Return only decision, new_goals, referent_updates, resolved_references, confidence, and reason_summary. "
             )
         else:
             contract_name = "Goal Association"
@@ -2315,7 +2580,7 @@ class GoalAssociationResolver:
             )
             output_instructions = (
                 "The exact GoalAssociationModelOutput JSON Schema is enforced by the Ollama decoder out-of-band. "
-                "Return only decision, associations, new_goals, referent_updates, resolved_references, clarification, confidence, and reason_summary. "
+                "Return only decision, associations, new_goals, referent_updates, resolved_references, confidence, and reason_summary. "
             )
         return (
             f"The previous minimal {contract_name} semantic DTO failed its exact contract. {revision_action} and "
@@ -2354,11 +2619,36 @@ class GoalAssociationResolver:
             "Exact validation errors JSON:\n"
             f"{validation_error}\n\n"
             + output_instructions
-            + "Select exactly one decision branch. clarification is only a concise user-facing question and must be empty for non-clarify decisions. Each new_goals item contains description, output_mode, optional media_operation, bindings, optional supersedes_goal_ids, and optional provider-neutral resource_responsibility only. Choose output_mode from the work that actually completes the Goal; the Host derives the internal responsibility class, lane, and provider-evidence requirement. media_playback requires one exact media_operation; non-media Goals may omit it. "
+            + "Select exactly one Goal-state decision branch. Do not author clarification wording or planning gaps. Each new_goals item contains description, output_mode, optional media_operation, bindings, optional supersedes_goal_ids, and optional provider-neutral resource_responsibility only. Choose output_mode from the work that actually completes the Goal; the Host derives the internal responsibility class, lane, and provider-evidence requirement. media_playback requires one exact media_operation; non-media Goals may omit it. "
             + _EXECUTION_CONTRACT_PROMPT
-            + " Preserve one nested resource_responsibility when the responsibility is genuinely to acquire and deliver a physical object or grounded information; never add it to a vocal performance or insert provider details. It is the sole writable resource authority. Use kind=information with output_mode=capability_work, query_scope for all requested information facts, and a narrow source object that can only delegate, remain unknown, or name one explicit information source. Use kind=physical_object with output_mode=body_action, delivery_mode=physical_handover, and source.acquisition_bindings as the sole spatial/acquisition fact surface. Never duplicate one fact across fields and never create top-level Goal bindings for a resource Goal. Preserve every supplied temporal dimension separately: use entity_type=date for a resolved calendar or relative date and entity_type=day_part for a resolved local day part. A compound date-plus-day-part scope requires both bindings; neither replaces the other. Never repair missing human-level scope by inventing a default: if authoritative user, discourse, retained-Goal, and Situation context cannot resolve what Chromie owes, return top-level clarification. Preserve or repair explicit discourse resolution and referent updates; never use tool-result contents to infer a reference. "
+            + " Preserve one nested resource_responsibility when the responsibility is genuinely to acquire and deliver a physical object or grounded information; never add it to a vocal performance or insert provider details. It is the sole writable resource authority. Use kind=information with output_mode=capability_work, query_scope for all requested information facts, and a narrow source object that can only delegate, remain unknown, or name one explicit information source. Use kind=physical_object with output_mode=body_action, delivery_mode=physical_handover, and source.acquisition_bindings as the sole spatial/acquisition fact surface. Never duplicate one fact across fields and never create top-level Goal bindings for a resource Goal. Preserve every supplied temporal dimension separately: use entity_type=date for a resolved calendar or relative date and normalize its value to today, tomorrow, or an exact ISO 8601 calendar date (YYYY-MM-DD); use entity_type=day_part for a resolved local day part. A compound date-plus-day-part scope requires both bindings; neither replaces the other. Never repair missing human-level scope by inventing a default: preserve unresolved scope in a provisional Goal and leave the exact missing value unset. Preserve or repair explicit discourse resolution and referent updates; never use tool-result contents to infer a reference. "
             "The host owns every ID and persistence field. Re-segment every independently satisfiable responsibility from the authoritative user turn; do not preserve an invalid merge merely because it appeared in the previous output.\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
+        )
+
+    @classmethod
+    def _build_temporal_contract_repair_prompt(
+        cls,
+        *,
+        raw: dict[str, Any],
+        validation_error: str,
+        temporal_paths: list[tuple[str | int, ...]],
+    ) -> str:
+        return (
+            "The semantic decision below is already final and authoritative. Repair "
+            "only temporal binding value fields named by the validation errors. For "
+            "entity_type=date, use today, tomorrow, or an exact ISO 8601 calendar "
+            "date (YYYY-MM-DD). For entity_type=day_part, use day, morning, "
+            "afternoon, evening, or tonight. Return only a repairs array containing "
+            "one object with path and normalized value for each authorized path. Do "
+            "not return or rewrite the semantic DTO. The Host applies only those exact "
+            "value fields and rejects missing, duplicate, or unauthorized paths.\n\n"
+            "AUTHORIZED TEMPORAL VALUE PATHS JSON:\n"
+            f"{cls._bounded_json([cls._json_path_text(path) for path in temporal_paths], 2400)}\n\n"
+            "FINAL SEMANTIC DTO JSON:\n"
+            f"{cls._bounded_json(raw, 9000)}\n\n"
+            "TEMPORAL VALUE VALIDATION ERRORS JSON:\n"
+            f"{validation_error}"
         )
 
     def _layered_prompt(
@@ -2445,11 +2735,11 @@ class GoalAssociationResolver:
         *,
         request: CognitiveWorkRequest,
     ) -> bool:
-        """Audit every newly proposed Goal set and no non-creation branch.
+        """Audit every newly proposed Goal set and no association-only branch.
 
         This is a structural transition, not a Host semantic risk heuristic.
-        Association-only and clarification results have no candidate new-Goal set
-        for this certificate to prove.
+        Association-only results have no candidate new-Goal set for this certificate
+        to prove.
         """
 
         del request
@@ -2494,7 +2784,9 @@ class GoalAssociationResolver:
                         },
                         "then": {
                             "properties": {
-                                "coverage": {"enum": ["covered"]},
+                                "coverage": {
+                                    "enum": ["covered", "clarification_required"]
+                                },
                                 "independently_satisfiable": {"enum": [False]},
                                 "candidate_goal_indices": {"maxItems": 0},
                             }
@@ -2519,7 +2811,9 @@ class GoalAssociationResolver:
                                 "role": {
                                     "enum": ["responsibility", "constraint"]
                                 },
-                                "coverage": {"enum": ["covered"]},
+                                "coverage": {
+                                    "enum": ["covered", "clarification_required"]
+                                },
                             },
                             "required": ["role", "coverage"],
                         },
@@ -2580,10 +2874,7 @@ class GoalAssociationResolver:
                         "if": {
                             "properties": {
                                 "coverage": {
-                                    "enum": [
-                                        "missing",
-                                        "clarification_required",
-                                    ]
+                                    "enum": ["missing"]
                                 }
                             },
                             "required": ["coverage"],
@@ -2640,18 +2931,6 @@ class GoalAssociationResolver:
                             "candidate_goal_indices": list(indices),
                         }
                     )
-                elif coverage == "clarification_required":
-                    # Unresolved human meaning cannot have a Goal owner yet. Dropping
-                    # the indices preserves the rejecting/clarification verdict.
-                    item["candidate_goal_indices"] = []
-                    recoveries.append(
-                        {
-                            "item_index": item_index,
-                            "from": "clarification_required_with_owner",
-                            "to": "clarification_required",
-                            "candidate_goal_indices": [],
-                        }
-                    )
         if recoveries:
             logger.warning(
                 "goal_association_coverage_shape_normalized sid=%s recoveries=%s",
@@ -2659,6 +2938,13 @@ class GoalAssociationResolver:
                 cls._bounded_json(recoveries, 1800),
             )
         certificate = GoalResponsibilityCoverageCertificate.model_validate(normalized_raw)
+        if any(
+            item.coverage == "clarification_required"
+            for item in certificate.items
+        ) and not request.interpretation_unresolved:
+            raise ValueError(
+                "clarification_required coverage needs exact GI unresolved-meaning evidence"
+            )
         authoritative_turn = " ".join(request.text.strip().split()).casefold()
         for index, item in enumerate(certificate.items):
             excerpt = " ".join(item.source_excerpt.strip().split()).casefold()
@@ -2689,11 +2975,17 @@ class GoalAssociationResolver:
         responsibility_owner_counts: dict[int, int] = {}
         positively_owned: set[int] = set()
         for item in certificate.items:
-            if item.role in {"responsibility", "constraint"} and item.coverage != "covered":
+            if item.role in {"responsibility", "constraint"} and item.coverage not in {
+                "covered",
+                "clarification_required",
+            }:
                 problems.append(
                     f"{item.coverage}:{item.role}:{item.source_excerpt}"
                 )
-            if item.role != "responsibility" or item.coverage != "covered":
+            if item.role != "responsibility" or item.coverage not in {
+                "covered",
+                "clarification_required",
+            }:
                 continue
             for goal_index in item.candidate_goal_indices:
                 positively_owned.add(goal_index)
@@ -2723,13 +3015,15 @@ class GoalAssociationResolver:
             type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
         ),
         problems: list[str],
-        force_clarification: bool = False,
+        preserve_unresolved_meaning: bool = False,
     ) -> str:
         terminal_instruction = (
             "The independent proof established that material meaning is unresolved. "
-            "Return decision=clarify with exactly one concise question that asks for "
-            "that missing meaning; do not create or associate Goals. "
-            if force_clarification
+            "Preserve a provisional Goal for the source-grounded Responsibility without "
+            "inventing the unresolved referent or scope. Goal Interpretation has already "
+            "exposed the ambiguity to Fast Planner, which alone decides whether and how "
+            "to ask; Goal Association must not author a clarification Activity or wording. "
+            if preserve_unresolved_meaning
             else ""
         )
         return (
@@ -2784,8 +3078,20 @@ class GoalAssociationResolver:
             "semantics or a dropped/generalized material qualifier, binding, result aspect, "
             "severity, threshold, or scope. A supplied date and a supplied local day part "
             "are separate temporal dimensions; a candidate that retains only one has a "
-            "representation mismatch. In that case identify the mismatched candidate "
-            "index. Use coverage=missing only when no candidate attempts to own the fragment, "
+            "representation mismatch. Binding entity_type, not the arbitrary binding name, "
+            "is the semantic authority: one entity_type=date binding plus one "
+            "entity_type=day_part binding preserves both dimensions even when their names "
+            "are time, period, or other schema-facing parameter names. Normalized values "
+            "such as today and morning preserve equivalent source wording. Never report a "
+            "representation mismatch merely because a binding name differs from its "
+            "entity_type or a source value is canonically normalized. Conversely, prose, "
+            "a binding name, and a day_part value never imply a missing date binding. For a "
+            "compound date-plus-day-part expression, emit and audit one constraint item for "
+            "each temporal dimension even when their source excerpts are adjacent. Before "
+            "marking either covered, enumerate the candidate's actual entity_type values; "
+            "if date or day_part is absent, mark that dimension representation_mismatch. "
+            "In that case identify "
+            "the mismatched candidate index. Use coverage=missing only when no candidate attempts to own the fragment, "
             "with no candidate indices. A positive observable "
             "outcome the user can independently judge is a responsibility, not a "
             "constraint or decoration. Do not invent a vocal outcome from a broad "
@@ -2869,12 +3175,14 @@ class GoalAssociationResolver:
             "If a candidate attempts to own the fragment but drops or generalizes a material "
             "qualifier, binding, result aspect, severity/intensity, threshold, subtype, "
             "comparison, or scope, use coverage=representation_mismatch and include that "
-            "candidate index instead. clarification_required only when the human-level responsibility itself "
-            "cannot be determined without asking the user. Context and framing "
+            "candidate index instead. Use clarification_required only when GI's supplied "
+            "unresolved-meaning evidence says the human-level responsibility cannot be "
+            "fully determined without asking the user; map it to the one provisional Goal "
+            "that preserves that Responsibility. Context and framing "
             "acknowledge non-owed meaning rather than requiring ownership: they must "
             "always use coverage=covered, independently_satisfiable=false, and an "
             "empty candidate_goal_indices list. Never mark context or framing as "
-            "missing or clarification_required. For a represented constraint, the expected shape is "
+            "missing. For a represented constraint, the expected shape is "
             "role=constraint, independently_satisfiable=false, coverage=covered, and "
             "the affected Goal index or indices. Never mark a constraint missing "
             "merely because it is not a responsibility, has no separate Goal, or is "
@@ -2901,8 +3209,12 @@ class GoalAssociationResolver:
             "source object cannot own those query facts. Audit every supplied temporal "
             "dimension independently: if the turn supplies both a calendar or relative "
             "date and a local day part, the query scope must contain separate date and "
-            "day_part bindings. Candidate prose or either binding alone does not cover "
-            "the missing dimension; use coverage=representation_mismatch. For a physical resource, an "
+            "day_part bindings. Judge their types by entity_type regardless of binding "
+            "name. If both typed bindings carry equivalent normalized values, mark both "
+            "source constraints covered. Emit separate coverage items for the date and "
+            "day-part source fragments; do not collapse a compound temporal expression into "
+            "one item whose coverage can be inferred from prose. Candidate prose or either binding alone does not "
+            "cover the missing dimension; use coverage=representation_mismatch. For a physical resource, an "
             "acquisition location, distance, direction, or route constraint is covered "
             "only by resource_responsibility.source.acquisition_bindings. Descriptions "
             "are summary only. The schema deliberately exposes one writable owner per "
@@ -2927,6 +3239,9 @@ class GoalAssociationResolver:
             "unavailable requested effect remains a responsibility.\n\n"
             "Candidate Goal DTO JSON:\n"
             f"{self._bounded_json(raw, 9000)}\n\n"
+            "GI unresolved-meaning evidence (the only authority for "
+            "clarification_required coverage):\n"
+            f"{self._bounded_json(request.interpretation_unresolved, 1600)}\n\n"
             "Recent conversation JSON (reference context only; current-turn Goal "
             "coverage must still be anchored by source_excerpt from the final turn):\n"
             f"{self._bounded_json((context.get('history') or request.history or [])[-6:], 3000)}\n\n"
@@ -2978,6 +3293,14 @@ class GoalAssociationResolver:
         return (
             f"You repair one minimal {contract_name} semantic DTO using semantic reasoning and the supplied exact JSON Schema. "
             "Return only the corrected JSON object. Do not add commentary, markdown, lexical mappings, or hidden reasoning."
+        )
+
+    @staticmethod
+    def _temporal_contract_repair_system_prompt() -> str:
+        return (
+            "You are a bounded DTO temporal-value normalizer. Return only authorized "
+            "JSON-path/value repairs for invalid date or day_part strings. Never return "
+            "or rewrite the semantic DTO. Return JSON only."
         )
 
     @staticmethod
@@ -3383,31 +3706,18 @@ class GoalAssociationResolver:
             for goal in new_goals
             for ref in goal.source_responsibility_refs
         ]
-        if not model_output.clarification and sorted(mapped_refs) != sorted(
-            responsibility_refs
-        ):
+        if sorted(mapped_refs) != sorted(responsibility_refs):
             raise ValueError(
                 "Goal Association must map every GI Responsibility exactly once: "
                 f"expected={sorted(responsibility_refs)} actual={sorted(mapped_refs)}"
             )
-        gaps_by_ref = {
-            item.local_ref: list(item.information_gaps)
-            for item in request.responsibilities
-            if item.information_gaps
-        }
         return GoalAssociationResolution(
             turn_id=turn_id,
-            resolution_status=(
-                "needs_clarification"
-                if model_output.clarification
-                else "resolved"
-            ),
+            resolution_status="resolved",
             associations=associations,
             new_goals=new_goals,
             referent_updates=referent_updates,
             resolved_references=resolved_references,
-            information_gaps=gaps_by_ref,
-            clarification=model_output.clarification,
             confidence=model_output.confidence,
             reason_summary=model_output.reason_summary,
             metadata={
@@ -3443,11 +3753,7 @@ class GoalAssociationResolver:
             else:
                 accepted.append(association)
 
-        if resolution.clarification:
-            accepted = []
-            new_goals: list[SemanticGoal] = []
-        else:
-            new_goals = resolution.new_goals
+        new_goals = resolution.new_goals
 
         metadata = dict(resolution.metadata)
         metadata.update(
@@ -3469,35 +3775,15 @@ class GoalAssociationResolver:
             not accepted
             and not new_goals
             and not resolution.referent_updates
-            and not resolution.clarification
         ):
             return GoalAssociationResolution(
                 turn_id=resolution.turn_id,
-                resolution_status="needs_clarification",
-                clarification=self._safe_clarification(
-                    request,
-                    has_candidate_goals=bool(candidate_goals),
-                ),
+                resolution_status="fail_closed",
                 confidence=0.0,
-                reason_summary="No sufficiently grounded goal association or new goal was accepted.",
-                metadata={**metadata, "status": "needs_clarification"},
+                reason_summary=(
+                    "No sufficiently grounded Goal association or new Goal reached "
+                    "the canonical commit boundary."
+                ),
+                metadata={**metadata, "status": "fail_closed"},
             )
         return resolution.model_copy(update={"associations": accepted, "new_goals": new_goals, "metadata": metadata})
-
-    @staticmethod
-    def _safe_clarification(
-        request: CognitiveWorkRequest,
-        *,
-        has_candidate_goals: bool,
-    ) -> str:
-        if has_candidate_goals:
-            return (
-                "你是在继续刚才的事情，还是想开始一件新的事情？"
-                if (request.language or "").startswith("zh")
-                else "Is this about what we were already doing, or is it a new request?"
-            )
-        return (
-            "我还没能可靠地分清你想完成的事情，可以换一种说法吗？"
-            if (request.language or "").startswith("zh")
-            else "I couldn't reliably separate the things you want done. Could you rephrase the request?"
-        )

@@ -34,9 +34,7 @@
               "completion_requires_fresh_evidence": true,
               "confidence": 0.95,
               "relationship": "new",
-              "target_goal_ids": [],
-              "information_gaps": [],
-              "resolved_gap_ids": []
+              "target_goal_ids": []
             }
           ],
           "unresolved": []
@@ -64,9 +62,7 @@
         "completion_requires_fresh_evidence": true,
         "confidence": 0.95,
         "relationship": "new",
-        "target_goal_ids": [],
-        "information_gaps": [],
-        "resolved_gap_ids": []
+        "target_goal_ids": []
       }
     ]
   }

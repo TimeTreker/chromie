@@ -58,14 +58,17 @@ capability, but it cannot reinterpret the user Goal or plan across capabilities 
 does not own. The live capability contract, not a permanent architectural layer or
 capability name, is the decomposition boundary.
 
-## Current semantic boundary
+## Approved semantic boundary
 
-Goal Interpretation performs WHAT-only semantic interpretation. Its maintained
-model-facing contract emits provider-neutral `responsibilities[]`, material bindings,
-and optional immediate communication. It does not author Work, Primary Activities,
-Plan structure, execution lanes, realization, Capability IDs, executable arguments,
-provider requests, or `actions[]`; Goal Association owns canonical Goal state and
-Planner owns the first Work/Activity contract. No maintained `RouteDecision` or
+Goal Interpretation performs WHAT-only semantic interpretation. Its target model-facing
+contract emits provider-neutral `responsibilities[]`, material bindings,
+Goal relationships, and bounded unresolved meaning. It does not author Work, Primary
+Activities, Plan structure, execution lanes, realization, Capability IDs, executable
+arguments, provider requests, planning InformationGaps, input-source/default policy,
+clarification selection, or `actions[]`; Goal Association owns canonical Goal state and
+Planner owns the first Work/Activity contract. Fast Planner also owns execution-input
+completeness and source strategy. That ownership cannot be used to reinterpret,
+widen, narrow, or invent Responsibility meaning. No maintained `RouteDecision` or
 legacy Agent semantic compatibility surface remains on the Core path.
 
 ## Entrypoint ownership

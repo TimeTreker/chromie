@@ -167,6 +167,36 @@ class WeatherLocationResolutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(period.precipitation_probability_max, 65.0)
         self.assertEqual(period.weather_code, 61)
 
+    def test_elapsed_morning_hours_remain_in_the_requested_period_scope(self) -> None:
+        client = OpenMeteoWeatherClient()
+        hourly = {
+            "time": [
+                "2026-08-18T06:00",
+                "2026-08-18T09:00",
+                "2026-08-18T11:00",
+                "2026-08-18T12:00",
+            ],
+            "temperature_2m": [28.0, 30.0, 32.0, 33.0],
+            "apparent_temperature": [30.0, 33.0, 36.0, 37.0],
+            "precipitation_probability": [10.0, 70.0, 40.0, 20.0],
+            "weather_code": [2, 61, 3, 2],
+        }
+
+        period = client._period_forecast(
+            forecast={"hourly": hourly},
+            daily={"time": ["2026-08-18", "2026-08-19"]},
+            current={"time": "2026-08-18T12:00"},
+            day_index=0,
+            period="morning",
+        )
+
+        self.assertIsNotNone(period)
+        assert period is not None
+        self.assertEqual(period.start_local, "2026-08-18T06:00")
+        self.assertEqual(period.end_local, "2026-08-18T11:00")
+        self.assertEqual(period.precipitation_probability_max, 70.0)
+        self.assertEqual(period.weather_code, 61)
+
     async def test_hierarchical_chinese_location_retries_locality_and_qualifies_admin1(self) -> None:
         geocode_queries: list[str] = []
         forecast_requests: list[httpx.Request] = []
