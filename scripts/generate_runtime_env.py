@@ -36,6 +36,18 @@ MODEL_PLAN_KEYS = (
     "AGENT_SOCIAL_ATTENTION_MODEL",
 )
 
+# Hardware profiles are declarative flat values, not shell programs. Keep every
+# model assignment explicit so generated .env.runtime cannot preserve a literal
+# ${VAR} and later hand that string to Ollama as a model name.
+MODEL_ASSIGNMENT_KEYS = (
+    *MODEL_PLAN_KEYS,
+    "AGENT_FAST_TRUTH_MODEL",
+    "AGENT_TASK_CONTINUITY_MODEL",
+    "AGENT_SKILL_SELECTION_MODEL",
+    "TTS_COSYVOICE_OLLAMA_MODEL",
+)
+MODEL_REFERENCE_RE = re.compile(r"\$(?:\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)")
+
 COGNITIVE_BUDGET_KEYS = (
     "CHROMIE_COGNITIVE_BUDGET_PROFILE",
     "OLLAMA_CONTEXT_LENGTH",
@@ -229,6 +241,19 @@ def validate_profile(
     system_info: Mapping[str, str],
 ) -> None:
     _require_nonempty(profile, REQUIRED_PROFILE_KEYS, source=profile_path)
+    unresolved_model_refs = {
+        key: profile[key]
+        for key in MODEL_ASSIGNMENT_KEYS
+        if profile.get(key) and MODEL_REFERENCE_RE.search(profile[key])
+    }
+    if unresolved_model_refs:
+        details = ", ".join(
+            f"{key}={value!r}" for key, value in unresolved_model_refs.items()
+        )
+        raise ConfigurationError(
+            f"hardware profile {profile_path} contains unresolved model variable references: {details}; "
+            "model assignments must use explicit model tags"
+        )
     declared = profile["CHROMIE_HARDWARE_PROFILE"]
     if declared != profile_name:
         raise ConfigurationError(
