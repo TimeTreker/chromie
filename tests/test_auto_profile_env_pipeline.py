@@ -293,17 +293,29 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             manifest = json.loads((root / ".chromie" / "runtime_profile.json").read_text())
 
         self.assertEqual(values["CHROMIE_ACTIVE_PROFILE"], "rtx4090_laptop")
-        self.assertEqual(values["AGENT_GOAL_INTERPRETER_MODEL"], "qwen3:8b")
-        self.assertEqual(values["AGENT_GOAL_ASSOCIATION_MODEL"], "gemma4:e4b")
-        self.assertEqual(values["AGENT_DEEP_PLANNER_MODEL"], "qwen3:8b")
-        self.assertEqual(values["AGENT_FAST_PLANNER_MODEL"], "qwen3:4b")
-        self.assertEqual(values["AGENT_FAST_FIRST_RESPONSE_MODEL"], "qwen3:8b")
-        self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "0")
+        single_model = "qwen3:4b-instruct-2507-q4_K_M"
+        for key in (
+            "AGENT_MODEL",
+            "OLLAMA_MODEL",
+            "AGENT_GOAL_INTERPRETER_MODEL",
+            "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
+            "AGENT_GOAL_ASSOCIATION_MODEL",
+            "AGENT_FAST_PLANNER_MODEL",
+            "AGENT_FAST_FIRST_RESPONSE_MODEL",
+            "AGENT_FAST_TRUTH_MODEL",
+            "AGENT_DEEP_PLANNER_MODEL",
+            "AGENT_TASK_CONTINUITY_MODEL",
+            "AGENT_SOCIAL_ATTENTION_MODEL",
+            "AGENT_SKILL_SELECTION_MODEL",
+            "TTS_COSYVOICE_OLLAMA_MODEL",
+        ):
+            self.assertEqual(values[key], single_model, key)
+        self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "1")
         self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "32768")
         self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "1")
         self.assertEqual(
             manifest["active_ollama_models"],
-            ["qwen3:8b", "qwen3:4b", "gemma4:e4b"],
+            [single_model],
         )
         for key in (
             "OLLAMA_CONTEXT_LENGTH",
@@ -315,6 +327,8 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_DEEP_PLANNER_NUM_CTX",
         ):
             self.assertEqual(values[key], "32768", key)
+        self.assertEqual(values["AGENT_SOCIAL_ATTENTION_NUM_CTX"], "32768")
+        self.assertEqual(values["AGENT_SKILL_SELECTION_NUM_CTX"], "32768")
         self.assertEqual(values["AGENT_SOCIAL_ATTENTION_NUM_PREDICT"], "160")
         self.assertEqual(values["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"], "2048")
         self.assertEqual(values["AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS"], "120000")
