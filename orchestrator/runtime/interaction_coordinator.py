@@ -76,6 +76,7 @@ SpeechCancelScheduler = Callable[
     [CapabilityRequest, dict[str, Any]],
     None | Awaitable[None],
 ]
+CommunicativeDeliveryRecorder = Callable[[str | None, str, dict[str, Any]], None]
 _TASK_GRAPH_CAPABILITY_ID = "chromie.task_graph.execute"
 
 
@@ -160,6 +161,7 @@ class InteractionRuntimeCoordinator:
         max_concurrency: int | None = None,
         catalog_refresh_ttl_s: float | None = None,
         interaction_ledger: Any | None = None,
+        communicative_delivery_recorder: CommunicativeDeliveryRecorder | None = None,
     ) -> None:
         self.registry = CapabilityRegistry()
         self.registry.register(local_speech_definition())
@@ -225,6 +227,7 @@ class InteractionRuntimeCoordinator:
         )
         self._catalog_lock = asyncio.Lock()
         self.interaction_ledger = interaction_ledger
+        self.communicative_delivery_recorder = communicative_delivery_recorder
         self._preexecuted: dict[tuple[str, str], tuple[CapabilityResult, CapabilityTrace | None]] = {}
 
     async def ensure_capability_definitions(self, capability_ids: Iterable[str]) -> None:
@@ -316,6 +319,37 @@ class InteractionRuntimeCoordinator:
                     activity.activity_id,
                     type(exc).__name__,
                     exc,
+                )
+                return
+            execution = completed.result()
+            delivered = any(
+                result.capability_id == "chromie.speak"
+                and result.status == "completed"
+                for result in execution.results
+            )
+            if not delivered or self.communicative_delivery_recorder is None:
+                return
+            try:
+                self.communicative_delivery_recorder(
+                    session_id,
+                    activity.text,
+                    {
+                        "source": "fast_planner_communicative_delivery",
+                        "turn_id": turn_id,
+                        "fast_activity_id": activity.activity_id,
+                        "delivery_role": activity.role,
+                        "speech_act": activity.speech_act,
+                        "truth_stage": activity.truth_stage,
+                    },
+                )
+            except Exception as recorder_exc:  # delivery evidence must not crash Runtime
+                logger.warning(
+                    "fast_planner_vocal_delivery_record_failed turn_id=%s "
+                    "activity_id=%s error_type=%s error=%s",
+                    turn_id,
+                    activity.activity_id,
+                    type(recorder_exc).__name__,
+                    recorder_exc,
                 )
 
         task.add_done_callback(observe_completion)

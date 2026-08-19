@@ -17,7 +17,8 @@
     ],
     "digest_source": "The active profile model digests are captured from /api/tags in build-provenance.json when provenance is collected",
     "goal_interpreter_models": [
-      "qwen3:4b"
+      "qwen3:4b",
+      "qwen3:8b"
     ]
   },
   "schema_version": 2,

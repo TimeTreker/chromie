@@ -508,6 +508,30 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(weather.prompt_tier, "common")
         self.assertEqual(weather.hints.get("tool_name"), "weather")
 
+    async def test_local_clock_is_common_safe_read_without_invented_inputs(self) -> None:
+        registry = CapabilityRegistry.from_bundles([chromie_capability_bundle()])
+        catalog = CapabilityCatalog(registry, live_invoker=None)
+
+        common = await catalog.prompt_entries(scope="common")
+        clock = next(item for item in common if item.capability_id == "chromie.clock.local")
+
+        self.assertEqual(clock.route, "tool")
+        self.assertEqual(clock.agent_id, "chromie.clock")
+        self.assertEqual(clock.safety_class, "safe_read")
+        self.assertTrue(clock.interaction_executable)
+        self.assertEqual(clock.prompt_tier, "common")
+        self.assertEqual(clock.input_schema.get("required"), [])
+        self.assertEqual(clock.input_schema.get("additionalProperties"), False)
+        self.assertIn("clock_lookup", clock.effects)
+        self.assertEqual(clock.hints.get("tool_name"), "local_clock")
+        self.assertEqual(
+            clock.hints["semantic_scope"]["fixed_temporal_scope"],
+            {
+                "entity_types": ["time", "time_frame", "temporal_scope"],
+                "values": ["now"],
+            },
+        )
+
     async def test_verified_memory_read_is_a_tool_not_a_memory_write_route(self) -> None:
         registry = CapabilityRegistry.from_bundles([chromie_capability_bundle()])
         catalog = CapabilityCatalog(registry, live_invoker=None)

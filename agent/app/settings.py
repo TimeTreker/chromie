@@ -320,6 +320,21 @@ class Settings(BaseModel):
         not in {"0", "false", "no", "off"}
     )
     fast_planner_model: str = Field(default_factory=lambda: os.getenv("AGENT_FAST_PLANNER_MODEL", "qwen3:4b"))
+    fast_first_response_model: str = Field(
+        default_factory=lambda: os.getenv(
+            "AGENT_FAST_FIRST_RESPONSE_MODEL",
+            os.getenv("AGENT_MODEL", "gemma4:e2b"),
+        )
+    )
+    fast_truth_model: str = Field(
+        default_factory=lambda: os.getenv(
+            "AGENT_FAST_TRUTH_MODEL",
+            os.getenv(
+                "AGENT_FAST_FIRST_RESPONSE_MODEL",
+                os.getenv("AGENT_MODEL", "gemma4:e2b"),
+            ),
+        )
+    )
     fast_planner_timeout_ms: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_FAST_PLANNER_TIMEOUT_MS", "2500")), ge=100, le=120000
     )
@@ -376,10 +391,10 @@ class GoalInterpreterSettings(BaseModel):
     ollama_url: str = Field(default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_OLLAMA_URL", "http://chromie-llm:11434"))
     model: str = Field(default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_MODEL", "qwen3:4b"))
     deep_model: str = Field(
-        default_factory=lambda: os.getenv(
-            "AGENT_DEEP_PLANNER_MODEL",
-            os.getenv("AGENT_GOAL_INTERPRETER_MODEL", "qwen3:4b"),
-        )
+        # Deep Goal Interpretation retains the same WHAT-only model authority.
+        # Reusing the Deep Planner model here couples semantic interpretation to
+        # a separately tuned HOW owner and has produced responsibility collapse.
+        default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_MODEL", "qwen3:4b")
     )
     timeout_ms: int = Field(default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_TIMEOUT_MS", "5400")))
     llm_num_ctx: int = Field(

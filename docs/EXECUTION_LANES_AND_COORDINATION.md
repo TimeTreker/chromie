@@ -356,7 +356,7 @@ Validated Goals retain five separate completion facts instead of overloading
 ```text
 responsibility_kind  human completion modality
 execution_lane       vocal | activity | none
-output_mode          speech | expressive_speech | recitation | singing | humming
+output_mode          speech | styled_speech | recitation | singing | humming
                      | nonverbal_vocalization | body_action | media_playback
                      | capability_work | other
 provider_required    exact provider evidence required beyond ordinary speech
@@ -387,7 +387,7 @@ through the Vocal Execution Lane:
 ```text
 Vocal Expression
 ├── mode=speech
-├── mode=expressive_speech
+├── mode=styled_speech
 ├── mode=recitation
 ├── mode=singing
 ├── mode=humming

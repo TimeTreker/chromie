@@ -79,6 +79,9 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
                     "success_criteria": [
                         "使用与当前地点和日期匹配的可信天气证据回答。"
                     ],
+                    "output_mode": "capability_work",
+                    "information_domain": "weather_forecast",
+                    "resource_kind": "information",
                 }
             ],
             context_summary=[
@@ -107,6 +110,33 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
                         }
                     ],
                     context_summary=["route=robot_action"],
+                )
+            )
+        )
+
+        self.assertEqual(selection.status, "no_candidates")
+        self.assertEqual(selection.selected_agent_skills, ())
+        self.assertEqual(model.calls, [])
+
+    def test_declared_goal_applicability_excludes_external_skills_without_route_hint(self):
+        model = ScriptedModel([])
+        service = AgentSkillSelectionService(model, self.registry)
+
+        selection = asyncio.run(
+            service.select(
+                AgentSkillSelectionRequest(
+                    sid="sid-physical-output",
+                    turn_id="turn-physical-output",
+                    agent_role="fast_planner",
+                    text="Walk forward for ten seconds.",
+                    language="en-US",
+                    goals=[
+                        {
+                            "goal_id": "goal-walk",
+                            "description": "Move forward for ten seconds.",
+                            "output_mode": "body_action",
+                        }
+                    ],
                 )
             )
         )
@@ -156,6 +186,22 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
             weather.optional_capabilities,
             ("chromie.memory.retrieve_verified_tool_result",),
         )
+        self.assertEqual(weather.applicable_output_modes, ("capability_work",))
+        self.assertEqual(
+            weather.applicable_information_domains,
+            ("weather_forecast",),
+        )
+
+    def test_external_information_summary_excludes_deterministic_local_reads(self) -> None:
+        description = self.summaries[BASE_ID].description
+        self.assertIn("outside information source", description)
+        self.assertIn("local clock", description)
+        self.assertIn("direct visual or auditory observation", description)
+        self.assertIn("Do not select", description)
+
+        system_prompt = AgentSkillSelectionService._system_prompt("fast_planner")
+        self.assertIn("Fresh runtime evidence alone", system_prompt)
+        self.assertIn("local clock", system_prompt)
 
     def test_registry_summaries_do_not_expose_skill_or_projection_content(self) -> None:
         for summary in self.registry.list_summaries():
@@ -225,17 +271,8 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
             [BASE_ID],
         )
 
-    def test_non_external_goal_can_explicitly_select_no_skill(self) -> None:
-        model = ScriptedModel(
-            [
-                {
-                    "decision": "no_skill",
-                    "selected_agent_skills": [],
-                    "confidence": 0.96,
-                    "reason_summary": "This conversational Goal does not need external evidence.",
-                }
-            ]
-        )
+    def test_non_external_goal_has_no_applicable_skill_candidates(self) -> None:
+        model = ScriptedModel([])
         payload = self._request("fast_planner").model_dump(mode="python")
         payload.update(
             {
@@ -246,6 +283,7 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
                         "description": "Tell a short joke.",
                         "bindings": [],
                         "success_criteria": ["Respond conversationally."],
+                        "output_mode": "speech",
                     }
                 ],
             }
@@ -254,8 +292,39 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
         selection = asyncio.run(
             AgentSkillSelectionService(model, self.registry).select(request)
         )
-        self.assertEqual(selection.status, "no_skill")
+        self.assertEqual(selection.status, "no_candidates")
         self.assertEqual(selection.selected_agent_skills, ())
+        self.assertEqual(model.calls, [])
+
+    def test_declared_applicability_excludes_external_skills_for_vocal_work(self) -> None:
+        model = ScriptedModel([])
+        selection = asyncio.run(
+            AgentSkillSelectionService(model, self.registry).select(
+                AgentSkillSelectionRequest(
+                    sid="sid-singing",
+                    turn_id="turn-singing",
+                    agent_role="deep_planner",
+                    text="Sing while walking.",
+                    language="en-US",
+                    goals=[
+                        {
+                            "goal_id": "goal-sing",
+                            "description": "Sing.",
+                            "output_mode": "singing",
+                        },
+                        {
+                            "goal_id": "goal-walk",
+                            "description": "Walk.",
+                            "output_mode": "body_action",
+                        },
+                    ],
+                )
+            )
+        )
+
+        self.assertEqual(selection.status, "no_candidates")
+        self.assertEqual(selection.selected_agent_skills, ())
+        self.assertEqual(model.calls, [])
 
     def test_real_fast_planner_projections_bind_content_free_plan_provenance(self) -> None:
         role = "fast_planner"

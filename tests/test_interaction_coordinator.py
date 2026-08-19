@@ -10,6 +10,7 @@ from orchestrator.runtime.interaction_coordinator import (
 )
 from orchestrator.runtime.interaction_ledger import InteractionLedger
 from shared.chromie_contracts.interaction import InteractionResponse, CapabilityRequest
+from shared.chromie_contracts.plan import FastPlannerCompleteResponseAct
 from shared.chromie_contracts.reflex import CancellationDirective
 
 
@@ -112,6 +113,65 @@ class _SoridormiInvoker:
 
 
 class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
+    async def test_delivered_fast_communicative_act_is_recorded_for_continuity(self) -> None:
+        recorded: list[tuple[str | None, str, dict[str, Any]]] = []
+        coordinator = InteractionRuntimeCoordinator(
+            lambda _args: {"scheduled": True, "playback_started": True},
+            communicative_delivery_recorder=(
+                lambda sid, text, metadata: recorded.append((sid, text, metadata))
+            ),
+        )
+
+        ready = await coordinator.start_fast_planner_communicative_act(
+            FastPlannerCompleteResponseAct.model_validate({
+                "activity_id": "a1",
+                "role": "complete_response",
+                "speech_act": "respond",
+                "text": "Hello there.",
+                "truth_stage": "context_grounded",
+                "source_responsibility_refs": ["r1"],
+            }),
+            session_id="sid-continuity",
+            turn_id="turn-continuity",
+            language="en-US",
+        )
+        await ready.task
+        await asyncio.sleep(0)
+
+        self.assertEqual(len(recorded), 1)
+        self.assertEqual(recorded[0][0:2], ("sid-continuity", "Hello there."))
+        self.assertEqual(
+            recorded[0][2]["source"],
+            "fast_planner_communicative_delivery",
+        )
+
+    async def test_failed_fast_communicative_act_is_not_recorded(self) -> None:
+        recorded: list[tuple[str | None, str, dict[str, Any]]] = []
+        coordinator = InteractionRuntimeCoordinator(
+            lambda _args: {"scheduled": False, "playback_started": False},
+            communicative_delivery_recorder=(
+                lambda sid, text, metadata: recorded.append((sid, text, metadata))
+            ),
+        )
+
+        ready = await coordinator.start_fast_planner_communicative_act(
+            FastPlannerCompleteResponseAct.model_validate({
+                "activity_id": "a1",
+                "role": "complete_response",
+                "speech_act": "respond",
+                "text": "Hello there.",
+                "truth_stage": "context_grounded",
+                "source_responsibility_refs": ["r1"],
+            }),
+            session_id="sid-continuity",
+            turn_id="turn-continuity",
+            language="en-US",
+        )
+        await ready.task
+        await asyncio.sleep(0)
+
+        self.assertEqual(recorded, [])
+
     async def test_emergency_stop_uses_dedicated_soridormi_control(self) -> None:
         invoker = _SoridormiInvoker()
         coordinator = InteractionRuntimeCoordinator(

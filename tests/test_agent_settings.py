@@ -28,7 +28,48 @@ class AgentSettingsTests(unittest.TestCase):
         self.assertEqual(settings.weather_timeout_s, 12.5)
         self.assertFalse(settings.weather_enabled)
 
-    def test_goal_interpreter_settings_reuse_existing_deep_cognition_model(self) -> None:
+    def test_fast_first_response_model_is_profile_owned_and_independent(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "AGENT_MODEL": "general-model",
+                "AGENT_FAST_PLANNER_MODEL": "compact-planner",
+                "AGENT_FAST_FIRST_RESPONSE_MODEL": "natural-response-model",
+                "AGENT_FAST_TRUTH_MODEL": "truth-model",
+            },
+            clear=False,
+        ):
+            settings = Settings()
+        self.assertEqual(settings.fast_planner_model, "compact-planner")
+        self.assertEqual(
+            settings.fast_first_response_model, "natural-response-model"
+        )
+        self.assertEqual(settings.fast_truth_model, "truth-model")
+
+    def test_fast_first_response_model_defaults_to_profile_agent_model(self) -> None:
+        with patch.dict(os.environ, {"AGENT_MODEL": "profile-model"}, clear=False):
+            with patch.dict(
+                os.environ, {"AGENT_FAST_FIRST_RESPONSE_MODEL": ""}, clear=False
+            ):
+                os.environ.pop("AGENT_FAST_FIRST_RESPONSE_MODEL")
+                settings = Settings()
+        self.assertEqual(settings.fast_first_response_model, "profile-model")
+
+    def test_fast_truth_model_defaults_to_first_response_model(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "AGENT_MODEL": "general-model",
+                "AGENT_FAST_PLANNER_MODEL": "planner-model",
+                "AGENT_FAST_FIRST_RESPONSE_MODEL": "response-model",
+            },
+            clear=False,
+        ):
+            os.environ.pop("AGENT_FAST_TRUTH_MODEL", None)
+            settings = Settings()
+        self.assertEqual(settings.fast_truth_model, "response-model")
+
+    def test_goal_interpreter_deep_pass_retains_its_own_model_authority(self) -> None:
         with patch.dict(
             os.environ,
             {
@@ -41,7 +82,7 @@ class AgentSettingsTests(unittest.TestCase):
             settings = GoalInterpreterSettings()
         self.assertEqual(settings.timeout_ms, 7777)
         self.assertEqual(settings.model, "fast-gi")
-        self.assertEqual(settings.deep_model, "deep-cognition")
+        self.assertEqual(settings.deep_model, "fast-gi")
         self.assertFalse(hasattr(settings, "mode"))
         self.assertFalse(hasattr(settings, "capability_catalog_url"))
         self.assertFalse(hasattr(settings, "review_timeout_ms"))

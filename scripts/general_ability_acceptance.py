@@ -70,6 +70,7 @@ class TextScenarioCase:
     forbidden_capabilities: tuple[str, ...] = field(default_factory=tuple)
     allow_expressive_cues: bool = True
     require_speech: bool = True
+    expect_no_speech: bool = False
     require_fast_speech: bool = False
     forbid_fast_speech: bool = False
     expected_fast_speech_purposes: tuple[str, ...] = field(default_factory=tuple)
@@ -89,6 +90,7 @@ class TextScenarioCase:
     min_goal_outcome_count: int = 0
     forbidden_plan_agent_skills: tuple[str, ...] = field(default_factory=tuple)
     require_llm_integrity: bool = True
+    expected_repeat_of_previous_speech: bool = False
     description: str = ""
     turns: tuple["TextScenarioCase", ...] = field(default_factory=tuple)
 
@@ -161,17 +163,48 @@ def _tuple_of_strings(value: Any) -> tuple[str, ...]:
 
 
 def _speech_text(summary: dict[str, Any]) -> str:
+    texts: list[str] = []
     response = summary.get("interaction_response")
-    if not isinstance(response, dict):
-        return ""
-    speech = response.get("speech")
-    if not isinstance(speech, list):
-        return ""
-    return "\n".join(
-        str(item.get("text") or "")
-        for item in speech
-        if isinstance(item, dict)
+    if isinstance(response, dict):
+        speech = response.get("speech")
+        if isinstance(speech, list):
+            texts.extend(
+                str(item.get("text") or "").strip()
+                for item in speech
+                if isinstance(item, dict) and str(item.get("text") or "").strip()
+            )
+
+    # A first Communicative Act can be realized immediately by the Host. It is
+    # intentionally absent from interaction_response.speech so that the terminal
+    # plan does not play it twice. Complete responses remain semantic acceptance
+    # output; progress belongs in user-outcome acceptance only when the retained
+    # session evidence proves that TTS actually played in this turn.
+    cognitive = summary.get("cognitive_runtime")
+    metadata = cognitive.get("metadata") if isinstance(cognitive, dict) else None
+    first_response = (
+        metadata.get("fast_planner_first_response")
+        if isinstance(metadata, dict)
+        else None
     )
+    activity = (
+        first_response.get("activity")
+        if isinstance(first_response, dict)
+        else None
+    )
+    session_state = summary.get("session_state")
+    played_tts = (
+        int(session_state.get("played_tts") or 0)
+        if isinstance(session_state, dict)
+        else 0
+    )
+    if isinstance(activity, dict) and (
+        activity.get("role") == "complete_response"
+        or (activity.get("role") == "progress" and played_tts > 0)
+    ):
+        text = str(activity.get("text") or "").strip()
+        if text and text not in texts:
+            texts.append(text)
+    return "\n".join(texts)
 
 
 def _capability_items(summary: dict[str, Any]) -> list[dict[str, Any]]:
@@ -640,6 +673,19 @@ def validate_live_text_result(
 
     speech = _speech_text(summary)
     speech_lower = speech.lower()
+    session_state = summary.get("session_state")
+    if not isinstance(session_state, dict):
+        session_state = {}
+    if case.expect_no_speech:
+        delivered_counts = {
+            key: int(session_state.get(key) or 0)
+            for key in ("scheduled_tts", "played_tts", "queued_tts")
+        }
+        if speech.strip() or any(delivered_counts.values()):
+            errors.append(
+                "turn required silence but emitted or scheduled speech: "
+                f"speech_chars={len(speech.strip())} tts={delivered_counts}"
+            )
     for phrase in case.expected_speech_all:
         if phrase.lower() not in speech_lower and phrase not in speech:
             errors.append(f"speech missing required phrase {phrase!r}")
@@ -714,9 +760,6 @@ def validate_live_text_result(
     timings = cognitive.get("timings_ms")
     if not isinstance(timings, dict):
         timings = {}
-    session_state = summary.get("session_state")
-    if not isinstance(session_state, dict):
-        session_state = {}
     workflow_stages = [
         item
         for item in session_state.get("cognitive_workflow_stages") or []
@@ -942,6 +985,7 @@ def _text_scenario_case(
         forbidden_capabilities=_tuple_of_strings(raw.get("forbidden_capabilities")),
         allow_expressive_cues=bool(raw.get("allow_expressive_cues", True)),
         require_speech=bool(raw.get("require_speech", True)),
+        expect_no_speech=bool(raw.get("expect_no_speech", False)),
         require_fast_speech=bool(raw.get("require_fast_speech", False)),
         forbid_fast_speech=bool(raw.get("forbid_fast_speech", False)),
         expected_fast_speech_purposes=_tuple_of_strings(
@@ -1000,6 +1044,9 @@ def _text_scenario_case(
             raw.get("forbidden_plan_agent_skills")
         ),
         require_llm_integrity=bool(raw.get("require_llm_integrity", True)),
+        expected_repeat_of_previous_speech=bool(
+            raw.get("expected_repeat_of_previous_speech", False)
+        ),
         description=str(raw.get("description") or ""),
     )
 
@@ -1135,7 +1182,18 @@ def validate_manifest(
         if not ability.level_a_scenarios and not ability.live_text_cases:
             errors.append(f"{ability.ability_id}: no acceptance cases declared")
         for ref in ability.live_text_cases:
+            for turn_index, turn in enumerate(ref.case.turns):
+                if turn.expected_repeat_of_previous_speech and turn_index == 0:
+                    errors.append(
+                        f"{ability.ability_id}/{turn.case_id}: previous-speech "
+                        "repeat assertion requires a non-first episode turn"
+                    )
             for case in (ref.case, *ref.case.turns):
+                if case.require_speech and case.expect_no_speech:
+                    errors.append(
+                        f"{ability.ability_id}/{case.case_id}: speech cannot be "
+                        "both required and forbidden"
+                    )
                 if case.require_fast_speech and case.forbid_fast_speech:
                     errors.append(
                         f"{ability.ability_id}/{case.case_id}: fast speech "
@@ -1648,6 +1706,22 @@ def _episode_diagnostic_evaluation(
     }
 
 
+def _previous_speech_repeat_error(
+    previous: dict[str, Any],
+    current: dict[str, Any],
+) -> str:
+    previous_text = " ".join(_speech_text(previous).split())
+    current_text = " ".join(_speech_text(current).split())
+    if not previous_text:
+        return "previous turn has no delivered assistant speech to repeat"
+    if previous_text not in current_text:
+        return (
+            "delivered speech did not repeat the previous accepted assistant "
+            "utterance exactly"
+        )
+    return ""
+
+
 async def _run_live_case(
     args: argparse.Namespace,
     case: TextScenarioCase,
@@ -1702,6 +1776,22 @@ async def _run_live_case(
             raw_results[index],
             assertion_scope=args.assertion_scope,
         )
+        if turn.expected_repeat_of_previous_speech:
+            repeat_error = _previous_speech_repeat_error(
+                raw_results[index - 1],
+                raw_results[index],
+            )
+            if repeat_error:
+                result["errors"].append(repeat_error)
+                result["ok"] = False
+                user_outcome = result.get("user_outcome")
+                if isinstance(user_outcome, dict):
+                    user_outcome["ok"] = False
+                result["diagnostic_evaluation"] = diagnostic_evaluation(
+                    turn,
+                    result,
+                    list(result["errors"]),
+                )
         turn_results.append(result)
         episode_errors.extend(
             f"{turn.case_id}: {error}" for error in result.get("errors") or []

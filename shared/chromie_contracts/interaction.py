@@ -25,7 +25,7 @@ CapabilityResultStatus = Literal[
 VOCAL_PERFORMANCE_CAPABILITY_ID = "chromie.vocal.perform"
 VOCAL_MODES = (
     "speech",
-    "expressive_speech",
+    "styled_speech",
     "recitation",
     "singing",
     "humming",
@@ -33,7 +33,7 @@ VOCAL_MODES = (
 )
 VocalMode = Literal[
     "speech",
-    "expressive_speech",
+    "styled_speech",
     "recitation",
     "singing",
     "humming",

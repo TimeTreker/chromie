@@ -16,6 +16,10 @@ optional_capabilities:
 applicable_routes:
   - tool
   - chat
+applicable_output_modes:
+  - capability_work
+applicable_information_domains:
+  - weather_forecast
 projections:
   goal_association: projections/goal_association.md
   fast_planner: projections/fast_planner.md

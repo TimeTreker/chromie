@@ -364,6 +364,52 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                     "chromie_response_layer",
                 )
 
+    def test_information_domain_rejects_unrelated_current_read(self) -> None:
+        goal = self._resource_goal()
+        goal["resource_responsibility"] = {
+            "responsibility_type": "acquire_and_deliver_resource",
+            "resource": {
+                "kind": "information",
+                "description": "whether a person is present nearby",
+                "attributes": {
+                    "information_domain": {
+                        "name": "information_domain",
+                        "entity_type": "information_domain",
+                        "value": "direct_environment_perception",
+                    }
+                },
+            },
+            "source": {"status": "unknown"},
+            "recipient": {"description": "requester"},
+            "delivery_mode": "spoken_explanation",
+        }
+        weather = {
+            "capability_id": "chromie.weather.lookup",
+            "hints": {
+                "semantic_scope": {
+                    "responsibility_type": "acquire_and_deliver_resource",
+                    "resource_kinds": ["information"],
+                    "delivery_modes": ["spoken_explanation"],
+                    "domain": "weather_forecast",
+                },
+                "resource_contract": {
+                    "plan_requires": [],
+                    "plan_provides": ["resource_acquired"],
+                    "final_delivery_owner": "chromie_response_layer",
+                },
+            },
+        }
+
+        with self.assertRaisesRegex(
+            ResourceResponsibilityCapabilityUnavailableError,
+            "semantic_scope.domain does not match canonical information domain",
+        ):
+            validate_resource_responsibility_capability_grounding(
+                self._planner_output("chromie.weather.lookup"),
+                authoritative_goals=[goal],
+                capabilities=[weather],
+            )
+
     def test_information_and_physical_delivery_modes_are_distinct(self) -> None:
         AcquireAndDeliverResource(
             resource=ResourceDescriptor(

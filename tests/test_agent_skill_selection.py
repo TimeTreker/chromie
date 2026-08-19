@@ -189,6 +189,31 @@ class AgentSkillSelectionTests(unittest.TestCase):
                 }
             )
 
+    def test_decoder_schema_couples_selection_decision_to_list_cardinality(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._write_package(root, "weather-information")
+            service = AgentSkillSelectionService(
+                ScriptedModel([]),
+                self._registry(root),
+            )
+            request = self._request()
+            candidates, _, _ = service._discover_candidates(request)
+            schema = service._response_schema(request, candidates)
+
+        branch = schema["allOf"][-1]
+        self.assertEqual(
+            branch["if"]["properties"]["decision"],
+            {"const": "select_skills"},
+        )
+        self.assertEqual(
+            branch["then"]["properties"]["selected_agent_skills"]["minItems"],
+            1,
+        )
+        self.assertEqual(
+            branch["else"]["properties"]["selected_agent_skills"]["maxItems"],
+            0,
+        )
     def test_goal_association_without_current_goals_skips_domain_skill_selection(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

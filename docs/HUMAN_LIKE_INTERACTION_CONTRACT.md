@@ -313,9 +313,9 @@ semantic decision.
 
 ## Responsive speech and planning depth
 
-The routing and independently scheduled response-stage changes in this section
-are queued design requirements, not current implementation claims. Current
-behavior and evidence remain authoritative in [STATUS.md](STATUS.md).
+The routing and independently scheduled Fast-response boundaries in this section
+are implemented in current source. Their source, model, target, and release
+evidence remain separately authoritative in [STATUS.md](STATUS.md).
 
 Responsiveness is the time until Chromie produces the first truthful,
 user-observable response, not merely the time until an internal model or HTTP
@@ -323,23 +323,23 @@ request finishes. Cognitive effort should be proportional to semantic
 uncertainty, required effects, dependencies, novelty, and risk.
 
 Every admitted turn retains one Core-owned semantic and conversational
-authority. Speech composition and user-task execution may be prepared or
+authority. Communicative Activity planning and user-task execution may be prepared or
 scheduled independently, including with bounded parallel model calls, but both
 consume the applicable immutable authoritative state: the same turn, plus Goal
 versions, a Canonical Plan, and evidence when each exists. Neither a response
-composer nor an execution specialist may reinterpret the Goal, widen effects,
+delivery transport nor an execution specialist may reinterpret the Goal, widen effects,
 authorize work, or become a second conversation authority. Physical TaskGraph
 execution remains sequential.
 
 A provider-free already-complete Communicative Act is selected by Fast Planner from
-Goal Interpretation's Responsibility evidence. Its wording is authored by the downstream
-language-formulation owner and may begin through the existing Vocal
+Goal Interpretation's Responsibility evidence. Its exact wording is authored in that
+same typed Fast-Planner Activity and may begin through the existing Vocal
 runtime immediately. A simple greeting may finish there without Goal Association; if
 persistent work also exists, Fast Planner may author only prospective progress while
 requesting Goal Association. These are model-authored planning decisions, never a Host
 greeting phrase table, and Goal Interpretation does not write the reply. Planner owns
-the Communicative Act; language formulation owns its wording. Exact
-reuse is not a second writer. Complete bounded capability work
+the Communicative Act and its exact wording; the Host validates and delivers without
+rewriting either. Exact reuse is not a second writer. Complete bounded capability work
 belongs on the Fast path. Once that Fast work is completely grounded, exactly
 capability-bound, deterministically safe/authorized, and needs no confirmation, it may
 be committed without waiting for Deep. Deep is not a reviewer of a successful Fast

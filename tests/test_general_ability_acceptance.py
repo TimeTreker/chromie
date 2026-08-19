@@ -414,6 +414,35 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         errors = validate_live_text_result(case, summary)
         self.assertTrue(any("forbidden pre-effect" in item for item in errors))
 
+    def test_live_validation_can_require_complete_silence(self) -> None:
+        case = TextScenarioCase(
+            case_id="silent_motion",
+            text="别说话，过来。",
+            require_speech=False,
+            expect_no_speech=True,
+            forbid_fast_speech=True,
+        )
+        summary = {
+            "interaction_response": {"speech": [], "capabilities": []},
+            "session_state": {
+                "scheduled_tts": 1,
+                "played_tts": 1,
+                "queued_tts": 0,
+            },
+            "preview_only": False,
+            "cognitive_runtime": {},
+        }
+
+        errors = validate_live_text_result(case, summary)
+        self.assertTrue(any("required silence" in item for item in errors))
+
+        summary["session_state"] = {
+            "scheduled_tts": 0,
+            "played_tts": 0,
+            "queued_tts": 0,
+        }
+        self.assertEqual(validate_live_text_result(case, summary), [])
+
     def test_manifest_rejects_contradictory_fast_speech_policy(self) -> None:
         manifest = load_manifest(DEFAULT_MANIFEST)
         ability = manifest.ability_classes[0]
@@ -437,6 +466,121 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
 
         errors = validate_manifest(patched_manifest, validate_level_a_sources=False)
         self.assertTrue(any("both required and forbidden" in item for item in errors))
+
+    def test_live_validation_counts_played_fast_complete_response_as_speech(self) -> None:
+        case = TextScenarioCase(
+            case_id="fast_complete_response",
+            text="I am tired.",
+            expected_speech_any=("rest",),
+            expect_no_capabilities=True,
+        )
+        summary = {
+            "interaction_response": {"speech": [], "capabilities": []},
+            "cognitive_runtime": {
+                "metadata": {
+                    "fast_planner_first_response": {
+                        "activity": {
+                            "role": "complete_response",
+                            "text": "You sound tired; get some rest.",
+                        }
+                    }
+                }
+            },
+            "session_state": {
+                "scheduled_tts": 1,
+                "played_tts": 1,
+                "queued_tts": 0,
+            },
+        }
+
+        self.assertEqual(validate_live_text_result(case, summary), [])
+
+    def test_live_validation_counts_played_fast_progress_as_speech(self) -> None:
+        case = TextScenarioCase(
+            case_id="fast_progress",
+            text="刚才那个事情继续。",
+            expected_speech_any=("往前走",),
+        )
+        summary = {
+            "interaction_response": {"speech": [], "capabilities": []},
+            "cognitive_runtime": {
+                "metadata": {
+                    "fast_planner_first_response": {
+                        "activity": {
+                            "role": "progress",
+                            "text": "好，我接着往前走。",
+                        }
+                    }
+                }
+            },
+            "session_state": {
+                "scheduled_tts": 1,
+                "played_tts": 1,
+                "queued_tts": 1,
+            },
+        }
+
+        self.assertEqual(validate_live_text_result(case, summary), [])
+        summary["session_state"]["played_tts"] = 0
+        errors = validate_live_text_result(case, summary)
+        self.assertTrue(any("speech missing" in item for item in errors))
+
+    def test_previous_speech_repeat_requires_delivered_assistant_utterance(self) -> None:
+        from scripts.general_ability_acceptance import _previous_speech_repeat_error
+
+        previous = {
+            "interaction_response": {"speech": []},
+            "cognitive_runtime": {
+                "metadata": {
+                    "fast_planner_first_response": {
+                        "activity": {
+                            "role": "complete_response",
+                            "text": "你好！有什么想聊的吗？",
+                        }
+                    }
+                }
+            },
+        }
+        correct = {
+            "interaction_response": {
+                "speech": [{"text": "我刚才说：你好！有什么想聊的吗？"}]
+            }
+        }
+        wrong_speaker = {
+            "interaction_response": {
+                "speech": [{"text": "我刚才说：你好，Chromie。"}]
+            }
+        }
+
+        self.assertEqual(_previous_speech_repeat_error(previous, correct), "")
+        self.assertIn(
+            "did not repeat",
+            _previous_speech_repeat_error(previous, wrong_speaker),
+        )
+
+    def test_manifest_rejects_contradictory_silence_policy(self) -> None:
+        manifest = load_manifest(DEFAULT_MANIFEST)
+        ability = manifest.ability_classes[0]
+        contradictory = TextScenarioCase(
+            case_id="contradictory_silence",
+            text="Come here silently.",
+            require_speech=True,
+            expect_no_speech=True,
+        )
+        patched_ability = replace(
+            ability,
+            live_text_cases=(
+                *ability.live_text_cases,
+                LiveCaseRef(case=contradictory),
+            ),
+        )
+        patched_manifest = replace(
+            manifest,
+            ability_classes=(patched_ability, *manifest.ability_classes[1:]),
+        )
+
+        errors = validate_manifest(patched_manifest, validate_level_a_sources=False)
+        self.assertTrue(any("speech cannot be both required and forbidden" in item for item in errors))
 
     def test_retained_voice_incident_is_a_two_turn_live_episode(self) -> None:
         manifest = load_manifest(DEFAULT_MANIFEST)

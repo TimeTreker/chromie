@@ -79,7 +79,7 @@ whole workflow atomically may make it one Activity. Likewise, one Goal can own b
 count therefore never define Activity count by themselves.
 
 `Vocal Expression` has one personal voice with modes `speech` (speaking),
-`expressive_speech`, `recitation`, `singing`, `humming`, and
+`styled_speech`, `recitation`, `singing`, `humming`, and
 `nonverbal_vocalization`. Those modes are **not** sibling Primary-Activity kinds.
 Likewise, `Vocal` and `Activity` are runtime execution lanes, and media/body
 Capability identities are implementation facts. `SocialAttentionActivityAnchor`

@@ -1,159 +1,144 @@
 # Chromie Development Checkpoint
-Status: current resume point
-Updated: 2026-08-18
-Base main before this delivery: `39aa2a9e595396e9d5cb6fed10fb138879c40567`. This is the fast handoff for the next development session; canonical owners linked below win if a conflict appears.
-## Project in one minute
-Chromie is a local-first realtime interaction control plane for a voice assistant that can use embodied capabilities safely. Chromie owns user-facing cognition, Goal meaning and continuity, cross-provider planning, personal Vocal behavior, trusted authorization, coordination, and evidence reconciliation.
-Soridormi is a peer embodied Capability Provider beneath Activity; its advertised granularity may be one atomic workflow or smaller capabilities that Chromie composes.
-The core separation is: **models reason about meaning; trusted mechanisms own authorization, execution, resources, and evidence.** Capability unavailable, execution failed, empty result, and successful result are different truths.
-Read first: [Project Charter](docs/PROJECT_CHARTER.md), [Goal-Driven Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md) (the canonical expanded flow is frozen there and in the Charter: Session Context → GI → Fast Planner first Communicative Activity → concurrent remaining Fast Activity planning and GA → deterministic Goal binding → Goal-grouped Trusted Capability Runtime → Evidence/Response, with Deep Planner only for complex HOW), [Execution Lanes](docs/EXECUTION_LANES_AND_COORDINATION.md), [Current Status](docs/STATUS.md), and [Roadmap](ROADMAP.md).
-## Current architecture
+
+Status: current resume point; incomplete development snapshot
+Updated: 2026-08-19
+Base main before this delivery: `3f58dffdc9f26c92faf081c335aa0fc0b408333c`
+
+## Read first
+
+Canonical owners remain [Project Charter](docs/PROJECT_CHARTER.md),
+[Human-Like Interaction Contract](docs/HUMAN_LIKE_INTERACTION_CONTRACT.md),
+[Current Status](docs/STATUS.md), [Roadmap](ROADMAP.md), and
+[Acceptance](docs/ACCEPTANCE.md). Source and executable evidence win over old
+milestone prose.
+
+Current delivery focus: Goal-driven single semantic authority with human-like,
+evidence-grounded interaction behavior.
+
+## Current verdict
+
+**Do not treat this tree as behavior-qualified.** It contains the current
+cross-turn continuity, exact-speech provenance, evidence re-entry, Agent-Skill
+filtering, Planner truth qualification, and runtime-profile work, but the
+latest live-text probe fails before motion. All six owner-required gates remain
+open: semantic correctness, behavior, timing, natural speech, no
+repetition/fabrication, and human-like failure. Older 44/44 and canonical-gate
+records in status history apply only to their recorded revisions.
+
+The main probe is `你往前走 10 秒。` → `刚才那个事情继续。`. Treat it as a
+general continuity/action ability, never as a phrase target.
+
+## Latest actual workflow
+
+Retained v23 evidence:
+`.chromie/acceptance/general-ability/20260819-user-probe-continue-six-gates-v23-evidence-and-truth/`.
+It failed 0/1 on the first turn, so the continuation did not run.
+
+| Boundary | Authoritative input → actual output | Verdict |
+|---|---|---|
+| Gateway / GI | Exact admitted text → one `body_action` Responsibility for forward motion lasting `10 秒` | Correct |
+| Fast first response | Responsibility → candidate speech rejected by the configured truth owner for perspective and ungrounded-claim defects | Correct containment; no natural replacement reached the user |
+| Fast Advance | Same Responsibility → `soridormi.walk_forward(duration_s=10)` after one mechanical DTO revision; about 26.75 s | Correct action semantics; timing fails |
+| Goal Association | Same Responsibility, no active Goals → three model calls, then `structured_output_validation`; about 32.13 s | **Earliest blocking wrong boundary in v23** |
+| Trusted Runtime / output | No canonical Goal → no dispatch, TTS, response text, or motion | Honest containment, but behavior and human-like failure fail |
+
 ```text
-admitted UserTurnEnvelope + bounded Session Context
-  -> Goal Interpretation (Responsibility + Goal relation + bounded unresolved meaning)
-  -> Fast Planner -> first exact Communicative Activity or silence
-  -> same-result concurrent continuation
-       |-> same Fast Planner -> input resolution + remaining Communicative/Capability Activities
-       |     |-> Host-validated act -> Vocal/TTS; or user-resolvable clarification
-       |     `-> Deep Planner only for complex HOW
-       `-> Goal Association -> sole canonical Goal commit/version authority
-  -> bind Activities into one task-list view per Goal
-  -> Trusted Capability Runtime resource-aware scheduling
-  -> Providers -> Host-bound Evidence -> Fast Planner re-entry
-       -> same-owner immutable answer qualification -> per-Goal Response or one Deep escalation
+admitted text
+  -> GI Responsibility (correct)
+  -> Fast speech truth rejection (contained)
+  -> Fast body-action plan (correct, ~26.75 s)
+  -> Goal Association schema failure (~32.13 s)
+  -> no Goal commit -> no Runtime dispatch -> no speech or motion
 ```
-Social Attention is optional body decoration anchored to a concrete semantic primary human-observable Activity—what Chromie is doing, not how a lane/mode/Capability realizes it; it is not a Goal, execution lane, or cognition-milestone reaction.
-Durable Mind stays small: Stable Mind, unfinished Goals, selective Memory.
-Situation is bounded, revisable, mostly reconstructable live soft state.
-Evidence/Ledger plus Plan/Request/Execution/Outcome ground Work; `Responsibility` and
-`Work` are architecture vocabulary, not parallel manager objects.
-## Settled boundaries
-- **Goal Interpretation stops at Responsibility evidence.** GI may not author response wording, Work, Primary Activities, Plan/execution/realization contracts, Capabilities, planning InformationGaps, execution-input completeness, blocking state, or input-source/default/clarification policy. It may report bounded unresolved meaning for a genuinely ambiguous outcome, scope, or referent. Fast Planner first owns HOW/Activity and input resolution without changing Responsibility meaning; it may request Deep Planner continuation for complex HOW without absorbing Deep authority. GA independently consumes the same GI result without waiting for Fast.
-- **Goal = canonical unfinished Responsibility.** Planning, waiting, confirmation,
-  scheduling, running, retry/recovery, and provider state belong to Work/runtime.
-- **Responsibility completeness is contained.** Every newly proposed Goal set
-  uses an authority-ephemeral model-owned coverage certificate; the Host derives
-  only its verdict, allows at most one fresh interpretation, and fails closed on
-  invalid or repeatedly incomplete output.
-- **`output_mode` is the sole model-authored Goal execution discriminant.** The
-  Host derives responsibility kind, execution lane, and provider requirement.
-  Reverse inference and model-authored copies are not supported protocol.
-- **Unavailability never erases a requested responsibility.** Preserve the Goal
-  and report the limitation; ordinary speech, media, or body motion cannot silently
-  substitute for a provider-required vocal or effectful outcome.
-- **Chromie has one personal Vocal Expression domain.** `speech` (speaking),
-  `expressive_speech`, `recitation`, `singing`, `humming`, and
-  `nonverbal_vocalization` are modes of one personal voice. `chromie.voice` is
-  exclusive. A compatible body/media realization may overlap Vocal; simultaneous
-  personal Vocal modes may not. Existing-media playback is realized through the
-  Activity Execution Lane, not through personal Vocal Expression.
-- **Social Attention is optional decoration with one semantic owner and one semantic primary-Activity anchor.**
-  `SocialAttentionPlanner` alone authors decoration for the concrete human-observable
-  behavior Chromie is doing: for example greet Alice, tell a joke, walk toward the
-  user, sing a song, hand over water, or show/play something. Execution lanes, Vocal
-  modes, Capability IDs, provider requests, and transport objects describe how that
-  Activity is realized; they are not Primary-Activity kinds. Multiple realization
-  items for one semantic Activity share one decoration opportunity, while independent
-  semantic Activities may independently choose `none` or expression. Cognition
-  milestones, planning state, evidence arrival, and waiting are not anchors.
-  Malformed/conflicting decoration disappears locally with no second call, Goal
-  completion authority, speech recomposition, or Goal/Plan mutation.
-- **Chromie is embodiment-independent.** Soridormi/MuJoCo is sufficient for the
-  core embodied outcome; cognition must not know the backend, and physical-robot
-  commissioning is optional provider work rather than a Chromie completion gate.
-- **Reality enters through evidence.** Provider evidence and reconciliation own
-  runtime truth; evidence integrity is not automatically claim sufficiency.
-- **Planner owns complete Communicative Activities.** Maintained GI does not own
-  speech. Fast Planner selects an immediate act's function, exact wording,
-  timing, Responsibility/Goal provenance, exact reason provenance to GI
-  unresolved meaning or a Planner-owned InformationGap, truth stage, and
-  Evidence references. The Host validates without rewriting; TTS/playback owns
-  physical delivery Evidence.
-- **Cross-cutting contracts are inputs, not authorities.** Claim qualification,
-  retention/privacy, and bounded adaptation cannot inherit Goal/Plan/effect authority.
-- **Readiness is local, not pipeline-global.** A branch advances when its own
-  meaning, inputs, evidence, dependencies, and authority are sufficient.
-- **Stable Mind is not dynamic world knowledge.** Identity/personality/values may
-  be cached; changing facts such as weather, news, prices, schedules, and law are
-  acquired through trusted information paths.
-## Recent architecture closure
-Current source bounds Goal/Planner reconsideration, keeps benign chat Fast, makes
-Deep/Host semantic rejection terminal, and implements the frozen human-like Core.
-Response Goal coverage is a Host-derived read-only projection. Planner owns
-wording while canonical Goal ownership and exact reused-speech provenance
-project delivery bookkeeping mechanically. No second response-writing model
-sits between Planner and Vocal delivery.
-The authority rule is act-scoped: maintained Goal Interpretation owns Responsibility
-meaning only. Fast Planner owns complete Communicative Activities in its first Activity Plan;
-`SocialAttentionPlanner` is the sole
-optional-decoration writer. Accepted design now separates open-Goal
-Reflection actions from terminal-history learning proposals: future online adaptation is
-bounded advisory Memory with independent scope/lifetime and can never self-modify shared
-cognitive policy or cache semantic decisions.
 
-The owner-capped fifth rebuilt-Agent live-text run for “你好，今天重庆白天天气怎么样啊？”
-is retained at `.chromie/acceptance/general-ability/20260817T224316Z-live-text/`. It
-proves GI no longer requested the already-supplied location/date, GA committed the
-Chongqing/today/day Goal, and Runtime dispatched `chromie.weather.lookup`. It then
-exposed arbitrary Fast `speech_act` text with an invalid Deep continuation and a
-weather-adapter mismatch between `Chongqing Municipality` and `Chongqing`. Current
-source closes both through constrained Fast decoding and provider administrative-suffix
-normalization. The canonical gate passes 1,900 tests, all 44 Level A cases pass, and a
-real-network provider probe resolves `重庆`. The five-cycle limit leaves no sixth
-combined proof; the fifth-run GI also narrowed the open question to sunny/not-sunny,
-so that semantic fidelity remains an explicit evidence gap.
-The current daily-life source correction also closes the general boundaries exposed by the generated-voice suite: Capability choice requires declared semantic entailment rather than topical proximity; state mutations are not information resources; local/private sensor state stays unknown without a trusted Provider; unavailable persistent work cannot be phrased as a future promise; and Gateway Attention uses bounded recent dialogue for temporary user-authored addressedness policy with one fail-open judgment and no online repair/reviewer chain. The owner-approved GI/Fast-Planner boundary is now implemented: Goal Interpretation preserves typed provider-neutral Responsibility meaning, Goal relation, and bounded unresolved meaning only; Fast Planner owns planning InformationGaps, execution-input completeness, source/default/blocking policy, and clarification selection. The temporary Deep-GI external-evidence defense and GI gap strategy fields are removed. One source-based Deep GI pass remains only for genuine semantic ambiguity. The same GI result first enters Fast Planner's bounded first-response phase; after that commitment, remaining Fast planning and GA continue concurrently. GA commits the narrowest source-grounded Goal but cannot author the question. Runtime deterministically binds each Planner gap to that exact Goal and commits it before clarification delivery. Fast Planner remains the first HOW owner and authors Communicative Acts plus Capability Activities; safe side-effect-free reads may start while GA commits canonical Goal identity, while effects remain Goal/confirmation/authorization gated. Trusted Capability Runtime presents one task-list view per Goal and never duplicates a shared task identity. Social Attention is keyed to semantic primary human-observable Activity meaning rather than to cognition milestones, execution modalities, or a once-per-turn budget. Responsibility/Goal sits above Activity; one Goal may own several semantic Activities/Work items, and a high-level provider Capability may realize one Activity atomically. Final `InteractionResponse` transport objects, Vocal modes, body/media requests, and Capability IDs are realization evidence only. Canonical Communicative Acts and Plan-step meaning provide Activity granularity; execution modality never does. Planner execution eligibility is derived from canonical Goal completion semantics. The maintained Goal Interpretation handoff has no route/intent compatibility fields; Responsibility moves into downstream cognition through typed `CognitiveWorkRequest`.
-The consolidated current-source gate passes all 13 repository-policy families, 119 benchmark tests, 1,835 maintained tests, 20 legacy Agent tests, all 44 Level A cases, test ownership, static analysis, configuration, structure, and documentation checks. These are source claims only; no new target evidence is implied.
+The preceding v22 evidence is at
+`.chromie/acceptance/general-ability/20260819-user-probe-continue-six-gates-v22-timing-boundaries/`.
+It also failed 0/1, but both turns executed one walking action. The continuation
+acknowledgement, `好，我这就往前走十秒。`, sounded like a new request; dispatch
+took roughly 34–35 seconds and whole turns roughly 66–67 seconds. It also
+exposed a generic post-evidence fallback after duplicate suppression and an
+evidence-boundary rejection for completed body Work.
 
-The current Chongqing-tonight closure is retained at `.chromie/acceptance/general-ability/20260818T111002Z-live-text/`. Under full assertion scope it proves an accepted prospective Fast response, one non-blocking Main-Activity Social-Attention opportunity, exact `today + night` weather execution, Goal-bound terminal Evidence re-entry, and an accepted probability-preserving final answer. Its raw anchors give 1,062.218 ms from validated GI handoff to Fast commitment, 2,362.831 ms from session start to that commitment, and 2,496.232 ms from commitment to discarded-output playback. The 1,888.418 ms sum of GI duration and Fast duration is diagnostic only and must never be subtracted from an absolute session timestamp. Fast Advance's sole mechanical DTO revision preserved the model's original `execute` disposition and materialized exact Capability args, after which GA only bound the Plan to canonical Goal identity. The weather output now projects primary condition/probability/summary from the requested period instead of exposing current weather as a competing primary scope.
-The acceptance correction now retains those raw stage/event timestamps, measures the two contract intervals directly, writes a source/runtime-bound reviewer packet, and reuses the existing sanitizer. A corrected diagnostic at `.chromie/acceptance/general-ability/20260818-latency-reviewer-diagnostic/` failed commit-to-playback at 4,663.077 ms because it ran a second Host against the operator's active singleton TTS worker; the Fast interval itself passed at 1,067.237 ms. This was harness resource contamination, not a Social-Attention serialization edge. Live-text qualification now acquires the existing Orchestrator lock before constructing `VoiceAssistant`, while the candidate TTS boundary reports worker queue wait. The fixed exact-revision replay location is `.chromie/acceptance/general-ability/20260818-latency-reviewer-current/`; read its `summary.json` rather than prose and keep target closure open if it is absent or failed.
-The related Level A classes pass 15/15 and the canonical gate passes 119 benchmark, 1,854 maintained, and 20 legacy Agent tests. This is injected-text, real-network-weather, generated-TTS, `speaker=false` discarded-output evidence; physical microphone, audible speaker, and physical robot remain unproven.
+## Current source changes, not yet live-qualified together
 
-The uploaded `20260818_202500` workflow exposed a later startup boundary without changing that semantic result: Fast Advance produced eligible weather Work around 7.9 seconds, but the Agent Tool → Runtime adapter omitted `parallel_metadata_declared`, so early Runtime admission failed and provider Work waited behind the roughly 30.4-second GA path. Current source preserves the tool's explicit parallel declaration and asserts the pre-GA safe dispatch path in both Chongqing live-text cases. The subsequent architecture audit also removed `requires_replan` from both GA and the older internal semantic-operation contract, together with the Host's relationship-enum compatibility inference. Any canonical Goal commit that intersects provisional or retained Work now structurally reactivates Fast Planner Work Reconciliation with Canonical Goal plus bounded actual Work. Planner explicitly selects exact stable Activity IDs for reuse or proposes complete replacement Work; Runtime only validates live identity/state/Capability/arguments, preserves one execution identity for an atomic retained selection, or obtains exact cancellation receipts before replacement dispatch. Stale state fails closed and a later trusted Runtime/Evidence event re-enters cognition; the Host never repairs semantics. Focused semantic-operation/Planner/GA/Cognitive-Runtime/Conversation-State/Capability-Runtime/acceptance tests pass 359 tests, all Level A classes pass 44/44, and the canonical source gate passes 13 policy families, 119 benchmark, 1,865 maintained, and 20 legacy Agent tests. No new document, environment key, runtime switch, compatibility path, manager, or live provider/audio/robot evidence is claimed.
-## Do not resurrect
-- independent Router semantic authority;
-- `social_attention` as a third execution lane or standalone Goal;
-- `Speaking` as a sibling domain to singing/humming, or multiple personal mouths;
-- reverse `responsibility_kind -> output_mode` compatibility inference;
-- Host phrase tables/regexes deciding ordinary intent or planning;
-- a generic global semantic-review layer merely because local stages review;
-- random idle animation disguised as Social Attention;
-- silent capability substitution, evidence promotion, or response text as proof;
-- compatibility machinery for an owner-replaced architecture;
-- online semantic repair chains, reviewer-of-reviewer flows, and repair-of-repair (the semantic-authority audit must reject their return);
-- Host replanning after a terminal Deep plan has failed trusted validation;
-- model-authored duplicate copies of one semantic fact;
-- managers/layers/prompt mountains without a distinct required owner or invariant.
-## Engineering decision rule
-The Charter requires the **best-known technically justified architecture** as the
-default target. First determine what is technically strongest; then weigh current
-code, compatibility, migration effort, sunk cost, schedule, and diff size. Those
-costs matter but do not have architecture veto power. If the stronger design needs
-new owner authority, explain why it is stronger, alternatives, tradeoffs, risks,
-migration/removal impact, and the exact authority required, then ask the owner.
-Do not silently downgrade because authority is absent.
-This checkpoint does **not** grant blanket architecture authority to later
-sessions; use Charter governance when new authority is needed.
-## Resume point
-The GI/GA/Fast-Planner ownership migration, Planner-owned communication, Main-Activity-attached Social Attention opportunity, exact weather scope, pre-GA safe-read startup, compatible task binding, Planner-before-cancellation reconsideration, Host Evidence → Fast Planner result re-entry, raw latency anchors, exclusive live-test Host ownership, and portable reviewer packet are source-closed. Preserve those regressions. First inspect or generate the fixed current-revision injected-text replay named above; then the next evidence task is supervised physical microphone/audible-speaker proof and the remaining default target-evidence profile. Discarded playback must not be promoted to audible proof. After evidence closure, resume Host decomposition along the existing ownership seams and then the semantic Issue order in `ROADMAP.md`; do not recreate a later wording/result model, GA-authored questions, standalone Social Attention, or current/day weather fields as evidence for another requested period.
-## Resume and verification commands
-`docs/STATUS.md` owns implementation/evidence claims. Do not claim live-model,
-audio, MuJoCo, GPU, or physical-provider qualification unless that exact gate ran
-and retained evidence.
+- exact `fast_activity_id` speech reuse and delivery provenance;
+- duplicate delivery suppression that does not trigger a fake generic fallback;
+- exact terminal-Evidence re-entry for completed Goal-bound Work;
+- declared Agent-Skill output/domain applicability;
+- continuation-aware Responsibility retention and Work reconciliation;
+- constrained Planner InformationGap DTOs;
+- profile-owned first-response and truth models;
+- regressions for playback, TTS alignment, conversation state, Cognitive
+  Runtime, evidence re-entry, Planner contracts, Agent Skills, and profiles.
+
+These are general boundary changes, not hardcoded utterance rules. v23 proves
+that Goal Association model-contract integrity and Fast/GA latency still block
+human behavior.
+
+## Verification state
+
+- Recently passed: 31 Agent-Skill domain/selection tests; three focused
+  continuation/retained-Work Cognitive Runtime tests; focused evidence re-entry,
+  Planner schema, profile/settings, playback, TTS-alignment, and conversation
+  state tests.
+- The complete current-tree Level A run passes 44/44. This is deterministic
+  Level A evidence only and does not override the failed v23 live-text outcome.
+- The current focused rerun confirms two Goal Association failures:
+  `test_weather_material_modifier_and_planner_progress_recover_to_one_goal` and
+  `test_body_actions_miscast_as_physical_resources_are_reconsidered`.
+- The 2026-08-19 pre-handoff repository-policy check fails at three boundaries:
+  two Host inspections of `request.goals` in Agent-Skill discovery, and a stale
+  reviewed exception-handler checksum in `agent/app/deep_planner.py`.
+- Documentation, test ownership, runtime structure, semantic-authority, and
+  regenerated configuration-inventory checks pass. The inventory grows from
+  401 to 403 keys for the two documented service-owned model variables; modes
+  remain 4, public booleans 1, and aliases 0.
+- Benchmark tests pass 119/119, then the benchmark gate stops on the same policy
+  failures. `./scripts/run_tests.sh` also stops at repository policy before the
+  maintained suite, so no current full-suite result is claimed. `git diff
+  --check` passes. Physical microphone, audible speaker, simulator execution
+  for these probes, and physical robot behavior are not proven.
+
+## Exact resume order
+
+1. Pull this handoff commit and generate a clean runtime. Rebuild rather than
+   trusting manually recreated containers. The local v23 experiment used
+   `qwen3.5:4b` for Fast first response/truth; committed profiles are the
+   authority elsewhere. Never edit `.env.runtime` directly.
+2. Reproduce the two Goal Association tests and v23
+   `structured_output_validation`. Fix Goal Association, the earliest wrong
+   owner; do not add a repair layer, semantic Host rule, or phrase rule.
+3. Remove the Agent-Skill Host semantic inspection or restore model-owned
+   selection without losing capability grounding. Re-audit the Deep Planner
+   exception handler before refreshing its checksum; never update the checksum
+   merely to silence the gate.
+4. Rerun the exact live case:
+
+   ```bash
+   python scripts/general_ability_acceptance.py --mode live-text \
+     --only-case user_probe_continue_recent_walk --execute \
+     --evidence-dir .chromie/acceptance/general-ability/20260819-user-probe-continue-six-gates-v24 \
+     --timeout-s 240 --capability-timeout-s 180 --case-timeout-s 420
+   ```
+
+5. Require all six gates on both turns. Fail-closed is not a behavioral pass;
+   motion completion is not a natural-speech or timing pass.
+6. Only after this case passes, run its general-ability class, all Level A
+   cases, and canonical gates. Then resume the remaining user probes in
+   scenario order. Do not add architecture while an existing owner can express
+   correct behavior.
+
+## Verification commands
+
 ```bash
-git switch main && git pull --ff-only
 git status --short
-git log -10 --oneline
 python scripts/check_repository_policies.py
 python scripts/check_test_ownership.py
 python scripts/runtime_configuration_inventory.py --check
 python scripts/check_runtime_structure.py
 python scripts/check_docs.py
-python scripts/semantic_authority_audit.py --check
+python scripts/semantic_authority_audit.py
+python scripts/general_ability_acceptance.py --mode level-a --no-write
 ./scripts/benchmark_check.sh
-./scripts/run_tests.sh   # canonical gate in a dependency-complete environment
+./scripts/run_tests.sh
 ```
-Canonical owners: [Charter](docs/PROJECT_CHARTER.md) ·
-[Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md) ·
-[Turn Loop](docs/COGNITIVE_TURN_LOOP.md) · [Roadmap](ROADMAP.md) · [Status](docs/STATUS.md) ·
-[Target Evidence](docs/TARGET_EVIDENCE_CLOSURE.md) · [API](docs/API_REFERENCE.md) · [Runbook](CHROMIE_RUNBOOK.md).

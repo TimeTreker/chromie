@@ -148,4 +148,11 @@ def build_interaction_runtime(
         max_concurrency=settings.capability_runtime.capability_max_concurrency,
         catalog_refresh_ttl_s=settings.capability_runtime.catalog_refresh_ttl_s,
         interaction_ledger=interaction_ledger,
+        communicative_delivery_recorder=(
+            lambda sid, text, metadata: assistant.conversation_state.record_assistant_turn(
+                sid,
+                text,
+                metadata=metadata,
+            )
+        ),
     )

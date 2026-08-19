@@ -93,6 +93,7 @@ class PlaybackDeliveryLifecycleTests(unittest.IsolatedAsyncioTestCase):
             stage="pre_action",
             purpose="acknowledge_and_check",
             commitment="evaluating",
+            fast_activity_id="progress_weather",
             source_goal_ids=["goal-weather", "goal-weather"],
             canonical_plan_id="plan-weather",
             canonical_plan_fingerprint="fingerprint-weather",
@@ -105,6 +106,7 @@ class PlaybackDeliveryLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(event["turn_id"], "turn-weather")
         self.assertEqual(event["source_goal_ids"], ["goal-weather"])
         self.assertEqual(event["claims"], ["checking"])
+        self.assertEqual(event["fast_activity_id"], "progress_weather")
 
         lifecycle.resolve_playback_start_waiter(
             generation=3,

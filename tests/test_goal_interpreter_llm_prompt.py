@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import unittest
 from unittest import mock
@@ -16,6 +17,7 @@ from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
     _payload_message_texts,
     _reject_canonical_goal_identity_refs,
     _reject_planner_shaped_goal_interpretation,
+    _reject_untyped_coordination_bindings,
     _without_goal_interpretation_authority,
 )
 from agent.app.cognitive_core.goal_interpreter.schema import (
@@ -32,6 +34,7 @@ def _valid_output(*, local_ref: str = "r1") -> dict[str, object]:
                 "local_ref": local_ref,
                 "outcome": "provide today's weather for Chongqing",
                 "bindings": {"location": "Chongqing", "time": "today"},
+                "output_mode": "capability_work",
                 "completion_requires_work": True,
                 "completion_requires_fresh_evidence": True,
                 "confidence": 0.95,
@@ -207,14 +210,74 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertNotIn("Route Taxonomy", prompt)
         self.assertNotIn("Compatibility Framing", prompt)
 
+        schema = self._interpreter()._goal_interpretation_response_schema()
+        responsibility = schema["$defs"]["CognitiveResponsibilityProposal"]
+        self.assertIn(
+            "Never combine coordinated positive effects",
+            responsibility["properties"]["outcome"]["description"],
+        )
+
+    def test_system_prompt_preserves_speaker_and_immediate_conversation_boundaries(self) -> None:
+        prompt = self._interpreter().load_system_prompt()
+        self.assertIn("downstream work beyond the immediate ordinary conversational response", prompt)
+        self.assertIn("Preserve speaker, experiencer, actor, addressee", prompt)
+        self.assertIn("most recent accepted assistant/Chromie utterance", prompt)
+        self.assertIn("does not continue, resume, or modify the old Goal", prompt)
+        self.assertIn("Coordination does not merge independently observable effects", prompt)
+        self.assertIn("Chinese `边…边…`", prompt)
+        self.assertIn("singing is output_mode=singing", prompt)
+        self.assertIn("Each outcome describes only its own effect", prompt)
+        self.assertIn("exactly one canonical JSON token", prompt)
+        self.assertIn("`new`, `continue`, `modify`", prompt)
+        self.assertIn("never inflect, pluralize, conjugate", prompt)
+        self.assertNotIn("new or continues, modifies", prompt)
+
+        turn_prompt = self._interpreter().build_interpretation_user_prompt(
+            GoalInterpretationRequest(text="边走边唱歌。", language="zh-CN")
+        )
+        self.assertIn("whole Latest user input", turn_prompt)
+        self.assertIn("not semantic bindings", turn_prompt)
+
+        turn_prompt = self._interpreter().build_interpretation_user_prompt(
+            GoalInterpretationRequest(
+                text="你刚才说什么？",
+                language="zh-CN",
+                context={
+                    "history": [
+                        {"role": "user", "text": "你好，Chromie。"},
+                        {"role": "assistant", "text": "你好呀！"},
+                    ]
+                },
+            )
+        )
+        self.assertIn("most recent accepted assistant utterance", turn_prompt)
+        self.assertIn("not continuation of the prior utterance's Goal", turn_prompt)
+        self.assertIn("Most recent accepted Chromie/assistant utterance JSON", turn_prompt)
+        self.assertIn('"role":"assistant"', turn_prompt)
+        self.assertIn('"text":"你好呀！"', turn_prompt)
+
     def test_system_prompt_preserves_direct_entity_surface_and_rejects_provider_time_uncertainty(self) -> None:
         prompt = self._interpreter().load_system_prompt()
         self.assertIn("exact contiguous surface", prompt)
         self.assertIn("Never translate, transliterate", prompt)
+        self.assertIn("deictic spatial language", prompt)
+        self.assertIn("inside/outside", prompt)
+        self.assertIn("Chinese `重庆` stays `重庆`, never `Chongqing`", prompt)
+        self.assertIn("`外面` stays `外面`, never `outside`", prompt)
         self.assertIn("emit a `date` binding and a `day_part` binding", prompt)
         self.assertIn("contextual WHAT normalization only", prompt)
         self.assertIn("provider timezone", prompt)
         self.assertIn("never an unresolved WHAT question", prompt)
+
+        turn_prompt = self._interpreter().build_interpretation_user_prompt(
+            GoalInterpretationRequest(
+                text="今天晚上重庆热不热？",
+                language="zh-CN",
+            )
+        )
+        self.assertIn("literal surface audit", turn_prompt)
+        self.assertIn('authoritative input is "今天晚上重庆热不热？"', turn_prompt)
+        self.assertIn("translated equivalent", turn_prompt)
 
     def test_system_prompt_preserves_requested_judgment_without_asserting_the_answer(self) -> None:
         prompt = self._interpreter().load_system_prompt().casefold()
@@ -256,7 +319,10 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertEqual(payload["model"], "deep-model")
         self.assertIn("Deep Goal Interpretation", system_text)
         self.assertIn("genuine consequential ambiguity", system_text)
+        self.assertIn("atomicity audit", system_text)
+        self.assertIn("responsibilities must contain N sibling items", system_text)
         self.assertIn("No prior interpretation DTO is supplied", user_text)
+        self.assertIn("final number of responsibilities must equal that count", user_text)
         self.assertNotIn("previous output", all_text.casefold())
 
     def test_decision_confidence_is_required_model_evidence(self) -> None:
@@ -299,6 +365,7 @@ class GoalInterpreterPromptTests(unittest.TestCase):
                 "local_ref",
                 "outcome",
                 "bindings",
+                "output_mode",
                 "completion_requires_work",
                 "completion_requires_fresh_evidence",
                 "confidence",
@@ -310,6 +377,19 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertNotIn("relationship", responsibility_schema["properties"])
         self.assertNotIn("target_goal_ids", responsibility_schema["properties"])
         self.assertNotIn("InformationGap", payload["format"]["$defs"])
+        output_modes = {
+            item["const"]
+            for item in responsibility_schema["properties"]["output_mode"]["oneOf"]
+        }
+        self.assertNotIn("unspecified", output_modes)
+        self.assertNotIn("other", output_modes)
+        self.assertIn("singing", output_modes)
+        nonverbal = next(
+            item
+            for item in responsibility_schema["properties"]["output_mode"]["oneOf"]
+            if item.get("const") == "nonverbal_vocalization"
+        )
+        self.assertIn("excludes singing", nonverbal["description"])
 
     def test_repair_schema_does_not_reintroduce_planning_gap_contract(self) -> None:
         interpreter = self._interpreter()
@@ -374,6 +454,121 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("target_goal_ids", responsibility["properties"])
         self.assertIn("relationship", responsibility["required"])
         self.assertIn("target_goal_ids", responsibility["required"])
+        relationship = responsibility["properties"]["relationship"]
+        self.assertNotIn("enum", relationship)
+        self.assertEqual(
+            {item["const"] for item in relationship["oneOf"]},
+            {
+                "continue",
+                "modify",
+                "clarify",
+                "confirm",
+                "reject",
+                "cancel",
+                "pause",
+                "resume",
+                "merge",
+                "split",
+                "reference",
+                "new",
+            },
+        )
+        self.assertIn("never inflect", relationship["description"])
+        self.assertNotIn("continues", json.dumps(relationship))
+        self.assertNotIn("resumes", json.dumps(relationship))
+        self.assertEqual(
+            responsibility["properties"]["target_goal_ids"]["items"]["enum"],
+            ["goal-existing"],
+        )
+        relationship_targets = responsibility["allOf"][-1]
+        self.assertEqual(
+            relationship_targets["if"]["properties"]["relationship"],
+            {"const": "new"},
+        )
+        self.assertEqual(
+            relationship_targets["then"]["properties"]["target_goal_ids"][
+                "maxItems"
+            ],
+            0,
+        )
+        self.assertEqual(
+            relationship_targets["else"]["properties"]["target_goal_ids"][
+                "minItems"
+            ],
+            1,
+        )
+        _, user_prompt, _ = _payload_message_texts(payload)
+        self.assertIn("copy exactly one relationship protocol token", user_prompt)
+        self.assertIn("Never inflect, conjugate, translate", user_prompt)
+
+        repair = interpreter.build_interpretation_repair_payload(
+            GoalInterpretationRequest(
+                text="刚才那个事情继续。",
+                language="zh-CN",
+                context={
+                    "active_goal_snapshots": [
+                        {"goal_id": "goal-existing", "goal": {"goal_id": "goal-existing"}}
+                    ]
+                },
+            ),
+            previous_content='{"relationship":"continues"}',
+            validation_error=ValueError("invalid relationship token"),
+        )
+        repair_responsibility = repair["format"]["$defs"][
+            "CognitiveResponsibilityProposal"
+        ]
+        self.assertEqual(
+            repair_responsibility["properties"]["target_goal_ids"]["items"]["enum"],
+            ["goal-existing"],
+        )
+        self.assertIn(
+            "continue",
+            {
+                item["const"]
+                for item in repair_responsibility["properties"]["relationship"]["oneOf"]
+            },
+        )
+        repair_system, _, _ = _payload_message_texts(repair)
+        self.assertIn("copy one exact protocol token", repair_system)
+
+    def test_recent_terminal_goal_semantics_are_available_for_continuation(self) -> None:
+        interpreter = self._interpreter()
+        request = GoalInterpretationRequest(
+            text="刚才那个事情继续。",
+            language="zh-CN",
+            context={
+                "active_goal_snapshots": [],
+                "recent_goal_snapshots": [
+                    {
+                        "goal_id": "goal-walk",
+                        "responsibility_status": "satisfied",
+                        "last_user_update": "你往前走 10 秒。",
+                        "goal": {
+                            "goal_id": "goal-walk",
+                            "description": "move forward for ten seconds",
+                            "metadata": {
+                                "output_mode": "body_action",
+                                "completion_requires_work": True,
+                                "completion_requires_fresh_evidence": False,
+                            },
+                        },
+                    }
+                ],
+            },
+        )
+
+        payload = interpreter.build_interpretation_payload(request)
+        _, user_prompt, _ = _payload_message_texts(payload)
+
+        self.assertIn("Retained active/recent Goal semantics", user_prompt)
+        self.assertIn('"goal_id":"goal-walk"', user_prompt)
+        self.assertIn("move forward for ten seconds", user_prompt)
+        self.assertEqual(
+            payload["format"]["$defs"]["CognitiveResponsibilityProposal"][
+                "properties"
+            ]["target_goal_ids"]["items"]["enum"],
+            ["goal-walk"],
+        )
 
     def test_repair_schema_excludes_bound_values_from_unresolved(self) -> None:
         interpreter = self._interpreter()
@@ -441,6 +636,38 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertNotIn('"route"', prompt)
         self.assertNotIn('"intent"', prompt)
 
+    def test_prompt_exposes_retained_goal_completion_modality_for_continuation(self) -> None:
+        prompt = self._interpreter().build_interpretation_user_prompt(
+            GoalInterpretationRequest(
+                sid="continue-walk",
+                text="刚才那个事情继续。",
+                language="zh-CN",
+                context={
+                    "active_goal_snapshots": [
+                        {
+                            "goal_id": "goal-walk",
+                            "goal": {
+                                "goal_id": "goal-walk",
+                                "description": "move forward 10 seconds",
+                                "metadata": {
+                                    "output_mode": "body_action",
+                                    "provider_required": True,
+                                    "completion_requires_work": True,
+                                    "completion_requires_fresh_evidence": False,
+                                },
+                            },
+                        }
+                    ]
+                },
+            )
+        )
+
+        self.assertIn('"output_mode":"body_action"', prompt)
+        self.assertIn('"completion_requires_work":true', prompt)
+        self.assertIn(
+            "continues or resumes one supplied Goal must preserve", prompt
+        )
+
     def test_repair_prompt_does_not_replay_rejected_output(self) -> None:
         interpreter = self._interpreter()
         request = GoalInterpretationRequest(text="Bring me water.")
@@ -474,6 +701,161 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.responsibilities[0].local_ref, "r1")
         self.assertTrue(result.responsibilities[0].completion_requires_fresh_evidence)
         self.assertEqual(interpreter._chat.await_count, 1)
+
+    async def test_provider_key_value_bindings_are_mechanically_normalized(self) -> None:
+        interpreter = self._interpreter()
+        output = {
+            "responsibilities": [
+                {
+                    "local_ref": "r1",
+                    "outcome": "move forward for ten seconds",
+                    "bindings": [
+                        {"name": "direction", "value": "forward"},
+                        {"key": "duration", "value": "10 秒"},
+                    ],
+                    "output_mode": "body_action",
+                    "relationship": "new",
+                    "target_goal_ids": [],
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.95,
+                }
+            ],
+            "unresolved": [],
+        }
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            return_value={"message": {"content": json.dumps(output)}}
+        )
+
+        result = await interpreter.interpret_goal(
+            GoalInterpretationRequest(text="你往前走 10 秒。", language="zh-CN")
+        )
+
+        self.assertEqual(result.confidence, 0.95)
+        self.assertEqual(
+            result.responsibilities[0].bindings,
+            {"direction": "forward", "duration": "10 秒"},
+        )
+        self.assertEqual(interpreter._chat.await_count, 1)
+
+    async def test_spelled_out_explicit_number_receives_one_dto_repair(self) -> None:
+        interpreter = self._interpreter()
+        invalid = {
+            "responsibilities": [
+                {
+                    "local_ref": "r1",
+                    "outcome": "move forward for ten seconds",
+                    "bindings": [
+                        {"name": "direction", "value": "forward"},
+                        {"name": "duration", "value": "ten seconds"},
+                    ],
+                    "output_mode": "body_action",
+                    "relationship": "new",
+                    "target_goal_ids": [],
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.95,
+                }
+            ],
+            "unresolved": [],
+        }
+        repaired = copy.deepcopy(invalid)
+        repaired["responsibilities"][0]["bindings"][1]["value"] = "10 秒"
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            side_effect=[
+                {"message": {"content": json.dumps(invalid)}},
+                {"message": {"content": json.dumps(repaired)}},
+            ]
+        )
+
+        result = await interpreter.interpret_goal(
+            GoalInterpretationRequest(text="你往前走 10 秒。", language="zh-CN")
+        )
+
+        self.assertEqual(result.responsibilities[0].bindings["duration"], "10 秒")
+        self.assertEqual(interpreter._chat.await_count, 2)
+
+    def test_body_action_completion_is_not_fresh_information(self) -> None:
+        with self.assertRaisesRegex(
+            ValidationError, "not a fresh-information Responsibility"
+        ):
+            CognitiveResponsibilityProposal.model_validate(
+                {
+                    "local_ref": "walk",
+                    "outcome": "move forward for ten seconds",
+                    "bindings": {"duration": "10 seconds"},
+                    "output_mode": "body_action",
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.95,
+                }
+            )
+
+    async def test_continuation_cannot_turn_retained_body_work_into_speech(self) -> None:
+        interpreter = self._interpreter()
+        wrong = {
+            "confidence": 0.95,
+            "responsibilities": [
+                {
+                    "local_ref": "r1",
+                    "outcome": "continue the previous action",
+                    "bindings": {"previous_action": "你往前走 10 秒。"},
+                    "output_mode": "speech",
+                    "relationship": "continue",
+                    "target_goal_ids": ["goal-walk"],
+                    "completion_requires_work": False,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.95,
+                }
+            ],
+            "unresolved": [],
+        }
+        corrected = copy.deepcopy(wrong)
+        corrected["responsibilities"][0]["output_mode"] = "body_action"
+        corrected["responsibilities"][0]["completion_requires_work"] = True
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            side_effect=[
+                {"message": {"content": json.dumps(wrong, ensure_ascii=False)}},
+                {
+                    "message": {
+                        "content": json.dumps(corrected, ensure_ascii=False)
+                    }
+                },
+            ]
+        )
+        request = GoalInterpretationRequest(
+            sid="continue-walk",
+            text="刚才那个事情继续。",
+            language="zh-CN",
+            context={
+                "active_goal_snapshots": [
+                    {
+                        "goal_id": "goal-walk",
+                        "goal": {
+                            "goal_id": "goal-walk",
+                            "description": "move forward 10 seconds",
+                            "metadata": {
+                                "output_mode": "body_action",
+                                "provider_required": True,
+                                "completion_requires_work": True,
+                                "completion_requires_fresh_evidence": False,
+                            },
+                        },
+                    }
+                ]
+            },
+        )
+
+        result = await interpreter.interpret_goal(request)
+
+        responsibility = result.responsibilities[0]
+        self.assertEqual(responsibility.output_mode, "body_action")
+        self.assertTrue(responsibility.completion_requires_work)
+        self.assertEqual(interpreter._chat.await_count, 2)
+        self.assertEqual(
+            interpreter._chat.await_args_list[1].kwargs["stage"],
+            "goal_interpretation_contract_repair",
+        )
 
     async def test_unprovenanced_translated_location_gets_one_dto_repair(self) -> None:
         interpreter = self._interpreter()
@@ -789,6 +1171,208 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             {"device": "washing machine"},
         )
         self.assertEqual(interpreter._chat.await_count, 2)
+
+    async def test_transport_echo_bindings_escalate_once_from_source(self) -> None:
+        interpreter = self._interpreter()
+        invalid = {
+            "confidence": 0.95,
+            "responsibilities": [
+                {
+                    "local_ref": "combined",
+                    "outcome": "walk while singing",
+                    "bindings": {
+                        "language": "zh-CN",
+                        "text": "边走边唱歌",
+                    },
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.95,
+                }
+            ],
+            "unresolved": [],
+        }
+        corrected = {
+            "confidence": 0.95,
+            "responsibilities": [
+                {
+                    "local_ref": "walk",
+                    "outcome": "walk forward",
+                    "bindings": {},
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.95,
+                },
+                {
+                    "local_ref": "sing",
+                    "outcome": "sing audibly while walking",
+                    "bindings": {"coordinate_with": "walk"},
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.95,
+                },
+            ],
+            "unresolved": [],
+        }
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            side_effect=[
+                {"message": {"content": json.dumps(invalid, ensure_ascii=False)}},
+                {"message": {"content": json.dumps(corrected, ensure_ascii=False)}},
+            ]
+        )
+
+        result = await interpreter.interpret_goal(
+            GoalInterpretationRequest(text="边走边唱歌。", language="zh-CN")
+        )
+
+        self.assertEqual(
+            [item.local_ref for item in result.responsibilities],
+            ["walk", "sing"],
+        )
+        self.assertEqual(interpreter._chat.await_count, 2)
+        deep_call = interpreter._chat.await_args_list[1]
+        self.assertEqual(deep_call.kwargs["stage"], "goal_interpretation_deep")
+        self.assertIn("No prior interpretation DTO", deep_call.args[0]["messages"][1]["content"])
+
+    async def test_free_form_coordination_effect_escalates_once_from_source(self) -> None:
+        interpreter = self._interpreter()
+        invalid = {
+            "confidence": 0.95,
+            "responsibilities": [
+                {
+                    "local_ref": "r1",
+                    "outcome": "walk ahead",
+                    "bindings": {},
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.95,
+                },
+                {
+                    "local_ref": "r2",
+                    "outcome": "sing simultaneously",
+                    "bindings": {"simultaneously": "with blinking eyes"},
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.95,
+                },
+            ],
+            "unresolved": [],
+        }
+        corrected = {
+            "confidence": 0.95,
+            "responsibilities": [
+                {
+                    "local_ref": "r1",
+                    "outcome": "walk ahead",
+                    "bindings": {"coordinate_with": ["r2", "r3"]},
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.95,
+                },
+                {
+                    "local_ref": "r2",
+                    "outcome": "sing",
+                    "bindings": {"coordinate_with": ["r1", "r3"]},
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.95,
+                },
+                {
+                    "local_ref": "r3",
+                    "outcome": "blink eyes",
+                    "bindings": {"coordinate_with": ["r1", "r2"]},
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.95,
+                },
+            ],
+            "unresolved": [],
+        }
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            side_effect=[
+                {"message": {"content": json.dumps(invalid)}},
+                {"message": {"content": json.dumps(corrected)}},
+            ]
+        )
+
+        result = await interpreter.interpret_goal(
+            GoalInterpretationRequest(
+                text="walk ahead, singing and blinking eyes simultaneously"
+            )
+        )
+
+        self.assertEqual(len(result.responsibilities), 3)
+        self.assertEqual(interpreter._chat.await_count, 2)
+        self.assertEqual(
+            interpreter._chat.await_args_list[1].kwargs["stage"],
+            "goal_interpretation_deep",
+        )
+
+    async def test_valid_compound_meaning_gets_one_source_based_deep_pass(self) -> None:
+        interpreter = self._interpreter()
+        primary = {
+            "confidence": 0.95,
+            "responsibilities": [
+                {
+                    "local_ref": "walk",
+                    "outcome": "walk",
+                    "bindings": {"mode": "simultaneous"},
+                    "output_mode": "body_action",
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.95,
+                },
+                {
+                    "local_ref": "sing",
+                    "outcome": "sing",
+                    "bindings": {"simultaneously": "simultaneously"},
+                    "output_mode": "singing",
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.95,
+                },
+            ],
+            "unresolved": [],
+        }
+        deep = copy.deepcopy(primary)
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            side_effect=[
+                {"message": {"content": json.dumps(primary)}},
+                {"message": {"content": json.dumps(deep)}},
+            ]
+        )
+
+        result = await interpreter.interpret_goal(
+            GoalInterpretationRequest(text="walk and sing simultaneously")
+        )
+
+        self.assertEqual(
+            [item.output_mode for item in result.responsibilities],
+            ["body_action", "singing"],
+        )
+        self.assertEqual(interpreter._chat.await_count, 2)
+        self.assertEqual(
+            interpreter._chat.await_args_list[1].kwargs["stage"],
+            "goal_interpretation_deep",
+        )
+
+    def test_self_referential_action_combination_is_structural_loss(self) -> None:
+        parsed = {
+            "confidence": 0.95,
+            "responsibilities": [
+                {
+                    "local_ref": "r1",
+                    "outcome": "combined request",
+                    "bindings": {"action_combination": ["r1"]},
+                    "output_mode": "capability_work",
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.95,
+                }
+            ],
+            "unresolved": [],
+        }
+        with self.assertRaisesRegex(ValueError, "sibling local_ref"):
+            _reject_untyped_coordination_bindings(parsed)
 
     async def test_route_output_gets_one_mechanical_dto_repair(self) -> None:
         interpreter = self._interpreter()

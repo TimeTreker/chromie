@@ -141,6 +141,32 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         self.assertEqual(request.context["result_evidence_reentry"]["source_goal_ids"], [goal_id])
         self.assertEqual(request.context["trusted_terminal_evidence"][0]["evidence_id"], "weather-result")
 
+        assistant._turn_speech_events = {
+            "session": [
+                {
+                    "event_id": "speech-event-existing",
+                    "session_id": "session",
+                    "status": "playback_started",
+                    "text": "上午不会下雨。",
+                }
+            ]
+        }
+        duplicate = asyncio.run(
+            assistant._planner_evidence_reentry_response(
+                source_response=source,
+                canonical_plan=original,
+                user_request="今天上午会下雨吗？",
+                language="zh-CN",
+                goal_ids=[goal_id],
+                evidence=[evidence],
+                session_id="session",
+                phase="post_execution",
+            )
+        )
+        self.assertIsNotNone(duplicate)
+        assert duplicate is not None
+        self.assertEqual(duplicate.speech, [])
+
 
 if __name__ == "__main__":
     unittest.main()

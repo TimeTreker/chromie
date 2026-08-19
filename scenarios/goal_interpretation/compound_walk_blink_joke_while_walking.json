@@ -50,7 +50,8 @@
               "local_ref": "r2",
               "outcome": "tell a joke while walking",
               "bindings": {
-                "concurrency": "while walking"
+                "concurrency": "while walking",
+                "count": 6
               },
               "completion_requires_work": true,
               "completion_requires_fresh_evidence": false,
@@ -102,7 +103,8 @@
         "local_ref": "r2",
         "outcome": "tell a joke while walking",
         "bindings": {
-          "concurrency": "while walking"
+          "concurrency": "while walking",
+          "count": 6
         },
         "completion_requires_work": true,
         "completion_requires_fresh_evidence": false,

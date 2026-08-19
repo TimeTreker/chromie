@@ -31,6 +31,7 @@ MODEL_PLAN_KEYS = (
     "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
     "AGENT_GOAL_ASSOCIATION_MODEL",
     "AGENT_FAST_PLANNER_MODEL",
+    "AGENT_FAST_FIRST_RESPONSE_MODEL",
     "AGENT_DEEP_PLANNER_MODEL",
     "AGENT_SOCIAL_ATTENTION_MODEL",
 )
@@ -437,6 +438,7 @@ def active_models(values: Mapping[str, str]) -> list[str]:
         append(values.get("AGENT_GOAL_ASSOCIATION_MODEL"))
     if enabled(values.get("AGENT_FAST_PLANNER_ENABLED"), default=True):
         append(values.get("AGENT_FAST_PLANNER_MODEL"))
+        append(values.get("AGENT_FAST_FIRST_RESPONSE_MODEL"))
     if enabled(values.get("AGENT_DEEP_PLANNER_ENABLED"), default=True):
         append(values.get("AGENT_DEEP_PLANNER_MODEL"))
     if values.get("AGENT_SOCIAL_ATTENTION_MODE", "off") != "off":
@@ -598,6 +600,7 @@ def main(argv: list[str] | None = None) -> int:
         f"goal_interpreter={models['AGENT_GOAL_INTERPRETER_MODEL']} "
         f"association={models['AGENT_GOAL_ASSOCIATION_MODEL']} "
         f"fast={models['AGENT_FAST_PLANNER_MODEL']} "
+        f"fast_first_response={models['AGENT_FAST_FIRST_RESPONSE_MODEL']} "
         f"deep={models['AGENT_DEEP_PLANNER_MODEL']}"
     )
     budgets = manifest.get("cognitive_budgets")

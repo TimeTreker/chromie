@@ -153,6 +153,30 @@ class CognitiveGatewayAttentionReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.disposition, "suppress")
         self.assertEqual(client.calls, 1)
 
+    async def test_active_exchange_reply_cannot_be_marked_unaddressed(self) -> None:
+        client = _Client(
+            {
+                "addressed": False,
+                "speech_act": "reply",
+                "confidence": 0.9,
+            }
+        )
+        reviewer = AttentionReviewer(client)
+
+        result = await reviewer.review(
+            self.request(
+                "Continue the previous thing.",
+                active=True,
+                evidence="active_task",
+                recent_dialogue=[
+                    {"role": "assistant", "text": "I will walk forward."}
+                ],
+            )
+        )
+
+        self.assertEqual(result.disposition, "admit")
+        self.assertEqual(result.source, "cognitive_gateway.attention_review_fail_open")
+
     async def test_model_failure_is_fail_open(self) -> None:
         reviewer = AttentionReviewer(_Client(error=TimeoutError("slow")))
 
@@ -179,7 +203,26 @@ class CognitiveGatewayAttentionReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("pro-drop languages", prompt)
         self.assertIn("third-person beneficiary or recipient", prompt)
         self.assertIn("temporary interaction rule", prompt)
+        self.assertIn("continue, resume, change, stop, or cancel", prompt)
         self.assertIn("Please wait until I say Chromie", user_prompt)
+
+    def test_decoder_schema_requires_directed_speech_to_be_addressed(self) -> None:
+        schema = AttentionReviewer._response_schema()
+        directed_rule = schema["allOf"][0]
+
+        self.assertEqual(
+            set(directed_rule["if"]["properties"]["speech_act"]["enum"]),
+            {"question", "request", "imperative", "greeting"},
+        )
+        self.assertTrue(
+            directed_rule["then"]["properties"]["addressed"]["const"]
+        )
+
+        active_schema = AttentionReviewer._response_schema(active_engagement=True)
+        self.assertIn(
+            "reply",
+            active_schema["allOf"][0]["if"]["properties"]["speech_act"]["enum"],
+        )
 
 
 

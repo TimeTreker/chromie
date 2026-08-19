@@ -16,6 +16,25 @@ AgentSkillProjectionName = Literal[
     "deep_planner",
 ]
 AgentSkillSelectionDecision = Literal["select_skills", "no_skill"]
+AgentSkillApplicableOutputMode = Literal[
+    "speech",
+    "styled_speech",
+    "recitation",
+    "singing",
+    "humming",
+    "nonverbal_vocalization",
+    "body_action",
+    "media_playback",
+    "capability_work",
+    "other",
+]
+AgentSkillApplicableInformationDomain = Literal[
+    "local_clock",
+    "weather_forecast",
+    "external_grounded_information",
+    "direct_environment_perception",
+    "private_runtime_information",
+]
 AgentSkillSelectionStatus = Literal[
     "selected",
     "no_skill",
@@ -129,6 +148,13 @@ class AgentSkillMetadata(BaseModel):
     required_capabilities: tuple[str, ...] = Field(default_factory=tuple, max_length=64)
     optional_capabilities: tuple[str, ...] = Field(default_factory=tuple, max_length=64)
     applicable_routes: tuple[str, ...] = Field(default_factory=tuple, max_length=16)
+    applicable_output_modes: tuple[AgentSkillApplicableOutputMode, ...] = Field(
+        default_factory=tuple,
+        max_length=10,
+    )
+    applicable_information_domains: tuple[
+        AgentSkillApplicableInformationDomain, ...
+    ] = Field(default_factory=tuple, max_length=5)
     projections: tuple[AgentSkillProjectionDeclaration, ...] = Field(min_length=1, max_length=5)
 
     @field_validator("agent_skill_id", mode="before")
@@ -234,6 +260,12 @@ class AgentSkillSummary(BaseModel):
     required_capabilities: tuple[str, ...] = Field(default_factory=tuple)
     optional_capabilities: tuple[str, ...] = Field(default_factory=tuple)
     applicable_routes: tuple[str, ...] = Field(default_factory=tuple)
+    applicable_output_modes: tuple[AgentSkillApplicableOutputMode, ...] = Field(
+        default_factory=tuple
+    )
+    applicable_information_domains: tuple[
+        AgentSkillApplicableInformationDomain, ...
+    ] = Field(default_factory=tuple)
     available_projections: tuple[AgentSkillProjectionName, ...] = Field(default_factory=tuple)
 
 
@@ -273,6 +305,9 @@ class AgentSkillSelectionGoalContext(BaseModel):
     description: str = Field(min_length=1, max_length=1000)
     bindings: tuple[str, ...] = Field(default_factory=tuple, max_length=32)
     success_criteria: tuple[str, ...] = Field(default_factory=tuple, max_length=32)
+    output_mode: AgentSkillApplicableOutputMode | Literal[""] = ""
+    information_domain: AgentSkillApplicableInformationDomain | Literal[""] = ""
+    resource_kind: Literal["", "physical_object", "information"] = ""
 
     @field_validator("goal_id", "description", mode="before")
     @classmethod

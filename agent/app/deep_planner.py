@@ -36,16 +36,21 @@ from .planner_contract import (
     EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
     PlannerDTOContractError,
     ResourceResponsibilityCapabilityUnavailableError,
+    VOCAL_PERFORMANCE_CAPABILITY_ID,
+    canonical_goal_binding_argument_response_schema,
     canonical_resource_argument_response_schema,
     canonical_goal_grounding,
     canonical_plan_response_schema,
     coordinated_action_goal_ids,
     expected_goal_ids,
+    explicit_numeric_goal_values,
     goal_association_prompt_projection,
+    information_goal_ids_without_declared_provider,
     is_planner_step_capability,
     materialize_goal_outcomes,
     materialize_planner_metadata,
     normalize_detached_parameter_resolutions,
+    normalize_missing_numeric_parameter_provenance,
     normalize_schema_default_parameter_provenance,
     parallel_plan_contract_errors,
     planner_goal_execution_requirements,
@@ -53,6 +58,8 @@ from .planner_contract import (
     planner_provider_vocal_goal_ids,
     planner_response_goal_ids,
     planner_contract_diagnostics,
+    qualify_capability_catalog_for_information_domains,
+    qualify_capability_catalog_for_output_modes,
     review_coordinated_action_plan_coverage,
     situation_prompt_projection,
     validate_explicit_numeric_parameter_grounding,
@@ -151,7 +158,51 @@ class DeepPlannerResolver:
         ]
         if response_only:
             executable = []
-        payload = [self._capability_payload(item) for item in executable[: self.max_capabilities]]
+        full_payload = [self._capability_payload(item) for item in executable]
+        output_mode_qualified_payload = qualify_capability_catalog_for_output_modes(
+            full_payload,
+            authoritative_goals=authoritative_goals,
+        )
+        qualified_payload = qualify_capability_catalog_for_information_domains(
+            output_mode_qualified_payload,
+            authoritative_goals=authoritative_goals,
+        )
+        payload = qualified_payload[: self.max_capabilities]
+        omitted_domain_capability_ids = sorted(
+            {
+                str(item.get("capability_id") or "")
+                for item in full_payload
+            }
+            - {
+                str(item.get("capability_id") or "")
+                for item in qualified_payload
+            }
+        )
+        if omitted_domain_capability_ids:
+            logger.info(
+                "deep_planner_information_domain_catalog_qualified sid=%s omitted=%s",
+                request.sid,
+                omitted_domain_capability_ids,
+            )
+        unavailable_information_goal_ids = information_goal_ids_without_declared_provider(
+            payload,
+            authoritative_goals=authoritative_goals,
+        )
+        if context.get("verified_tool_memory_index"):
+            # A fresh exact memory entry may satisfy a typed information Goal via
+            # its original provider contract; the Planner and evidence validator
+            # retain authority over that match.
+            unavailable_information_goal_ids.clear()
+        single_step_goal_ids = [
+            str(goal.get("goal_id") or "").strip()
+            for goal in authoritative_goals
+            if isinstance(goal, dict)
+            and str(goal.get("goal_id") or "").strip()
+            and not goal.get("resource_responsibility")
+            and isinstance(goal.get("metadata"), dict)
+            and str(goal["metadata"].get("responsibility_kind") or "").strip()
+            in {"executable_action", "capability_dependent"}
+        ]
         response_schema = self._response_schema(
             expected_goal_ids_for_turn,
             allowed_capability_ids=[item["capability_id"] for item in payload],
@@ -167,8 +218,19 @@ class DeepPlannerResolver:
             provider_required_media_goal_operations=(
                 planner_provider_media_goal_operations(authoritative_goals)
             ),
+            unavailable_information_goal_ids=sorted(
+                unavailable_information_goal_ids
+            ),
+            single_step_goal_ids=single_step_goal_ids,
+            required_numeric_goal_values=explicit_numeric_goal_values(
+                authoritative_goals
+            ),
         )
         response_schema = canonical_resource_argument_response_schema(
+            response_schema,
+            authoritative_goals=authoritative_goals,
+        )
+        response_schema = canonical_goal_binding_argument_response_schema(
             response_schema,
             authoritative_goals=authoritative_goals,
         )
@@ -184,14 +246,18 @@ class DeepPlannerResolver:
         feedback: list[dict[str, Any]] = list(persistent_safety_feedback)
         previous_raw: Any = None
         initial_raw_output: Any = None
+        mechanical_numeric_baseline: dict[str, Any] | None = None
         contract_repair_attempted = False
         initial_validation_errors = ""
         for attempt in range(self.max_contract_repairs + 1):
             raw: Any = None
+            mixed_accounting_repairs: list[dict[str, Any]] = []
+            numeric_provenance_repairs: list[dict[str, Any]] = []
             try:
                 active_response_schema = self._contract_revision_response_schema(
                     response_schema,
                     feedback=feedback,
+                    semantic_baseline=mechanical_numeric_baseline,
                 )
                 if self._requires_safety_revision(feedback):
                     active_response_schema = self._safety_revision_response_schema(
@@ -216,6 +282,11 @@ class DeepPlannerResolver:
                 )
                 if not isinstance(raw, dict):
                     raise PlannerDTOContractError("deep planner response is not a JSON object")
+                if mechanical_numeric_baseline is not None:
+                    self._validate_mechanical_numeric_revision_preserved(
+                        raw,
+                        baseline=mechanical_numeric_baseline,
+                    )
                 raw, detached_resolution_repairs = (
                     normalize_detached_parameter_resolutions(raw)
                 )
@@ -241,6 +312,32 @@ class DeepPlannerResolver:
                         "sid=%s repairs=%s",
                         request.sid,
                         self._bounded(provenance_repairs, 2000),
+                    )
+                raw, numeric_provenance_repairs = (
+                    normalize_missing_numeric_parameter_provenance(
+                        raw,
+                        authoritative_goals=canonical_goal_grounding(
+                            request.context
+                        ),
+                    )
+                )
+                if numeric_provenance_repairs:
+                    logger.info(
+                        "deep_planner_numeric_provenance_normalized sid=%s repairs=%s",
+                        request.sid,
+                        self._bounded(numeric_provenance_repairs, 2000),
+                    )
+                raw, mixed_accounting_repairs = (
+                    self._normalize_mixed_goal_outcome_accounting(
+                        raw,
+                        expected_goal_ids=expected_goal_ids_for_turn,
+                    )
+                )
+                if mixed_accounting_repairs:
+                    logger.info(
+                        "deep_planner_mixed_accounting_normalized sid=%s repairs=%s",
+                        request.sid,
+                        self._bounded(mixed_accounting_repairs, 2000),
                     )
                 try:
                     self._validate_parallel_timing_preservation(
@@ -283,6 +380,7 @@ class DeepPlannerResolver:
                 validate_goal_binding_argument_grounding(
                     validated_model_output,
                     authoritative_goals=canonical_goal_grounding(request.context),
+                    capabilities=payload,
                 )
                 validate_user_supplied_parameter_provenance(
                     validated_model_output,
@@ -323,9 +421,25 @@ class DeepPlannerResolver:
                 mechanical_contract_error = isinstance(
                     exc, (PlannerDTOContractError, json.JSONDecodeError)
                 )
+                numeric_obligations = self._detached_numeric_provenance_obligations(
+                    raw,
+                    authoritative_goals=canonical_goal_grounding(request.context),
+                    error=exc,
+                )
+                if numeric_obligations:
+                    # The model has already made the semantic mapping by placing
+                    # the exact Goal number in one owned step argument. A missing
+                    # duplicate provenance row is a mechanically incomplete DTO,
+                    # eligible for the one bounded same-tier regeneration.
+                    mechanical_contract_error = True
                 if attempt < self.max_contract_repairs and mechanical_contract_error:
                     contract_repair_attempted = True
                     initial_raw_output = raw
+                    mechanical_numeric_baseline = (
+                        copy.deepcopy(raw)
+                        if numeric_obligations and isinstance(raw, dict)
+                        else None
+                    )
                     # Contract repair is a fresh schema-constrained regeneration,
                     # not an in-place JSON edit.  Supplying the invalid object as
                     # copy text encouraged deployed models to splice validator
@@ -337,6 +451,9 @@ class DeepPlannerResolver:
                         raw=raw,
                         expected_goal_ids_for_turn=expected_goal_ids_for_turn,
                         capability_payload=payload,
+                        authoritative_goals=canonical_goal_grounding(
+                            request.context
+                        ),
                     )
                     initial_validation_errors = json.dumps(
                         validation_feedback,
@@ -498,6 +615,20 @@ class DeepPlannerResolver:
                     }
                 )
                 metadata.update(coverage_review_metadata)
+                if numeric_provenance_repairs:
+                    metadata["numeric_provenance_normalization"] = {
+                        "strategy": "copy_exact_owned_step_argument",
+                        "repairs": numeric_provenance_repairs,
+                        "semantic_plan_unchanged": True,
+                    }
+                if mixed_accounting_repairs:
+                    metadata["mixed_goal_accounting_recovery"] = {
+                        "strategy": (
+                            "preserve_per_goal_outcomes_and_remove_unowned_steps"
+                        ),
+                        "repairs": mixed_accounting_repairs,
+                        "semantic_outcomes_unchanged": True,
+                    }
                 if contract_repair_attempted:
                     metadata["contract_repair"] = {
                         "attempted": True,
@@ -569,6 +700,7 @@ class DeepPlannerResolver:
         raw: Any,
         expected_goal_ids_for_turn: list[str],
         capability_payload: list[dict[str, Any]] | None = None,
+        authoritative_goals: list[dict[str, Any]] | None = None,
     ) -> list[dict[str, Any]]:
         if isinstance(exc, ValidationError):
             feedback = list(exc.errors(include_url=False))
@@ -702,6 +834,24 @@ class DeepPlannerResolver:
                             ),
                         }
                     )
+            for obligation in DeepPlannerResolver._detached_numeric_provenance_obligations(
+                raw,
+                authoritative_goals=list(authoritative_goals or []),
+                error=exc,
+            ):
+                feedback.append(
+                    {
+                        "type": "missing_user_supplied_parameter_resolution",
+                        **obligation,
+                        "corrective_contract": (
+                            "The semantic mapping already exists in exactly one owned "
+                            "step argument. Preserve the plan meaning and add one "
+                            "nonblocking parameter_resolution with this exact step_id, "
+                            "parameter, numeric value, strategy=user_supplied, and sole "
+                            "source Goal. Do not add, remove, or substitute work."
+                        ),
+                    }
+                )
         unique: list[dict[str, Any]] = []
         seen: set[tuple[str, tuple[Any, ...]]] = set()
         for item in feedback:
@@ -723,6 +873,100 @@ class DeepPlannerResolver:
             seen.add(key)
             unique.append(item)
         return unique
+
+    @staticmethod
+    def _detached_numeric_provenance_obligations(
+        raw: Any,
+        *,
+        authoritative_goals: list[dict[str, Any]],
+        error: Exception,
+    ) -> list[dict[str, Any]]:
+        """Identify only unambiguous missing duplicate numeric provenance rows."""
+
+        if (
+            "explicit numeric goal value has no matching user_supplied "
+            "parameter resolution" not in str(error)
+            or not isinstance(raw, dict)
+        ):
+            return []
+        numeric_by_goal = explicit_numeric_goal_values(authoritative_goals)
+        outcomes = raw.get("goal_outcomes")
+        steps = raw.get("steps")
+        resolutions = raw.get("parameter_resolutions")
+        if not isinstance(steps, list):
+            return []
+        outcomes = outcomes if isinstance(outcomes, dict) else {}
+        resolutions = resolutions if isinstance(resolutions, list) else []
+        step_owned_goal_ids = {
+            str(goal_id)
+            for step in steps
+            if isinstance(step, dict)
+            for goal_id in step.get("source_goal_ids") or []
+            if str(goal_id).strip()
+        }
+
+        def numeric(value: Any) -> float | None:
+            if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+                return None
+            try:
+                return float(str(value).strip())
+            except ValueError:
+                return None
+
+        obligations: list[dict[str, Any]] = []
+        for goal_id, values in numeric_by_goal.items():
+            outcome = outcomes.get(goal_id)
+            if isinstance(outcome, dict):
+                if outcome.get("disposition") != "execute":
+                    continue
+            elif goal_id not in step_owned_goal_ids:
+                continue
+            for value in values:
+                candidates: list[tuple[str, str]] = []
+                for step in steps:
+                    if not isinstance(step, dict) or goal_id not in (
+                        step.get("source_goal_ids") or []
+                    ):
+                        continue
+                    step_id = " ".join(str(step.get("step_id") or "").strip().split())
+                    args = step.get("args")
+                    if not step_id or not isinstance(args, dict):
+                        continue
+                    for parameter, argument in args.items():
+                        argument_number = numeric(argument)
+                        if argument_number is None:
+                            continue
+                        scale = max(abs(float(value)), abs(argument_number), 1.0)
+                        if abs(float(value) - argument_number) <= 1e-12 * scale:
+                            candidates.append((step_id, str(parameter)))
+                if len(candidates) != 1:
+                    return []
+                step_id, parameter = candidates[0]
+                already_present = any(
+                    isinstance(resolution, dict)
+                    and str(resolution.get("strategy") or "") == "user_supplied"
+                    and str(resolution.get("step_id") or "").strip() == step_id
+                    and str(resolution.get("parameter") or "").strip() == parameter
+                    and resolution.get("source_goal_ids") == [goal_id]
+                    and numeric(resolution.get("value")) is not None
+                    and abs(
+                        float(value)
+                        - float(numeric(resolution.get("value")) or 0.0)
+                    )
+                    <= 1e-12 * max(abs(float(value)), 1.0)
+                    for resolution in resolutions
+                )
+                if already_present:
+                    continue
+                obligations.append(
+                    {
+                        "step_id": step_id,
+                        "parameter": parameter,
+                        "value": value,
+                        "source_goal_ids": [goal_id],
+                    }
+                )
+        return obligations
 
     @staticmethod
     def _validation_error_json(
@@ -784,6 +1028,9 @@ class DeepPlannerResolver:
         response_goal_ids: list[str] | None = None,
         provider_required_vocal_goal_ids: list[str] | None = None,
         provider_required_media_goal_operations: dict[str, str] | None = None,
+        unavailable_information_goal_ids: list[str] | None = None,
+        single_step_goal_ids: list[str] | None = None,
+        required_numeric_goal_values: dict[str, list[int | float]] | None = None,
     ) -> dict[str, Any]:
         return canonical_plan_response_schema(
             planner_tier="deep",
@@ -795,6 +1042,9 @@ class DeepPlannerResolver:
             response_goal_ids=response_goal_ids,
             provider_required_vocal_goal_ids=(provider_required_vocal_goal_ids),
             provider_required_media_goal_operations=(provider_required_media_goal_operations),
+            unavailable_information_goal_ids=unavailable_information_goal_ids,
+            single_step_goal_ids=single_step_goal_ids,
+            required_numeric_goal_values=required_numeric_goal_values,
         )
 
     @staticmethod
@@ -888,6 +1138,234 @@ class DeepPlannerResolver:
                 merged.append(item)
         return merged
 
+    @staticmethod
+    def _normalize_mixed_goal_outcome_accounting(
+        raw: dict[str, Any],
+        *,
+        expected_goal_ids: list[str],
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        """Normalize only redundant aggregate fields in an explicit mixed plan.
+
+        Per-Goal outcomes are the semantic authority. When they cover every
+        canonical Goal, contain at least two terminal dispositions, and explicitly
+        leave some Goals non-executing, top-level ``coverage`` means accounting
+        coverage and is therefore mechanically ``complete``. A step that no execute
+        outcome references is contradictory DTO residue and cannot be executed; it
+        is removed without changing any Goal outcome or inventing replacement work.
+        """
+
+        normalized = copy.deepcopy(raw)
+        outcomes = normalized.get("goal_outcomes")
+        expected = set(expected_goal_ids)
+        if not isinstance(outcomes, dict) or set(outcomes) != expected or not expected:
+            return normalized, []
+        dispositions = {
+            str(item.get("disposition") or "").strip()
+            for item in outcomes.values()
+            if isinstance(item, dict)
+        }
+        if len(dispositions) < 2 or not dispositions.issubset(
+            {"execute", "respond", "clarify", "unavailable", "refused"}
+        ):
+            return normalized, []
+        repairs: list[dict[str, Any]] = []
+        if normalized.get("disposition") != "mixed":
+            repairs.append(
+                {
+                    "path": "disposition",
+                    "from": normalized.get("disposition"),
+                    "to": "mixed",
+                    "basis": "explicit per-Goal terminal dispositions differ",
+                }
+            )
+            normalized["disposition"] = "mixed"
+        if normalized.get("coverage") != "complete":
+            repairs.append(
+                {
+                    "path": "coverage",
+                    "from": normalized.get("coverage"),
+                    "to": "complete",
+                    "basis": "every canonical Goal has an explicit terminal outcome",
+                }
+            )
+            normalized["coverage"] = "complete"
+
+        for goal_id, outcome in outcomes.items():
+            if not isinstance(outcome, dict):
+                continue
+            satisfaction = outcome.get("satisfaction")
+            if not isinstance(satisfaction, dict) or satisfaction.get("status") != "exact":
+                continue
+            satisfied = {
+                str(item).strip()
+                for item in satisfaction.get("satisfied_goal_ids") or []
+                if str(item).strip()
+            }
+            unmet = list(satisfaction.get("unmet_goal_ids") or [])
+            retained_unmet = [
+                item for item in unmet if str(item).strip() not in satisfied
+            ]
+            if retained_unmet != unmet:
+                repairs.append(
+                    {
+                        "path": f"goal_outcomes.{goal_id}.satisfaction.unmet_goal_ids",
+                        "from": unmet,
+                        "to": retained_unmet,
+                        "basis": "the same Goal cannot be both satisfied and unmet",
+                    }
+                )
+                satisfaction["unmet_goal_ids"] = retained_unmet
+            unmet_requirements = list(
+                satisfaction.get("unmet_requirements") or []
+            )
+            if unmet_requirements:
+                repairs.append(
+                    {
+                        "path": (
+                            f"goal_outcomes.{goal_id}.satisfaction."
+                            "unmet_requirements"
+                        ),
+                        "from": unmet_requirements,
+                        "to": [],
+                        "basis": (
+                            "status=exact is the explicit prospective adequacy "
+                            "judgment and cannot also carry unmet requirements"
+                        ),
+                    }
+                )
+                satisfaction["unmet_requirements"] = []
+
+        per_goal_satisfaction = [
+            outcome.get("satisfaction")
+            for outcome in outcomes.values()
+            if isinstance(outcome, dict)
+            and isinstance(outcome.get("satisfaction"), dict)
+        ]
+        aggregate_satisfaction = normalized.get("goal_satisfaction")
+        if (
+            len(per_goal_satisfaction) == len(expected)
+            and isinstance(aggregate_satisfaction, dict)
+        ):
+            scores = [item.get("score") for item in per_goal_satisfaction]
+            if all(
+                isinstance(score, (int, float)) and not isinstance(score, bool)
+                for score in scores
+            ):
+                aggregate_score = sum(float(score) for score in scores) / len(scores)
+                aggregate_satisfied = list(
+                    dict.fromkeys(
+                        str(goal_id).strip()
+                        for item in per_goal_satisfaction
+                        for goal_id in item.get("satisfied_goal_ids") or []
+                        if str(goal_id).strip()
+                    )
+                )
+                aggregate_unmet = list(
+                    dict.fromkeys(
+                        str(goal_id).strip()
+                        for item in per_goal_satisfaction
+                        for goal_id in item.get("unmet_goal_ids") or []
+                        if str(goal_id).strip()
+                    )
+                )
+                aggregate_requirements = list(
+                    dict.fromkeys(
+                        " ".join(str(requirement or "").strip().split())
+                        for item in per_goal_satisfaction
+                        for requirement in item.get("unmet_requirements") or []
+                        if " ".join(str(requirement or "").strip().split())
+                    )
+                )
+                aggregate_status = (
+                    "exact"
+                    if aggregate_score >= 0.95 and not aggregate_unmet and not aggregate_requirements
+                    else "substantial"
+                    if aggregate_score >= 0.75
+                    else "partial"
+                    if aggregate_score > 0.0
+                    else "unsatisfied"
+                )
+                aggregate_projection = {
+                    "score": aggregate_score,
+                    "status": aggregate_status,
+                    "satisfied_goal_ids": aggregate_satisfied,
+                    "unmet_goal_ids": aggregate_unmet,
+                    "unmet_requirements": aggregate_requirements,
+                }
+                changed_fields = {
+                    field_name: {
+                        "from": aggregate_satisfaction.get(field_name),
+                        "to": value,
+                    }
+                    for field_name, value in aggregate_projection.items()
+                    if aggregate_satisfaction.get(field_name) != value
+                }
+                if changed_fields:
+                    repairs.append(
+                        {
+                            "path": "goal_satisfaction",
+                            "fields": changed_fields,
+                            "basis": "deterministic aggregate of explicit per-Goal judgments",
+                        }
+                    )
+                    aggregate_satisfaction.update(aggregate_projection)
+
+        referenced_execute_steps = {
+            str(step_id).strip()
+            for outcome in outcomes.values()
+            if isinstance(outcome, dict)
+            and outcome.get("disposition") == "execute"
+            for step_id in outcome.get("step_ids") or []
+            if str(step_id).strip()
+        }
+        execute_owners_by_step: dict[str, list[str]] = {}
+        for goal_id, outcome in outcomes.items():
+            if not isinstance(outcome, dict) or outcome.get("disposition") != "execute":
+                continue
+            for step_id in outcome.get("step_ids") or []:
+                normalized_step_id = str(step_id).strip()
+                if normalized_step_id:
+                    execute_owners_by_step.setdefault(normalized_step_id, []).append(
+                        str(goal_id)
+                    )
+        steps = normalized.get("steps")
+        if not isinstance(steps, list):
+            return normalized, repairs
+        retained: list[Any] = []
+        for index, step in enumerate(steps):
+            if not isinstance(step, dict):
+                retained.append(step)
+                continue
+            step_id = str(step.get("step_id") or "").strip()
+            if not step_id or step_id in referenced_execute_steps:
+                expected_owners = execute_owners_by_step.get(step_id, [])
+                actual_owners = list(step.get("source_goal_ids") or [])
+                if step_id and expected_owners and actual_owners != expected_owners:
+                    repaired_step = dict(step)
+                    repaired_step["source_goal_ids"] = expected_owners
+                    repairs.append(
+                        {
+                            "path": f"steps[{index}].source_goal_ids",
+                            "step_id": step_id,
+                            "from": actual_owners,
+                            "to": expected_owners,
+                            "basis": "execute outcomes are the per-Goal ownership authority",
+                        }
+                    )
+                    retained.append(repaired_step)
+                    continue
+                retained.append(step)
+                continue
+            repairs.append(
+                {
+                    "path": f"steps[{index}]",
+                    "step_id": step_id,
+                    "reason": "not_referenced_by_any_execute_outcome",
+                }
+            )
+        normalized["steps"] = retained
+        return normalized, repairs
+
     @classmethod
     def _safety_revision_response_schema(
         cls,
@@ -972,8 +1450,9 @@ class DeepPlannerResolver:
         base_schema: dict[str, Any],
         *,
         feedback: list[dict[str, Any]] | None = None,
+        semantic_baseline: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Tighten only model-authored step/parameter pairs rejected as inconsistent."""
+        """Tighten rejected pairs without allowing a mechanical repair to replan."""
 
         mismatches = [
             item
@@ -983,7 +1462,17 @@ class DeepPlannerResolver:
             and str(item.get("capability_id") or "").strip()
             and str(item.get("parameter") or "").strip()
         ]
-        if not mismatches:
+        missing_numeric = [
+            item
+            for item in list(feedback or [])
+            if isinstance(item, dict)
+            and item.get("type")
+            == "missing_user_supplied_parameter_resolution"
+            and str(item.get("step_id") or "").strip()
+            and str(item.get("parameter") or "").strip()
+            and list(item.get("source_goal_ids") or [])
+        ]
+        if not mismatches and not missing_numeric:
             return base_schema
         schema = copy.deepcopy(base_schema)
         branches = (
@@ -1015,7 +1504,82 @@ class DeepPlannerResolver:
                 required = args.setdefault("required", [])
                 if parameter not in required:
                     required.append(parameter)
+        if missing_numeric:
+            if isinstance(semantic_baseline, dict):
+                properties = schema.get("properties")
+                if isinstance(properties, dict):
+                    for field_name, field_value in semantic_baseline.items():
+                        if field_name == "parameter_resolutions":
+                            continue
+                        properties[field_name] = {
+                            "const": copy.deepcopy(field_value)
+                        }
+            resolution_array = schema.get("properties", {}).get(
+                "parameter_resolutions"
+            )
+            resolution_model = schema.get("$defs", {}).get(
+                "PlanParameterResolution"
+            )
+            if isinstance(resolution_array, dict) and isinstance(
+                resolution_model, dict
+            ):
+                resolution_branches: list[dict[str, Any]] = []
+                for obligation in missing_numeric:
+                    branch = copy.deepcopy(resolution_model)
+                    branch_properties = branch.setdefault("properties", {})
+                    branch_properties["step_id"] = {
+                        "const": str(obligation["step_id"])
+                    }
+                    branch_properties["parameter"] = {
+                        "const": str(obligation["parameter"])
+                    }
+                    branch_properties["strategy"] = {"const": "user_supplied"}
+                    branch_properties["value"] = {"const": obligation["value"]}
+                    branch_properties["blocking"] = {"const": False}
+                    branch_properties["source_goal_ids"] = {
+                        "const": list(obligation["source_goal_ids"])
+                    }
+                    required = branch.setdefault("required", [])
+                    for field_name in (
+                        "step_id",
+                        "parameter",
+                        "strategy",
+                        "value",
+                        "confidence",
+                        "blocking",
+                        "rationale",
+                        "source_goal_ids",
+                    ):
+                        if field_name not in required:
+                            required.append(field_name)
+                    resolution_branches.append(branch)
+                resolution_array["items"] = (
+                    resolution_branches[0]
+                    if len(resolution_branches) == 1
+                    else {"oneOf": resolution_branches}
+                )
+                resolution_array["minItems"] = len(resolution_branches)
         return schema
+
+    @staticmethod
+    def _validate_mechanical_numeric_revision_preserved(
+        candidate: dict[str, Any],
+        *,
+        baseline: dict[str, Any],
+    ) -> None:
+        """Reject any semantic rewrite during a provenance-only DTO repair."""
+
+        changed = sorted(
+            field_name
+            for field_name in set(candidate).union(baseline)
+            if field_name != "parameter_resolutions"
+            and candidate.get(field_name) != baseline.get(field_name)
+        )
+        if changed:
+            raise PlannerDTOContractError(
+                "mechanical numeric provenance repair changed semantic plan fields: "
+                + ",".join(changed)
+            )
 
     @classmethod
     def _safety_revision_contract_errors(
@@ -1186,6 +1750,19 @@ class DeepPlannerResolver:
         feedback_section = self._bounded(combined_feedback, 5000) if combined_feedback else "[]"
         previous_section = self._bounded(previous_raw, 5000) if previous_raw is not None else "null"
         response_only, requires_execution = planner_goal_execution_requirements(grounding)
+        provider_vocal_goal_ids = sorted(
+            planner_provider_vocal_goal_ids(grounding)
+        )
+        available_capability_ids = {
+            str(item.get("capability_id") or "").strip()
+            for item in capabilities
+            if str(item.get("capability_id") or "").strip()
+        }
+        unavailable_provider_vocal_goal_ids = (
+            provider_vocal_goal_ids
+            if VOCAL_PERFORMANCE_CAPABILITY_ID not in available_capability_ids
+            else []
+        )
         goal_execution_contract = (
             "The canonical Goals are provider-free direct speech responsibilities. "
             "This plan is response-only: do not select executable capabilities or plan steps. "
@@ -1224,12 +1801,16 @@ class DeepPlannerResolver:
             "When validation feedback is present but the previous output is null, regenerate one fresh complete object from the authoritative turn, goals, catalog, and all listed defects. Do not patch, quote, splice, annotate, or embed JSON fragments inside rationale or response strings. "
             "When validation feedback reports parallel_step_count=1, the parallel label has no peer and is a malformed scheduling annotation rather than a user-visible concurrency plan; regenerate that exact one-step plan with timing=sequential. When validation feedback says multi-step parallel execution is not affirmatively safe, never silently change those parallel steps to an exact sequential plan. Either author plan_relation=safe_adjustment or alternative with user_confirmation_required=true and response_text explaining the timing change, or return a zero-step clarification/unavailable result. "
             "Produce the final DeepPlannerModelOutput for the complete user goal. Deep planning is terminal: never return to the Fast Planner. The FINAL AUTHORITATIVE USER TURN owns the current communicative act. Retained Goals and delivered evidence may support a response, but must not replace the latest reaction, feeling, acknowledgement, evaluation, or practical decision. Answer that current act directly; replay or re-explain a prior task only when the latest turn asks for it. The verified tool-memory index contains no answer facts. If one exact fresh index entry matches the authoritative Goal bindings, execute chromie.memory.retrieve_verified_tool_result with its evidence_id, original tool_id, and the exact material arguments. If no such entry exists, execute the fresh read capability. Never answer directly from index metadata, never reinterpret an unresolved reference from old memory, and never use another task's result. When a scheduled, running, or recoverable safe read has no matching completed memory entry, resume or retry its bound capability with the exact arguments. "
+            f"Required response language: {str(request.language or 'auto')[:32]}. "
+            "Write every user-facing top-level and per-goal response_text naturally "
+            "in that language. Do not switch languages merely because internal Goals, "
+            "capability descriptions, rationales, or validation feedback use another language. "
             f"{goal_execution_contract}"
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
             f"{EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT}"
             "Use the full catalog, preserve all independent responsibilities, constraints, conditions, ordering, concurrency, temporal scope, comparison period, and requested answer shape. Never silently rewrite simultaneous independent actions as before/after actions. An explicit ordered relation must remain sequential. Capability parallel-safety is permission to honor user-requested concurrency, never evidence that concurrency was requested. Every executable step must explicitly include timing; omission is invalid because it would erase the model's ordering or concurrency decision. When the user requests compatible actions to happen together, assign timing=parallel only when each selected capability explicitly declares parallel_metadata_declared=true and can_run_parallel=true and their exclusive/resource claims are compatible. Never invent an unstated feature of a capability in a reason or outcome; a physical action cannot satisfy a conversational or spoken-performance Goal unless its supplied semantics explicitly say so. Use a respond outcome for speech you author exactly as a Communicative Activity. Never satisfy a prohibition, negation, or hold-state constraint by invoking the positive action it forbids; if the catalog has no capability whose semantic scope actually enforces that negative state, clarify or report it unavailable. If safe parallel execution is unavailable or uncertain, clarify or propose an explicit safe adjustment rather than silently serializing the request. For a Goal with resource_responsibility, keep the entire acquire-and-deliver outcome as one semantic responsibility and use the current capability catalog as the dynamic decomposition boundary. Prefer one exact capability when its declared resource_contract.plan_provides covers the complete required resource state. If no one capability covers the Goal, compose multiple advertised capabilities whose matching semantic scopes and ordered plan_requires/plan_provides form a valid chain covering the required outcome. Never invent provider-internal navigation, perception, grasp, search, retry, carrying, or handover stages that are not separately advertised capabilities. Provider-local decomposition stays inside the selected capability. The Goal is provider-neutral: choose the smallest reliable complete capability set from current declared semantics, never from capability names or a hardcoded provider rule. When source.status=unknown, the selected chain must include a capability that can resolve it internally or otherwise avoid requiring an unresolved source state; do not invent a source. Capability semantic_scope and resource_contract metadata are authoritative applicability evidence. When a selected Capability accepts resource, source, or recipient objects, copy each accepted object exactly from the canonical resource_responsibility, including nested quantity, source bindings, and recipient fields. Do not emit parameter_resolutions for nested fields of those complete structured arguments or invent top-level fields absent from the Capability schema. Never silently narrow a canonical goal to fit a capability or its enum defaults. If a goal is outside every available capability scope, clarify or report unavailable with zero steps. Resolve low-consequence "
-            "parameters semantically when justified; otherwise return a specific natural clarification. Clarification is only for ambiguous user meaning or missing material information that the user can supply and whose answer can enable a matching catalog capability. When the Goal is already clear but no exact available capability covers the required outcome, return unavailable rather than asking for preferences, refinements, or details that cannot create the missing provider. Canonical Goal typed semantics are authoritative: non-resource Goals use object.bindings, while resource Goals use resource_responsibility directly with no persisted flat compatibility copy. Every material step argument, including location, date, target, person, and entity identity, must equal the matching canonical binding; do not replace a binding with a value from older memory or re-resolve the original reference. A calendar-date argument does not cover a finer day-part binding: exact coverage requires a capability argument and declared output evidence for that same day part. For chromie.weather.lookup, keep args.location exactly equal to the canonical location binding. When the user or discourse context clearly supplies a hierarchical place, you may also provide location_context with locality, admin1, country, and aliases for that same place; never use it to select a different place. For chromie.memory.retrieve_verified_tool_result, resolved Goal bindings such as location and date belong inside the single material_args object. They are not missing direct step arguments, so do not emit separate location or date parameter_resolutions. If a resolution for that nested object is useful, its parameter must be material_args and its value must equal the complete step.args.material_args object. When independent goals have different terminal needs, use disposition=mixed, coverage=complete, and goal_outcomes so executable goals can proceed while only affected goals wait for clarification. Scope every blocking parameter resolution with source_goal_ids. Exact, safe-adjusted, or alternative executable plans "
+            "parameters semantically when justified; otherwise return a specific natural clarification. Clarification is only for ambiguous user meaning or missing material information that the user can supply and whose answer can enable a matching catalog capability. When the Goal is already clear but no exact available capability covers the required outcome, return unavailable rather than asking for preferences, refinements, or details that cannot create the missing provider. Author exact natural response_text for every clarify, unavailable, or refused result; unresolved diagnostics alone are not speech. Capability domains are not interchangeable merely because each reads current information: a local-clock capability covers only declared clock facts, a weather capability covers only declared weather facts, and neither covers environmental person-presence or direct perception. Never choose the nearest read-only capability from another domain. Canonical Goal typed semantics are authoritative: non-resource Goals use object.bindings, while resource Goals use resource_responsibility directly with no persisted flat compatibility copy. Every material step argument, including location, date, target, person, and entity identity, must equal the matching canonical binding; do not replace a binding with a value from older memory or re-resolve the original reference. A calendar-date argument does not cover a finer day-part binding: exact coverage requires a capability argument and declared output evidence for that same day part. For chromie.weather.lookup, keep args.location exactly equal to the canonical location binding. When the user or discourse context clearly supplies a hierarchical place, you may also provide location_context with locality, admin1, country, and aliases for that same place; never use it to select a different place. For chromie.memory.retrieve_verified_tool_result, resolved Goal bindings such as location and date belong inside the single material_args object. They are not missing direct step arguments, so do not emit separate location or date parameter_resolutions. If a resolution for that nested object is useful, its parameter must be material_args and its value must equal the complete step.args.material_args object. When independent goals have different terminal needs, use disposition=mixed, coverage=complete, and goal_outcomes so executable goals can proceed while only affected goals wait for clarification. Scope every blocking parameter resolution with source_goal_ids. Exact, safe-adjusted, or alternative executable plans "
             "must use coverage=complete and disposition=execute or mixed as appropriate. Every executable step must include source_goal_ids identifying exactly the goals it serves. Use plan_relation=exact for an exact plan. A safe_adjustment or material alternative must use the corresponding plan_relation, be described in response_text, set user_confirmation_required=true, and require "
             "confirmation downstream. For every missing parameter, return parameter_resolutions with a semantic strategy, concrete value when resolved, confidence, and rationale. Use safe_default only for low-consequence reversible values inside schema bounds. Use ask_user for material or risky values. Also return goal_satisfaction as prospective plan adequacy: planned steps count as satisfying their goals if successful, and pending execution alone is never an unmet requirement. An exact complete plan therefore uses status=exact with score at least 0.95 and lists the goals it is designed to satisfy. If essential information remains missing, use coverage=partial or uncertain with disposition=clarify and zero steps. "
             "If unavailable or refused, use zero steps. Use exact supplied capability IDs and schema-valid args. "
@@ -1238,8 +1819,8 @@ class DeepPlannerResolver:
             "A plan step may contain only step_id, capability_id, args, timing, source_goal_ids, reuse_activity_id, and reason_summary. "
             "Use capability_id as the executable identity. Do not copy catalog-only fields such as input_schema, parameters, route, step_type, or effects into a plan step. "
             "Use exactly the supplied canonical goal IDs. Do not create goals for internal status checks, safety checks, capability lookups, or implementation preconditions; represent any justified internal operation only as a step owned by an existing user goal. "
-            "Keep the plan minimal: do not add neutral-position, reset, transition, cleanup, or presentation steps unless the user explicitly requested them or a supplied capability execution constraint explicitly requires them. "
-            "goal_outcomes is a JSON object keyed by every supplied canonical goal ID exactly once, never a list; every Deep Planner result must include it. Every outcome must explicitly author disposition, coverage, response_text, unresolved, step_ids, satisfaction, and rationale. Each value describes only that key's goal and must not repeat goal_id inside the value. Per-goal outcome invariants are mandatory: execute requires coverage=complete and at least one real plan step_id copied exactly from steps; respond requires coverage=complete, the actual answer text now (not a promise that it will be supplied later), and zero step_ids; clarify requires coverage=partial or uncertain, an unresolved need or response_text, and zero step_ids; unavailable and refused require zero step_ids. Top-level and per-goal satisfaction are always non-null model judgments with score, status, satisfied_goal_ids, unmet_goal_ids, unmet_requirements, and rationale. A satisfaction score from 0.95 through 1.0 requires status=exact; score=1.0 must never use substantial. Do not assign a physical skill to a conversational answer merely because it is the nearest remaining capability. "
+            "Keep the plan minimal: every executable step must be necessary for one concrete observable outcome in the canonical Goal that owns it. A general body_action output mode does not authorize unrelated body effects. Do not add a blink, gaze, gesture, posture, attention expression, personality flourish, social enhancement, neutral-position, reset, transition, cleanup, or other presentation step merely to seem natural or improve the interaction. Optional coordinated expression belongs to the separate Social Attention owner; it enters the main Plan only when the user explicitly requested that exact observable effect or a supplied capability execution constraint explicitly requires it. "
+            "goal_outcomes is a JSON object keyed by every supplied canonical goal ID exactly once, never a list; every Deep Planner result must include it. Every outcome must explicitly author disposition, coverage, response_text, unresolved, step_ids, satisfaction, and rationale. Each value describes only that key's goal and must not repeat goal_id inside the value. Per-goal outcome invariants are mandatory: execute requires coverage=complete and at least one real plan step_id copied exactly from steps; respond requires coverage=complete, the actual answer text now (not a promise that it will be supplied later), and zero step_ids; clarify requires coverage=partial or uncertain, exact natural response_text, and zero step_ids; unavailable and refused require exact natural response_text and zero step_ids. Top-level and per-goal satisfaction are always non-null model judgments with score, status, satisfied_goal_ids, unmet_goal_ids, unmet_requirements, and rationale. A satisfaction score from 0.95 through 1.0 requires status=exact; score=1.0 must never use substantial. Do not assign a physical skill to a conversational answer merely because it is the nearest remaining capability. "
             "Complete plan coverage means every Goal has an explicit outcome; it does not mean every Goal can be satisfied. An unavailable, refused, or unresolved Goal must remain in unmet_goal_ids with a non-exact satisfaction status and score. The top-level satisfaction must preserve those same unmet Goals and requirements even when independent execute Goals can proceed in a coverage=complete mixed plan. "
             "An unavailable or refused outcome explicitly represents its Goal but does not satisfy it, and it is not by itself a safe adjustment or alternative. Do not promise, acknowledge as forthcoming, or otherwise claim that unavailable or refused work will occur in top-level or per-goal response_text. State the limitation truthfully while preserving exact independent executable work. "
             "Top-level disposition is the aggregate of per-goal dispositions: use mixed only when at least two different per-goal disposition values are present. Multiple goals that are all execute use top-level execute; multiple goals that are all respond use top-level respond. "
@@ -1248,6 +1829,10 @@ class DeepPlannerResolver:
             "The following final grounding block is authoritative and must override unrelated content in previous model output or advisory context.\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}\n\n"
             f"FINAL CANONICAL GOALS JSON (copy goal IDs exactly and satisfy these meanings only):\n{self._bounded(grounding, 5000)}\n\n"
+            "FINAL PROVIDER-REQUIRED VOCAL GOALS WITH NO EXACT AVAILABLE "
+            "VOCAL PROVIDER JSON (each must have a zero-step unavailable/refused "
+            "outcome and truthful limitation wording; never promise the performance):\n"
+            f"{self._bounded(unavailable_provider_vocal_goal_ids, 2000)}\n\n"
             f"FINAL ALLOWED EXECUTABLE CAPABILITY IDS JSON:\n{self._bounded([item['capability_id'] for item in capabilities], 4000)}"
         )
 
@@ -1386,6 +1971,9 @@ class DeepPlannerResolver:
                 capability.get("description") or ""
             ).strip():
                 projected["when_to_use"] = when_to_use[:600]
+            when_not_to_use = str(hints.get("when_not_to_use") or "").strip()
+            if when_not_to_use:
+                projected["when_not_to_use"] = when_not_to_use[:600]
         constraints = capability.get("execution_constraints")
         if isinstance(constraints, dict):
             retained_constraints = {

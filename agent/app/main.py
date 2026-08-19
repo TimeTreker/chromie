@@ -6,7 +6,11 @@ import secrets
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse, ORJSONResponse
 
-from .settings import Settings, agent_service_settings as settings
+from .settings import (
+    Settings,
+    agent_service_settings as settings,
+    goal_interpreter_settings,
+)
 from .capabilities.catalog import CapabilityCatalog, CapabilitySearchRequest, CapabilitySearchResult
 from .capabilities.loader import build_configured_registry, parse_manifest_paths
 from .agent_skills import (
@@ -341,10 +345,65 @@ fast_planner_client = (
     if settings.use_llm and settings.fast_planner_enabled
     else None
 )
+fast_first_response_client = (
+    fast_planner_client
+    if settings.use_llm
+    and settings.fast_planner_enabled
+    and settings.fast_first_response_model == settings.fast_planner_model
+    else OllamaClient(
+        settings.ollama_url,
+        settings.fast_first_response_model,
+        timeout_ms=settings.fast_planner_timeout_ms,
+        purpose="fast_planner_first_response",
+        service_settings=settings,
+    )
+    if settings.use_llm and settings.fast_planner_enabled
+    else None
+)
+fast_truth_client = (
+    fast_planner_client
+    if settings.use_llm
+    and settings.fast_planner_enabled
+    and settings.fast_truth_model == settings.fast_planner_model
+    else OllamaClient(
+        settings.ollama_url,
+        settings.fast_truth_model,
+        timeout_ms=settings.fast_planner_timeout_ms,
+        purpose="fast_planner_truth",
+        service_settings=settings,
+    )
+    if settings.use_llm and settings.fast_planner_enabled
+    else None
+)
 fast_planner_resolver = (
     FastPlannerResolver(
         fast_planner_client,
         capability_catalog,
+        first_response_ollama=fast_first_response_client,
+        truth_ollama=fast_truth_client,
+        truth_num_ctx=(
+            settings.fast_planner_num_ctx
+            if settings.fast_truth_model == settings.fast_planner_model
+            else settings.goal_association_num_ctx
+            if settings.fast_truth_model == settings.goal_association_model
+            else settings.cognitive_gateway_attention_num_ctx
+            if settings.fast_truth_model
+            == settings.cognitive_gateway_attention_model
+            else settings.social_attention_num_ctx
+            if settings.fast_truth_model == settings.social_attention_model
+            else settings.agent_skill_selection_num_ctx
+            if settings.fast_truth_model == settings.agent_skill_selection_model
+            else min(settings.fast_planner_num_ctx, 6144)
+        ),
+        first_response_num_ctx=(
+            settings.fast_planner_num_ctx
+            if settings.fast_first_response_model
+            == settings.fast_planner_model
+            else goal_interpreter_settings.llm_num_ctx
+            if settings.fast_first_response_model
+            == goal_interpreter_settings.model
+            else min(settings.fast_planner_num_ctx, 6144)
+        ),
         min_confidence=settings.fast_planner_min_confidence,
         num_ctx=settings.fast_planner_num_ctx,
         num_predict=settings.fast_planner_num_predict,
@@ -482,6 +541,14 @@ async def health() -> HealthResponse:
         ),
         fast_planner_enabled=fast_planner_resolver is not None,
         fast_planner_model=(settings.fast_planner_model if fast_planner_resolver is not None else None),
+        fast_first_response_model=(
+            settings.fast_first_response_model
+            if fast_planner_resolver is not None
+            else None
+        ),
+        fast_truth_model=(
+            settings.fast_truth_model if fast_planner_resolver is not None else None
+        ),
         deep_planner_enabled=deep_planner_resolver is not None,
         deep_planner_model=(settings.deep_planner_model if deep_planner_resolver is not None else None),
         social_attention_mode=settings.social_attention_mode,

@@ -1268,7 +1268,11 @@ async def run_check(
             },
         )
         if args.preview_only or errors:
-            assistant.conversation_state.record_interaction_response(sid, response)
+            assistant.conversation_state.record_interaction_response(
+                sid,
+                response,
+                bind_planned_execution=not args.preview_only,
+            )
         if confirmation_request_ids and not args.grant_confirmation:
             errors.append(
                 "The provider/Host contract requires confirmation, but this text "

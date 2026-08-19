@@ -409,7 +409,7 @@ Capability ID during proposal, validation, authorization, execution,
 cancellation, or evidence collection.
 
 The request schema requires authored `text` and one exact `mode` from
-`speech`, `expressive_speech`, `recitation`, `singing`, `humming`, or
+`speech`, `styled_speech`, `recitation`, `singing`, `humming`, or
 `nonverbal_vocalization`. A qualified provider declaration names its supported
 modes, text/audio streaming support, request-cancellation support, timing-mark
 types, sample formats and rates, concurrency limit, immutable software/model

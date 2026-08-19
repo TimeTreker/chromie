@@ -66,6 +66,11 @@ Provider-owned body calibration, backend identity, joint targets, and low-level 
 
 Executable provider functionality is a **Capability**. Reusable model-facing knowledge/procedure packages are **Agent Skills**. Do not use executable `SkillRuntime`/`SkillRequest` vocabulary inside Chromie's canonical runtime. Soridormi may still use provider-local wire `skill_id`, translated at its adapter boundary.
 
+The built-in `chromie.clock.local` Capability is the trusted read-only source for
+current local date/time and UTC offset. It takes no arguments, returns immutable
+Evidence through the ordinary tool-result path, and does not permit a Planner to
+guess or announce the current time before that Evidence returns.
+
 ## TaskGraph diagnostics
 
 TaskGraph validation and explicitly gated execution remain available for engineering/control-plane diagnostics. Read-only, planning, guarded, and physical execution retain their separate authorization gates. These endpoints do not replace the canonical Fast/Deep Planner.

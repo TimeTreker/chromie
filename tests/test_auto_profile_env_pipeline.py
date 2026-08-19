@@ -17,6 +17,7 @@ MODEL_KEYS = (
     "AGENT_GOAL_INTERPRETER_MODEL",
     "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
     "AGENT_FAST_PLANNER_MODEL",
+    "AGENT_FAST_FIRST_RESPONSE_MODEL",
     "AGENT_GOAL_ASSOCIATION_MODEL",
     "AGENT_DEEP_PLANNER_MODEL",
     "AGENT_SOCIAL_ATTENTION_MODEL",
@@ -222,6 +223,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_MODEL"], "gemma4:12b")
         self.assertEqual(values["AGENT_DEEP_PLANNER_MODEL"], "gemma4:12b")
         self.assertEqual(values["AGENT_FAST_PLANNER_MODEL"], "qwen3:4b")
+        self.assertEqual(values["AGENT_FAST_FIRST_RESPONSE_MODEL"], "gemma4:12b")
         self.assertEqual(values["AGENT_SOCIAL_ATTENTION_MODEL"], "qwen3:4b")
         self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "0")
         self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "32768")
@@ -289,15 +291,17 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             manifest = json.loads((root / ".chromie" / "runtime_profile.json").read_text())
 
         self.assertEqual(values["CHROMIE_ACTIVE_PROFILE"], "rtx4090_laptop")
+        self.assertEqual(values["AGENT_GOAL_INTERPRETER_MODEL"], "qwen3:8b")
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_MODEL"], "gemma4:e4b")
-        self.assertEqual(values["AGENT_DEEP_PLANNER_MODEL"], "gemma4:e4b")
+        self.assertEqual(values["AGENT_DEEP_PLANNER_MODEL"], "qwen3:8b")
         self.assertEqual(values["AGENT_FAST_PLANNER_MODEL"], "qwen3:4b")
+        self.assertEqual(values["AGENT_FAST_FIRST_RESPONSE_MODEL"], "qwen3:8b")
         self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "0")
         self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "32768")
         self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "1")
         self.assertEqual(
             manifest["active_ollama_models"],
-            ["qwen3:4b", "gemma4:e4b"],
+            ["qwen3:8b", "qwen3:4b", "gemma4:e4b"],
         )
         for key in (
             "OLLAMA_CONTEXT_LENGTH",
@@ -482,6 +486,8 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "CHROMIE_ACTIVE_PROFILE: ${CHROMIE_ACTIVE_PROFILE:?",
             "CHROMIE_RUNTIME_ENV_FINGERPRINT: ${CHROMIE_RUNTIME_ENV_FINGERPRINT:?",
             "AGENT_FAST_PLANNER_MODEL: ${AGENT_FAST_PLANNER_MODEL:-qwen3:4b}",
+            "AGENT_FAST_FIRST_RESPONSE_MODEL: ${AGENT_FAST_FIRST_RESPONSE_MODEL:-gemma4:e2b}",
+            "AGENT_FAST_TRUTH_MODEL: ${AGENT_FAST_TRUTH_MODEL:-${AGENT_FAST_FIRST_RESPONSE_MODEL:-gemma4:e2b}}",
             "AGENT_DEEP_PLANNER_MODEL: ${AGENT_DEEP_PLANNER_MODEL:-gemma4:e2b}",
             "AGENT_DEEP_PLANNER_TIMEOUT_MS: ${AGENT_DEEP_PLANNER_TIMEOUT_MS:-9000}",
             "AGENT_DEEP_PLANNER_NUM_CTX: ${AGENT_DEEP_PLANNER_NUM_CTX:-8192}",

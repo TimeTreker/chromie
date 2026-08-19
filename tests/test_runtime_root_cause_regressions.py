@@ -14,6 +14,8 @@ from agent.app.planner_contract import (
     fast_multi_goal_response_schema,
     planner_coverage_review_response_schema,
     coordinated_action_goal_ids,
+    information_goal_ids_without_declared_provider,
+    qualify_capability_catalog_for_information_domains,
     validate_goal_responsibility_outcomes,
 )
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
@@ -55,6 +57,94 @@ def _allows_null(node: Any) -> bool:
 
 
 class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
+    def test_typed_information_domain_qualifies_deep_planner_catalog(self) -> None:
+        capabilities = [
+            {
+                "capability_id": "chromie.weather.lookup",
+                "hints": {"semantic_scope": {"domain": "weather_forecast"}},
+            },
+            {
+                "capability_id": "chromie.environment.observe",
+                "hints": {
+                    "semantic_scope": {
+                        "domain": "direct_environment_perception",
+                        "responsibility_type": "acquire_and_deliver_resource",
+                        "resource_kinds": ["information"],
+                    }
+                },
+            },
+            {
+                "capability_id": "chromie.memory.retrieve_verified_tool_result",
+                "hints": {"semantic_scope": {}},
+            },
+        ]
+        goals = [
+            {
+                "goal_id": "goal-presence",
+                "resource_responsibility": {
+                    "responsibility_type": "acquire_and_deliver_resource",
+                    "resource": {
+                        "kind": "information",
+                        "attributes": {
+                            "information_domain": {
+                                "value": "direct_environment_perception"
+                            }
+                        },
+                    }
+                },
+            }
+        ]
+
+        qualified = qualify_capability_catalog_for_information_domains(
+            capabilities,
+            authoritative_goals=goals,
+        )
+
+        self.assertEqual(
+            [item["capability_id"] for item in qualified],
+            [
+                "chromie.environment.observe",
+                "chromie.memory.retrieve_verified_tool_result",
+            ],
+        )
+        self.assertEqual(
+            information_goal_ids_without_declared_provider(
+                qualified,
+                authoritative_goals=goals,
+            ),
+            set(),
+        )
+        self.assertEqual(
+            information_goal_ids_without_declared_provider(
+                [capabilities[0], capabilities[2]],
+                authoritative_goals=goals,
+            ),
+            {"goal-presence"},
+        )
+
+        unavailable_schema = canonical_plan_response_schema(
+            planner_tier="deep",
+            expected_goal_ids=["goal-presence"],
+            allowed_capability_ids=[],
+            requires_execution=True,
+            unavailable_information_goal_ids=["goal-presence"],
+        )
+        self.assertEqual(
+            unavailable_schema["properties"]["disposition"]["enum"],
+            ["unavailable", "refused"],
+        )
+        unavailable_outcome = unavailable_schema["properties"]["goal_outcomes"][
+            "properties"
+        ]["goal-presence"]
+        self.assertEqual(
+            unavailable_outcome["properties"]["disposition"]["enum"],
+            ["unavailable", "refused"],
+        )
+        self.assertEqual(
+            unavailable_outcome["properties"]["response_text"]["minLength"],
+            1,
+        )
+
     def test_coverage_review_schema_requires_branch_complete_output(self) -> None:
         schema = planner_coverage_review_response_schema()
 
@@ -439,7 +529,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                     "reason_summary": "Treat the fragment as conversation.",
                 },
                 {
-                    "items": [
+                    "responsibility_items": [
                         {
                             "source_excerpt": "F.",
                             "role": "responsibility",
@@ -448,6 +538,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                             "candidate_goal_indices": [0],
                         }
                     ],
+                    "supporting_items": [],
                     "reason_summary": "The candidate covers the conversational act.",
                 },
             ]
@@ -487,7 +578,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(_allows_null(schema["properties"]["goal_satisfaction"]))
 
 
-    def test_tool_route_planner_schemas_forbid_model_authored_speech(self) -> None:
+    def test_tool_route_planner_schema_requires_terminal_limitation_speech(self) -> None:
         fast = fast_multi_goal_response_schema(
             expected_goal_ids=["goal-weather"],
             allowed_capability_ids=["chromie.weather.lookup"],
@@ -522,14 +613,50 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             deep["properties"]["disposition"]["enum"],
             ["execute", "clarify", "unavailable", "refused"],
         )
+        self.assertEqual(deep["properties"]["response_text"]["maxLength"], 800)
+        terminal_response_branch = next(
+            item
+            for item in deep["allOf"]
+            if any(
+                branch.get("properties", {})
+                .get("disposition", {})
+                .get("enum")
+                == ["clarify", "unavailable", "refused"]
+                for branch in item.get("anyOf", [])
+            )
+        )
+        limitation = terminal_response_branch["anyOf"][1]
         self.assertEqual(
-            deep["properties"]["response_text"]["maxLength"],
-            0,
+            limitation["properties"]["response_text"]["minLength"],
+            1,
         )
         deep_outcome = deep["properties"]["goal_outcomes"]["properties"]["goal-weather"]
+        self.assertNotIn(
+            "maxLength",
+            deep_outcome["properties"]["response_text"],
+        )
+        outcome_terminal_branch = next(
+            item
+            for item in deep_outcome["allOf"]
+            if any(
+                branch.get("properties", {})
+                .get("disposition", {})
+                .get("enum")
+                == ["clarify", "unavailable", "refused"]
+                for branch in item.get("anyOf", [])
+            )
+        )
         self.assertEqual(
-            deep_outcome["properties"]["response_text"]["maxLength"],
+            outcome_terminal_branch["anyOf"][0]["properties"]["response_text"][
+                "maxLength"
+            ],
             0,
+        )
+        self.assertEqual(
+            outcome_terminal_branch["anyOf"][1]["properties"]["response_text"][
+                "minLength"
+            ],
+            1,
         )
         self.assertNotIn(
             ["respond"],

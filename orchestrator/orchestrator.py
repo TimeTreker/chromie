@@ -681,6 +681,7 @@ class VoiceAssistant:
         stage: str,
         purpose: str,
         commitment: str = "",
+        fast_activity_id: str = "",
         turn_id: str | None = None,
         source_goal_ids: list[str] | None = None,
         canonical_plan_id: str = "",
@@ -698,6 +699,7 @@ class VoiceAssistant:
             stage=stage,
             purpose=purpose,
             commitment=commitment,
+            fast_activity_id=fast_activity_id,
             turn_id=turn_id,
             source_goal_ids=source_goal_ids,
             canonical_plan_id=canonical_plan_id,
@@ -1784,7 +1786,12 @@ class VoiceAssistant:
                 for item in reversed(events):
                     if event_id and str(item.get("event_id") or "") != event_id:
                         continue
-                    if int(item.get("generation") or -1) != generation:
+                    raw_event_generation = item.get("generation")
+                    try:
+                        event_generation = int(raw_event_generation)
+                    except (TypeError, ValueError):
+                        event_generation = -1
+                    if event_generation != generation:
                         continue
                     item_orders = item.get("orders")
                     if not isinstance(item_orders, list) or orders[0] not in item_orders:
@@ -1921,6 +1928,11 @@ class VoiceAssistant:
                 ),
                 commitment=(
                     str(metadata.get("commitment_state") or "")
+                    if isinstance(metadata, dict)
+                    else ""
+                ),
+                fast_activity_id=(
+                    str(metadata.get("fast_activity_id") or "")
                     if isinstance(metadata, dict)
                     else ""
                 ),
@@ -5679,6 +5691,27 @@ class VoiceAssistant:
             language=language,
             context=context,
         )
+        delivered_texts = {
+            normalized
+            for item in self._delivered_turn_speech_events(sid)
+            if (normalized := " ".join(str(item.get("text") or "").strip().split()))
+        }
+        if delivered_texts and response.speech:
+            retained_speech = [
+                speech
+                for speech in response.speech
+                if " ".join(str(speech.text or "").strip().split())
+                not in delivered_texts
+            ]
+            if len(retained_speech) != len(response.speech):
+                self.session_log(
+                    session_id,
+                    "planner_evidence_reentry_duplicate_speech_suppressed: count=%s",
+                    len(response.speech) - len(retained_speech),
+                )
+                if not retained_speech:
+                    return response.model_copy(update={"speech": []})
+                response = response.model_copy(update={"speech": retained_speech})
         evidence_refs = [item.evidence_id for item in evidence]
         for speech in response.speech:
             speech.metadata.update(

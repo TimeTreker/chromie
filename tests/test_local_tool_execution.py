@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from datetime import datetime, timedelta, timezone
 
 from agent.app.capabilities.local import chromie_capability_bundle
 from agent.app.capabilities.models import CapabilityRegistry
@@ -46,6 +47,63 @@ class _MissingLocationWeatherClient:
 
 
 class LocalToolExecutionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_executor_reads_trusted_timezone_aware_local_clock(self) -> None:
+        fixed_now = datetime(
+            2026,
+            8,
+            19,
+            1,
+            2,
+            3,
+            tzinfo=timezone(timedelta(hours=8), name="CST"),
+        )
+        executor = LocalToolExecutor(
+            CapabilityRegistry.from_bundles([chromie_capability_bundle()]),
+            clock=lambda: fixed_now,
+        )
+
+        result = await executor.execute(
+            ToolExecutionRequest(
+                request_id="clock-1",
+                tool_id="chromie.clock.local",
+                args={},
+                language="zh-CN",
+            )
+        )
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(result.output["local_iso"], "2026-08-19T01:02:03+08:00")
+        self.assertEqual(result.output["local_date"], "2026-08-19")
+        self.assertEqual(result.output["local_time"], "01:02:03")
+        self.assertEqual(result.output["weekday"], "Wednesday")
+        self.assertEqual(result.output["timezone"], "CST")
+        self.assertEqual(result.output["utc_offset"], "+08:00")
+        self.assertEqual(result.output["source"], "host_local_clock")
+        self.assertEqual(
+            result.metadata["provider_resolution"],
+            {
+                "provider": "host_local_clock",
+                "timezone": "CST",
+                "utc_offset": "+08:00",
+            },
+        )
+
+    async def test_executor_rejects_local_clock_arguments(self) -> None:
+        executor = LocalToolExecutor(
+            CapabilityRegistry.from_bundles([chromie_capability_bundle()])
+        )
+
+        result = await executor.execute(
+            ToolExecutionRequest(
+                request_id="clock-invalid",
+                tool_id="chromie.clock.local",
+                args={"location": "重庆"},
+            )
+        )
+
+        self.assertEqual(result.status, "refused")
+        self.assertEqual(result.reason_code, "contract_invalid")
+
     async def test_executor_runs_exact_planned_weather_tool_and_returns_evidence(self) -> None:
         client = _WeatherClient()
         executor = LocalToolExecutor(

@@ -13,6 +13,7 @@ from agent.app.goal_association import (
     GoalAssociationModelBinding,
     GoalAssociationModelGoal,
     GoalAssociationModelInformationResourceResponsibility,
+    GoalAssociationModelOutput,
     GoalAssociationModelPhysicalResourceResponsibility,
     GoalAssociationResolver,
     GoalResponsibilityCoverageCertificate,
@@ -86,6 +87,7 @@ def resource_responsibility(
     recipient: str = "用户",
     recipient_referent_id: str | None = None,
     delivery_mode: str | None = None,
+    information_domain: str = "weather_forecast",
 ) -> dict:
     recipient_payload = {"description": recipient}
     if recipient_referent_id:
@@ -96,6 +98,7 @@ def resource_responsibility(
             source_payload["source_name"] = source_description or "named source"
         return {
             "kind": "information",
+            "information_domain": information_domain,
             "description": description,
             "quantity": quantity,
             "query_scope": list(attributes or []),
@@ -130,10 +133,9 @@ def goal(
         "description": description,
         "output_mode": output_mode,
         "bindings": list(bindings or []),
+        "resource_responsibility": resource,
         **extra,
     }
-    if resource is not None:
-        payload["resource_responsibility"] = resource
     return payload
 
 
@@ -154,6 +156,8 @@ def coverage_item(
     independently_satisfiable: bool = True,
     temporal_dimensions: list[str] | None = None,
     required_goal_shape: str = "ordinary",
+    required_information_domain: str | None = None,
+    required_output_mode: str | None = None,
 ) -> dict:
     return {
         "source_excerpt": source_excerpt,
@@ -165,12 +169,33 @@ def coverage_item(
         "candidate_goal_indices": list(goal_indices),
         "temporal_dimensions": list(temporal_dimensions or []),
         "required_goal_shape": required_goal_shape,
+        "required_information_domain": (
+            required_information_domain
+            if required_information_domain is not None
+            else "weather_forecast"
+            if required_goal_shape == "information_resource"
+            else "none"
+        ),
+        "required_output_mode": (
+            required_output_mode
+            if required_output_mode is not None
+            else "capability_work"
+            if required_goal_shape in {"information_resource", "persistent_effect"}
+            else "body_action"
+            if required_goal_shape == "physical_resource"
+            else "none"
+        ),
     }
 
 
 def certificate(*items: dict) -> dict:
     return {
-        "items": list(items),
+        "responsibility_items": [
+            item for item in items if item.get("role") == "responsibility"
+        ],
+        "supporting_items": [
+            item for item in items if item.get("role") != "responsibility"
+        ],
         "reason_summary": "The item judgments prove candidate responsibility coverage.",
     }
 
@@ -242,6 +267,24 @@ def active_goal(goal_id: str, description: str) -> dict:
 
 
 class GoalExecutionContractTests(unittest.TestCase):
+    def test_qualitative_speed_binding_uses_provider_neutral_canonical_value(self):
+        self.assertEqual(
+            GoalAssociationModelBinding(
+                name="speed",
+                entity_type="speed",
+                value="quick",
+                confidence=1.0,
+            ).value,
+            "quick",
+        )
+        with self.assertRaisesRegex(ValidationError, "qualitative speed bindings"):
+            GoalAssociationModelBinding(
+                name="speed",
+                entity_type="speed",
+                value="quickly",
+                confidence=1.0,
+            )
+
     def test_day_part_binding_uses_canonical_runtime_vocabulary(self):
         with self.assertRaisesRegex(ValueError, "canonical day-part value"):
             GoalAssociationModelBinding.model_validate(
@@ -471,6 +514,15 @@ class GoalExecutionContractTests(unittest.TestCase):
             self.assertIn("kind", schema.get("required", []))
             self.assertNotIn("default", schema["properties"]["kind"])
 
+        information_schema = (
+            GoalAssociationModelInformationResourceResponsibility.model_json_schema()
+        )
+        self.assertIn("information_domain", information_schema["required"])
+        self.assertNotIn(
+            "default",
+            information_schema["properties"]["information_domain"],
+        )
+
         physical_schema = (
             GoalAssociationModelPhysicalResourceResponsibility.model_json_schema()
         )
@@ -538,11 +590,55 @@ class GoalExecutionContractTests(unittest.TestCase):
             [],
             responsibility_count=2,
             responsibility_refs=["r1", "r2"],
+            responsibility_output_modes={"r1": "body_action", "r2": "singing"},
         )
         bounded_goal_validator = Draft202012Validator(bounded_goal_schema)
+        for branch in bounded_goal_schema["$defs"]["GoalAssociationModelGoal"][
+            "oneOf"
+        ]:
+            self.assertIn("description", branch["required"])
+            self.assertIn("output_mode", branch["required"])
+            self.assertIn("bindings", branch["required"])
+            self.assertIn("resource_responsibility", branch["required"])
+            self.assertIn("description", branch["properties"])
+            self.assertIn("bindings", branch["properties"])
+            self.assertIn("resource_responsibility", branch["properties"])
+        goal_branches = bounded_goal_schema["$defs"][
+            "GoalAssociationModelGoal"
+        ]["oneOf"]
+        body_branches = [
+            branch
+            for branch in goal_branches
+            if branch["properties"]["source_responsibility_refs"].get("const")
+            == ["r1"]
+        ]
+        self.assertEqual(len(body_branches), 2)
+        self.assertEqual(
+            body_branches[0]["properties"]["resource_responsibility"],
+            {"type": "null"},
+        )
+        self.assertEqual(
+            body_branches[1]["properties"]["resource_responsibility"]["$ref"],
+            "#/$defs/GoalAssociationModelPhysicalResourceResponsibility",
+        )
+        self.assertEqual(
+            body_branches[1]["properties"]["bindings"]["maxItems"],
+            0,
+        )
+        vocal_branches = [
+            branch
+            for branch in goal_branches
+            if branch["properties"]["source_responsibility_refs"].get("const")
+            == ["r2"]
+        ]
+        self.assertEqual(len(vocal_branches), 1)
+        self.assertEqual(
+            vocal_branches[0]["properties"]["resource_responsibility"],
+            {"type": "null"},
+        )
         two_body_actions = create_goals(
             goal("Run forward for 15 seconds.", "body_action"),
-            goal("Blink.", "body_action", source_responsibility_refs=["r2"]),
+            goal("Sing.", "singing", source_responsibility_refs=["r2"]),
         )
         two_body_actions.update(
             referent_updates=[],
@@ -552,6 +648,9 @@ class GoalExecutionContractTests(unittest.TestCase):
             list(bounded_goal_validator.iter_errors(two_body_actions)),
             [],
         )
+        two_body_actions["new_goals"][1]["output_mode"] = "body_action"
+        self.assertTrue(list(bounded_goal_validator.iter_errors(two_body_actions)))
+        two_body_actions["new_goals"][1]["output_mode"] = "singing"
         three_goals = create_goals(
             *two_body_actions["new_goals"],
             goal("Say that the actions are being handled.", "speech"),
@@ -601,10 +700,56 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertTrue(list(goal_validator.iter_errors(typed_physical_attribute)))
 
         coverage_schema = GoalAssociationResolver._coverage_certificate_response_schema(
-            1
+            [
+                GoalAssociationModelGoal.model_validate(
+                    goal("Walk forward.", "body_action")
+                )
+            ]
         )
         Draft202012Validator.check_schema(coverage_schema)
         coverage_validator = Draft202012Validator(coverage_schema)
+        coverage_items_schema = coverage_schema["properties"]["responsibility_items"]
+        self.assertEqual(coverage_items_schema["minItems"], 1)
+        covered_responsibility_branch = coverage_items_schema["items"]["oneOf"][0]
+        self.assertEqual(
+            covered_responsibility_branch["properties"]["role"]["const"],
+            "responsibility",
+        )
+        self.assertEqual(
+            covered_responsibility_branch["properties"]["required_goal_shape"][
+                "const"
+            ],
+            "ordinary",
+        )
+        self.assertEqual(
+            covered_responsibility_branch["properties"]["required_output_mode"][
+                "const"
+            ],
+            "body_action",
+        )
+        supporting_items_schema = coverage_schema["properties"]["supporting_items"]
+        self.assertIn(
+            "Durations",
+            supporting_items_schema["items"]["properties"][
+                "temporal_dimensions"
+            ]["description"],
+        )
+        self.assertIn(
+            "required_information_domain",
+            covered_responsibility_branch["required"],
+        )
+        self.assertIn(
+            "required_output_mode",
+            covered_responsibility_branch["required"],
+        )
+        constraint_only = certificate(
+            coverage_item(
+                "tonight",
+                role="constraint",
+                temporal_dimensions=["date", "day_part"],
+            )
+        )
+        self.assertTrue(list(coverage_validator.iter_errors(constraint_only)))
         invalid_context = certificate(
             {
                 "source_excerpt": "I am a little tired",
@@ -616,6 +761,11 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
         self.assertTrue(list(coverage_validator.iter_errors(invalid_context)))
         valid_context = certificate(
+            coverage_item(
+                "help me decide",
+                0,
+                required_output_mode="body_action",
+            ),
             coverage_item(
                 "I am a little tired",
                 role="context",
@@ -696,7 +846,20 @@ class GoalExecutionContractTests(unittest.TestCase):
             coverage_prompt,
         )
         self.assertIn(
-            "temporal_dimensions=[date,day_part] on one item",
+            "one role=constraint item with temporal_dimensions=date_and_day_part",
+            coverage_prompt,
+        )
+        self.assertIn(
+            "A responsibility item always uses temporal_dimensions=none",
+            coverage_prompt,
+        )
+        self.assertIn(
+            "Never return only constraints",
+            coverage_prompt,
+        )
+        self.assertIn(
+            "reject your own draft if any temporal dimension appears on a "
+            "non-constraint item",
             coverage_prompt,
         )
         self.assertIn("required_goal_shape", coverage_prompt)
@@ -860,6 +1023,544 @@ class GoalExecutionContractTests(unittest.TestCase):
             problems,
         )
 
+    def test_coverage_removes_only_exact_duplicate_item_noise(self):
+        req = request("帮我看看现在几点。")
+        item = coverage_item(
+            "帮我看看现在几点。",
+            0,
+            required_goal_shape="information_resource",
+        )
+        raw = certificate(item, dict(item))
+
+        parsed = GoalAssociationResolver._validate_coverage_certificate(
+            raw,
+            request=req,
+            goal_count=1,
+        )
+
+        self.assertEqual(len(parsed.responsibility_items), 1)
+        verdict, problems = GoalAssociationResolver._coverage_verdict(
+            parsed,
+            goal_count=1,
+        )
+        self.assertEqual(verdict, "accept")
+        self.assertEqual(problems, [])
+
+    def test_non_information_coverage_clears_redundant_information_domain(self):
+        req = request("bring the bottle to me", language="en-US")
+        parsed = GoalAssociationResolver._validate_coverage_certificate(
+            certificate(
+                coverage_item(
+                    "bring the bottle to me",
+                    0,
+                    required_goal_shape="physical_resource",
+                    required_information_domain="direct_environment_perception",
+                )
+            ),
+            request=req,
+            goal_count=1,
+        )
+
+        self.assertEqual(parsed.items[0].required_goal_shape, "physical_resource")
+        self.assertEqual(parsed.items[0].required_information_domain, "none")
+
+    def test_supporting_coverage_clears_ineligible_output_mode(self):
+        req = request("singing while blinking", language="en-US")
+        parsed = GoalAssociationResolver._validate_coverage_certificate(
+            certificate(
+                coverage_item("singing", 0),
+                coverage_item(
+                    "while blinking",
+                    0,
+                    role="constraint",
+                    required_output_mode="body_action",
+                ),
+            ),
+            request=req,
+            goal_count=1,
+        )
+
+        self.assertEqual(parsed.supporting_items[0].required_output_mode, "none")
+
+    def test_compact_coverage_temporal_scalar_is_mechanical_transport(self):
+        schema = GoalAssociationResolver._coverage_certificate_response_schema(
+            [
+                GoalAssociationModelGoal.model_validate(
+                    goal("Walk forward for 10 seconds.", "body_action")
+                )
+            ],
+            temporal_scalar=True,
+        )
+        Draft202012Validator.check_schema(schema)
+        temporal = schema["$defs"]["GoalResponsibilityCoverageItem"][
+            "properties"
+        ]["temporal_dimensions"]
+        self.assertEqual(
+            temporal["enum"],
+            ["none", "date", "day_part", "date_and_day_part"],
+        )
+
+        raw = certificate(
+            {
+                **coverage_item(
+                    "Walk forward for 10 seconds.",
+                    0,
+                    required_output_mode="body_action",
+                ),
+                "temporal_dimensions": "none",
+            }
+        )
+        parsed = GoalAssociationResolver._validate_coverage_certificate(
+            raw,
+            request=request("Walk forward for 10 seconds.", language="en-US"),
+            goal_count=1,
+        )
+
+        self.assertEqual(parsed.responsibility_items[0].temporal_dimensions, [])
+
+    def test_context_coverage_clears_ineligible_goal_ownership(self):
+        req = request("there is a bottle ahead; bring it", language="en-US")
+        parsed = GoalAssociationResolver._validate_coverage_certificate(
+            certificate(
+                coverage_item("bring it", 0),
+                coverage_item(
+                    "there is a bottle ahead",
+                    0,
+                    role="context",
+                    required_output_mode="body_action",
+                ),
+            ),
+            request=req,
+            goal_count=1,
+        )
+
+        context_item = parsed.supporting_items[0]
+        self.assertEqual(context_item.candidate_goal_indices, [])
+        self.assertEqual(context_item.required_output_mode, "none")
+
+    def test_coverage_rejects_wrong_requested_output_mode(self):
+        req = request("sing while moving", language="en-US")
+        candidate = GoalAssociationModelGoal.model_validate(
+            goal(
+                "sing while moving",
+                "body_action",
+                bindings=[binding("activity", "activity", "singing")],
+            )
+        )
+        parsed = GoalAssociationResolver._validate_coverage_certificate(
+            certificate(
+                coverage_item(
+                    "sing",
+                    0,
+                    required_output_mode="singing",
+                )
+            ),
+            request=req,
+            goal_count=1,
+            candidate_goals=[candidate],
+        )
+
+        self.assertEqual(parsed.items[0].coverage, "representation_mismatch")
+        verdict, problems = GoalAssociationResolver._coverage_verdict(
+            parsed,
+            goal_count=1,
+        )
+        self.assertEqual(verdict, "reject")
+        self.assertIn(
+            "required_output_mode:singing:responsibility:sing",
+            problems,
+        )
+
+    def test_goal_candidate_must_conserve_interpreted_output_mode(self):
+        req = request("sing a song", language="en-US").model_copy(
+            update={
+                "responsibilities": typed_responsibilities(
+                    {
+                        "local_ref": "r1",
+                        "outcome": "sing a song",
+                        "bindings": {},
+                        "output_mode": "singing",
+                        "completion_requires_work": True,
+                        "completion_requires_fresh_evidence": False,
+                        "confidence": 0.98,
+                    }
+                )
+            }
+        )
+        wrong = GoalSegmentationModelOutput.model_validate(
+            create_goals(goal("Sing a song.", "body_action"))
+        )
+
+        conflicts = GoalAssociationResolver._responsibility_output_mode_conflicts(
+            wrong,
+            request=req,
+        )
+
+        self.assertEqual(
+            conflicts,
+            ["new_goals[0] source_ref=r1 expected=singing actual=body_action"],
+        )
+
+    def test_physical_resource_cannot_drop_direct_gi_acquisition_bindings_into_prose(self):
+        req = request(
+            "bring the bottle from 50 meters ahead",
+            language="en-US",
+            responsibility_outcomes=["bring the bottle to the requester"],
+        ).model_copy(
+            update={
+                "responsibilities": typed_responsibilities(
+                    {
+                        "local_ref": "r1",
+                        "outcome": "bring the bottle to the requester",
+                        "bindings": {
+                            "object": "bottle",
+                            "distance": "50 meters",
+                            "direction": "ahead",
+                        },
+                        "completion_requires_work": True,
+                        "completion_requires_fresh_evidence": True,
+                        "confidence": 0.98,
+                    }
+                )
+            }
+        )
+        missing_source = GoalSegmentationModelOutput.model_validate(
+            create_goals(
+                goal(
+                    "Bring the bottle from 50 meters ahead.",
+                    "body_action",
+                    resource=resource_responsibility(
+                        description="bottle",
+                        source_status="unknown",
+                    ),
+                )
+            )
+        )
+
+        conflicts = GoalAssociationResolver._source_grounded_binding_coverage_conflicts(
+            missing_source,
+            request=req,
+        )
+
+        self.assertTrue(any("missing='50 meters'" in item for item in conflicts))
+        self.assertTrue(any("missing='ahead'" in item for item in conflicts))
+
+        grounded_source = GoalSegmentationModelOutput.model_validate(
+            create_goals(
+                goal(
+                    "Bring the bottle from 50 meters ahead.",
+                    "body_action",
+                    resource=resource_responsibility(
+                        description="bottle",
+                        source_status="known",
+                        source_description="50 meters ahead",
+                        source_bindings=[
+                            binding("distance", "distance", "50 meters"),
+                            binding("direction", "direction", "ahead"),
+                        ],
+                    ),
+                )
+            )
+        )
+        self.assertEqual(
+            GoalAssociationResolver._source_grounded_binding_coverage_conflicts(
+                grounded_source,
+                request=req,
+            ),
+            [],
+        )
+
+    def test_goal_description_owns_exact_action_while_bindings_own_parameters(self):
+        req = request(
+            "singing and blinking eyes simultaneously",
+            language="en-US",
+        ).model_copy(
+            update={
+                "responsibilities": typed_responsibilities(
+                    {
+                        "local_ref": "r1",
+                        "outcome": "singing",
+                        "bindings": {"action": "singing"},
+                        "output_mode": "singing",
+                        "completion_requires_work": True,
+                        "confidence": 0.98,
+                    },
+                    {
+                        "local_ref": "r2",
+                        "outcome": "blinking eyes simultaneously",
+                        "bindings": {
+                            "action": "blinking eyes",
+                            "simultaneously": "simultaneously",
+                        },
+                        "output_mode": "body_action",
+                        "completion_requires_work": True,
+                        "confidence": 0.98,
+                    },
+                )
+            }
+        )
+        output = GoalSegmentationModelOutput.model_validate(
+            create_goals(
+                goal("singing", "singing"),
+                goal(
+                    "blinking eyes simultaneously",
+                    "body_action",
+                    bindings=[
+                        binding(
+                            "simultaneously",
+                            "temporal_scope",
+                            "simultaneously",
+                        )
+                    ],
+                    source_responsibility_refs=["r2"],
+                ),
+            )
+        )
+
+        self.assertEqual(
+            GoalAssociationResolver._source_grounded_binding_coverage_conflicts(
+                output,
+                request=req,
+            ),
+            [],
+        )
+
+    def test_physical_resource_prose_cannot_hide_body_action_parameters(self):
+        req = request(
+            "walk ahead for 15 seconds quickly",
+            language="en-US",
+        ).model_copy(
+            update={
+                "responsibilities": typed_responsibilities(
+                    {
+                        "local_ref": "r1",
+                        "outcome": "walk ahead for 15 seconds quickly",
+                        "bindings": {
+                            "direction": "ahead",
+                            "duration": "15 seconds",
+                            "speed": "quickly",
+                        },
+                        "output_mode": "body_action",
+                        "completion_requires_work": True,
+                        "completion_requires_fresh_evidence": False,
+                        "confidence": 1.0,
+                    }
+                )
+            }
+        )
+        output = GoalSegmentationModelOutput.model_validate(
+            create_goals(
+                goal(
+                    "walk ahead for 15 seconds quickly",
+                    "body_action",
+                    resource=resource_responsibility(
+                        description="walk ahead for 15 seconds quickly",
+                        source_status="known",
+                        source_bindings=[
+                            binding("direction", "direction", "ahead"),
+                        ],
+                    ),
+                )
+            )
+        )
+
+        self.assertEqual(
+            GoalAssociationResolver._source_grounded_binding_coverage_conflicts(
+                output,
+                request=req,
+            ),
+            [
+                "new_goals[0] source_refs=r1 missing='15 seconds'",
+                "new_goals[0] source_refs=r1 missing='quickly'",
+            ],
+        )
+
+    def test_canonical_qualitative_speed_conserves_source_speed_dimension(self):
+        req = request(
+            "walk ahead for 15 seconds quickly",
+            language="en-US",
+        ).model_copy(
+            update={
+                "responsibilities": typed_responsibilities(
+                    {
+                        "local_ref": "r1",
+                        "outcome": "walk ahead for 15 seconds quickly",
+                        "bindings": {
+                            "direction": "ahead",
+                            "duration": "15 seconds",
+                            "speed": "quickly",
+                        },
+                        "output_mode": "body_action",
+                        "completion_requires_work": True,
+                        "completion_requires_fresh_evidence": False,
+                        "confidence": 1.0,
+                    }
+                )
+            }
+        )
+        output = GoalSegmentationModelOutput.model_validate(
+            create_goals(
+                goal(
+                    "walk ahead for 15 seconds quickly",
+                    "body_action",
+                    bindings=[
+                        binding("direction", "direction", "ahead"),
+                        binding("duration", "duration", "15 seconds"),
+                        binding("speed", "speed", "quick"),
+                    ],
+                )
+            )
+        )
+
+        self.assertEqual(
+            GoalAssociationResolver._source_grounded_binding_coverage_conflicts(
+                output,
+                request=req,
+            ),
+            [],
+        )
+
+    def test_named_canonical_binding_rejects_generic_entity_type(self):
+        output = GoalSegmentationModelOutput.model_validate(
+            create_goals(
+                goal(
+                    "Bring the milk from about 50 meters ahead.",
+                    "body_action",
+                    resource=resource_responsibility(
+                        description="a bottle of milk",
+                        source_status="known",
+                        source_bindings=[
+                            binding("distance", "measurement", "about 50 meters"),
+                        ],
+                    ),
+                )
+            )
+        )
+
+        self.assertEqual(
+            GoalAssociationResolver._binding_semantic_contract_conflicts(output),
+            ["new_goals[0].bindings[0]=distance/measurement"],
+        )
+
+    def test_physical_resource_source_rejects_body_action_parameters(self):
+        output = GoalSegmentationModelOutput.model_validate(
+            create_goals(
+                goal(
+                    "Walk ahead for 15 seconds quickly.",
+                    "body_action",
+                    resource=resource_responsibility(
+                        description="Walk ahead for 15 seconds quickly",
+                        source_status="known",
+                        source_bindings=[
+                            binding("direction", "direction", "ahead"),
+                            binding("duration", "duration", "15 seconds"),
+                            binding("speed", "speed", "quick"),
+                        ],
+                    ),
+                )
+            )
+        )
+
+        conflicts = (
+            GoalAssociationResolver._resource_source_binding_contract_conflicts(
+                output
+            )
+        )
+        self.assertEqual(
+            conflicts,
+            [
+                "new_goals[0].resource_responsibility."
+                "source.acquisition_bindings[duration]="
+                "non_source_semantics(duration/duration)",
+                "new_goals[0].resource_responsibility."
+                "source.acquisition_bindings[speed]="
+                "non_source_semantics(speed/speed)",
+            ],
+        )
+
+    def test_verbatim_relative_location_is_valid_location_provenance(self):
+        output = GoalSegmentationModelOutput.model_validate(
+            create_goals(
+                goal(
+                    "Bring the milk from ahead of you.",
+                    "body_action",
+                    resource=resource_responsibility(
+                        description="a bottle of milk",
+                        source_status="known",
+                        source_bindings=[
+                            binding("location", "relative_location", "ahead of you"),
+                        ],
+                    ),
+                )
+            )
+        )
+
+        self.assertEqual(
+            GoalAssociationResolver._non_verbatim_explicit_location_bindings(
+                output,
+                request=request("bring the milk from ahead of you", language="en-US"),
+            ),
+            [],
+        )
+
+    def test_location_name_cannot_hide_non_location_query_semantics(self):
+        payload = create_goals(
+            goal(
+                "Determine the current local time.",
+                "capability_work",
+                resource=resource_responsibility(
+                    kind="information",
+                    description="current local time",
+                    attributes=[
+                        binding(
+                            "location",
+                            "unspecified location for time query",
+                            "帮我看看现在几点",
+                        )
+                    ],
+                ),
+            )
+        )
+        payload.update(referent_updates=[], resolved_references=[])
+        model_output = GoalSegmentationModelOutput.model_validate(payload)
+
+        rejected = GoalAssociationResolver._non_verbatim_explicit_location_bindings(
+            model_output,
+            request=request("帮我看看现在几点。"),
+        )
+
+        self.assertEqual(len(rejected), 1)
+        self.assertIn("non_location_semantics", rejected[0])
+
+    def test_grounded_generic_location_type_is_mechanically_normalized(self):
+        payload = create_goals(
+            goal(
+                "Determine whether someone is outside.",
+                "capability_work",
+                resource=resource_responsibility(
+                    kind="information",
+                    information_domain="direct_environment_perception",
+                    description="whether someone is outside",
+                    attributes=[binding("location", "string", "外面")],
+                ),
+            )
+        )
+
+        normalized, repairs = (
+            GoalAssociationResolver._normalize_grounded_generic_location_types(
+                payload,
+                request=request("你觉得外面有人吗？"),
+            )
+        )
+
+        location = normalized["new_goals"][0]["resource_responsibility"][
+            "query_scope"
+        ][0]
+        self.assertEqual(location["entity_type"], "place")
+        self.assertEqual(location["value"], "外面")
+        self.assertEqual(repairs[0]["from"], "string")
+        self.assertTrue(repairs[0]["value_unchanged"])
+
     def test_coverage_typed_claims_reject_missing_date_and_information_resource(self):
         req = request("今晚重庆会不会下雨哦？")
         candidate = GoalAssociationModelGoal.model_validate(
@@ -911,6 +1612,47 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
         self.assertIn(
             "required_goal_shape:information_resource:responsibility:重庆会不会下雨",
+            problems,
+        )
+
+    def test_coverage_rejects_wrong_information_domain(self):
+        req = request("你觉得外面有人吗？")
+        candidate = GoalAssociationModelGoal.model_validate(
+            goal(
+                "Determine whether someone is outside.",
+                "capability_work",
+                resource=resource_responsibility(
+                    kind="information",
+                    information_domain="weather_forecast",
+                    description="whether someone is outside",
+                    attributes=[binding("location", "place", "外面")],
+                ),
+            )
+        )
+
+        parsed = GoalAssociationResolver._validate_coverage_certificate(
+            certificate(
+                coverage_item(
+                    "外面有人吗",
+                    0,
+                    required_goal_shape="information_resource",
+                    required_information_domain="direct_environment_perception",
+                )
+            ),
+            request=req,
+            goal_count=1,
+            candidate_goals=[candidate],
+        )
+
+        self.assertEqual(parsed.items[0].coverage, "representation_mismatch")
+        verdict, problems = GoalAssociationResolver._coverage_verdict(
+            parsed,
+            goal_count=1,
+        )
+        self.assertEqual(verdict, "reject")
+        self.assertIn(
+            "required_information_domain:direct_environment_perception:"
+            "responsibility:外面有人吗",
             problems,
         )
 
@@ -1164,8 +1906,9 @@ class GoalExecutionContractTests(unittest.TestCase):
 
         self.assertEqual(normalized["new_goals"][0]["bindings"], [])
         self.assertEqual(dropped[0]["path"], "new_goals[0].bindings")
+        self.assertEqual(dropped[0]["migrated_count"], 0)
 
-    def test_nonduplicate_inactive_resource_bindings_are_also_dropped(self):
+    def test_nonduplicate_inactive_resource_bindings_move_to_active_owner(self):
         resource = resource_responsibility(
             kind="information",
             description="package status",
@@ -1187,6 +1930,190 @@ class GoalExecutionContractTests(unittest.TestCase):
 
         self.assertEqual(normalized["new_goals"][0]["bindings"], [])
         self.assertEqual(dropped[0]["binding_count"], 1)
+        self.assertEqual(dropped[0]["migrated_count"], 1)
+        self.assertEqual(
+            normalized["new_goals"][0]["resource_responsibility"]["query_scope"][-1],
+            binding("carrier", "organization", "ParcelCo"),
+        )
+
+    def test_unknown_physical_source_grounding_is_cleared_for_coverage_audit(self):
+        raw = create_goals(
+            goal(
+                "Walk forward for ten seconds.",
+                "body_action",
+                bindings=[binding("duration", "time_duration", "10 seconds")],
+                resource={
+                    "kind": "physical_object",
+                    "description": "walking forward",
+                    "source": {
+                        "status": "unknown",
+                        "acquisition_bindings": [
+                            binding("direction", "direction", "forward")
+                        ],
+                    },
+                    "delivery_mode": "physical_handover",
+                },
+            )
+        )
+
+        normalized, dropped = (
+            GoalAssociationResolver._drop_inactive_resource_bindings(raw)
+        )
+
+        candidate = normalized["new_goals"][0]
+        self.assertEqual(candidate["bindings"], [])
+        self.assertNotIn(
+            "acquisition_bindings",
+            candidate["resource_responsibility"]["source"],
+        )
+        self.assertEqual(dropped[0]["migrated_count"], 0)
+        self.assertEqual(dropped[0]["inactive_acquisition_binding_count"], 1)
+
+    def test_invalid_optional_resource_quantity_is_dropped_without_inference(self):
+        raw = create_goals(
+            goal(
+                "Bring the bottle from ahead.",
+                "body_action",
+                resource=resource_responsibility(
+                    description="bottle",
+                    quantity=",",
+                    source_status="known",
+                    source_description="ahead",
+                    source_bindings=[binding("direction", "direction", "ahead")],
+                ),
+            )
+        )
+
+        normalized, dropped = (
+            GoalAssociationResolver._drop_invalid_optional_resource_quantities(raw)
+        )
+
+        resource = normalized["new_goals"][0]["resource_responsibility"]
+        self.assertNotIn("quantity", resource)
+        self.assertEqual(dropped[0]["reason"], "invalid_optional_quantity_scalar")
+
+    def test_missing_goal_description_copies_exact_source_outcome_only(self):
+        req = request("sing while moving", language="en-US").model_copy(
+            update={
+                "responsibilities": typed_responsibilities(
+                    {
+                        "local_ref": "sing",
+                        "outcome": "sing while moving",
+                        "bindings": {},
+                        "output_mode": "singing",
+                        "completion_requires_work": True,
+                        "completion_requires_fresh_evidence": False,
+                        "confidence": 0.98,
+                    }
+                )
+            }
+        )
+        raw = create_goals(goal("discarded", "singing", source_responsibility_refs=["sing"]))
+        raw["new_goals"][0].pop("description")
+
+        normalized, recovered = (
+            GoalAssociationResolver._restore_missing_goal_descriptions(
+                raw,
+                request=req,
+            )
+        )
+
+        self.assertEqual(
+            normalized["new_goals"][0]["description"],
+            "sing while moving",
+        )
+        self.assertEqual(recovered[0]["source_responsibility_ref"], "sing")
+        self.assertTrue(recovered[0]["semantic_value_unchanged"])
+
+        ambiguous = copy.deepcopy(raw)
+        ambiguous["new_goals"][0]["source_responsibility_refs"] = ["sing", "other"]
+        unchanged, recovered = (
+            GoalAssociationResolver._restore_missing_goal_descriptions(
+                ambiguous,
+                request=req,
+            )
+        )
+        self.assertNotIn("description", unchanged["new_goals"][0])
+        self.assertEqual(recovered, [])
+
+    def test_fresh_interpretation_explains_ordinary_effect_shape(self):
+        prompt = GoalAssociationResolver(FakeOllama({}))._build_fresh_interpretation_prompt(
+            request=request("你往前走 10 秒。"),
+            candidate_goals=[],
+            output_type=GoalSegmentationModelOutput,
+            problems=["required_goal_shape:ordinary:responsibility:你往前走 10 秒"],
+        )
+
+        self.assertIn("required_goal_shape:ordinary", prompt)
+        self.assertIn("must have no resource_responsibility", prompt)
+        self.assertIn("body motion, locomotion", prompt)
+        self.assertIn("top-level semantic bindings", prompt)
+
+    def test_fresh_interpretation_requires_known_physical_source_grounding(self):
+        prompt = GoalAssociationResolver(FakeOllama({}))._build_fresh_interpretation_prompt(
+            request=request(
+                "bring the bottle from 50 meters ahead",
+                language="en-US",
+            ),
+            candidate_goals=[],
+            output_type=GoalSegmentationModelOutput,
+            problems=[
+                "missing_source_grounded_binding=new_goals[0] missing='50 meters'",
+                "missing_source_grounded_binding=new_goals[0] missing='ahead'",
+            ],
+        )
+
+        self.assertIn("source.status=known", prompt)
+        self.assertIn("source.acquisition_bindings", prompt)
+        self.assertIn("unknown is not a placeholder", prompt)
+
+    def test_unentailed_resource_query_location_is_dropped_without_replacement(self):
+        raw = create_goals(
+            goal(
+                "Report the current local time.",
+                "capability_work",
+                resource=resource_responsibility(
+                    kind="information",
+                    description="current local time",
+                    attributes=[
+                        binding("time", "time", "now"),
+                        binding("location", "unspecified", "current location"),
+                    ],
+                    source_status="unknown",
+                ),
+            )
+        )
+        req = request(
+            "帮我看看现在几点。",
+            language="zh-CN",
+        )
+        req = req.model_copy(
+            update={
+                "responsibilities": typed_responsibilities(
+                    {
+                        "local_ref": "r1",
+                        "outcome": "determine the current local time",
+                        "bindings": {"time": "now"},
+                        "completion_requires_work": True,
+                        "completion_requires_fresh_evidence": True,
+                        "confidence": 0.95,
+                    }
+                )
+            }
+        )
+
+        normalized, dropped = (
+            GoalAssociationResolver._drop_ungrounded_resource_query_locations(
+                raw,
+                request=req,
+            )
+        )
+
+        query_scope = normalized["new_goals"][0]["resource_responsibility"][
+            "query_scope"
+        ]
+        self.assertEqual([item["name"] for item in query_scope], ["time"])
+        self.assertEqual(dropped[0]["value"], "current location")
 
     def test_goal_prompts_distinguish_body_action_from_physical_resource(self):
         resolver = GoalAssociationResolver(FakeOllama({}))
@@ -1203,6 +2130,123 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertIn("Responsibility conservation is strict", primary_prompt)
         self.assertIn("physical resource", coverage_system)
         self.assertIn("coverage=representation_mismatch", coverage_system)
+
+    def test_no_candidate_segmentation_prompt_fits_qualified_8k_preflight(self):
+        resolver = GoalAssociationResolver(FakeOllama({}))
+        req = request("你往前走 10 秒。")
+
+        layered = resolver._layered_prompt(
+            req,
+            [],
+            output_type=GoalSegmentationModelOutput,
+        )
+        input_chars = len(layered.render()) + len(
+            resolver._system_prompt(GoalSegmentationModelOutput)
+        )
+
+        # The deployed fail-closed estimate is two characters per token.  An
+        # 8,192-token request reserving 512 output and 2,048 safety tokens may
+        # therefore admit at most 11,264 input characters.
+        self.assertLessEqual(input_chars, 11_264)
+        prompt = layered.render()
+        self.assertIn("Responsibility conservation is strict", prompt)
+        self.assertIn("distinct concrete object", prompt)
+        self.assertIn("non-resource body_action Goals", prompt)
+        self.assertIn("FINAL AUTHORITATIVE USER TURN", prompt)
+
+        coverage_prompt = resolver._build_responsibility_coverage_prompt(
+            request=req,
+            raw=create_goals(
+                goal(
+                    "move forward for 10 seconds",
+                    "body_action",
+                    bindings=[
+                        binding("distance_duration", "duration", "10 秒")
+                    ],
+                )
+            ),
+        )
+        coverage_input_chars = len(coverage_prompt) + len(
+            resolver._responsibility_coverage_system_prompt()
+        )
+        self.assertLessEqual(coverage_input_chars, 11_264)
+        self.assertIn("Duration is never a second outcome", coverage_prompt)
+
+    def test_existing_goal_association_prompt_fits_qualified_8k_preflight(self):
+        resolver = GoalAssociationResolver(FakeOllama({}))
+        req = request(
+            "刚才那个事情继续。",
+            active_goals=[active_goal("goal-walk", "往前走十秒")],
+        )
+        req = req.model_copy(
+            update={
+                "responsibilities": typed_responsibilities(
+                    {
+                        "local_ref": "r1",
+                        "outcome": "continue moving forward for ten seconds",
+                        "bindings": {
+                            "direction": "forward",
+                            "distance_duration": "10 秒",
+                        },
+                        "output_mode": "body_action",
+                        "relationship": "continue",
+                        "target_goal_ids": ["goal-walk"],
+                        "completion_requires_work": True,
+                        "completion_requires_fresh_evidence": False,
+                        "confidence": 1.0,
+                    }
+                ),
+                "context": {
+                    **req.context,
+                    "history": [
+                        {
+                            "role": "user",
+                            "text": "你往前走 10 秒。",
+                            "metadata": {
+                                "turn_envelope": "runtime transport must not leak"
+                            },
+                        },
+                        {
+                            "role": "assistant",
+                            "text": "好，我这就往前走十秒。",
+                        },
+                    ],
+                },
+            }
+        )
+        candidates = resolver._candidate_goals(req)
+        layered = resolver._layered_prompt(
+            req,
+            candidates,
+            output_type=GoalAssociationModelOutput,
+        )
+        input_chars = len(layered.render()) + len(
+            resolver._system_prompt(GoalAssociationModelOutput)
+        )
+
+        self.assertLessEqual(input_chars, 11_264)
+        prompt = layered.render()
+        self.assertIn("Verify GI relationship", prompt)
+        self.assertIn('"relationship":"continue"', prompt)
+        self.assertIn('"goal_id":"goal-walk"', prompt)
+        self.assertIn("好，我这就往前走十秒。", prompt)
+        self.assertNotIn("runtime transport must not leak", prompt)
+        self.assertNotIn("Owner-approved Personality Expression JSON", prompt)
+
+        schema = resolver._response_schema(
+            GoalAssociationModelOutput,
+            candidates,
+            [],
+            responsibility_count=1,
+            responsibility_refs=["r1"],
+            responsibility_output_modes={"r1": "body_action"},
+            responsibility_bindings={
+                "r1": {"direction": "forward", "distance_duration": "10 秒"}
+            },
+        )
+        association_schema = schema["$defs"]["GoalAssociationModelAssociation"]
+        self.assertIn("confidence", association_schema["required"])
+        self.assertIn("target_goal_ids", association_schema["required"])
 
 
 
@@ -1290,6 +2334,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
                 0,
                 coverage="missing",
                 independently_satisfiable=True,
+                required_goal_shape="information_resource",
             ),
         )
         corrected = create_goals(
@@ -1321,7 +2366,11 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             coverage_item(
                 "我在重庆", role="context", independently_satisfiable=False
             ),
-            coverage_item("今天晚上有大雨吗？", 0),
+            coverage_item(
+                "今天晚上有大雨吗？",
+                0,
+                required_goal_shape="information_resource",
+            ),
         )
         ollama = ScriptedOllama(
             [initial, rejected_coverage, corrected, final_coverage]
@@ -1588,6 +2637,31 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             ],
         )
 
+    def test_ordinary_coverage_cannot_certify_a_physical_resource_wrapper(self):
+        req = request("Walk forward.", language="en-US")
+        mistaken = GoalAssociationModelGoal.model_validate(
+            goal(
+                "Walk forward.",
+                "body_action",
+                resource=resource_responsibility(
+                    description="walking motion",
+                    quantity="",
+                ),
+            )
+        )
+
+        result = GoalAssociationResolver._validate_coverage_certificate(
+            certificate(coverage_item("Walk forward.", 0)),
+            request=req,
+            goal_count=1,
+            candidate_goals=[mistaken],
+        )
+
+        self.assertEqual(
+            result.responsibility_items[0].coverage,
+            "representation_mismatch",
+        )
+
     def test_primary_dto_gets_exactly_one_contract_repair(self):
         invalid = create_goals(goal("Blink twice.", "invalid_mode"))
         valid = create_goals(goal("Blink twice.", "body_action"))
@@ -1611,6 +2685,74 @@ class GoalAssociationTransactionTests(unittest.TestCase):
                 "goal_association.contract_repair",
                 "goal_association.responsibility_coverage",
             ],
+        )
+
+    def test_primary_cannot_drop_direct_gi_binding_into_goal_prose(self):
+        missing = create_goals(
+            goal("Move forward for 10 seconds.", "body_action")
+        )
+        repaired = create_goals(
+            goal(
+                "Move forward for 10 seconds.",
+                "body_action",
+                bindings=[binding("duration", "duration", "10 seconds")],
+            )
+        )
+        accepted = certificate(coverage_item("Move forward for 10 seconds", 0))
+        ollama = ScriptedOllama([missing, repaired, accepted])
+        req = request("Move forward for 10 seconds.", language="en-US").model_copy(
+            update={
+                "responsibilities": typed_responsibilities(
+                    {
+                        "local_ref": "r1",
+                        "outcome": "move forward for ten seconds",
+                        "bindings": {"duration": "10 seconds"},
+                        "output_mode": "body_action",
+                        "completion_requires_work": True,
+                        "confidence": 0.95,
+                    }
+                )
+            }
+        )
+
+        result = self._resolve(ollama, req)
+
+        self.assertEqual(result.resolution_status, "resolved")
+        self.assertEqual(
+            result.new_goals[0].object["bindings"]["duration"]["value"],
+            "10 seconds",
+        )
+        self.assert_transaction(
+            result,
+            ollama,
+            terminal="resolved",
+            families=[
+                "goal_association.primary",
+                "goal_association.contract_repair",
+                "goal_association.responsibility_coverage",
+            ],
+        )
+
+    def test_response_schema_requires_source_grounded_ordinary_bindings(self):
+        schema = GoalAssociationResolver._response_schema(
+            GoalSegmentationModelOutput,
+            [],
+            [],
+            responsibility_count=1,
+            responsibility_refs=["r1"],
+            responsibility_output_modes={"r1": "body_action"},
+            responsibility_bindings={"r1": {"duration": "10 秒"}},
+        )
+
+        ordinary_branch = schema["$defs"]["GoalAssociationModelGoal"]["oneOf"][0]
+        bindings = ordinary_branch["properties"]["bindings"]
+        self.assertEqual(bindings["minItems"], 1)
+        self.assertEqual(
+            bindings["allOf"][0]["contains"]["properties"],
+            {
+                "name": {"const": "duration"},
+                "value": {"const": "10 秒"},
+            },
         )
 
     def test_invalid_contract_repair_fails_closed_without_third_call(self):
@@ -1835,43 +2977,66 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             goal(
                 "Check Chongqing weather this morning.",
                 "capability_work",
-                bindings=[
-                    binding("location", "location", "重庆"),
-                    binding("date", "date", "today"),
-                    binding("day_part", "day_part", "morning"),
-                ],
+                resource=resource_responsibility(
+                    kind="information",
+                    description="Chongqing weather this morning",
+                    attributes=[
+                        binding("location", "location", "重庆"),
+                        binding("date", "date", "today"),
+                        binding("day_part", "day_part", "morning"),
+                    ],
+                    source_status="provider_resolved",
+                ),
             )
         )
         rejected = certificate(
+            coverage_item(
+                "重庆会不会下雨",
+                0,
+                required_goal_shape="information_resource",
+            ),
             coverage_item(
                 "今天上午",
                 0,
                 role="constraint",
                 coverage="representation_mismatch",
                 independently_satisfiable=False,
+                temporal_dimensions=["date", "day_part"],
             )
         )
         invalid_fresh = create_goals(
             goal(
                 "Check Chongqing weather this morning.",
                 "capability_work",
-                bindings=[
-                    binding("location", "location", "重庆"),
-                    binding("date", "date", "今天"),
-                    binding("day_part", "day_part", "morning"),
-                ],
+                resource=resource_responsibility(
+                    kind="information",
+                    description="Chongqing weather this morning",
+                    attributes=[
+                        binding("location", "location", "重庆"),
+                        binding("date", "date", "今天"),
+                        binding("day_part", "day_part", "morning"),
+                    ],
+                    source_status="provider_resolved",
+                ),
             )
         )
         repaired = {
             "repairs": [
                 {
-                    "path": "$.new_goals[0].bindings[1].value",
+                    "path": (
+                        "$.new_goals[0].resource_responsibility."
+                        "query_scope[1].value"
+                    ),
                     "value": "today",
                 }
             ]
         }
         accepted = certificate(
-            coverage_item("今天上午重庆会不会下雨", 0)
+            coverage_item(
+                "今天上午重庆会不会下雨",
+                0,
+                required_goal_shape="information_resource",
+            )
         )
         ollama = ScriptedOllama(
             [first, rejected, invalid_fresh, repaired, accepted]
@@ -1884,14 +3049,17 @@ class GoalAssociationTransactionTests(unittest.TestCase):
 
         self.assertEqual(result.resolution_status, "resolved")
         self.assertEqual(
-            result.new_goals[0].object["bindings"]["date"]["value"],
+            result.new_goals[0]
+            .resource_responsibility.resource.attributes["date"]["value"],
             "today",
         )
         self.assertEqual(
             result.metadata["fresh_temporal_contract_repair"],
             {
                 "strategy": "bounded_same_stage_dto_repair",
-                "changed_fields": ["$.new_goals[0].bindings[1].value"],
+                "changed_fields": [
+                    "$.new_goals[0].resource_responsibility.query_scope[1].value"
+                ],
                 "semantic_fields_unchanged": True,
             },
         )
@@ -1917,6 +3085,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             )
         )
         rejected = certificate(
+            coverage_item("重庆会不会下雨", 0),
             coverage_item(
                 "今天上午",
                 0,
@@ -2076,7 +3245,11 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
                 ),
                 certificate(
                     coverage_item("去往前走个100米", 0, role="constraint"),
-                    coverage_item("帮我拿杯水过来", 0),
+                    coverage_item(
+                        "帮我拿杯水过来",
+                        0,
+                        required_goal_shape="physical_resource",
+                    ),
                 ),
             ],
             request(
@@ -2116,7 +3289,11 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
                     )
                 ),
                 certificate(
-                    coverage_item("bring me a bottle of water", 0),
+                    coverage_item(
+                        "bring me a bottle of water",
+                        0,
+                        required_goal_shape="physical_resource",
+                    ),
                     coverage_item(
                         "the water is 100 meters ahead of you",
                         0,
@@ -2164,7 +3341,11 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
                 ),
                 certificate(
                     coverage_item("Walk 100 meters for exercise", 0),
-                    coverage_item("bring the bottle from the table to me", 1),
+                    coverage_item(
+                        "bring the bottle from the table to me",
+                        1,
+                        required_goal_shape="physical_resource",
+                    ),
                 ),
             ],
             request(
@@ -2197,7 +3378,13 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
                 create_goals(
                     goal("查询并解释重庆明天的天气。", "capability_work", resource=weather)
                 ),
-                certificate(coverage_item("查重庆明天天气", 0)),
+                certificate(
+                    coverage_item(
+                        "查重庆明天天气",
+                        0,
+                        required_goal_shape="information_resource",
+                    )
+                ),
             ],
             request(
                 "帮我查重庆明天天气。",
@@ -2206,7 +3393,14 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
 
         canonical = result.new_goals[0].resource_responsibility
         self.assertEqual(canonical.resource.kind, "information")
-        self.assertEqual(set(canonical.resource.attributes), {"location", "date"})
+        self.assertEqual(
+            set(canonical.resource.attributes),
+            {"location", "date", "information_domain"},
+        )
+        self.assertEqual(
+            canonical.resource.attributes["information_domain"]["value"],
+            "weather_forecast",
+        )
         self.assertEqual(canonical.resource.attributes["date"]["value"], "tomorrow")
         self.assertEqual(canonical.source.status, "provider_resolved")
         self.assertEqual(canonical.source.bindings, {})
@@ -2238,6 +3432,7 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
                         "please help me check whether it will rain tonight and whether it it cold",
                         0,
                         independently_satisfiable=False,
+                        required_goal_shape="information_resource",
                     ),
                 ),
             ],
@@ -2250,9 +3445,11 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
         self.assertEqual(len(result.new_goals), 1)
         semantic = result.new_goals[0]
         self.assertEqual(semantic.metadata["output_mode"], "capability_work")
+        self.assertTrue(semantic.metadata["completion_requires_work"])
+        self.assertFalse(semantic.metadata["completion_requires_fresh_evidence"])
         self.assertEqual(
             set(semantic.resource_responsibility.resource.attributes),
-            {"location", "time", "aspects"},
+            {"location", "time", "aspects", "information_domain"},
         )
 
     def test_user_joke_probe_acknowledges_tired_context_without_goal_ownership(self):
@@ -2306,12 +3503,53 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
         self.assertEqual(result.new_goals, [])
         self.assertEqual(len(ollama.prompts), 1)
 
+    def test_associate_discriminant_mechanically_drops_inactive_new_goal_branch(self):
+        ollama = ScriptedOllama(
+            [
+                {
+                    "decision": "associate",
+                    "associations": [
+                        {
+                            "relationship": "continue",
+                            "source_responsibility_refs": ["r1"],
+                            "target_goal_ids": ["goal-a"],
+                            "confidence": 0.95,
+                            "reason_summary": "Continue the unfinished task.",
+                        }
+                    ],
+                    "new_goals": [
+                        goal(
+                            "Inactive decoder branch must not double-map r1.",
+                            "speech",
+                        )
+                    ],
+                    "confidence": 0.95,
+                }
+            ]
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request("Continue.", active_goals=[active_goal("goal-a", "Do A")])
+            )
+        )
+
+        self.assertEqual(result.resolution_status, "resolved")
+        self.assertEqual(len(result.associations), 1)
+        self.assertEqual(result.new_goals, [])
+        self.assertEqual(len(ollama.prompts), 1)
+
     def test_explicit_location_preserves_referent_provenance(self):
         payload = create_goals(
             goal(
                 "Check 重庆 weather.",
                 "capability_work",
-                bindings=[binding("location", "location", "重庆")],
+                resource=resource_responsibility(
+                    kind="information",
+                    description="重庆 weather",
+                    attributes=[binding("location", "location", "重庆")],
+                    source_status="provider_resolved",
+                ),
             )
         )
         payload["referent_updates"] = [
@@ -2324,14 +3562,24 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
             }
         ]
         result = self._resolve(
-            [payload, certificate(coverage_item("Check 重庆 weather", 0))],
+            [
+                payload,
+                certificate(
+                    coverage_item(
+                        "Check 重庆 weather",
+                        0,
+                        required_goal_shape="information_resource",
+                    )
+                ),
+            ],
             request("Check 重庆 weather.", language="en-US"),
         )
 
         referent = result.referent_updates[0].referent
         self.assertIsNotNone(referent)
         self.assertEqual(
-            result.new_goals[0].object["bindings"]["location"]["referent_id"],
+            result.new_goals[0]
+            .resource_responsibility.resource.attributes["location"]["referent_id"],
             referent.referent_id,
         )
 

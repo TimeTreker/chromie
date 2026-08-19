@@ -72,6 +72,91 @@
             "similar movement"
           ],
           "description": "ASR-style typo should be understood as a walking request when the live catalog supports walking."
+        },
+        {
+          "id": "user_probe_repeat_last_utterance",
+          "description": "Chromie must repeat or accurately summarize what she actually delivered, not invent an earlier sentence or expose internal planner text.",
+          "turns": [
+            {
+              "id": "repeat_context_greeting",
+              "text": "你好，Chromie。",
+              "language": "zh-CN",
+              "expect_no_capabilities": true,
+              "require_speech": true
+            },
+            {
+              "id": "repeat_delivered_speech",
+              "text": "你刚才说什么？",
+              "language": "zh-CN",
+              "expect_no_capabilities": true,
+              "expected_speech_any": [
+                "刚才",
+                "说",
+                "你好"
+              ],
+              "expected_repeat_of_previous_speech": true,
+              "min_new_goal_count": 1,
+              "min_goal_outcome_count": 1
+            }
+          ]
+        },
+        {
+          "id": "user_probe_tired_social_response",
+          "text": "我有点累。",
+          "language": "zh-CN",
+          "expect_no_capabilities": true,
+          "expected_speech_any": [
+            "累",
+            "休息",
+            "歇",
+            "陪"
+          ],
+          "min_new_goal_count": 1,
+          "min_goal_outcome_count": 1,
+          "description": "A personal feeling is a fresh social Responsibility; Chromie should respond warmly without treating it as a body command, diagnosis, or empty turn."
+        },
+        {
+          "id": "user_probe_continue_recent_walk",
+          "description": "An indirect continuation must bind to the one retained unfinished walking Goal rather than create a generic new task.",
+          "turns": [
+            {
+              "id": "continue_walk_context",
+              "text": "你往前走 10 秒。",
+              "language": "zh-CN",
+              "expected_capabilities": [
+                "soridormi.walk_forward"
+              ],
+              "expected_args": [
+                "0:duration_s=10.0"
+              ]
+            },
+            {
+              "id": "continue_recent_walk",
+              "text": "刚才那个事情继续。",
+              "language": "zh-CN",
+              "expected_capabilities": [
+                "soridormi.walk_forward"
+              ],
+              "expected_args": [
+                "0:duration_s=10.0"
+              ],
+              "expected_speech_any": [
+                "继续往前",
+                "继续向前",
+                "接着往前",
+                "接着向前"
+              ],
+              "forbidden_speech_any": [
+                "刚才那个事情",
+                "刚才那个动作",
+                "接着说",
+                "继续说",
+                "接着讲",
+                "继续讲"
+              ],
+              "min_goal_outcome_count": 1
+            }
+          ]
         }
       ]
     },
@@ -156,6 +241,20 @@
             "quick"
           ],
           "description": "Clean walking request should preserve duration and speed."
+        },
+        {
+          "id": "user_probe_walk_forward_ten_seconds",
+          "text": "你往前走 10 秒。",
+          "language": "zh-CN",
+          "expected_capabilities": [
+            "soridormi.walk_forward"
+          ],
+          "expected_args": [
+            "0:duration_s=10.0"
+          ],
+          "min_new_goal_count": 1,
+          "min_goal_outcome_count": 1,
+          "description": "The supplied Chinese motion probe must preserve its direction and duration in one catalog-backed body Goal."
         }
       ]
     },
@@ -234,6 +333,34 @@
             "what"
           ],
           "description": "A low-information fragment should clarify instead of becoming blink or another nearby skill."
+        },
+        {
+          "id": "user_probe_unknown_people_outside",
+          "text": "你觉得外面有人吗？",
+          "language": "zh-CN",
+          "expected_routes": [
+            "refused"
+          ],
+          "expect_no_capabilities": true,
+          "expected_speech_any": [
+            "不确定",
+            "不知道",
+            "看不到",
+            "没法确认",
+            "听不到",
+            "无法判断",
+            "不能判断",
+            "帮不了"
+          ],
+          "forbidden_speech_any": [
+            "我看到了",
+            "我听到了",
+            "肯定有人",
+            "确定没人"
+          ],
+          "min_new_goal_count": 1,
+          "min_goal_outcome_count": 1,
+          "description": "Without trusted local perception Evidence, Chromie must preserve uncertainty instead of inventing a person outside."
         }
       ]
     },
@@ -379,6 +506,67 @@
               "description": "The new turn must preserve walking, blinking, and spoken performance without stale weather provenance or partial overclaim."
             }
           ]
+        },
+        {
+          "id": "user_probe_walk_while_singing",
+          "text": "边走边唱歌。",
+          "language": "zh-CN",
+          "expected_capabilities": [
+            "soridormi.walk_forward"
+          ],
+          "expected_observations": [
+            {
+              "type": "locomotion.walk_forward"
+            },
+            {
+              "type": "speech.output"
+            }
+          ],
+          "min_new_goal_count": 2,
+          "min_goal_outcome_count": 2,
+          "description": "Walking and a requested vocal performance are independent simultaneous outcomes; unavailable singing must stay explicit rather than disappearing or becoming ordinary TTS."
+        },
+        {
+          "id": "user_probe_fetch_milk_fifty_meters",
+          "text": "there is a bottle of milk ahead of you about 50 meters, please bring it to me",
+          "language": "en-US",
+          "expected_capabilities": [
+            "soridormi.acquire_and_deliver_resource"
+          ],
+          "min_new_goal_count": 1,
+          "min_goal_outcome_count": 1,
+          "description": "The bottle, approximate fifty-meter acquisition constraint, and recipient must remain one physical acquire-and-deliver Responsibility rather than fragmented navigation and grasp Goals."
+        },
+        {
+          "id": "user_probe_walk_sing_blink_simultaneously",
+          "text": "walk ahead for 15 seconds quickly, singing and blinking eyes simulatiously",
+          "language": "en-US",
+          "expected_capabilities": [
+            "soridormi.walk_forward",
+            "soridormi.blink_eyes"
+          ],
+          "expected_args": [
+            "0:duration_s=15.0",
+            "0:speed=quick"
+          ],
+          "expected_observations": [
+            {
+              "type": "locomotion.walk_forward",
+              "args": {
+                "duration_s": 15.0,
+                "speed": "quick"
+              }
+            },
+            {
+              "type": "social_attention.blink"
+            },
+            {
+              "type": "speech.output"
+            }
+          ],
+          "min_new_goal_count": 3,
+          "min_goal_outcome_count": 3,
+          "description": "The ASR-style simultaneous request must retain fast walking, blinking, and vocal performance as three complete outcomes and must not silently serialize or omit one."
         }
       ]
     },
@@ -446,6 +634,30 @@
           "min_new_goal_count": 1,
           "min_goal_outcome_count": 1,
           "description": "The originating Chongqing-tonight episode must either commit a truth-qualified prospective first response or remain silent, normalize tonight to date=today plus period=night, and schedule the trusted lookup without asking the user for the weather result."
+        },
+        {
+          "id": "user_probe_chongqing_tonight_hot",
+          "text": "今天晚上重庆热不热？",
+          "language": "zh-CN",
+          "expected_capabilities": [
+            "chromie.weather.lookup"
+          ],
+          "expected_args": [
+            "0:location=重庆",
+            "0:date=today",
+            "0:period=night"
+          ],
+          "require_fast_speech": true,
+          "expected_fast_speech_purposes": [
+            "acknowledge_and_check"
+          ],
+          "min_new_goal_count": 1,
+          "min_goal_outcome_count": 1,
+          "forbidden_speech_any": [
+            "已经查过",
+            "肯定很热"
+          ],
+          "description": "The supplied weather probe must acquire tonight's temperature Evidence and then judge heat from that requested period without guessing or answering from the current daytime condition."
         }
       ]
     },
@@ -569,7 +781,46 @@
           "rationale": "Rejected physical execution rolls back without leaking authority."
         }
       ],
-      "live_text_cases": []
+      "live_text_cases": [
+        {
+          "id": "user_probe_cancel_recent_walk",
+          "description": "A plain abandonment turn must deterministically cancel the retained foreground walking work without creating another semantic task.",
+          "turns": [
+            {
+              "id": "cancel_walk_context",
+              "text": "你往前走 10 秒。",
+              "language": "zh-CN",
+              "expected_capabilities": [
+                "soridormi.walk_forward"
+              ],
+              "expected_args": [
+                "0:duration_s=10.0"
+              ]
+            },
+            {
+              "id": "cancel_recent_walk",
+              "text": "算了，不用了。",
+              "language": "zh-CN",
+              "expect_no_capabilities": true,
+              "require_speech": false,
+              "forbidden_speech_any": [
+                "已经完成",
+                "继续走"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "user_probe_silent_come_here",
+          "text": "别说话，过来。",
+          "language": "zh-CN",
+          "expect_no_capabilities": true,
+          "require_speech": false,
+          "expect_no_speech": true,
+          "forbid_fast_speech": true,
+          "description": "The negative speech boundary is deterministic. With no trusted speaker target location, Chromie must neither talk nor invent a direction of travel."
+        }
+      ]
     },
     {
       "id": "evidence_coverage_and_claim_discipline",
@@ -608,7 +859,29 @@
           "rationale": "Overlapping ordinary turns preserve each independent outcome."
         }
       ],
-      "live_text_cases": []
+      "live_text_cases": [
+        {
+          "id": "user_probe_current_local_time",
+          "text": "帮我看看现在几点。",
+          "language": "zh-CN",
+          "require_speech": true,
+          "require_fast_speech": true,
+          "expected_capabilities": [
+            "chromie.clock.local"
+          ],
+          "min_new_goal_count": 1,
+          "min_goal_outcome_count": 1,
+          "forbidden_speech_any": [
+            "作为AI",
+            "系统时间",
+            "模型",
+            "手机",
+            "屏幕",
+            "天气"
+          ],
+          "description": "The current-time probe must be judged against retained trusted clock Evidence; fluent model guessing is a hard failure even when the spoken time happens to look plausible."
+        }
+      ]
     },
     {
       "id": "multi_goal_daily_life",

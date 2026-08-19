@@ -13,12 +13,14 @@ try:
     from chromie_contracts.interaction import (
         CapabilityIdentityModel,
         MEDIA_CAPABILITY_IDS,
+        VOCAL_MODES,
         VOCAL_PERFORMANCE_CAPABILITY_ID,
     )
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.interaction import (
         CapabilityIdentityModel,
         MEDIA_CAPABILITY_IDS,
+        VOCAL_MODES,
         VOCAL_PERFORMANCE_CAPABILITY_ID,
     )
 
@@ -200,10 +202,19 @@ class PlannerCommunicationReview(BaseModel):
 # a ``respond`` outcome. Executable outcomes may also carry prospective
 # ``response_text``; that speech never authorizes or proves the effect.
 NON_PLANNER_TRANSPORT_CAPABILITY_IDS = frozenset({"chromie.speak"})
+# User stop/cancel is admitted and targeted by Cognitive Gateway's deterministic
+# reflex contract. Exposing the live named stop as a semantic Planner option lets
+# unrelated meaning become robot motion. Keep this operational control out of
+# model-authored task plans; the deterministic reflex path retains authority.
+DETERMINISTIC_CONTROL_CAPABILITY_IDS = frozenset({"soridormi.stop"})
 
 
 def is_planner_step_capability(capability_id: str) -> bool:
-    return str(capability_id or "").strip() not in NON_PLANNER_TRANSPORT_CAPABILITY_IDS
+    normalized = str(capability_id or "").strip()
+    return normalized not in (
+        NON_PLANNER_TRANSPORT_CAPABILITY_IDS
+        | DETERMINISTIC_CONTROL_CAPABILITY_IDS
+    )
 
 
 
@@ -336,7 +347,9 @@ class PlannerModelGoalOutcome(BaseModel):
                     "clarify goal outcome requires an unresolved need or response_text"
                 )
         elif self.step_ids:
-            raise ValueError("unavailable and refused goal outcomes must not reference steps")
+            raise ValueError(
+                "unavailable and refused goal outcomes must not reference steps"
+            )
         return self
 
 
@@ -415,8 +428,9 @@ class PlannerModelOutput(BaseModel):
         ]
         if response_transport_steps:
             raise ValueError(
-                "generic response transport is not an executable task-plan capability; "
-                "represent conversational goals with respond outcomes and response_text: "
+                "generic response transport or deterministic operational control is not an "
+                "executable model-authored task-plan capability; represent conversation "
+                "with respond outcomes and route stop/cancel through deterministic control: "
                 + ",".join(response_transport_steps)
             )
         if self.coverage != "complete" and self.steps:
@@ -427,6 +441,17 @@ class PlannerModelOutput(BaseModel):
             raise ValueError("mixed planner output requires steps and goal_outcomes")
         if self.disposition == "respond" and not self.response_text.strip():
             raise ValueError("respond planner output requires response_text")
+        if self.disposition in {"clarify", "unavailable", "refused"} and not (
+            self.response_text.strip()
+            or any(
+                outcome.response_text.strip()
+                for outcome in self.goal_outcomes.values()
+            )
+        ):
+            raise ValueError(
+                f"{self.disposition} planner output requires exact "
+                "Planner-owned response_text"
+            )
         if self.disposition not in {"execute", "mixed"} and self.steps:
             raise ValueError(f"{self.disposition} planner output must not carry executable steps")
         if self.disposition == "escalate" and not self.escalation_reason.strip():
@@ -1121,6 +1146,217 @@ class ResourceResponsibilityRequiresCompositionError(
     """The Goal is coverable only by composing multiple advertised capabilities."""
 
 
+def qualify_capability_catalog_for_output_modes(
+    capabilities: list[dict[str, Any]],
+    *,
+    authoritative_goals: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Remove capabilities whose typed lane cannot serve any current Goal.
+
+    Goal Association already owns each Goal's provider-neutral output mode. The
+    catalog owns executable route and semantic-scope metadata. Intersecting those
+    declarations prevents an information tool from becoming decorative body work,
+    or a body action from standing in for an exact vocal/media provider, without
+    inferring intent from user phrases or capability names.
+    """
+
+    output_modes = {
+        " ".join(
+            str((goal.get("metadata") or {}).get("output_mode") or "")
+            .strip()
+            .split()
+        )
+        for goal in authoritative_goals
+        if isinstance(goal, dict) and isinstance(goal.get("metadata"), dict)
+    }
+    output_modes.discard("")
+    if not output_modes or "other" in output_modes:
+        return list(capabilities)
+
+    has_body = "body_action" in output_modes
+    has_information = "capability_work" in output_modes
+    has_media = "media_playback" in output_modes
+    has_provider_vocal = bool(
+        output_modes.intersection(set(VOCAL_MODES) - {"speech"})
+    )
+    qualified: list[dict[str, Any]] = []
+    for capability in capabilities:
+        if not isinstance(capability, dict):
+            continue
+        capability_id = " ".join(
+            str(capability.get("capability_id") or "").strip().split()
+        )
+        route = " ".join(str(capability.get("route") or "").strip().split())
+        hints = capability.get("hints")
+        hints = hints if isinstance(hints, dict) else {}
+        scope = capability.get("semantic_scope")
+        if not isinstance(scope, dict) or not scope:
+            scope = hints.get("semantic_scope")
+        scope = scope if isinstance(scope, dict) else {}
+        responsibility_type = " ".join(
+            str(scope.get("responsibility_type") or "").strip().split()
+        )
+        resource_kinds = {
+            " ".join(str(item or "").strip().split())
+            for item in scope.get("resource_kinds") or []
+        }
+        is_information = (
+            responsibility_type == "acquire_and_deliver_resource"
+            and "information" in resource_kinds
+        ) or route in {"tool", "memory"}
+        is_vocal = capability_id == VOCAL_PERFORMANCE_CAPABILITY_ID
+        is_media = capability_id in set(MEDIA_CAPABILITY_IDS.values())
+        if is_vocal:
+            if has_provider_vocal:
+                qualified.append(capability)
+            continue
+        if is_media:
+            if has_media:
+                qualified.append(capability)
+            continue
+        if is_information:
+            if has_information:
+                qualified.append(capability)
+            continue
+        if route == "robot_action":
+            if has_body:
+                qualified.append(capability)
+            continue
+        # Unknown provider-neutral routes remain visible only for capability work;
+        # their later semantic/resource validators still decide applicability.
+        if has_information:
+            qualified.append(capability)
+    return qualified
+
+
+def qualify_capability_catalog_for_information_domains(
+    capabilities: list[dict[str, Any]],
+    *,
+    authoritative_goals: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Remove explicitly wrong-domain information providers before planning.
+
+    Goal Association has already authored the information domain. A Capability
+    that explicitly declares a different domain is therefore inapplicable, not
+    an alternative for the Planner to consider. Capabilities without a declared
+    domain remain visible because another typed contract or the Planner may still
+    establish their applicability. With multiple information Goals, a Capability
+    is retained when its domain matches at least one of them; per-Goal ownership
+    remains subject to the normal resource-grounding validator.
+    """
+
+    required_domains: set[str] = set()
+    for goal in authoritative_goals:
+        if not isinstance(goal, dict):
+            continue
+        responsibility = goal.get("resource_responsibility")
+        responsibility = responsibility if isinstance(responsibility, dict) else {}
+        resource = responsibility.get("resource")
+        resource = resource if isinstance(resource, dict) else {}
+        if " ".join(str(resource.get("kind") or "").strip().split()) != "information":
+            continue
+        attributes = resource.get("attributes")
+        attributes = attributes if isinstance(attributes, dict) else {}
+        domain = attributes.get("information_domain")
+        domain = domain if isinstance(domain, dict) else {}
+        value = " ".join(str(domain.get("value") or "").strip().split())
+        if value:
+            required_domains.add(value)
+
+    if not required_domains:
+        return list(capabilities)
+
+    qualified: list[dict[str, Any]] = []
+    for capability in capabilities:
+        if not isinstance(capability, dict):
+            continue
+        hints = capability.get("hints")
+        metadata = capability.get("metadata")
+        hints = hints if isinstance(hints, dict) else {}
+        metadata = metadata if isinstance(metadata, dict) else {}
+        scope = capability.get("semantic_scope")
+        if not isinstance(scope, dict) or not scope:
+            scope = hints.get("semantic_scope")
+        if not isinstance(scope, dict) or not scope:
+            scope = metadata.get("semantic_scope")
+        scope = scope if isinstance(scope, dict) else {}
+        domain = " ".join(str(scope.get("domain") or "").strip().split())
+        if domain and domain not in required_domains:
+            continue
+        qualified.append(capability)
+    return qualified
+
+
+def information_goal_ids_without_declared_provider(
+    capabilities: list[dict[str, Any]],
+    *,
+    authoritative_goals: list[dict[str, Any]],
+) -> set[str]:
+    """Return typed information Goals with no matching declared provider.
+
+    This is a contract lookup, not semantic intent inference: the information
+    domain, responsibility type, and resource kind were already authored by Goal
+    Association, and provider applicability comes only from Capability metadata.
+    """
+
+    declared_scopes: list[dict[str, Any]] = []
+    for capability in capabilities:
+        if not isinstance(capability, dict):
+            continue
+        hints = capability.get("hints")
+        metadata = capability.get("metadata")
+        hints = hints if isinstance(hints, dict) else {}
+        metadata = metadata if isinstance(metadata, dict) else {}
+        scope = capability.get("semantic_scope")
+        if not isinstance(scope, dict) or not scope:
+            scope = hints.get("semantic_scope")
+        if not isinstance(scope, dict) or not scope:
+            scope = metadata.get("semantic_scope")
+        if isinstance(scope, dict) and scope:
+            declared_scopes.append(scope)
+
+    unavailable: set[str] = set()
+    for goal in authoritative_goals:
+        if not isinstance(goal, dict):
+            continue
+        goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
+        responsibility = goal.get("resource_responsibility")
+        responsibility = responsibility if isinstance(responsibility, dict) else {}
+        resource = responsibility.get("resource")
+        resource = resource if isinstance(resource, dict) else {}
+        kind = " ".join(str(resource.get("kind") or "").strip().split())
+        attributes = resource.get("attributes")
+        attributes = attributes if isinstance(attributes, dict) else {}
+        binding = attributes.get("information_domain")
+        binding = binding if isinstance(binding, dict) else {}
+        domain = " ".join(str(binding.get("value") or "").strip().split())
+        responsibility_type = " ".join(
+            str(responsibility.get("responsibility_type") or "").strip().split()
+        )
+        if not goal_id or kind != "information" or not domain:
+            continue
+        matching_provider = any(
+            " ".join(str(scope.get("domain") or "").strip().split()) == domain
+            and " ".join(
+                str(scope.get("responsibility_type") or "").strip().split()
+            )
+            == responsibility_type
+            and kind
+            in {
+                " ".join(str(value or "").strip().split())
+                for value in (
+                    scope.get("resource_kinds")
+                    if isinstance(scope.get("resource_kinds"), list)
+                    else []
+                )
+            }
+            for scope in declared_scopes
+        )
+        if not matching_provider:
+            unavailable.add(goal_id)
+    return unavailable
+
+
 def validate_resource_responsibility_capability_grounding(
     output: PlannerModelOutput,
     *,
@@ -1177,6 +1413,7 @@ def validate_resource_responsibility_capability_grounding(
         expected_type: str,
         expected_kind: str,
         expected_delivery: str,
+        expected_information_domain: str,
         allow_legacy_full: bool,
     ) -> tuple[list[str], set[str], set[str], set[str], str]:
         scope, contract = capability_contract(candidate)
@@ -1193,6 +1430,19 @@ def validate_resource_responsibility_capability_grounding(
             errors.append(
                 "semantic_scope.resource_kinds does not include "
                 f"{expected_kind!r}"
+            )
+        capability_domain = " ".join(
+            str(scope.get("domain") or "").strip().split()
+        )
+        if (
+            expected_kind == "information"
+            and expected_information_domain
+            and capability_domain
+            and capability_domain != expected_information_domain
+        ):
+            errors.append(
+                "semantic_scope.domain does not match canonical information domain "
+                f"{expected_information_domain!r}"
             )
         raw_delivery_modes = scope.get("delivery_modes")
         delivery_modes = {
@@ -1267,6 +1517,15 @@ def validate_resource_responsibility_capability_grounding(
             str(responsibility.get("responsibility_type") or "").strip().split()
         )
         expected_kind = " ".join(str(resource.get("kind") or "").strip().split())
+        resource_attributes = resource.get("attributes")
+        resource_attributes = (
+            resource_attributes if isinstance(resource_attributes, dict) else {}
+        )
+        domain_binding = resource_attributes.get("information_domain")
+        domain_binding = domain_binding if isinstance(domain_binding, dict) else {}
+        expected_information_domain = " ".join(
+            str(domain_binding.get("value") or "").strip().split()
+        )
         expected_delivery = " ".join(
             str(responsibility.get("delivery_mode") or "").strip().split()
         )
@@ -1290,6 +1549,7 @@ def validate_resource_responsibility_capability_grounding(
                         expected_type=expected_type,
                         expected_kind=expected_kind,
                         expected_delivery=expected_delivery,
+                        expected_information_domain=expected_information_domain,
                         allow_legacy_full=True,
                     )
                 )
@@ -1362,6 +1622,7 @@ def validate_resource_responsibility_capability_grounding(
                     expected_type=expected_type,
                     expected_kind=expected_kind,
                     expected_delivery=expected_delivery,
+                    expected_information_domain=expected_information_domain,
                     allow_legacy_full=len(owned_steps) == 1,
                 )
             )
@@ -1548,6 +1809,89 @@ def canonical_resource_argument_response_schema(
             "read-only projections and require no Planner-authored resolutions."
         )
     return schema
+
+
+def _argument_schema_accepts_canonical_binding(
+    argument_schema: dict[str, Any],
+    value: Any,
+) -> bool:
+    """Return whether a binding can be copied without semantic conversion."""
+
+    if "const" in argument_schema:
+        return argument_schema["const"] == value
+    enum = argument_schema.get("enum")
+    if isinstance(enum, list):
+        return value in enum
+    value_type = argument_schema.get("type")
+    if value_type == "string":
+        return isinstance(value, str)
+    if value_type == "boolean":
+        return isinstance(value, bool)
+    if value_type == "integer":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if value_type == "number":
+        return isinstance(value, (int, float, Decimal)) and not isinstance(value, bool)
+    return False
+
+
+def canonical_goal_binding_argument_response_schema(
+    base_schema: dict[str, Any],
+    *,
+    authoritative_goals: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Project exact, same-name Goal bindings into compatible step branches.
+
+    This is a read-only DTO projection, not semantic argument mapping. Values are
+    constrained only when every current Goal using that binding name agrees and
+    the Capability argument schema accepts the canonical value unchanged.
+    """
+
+    values_by_name: dict[str, list[Any]] = {}
+    for goal in authoritative_goals:
+        if not isinstance(goal, dict) or isinstance(
+            goal.get("resource_responsibility"), dict
+        ):
+            continue
+        for name, binding in _goal_binding_map(goal).items():
+            value = binding.get("value")
+            if not any(
+                _material_values_equal(existing, value, list_compatible=False)
+                for existing in values_by_name.setdefault(name, [])
+            ):
+                values_by_name[name].append(value)
+    exact_bindings = {
+        name: values[0]
+        for name, values in values_by_name.items()
+        if len(values) == 1
+    }
+    if not exact_bindings:
+        return base_schema
+
+    schema = copy.deepcopy(base_schema)
+    step_schema = schema.get("$defs", {}).get("PlannerModelStep")
+    branches = step_schema.get("oneOf") if isinstance(step_schema, dict) else None
+    if not isinstance(branches, list):
+        return base_schema
+
+    constrained = False
+    for branch in branches:
+        properties = branch.get("properties") if isinstance(branch, dict) else None
+        args = properties.get("args") if isinstance(properties, dict) else None
+        argument_properties = args.get("properties") if isinstance(args, dict) else None
+        if not isinstance(argument_properties, dict):
+            continue
+        required = args.setdefault("required", [])
+        for name, value in exact_bindings.items():
+            argument_schema = argument_properties.get(name)
+            if not isinstance(argument_schema, dict) or not (
+                _argument_schema_accepts_canonical_binding(argument_schema, value)
+            ):
+                continue
+            argument_properties[name] = {"const": copy.deepcopy(value)}
+            if isinstance(required, list) and name not in required:
+                required.append(name)
+            constrained = True
+    return schema if constrained else base_schema
 
 
 def resource_grounding_repair_response_schema(
@@ -2014,6 +2358,77 @@ async def review_coordinated_action_plan_coverage(
     sends Fast Planning to Deep Planning, or makes Deep Planning fail closed.
     """
 
+    plan_payload = plan.model_dump(
+        mode="json",
+        exclude={"metadata", "selected_agent_skills"},
+    )
+    terminal_non_effect_outcomes = [
+        item
+        for item in plan_payload.get("goal_outcomes", [])
+        if isinstance(item, dict)
+        and item.get("disposition") in {"unavailable", "refused"}
+    ]
+    effect_claim_outcomes = [
+        item
+        for item in plan_payload.get("goal_outcomes", [])
+        if isinstance(item, dict)
+        and item.get("disposition") not in {"unavailable", "refused"}
+    ]
+    effect_claim_goal_ids = {
+        str(item.get("goal_id") or "").strip()
+        for item in effect_claim_outcomes
+        if str(item.get("goal_id") or "").strip()
+    }
+    if not plan_payload.get("goal_outcomes"):
+        # The compact single-Goal Fast contract can omit the redundant outcome
+        # envelope.  In that shape the Plan's authoritative goal_ids identify
+        # the effect claims to audit.
+        effect_claim_goal_ids.update(
+            str(item or "").strip()
+            for item in plan_payload.get("goal_ids", [])
+            if str(item or "").strip()
+        )
+    effect_claim_goals = [
+        item
+        for item in authoritative_goals
+        if str(item.get("goal_id") or "").strip() in effect_claim_goal_ids
+    ]
+    authoritative_goals_by_id = {
+        str(item.get("goal_id") or "").strip(): item
+        for item in authoritative_goals
+        if str(item.get("goal_id") or "").strip()
+    }
+    terminal_non_effect_accounting = [
+        {
+            "authoritative_goal": authoritative_goals_by_id.get(
+                str(item.get("goal_id") or "").strip(),
+                {"goal_id": str(item.get("goal_id") or "").strip()},
+            ),
+            "terminal_outcome": item,
+        }
+        for item in terminal_non_effect_outcomes
+    ]
+    proposed_effect_claim_plan = {
+        "disposition": plan_payload.get("disposition"),
+        "coverage": plan_payload.get("coverage"),
+        "goal_ids": sorted(effect_claim_goal_ids),
+        "goal_outcomes": effect_claim_outcomes,
+        "steps": plan_payload.get("steps", []),
+        "response_text": plan_payload.get("response_text", ""),
+        "parameter_resolutions": plan_payload.get("parameter_resolutions", []),
+    }
+    selected_capability_ids = {
+        str(item.get("capability_id") or "").strip()
+        for item in proposed_effect_claim_plan["steps"]
+        if isinstance(item, dict)
+        and str(item.get("capability_id") or "").strip()
+    }
+    selected_capabilities = [
+        item
+        for item in capabilities
+        if str(item.get("capability_id") or "").strip()
+        in selected_capability_ids
+    ]
     prompt = json.dumps(
         {
             "responsibility": (
@@ -2036,9 +2451,29 @@ async def review_coordinated_action_plan_coverage(
                 "conversational delta, but it never substitutes for an effectful or "
                 "provider-backed responsibility and never proves execution. A direct "
                 "vocal_output Goal is completed by its respond outcome rather than "
-                "a response-transport task step. Unavailable or refused outcomes may "
-                "represent an unmet Goal only when satisfaction remains non-exact and "
-                "the wording does not promise the unavailable work. For a material "
+                "a response-transport task step. Audit effect claims only against the "
+                "Goals listed in effect_claim_goals. Every proposed step must be "
+                "necessary for a concrete observable outcome in one of those Goals. "
+                "Reject optional decoration, personality flourishes, social enhancement, "
+                "or attention/body expression that the Goal did not request; those "
+                "effects belong to a separate Social Attention owner. A broad body_action "
+                "mode alone never authorizes arbitrary body Capabilities. Audit only the "
+                "explicit Goal meaning, not a rationale claiming an extra step helps. "
+                "The supplied executable_capabilities list contains only Capabilities "
+                "actually selected by the immutable Plan. Never substitute, compare, "
+                "or name an unlisted alternative Capability. Judge the exact selected "
+                "capability_id and arguments as written. Runtime owns confirmation, "
+                "provider enablement, bounds, monitoring, interruption, and safety "
+                "preemption; do not invent a missing Planner step for those Runtime "
+                "duties and do not reject an otherwise exact Plan merely because "
+                "execution could later be interrupted. "
+                "An explicit unavailable or refused "
+                "outcome is terminal non-effect accounting, not a claim that a provider "
+                "will perform that Goal: do not reject it merely because no matching "
+                "Capability exists. It represents the unmet Goal only when it owns no "
+                "step, satisfaction remains non-exact, and the aggregate and per-Goal "
+                "wording truthfully disclose the limitation without promising the work. "
+                "Reject terminal accounting that violates those conditions. For a material "
                 "adjustment or alternative, require the explicit confirmation-bound "
                 "plan relation. Reject any exact Plan that omits or contradicts one of "
                 "these semantic responsibilities. Do not propose or authorize "
@@ -2046,11 +2481,9 @@ async def review_coordinated_action_plan_coverage(
             ),
             "user_text": request_text,
             "language": language,
-            "authoritative_goals": authoritative_goals,
-            "proposed_plan": plan.model_dump(
-                mode="json",
-                exclude={"metadata", "selected_agent_skills"},
-            ),
+            "effect_claim_goals": effect_claim_goals,
+            "proposed_effect_claim_plan": proposed_effect_claim_plan,
+            "terminal_non_effect_accounting": terminal_non_effect_accounting,
             "proposed_adjustment_contract": {
                 "plan_relation": plan.metadata.get("plan_relation", "exact"),
                 "user_confirmation_required": bool(
@@ -2058,11 +2491,12 @@ async def review_coordinated_action_plan_coverage(
                 ),
                 "response_text": plan.response_text,
             },
-            "executable_capabilities": capabilities,
+            "executable_capabilities": selected_capabilities,
             "output_contract": {
                 "decision": "accept or reject",
                 "accept": (
-                    "Only when every material responsibility is represented; "
+                    "Only when every effect claim is semantically supported and every "
+                    "other Goal has truthful explicit terminal non-effect accounting; "
                     "uncovered_requirements must be empty."
                 ),
                 "reject": (
@@ -2269,6 +2703,7 @@ def validate_goal_binding_argument_grounding(
     output: PlannerModelOutput,
     *,
     authoritative_goals: list[dict[str, Any]],
+    capabilities: list[dict[str, Any]] | None = None,
 ) -> None:
     """Keep executable arguments aligned with Goal Association bindings.
 
@@ -2285,6 +2720,12 @@ def validate_goal_binding_argument_grounding(
 
     if output.disposition not in {"execute", "mixed"}:
         return
+
+    capabilities_by_id = {
+        str(item.get("capability_id") or ""): item
+        for item in (capabilities or [])
+        if isinstance(item, dict) and str(item.get("capability_id") or "")
+    }
 
     bindings_by_goal: dict[str, dict[str, dict[str, Any]]] = {}
     information_goal_ids: set[str] = set()
@@ -2335,7 +2776,24 @@ def validate_goal_binding_argument_grounding(
                 required[name] = binding
 
         for name, binding in required.items():
+            capability = capabilities_by_id.get(step.capability_id) or {}
+            input_schema = capability.get("input_schema")
+            argument_schema = (
+                (input_schema.get("properties") or {}).get(name)
+                if isinstance(input_schema, dict)
+                else None
+            )
             if name not in step.args:
+                if isinstance(argument_schema, dict) and (
+                    _argument_schema_accepts_canonical_binding(
+                        argument_schema,
+                        binding["value"],
+                    )
+                ):
+                    raise PlannerDTOContractError(
+                        "planner step omitted same-name authoritative Goal binding: "
+                        f"{step.step_id}.{name}={binding['value']!r}"
+                    )
                 continue
             actual = step.args[name]
             expected = binding["value"]
@@ -2360,6 +2818,28 @@ def validate_goal_binding_argument_grounding(
                 if any(
                     _material_values_equal(actual, expected, list_compatible=False)
                     for actual in argument_values
+                ):
+                    continue
+                capability = capabilities_by_id.get(step.capability_id) or {}
+                semantic_scope = (
+                    (capability.get("hints") or {}).get("semantic_scope") or {}
+                )
+                fixed_scope = semantic_scope.get("fixed_temporal_scope") or {}
+                fixed_entity_types = {
+                    str(value).casefold()
+                    for value in fixed_scope.get("entity_types") or []
+                }
+                fixed_values = list(fixed_scope.get("values") or [])
+                if (
+                    binding["entity_type"] in fixed_entity_types
+                    and any(
+                        _material_values_equal(
+                            declared,
+                            expected,
+                            list_compatible=False,
+                        )
+                        for declared in fixed_values
+                    )
                 ):
                     continue
                 raise PlannerDTOContractError(
@@ -2591,6 +3071,7 @@ def validate_external_response_evidence_boundary(
         for goal_id in item.get("source_goal_ids") or []
     }
     index_only_goal_ids = responding_goal_ids & verified_goal_ids - dialogue_goal_ids
+    index_only_goal_ids -= result_evidence_reentry_goal_ids(context)
     if index_only_goal_ids:
         raise ValueError(
             "external_read_response_requires_evidence_bound_dialogue_or_retrieval: "
@@ -2858,6 +3339,170 @@ def validate_explicit_numeric_parameter_grounding(
         )
 
 
+def explicit_numeric_goal_values(
+    authoritative_goals: list[dict[str, Any]],
+    *,
+    include_resource_goals: bool = False,
+) -> dict[str, list[int | float]]:
+    """Project explicit Goal numbers for decoder-side provenance obligations.
+
+    This is the same immutable Goal surface consumed by the runtime validator;
+    it does not decide which Capability parameter a number means. Resource Goals
+    are excluded by default because an exact structured resource argument carries
+    its own nested numeric grounding without a flat parameter resolution.
+    """
+
+    projected: dict[str, list[int | float]] = {}
+    for goal in authoritative_goals:
+        if not isinstance(goal, dict):
+            continue
+        goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
+        if not goal_id:
+            continue
+        if (
+            not include_resource_goals
+            and isinstance(goal.get("resource_responsibility"), dict)
+        ):
+            continue
+        parts: list[str] = []
+        description = str(goal.get("description") or "").strip()
+        if description:
+            parts.append(description)
+        criteria = goal.get("success_criteria")
+        if isinstance(criteria, list):
+            parts.extend(
+                str(item).strip() for item in criteria if str(item).strip()
+            )
+        source_text = str(goal.get("source_text") or "").strip()
+        if not parts and source_text:
+            parts.append(source_text)
+        parts.extend(
+            str(binding.get("value")).strip()
+            for binding in _goal_binding_map(goal).values()
+            if binding.get("value") is not None
+            and str(binding.get("value")).strip()
+        )
+        values: list[int | float] = []
+        for match in _NUMERIC_LITERAL_RE.finditer(" ".join(dict.fromkeys(parts))):
+            try:
+                decimal_value = Decimal(match.group(0))
+            except InvalidOperation:
+                continue
+            json_value: int | float = (
+                int(decimal_value)
+                if decimal_value == decimal_value.to_integral_value()
+                else float(decimal_value)
+            )
+            if json_value not in values:
+                values.append(json_value)
+        if values:
+            projected[goal_id] = values
+    return projected
+
+
+def normalize_missing_numeric_parameter_provenance(
+    raw: dict[str, Any],
+    *,
+    authoritative_goals: list[dict[str, Any]],
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Add only mechanically provable duplicate provenance for Goal numbers.
+
+    Capability choice, step ownership, argument name, and argument value must
+    already exist in the model-authored DTO. A row is added only when one exact
+    Goal number occurs in exactly one argument of exactly one step owned by that
+    Goal. No executable or communicative field is changed.
+    """
+
+    steps = raw.get("steps")
+    if not isinstance(steps, list):
+        return raw, []
+    outcomes = raw.get("goal_outcomes")
+    outcomes = outcomes if isinstance(outcomes, dict) else {}
+    resolutions = raw.get("parameter_resolutions")
+    resolutions = resolutions if isinstance(resolutions, list) else []
+
+    def numeric(value: Any) -> Decimal | None:
+        if isinstance(value, bool) or not isinstance(
+            value, (int, float, Decimal, str)
+        ):
+            return None
+        if (
+            isinstance(value, str)
+            and _NUMERIC_LITERAL_RE.fullmatch(value.strip()) is None
+        ):
+            return None
+        try:
+            return Decimal(str(value).strip())
+        except InvalidOperation:
+            return None
+
+    def equal(left: Decimal, right: Decimal) -> bool:
+        scale = max(abs(left), abs(right), Decimal(1))
+        return abs(left - right) <= Decimal("1e-12") * scale
+
+    repairs: list[dict[str, Any]] = []
+    for goal_id, values in explicit_numeric_goal_values(
+        authoritative_goals
+    ).items():
+        outcome = outcomes.get(goal_id)
+        if isinstance(outcome, dict) and outcome.get("disposition") != "execute":
+            continue
+        for value in values:
+            expected = Decimal(str(value))
+            candidates: list[tuple[str, str]] = []
+            for step in steps:
+                if not isinstance(step, dict) or goal_id not in (
+                    step.get("source_goal_ids") or []
+                ):
+                    continue
+                step_id = " ".join(str(step.get("step_id") or "").strip().split())
+                args = step.get("args")
+                if not step_id or not isinstance(args, dict):
+                    continue
+                for parameter, argument in args.items():
+                    actual = numeric(argument)
+                    if actual is not None and equal(actual, expected):
+                        candidates.append((step_id, str(parameter)))
+            if len(candidates) != 1:
+                continue
+            step_id, parameter = candidates[0]
+            # This adapter fills an absent duplicate-provenance row only. An
+            # existing row for the same argument remains model-authored input,
+            # including when its value or Goal ownership is wrong, so normal
+            # contract validation can reject it instead of masking the defect
+            # with a second mechanically generated row.
+            if any(
+                isinstance(resolution, dict)
+                and str(resolution.get("step_id") or "").strip() == step_id
+                and str(resolution.get("parameter") or "").strip() == parameter
+                for resolution in resolutions
+            ):
+                continue
+            repairs.append(
+                {
+                    "step_id": step_id,
+                    "parameter": parameter,
+                    "strategy": "user_supplied",
+                    "value": value,
+                    "confidence": 1.0,
+                    "blocking": False,
+                    "rationale": (
+                        "Exact duplicate provenance for a Goal numeric value "
+                        "already present in one owned step argument."
+                    ),
+                    "source_goal_ids": [goal_id],
+                }
+            )
+    if not repairs:
+        return raw, []
+    normalized = copy.deepcopy(raw)
+    target = normalized.setdefault("parameter_resolutions", [])
+    if not isinstance(target, list):
+        return raw, []
+    target.extend(copy.deepcopy(repairs))
+    return normalized, repairs
+
+
 def normalize_schema_default_parameter_provenance(
     raw: dict[str, Any],
     *,
@@ -3067,6 +3712,9 @@ def canonical_plan_response_schema(
     response_goal_ids: list[str] | None = None,
     provider_required_vocal_goal_ids: list[str] | None = None,
     provider_required_media_goal_operations: dict[str, str] | None = None,
+    unavailable_information_goal_ids: list[str] | None = None,
+    single_step_goal_ids: list[str] | None = None,
+    required_numeric_goal_values: dict[str, list[int | float]] | None = None,
 ) -> dict[str, Any]:
     """Return one flat, constrained model-output schema for a planner request.
 
@@ -3153,6 +3801,19 @@ def canonical_plan_response_schema(
     allowed_goals = list(dict.fromkeys(expected_goal_ids))
     allowed_capabilities = list(dict.fromkeys(allowed_capability_ids))
     response_goal_set = set(response_goal_ids or []).intersection(allowed_goals)
+    single_step_goal_set = set(single_step_goal_ids or []).intersection(
+        allowed_goals
+    )
+    unavailable_information_goal_set = set(
+        unavailable_information_goal_ids or []
+    ).intersection(allowed_goals)
+    if (
+        planner_tier == "deep"
+        and unavailable_information_goal_set
+        and unavailable_information_goal_set == set(allowed_goals)
+        and isinstance(disposition, dict)
+    ):
+        disposition["enum"] = ["unavailable", "refused"]
     provider_vocal_goal_set = set(provider_required_vocal_goal_ids or []).intersection(
         allowed_goals
     )
@@ -3162,14 +3823,46 @@ def canonical_plan_response_schema(
         if goal_id in allowed_goals and operation in MEDIA_CAPABILITY_IDS
     }
     vocal_capability_available = VOCAL_PERFORMANCE_CAPABILITY_ID in allowed_capabilities
+    unavailable_provider_vocal_goal_set = (
+        provider_vocal_goal_set if not vocal_capability_available else set()
+    )
+    unavailable_provider_media_goal_set = {
+        goal_id
+        for goal_id, operation in provider_media_goal_operations.items()
+        if MEDIA_CAPABILITY_IDS[operation] not in allowed_capabilities
+    }
+    executable_source_goal_ids = [
+        goal_id
+        for goal_id in allowed_goals
+        if goal_id
+        not in (
+            unavailable_provider_vocal_goal_set
+            | unavailable_provider_media_goal_set
+            | unavailable_information_goal_set
+        )
+    ]
+
+    if unavailable_provider_vocal_goal_set:
+        planner_response_text = properties.get("response_text")
+        if isinstance(planner_response_text, dict):
+            planner_response_text.pop("maxLength", None)
+            planner_response_text["minLength"] = 1
+            planner_response_text["description"] = (
+                "Required natural aggregate limitation: explicitly state that the "
+                "provider-required vocal performance cannot be performed with the "
+                "available capabilities. Never claim, promise, or imply that the "
+                "unavailable vocal work will happen. Independent executable work may "
+                "still be described prospectively."
+            )
 
     if requires_execution and not response_goal_set:
         planner_response_text = properties.get("response_text")
         if isinstance(planner_response_text, dict):
-            planner_response_text["maxLength"] = 0
+            planner_response_text.pop("maxLength", None)
             planner_response_text["description"] = (
-                "Execution-only planning does not author speech; communication is "
-                "owned by the response layer."
+                "Use an empty string only for pure executable work. A terminal "
+                "clarify, unavailable, or refused result must contain the exact "
+                "natural Planner-owned limitation or question for the user."
             )
 
     # Both tiers must emit the multi-goal outcome envelope.  Deep Planner always
@@ -3322,7 +4015,14 @@ def canonical_plan_response_schema(
                 for field_name in goal_list_fields:
                     field = node_properties.get(field_name)
                     if isinstance(field, dict) and allowed_goals:
-                        field["items"] = {"type": "string", "enum": allowed_goals}
+                        field["items"] = {
+                            "type": "string",
+                            "enum": (
+                                executable_source_goal_ids
+                                if field_name == "source_goal_ids"
+                                else allowed_goals
+                            ),
+                        }
                         field["uniqueItems"] = True
                         if field_name == "source_goal_ids":
                             field["minItems"] = 1
@@ -3397,11 +4097,38 @@ def canonical_plan_response_schema(
                         ]
                     response_text_field = specialized_properties.get("response_text")
                     if isinstance(response_text_field, dict):
-                        response_text_field["maxLength"] = 0
+                        response_text_field.pop("maxLength", None)
                         response_text_field["description"] = (
-                            "Execution Goals do not author speech; communication is "
-                            "owned by the response layer."
+                            "Use an empty string for an executable outcome. A terminal "
+                            "clarify, unavailable, or refused outcome must contain its "
+                            "exact natural Planner-owned limitation or question."
                         )
+                    specialized.setdefault("allOf", []).append(
+                        {
+                            "anyOf": [
+                                {
+                                    "properties": {
+                                        "disposition": {"enum": ["execute"]},
+                                        "response_text": {"maxLength": 0},
+                                    },
+                                    "required": ["disposition", "response_text"],
+                                },
+                                {
+                                    "properties": {
+                                        "disposition": {
+                                            "enum": [
+                                                "clarify",
+                                                "unavailable",
+                                                "refused",
+                                            ]
+                                        },
+                                        "response_text": {"minLength": 1},
+                                    },
+                                    "required": ["disposition", "response_text"],
+                                },
+                            ]
+                        }
+                    )
                     branches = specialized.get("oneOf")
                     if isinstance(branches, list):
                         specialized["oneOf"] = [
@@ -3437,6 +4164,16 @@ def canonical_plan_response_schema(
                                 == ["respond"]
                             )
                         ]
+                if goal_id in single_step_goal_set:
+                    step_ids_field = specialized_properties.get("step_ids")
+                    if isinstance(step_ids_field, dict):
+                        step_ids_field["maxItems"] = 1
+                        step_ids_field["description"] = (
+                            "This non-resource Goal represents one independently "
+                            "observable effect and may own at most one executable "
+                            "step. Optional or decorative effects require their own "
+                            "authoritative Goal."
+                        )
                 if goal_id in provider_vocal_goal_set:
                     disposition_field = specialized_properties.get("disposition")
                     if isinstance(disposition_field, dict):
@@ -3456,12 +4193,21 @@ def canonical_plan_response_schema(
                         )
                     response_text_field = specialized_properties.get("response_text")
                     if isinstance(response_text_field, dict):
-                        response_text_field.pop("minLength", None)
                         response_text_field["maxLength"] = 800
-                        response_text_field["description"] = (
-                            "Optional conversational delta; it never substitutes for "
-                            "the provider-required vocal performance."
-                        )
+                        if vocal_capability_available:
+                            response_text_field.pop("minLength", None)
+                            response_text_field["description"] = (
+                                "Optional conversational delta; it never substitutes "
+                                "for the provider-required vocal performance."
+                            )
+                        else:
+                            response_text_field["minLength"] = 1
+                            response_text_field["description"] = (
+                                "Required natural limitation for this exact vocal Goal: "
+                                "state that the requested performance cannot be performed "
+                                "with the available capabilities. Never claim or promise "
+                                "that it will happen."
+                            )
                     step_ids_field = specialized_properties.get("step_ids")
                     if isinstance(step_ids_field, dict) and not vocal_capability_available:
                         step_ids_field["maxItems"] = 0
@@ -3522,6 +4268,25 @@ def canonical_plan_response_schema(
                                 )
                             )
                         ]
+                if goal_id in unavailable_information_goal_set:
+                    disposition_field = specialized_properties.get("disposition")
+                    if isinstance(disposition_field, dict):
+                        disposition_field["enum"] = ["unavailable", "refused"]
+                        disposition_field["description"] = (
+                            "The typed information domain has no matching declared "
+                            "provider in this turn's qualified catalog."
+                        )
+                    response_text_field = specialized_properties.get("response_text")
+                    if isinstance(response_text_field, dict):
+                        response_text_field.pop("maxLength", None)
+                        response_text_field["minLength"] = 1
+                        response_text_field["description"] = (
+                            "Required natural, truthful limitation in the user's language; "
+                            "do not ask for details that cannot create the missing provider."
+                        )
+                    step_ids_field = specialized_properties.get("step_ids")
+                    if isinstance(step_ids_field, dict):
+                        step_ids_field["maxItems"] = 0
                 goal_property.clear()
                 goal_property.update(specialized)
                 goal_property["description"] = (
@@ -3615,6 +4380,97 @@ def canonical_plan_response_schema(
             allowed_capabilities=allowed_capabilities,
             capability_input_schemas=capability_input_schemas,
         )
+    if planner_tier == "deep" and requires_execution and not response_goal_set:
+        schema.setdefault("allOf", []).append(
+            {
+                "anyOf": [
+                    {
+                        "properties": {
+                            "disposition": {"enum": ["execute"]},
+                            "response_text": {"maxLength": 0},
+                        },
+                        "required": ["disposition", "response_text"],
+                    },
+                    {
+                        "properties": {
+                            "disposition": {
+                                "enum": ["clarify", "unavailable", "refused"]
+                            },
+                            "response_text": {"minLength": 1},
+                        },
+                        "required": ["disposition", "response_text"],
+                    },
+                ]
+            }
+        )
+    numeric_obligations = {
+        goal_id: list(dict.fromkeys(values))
+        for goal_id, values in (required_numeric_goal_values or {}).items()
+        if goal_id in allowed_goals and values
+    }
+    parameter_resolution_schema = properties.get("parameter_resolutions")
+    if isinstance(parameter_resolution_schema, dict) and numeric_obligations:
+        parameter_resolution_schema["description"] = (
+            "When the named Goal outcome disposition is execute, include one "
+            "nonblocking user_supplied resolution for every listed numeric value; "
+            "the model still owns the exact step and argument mapping. Obligations: "
+            + json.dumps(
+                numeric_obligations,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
+        for goal_id, values in numeric_obligations.items():
+            for value in values:
+                schema.setdefault("allOf", []).append(
+                    {
+                        "if": {
+                            "properties": {
+                                "goal_outcomes": {
+                                    "properties": {
+                                        goal_id: {
+                                            "properties": {
+                                                "disposition": {"const": "execute"}
+                                            },
+                                            "required": ["disposition"],
+                                        }
+                                    },
+                                    "required": [goal_id],
+                                }
+                            },
+                            "required": ["goal_outcomes"],
+                        },
+                        "then": {
+                            "properties": {
+                                "parameter_resolutions": {
+                                    "contains": {
+                                        "type": "object",
+                                        "properties": {
+                                            "strategy": {
+                                                "const": "user_supplied"
+                                            },
+                                            "value": {"const": value},
+                                            "source_goal_ids": {
+                                                "contains": {"const": goal_id},
+                                                "minContains": 1,
+                                            },
+                                            "blocking": {"const": False},
+                                        },
+                                        "required": [
+                                            "strategy",
+                                            "value",
+                                            "source_goal_ids",
+                                            "blocking",
+                                        ],
+                                    },
+                                    "minContains": 1,
+                                }
+                            },
+                            "required": ["parameter_resolutions"],
+                        },
+                    }
+                )
     _constrain_terminal_unresolved(schema)
     return schema
 

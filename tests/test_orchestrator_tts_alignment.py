@@ -55,7 +55,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         key = assistant.playback_start_key(3, 7, "sid-fast")
         assistant.playback_start_waiters[key] = asyncio.get_running_loop().create_future()
 
-        event = assistant._register_turn_speech_event(session_id='sid-fast', generation=3, orders=[7], text='好呀，我帮你看看。', stage='fast_first', purpose='acknowledge_and_check', commitment='checking_only')
+        event = assistant._register_turn_speech_event(session_id='sid-fast', generation=3, orders=[7], text='好呀，我帮你看看。', stage='fast_first', purpose='acknowledge_and_check', commitment='checking_only', fast_activity_id='progress_weather')
 
         self.assertIsNotNone(event)
         self.assertEqual(assistant._delivered_turn_speech_events("sid-fast"), [])
@@ -70,6 +70,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(delivered), 1)
         self.assertEqual(delivered[0]["status"], "playback_started")
         self.assertEqual(delivered[0]["text"], "好呀，我帮你看看。")
+        self.assertEqual(delivered[0]["fast_activity_id"], "progress_weather")
 
     async def test_failure_experience_recovers_user_text_from_accepted_dialogue(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
@@ -944,7 +945,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             lambda self, sid, message, *args: None,
             assistant,
         )
-        event = assistant._register_turn_speech_event(session_id='sid-reuse', generation=2, orders=[5], text='好，我帮你查一下。', stage='fast_first', purpose='acknowledge_and_check', commitment='checking_only')
+        event = assistant._register_turn_speech_event(session_id='sid-reuse', generation=0, orders=[5], text='好，我帮你查一下。', stage='fast_first', purpose='acknowledge_and_check', commitment='checking_only')
         self.assertIsNotNone(event)
         assert event is not None
         event["status"] = "playback_started"
@@ -966,7 +967,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                     "session_id": "sid-reuse",
                     "reuse_current_turn_speech": True,
                     "reused_speech_event_id": event["event_id"],
-                    "reused_speech_generation": 2,
+                    "reused_speech_generation": 0,
                     "reused_speech_orders": [5],
                     "wait_for_playback_start": True,
                 },

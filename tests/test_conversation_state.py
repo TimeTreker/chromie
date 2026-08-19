@@ -400,6 +400,35 @@ class ConversationStateTests(unittest.TestCase):
             "soridormi.nod_yes",
         )
 
+    def test_reused_fast_speech_is_not_recorded_as_a_second_assistant_turn(self) -> None:
+        manager = ConversationStateManager()
+        manager.record_assistant_turn(
+            "s1",
+            "好，我这就往前走十秒。",
+            metadata={"source": "fast_planner_communicative_delivery"},
+        )
+
+        manager.record_interaction_response(
+            "s1",
+            InteractionResponse(
+                speech=[
+                    {
+                        "text": "好，我这就往前走十秒。",
+                        "metadata": {
+                            "reuse_current_turn_speech": True,
+                            "reused_speech_event_id": "speech_event_walk",
+                        },
+                    }
+                ],
+                capabilities=[{"capability_id": "soridormi.walk_forward"}],
+            ),
+        )
+
+        self.assertEqual(
+            [turn["text"] for turn in manager.get_history()],
+            ["好，我这就往前走十秒。"],
+        )
+
     def test_native_interaction_metadata_records_memory_update(self) -> None:
         manager = ConversationStateManager()
 
@@ -837,6 +866,57 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             ],
             ["goal-walk", "goal-blink"],
         )
+
+    def test_planning_only_response_retains_semantics_without_runtime_work(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="planning-only")
+        self._create_goals(manager, "goal-walk")
+        response = InteractionResponse(
+            interaction_id="interaction-preview",
+            capabilities=[
+                {
+                    "request_id": "walk-preview",
+                    "capability_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 10},
+                    "metadata": {"source_goal_ids": ["goal-walk"]},
+                }
+            ],
+            speech=[
+                {
+                    "id": "speech-preview",
+                    "text": "Okay, I'll walk forward.",
+                    "metadata": {"covers_goal_ids": ["goal-walk"]},
+                }
+            ],
+            metadata={
+                "planning_result": "composed_plan",
+                "canonical_plan": self._canonical_plan(
+                    "execute",
+                    [
+                        {
+                            "goal_id": "goal-walk",
+                            "disposition": "execute",
+                            "coverage": "complete",
+                            "step_ids": ["walk-preview"],
+                        }
+                    ],
+                ),
+            },
+        )
+
+        manager.record_interaction_response(
+            "sid-preview",
+            response,
+            bind_planned_execution=False,
+        )
+
+        snapshot = manager.active_goal_snapshots()[0]
+        self.assertEqual(snapshot["goal_id"], "goal-walk")
+        self.assertEqual(
+            snapshot["metadata"]["execution_binding"]["remaining_request_ids"],
+            [],
+        )
+        self.assertEqual(manager.snapshot()["pending_tasks"], [])
+        self.assertEqual(manager.get_history()[-1]["text"], "Okay, I'll walk forward.")
 
     def test_respond_goal_waits_for_scoped_speech_runtime_result(self) -> None:
         manager = ConversationStateManager(base_conversation_id="respond-lifecycle")

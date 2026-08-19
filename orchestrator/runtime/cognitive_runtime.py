@@ -1186,7 +1186,24 @@ class CanonicalPlanRuntimeAdapter:
             if isinstance(envelope, dict)
             else session_id
         )
-        speech = [
+        reflex = envelope.get("reflex") if isinstance(envelope, dict) else None
+        deterministic_interrupt = bool(
+            isinstance(envelope, dict)
+            and envelope.get("admission") == "reflex_and_admit"
+            and isinstance(reflex, dict)
+            and reflex.get("action") == "interrupt"
+        )
+        speech_prohibited = bool(
+            deterministic_interrupt and reflex.get("should_speak") is not True
+        )
+        residual_effects_permitted = bool(
+            deterministic_interrupt
+            and reflex.get("intent") == "stop_current_output"
+            and reflex.get("cancellation_scope") == "output_only"
+            and isinstance(reflex.get("metadata"), dict)
+            and reflex["metadata"].get("residual_semantic_input") is True
+        )
+        speech = [] if speech_prohibited else [
             InteractionSpeech(
                 text=final.text,
                 timing="immediate",
@@ -1288,6 +1305,32 @@ class CanonicalPlanRuntimeAdapter:
     ) -> InteractionResponse:
         """Mechanically realize exact Planner wording without another model owner."""
 
+        delivered_by_fast_activity_id: dict[str, dict[str, Any]] = {}
+        ambiguous_fast_activity_ids: set[str] = set()
+        if isinstance(context, dict):
+            delivered_rows = context.get("delivered_turn_speech")
+            if isinstance(delivered_rows, list):
+                for row in delivered_rows:
+                    if not isinstance(row, dict):
+                        continue
+                    activity_id = " ".join(
+                        str(row.get("fast_activity_id") or "").strip().split()
+                    )
+                    event_id = " ".join(
+                        str(row.get("event_id") or row.get("speech_event_id") or "")
+                        .strip()
+                        .split()
+                    )
+                    if not activity_id or not event_id:
+                        continue
+                    previous = delivered_by_fast_activity_id.get(activity_id)
+                    if previous is not None and str(previous.get("event_id")) != event_id:
+                        ambiguous_fast_activity_ids.add(activity_id)
+                        continue
+                    delivered_by_fast_activity_id[activity_id] = dict(row)
+        for activity_id in ambiguous_fast_activity_ids:
+            delivered_by_fast_activity_id.pop(activity_id, None)
+
         confirmation_required = any(
             self.interaction_runtime.capability_definition(step.capability_id)
             .requires_confirmation
@@ -1326,12 +1369,23 @@ class CanonicalPlanRuntimeAdapter:
                     for goal_id in plan.goal_ids
                     if any(goal_id in act.source_goal_ids for act in acts)
                 ]
+                reused_event_id = ""
+                if len(acts) == 1:
+                    reused_event = delivered_by_fast_activity_id.get(
+                        str(acts[0].activity_id)
+                    )
+                    if reused_event is not None:
+                        reused_event_id = " ".join(
+                            str(reused_event.get("event_id") or "").strip().split()
+                        )
                 return ResponseStage(
                     text=text,
                     speech_act=speech_act,
                     commitment_state=commitment_state,
                     must_not_claim_completion=must_not_claim_completion,
                     covers_goal_ids=covered,
+                    reuse_current_turn_speech=bool(reused_event_id),
+                    reused_speech_event_id=reused_event_id or None,
                     metadata={
                         "wording_owner": "planner",
                         "canonical_plan_id": plan.plan_id,
@@ -1424,6 +1478,39 @@ class CanonicalPlanRuntimeAdapter:
                 dict.fromkeys(
                     item.text for item in plan.communicative_acts if item.text
                 )
+            )
+        pure_silent_execution = (
+            not text
+            and plan.disposition == "execute"
+            and bool(plan.steps)
+            and set(plan.executable_goal_ids()) == set(plan.goal_ids)
+            and not confirmation_required
+        )
+        if pure_silent_execution:
+            fingerprint = canonical_plan_fingerprint(plan)
+            composition = CoordinatedResponsePlan(
+                composition_id=f"planner_owned_{fingerprint[:20]}",
+                canonical_plan_id=plan.plan_id,
+                canonical_plan_fingerprint=fingerprint,
+                canonical_plan=plan,
+                response_plan=ResponsePlan(),
+                lane_coordination=[],
+                confidence=plan.confidence,
+                rationale=(
+                    "Planner selected complete execution without a communicative act."
+                ),
+                metadata={
+                    "authority": "planner",
+                    "resolver": "planner_owned_communication",
+                    "task_plan_immutable": True,
+                },
+            )
+            return await self.build_response(
+                plan=plan,
+                composition=composition,
+                session_id=session_id,
+                language=language,
+                context=context,
             )
         if not text:
             raise ValueError(
@@ -1564,6 +1651,23 @@ class CanonicalPlanRuntimeAdapter:
             if isinstance(envelope, dict)
             else session_id
         )
+        reflex = envelope.get("reflex") if isinstance(envelope, dict) else None
+        deterministic_interrupt = bool(
+            isinstance(envelope, dict)
+            and envelope.get("admission") == "reflex_and_admit"
+            and isinstance(reflex, dict)
+            and reflex.get("action") == "interrupt"
+        )
+        speech_prohibited = bool(
+            deterministic_interrupt and reflex.get("should_speak") is not True
+        )
+        residual_effects_permitted = bool(
+            deterministic_interrupt
+            and reflex.get("intent") == "stop_current_output"
+            and reflex.get("cancellation_scope") == "output_only"
+            and isinstance(reflex.get("metadata"), dict)
+            and reflex["metadata"].get("residual_semantic_input") is True
+        )
         alternative = str(plan.metadata.get("plan_relation") or "") in {
             "alternative",
             "safe_adjustment",
@@ -1660,6 +1764,14 @@ class CanonicalPlanRuntimeAdapter:
             and plan.disposition == "execute"
             and executable_goal_ids == set(plan.goal_ids)
         )
+        pure_execution_speech_optional = (
+            effectful_pre_execution
+            and plan.disposition == "execute"
+            and executable_goal_ids == set(plan.goal_ids)
+            and not confirmation_goal_ids
+            and response_plan.immediate is None
+            and response_plan.pre_action is None
+        )
         reusable_turn_speech: dict[str, dict[str, Any]] = {}
         if isinstance(context, dict):
             # A speech-event identity selects the Communicative Act. Text is
@@ -1734,15 +1846,16 @@ class CanonicalPlanRuntimeAdapter:
                 else:
                     stage_items = []
             else:
-                if not available_pre_execution or not required_goal_ids.issubset(
+                if pure_execution_speech_optional:
+                    stage_items = []
+                elif not available_pre_execution or not required_goal_ids.issubset(
                     covered_pre_execution
                 ):
                     raise ValueError(
                         "effectful pre-execution response requires immediate and/or "
                         "pre_action stages covering all canonical goals"
                     )
-
-                if pre_action_item is not None and required_goal_ids.issubset(
+                elif pre_action_item is not None and required_goal_ids.issubset(
                     set(pre_action_item[1].covers_goal_ids)
                 ):
                     stage_items = [pre_action_item]
@@ -1875,6 +1988,9 @@ class CanonicalPlanRuntimeAdapter:
                 if stage is not None
             ]
 
+        if speech_prohibited:
+            projected_speech_stages = []
+
         speech: list[InteractionSpeech] = []
         for projected in projected_speech_stages:
             phase = str(projected["phase"])
@@ -1887,6 +2003,7 @@ class CanonicalPlanRuntimeAdapter:
             )
             speech_metadata = {
                 "source": projected["source"],
+                "session_id": session_id,
                 "turn_id": turn_id,
                 "phase": phase,
                 "speech_act": projected["speech_act"],
@@ -2012,6 +2129,11 @@ class CanonicalPlanRuntimeAdapter:
 
         capabilities: list[CapabilityRequest] = []
         for step in plan.steps:
+            if deterministic_interrupt and not residual_effects_permitted:
+                # The control itself is already applied by the Gateway. Semantic
+                # admission exists only to reconcile retained Goal state; it may
+                # never materialize replacement work for the interrupting turn.
+                continue
             if (step.metadata or {}).get("retained_work_reused") is True:
                 # The exact live request remains owned by its original Runtime
                 # submission. Planner selected it explicitly and Host validated
@@ -2204,6 +2326,8 @@ class CanonicalPlanRuntimeAdapter:
             "operational_speech_authority": (
                 "llm_optional_micro_ack"
                 if safe_read_speech_optional
+                else "planner_selected_silence"
+                if pure_execution_speech_optional
                 else "llm_parallel_speech"
                 if safe_read_parallel
                 else "planner_wording_runtime_validated"
@@ -2214,6 +2338,10 @@ class CanonicalPlanRuntimeAdapter:
             "safe_read_speech_optional": safe_read_speech_optional,
             "retained_work_reconciliation_only": (
                 plan.metadata.get("retained_work_reconciliation_only") is True
+            ),
+            "deterministic_interrupt_speech_prohibited": speech_prohibited,
+            "deterministic_interrupt_residual_effects_permitted": (
+                residual_effects_permitted
             ),
         }
         runtime_context = context if isinstance(context, dict) else {}
@@ -4709,18 +4837,6 @@ class GoalDrivenRuntimeCoordinator:
             needs_deep_planner = "deep_planner" in fast_advance.continuations
 
             association_goal_ids = self._association_goal_ids(association)
-            retained_goal_work_reconciliation = any(
-                item.relationship != "cancel"
-                for item in association.associations
-            )
-            work_reconciliation_required = (
-                not has_named_goal_cancellation
-                and (
-                    ready_fast_capability_execution is not None
-                    or retained_goal_work_reconciliation
-                    or has_goal_replacement
-                )
-            )
             retained_reconciliation_goal_ids = {
                 *association_goal_ids,
                 *(
@@ -4729,13 +4845,16 @@ class GoalDrivenRuntimeCoordinator:
                     for goal_id in goal.supersedes_goal_ids
                 ),
             }
-            retained_work_activities = (
-                self._retained_work_reconciliation_activities(
-                    context=planning_context,
-                    goal_ids=retained_reconciliation_goal_ids,
+            retained_work_activities = self._retained_work_reconciliation_activities(
+                context=planning_context,
+                goal_ids=retained_reconciliation_goal_ids,
+            )
+            work_reconciliation_required = (
+                not has_named_goal_cancellation
+                and (
+                    ready_fast_capability_execution is not None
+                    or bool(retained_work_activities)
                 )
-                if work_reconciliation_required
-                else []
             )
             if work_reconciliation_required:
                 reconciliation_reason = (

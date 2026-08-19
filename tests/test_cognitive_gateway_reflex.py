@@ -110,6 +110,7 @@ class ReflexFilterTests(unittest.TestCase):
         for text, scope, intent in (
             ("Stop talking.", "output_only", "stop_current_output"),
             ("别说了。", "output_only", "stop_current_output"),
+            ("别说话。", "output_only", "stop_current_output"),
             ("Stop moving.", "embodied_motion", "stop_embodied_motion"),
             ("Stop all motion.", "embodied_motion", "stop_embodied_motion"),
             ("停止移动。", "embodied_motion", "stop_embodied_motion"),
@@ -125,6 +126,8 @@ class ReflexFilterTests(unittest.TestCase):
             ("Cancel.", "current_interaction", "cancel_current_interaction"),
             ("取消。", "current_interaction", "cancel_current_interaction"),
             ("取消一切。", "current_interaction", "cancel_current_interaction"),
+            ("算了，不用了。", "current_interaction", "cancel_current_interaction"),
+            ("不用了。", "current_interaction", "cancel_current_interaction"),
         ):
             with self.subTest(text=text):
                 outcome = reflex_filter.evaluate(text)
@@ -132,6 +135,19 @@ class ReflexFilterTests(unittest.TestCase):
                 self.assertEqual(outcome.action, "interrupt")
                 self.assertEqual(outcome.cancellation_scope, scope)
                 self.assertEqual(outcome.intent, intent)
+
+    def test_output_stop_compound_preserves_residual_semantic_input(self) -> None:
+        for text in ("别说话，过来。", "Don't speak, come here."):
+            with self.subTest(text=text):
+                outcome = ReflexFilter().evaluate(text)
+
+                self.assertEqual(outcome.action, "interrupt")
+                self.assertEqual(outcome.cancellation_scope, "output_only")
+                self.assertEqual(outcome.intent, "stop_current_output")
+                self.assertTrue(outcome.metadata["residual_semantic_input"])
+
+        exact = ReflexFilter().evaluate("别说话。")
+        self.assertFalse(exact.metadata["residual_semantic_input"])
 
     def test_named_selective_stop_stays_cognitive(self) -> None:
         reflex_filter = ReflexFilter()

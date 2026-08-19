@@ -389,7 +389,23 @@ class FastPlannerFirstResponseTruthCertificate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    has_unverified_result_or_completion_claim: bool = False
+    has_ungrounded_method_or_world_claim: bool = False
+    has_semantic_perspective_contradiction: bool = False
     decision: Literal["accept", "reject"]
+
+    @model_validator(mode="after")
+    def decision_matches_claim_audit(self) -> "FastPlannerFirstResponseTruthCertificate":
+        has_violation = (
+            self.has_unverified_result_or_completion_claim
+            or self.has_ungrounded_method_or_world_claim
+            or self.has_semantic_perspective_contradiction
+        )
+        if self.decision == "accept" and has_violation:
+            raise ValueError("accept requires every truth-audit flag to be false")
+        # Decoder contracts require all audit flags explicitly. Defaults retain
+        # backward-compatible parsing for historical evidence only.
+        return self
 
 
 class FastPlannerFirstResponse(BaseModel):

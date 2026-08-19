@@ -601,6 +601,104 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(result.interaction_response.capabilities, [])
 
+    def test_completed_goal_continuation_uses_fast_advance_without_work_replanning(self):
+        association = GoalAssociationResolution(
+            resolution_status="resolved",
+            turn_id="turn-continue-walk",
+            associations=[
+                {
+                    "association_id": "association-continue-walk",
+                    "relationship": "continue",
+                    "source_responsibility_refs": ["walk"],
+                    "target_goal_ids": ["goal-walk"],
+                    "confidence": 0.98,
+                }
+            ],
+            confidence=0.98,
+        )
+        advance = FastPlannerAdvance(
+            turn_id="turn-continue-walk",
+            disposition="execute",
+            coverage="complete",
+            covered_responsibility_refs=["walk"],
+            activities=[
+                FastPlannerCapabilityActivity(
+                    activity_id="continue-walk-ten-seconds",
+                    role="capability",
+                    capability_id="soridormi.walk_forward",
+                    args={"duration_s": 10.0},
+                    source_responsibility_refs=["walk"],
+                    reason_summary="Continue the requested completed walk as new Work.",
+                )
+            ],
+            confidence=0.98,
+            reason_summary="The current continuation has one bounded body Activity.",
+        )
+        client = ScriptedClient(
+            association=association,
+            fast_plans=[],
+            fast_advances=[advance],
+        )
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(FastAdvanceRuntime([walk_definition()])),
+            policy=CognitiveRuntimePolicy(mode="report_only"),
+        )
+        core, envelope = admitted_core(
+            "继续刚才的动作。",
+            sid="turn-continue-walk",
+            language="zh-CN",
+            responsibilities=[
+                {
+                    "local_ref": "walk",
+                    "outcome": "Continue moving forward for ten seconds.",
+                    "relationship": "continue",
+                    "target_goal_ids": ["goal-walk"],
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.98,
+                }
+            ],
+        )
+
+        result = asyncio.run(
+            coordinator.resolve(
+                object(),
+                text="继续刚才的动作。",
+                sid="turn-continue-walk",
+                core_interpretation=core,
+                turn_envelope=envelope,
+                context={
+                    "history": [],
+                    "active_task_snapshots": [
+                        {
+                            "task_id": "task-old-walk",
+                            "status": "done",
+                            "semantic_goal": {
+                                "goal_id": "goal-walk",
+                                "description": "Move forward for ten seconds.",
+                            },
+                            "metadata": {
+                                "execution_binding": {
+                                    "remaining_request_ids": [],
+                                }
+                            },
+                        }
+                    ],
+                },
+                history=[],
+                language="zh-CN",
+            )
+        )
+
+        self.assertEqual(result.status, "report_only")
+        self.assertNotIn("fast", client.calls)
+        self.assertEqual(
+            result.terminal_plan.metadata["resolver"],
+            "fast_planner_advance",
+        )
+        self.assertFalse(result.metadata["work_reconciliation_required"])
+
     def test_changed_retained_work_is_cancelled_after_planner_before_replacement(self):
         events: list[str] = []
 
@@ -2737,6 +2835,85 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             response.speech[0].metadata["reuse_current_turn_speech"]
         )
 
+    def test_planner_owned_response_reuses_delivered_matching_fast_activity(self):
+        fast_activity_id = "progress_walk_ten_seconds"
+        fast_text = "好，我这就往前走十秒。"
+        plan = CanonicalPlan(
+            plan_id="plan-walk-fast-identity",
+            planner_tier="fast",
+            disposition="execute",
+            coverage="complete",
+            confidence=0.98,
+            goal_ids=["goal-walk"],
+            goal_summary="Walk forward for ten seconds.",
+            communicative_acts=[
+                {
+                    "activity_id": fast_activity_id,
+                    "text": fast_text,
+                    "role": "progress",
+                    "speech_act": "acknowledge",
+                    "source_goal_ids": ["goal-walk"],
+                    "source_responsibility_refs": ["walk"],
+                    "truth_stage": "pre_evidence",
+                    "progress_kind": "perform_action",
+                }
+            ],
+            steps=[
+                {
+                    "step_id": "walk",
+                    "capability_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 10},
+                    "source_goal_ids": ["goal-walk"],
+                }
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-walk",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["walk"],
+                }
+            ],
+        )
+
+        response = asyncio.run(
+            CanonicalPlanRuntimeAdapter(
+                FakeRuntime([walk_definition()])
+            ).build_planner_owned_response(
+                plan=plan,
+                session_id="sid-walk-fast-identity",
+                language="zh-CN",
+                context={
+                    "delivered_turn_speech": [
+                        {
+                            "event_id": "speech_event_walk_fast_identity",
+                            "status": "playback_started",
+                            "text": fast_text,
+                            "fast_activity_id": fast_activity_id,
+                            "generation": 7,
+                            "orders": [12],
+                        }
+                    ]
+                },
+            )
+        )
+
+        self.assertEqual(len(response.speech), 1)
+        self.assertTrue(response.speech[0].metadata["reuse_current_turn_speech"])
+        self.assertEqual(
+            response.speech[0].metadata["session_id"],
+            "sid-walk-fast-identity",
+        )
+        self.assertEqual(
+            response.speech[0].metadata["reused_speech_event_id"],
+            "speech_event_walk_fast_identity",
+        )
+        self.assertEqual(len(response.capabilities), 1)
+        self.assertEqual(
+            response.capabilities[0].capability_id,
+            "soridormi.walk_forward",
+        )
+
     def test_safe_read_may_start_silently_without_delivery_barrier(self):
         plan = CanonicalPlan(
             plan_id="plan-weather-silent",
@@ -2789,6 +2966,52 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(response.capabilities[0].timing, "parallel")
         self.assertTrue(response.capabilities[0].metadata["retryable_safe_read"])
         self.assertTrue(response.metadata["safe_read_parallel_execution"])
+
+    def test_pure_effectful_execution_may_be_planner_selected_silence(self):
+        plan = execute_plan()
+        plan.response_text = None
+        adapter = CanonicalPlanRuntimeAdapter(
+            FakeRuntime([blink_definition()])
+        )
+
+        response = asyncio.run(
+            adapter.build_planner_owned_response(
+                plan=plan,
+                session_id="sid-blink-silent",
+                language="zh-CN",
+                context={},
+            )
+        )
+
+        self.assertEqual(response.speech, [])
+        self.assertEqual(
+            [item.capability_id for item in response.capabilities],
+            ["soridormi.blink_eyes"],
+        )
+        self.assertEqual(
+            response.metadata["operational_speech_authority"],
+            "planner_selected_silence",
+        )
+
+    def test_confirmation_gated_execution_cannot_be_silent(self):
+        plan = execute_plan()
+        plan.response_text = None
+        adapter = CanonicalPlanRuntimeAdapter(
+            FakeRuntime([blink_definition(confirmation=True)])
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "Planner-owned communicative response requires exact text",
+        ):
+            asyncio.run(
+                adapter.build_planner_owned_response(
+                    plan=plan,
+                    session_id="sid-blink-confirmation",
+                    language="zh-CN",
+                    context={},
+                )
+            )
 
     def test_effectful_pre_execution_preserves_model_speech_with_barrier(self):
         plan = execute_plan()
@@ -3791,6 +4014,95 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             all(item.metadata["wait_for_playback_start"] for item in response.speech)
         )
 
+
+
+class DeterministicInterruptResponseTests(unittest.TestCase):
+    @staticmethod
+    def _composition(plan: CanonicalPlan) -> CoordinatedResponsePlan:
+        return CoordinatedResponsePlan(
+            composition_id="composition-interrupt",
+            canonical_plan_id=plan.plan_id,
+            canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
+            canonical_plan=plan,
+            response_plan=ResponsePlan(
+                pre_action=ResponseStage(
+                    text="I will do that now.",
+                    speech_act="inform",
+                    commitment_state="evaluating",
+                    must_not_claim_completion=True,
+                    covers_goal_ids=plan.goal_ids,
+                )
+            ),
+            confidence=0.95,
+        )
+
+    @staticmethod
+    def _envelope(*, scope: str, residual: bool) -> dict:
+        return {
+            "turn_id": "turn-interrupt",
+            "admission": "reflex_and_admit",
+            "reflex": {
+                "action": "interrupt",
+                "intent": (
+                    "stop_current_output"
+                    if scope == "output_only"
+                    else "cancel_current_interaction"
+                ),
+                "cancellation_scope": scope,
+                "should_speak": False,
+                "metadata": {"residual_semantic_input": residual},
+            },
+        }
+
+    def test_plain_cancellation_cannot_materialize_replacement_work_or_speech(self):
+        plan = execute_plan(plan_id="plan-cancel")
+        response = asyncio.run(
+            CanonicalPlanRuntimeAdapter(FakeRuntime([blink_definition()])).build_response(
+                plan=plan,
+                composition=self._composition(plan),
+                session_id="sid-cancel",
+                language="zh-CN",
+                context={
+                    "user_turn_envelope": self._envelope(
+                        scope="current_interaction",
+                        residual=False,
+                    )
+                },
+            )
+        )
+
+        self.assertEqual(response.speech, [])
+        self.assertEqual(response.capabilities, [])
+        self.assertTrue(response.metadata["deterministic_interrupt_speech_prohibited"])
+        self.assertFalse(
+            response.metadata["deterministic_interrupt_residual_effects_permitted"]
+        )
+
+    def test_output_stop_compound_keeps_residual_body_work_but_never_speech(self):
+        plan = execute_plan(plan_id="plan-silent-body")
+        response = asyncio.run(
+            CanonicalPlanRuntimeAdapter(FakeRuntime([blink_definition()])).build_response(
+                plan=plan,
+                composition=self._composition(plan),
+                session_id="sid-silent-body",
+                language="zh-CN",
+                context={
+                    "user_turn_envelope": self._envelope(
+                        scope="output_only",
+                        residual=True,
+                    )
+                },
+            )
+        )
+
+        self.assertEqual(response.speech, [])
+        self.assertEqual(
+            [item.capability_id for item in response.capabilities],
+            ["soridormi.blink_eyes"],
+        )
+        self.assertTrue(
+            response.metadata["deterministic_interrupt_residual_effects_permitted"]
+        )
 
 
 class CognitiveEvidenceTests(unittest.TestCase):

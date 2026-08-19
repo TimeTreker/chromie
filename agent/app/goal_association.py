@@ -32,6 +32,7 @@ from .cognitive_identity import (
     PERSONALITY_SEMANTIC_CONTRACT,
     bounded_identity_json,
     bounded_personality_json,
+    owner_approved_identity_context,
 )
 try:
     from chromie_contracts.core_interpretation import CognitiveWorkRequest
@@ -97,6 +98,13 @@ logger = logging.getLogger("chromie.agent.goal_association")
 
 GoalSegmentationDecision = Literal["create_goals"]
 GoalAssociationDecision = Literal["associate", "create_goals"]
+InformationResourceDomain = Literal[
+    "local_clock",
+    "weather_forecast",
+    "external_grounded_information",
+    "direct_environment_perception",
+    "private_runtime_information",
+]
 GoalResponsibilityKind = Literal[
     "executable_action",
     "vocal_output",
@@ -106,7 +114,7 @@ GoalResponsibilityKind = Literal[
 GoalExecutionLane = Literal["vocal", "activity", "none"]
 GoalOutputMode = Literal[
     "speech",
-    "expressive_speech",
+    "styled_speech",
     "recitation",
     "singing",
     "humming",
@@ -131,7 +139,7 @@ _OUTPUT_MODE_EXECUTION_CONTRACT: dict[
     tuple[GoalResponsibilityKind, GoalExecutionLane, bool],
 ] = {
     "speech": ("vocal_output", "vocal", False),
-    "expressive_speech": ("vocal_output", "vocal", True),
+    "styled_speech": ("vocal_output", "vocal", True),
     "recitation": ("vocal_output", "vocal", True),
     "singing": ("vocal_output", "vocal", True),
     "humming": ("vocal_output", "vocal", True),
@@ -182,11 +190,27 @@ _EXECUTION_CONTRACT_PROMPT = (
     "that framing in the effect Goal. Create a separate vocal Goal only when the user "
     "requests independently observable positive words, information, or a vocal "
     "performance—not merely because wording or speech could help convey the style. "
+    "A coordination construction such as while, simultaneously, at the same time, "
+    "Chinese 边…边…, or an equivalent relation requires one Goal for every independently "
+    "observable requested modality. Preserve coordination in descriptions or bindings, "
+    "but never merge walking, gaze/blinking, and an authored vocal performance into one "
+    "Goal. Use body_action for each embodied effect and the exact authored vocal mode—"
+    "singing, recitation, humming, styled_speech, or nonverbal_vocalization—for "
+    "each vocal-performance effect. "
     "When a concrete requested effect is accompanied by a broad desired social "
     "impression but no words, information, vocal performance, or second effect "
     "modality is specified, apply that impression as embodiment-wide expression "
     "framing to the concrete effect. Do not invent an audible modality from an "
     "adjective, state directive, conjunction, or imperative grammar."
+)
+
+_GOAL_SEGMENTATION_IDENTITY_CONTRACT = (
+    "Owner-approved identity evidence names the first-person Chromie entity. Preserve "
+    "its exact name, age, human-child kind, family role, and acting/perceiving/body "
+    "ownership when those facts are material. Never replace that identity with model, "
+    "provider, device, robot, or system metadata. Unknown family members and relationship "
+    "labels remain unknown until introduced. Identity and personality expression never "
+    "create an extra Goal and must not be volunteered in unrelated work. "
 )
 
 
@@ -292,7 +316,8 @@ class GoalAssociationModelBinding(BaseModel):
             "contiguous user-language surface from the authoritative current turn; "
             "only an indirect reference backed by supplied discourse provenance may "
             "use a contextual canonical value. Typed temporal bindings are the explicit "
-            "exception: day_part and date use the shared canonical temporal vocabulary."
+            "exception: day_part, date, and qualitative speed use their shared canonical "
+            "semantic vocabularies."
         ),
     )
     referent_id: str = ""
@@ -333,6 +358,15 @@ class GoalAssociationModelBinding(BaseModel):
                     "date bindings require a canonical relative date (today or "
                     "tomorrow) or an ISO 8601 calendar date (YYYY-MM-DD)"
                 )
+        if (
+            self.entity_type.casefold() == "speed"
+            and not any(character.isdigit() for character in self.value)
+            and self.value not in {"slow", "normal", "quick"}
+        ):
+            raise ValueError(
+                "qualitative speed bindings require a canonical value: "
+                "slow, normal, or quick"
+            )
         return self
 
 
@@ -547,6 +581,16 @@ class GoalAssociationModelInformationResourceResponsibility(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["information"]
+    information_domain: InformationResourceDomain = Field(
+        description=(
+            "Provider-neutral semantic evidence domain. Classify the needed fact, "
+            "not the nearest available Capability: local_clock for Chromie's trusted "
+            "local date/time, weather_forecast for weather, "
+            "external_grounded_information for public facts/research, "
+            "direct_environment_perception for present nearby people/objects/events, "
+            "and private_runtime_information for other private live state."
+        ),
+    )
     description: str = Field(min_length=1)
     quantity: str = ""
     query_scope: list[GoalAssociationModelBinding] = Field(
@@ -581,7 +625,7 @@ class GoalAssociationModelInformationResourceResponsibility(BaseModel):
     def validate_scope(self) -> "GoalAssociationModelInformationResourceResponsibility":
         reserved = {
             "source", "provider", "provider_id", "website", "search_engine",
-            "delivery_mode", "recipient", "resource", "quantity",
+            "delivery_mode", "recipient", "resource", "quantity", "information_domain",
         }
         duplicated = sorted(
             binding.name
@@ -860,6 +904,13 @@ class GoalAssociationModelOutput(BaseModel):
         normalized["decision"] = decision
         if decision == "create_goals":
             normalized["associations"] = []
+        else:
+            # ``decision`` is the sole semantic branch authority. Decoder-small
+            # models can populate an inactive branch even after selecting
+            # association; discard it mechanically just as the create branch
+            # already discards inactive associations. It must never double-map one
+            # Responsibility and exhaust the one allowed DTO repair.
+            normalized["new_goals"] = []
         return normalized
 
     @field_validator("reason_summary", mode="before")
@@ -904,6 +955,27 @@ class GoalResponsibilityCoverageItem(BaseModel):
         "physical_resource",
         "persistent_effect",
     ] = "ordinary"
+    required_information_domain: Literal[
+        "none",
+        "local_clock",
+        "weather_forecast",
+        "external_grounded_information",
+        "direct_environment_perception",
+        "private_runtime_information",
+    ] = "none"
+    required_output_mode: Literal[
+        "none",
+        "speech",
+        "styled_speech",
+        "recitation",
+        "singing",
+        "humming",
+        "nonverbal_vocalization",
+        "body_action",
+        "media_playback",
+        "capability_work",
+        "other",
+    ] = "none"
 
     @field_validator("source_excerpt", mode="before")
     @classmethod
@@ -938,9 +1010,22 @@ class GoalResponsibilityCoverageItem(BaseModel):
             raise ValueError(
                 "required_goal_shape is valid only on responsibility coverage items"
             )
+        if self.required_goal_shape == "information_resource":
+            if self.required_information_domain == "none":
+                raise ValueError(
+                    "information_resource coverage requires an information domain"
+                )
+        elif self.required_information_domain != "none":
+            raise ValueError(
+                "required_information_domain is valid only for an information resource"
+            )
         if self.role != "responsibility" and self.independently_satisfiable:
             raise ValueError(
                 "only a responsibility may be independently_satisfiable"
+            )
+        if self.role != "responsibility" and self.required_output_mode != "none":
+            raise ValueError(
+                "required_output_mode is valid only on responsibility coverage items"
             )
         if self.role in {"context", "framing"}:
             if self.coverage != "covered" or self.candidate_goal_indices:
@@ -985,11 +1070,18 @@ class GoalResponsibilityCoverageCertificate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    items: list[GoalResponsibilityCoverageItem] = Field(
+    responsibility_items: list[GoalResponsibilityCoverageItem] = Field(
         min_length=1,
+        max_length=8,
+    )
+    supporting_items: list[GoalResponsibilityCoverageItem] = Field(
         max_length=16,
     )
     reason_summary: str = Field(min_length=1, max_length=1200)
+
+    @property
+    def items(self) -> list[GoalResponsibilityCoverageItem]:
+        return [*self.responsibility_items, *self.supporting_items]
 
     @field_validator("reason_summary", mode="before")
     @classmethod
@@ -1000,15 +1092,13 @@ class GoalResponsibilityCoverageCertificate(BaseModel):
 
     @model_validator(mode="after")
     def validate_material_evidence(self) -> "GoalResponsibilityCoverageCertificate":
-        # This certificate is immutable proof evidence, not a second canonical
-        # segmentation. Redundant/overlapping excerpts are diagnostically noisy but
-        # must not crash a valid semantic transaction by themselves.
-        if not any(
-            item.role in {"responsibility", "constraint"}
-            for item in self.items
-        ):
+        if any(item.role != "responsibility" for item in self.responsibility_items):
             raise ValueError(
-                "coverage certificate for created Goals requires material user meaning"
+                "responsibility_items accepts only role=responsibility"
+            )
+        if any(item.role == "responsibility" for item in self.supporting_items):
+            raise ValueError(
+                "supporting_items accepts only constraint, context, or framing roles"
             )
         return self
 
@@ -1087,6 +1177,21 @@ class GoalAssociationResolver:
             self._discourse_referents(request),
             responsibility_count=len(request.responsibilities),
             responsibility_refs=[item.local_ref for item in request.responsibilities],
+            responsibility_output_modes={
+                item.local_ref: item.output_mode
+                for item in request.responsibilities
+                if item.output_mode != "unspecified"
+            },
+            responsibility_bindings={
+                item.local_ref: {
+                    str(name): value
+                    for name, value in item.bindings.items()
+                    if isinstance(value, str)
+                    and " ".join(value.strip().casefold().split())
+                    in " ".join(request.text.strip().casefold().split())
+                }
+                for item in request.responsibilities
+            },
         )
         generation_options = {
             "temperature": 0,
@@ -1104,6 +1209,10 @@ class GoalAssociationResolver:
         fresh_temporal_contract_repair: list[str] = []
         optional_referent_recovery: list[dict[str, Any]] = []
         redundant_resource_binding_recovery: list[dict[str, Any]] = []
+        invalid_optional_quantity_recovery: list[dict[str, Any]] = []
+        ungrounded_resource_location_recovery: list[dict[str, Any]] = []
+        generic_location_type_recovery: list[dict[str, Any]] = []
+        missing_description_recovery: list[dict[str, Any]] = []
 
         async def invoke(
             prompt: Any,
@@ -1146,6 +1255,25 @@ class GoalAssociationResolver:
                 normalized
             )
             redundant_resource_binding_recovery.extend(recovered)
+            normalized, recovered = self._drop_invalid_optional_resource_quantities(
+                normalized
+            )
+            invalid_optional_quantity_recovery.extend(recovered)
+            normalized, recovered = self._drop_ungrounded_resource_query_locations(
+                normalized,
+                request=request,
+            )
+            ungrounded_resource_location_recovery.extend(recovered)
+            normalized, recovered = self._normalize_grounded_generic_location_types(
+                normalized,
+                request=request,
+            )
+            generic_location_type_recovery.extend(recovered)
+            normalized, recovered = self._restore_missing_goal_descriptions(
+                normalized,
+                request=request,
+            )
+            missing_description_recovery.extend(recovered)
             return normalized
 
         try:
@@ -1218,7 +1346,11 @@ class GoalAssociationResolver:
                     ),
                     system=self._responsibility_coverage_system_prompt(),
                     response_format=self._coverage_certificate_response_schema(
-                        len(model_output.new_goals)
+                        list(model_output.new_goals),
+                        temporal_scalar=self._uses_compact_coverage_contract(
+                            request=request,
+                            raw=accepted_raw,
+                        ),
                     ),
                     prompt_family="goal_association.responsibility_coverage",
                 )
@@ -1342,7 +1474,11 @@ class GoalAssociationResolver:
                             ),
                             system=self._responsibility_coverage_system_prompt(),
                             response_format=self._coverage_certificate_response_schema(
-                                len(reconsidered_output.new_goals)
+                                list(reconsidered_output.new_goals),
+                                temporal_scalar=self._uses_compact_coverage_contract(
+                                    request=request,
+                                    raw=accepted_raw,
+                                ),
                             ),
                             prompt_family=(
                                 "goal_association.responsibility_coverage_final"
@@ -1399,9 +1535,37 @@ class GoalAssociationResolver:
             if redundant_resource_binding_recovery:
                 metadata["mechanical_contract_recovery"] = {
                     "field": "new_goals[].bindings",
-                    "strategy": "drop_inactive_resource_binding_branch",
+                    "strategy": "normalize_inactive_resource_binding_branch",
                     "dropped_count": len(redundant_resource_binding_recovery),
                     "entries": redundant_resource_binding_recovery,
+                }
+            if invalid_optional_quantity_recovery:
+                metadata["optional_quantity_contract_recovery"] = {
+                    "field": "new_goals[].resource_responsibility.quantity",
+                    "strategy": "drop_invalid_optional_scalar",
+                    "dropped_count": len(invalid_optional_quantity_recovery),
+                    "entries": invalid_optional_quantity_recovery,
+                }
+            if ungrounded_resource_location_recovery:
+                metadata["source_grounding_recovery"] = {
+                    "field": "new_goals[].resource_responsibility.query_scope",
+                    "strategy": "drop_unentailed_location_query_fact",
+                    "dropped_count": len(ungrounded_resource_location_recovery),
+                    "entries": ungrounded_resource_location_recovery,
+                }
+            if generic_location_type_recovery:
+                metadata["generic_location_type_recovery"] = {
+                    "field": "new_goals[].semantic_bindings[].entity_type",
+                    "strategy": "normalize_grounded_generic_location_type",
+                    "changed_count": len(generic_location_type_recovery),
+                    "entries": generic_location_type_recovery,
+                }
+            if missing_description_recovery:
+                metadata["missing_description_recovery"] = {
+                    "field": "new_goals[].description",
+                    "strategy": "copy_exact_source_responsibility_outcome",
+                    "changed_count": len(missing_description_recovery),
+                    "entries": missing_description_recovery,
                 }
             if fresh_temporal_contract_repair:
                 metadata["fresh_temporal_contract_repair"] = {
@@ -1470,9 +1634,30 @@ class GoalAssociationResolver:
             if redundant_resource_binding_recovery:
                 metadata["mechanical_contract_recovery"] = {
                     "field": "new_goals[].bindings",
-                    "strategy": "drop_inactive_resource_binding_branch",
+                    "strategy": "normalize_inactive_resource_binding_branch",
                     "dropped_count": len(redundant_resource_binding_recovery),
                     "entries": redundant_resource_binding_recovery,
+                }
+            if ungrounded_resource_location_recovery:
+                metadata["source_grounding_recovery"] = {
+                    "field": "new_goals[].resource_responsibility.query_scope",
+                    "strategy": "drop_unentailed_location_query_fact",
+                    "dropped_count": len(ungrounded_resource_location_recovery),
+                    "entries": ungrounded_resource_location_recovery,
+                }
+            if generic_location_type_recovery:
+                metadata["generic_location_type_recovery"] = {
+                    "field": "new_goals[].semantic_bindings[].entity_type",
+                    "strategy": "normalize_grounded_generic_location_type",
+                    "changed_count": len(generic_location_type_recovery),
+                    "entries": generic_location_type_recovery,
+                }
+            if missing_description_recovery:
+                metadata["missing_description_recovery"] = {
+                    "field": "new_goals[].description",
+                    "strategy": "copy_exact_source_responsibility_outcome",
+                    "changed_count": len(missing_description_recovery),
+                    "entries": missing_description_recovery,
                 }
             return GoalAssociationResolution(
                 turn_id=turn_id,
@@ -1549,14 +1734,15 @@ class GoalAssociationResolver:
     def _drop_inactive_resource_bindings(
         raw: dict[str, Any],
     ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-        """Remove model content from a resource Goal's inactive binding branch.
+        """Normalize model content from a resource Goal's inactive binding branch.
 
         Resource Goals have one semantic owner: ``resource_responsibility``. Some
-        structured-output models nevertheless populate the mutually exclusive
-        top-level ``bindings`` branch. The decoder contract makes that branch empty,
-        so discarding it is mechanical DTO normalization, not semantic repair. The
-        independent source-grounded coverage certificate remains responsible for
-        rejecting any material user fact absent from the nested resource authority.
+        structured-output models nevertheless populate the mutually exclusive top-
+        level ``bindings`` branch. Move nonduplicate model-authored bindings into the
+        discriminated resource owner before clearing the inactive branch. This is
+        mechanical DTO normalization: no value is inferred or rewritten, and the
+        independent source-grounded coverage certificate still decides whether each
+        migrated fact belongs to the Responsibility.
         """
 
         normalized = copy.deepcopy(raw)
@@ -1569,24 +1755,379 @@ class GoalAssociationResolver:
             if not isinstance(goal, dict):
                 continue
             top_level = goal.get("bindings")
-            if not isinstance(top_level, list) or not top_level:
-                continue
+            if not isinstance(top_level, list):
+                top_level = []
             resource = goal.get("resource_responsibility")
             if not isinstance(resource, dict):
                 continue
             kind = str(resource.get("kind") or "").strip()
             if kind not in {"information", "physical_object"}:
                 continue
+            if kind == "information":
+                target = resource.get("query_scope")
+            else:
+                source = resource.get("source")
+                target = (
+                    source.get("acquisition_bindings")
+                    if isinstance(source, dict)
+                    else None
+                )
+            physical_source_unknown = bool(
+                kind == "physical_object"
+                and isinstance(resource.get("source"), dict)
+                and resource["source"].get("status") != "known"
+            )
+            has_inactive_physical_grounding = bool(
+                physical_source_unknown
+                and isinstance(target, list)
+                and target
+            )
+            if physical_source_unknown and (top_level or has_inactive_physical_grounding):
+                # `status` is the discriminant: unknown/provider-resolved sources
+                # cannot own acquisition grounding. Clear model content from that
+                # inactive branch so the independent semantic coverage audit can
+                # decide whether the entire resource wrapper was justified. Never
+                # flip unknown to known or reinterpret body-motion parameters as an
+                # object-acquisition location.
+                source = resource["source"]
+                existing = source.pop("acquisition_bindings", [])
+                goal["bindings"] = []
+                dropped.append(
+                    {
+                        "path": f"new_goals[{index}].bindings",
+                        "resource_kind": kind,
+                        "binding_count": len(top_level),
+                        "migrated_count": 0,
+                        "inactive_acquisition_binding_count": (
+                            len(existing) if isinstance(existing, list) else 0
+                        ),
+                        "reason": "unknown_physical_source_has_no_grounding_branch",
+                    }
+                )
+                continue
+            if not top_level:
+                continue
+            if not isinstance(target, list):
+                target = []
+                if kind == "information":
+                    resource["query_scope"] = target
+                elif isinstance(resource.get("source"), dict):
+                    resource["source"]["acquisition_bindings"] = target
+            fingerprints = {
+                json.dumps(item, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+                for item in target
+            }
+            migrated_count = 0
+            for binding in top_level:
+                fingerprint = json.dumps(
+                    binding,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                if fingerprint in fingerprints:
+                    continue
+                target.append(copy.deepcopy(binding))
+                fingerprints.add(fingerprint)
+                migrated_count += 1
             goal["bindings"] = []
             dropped.append(
                 {
                     "path": f"new_goals[{index}].bindings",
                     "resource_kind": kind,
                     "binding_count": len(top_level),
-                    "reason": "inactive_when_nested_resource_authority_is_present",
+                    "migrated_count": migrated_count,
+                    "reason": "normalized_into_active_resource_binding_branch",
                 }
             )
         return normalized, dropped
+
+    @staticmethod
+    def _drop_invalid_optional_resource_quantities(
+        raw: dict[str, Any],
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        """Drop only malformed optional quantity scalars before validation.
+
+        No replacement quantity is inferred. Responsibility coverage still proves
+        conservation of any source-grounded quantity, so removing decoder noise
+        cannot silently erase a quantity the human actually supplied.
+        """
+
+        normalized = copy.deepcopy(raw)
+        goals = normalized.get("new_goals")
+        if not isinstance(goals, list):
+            return normalized, []
+        dropped: list[dict[str, Any]] = []
+        for index, goal in enumerate(goals):
+            if not isinstance(goal, dict):
+                continue
+            resource = goal.get("resource_responsibility")
+            if not isinstance(resource, dict) or "quantity" not in resource:
+                continue
+            value = resource.get("quantity")
+            if value is None or value == "":
+                continue
+            try:
+                if not isinstance(value, str):
+                    raise ValueError("quantity is not a string")
+                _validate_model_resource_quantity(value.strip())
+            except (TypeError, ValueError):
+                resource.pop("quantity", None)
+                dropped.append(
+                    {
+                        "path": (
+                            f"new_goals[{index}].resource_responsibility.quantity"
+                        ),
+                        "reason": "invalid_optional_quantity_scalar",
+                        "input_type": type(value).__name__,
+                    }
+                )
+        return normalized, dropped
+
+    @staticmethod
+    def _restore_missing_goal_descriptions(
+        raw: dict[str, Any],
+        *,
+        request: CognitiveWorkRequest,
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        """Restore a mechanically omitted description from its exact source outcome.
+
+        The source Responsibility remains the semantic authority.  Recovery is
+        permitted only when the candidate names exactly one admitted local_ref and
+        its description is absent or blank; no wording is generated or inferred.
+        Responsibility/output-mode conservation and the independent coverage audit
+        still validate the resulting Goal.
+        """
+
+        normalized = copy.deepcopy(raw)
+        outcomes = {
+            item.local_ref: item.outcome
+            for item in request.responsibilities
+            if item.local_ref and item.outcome
+        }
+        recovered: list[dict[str, Any]] = []
+        goals = normalized.get("new_goals")
+        if not isinstance(goals, list):
+            return normalized, recovered
+        for index, goal in enumerate(goals):
+            if not isinstance(goal, dict):
+                continue
+            if str(goal.get("description") or "").strip():
+                continue
+            source_refs = goal.get("source_responsibility_refs")
+            if not isinstance(source_refs, list) or len(source_refs) != 1:
+                continue
+            source_ref = str(source_refs[0] or "").strip()
+            outcome = outcomes.get(source_ref)
+            if not outcome:
+                continue
+            goal["description"] = outcome
+            recovered.append(
+                {
+                    "path": f"new_goals[{index}].description",
+                    "source_responsibility_ref": source_ref,
+                    "semantic_value_unchanged": True,
+                }
+            )
+        return normalized, recovered
+
+    @staticmethod
+    def _drop_ungrounded_resource_query_locations(
+        raw: dict[str, Any],
+        *,
+        request: CognitiveWorkRequest,
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        """Drop an invented optional query location without choosing a replacement.
+
+        This restores Responsibility conservation before validation.  Coverage
+        remains responsible for rejecting the Goal when location was actually
+        material, so the normalization cannot silently satisfy missing meaning.
+        """
+
+        normalized = copy.deepcopy(raw)
+        authoritative_turn = " ".join(request.text.strip().split()).casefold()
+        grounded_values = {
+            " ".join(str(value).strip().split()).casefold()
+            for responsibility in request.responsibilities
+            for value in responsibility.bindings.values()
+            if str(value).strip()
+        }
+        resolved_values = {
+            " ".join(str(item.get("resolved_value") or "").strip().split()).casefold()
+            for item in normalized.get("resolved_references") or []
+            if isinstance(item, dict)
+            and str(item.get("resolved_value") or "").strip()
+        }
+        location_types = {
+            "address",
+            "city",
+            "country",
+            "county",
+            "location",
+            "place",
+            "region",
+        }
+        dropped: list[dict[str, Any]] = []
+        goals = normalized.get("new_goals")
+        if not isinstance(goals, list):
+            return normalized, dropped
+        for goal_index, goal in enumerate(goals):
+            if not isinstance(goal, dict):
+                continue
+            resource = goal.get("resource_responsibility")
+            if not isinstance(resource, dict) or resource.get("kind") != "information":
+                continue
+            query_scope = resource.get("query_scope")
+            if not isinstance(query_scope, list):
+                continue
+            kept: list[Any] = []
+            for binding_index, binding in enumerate(query_scope):
+                if not isinstance(binding, dict):
+                    kept.append(binding)
+                    continue
+                name = "_".join(
+                    str(binding.get("name") or "")
+                    .strip()
+                    .casefold()
+                    .replace("-", "_")
+                    .split()
+                )
+                entity_type = "_".join(
+                    str(binding.get("entity_type") or "")
+                    .strip()
+                    .casefold()
+                    .replace("-", "_")
+                    .split()
+                )
+                value = " ".join(
+                    str(binding.get("value") or "").strip().split()
+                ).casefold()
+                is_location = name == "location" or entity_type in location_types
+                grounded = bool(
+                    value
+                    and (
+                        value in authoritative_turn
+                        or value in grounded_values
+                        or value in resolved_values
+                    )
+                )
+                if (
+                    not is_location
+                    or str(binding.get("referent_id") or "").strip()
+                    or grounded
+                ):
+                    kept.append(binding)
+                    continue
+                dropped.append(
+                    {
+                        "path": (
+                            f"new_goals[{goal_index}].resource_responsibility."
+                            f"query_scope[{binding_index}]"
+                        ),
+                        "name": str(binding.get("name") or ""),
+                        "entity_type": str(binding.get("entity_type") or ""),
+                        "value": str(binding.get("value") or ""),
+                        "reason": "not_entailed_by_turn_responsibility_or_referent",
+                    }
+                )
+            resource["query_scope"] = kept
+        return normalized, dropped
+
+    @staticmethod
+    def _normalize_grounded_generic_location_types(
+        raw: dict[str, Any],
+        *,
+        request: CognitiveWorkRequest,
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        """Canonicalize only a source-grounded location with a generic DTO type.
+
+        The model already owns the semantic field name and exact value. This adapter
+        changes neither; it replaces only the mechanically non-semantic ``string``/
+        ``text``/``entity`` type label after the value is proven by the authoritative
+        turn, GI bindings, or an admitted resolved reference.
+        """
+
+        normalized = copy.deepcopy(raw)
+        authoritative_turn = " ".join(request.text.strip().split()).casefold()
+        grounded_values = {
+            " ".join(str(value).strip().split()).casefold()
+            for responsibility in request.responsibilities
+            for value in responsibility.bindings.values()
+            if str(value).strip()
+        }
+        grounded_values.update(
+            " ".join(str(item.get("resolved_value") or "").strip().split()).casefold()
+            for item in normalized.get("resolved_references") or []
+            if isinstance(item, dict)
+            and str(item.get("resolved_value") or "").strip()
+        )
+        generic_types = {"entity", "string", "text"}
+        repaired: list[dict[str, Any]] = []
+        goals = normalized.get("new_goals")
+        if not isinstance(goals, list):
+            return normalized, repaired
+        for goal_index, goal in enumerate(goals):
+            if not isinstance(goal, dict):
+                continue
+            surfaces: list[tuple[str, Any]] = [("bindings", goal.get("bindings"))]
+            resource = goal.get("resource_responsibility")
+            if isinstance(resource, dict):
+                if resource.get("kind") == "information":
+                    surfaces.append(("resource.query_scope", resource.get("query_scope")))
+                source = resource.get("source")
+                if isinstance(source, dict):
+                    surfaces.append(
+                        (
+                            "resource.source.acquisition_bindings",
+                            source.get("acquisition_bindings"),
+                        )
+                    )
+            for surface_name, bindings in surfaces:
+                if not isinstance(bindings, list):
+                    continue
+                for binding_index, binding in enumerate(bindings):
+                    if not isinstance(binding, dict):
+                        continue
+                    name = "_".join(
+                        str(binding.get("name") or "")
+                        .strip()
+                        .casefold()
+                        .replace("-", "_")
+                        .split()
+                    )
+                    entity_type = "_".join(
+                        str(binding.get("entity_type") or "")
+                        .strip()
+                        .casefold()
+                        .replace("-", "_")
+                        .split()
+                    )
+                    value = " ".join(
+                        str(binding.get("value") or "").strip().split()
+                    ).casefold()
+                    if (
+                        name != "location"
+                        or entity_type not in generic_types
+                        or not value
+                        or (
+                            value not in authoritative_turn
+                            and value not in grounded_values
+                        )
+                    ):
+                        continue
+                    binding["entity_type"] = "place"
+                    repaired.append(
+                        {
+                            "path": (
+                                f"new_goals[{goal_index}].{surface_name}"
+                                f"[{binding_index}].entity_type"
+                            ),
+                            "from": entity_type,
+                            "to": "place",
+                            "value_unchanged": True,
+                        }
+                    )
+        return normalized, repaired
 
     @staticmethod
     def _only_canonical_temporal_validation_errors(exc: ValidationError) -> bool:
@@ -1807,6 +2348,16 @@ class GoalAssociationResolver:
                 "new_goals item for every independently observable responsibility: "
                 + ", ".join(collection_bindings)
             )
+        output_mode_conflicts = self._responsibility_output_mode_conflicts(
+            model_output,
+            request=request,
+        )
+        if output_mode_conflicts:
+            raise ValueError(
+                "new Goal output_mode must preserve Goal Interpretation's "
+                "provider-neutral completion modality: "
+                + ", ".join(output_mode_conflicts)
+            )
         binding_conflicts = self._binding_semantic_contract_conflicts(model_output)
         if binding_conflicts:
             raise ValueError(
@@ -1825,6 +2376,18 @@ class GoalAssociationResolver:
                 "requested quantity, recipient, and delivery fields are not source "
                 "evidence: "
                 + ", ".join(resource_source_conflicts)
+            )
+        source_binding_conflicts = self._source_grounded_binding_coverage_conflicts(
+            model_output,
+            request=request,
+        )
+        if source_binding_conflicts:
+            raise ValueError(
+                "new Goal typed bindings must preserve every directly supplied "
+                "material Goal Interpretation value on the Goal that cites its "
+                "Responsibility; prose is not a binding and no supplied value may "
+                "be dropped: "
+                + ", ".join(source_binding_conflicts)
             )
         location_bindings = self._non_verbatim_explicit_location_bindings(
             model_output,
@@ -1870,14 +2433,39 @@ class GoalAssociationResolver:
         return rejected
 
     @staticmethod
+    def _responsibility_output_mode_conflicts(
+        model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
+        *,
+        request: CognitiveWorkRequest,
+    ) -> list[str]:
+        expected = {
+            item.local_ref: item.output_mode
+            for item in request.responsibilities
+            if item.output_mode != "unspecified"
+        }
+        conflicts: list[str] = []
+        for goal_index, goal in enumerate(model_output.new_goals):
+            for source_ref in goal.source_responsibility_refs:
+                required = expected.get(source_ref)
+                if required is None or goal.output_mode == required:
+                    continue
+                conflicts.append(
+                    f"new_goals[{goal_index}] source_ref={source_ref} "
+                    f"expected={required} actual={goal.output_mode}"
+                )
+        return conflicts
+
+    @staticmethod
     def _binding_semantic_contract_conflicts(
         model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
     ) -> list[str]:
         """Reject contradictions between model-authored canonical binding fields.
 
         This does not infer a parameter from user wording. It only prevents a DTO
-        from calling the same binding two different canonical parameter kinds, such
-        as ``name=distance`` with ``entity_type=quantity``.
+        from calling the same binding a different or non-canonical parameter kind,
+        such as ``name=distance`` with ``entity_type=quantity`` or the generic
+        ``measurement`` label. The decoder already exposes this exact invariant;
+        runtime validation keeps it fail-closed when a provider ignores the clause.
         """
 
         categories = {
@@ -1912,11 +2500,7 @@ class GoalAssociationResolver:
                 )
                 name_category = category_by_token.get(name)
                 type_category = category_by_token.get(entity_type)
-                if (
-                    name_category is not None
-                    and type_category is not None
-                    and name_category != type_category
-                ):
+                if name_category is not None and type_category != name_category:
                     conflicts.append(
                         f"new_goals[{goal_index}].bindings[{binding_index}]="
                         f"{binding.name}/{binding.entity_type}"
@@ -1971,12 +2555,22 @@ class GoalAssociationResolver:
             "distance",
             "location",
             "origin",
+            "path",
             "place",
             "provider",
+            "route",
             "source",
             "source_location",
             "source_provider",
             "spatial_offset",
+        }
+        spatial_source_types = {
+            "direction",
+            "distance",
+            "location",
+            "place",
+            "relative_location",
+            "route",
         }
 
         conflicts: list[str] = []
@@ -1997,15 +2591,185 @@ class GoalAssociationResolver:
                     .replace("-", "_")
                     .split()
                 )
-                if normalized_name in non_source_names or (
-                    normalized_type in identity_or_quantity_types
-                    and normalized_name not in explicit_source_names
+                if (
+                    normalized_name in non_source_names
+                    or normalized_name not in explicit_source_names
+                    or normalized_type not in spatial_source_types
+                    or (
+                        normalized_type in identity_or_quantity_types
+                        and normalized_name not in explicit_source_names
+                    )
                 ):
                     conflicts.append(
                         f"new_goals[{goal_index}].resource_responsibility."
                         f"source.acquisition_bindings[{source_name}]="
                         f"non_source_semantics({binding.name}/{binding.entity_type})"
                     )
+        return conflicts
+
+    @staticmethod
+    def _source_grounded_binding_coverage_conflicts(
+        model_output: (
+            GoalAssociationModelOutput
+            | GoalSegmentationModelOutput
+            | list[GoalAssociationModelGoal]
+        ),
+        *,
+        request: CognitiveWorkRequest,
+    ) -> list[str]:
+        """Conserve direct GI material values on their one typed Goal surface.
+
+        Goal Interpretation already owns whether a value is material WHAT. This
+        check does not infer a parameter kind from the utterance; it follows the
+        model-authored source_responsibility_refs and verifies that directly
+        source-grounded values did not disappear. The Goal description is the
+        authoritative owner of the action/effect itself, while bindings own its
+        material parameters; an exact source action retained in that description
+        therefore does not need a redundant ``action`` binding.
+        Context-normalized values absent from the literal turn remain governed by
+        their dedicated temporal/referent contracts.
+        """
+
+        authoritative_turn = " ".join(request.text.strip().casefold().split())
+        expected_by_ref: dict[str, set[tuple[str, str]]] = {}
+
+        def scalar_values(value: Any) -> set[str]:
+            if isinstance(value, str):
+                normalized = " ".join(value.strip().casefold().split())
+                return {normalized} if normalized else set()
+            if isinstance(value, dict):
+                return {
+                    item
+                    for nested in value.values()
+                    for item in scalar_values(nested)
+                }
+            if isinstance(value, (list, tuple)):
+                return {
+                    item
+                    for nested in value
+                    for item in scalar_values(nested)
+                }
+            return set()
+
+        for responsibility in request.responsibilities:
+            expected_by_ref[responsibility.local_ref] = {
+                (
+                    "_".join(str(name).strip().casefold().replace("-", "_").split()),
+                    value,
+                )
+                for name, raw_value in responsibility.bindings.items()
+                for value in scalar_values(raw_value)
+                if value in authoritative_turn
+            }
+
+        conflicts: list[str] = []
+        goals = model_output if isinstance(model_output, list) else model_output.new_goals
+        for goal_index, goal in enumerate(goals):
+            expected_pairs = {
+                pair
+                for source_ref in goal.source_responsibility_refs
+                for pair in expected_by_ref.get(source_ref, set())
+            }
+            if not expected_pairs:
+                continue
+            resource = goal.resource_responsibility
+            canonicalized_binding_names: set[str] = set()
+            if resource is None:
+                actual = {
+                    " ".join(binding.value.strip().casefold().split())
+                    for binding in goal.semantic_bindings
+                }
+                canonicalized_binding_names = {
+                    "_".join(
+                        binding.name.strip().casefold().replace("-", "_").split()
+                    )
+                    for binding in goal.semantic_bindings
+                    if binding.entity_type.casefold() == "speed"
+                }
+                normalized_description = " ".join(
+                    goal.description.strip().casefold().split()
+                )
+                actual.update(
+                    value
+                    for name, value in expected_pairs
+                    if name in {"action", "activity", "effect", "outcome"}
+                    and value in normalized_description
+                )
+            elif resource.kind == "information":
+                temporal_names = {
+                    "date",
+                    "day_part",
+                    "period",
+                    "temporal_scope",
+                    "time",
+                    "time_of_day",
+                }
+                expected_pairs = {
+                    pair for pair in expected_pairs if pair[0] not in temporal_names
+                }
+                actual = {
+                    " ".join(binding.value.strip().casefold().split())
+                    for binding in resource.query_scope
+                }
+                actual.update(
+                    scalar_values(resource.quantity)
+                )
+                actual.update(scalar_values(resource.recipient.description))
+                if resource.source.status == "known":
+                    actual.update(scalar_values(resource.source.source_name))
+            else:
+                actual = {
+                    " ".join(binding.value.strip().casefold().split())
+                    for binding in resource.source.acquisition_bindings
+                }
+                normalized_description = " ".join(
+                    goal.description.strip().casefold().split()
+                )
+                normalized_resource_description = " ".join(
+                    resource.description.strip().casefold().split()
+                )
+                actual.update(
+                    value
+                    for name, value in expected_pairs
+                    if name in {"action", "activity", "effect", "outcome"}
+                    and value in normalized_description
+                )
+                actual.update(
+                    value
+                    for name, value in expected_pairs
+                    if name
+                    in {
+                        "desired_item",
+                        "item",
+                        "object",
+                        "resource",
+                        "resource_identity",
+                        "target_item",
+                    }
+                    and value in normalized_resource_description
+                )
+                actual.update(
+                    value
+                    for name, value in expected_pairs
+                    if name in {"amount", "count", "quantity", "resource_quantity"}
+                    and value in scalar_values(resource.quantity)
+                )
+                actual.update(
+                    value
+                    for name, value in expected_pairs
+                    if name in {"recipient", "delivery_recipient"}
+                    and value in scalar_values(resource.recipient.description)
+                )
+            for _, missing in sorted(
+                pair
+                for pair in expected_pairs
+                if pair[1] not in actual
+                and pair[0] not in canonicalized_binding_names
+            ):
+                conflicts.append(
+                    f"new_goals[{goal_index}] source_refs="
+                    f"{','.join(goal.source_responsibility_refs)} missing={missing!r}"
+                )
         return conflicts
 
     @staticmethod
@@ -2029,6 +2793,16 @@ class GoalAssociationResolver:
             for item in model_output.resolved_references
         }
         rejected: list[str] = []
+        canonical_location_types = {
+            "address",
+            "city",
+            "country",
+            "county",
+            "location",
+            "place",
+            "relative_location",
+            "region",
+        }
         for goal_index, goal in enumerate(model_output.new_goals):
             for binding in goal.semantic_bindings:
                 name = "_".join(
@@ -2046,6 +2820,12 @@ class GoalAssociationResolver:
                     "place",
                     "region",
                 }:
+                    continue
+                if name == "location" and entity_type not in canonical_location_types:
+                    rejected.append(
+                        f"new_goals[{goal_index}].bindings[{binding.name}]="
+                        f"non_location_semantics({binding.entity_type!r})"
+                    )
                     continue
                 if binding.referent_id or (
                     binding.entity_type.casefold(),
@@ -2086,6 +2866,8 @@ class GoalAssociationResolver:
         *,
         responsibility_count: int | None = None,
         responsibility_refs: list[str] | None = None,
+        responsibility_output_modes: dict[str, str] | None = None,
+        responsibility_bindings: dict[str, dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         schema = copy.deepcopy(output_type.model_json_schema())
         active_ids = [
@@ -2106,6 +2888,11 @@ class GoalAssociationResolver:
             and " ".join(str(gap.get("gap_id") or "").strip().split())
         ]
         responsibility_refs = list(responsibility_refs or [])
+        responsibility_output_modes = dict(responsibility_output_modes or {})
+        responsibility_bindings = {
+            str(source_ref): dict(bindings)
+            for source_ref, bindings in (responsibility_bindings or {}).items()
+        }
         properties = schema.get("properties", {})
         new_goals = properties.get("new_goals")
         if isinstance(new_goals, dict):
@@ -2136,6 +2923,16 @@ class GoalAssociationResolver:
                         source_refs["uniqueItems"] = True
                         if responsibility_refs:
                             source_refs["minItems"] = 1
+                        if "relationship" in node_properties:
+                            # Association confidence is model evidence used by the
+                            # fail-closed commit threshold. A DTO default of 0.0 is
+                            # not evidence and must never silently discard an
+                            # otherwise correct continuity decision.
+                            required_fields = list(node.get("required") or [])
+                            for field in ("target_goal_ids", "confidence"):
+                                if field not in required_fields:
+                                    required_fields.append(field)
+                            node["required"] = required_fields
                     related_field = node_properties.get("related_goal_ids")
                     if isinstance(related_field, dict):
                         items = related_field.get("items")
@@ -2187,6 +2984,173 @@ class GoalAssociationResolver:
                     constrain(value)
 
         constrain(schema)
+        goal_schema = schema.get("$defs", {}).get("GoalAssociationModelGoal")
+        if isinstance(goal_schema, dict) and responsibility_refs:
+            # Every writable Goal-semantic surface must be explicit in the
+            # constrained model output. Defaults on these fields are Python DTO
+            # conveniences, not permission for the model to drop GI-grounded
+            # bindings or silently avoid deciding the resource branch.
+            goal_required = list(
+                dict.fromkeys(
+                    [
+                        *(goal_schema.get("required") or []),
+                        "source_responsibility_refs",
+                        "description",
+                        "output_mode",
+                        "bindings",
+                        "resource_responsibility",
+                    ]
+                )
+            )
+            goal_schema["required"] = goal_required
+            source_refs_schema = goal_schema.get("properties", {}).get(
+                "source_responsibility_refs"
+            )
+            if isinstance(source_refs_schema, dict):
+                source_refs_schema["minItems"] = 1
+                source_refs_schema["maxItems"] = 1
+            goal_properties = goal_schema.get("properties")
+            branch_goal_properties = (
+                copy.deepcopy(goal_properties)
+                if isinstance(goal_properties, dict)
+                else {}
+            )
+
+            def branch_properties(
+                source_ref: str,
+                *,
+                resource_variant: Literal[
+                    "ordinary", "physical_object", "information", "unbounded"
+                ],
+            ) -> dict[str, Any]:
+                """Return the complete, output-mode-compatible Goal surface.
+
+                ``resource_responsibility`` is required so the decoder must make
+                the resource decision explicitly, but Pydantic's default schema
+                lists the object union before ``null``.  Ollama's constrained
+                decoder consequently biased ordinary effects toward fabricated
+                resources.  Keep semantic selection model-owned while removing
+                impossible resource kinds and putting the ordinary ``null`` branch
+                first.  ``body_action`` remains free to select a real physical
+                acquisition, and ``capability_work`` remains free to select a real
+                information responsibility.
+                """
+
+                properties = copy.deepcopy(branch_goal_properties)
+                output_mode = responsibility_output_modes.get(source_ref)
+                if resource_variant == "ordinary":
+                    properties["resource_responsibility"] = {"type": "null"}
+                    expected_bindings = [
+                        (" ".join(str(name).strip().split()), str(value))
+                        for name, value in responsibility_bindings.get(
+                            source_ref, {}
+                        ).items()
+                        if " ".join(str(name).strip().split())
+                        and "_".join(
+                            str(name)
+                            .strip()
+                            .casefold()
+                            .replace("-", "_")
+                            .split()
+                        )
+                        not in {"action", "activity", "effect", "outcome"}
+                    ]
+                    if expected_bindings:
+                        bindings_schema = copy.deepcopy(
+                            properties.get("bindings") or {}
+                        )
+                        bindings_schema["minItems"] = len(expected_bindings)
+                        bindings_schema.setdefault("maxItems", 12)
+                        bindings_schema["allOf"] = [
+                            {
+                                "contains": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {"const": name},
+                                        "value": {"const": value},
+                                    },
+                                    "required": ["name", "value"],
+                                },
+                                "minContains": 1,
+                            }
+                            for name, value in expected_bindings
+                        ]
+                        properties["bindings"] = bindings_schema
+                elif resource_variant == "physical_object":
+                    properties["resource_responsibility"] = {
+                        "$ref": (
+                            "#/$defs/"
+                            "GoalAssociationModelPhysicalResourceResponsibility"
+                        )
+                    }
+                    properties["bindings"] = {
+                        **copy.deepcopy(properties.get("bindings") or {}),
+                        "maxItems": 0,
+                    }
+                elif resource_variant == "information":
+                    properties["resource_responsibility"] = {
+                        "$ref": (
+                            "#/$defs/"
+                            "GoalAssociationModelInformationResourceResponsibility"
+                        )
+                    }
+                    properties["bindings"] = {
+                        **copy.deepcopy(properties.get("bindings") or {}),
+                        "maxItems": 0,
+                    }
+
+                properties["source_responsibility_refs"] = {
+                    "const": [source_ref]
+                }
+                if output_mode is not None:
+                    properties["output_mode"] = {"const": output_mode}
+                return properties
+
+            def resource_variants(source_ref: str) -> list[str]:
+                output_mode = responsibility_output_modes.get(source_ref)
+                if output_mode == "body_action":
+                    return ["ordinary", "physical_object"]
+                if output_mode == "capability_work":
+                    return ["ordinary", "information"]
+                if output_mode is not None:
+                    return ["ordinary"]
+                return ["unbounded"]
+
+            goal_schema["oneOf"] = []
+            for source_ref in responsibility_refs:
+                for resource_variant in resource_variants(source_ref):
+                    goal_schema["oneOf"].append(
+                        {
+                            # Ollama's constrained decoder treats the selected
+                            # oneOf object branch as the active production surface.
+                            # Repeat the complete writable Goal surface here, not
+                            # only the discriminants, so branch-local required
+                            # fields can actually be generated. Resource-capable
+                            # modes use complete cross-product branches so an
+                            # ordinary Goal cannot also populate a resource object.
+                            "properties": branch_properties(
+                                source_ref,
+                                resource_variant=resource_variant,
+                            ),
+                            # Some constrained decoders treat a nested oneOf branch
+                            # as the active object production surface rather than
+                            # combining its required list with the parent object.
+                            "required": list(
+                                dict.fromkeys(
+                                    [
+                                        *goal_required,
+                                        "source_responsibility_refs",
+                                        *(
+                                            ["output_mode"]
+                                            if source_ref
+                                            in responsibility_output_modes
+                                            else []
+                                        ),
+                                    ]
+                                )
+                            ),
+                        }
+                    )
         properties = schema.setdefault("properties", {})
         required = list(schema.get("required") or [])
         if output_type is GoalSegmentationModelOutput:
@@ -2279,6 +3243,25 @@ class GoalAssociationResolver:
                                 "afternoon",
                                 "evening",
                                 "night",
+                            ]
+                        }
+                    },
+                    "required": ["value"],
+                },
+            }
+        )
+        clauses.append(
+            {
+                "if": {
+                    "properties": {"entity_type": {"const": "speed"}},
+                    "required": ["entity_type"],
+                },
+                "then": {
+                    "properties": {
+                        "value": {
+                            "anyOf": [
+                                {"enum": ["slow", "normal", "quick"]},
+                                {"pattern": r".*[0-9].*"},
                             ]
                         }
                     },
@@ -2465,6 +3448,325 @@ class GoalAssociationResolver:
         text = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
         return text if len(text) <= max_chars else text[:max_chars].rstrip() + "..."
 
+    def _build_segmentation_prompt(
+        self,
+        request: CognitiveWorkRequest,
+    ) -> str:
+        """Render the complete no-candidate Goal contract without continuity prose.
+
+        The former shared prompt repeated association, planning, resource, and
+        coverage rules even when no Goal existed to associate.  Besides making the
+        semantic boundary harder to review, that forced qualified small models into
+        a much larger context allocation.  This prompt keeps the same authorities
+        and failure semantics while stating each no-candidate rule once.
+        """
+
+        context = request.context if isinstance(request.context, dict) else {}
+        identity_json = self._goal_segmentation_identity_json(context)
+        identity_contract = (
+            _GOAL_SEGMENTATION_IDENTITY_CONTRACT
+            if identity_json != "null"
+            else ""
+        )
+        skill_section = agent_skill_prompt_section(
+            context,
+            agent_role="goal_association",
+        )
+        responsibilities_json = self._bounded_json(
+            [
+                item.model_dump(mode="json", exclude_none=True)
+                for item in request.responsibilities
+            ],
+            4200,
+        )
+        return (
+            "There are no active or retained recent Goals. Association is impossible; "
+            "create new Goals only. Goal Association receives provider-neutral "
+            "Responsibility evidence, not a route, Capability, plan, or response draft. "
+            "The authoritative user turn and the supplied GI Responsibilities are the "
+            "only sources of owed human outcomes. Fast Planner Activity is HOW authored "
+            "concurrently and must never become, justify, or be copied into a Goal. "
+            "Responsibility conservation is strict: create exactly one Goal for each "
+            "independently satisfiable Responsibility, copy its local_ref into "
+            "source_responsibility_refs, and neither merge independent effects nor add "
+            "acknowledgement, progress, delivery, personality, or implementation Goals. "
+            "A manner, prohibition, timing, or social-presentation modifier stays on the "
+            "outcome it constrains. A greeting attached to substantive work is framing; "
+            "a standalone social act is one speech Goal. One lookup and the requested "
+            "judgment of that same evidence are one Goal. Acquisition, carrying, return, "
+            "and handoff are stages of one requested physical delivery, not sibling Goals.\n\n"
+            "Copy a supplied Responsibility output_mode exactly; it is the only "
+            "model-authored execution discriminator. Preserve every supplied material "
+            "binding verbatim, including counts, durations, speeds, directions, targets, "
+            "severity, thresholds, negation, comparison, and scope. For a non-resource "
+            "Goal, put these in top-level typed bindings; the action itself may remain in "
+            "description. Do not claim completion or choose a Capability. "
+            f"{_EXECUTION_CONTRACT_PROMPT}\n\n"
+            "Use resource_responsibility only when obtaining and making a resource "
+            "available to a recipient is the human outcome. A physical_object is a "
+            "distinct concrete object independent of Chromie's body and requires "
+            "acquisition plus physical_handover. Locomotion, gaze, blinking, gesture, "
+            "turning, posture, and other self-motion are non-resource body_action Goals; "
+            "never describe Chromie's body, position, displacement, or motion as an "
+            "object to acquire or hand over. A physical resource keeps top-level bindings "
+            "empty; its identity/quantity belong to description/quantity and its supplied "
+            "location, distance, direction, and route belong separately in "
+            "source.acquisition_bindings. Supplied spatial grounding requires "
+            "source.status=known; source.status=unknown is allowed only when none was "
+            "supplied.\n\n"
+            "An information resource uses output_mode=capability_work and one exact "
+            "information_domain: local_clock, weather_forecast, "
+            "external_grounded_information, direct_environment_perception, or "
+            "private_runtime_information. Its query_scope is the sole owner of location, "
+            "time, aspects, comparisons, and thresholds: a resolved place is a "
+            "query_scope binding named location, with time and requested result aspects "
+            "as separate bindings. Current nearby people/objects/events require "
+            "direct_environment_perception, not weather. A public source uses "
+            "source.status=provider_resolved; source.status=unknown preserves an "
+            "unavailable local/private/runtime source; source.status=known is only for an "
+            "explicitly named source. Never invent location, timezone, source, provider, "
+            "device, coordinates, or another query fact. For a supplied date plus local "
+            "day part, emit separate query_scope bindings for both: entity_type=date and "
+            "entity_type=day_part. Normalize tonight to date=today plus day_part=night; "
+            "duration is not a date. Never narrow broader temporal scope.\n\n"
+            "Resolve a pronoun, demonstrative, ellipsis, correction, or task mention only "
+            "from explicit current meaning, a supplied scoped discourse referent, a "
+            "candidate binding, or accepted dialogue, in that order. There are no "
+            "candidate Goals in this request. If evidence does not select one meaning, "
+            "keep the narrowest source-grounded provisional Goal and do not invent the "
+            "referent; Fast Planner owns any clarification. resolved_references may copy "
+            "only a supplied referent_id. Ordinary explicit mentions are bindings, not "
+            "resolved references. referent_updates require supplied provenance; never "
+            "invent IDs. Tool results and runtime diagnostics are not semantic authority.\n\n"
+            f"{identity_contract}"
+            "The Host owns IDs, versions, lifecycle, source text, persistence, plans, and "
+            "canonical construction. Emit none of those fields. Return only the exact "
+            "GoalSegmentationModelOutput JSON Schema: decision=create_goals, new_goals, "
+            "referent_updates, resolved_references, confidence, and compact reason_summary. "
+            "Goal Association never executes, commits, asks a question, creates a planning "
+            "InformationGap, or pretends work is complete.\n\n"
+            "Owner-approved Chromie identity JSON:\n"
+            f"{identity_json}\n\n"
+            + skill_section
+            + "Responsibility evidence JSON:\n"
+            f"{responsibilities_json}\n\n"
+            "GI unresolved-meaning evidence JSON:\n"
+            f"{self._bounded_json(request.interpretation_unresolved, 1600)}\n\n"
+            "Scoped discourse referents JSON:\n"
+            f"{self._bounded_json(self._discourse_referents(request), 3000)}\n\n"
+            "Recent accepted conversation JSON (reference evidence only):\n"
+            f"{self._bounded_json((context.get('history') or request.history or [])[-6:], 2600)}\n\n"
+            f"Language hint: {request.language or 'auto'}\n"
+            f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
+        )
+
+    @staticmethod
+    def _goal_segmentation_identity_json(context: dict[str, Any]) -> str:
+        """Project identity facts Goal semantics can own, excluding voice style."""
+
+        source = owner_approved_identity_context(context)
+        identity = source.get("identity")
+        if not isinstance(identity, dict):
+            return "null"
+        compact_identity = {
+            key: identity[key]
+            for key in (
+                "entity_id",
+                "name",
+                "kind",
+                "gender",
+                "pronouns",
+                "age_description",
+                "family_role",
+                "family_context_boundary",
+            )
+            if key in identity and identity[key] not in (None, "", [], {})
+        }
+        payload: dict[str, Any] = {
+            "owner_approved": True,
+            "identity": compact_identity,
+        }
+        self_model = source.get("self_model")
+        if isinstance(self_model, dict):
+            compact_self_model = {
+                key: self_model[key]
+                for key in (
+                    "perceiving_entity_id",
+                    "acting_entity_id",
+                    "body_owner_entity_id",
+                )
+                if key in self_model and self_model[key] not in (None, "")
+            }
+            if compact_self_model:
+                payload["self_model"] = compact_self_model
+        return json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+
+    @staticmethod
+    def _association_goal_projection(
+        candidate_goals: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Keep only semantic continuity evidence owned by Goal Association."""
+
+        projected: list[dict[str, Any]] = []
+        for snapshot in candidate_goals:
+            if not isinstance(snapshot, dict):
+                continue
+            goal = snapshot.get("goal")
+            goal = goal if isinstance(goal, dict) else {}
+            metadata = goal.get("metadata")
+            metadata = metadata if isinstance(metadata, dict) else {}
+            item = {
+                "goal_id": snapshot.get("goal_id") or goal.get("goal_id"),
+                "responsibility_status": (
+                    snapshot.get("responsibility_status")
+                    or goal.get("responsibility_status")
+                ),
+                "work_status": snapshot.get("work_status"),
+                "description": goal.get("description"),
+                "source_text": goal.get("source_text"),
+                "bindings": (goal.get("object") or {}).get("bindings", {}),
+                "output_mode": metadata.get("output_mode"),
+                "completion_requires_work": metadata.get(
+                    "completion_requires_work"
+                ),
+                "completion_requires_fresh_evidence": metadata.get(
+                    "completion_requires_fresh_evidence"
+                ),
+                "open_information_gaps": snapshot.get(
+                    "open_information_gaps", []
+                ),
+                "last_user_update": snapshot.get("last_user_update"),
+            }
+            projected.append(
+                {
+                    key: value
+                    for key, value in item.items()
+                    if value not in (None, "", [], {})
+                }
+            )
+        return projected
+
+    @staticmethod
+    def _association_dialogue_projection(history: Any) -> list[dict[str, Any]]:
+        """Remove runtime envelopes while retaining accepted dialogue meaning."""
+
+        if not isinstance(history, list):
+            return []
+        projected: list[dict[str, Any]] = []
+        for item in history[-8:]:
+            if not isinstance(item, dict):
+                continue
+            role = str(item.get("role") or "").strip().lower()
+            text = " ".join(str(item.get("text") or "").strip().split())
+            if role not in {"user", "assistant"} or not text:
+                continue
+            compact: dict[str, Any] = {"role": role, "text": text[:320]}
+            metadata = item.get("metadata")
+            if isinstance(metadata, dict):
+                semantic_status = str(
+                    metadata.get("semantic_status") or ""
+                ).strip()
+                if semantic_status:
+                    compact["semantic_status"] = semantic_status
+            projected.append(compact)
+        return projected
+
+    def _build_association_prompt(
+        self,
+        request: CognitiveWorkRequest,
+        candidate_goals: list[dict[str, Any]],
+    ) -> str:
+        """Render existing-Goal continuity without unrelated planning prose."""
+
+        context = request.context if isinstance(request.context, dict) else {}
+        identity_json = self._goal_segmentation_identity_json(context)
+        identity_section = (
+            "Owner-approved Chromie identity JSON:\n"
+            f"{identity_json}\n\n"
+        )
+        identity_contract = (
+            _GOAL_SEGMENTATION_IDENTITY_CONTRACT
+            if identity_json != "null"
+            else ""
+        )
+        skill_section = agent_skill_prompt_section(
+            context,
+            agent_role="goal_association",
+        )
+        responsibilities = [
+            item.model_dump(mode="json", exclude_none=True)
+            for item in request.responsibilities
+        ]
+        history = context.get("history") or request.history or []
+        return (
+            "Resolve canonical Goal continuity from the authoritative user turn, GI "
+            "Responsibilities, bounded candidate Goals, scoped referents, and accepted "
+            "dialogue. This boundary owns Goal association/creation only: never choose "
+            "a Capability, Plan, execution method, response wording, clarification "
+            "policy, or completion claim. The Host owns IDs, versions, persistence, "
+            "lifecycle mechanics, and canonical construction.\n\n"
+            "Map every GI local_ref exactly once to either one association or one new "
+            "Goal; never merge independent effects or add progress, acknowledgement, "
+            "delivery, personality, or implementation Goals. Verify GI relationship "
+            "and target_goal_ids against the supplied candidates rather than recency or "
+            "lexical overlap. For unchanged unfinished/recoverable work use continue. "
+            "Use resume only for paused work. Use reference for retrieval, restatement, "
+            "explanation, comparison, or another answer from retained Goal meaning "
+            "without lifecycle change. A new reaction, feeling, evaluation, practical "
+            "decision, or independently satisfiable conversation is a new speech Goal. "
+            "Use clarify only when this turn supplies missing Goal meaning; confirm and "
+            "reject apply only to a pending proposal. Copy relationship exactly from "
+            "continue, modify, clarify, confirm, reject, cancel, pause, resume, merge, "
+            "split, or reference. Target only supplied Goal IDs.\n\n"
+            "An association preserves the existing Goal's description, typed bindings, "
+            "output_mode, and completion contract. It cannot rewrite a material entity "
+            "or parameter. If current meaning changes one, create one complete replacement "
+            "Goal and put the old ID in supersedes_goal_ids. If current meaning is "
+            "independent, create a new Goal without reopening the old one. A recent "
+            "terminal Goal may be referenced but not reopened. Preserve unresolved human "
+            "meaning in the narrowest provisional Goal; Fast Planner alone decides any "
+            "question.\n\n"
+            "For a new Goal, copy the GI output_mode and every material binding exactly. "
+            "Use resource_responsibility only when the owed outcome is to acquire and "
+            "make a resource available. A physical_object is a concrete object independent "
+            "of Chromie's body and uses physical_handover; locomotion, gaze, blinking, "
+            "gesture, and posture are non-resource body_action. An information resource "
+            "uses capability_work and keeps location, time, aspects, comparisons, and "
+            "thresholds in query_scope. Never invent a source, location, provider, device, "
+            "timezone, or execution fact. Directly named entities preserve the exact "
+            "current-turn surface. resolved_references and referent_updates may copy only "
+            "supplied referent IDs.\n\n"
+            "Return only the exact GoalAssociationModelOutput JSON: decision, "
+            "associations, new_goals, referent_updates, resolved_references, confidence, "
+            "and compact reason_summary. Use decision=associate for continuity and "
+            "decision=create_goals for independent or replacement work.\n\n"
+            f"{identity_section}"
+            f"{identity_contract}"
+            f"{_EXECUTION_CONTRACT_PROMPT}\n\n"
+            f"{skill_section}"
+            "Candidate Goal semantic evidence JSON:\n"
+            f"{self._bounded_json(self._association_goal_projection(candidate_goals), 2600)}\n\n"
+            "GI Responsibility evidence JSON:\n"
+            f"{self._bounded_json(responsibilities, 2600)}\n\n"
+            "GI unresolved-meaning evidence JSON:\n"
+            f"{self._bounded_json(request.interpretation_unresolved, 800)}\n\n"
+            "Goal interaction evidence JSON:\n"
+            f"{self._bounded_json(context.get('interaction_context') or {}, 900)}\n\n"
+            "Scoped discourse referents JSON:\n"
+            f"{self._bounded_json(self._discourse_referents(request), 1400)}\n\n"
+            "Accepted dialogue JSON:\n"
+            f"{self._bounded_json(self._association_dialogue_projection(history), 1400)}\n\n"
+            f"Language hint: {request.language or 'auto'}\n"
+            f"FINAL AUTHORITATIVE USER TURN:\n{request.text}\n\n"
+            "FINAL CANDIDATE GOAL IDS JSON:\n"
+            f"{self._bounded_json([item.get('goal_id') for item in candidate_goals], 900)}"
+        )
+
     def _build_prompt(
         self,
         request: CognitiveWorkRequest,
@@ -2474,6 +3776,12 @@ class GoalAssociationResolver:
             type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
         ),
     ) -> str:
+        if output_type is GoalSegmentationModelOutput:
+            return self._build_segmentation_prompt(request)
+        return self._build_association_prompt(request, candidate_goals)
+
+        # The remaining source below is retained temporarily while the compact
+        # existing-Goal prompt is validated against the canonical behavior suite.
         context = request.context if isinstance(request.context, dict) else {}
         identity_json = bounded_identity_json(context)
         personality_json = bounded_personality_json(context)
@@ -2517,19 +3825,24 @@ class GoalAssociationResolver:
             "Never emit id, goal_id, association_id, turn_id, schema_version, source_text, constraints, object, metadata, success_criteria, capabilities, or plans. Referent IDs may only be copied from the supplied discourse context; new referent IDs are Host-generated.\n\n"
             "Create one new goal for each independently satisfiable user responsibility. Copy every owning GI local_ref into that Goal's source_responsibility_refs; every GI Responsibility ref must map to exactly one association or new Goal. The authoritative user turn plus Responsibility evidence are the only sources of human Responsibility here; Fast Planner Activity is HOW authored concurrently and must never become, justify, or be copied into a sibling Goal. Responsibility conservation is strict: never create an extra Goal for acknowledgement, progress, response delivery, personality, or any other outcome that is absent from the authoritative Responsibility evidence. Emit exactly one new_goals item containing source_responsibility_refs, description, typed bindings, and an optional provider-neutral resource_responsibility for each responsibility. "
             "Every new Goal must declare one exact output_mode that describes the semantic work completing the human outcome. output_mode is the only model-authored execution discriminator. Responsibility kind, execution lane, and provider requirement are Host-derived projections and are not fields in the model schema. Media playback may also declare its exact media_operation; non-media Goals may omit media_operation and the Host supplies none. "
+            "When Responsibility evidence includes output_mode, copy that exact value "
+            "to its one Goal. Goal Interpretation owns this provider-neutral completion "
+            "modality; Goal Association must not reinterpret, weaken, or relabel it. "
+            "Use output_mode=speech for an ordinary authored conversational response, including a greeting, empathy, reassurance, restatement, explanation from supplied context, or acknowledgement of a person's feeling. The need to think or formulate words never makes ordinary conversation capability_work. A person's report of their own state never becomes body_action or capability_work unless the authoritative Responsibility separately asks Chromie to change the world. Preserve speaker, experiencer, actor, and addressee ownership exactly. "
             f"{_EXECUTION_CONTRACT_PROMPT} "
             "The eventual spoken delivery of a capability result is part of that same capability_dependent Goal, never an additional vocal_output Goal. Persona, tone, wording, and answer delivery are not independent Goals. "
             "A requested manner, mood, persona, or social presentation attached to a substantive action or other effect is a constraint on how that effect should be expressed, not a second Goal. Keep it in the substantive Goal description. It becomes a separate vocal Goal only when the user independently asks to hear positive authored content or a vocal performance that remains satisfiable without the substantive effect. "
             "A standalone social interaction such as a greeting, thanks, reassurance request, casual check-in, reaction, personal feeling, evaluation, or practical decision is itself one satisfiable conversational Goal: respond naturally to that current social act. This remains true when the act is grounded in information delivered by a previous Goal. Prior evidence may support the answer, but it does not replace the latest communicative responsibility. Do not treat it as an empty turn or fold it into an already completed task merely because the topic is related. "
+            "A new question about what Chromie previously said is a fresh speech Goal whose owed outcome is for Chromie to repeat or summarize the most recent accepted assistant/Chromie dialogue utterance. It references that utterance as content but does not continue, resume, or modify the old Goal merely because the old response supplies the answer. Never reverse this into asking the user to repeat, and never substitute the user's earlier utterance or current question for Chromie's delivered words. "
             "A greeting or politeness preamble attached to a substantive request is conversational framing, not a separate Goal unless the user independently asks for a social response. Owner-approved identity and personality shape expression only; never create a Goal merely to mention age, identity, warmth, curiosity, or another style trait. "
             "A factual lookup and the user's requested interpretation of that same evidence are one Goal when one capability result can satisfy both, such as checking weather and judging whether it is hot. Multiple requested aspects of one information result, such as precipitation and whether the resulting temperature is cold, remain one information responsibility when the same result satisfies them. Do not split evidence acquisition, requested result aspects, or interpretation of that result into separate Goals. "
             "A physical action and a conversational answer or spoken performance are independent goals when the answer or performance is genuinely requested. Separate independently requested outcomes that can be accepted or rejected on their own. However, acquisition and delivery stages that together constitute one human responsibility are one Goal: navigating/searching, locating, grasping or retrieving, carrying, returning, and handing over are provider-owned stages of one physical resource delivery; external search, evidence retrieval, evaluation, and spoken explanation are stages of one information resource delivery. Do not split those implementation stages into separate Goals unless the user independently requests one stage as its own outcome. A simple acknowledgement, confirmation, willingness statement, or progress prelude for capability work is not a separate vocal_output Goal; it is prospective conversational output attached to the existing responsibility and every cognitive stage must use Interaction Context to avoid repeating an already fulfilled act. Before returning, verify that every independently satisfiable user responsibility appears in exactly one new_goals item: no merged unrelated outcomes and no duplicated responsibility across Goals. "
-            "For a responsibility whose human-level outcome is to obtain something and make it available to a recipient, include exactly one nested resource_responsibility. It is the sole writable resource authority and is discriminated by top-level kind. A physical_object resource means a distinct concrete object that exists independently of Chromie's body motion and whose acquisition plus handover completes the human outcome. It is never a generic wrapper for embodied work: locomotion, body motion, gaze, blinking, waving, turning, posture, and gestures are non-resource body_action Goals, keep resource_responsibility absent, and preserve their material semantic parameters in top-level bindings. For kind=information, use output_mode=capability_work and write every requested query fact—location, time, requested aspect, comparison, threshold, or other answer-shaping scope—exactly once in query_scope. Its source object is intentionally narrow: source.status=provider_resolved delegates public/external source selection; source.status=unknown preserves an unavailable local/private/runtime source; source.status=known is only for a user- or discourse-named information source and then source_name is required. Never copy query_scope facts into source. For kind=physical_object, use output_mode=body_action and delivery_mode=physical_handover; identity and quantity live at resource_responsibility.description/quantity, while source.acquisition_bindings is the only writable location/distance/direction/route surface. Preserve explicit distance and direction separately; source.description is summary only and any numeric fact in it must also exist in acquisition_bindings. Resource Goals keep top-level bindings empty. No flat compatibility copy is created. resource_responsibility must never name or imply a Capability, provider implementation, website, search engine, coordinates, grasp pose, execution mode, or plan. Human-readable descriptions never override typed fields. "
+            "For a responsibility whose human-level outcome is to obtain something and make it available to a recipient, include exactly one nested resource_responsibility. It is the sole writable resource authority and is discriminated by top-level kind. A physical_object resource means a distinct concrete object that exists independently of Chromie's body motion and whose acquisition plus handover completes the human outcome. It is never a generic wrapper for embodied work: locomotion, body motion, gaze, blinking, waving, turning, posture, and gestures are non-resource body_action Goals, keep resource_responsibility absent, and preserve their material semantic parameters in top-level bindings. For kind=information, use output_mode=capability_work, classify the provider-neutral information_domain from the evidence actually needed (local_clock, weather_forecast, external_grounded_information, direct_environment_perception, or private_runtime_information), and write every requested query fact—location, time, requested aspect, comparison, threshold, or other answer-shaping scope—exactly once in query_scope. Current nearby person/object/event presence is direct_environment_perception, never weather merely because both concern outside. Its source object is intentionally narrow: source.status=provider_resolved delegates public/external source selection; source.status=unknown preserves an unavailable local/private/runtime source; source.status=known is only for a user- or discourse-named information source and then source_name is required. Never copy query_scope facts into source. For kind=physical_object, use output_mode=body_action and delivery_mode=physical_handover; identity and quantity live at resource_responsibility.description/quantity, while source.acquisition_bindings is the only writable location/distance/direction/route surface. When the user or a resolved discourse referent supplies any spatial acquisition fact, source.status must be known and acquisition_bindings must preserve every supplied distance, direction, location, or route separately. source.status=unknown is valid only when no acquisition grounding was supplied. Preserve explicit distance and direction separately; source.description is summary only and any numeric fact in it must also exist in acquisition_bindings. Resource Goals keep top-level bindings empty. No flat compatibility copy is created. resource_responsibility must never name or imply a Capability, provider implementation, website, search engine, coordinates, grasp pose, execution mode, or plan. Human-readable descriptions never override typed fields. "
             "Also preserve semantic qualifiers such as temporal scope, comparison period, and requested answer shape. Temporal scope can contain more than one material dimension. When the user supplies a calendar or relative date together with a local day part, emit separate query_scope bindings for both: entity_type=date with the resolved date value such as today or tomorrow, and entity_type=day_part with exactly one canonical value from day, morning, afternoon, evening, or night. Natural 'tonight' therefore normalizes to date=today plus day_part=night; never put relative-date meaning inside day_part. Use day for the whole local daylight period. Neither dimension covers or replaces the other. When only a local day part is semantically resolved, represent it provider-neutrally as entity_type=day_part with its canonical value; keep the user's natural wording in the Goal description rather than using a provider-specific clock interval. This is semantic normalization, not Capability selection. Never silently rewrite annual, seasonal, historical, comparative, or otherwise broad scope into current, today, tomorrow, or another narrower scope. If the intended scope is materially ambiguous, preserve it in a provisional Goal without choosing a narrower interpretation. "
             "Resolve references, pronouns, demonstratives, ellipsis, and task mentions before planning. Authority order is: explicit current user meaning; foreground scoped discourse referents; candidate Goal bindings; recent dialogue. First identify every material indirect referring expression, then require a unique value from that authority order before writing a resolved binding or supplied referent. Imperative grammar and a plausible generic noun such as device, object, person, task, or setting are never reference evidence. If two or more contextual candidates remain plausible, or none is supplied, preserve the unresolved reference in the provisional Goal description without selecting a candidate; Fast Planner owns the narrow clarification decision. Phrases such as ‘the last task I told you’ may semantically associate with an active, recoverable, or retained recent terminal Goal, but the model must decide that relationship from the supplied Goal state and dialogue—not from a Host phrase table. Tool-result memory is not reference-resolution authority and must never decide what an unresolved expression refers to. "
             "When the user introduces or explicitly corrects a salient entity, emit referent_updates only when the required discourse-index provenance is available. Use operation=correct with non-empty target_referent_ids copied from supplied discourse context when a new value supersedes an earlier referent; never emit an unscoped correction when no target referent ID was supplied. The canonical Goal association and typed bindings still preserve a correction even when no discourse-index update can be authored. The old referent remains available in its own task scope but becomes background. Use operation=introduce for a new salient entity, and focus/background/retire only for supplied referent IDs. "
             "Use resolved_references only for indirect references whose denotation is uniquely selected from a supplied discourse referent or active Goal binding, such as pronouns, demonstratives, ellipsis, aliases, corrections, or task mentions. Do not emit resolved_references for an ordinary explicit entity mention such as a directly named place; represent that meaning in the new Goal bindings and, when it is salient for future dialogue, in referent_updates. Every resolved_references item must copy a supplied referent_id and include explicit confidence. If resolution is materially ambiguous, omit the invented binding/reference and preserve a provisional Goal instead. "
-            "Each non-resource Goal must include top-level typed bindings for material entities and parameters already resolved here, including explicit counts, durations, speeds, directions, and targets. A resource Goal keeps top-level bindings empty and owns every material resource fact only in resource_responsibility. For information, query_scope is the one query-fact surface; for weather, a resolved place is a query_scope binding named location, with time and requested result aspects as separate bindings. Preserve every explicit severity, intensity, magnitude, threshold, subtype, negation, or comparison qualifier that changes satisfactory completion. Never generalize a narrower request. Downstream planners read the canonical resource directly; no persisted flat projection exists. "
+            "Each non-resource Goal must include top-level typed bindings for material entities and parameters already resolved here, including explicit counts, durations, speeds, directions, and targets. For a qualitative speed, use the provider-neutral canonical value slow, normal, or quick; retain more specific severity or intensity as a separate binding rather than hiding it in an inflected speed phrase. Preserve an explicit quantitative speed with its value and units. The action/effect itself belongs in the Goal description; it does not need a duplicate action binding when that exact source value is already retained there. A resource Goal keeps top-level bindings empty and owns every material resource fact only in resource_responsibility. For information, query_scope is the one query-fact surface; for weather, a resolved place is a query_scope binding named location, with time and requested result aspects as separate bindings. For physical acquisition, use the canonical name and entity_type distance/distance for distance and direction/direction for direction. A relative spatial place may use location/relative_location; generic labels such as measurement or string are not canonical substitutes for a known typed fact. Preserve every explicit severity, intensity, magnitude, threshold, subtype, negation, or comparison qualifier that changes satisfactory completion. Never generalize a narrower request. Downstream planners read the canonical resource directly; no persisted flat projection exists. "
             "For a location named directly in the final authoritative user turn, copy the complete location value verbatim as one contiguous span in the user's language. Never translate, transliterate, shorten, or expand a directly named location. A directly supplied location is a resolved semantic binding, not a claim that provider canonicalization has already succeeded. Do not ask the user for administrative granularity merely because multiple real-world places might share that value; create the fully bound Goal and let the downstream Capability resolve the exact value or report provider ambiguity. When the user's intended location is genuinely underdetermined in the dialogue, preserve that unresolved scope in the provisional Goal and leave clarification selection to Fast Planner. Only an indirect reference resolved from a supplied referent may use the referent's canonical value instead. For an indirect location, copy the supplied referent_id into both the location binding and resolved_references, and copy the indirect user surface into resolved_references.surface_form. "
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
@@ -2649,7 +3962,7 @@ class GoalAssociationResolver:
             + output_instructions
             + "Select exactly one Goal-state decision branch. Do not author clarification wording or planning gaps. Each new_goals item contains description, output_mode, optional media_operation, bindings, optional supersedes_goal_ids, and optional provider-neutral resource_responsibility only. Choose output_mode from the work that actually completes the Goal; the Host derives the internal responsibility class, lane, and provider-evidence requirement. media_playback requires one exact media_operation; non-media Goals may omit it. "
             + _EXECUTION_CONTRACT_PROMPT
-            + " Preserve one nested resource_responsibility when the responsibility is genuinely to acquire and deliver a physical object or grounded information; never add it to a vocal performance or insert provider details. It is the sole writable resource authority. Use kind=information with output_mode=capability_work, query_scope for all requested information facts, and a narrow source object that can only delegate, remain unknown, or name one explicit information source. Use kind=physical_object with output_mode=body_action, delivery_mode=physical_handover, and source.acquisition_bindings as the sole spatial/acquisition fact surface. Never duplicate one fact across fields and never create top-level Goal bindings for a resource Goal. Preserve every supplied temporal dimension separately: use entity_type=date for a resolved calendar or relative date and normalize its value to today, tomorrow, or an exact ISO 8601 calendar date (YYYY-MM-DD); use entity_type=day_part for a resolved local day part. A compound date-plus-day-part scope requires both bindings; neither replaces the other. Never repair missing human-level scope by inventing a default: preserve unresolved scope in a provisional Goal and leave the exact missing value unset. Preserve or repair explicit discourse resolution and referent updates; never use tool-result contents to infer a reference. "
+            + " Preserve one nested resource_responsibility when the responsibility is genuinely to acquire and deliver a physical object or grounded information; never add it to a vocal performance or insert provider details. It is the sole writable resource authority. Use kind=information with output_mode=capability_work, an exact provider-neutral information_domain, query_scope for all requested information facts, and a narrow source object that can only delegate, remain unknown, or name one explicit information source. Classify present nearby people, objects, or events as direct_environment_perception, not weather_forecast. Use kind=physical_object with output_mode=body_action, delivery_mode=physical_handover, and source.acquisition_bindings as the sole spatial/acquisition fact surface. Never duplicate one fact across fields and never create top-level Goal bindings for a resource Goal. In physical acquisition bindings, distance uses name=distance and entity_type=distance, direction uses name=direction and entity_type=direction, and a relative place may use name=location and entity_type=relative_location. Generic measurement or string types do not replace these canonical types. Preserve every supplied temporal dimension separately: use entity_type=date for a resolved calendar or relative date and normalize its value to today, tomorrow, or an exact ISO 8601 calendar date (YYYY-MM-DD); use entity_type=day_part for a resolved local day part. A compound date-plus-day-part scope requires both bindings; neither replaces the other. Never repair missing human-level scope by inventing a default: preserve unresolved scope in a provisional Goal and leave the exact missing value unset. Preserve or repair explicit discourse resolution and referent updates; never use tool-result contents to infer a reference. "
             "The host owns every ID and persistence field. Re-segment every independently satisfiable responsibility from the authoritative user turn; do not preserve an invalid merge merely because it appeared in the previous output.\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
         )
@@ -2689,10 +4002,19 @@ class GoalAssociationResolver:
         ),
     ) -> LayeredPrompt:
         context = request.context if isinstance(request.context, dict) else {}
-        identity_world = self._stable_identity_world_layer(context)
+        identity_json = self._goal_segmentation_identity_json(context)
+        identity_world = (
+            "Owner-approved Chromie identity JSON:\n"
+            f"{identity_json}\n\n"
+        )
         skill_contract = agent_skill_prompt_section(
             context,
             agent_role="goal_association",
+        )
+        identity_contracts = (
+            (_GOAL_SEGMENTATION_IDENTITY_CONTRACT,)
+            if identity_json != "null"
+            else ()
         )
         rendered = self._build_prompt(
             request,
@@ -2703,8 +4025,7 @@ class GoalAssociationResolver:
             rendered,
             identity_world=(identity_world,),
             operating_contract=(
-                IDENTITY_SEMANTIC_CONTRACT,
-                PERSONALITY_SEMANTIC_CONTRACT,
+                *identity_contracts,
                 _EXECUTION_CONTRACT_PROMPT,
             ),
             capability_contract=(skill_contract,),
@@ -2776,8 +4097,11 @@ class GoalAssociationResolver:
 
     @staticmethod
     def _coverage_certificate_response_schema(
-        goal_count: int,
+        candidate_goals: list[GoalAssociationModelGoal],
+        *,
+        temporal_scalar: bool = False,
     ) -> dict[str, Any]:
+        goal_count = len(candidate_goals)
         schema = copy.deepcopy(
             GoalResponsibilityCoverageCertificate.model_json_schema()
         )
@@ -2793,6 +4117,8 @@ class GoalAssociationResolver:
                 "candidate_goal_indices",
                 "temporal_dimensions",
                 "required_goal_shape",
+                "required_information_domain",
+                "required_output_mode",
             ]
             indices = item_schema.get("properties", {}).get(
                 "candidate_goal_indices"
@@ -2803,6 +4129,26 @@ class GoalAssociationResolver:
                 if isinstance(index_items, dict):
                     index_items["type"] = "integer"
                     index_items["enum"] = list(range(max(0, goal_count)))
+            if temporal_scalar:
+                temporal_dimensions = item_schema.get("properties", {}).get(
+                    "temporal_dimensions"
+                )
+                if isinstance(temporal_dimensions, dict):
+                    temporal_dimensions.clear()
+                    temporal_dimensions.update(
+                        {
+                            "type": "string",
+                            "enum": [
+                                "none",
+                                "date",
+                                "day_part",
+                                "date_and_day_part",
+                            ],
+                            "description": (
+                                "Calendar/local-day dimensions only; durations use none."
+                            ),
+                        }
+                    )
             item_schema.setdefault("allOf", []).extend(
                 [
                     {
@@ -2819,8 +4165,14 @@ class GoalAssociationResolver:
                                 },
                                 "independently_satisfiable": {"enum": [False]},
                                 "candidate_goal_indices": {"maxItems": 0},
-                                "temporal_dimensions": {"maxItems": 0},
+                                "temporal_dimensions": (
+                                    {"const": "none"}
+                                    if temporal_scalar
+                                    else {"maxItems": 0}
+                                ),
                                 "required_goal_shape": {"const": "ordinary"},
+                                "required_information_domain": {"const": "none"},
+                                "required_output_mode": {"const": "none"},
                             }
                         },
                     },
@@ -2835,6 +4187,52 @@ class GoalAssociationResolver:
                             "properties": {
                                 "independently_satisfiable": {"enum": [False]},
                                 "required_goal_shape": {"const": "ordinary"},
+                                "required_information_domain": {"const": "none"},
+                                "required_output_mode": {"const": "none"},
+                            }
+                        },
+                    },
+                    {
+                        "if": {
+                            "properties": {
+                                "role": {"enum": ["responsibility"]},
+                                "required_goal_shape": {
+                                    "enum": ["information_resource"]
+                                },
+                            },
+                            "required": ["role", "required_goal_shape"],
+                        },
+                        "then": {
+                            "properties": {
+                                "required_information_domain": {
+                                    "enum": [
+                                        "local_clock",
+                                        "weather_forecast",
+                                        "external_grounded_information",
+                                        "direct_environment_perception",
+                                        "private_runtime_information",
+                                    ]
+                                },
+                                "required_output_mode": {"const": "capability_work"},
+                            }
+                        },
+                    },
+                    {
+                        "if": {
+                            "properties": {
+                                "required_goal_shape": {
+                                    "enum": [
+                                        "ordinary",
+                                        "physical_resource",
+                                        "persistent_effect",
+                                    ]
+                                }
+                            },
+                            "required": ["required_goal_shape"],
+                        },
+                        "then": {
+                            "properties": {
+                                "required_information_domain": {"const": "none"}
                             }
                         },
                     },
@@ -2847,7 +4245,41 @@ class GoalAssociationResolver:
                         },
                         "then": {
                             "properties": {
-                                "temporal_dimensions": {"maxItems": 0}
+                                "temporal_dimensions": (
+                                    {"const": "none"}
+                                    if temporal_scalar
+                                    else {"maxItems": 0}
+                                )
+                            }
+                        },
+                    },
+                    {
+                        "if": {
+                            "properties": {
+                                "required_goal_shape": {
+                                    "enum": ["physical_resource"]
+                                }
+                            },
+                            "required": ["required_goal_shape"],
+                        },
+                        "then": {
+                            "properties": {
+                                "required_output_mode": {"const": "body_action"}
+                            }
+                        },
+                    },
+                    {
+                        "if": {
+                            "properties": {
+                                "required_goal_shape": {
+                                    "enum": ["persistent_effect"]
+                                }
+                            },
+                            "required": ["required_goal_shape"],
+                        },
+                        "then": {
+                            "properties": {
+                                "required_output_mode": {"const": "capability_work"}
                             }
                         },
                     },
@@ -2933,7 +4365,123 @@ class GoalAssociationResolver:
                     },
                 ]
             )
-        schema["required"] = ["items", "reason_summary"]
+            properties = schema.get("properties", {})
+            responsibility_items = properties.get("responsibility_items")
+            supporting_items = properties.get("supporting_items")
+            if isinstance(responsibility_items, dict):
+                responsibility_item = copy.deepcopy(item_schema)
+                responsibility_item_properties = responsibility_item["properties"]
+                responsibility_required = list(responsibility_item["required"])
+
+                def candidate_shape(
+                    candidate: GoalAssociationModelGoal,
+                ) -> tuple[str, str, str]:
+                    resource = candidate.resource_responsibility
+                    if resource is not None and resource.kind == "information":
+                        return (
+                            "information_resource",
+                            resource.information_domain,
+                            candidate.output_mode,
+                        )
+                    if resource is not None and resource.kind == "physical_object":
+                        return ("physical_resource", "none", candidate.output_mode)
+                    if candidate.output_mode == "capability_work":
+                        return ("persistent_effect", "none", candidate.output_mode)
+                    return ("ordinary", "none", candidate.output_mode)
+
+                def responsibility_branch(
+                    *,
+                    coverage: str,
+                    candidate_index: int | None,
+                    constrain_to_candidate: bool,
+                ) -> dict[str, Any]:
+                    branch_properties = copy.deepcopy(
+                        responsibility_item_properties
+                    )
+                    branch_properties["role"] = {"const": "responsibility"}
+                    branch_properties["coverage"] = {"const": coverage}
+                    branch_properties["temporal_dimensions"] = {
+                        **copy.deepcopy(
+                            branch_properties.get("temporal_dimensions") or {}
+                        ),
+                        "maxItems": 0,
+                    }
+                    branch_properties["candidate_goal_indices"] = {
+                        "const": (
+                            []
+                            if candidate_index is None
+                            else [candidate_index]
+                        )
+                    }
+                    if constrain_to_candidate and candidate_index is not None:
+                        shape, information_domain, output_mode = candidate_shape(
+                            candidate_goals[candidate_index]
+                        )
+                        branch_properties["required_goal_shape"] = {
+                            "const": shape
+                        }
+                        branch_properties["required_information_domain"] = {
+                            "const": information_domain
+                        }
+                        branch_properties["required_output_mode"] = {
+                            "const": output_mode
+                        }
+                    return {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": branch_properties,
+                        "required": responsibility_required,
+                    }
+
+                responsibility_branches: list[dict[str, Any]] = []
+                for candidate_index in range(goal_count):
+                    responsibility_branches.extend(
+                        [
+                            responsibility_branch(
+                                coverage="covered",
+                                candidate_index=candidate_index,
+                                constrain_to_candidate=True,
+                            ),
+                            responsibility_branch(
+                                coverage="clarification_required",
+                                candidate_index=candidate_index,
+                                constrain_to_candidate=True,
+                            ),
+                            responsibility_branch(
+                                coverage="representation_mismatch",
+                                candidate_index=candidate_index,
+                                constrain_to_candidate=False,
+                            ),
+                        ]
+                    )
+                responsibility_branches.append(
+                    responsibility_branch(
+                        coverage="missing",
+                        candidate_index=None,
+                        constrain_to_candidate=False,
+                    )
+                )
+                responsibility_items["items"] = {
+                    "oneOf": responsibility_branches
+                }
+            if isinstance(supporting_items, dict):
+                supporting_item = copy.deepcopy(item_schema)
+                supporting_item["properties"]["role"] = {
+                    "type": "string",
+                    "enum": ["constraint", "context", "framing"],
+                }
+                supporting_item["properties"]["temporal_dimensions"][
+                    "description"
+                ] = (
+                    "Calendar-date and local day-part dimensions only. Durations, "
+                    "ordering, concurrency, and simultaneity always use []."
+                )
+                supporting_items["items"] = supporting_item
+        schema["required"] = [
+            "responsibility_items",
+            "supporting_items",
+            "reason_summary",
+        ]
         schema["additionalProperties"] = False
         return schema
 
@@ -2955,12 +4503,157 @@ class GoalAssociationResolver:
                 retryable=True,
             )
         normalized_raw = copy.deepcopy(raw)
-        normalized_items = normalized_raw.get("items")
+        normalized_items: list[Any] = []
         recoveries: list[dict[str, Any]] = []
-        if isinstance(normalized_items, list):
+        for field_name in ("responsibility_items", "supporting_items"):
+            field_items = normalized_raw.get(field_name)
+            if isinstance(field_items, list):
+                unique_items: list[Any] = []
+                seen_items: set[str] = set()
+                for item_index, item in enumerate(field_items):
+                    fingerprint = json.dumps(
+                        item,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    )
+                    if fingerprint in seen_items:
+                        recoveries.append(
+                            {
+                                "field": field_name,
+                                "item_index": item_index,
+                                "recovery": "removed_exact_duplicate",
+                            }
+                        )
+                        continue
+                    seen_items.add(fingerprint)
+                    unique_items.append(item)
+                normalized_raw[field_name] = unique_items
+                normalized_items.extend(unique_items)
+        if normalized_items:
             for item_index, item in enumerate(normalized_items):
                 if not isinstance(item, dict):
                     continue
+                temporal_value = item.get("temporal_dimensions")
+                if isinstance(temporal_value, str):
+                    temporal_map = {
+                        "none": [],
+                        "date": ["date"],
+                        "day_part": ["day_part"],
+                        "date_and_day_part": ["date", "day_part"],
+                    }
+                    if temporal_value in temporal_map:
+                        item["temporal_dimensions"] = temporal_map[temporal_value]
+                        recoveries.append(
+                            {
+                                "item_index": item_index,
+                                "recovery": "expanded_temporal_dimension_scalar",
+                                "from": temporal_value,
+                                "to": temporal_map[temporal_value],
+                            }
+                        )
+                required_goal_shape = str(
+                    item.get("required_goal_shape") or "ordinary"
+                )
+                required_information_domain = str(
+                    item.get("required_information_domain") or "none"
+                )
+                role = str(item.get("role") or "")
+                required_output_mode = str(
+                    item.get("required_output_mode") or "none"
+                )
+                if role != "responsibility" and required_goal_shape != "ordinary":
+                    # Goal shape classifies the independently owed result only. A
+                    # supporting item can point at a resource Goal, but cannot own
+                    # or restate that Goal's shape. This projection follows the
+                    # auditor-authored role and changes no coverage judgment.
+                    item["required_goal_shape"] = "ordinary"
+                    item["required_information_domain"] = "none"
+                    recoveries.append(
+                        {
+                            "item_index": item_index,
+                            "recovery": "cleared_supporting_goal_shape",
+                            "role": role,
+                            "from": required_goal_shape,
+                            "to": "ordinary",
+                        }
+                    )
+                    required_goal_shape = "ordinary"
+                    required_information_domain = "none"
+                if (
+                    role == "responsibility"
+                    and required_output_mode
+                    not in {"none", "body_action", "capability_work"}
+                    and required_goal_shape != "ordinary"
+                ):
+                    # Resource completion modes are body_action (physical) or
+                    # capability_work (information). Once the independent auditor
+                    # has explicitly selected any vocal/media/other completion
+                    # mode, a resource shape is mechanically impossible.
+                    item["required_goal_shape"] = "ordinary"
+                    item["required_information_domain"] = "none"
+                    recoveries.append(
+                        {
+                            "item_index": item_index,
+                            "recovery": "normalized_output_mode_goal_shape",
+                            "required_output_mode": required_output_mode,
+                            "from": required_goal_shape,
+                            "to": "ordinary",
+                        }
+                    )
+                    required_goal_shape = "ordinary"
+                    required_information_domain = "none"
+                if (
+                    required_goal_shape != "information_resource"
+                    and required_information_domain != "none"
+                ):
+                    # This domain is a redundant refinement of an information
+                    # resource. Decoder-small models can populate it from a physical
+                    # task's likely observational means. Clearing it for every
+                    # non-information shape changes no semantic branch.
+                    item["required_information_domain"] = "none"
+                    recoveries.append(
+                        {
+                            "item_index": item_index,
+                            "recovery": "cleared_non_information_domain",
+                            "required_goal_shape": required_goal_shape,
+                            "from": required_information_domain,
+                            "to": "none",
+                        }
+                    )
+                if role != "responsibility" and required_output_mode != "none":
+                    # Completion mode refines the independently satisfiable outcome,
+                    # not a supporting constraint/context item. Removing it from an
+                    # ineligible branch changes no candidate ownership or verdict.
+                    item["required_output_mode"] = "none"
+                    recoveries.append(
+                        {
+                            "item_index": item_index,
+                            "recovery": "cleared_supporting_output_mode",
+                            "role": role,
+                            "from": required_output_mode,
+                            "to": "none",
+                        }
+                    )
+                if (
+                    role in {"context", "framing"}
+                    and item.get("coverage") == "covered"
+                    and item.get("candidate_goal_indices")
+                ):
+                    # Context/framing is acknowledged but never owns a Goal. The
+                    # model already classified the role and verdict; clearing an
+                    # ineligible index removes only DTO correlation noise.
+                    previous_indices = list(item.get("candidate_goal_indices") or [])
+                    item["candidate_goal_indices"] = []
+                    recoveries.append(
+                        {
+                            "item_index": item_index,
+                            "recovery": "cleared_context_goal_ownership",
+                            "role": role,
+                            "from": previous_indices,
+                            "to": [],
+                        }
+                    )
                 coverage = str(item.get("coverage") or "")
                 indices = item.get("candidate_goal_indices")
                 if not isinstance(indices, list) or not indices:
@@ -2991,6 +4684,12 @@ class GoalAssociationResolver:
                     required_goal_shape = str(
                         item.get("required_goal_shape") or "ordinary"
                     )
+                    required_information_domain = str(
+                        item.get("required_information_domain") or "none"
+                    )
+                    required_output_mode = str(
+                        item.get("required_output_mode") or "none"
+                    )
                     mismatch_reasons: list[str] = []
                     for goal_index in indices:
                         if not isinstance(goal_index, int) or not (
@@ -3011,7 +4710,13 @@ class GoalAssociationResolver:
                             )
                         resource = candidate.resource_responsibility
                         shape_matches = {
-                            "ordinary": True,
+                            "ordinary": (
+                                item.get("role") != "responsibility"
+                                or (
+                                    resource is None
+                                    and candidate.output_mode != "capability_work"
+                                )
+                            ),
                             "information_resource": (
                                 resource is not None
                                 and resource.kind == "information"
@@ -3029,6 +4734,34 @@ class GoalAssociationResolver:
                             mismatch_reasons.append(
                                 "required_goal_shape=" + required_goal_shape
                             )
+                        if (
+                            required_goal_shape == "information_resource"
+                            and resource is not None
+                            and resource.kind == "information"
+                            and resource.information_domain
+                            != required_information_domain
+                        ):
+                            mismatch_reasons.append(
+                                "required_information_domain="
+                                + required_information_domain
+                            )
+                        if (
+                            required_output_mode != "none"
+                            and candidate.output_mode != required_output_mode
+                        ):
+                            mismatch_reasons.append(
+                                "required_output_mode=" + required_output_mode
+                            )
+                        binding_conflicts = (
+                            cls._source_grounded_binding_coverage_conflicts(
+                                [candidate],
+                                request=request,
+                            )
+                        )
+                        mismatch_reasons.extend(
+                            "missing_source_grounded_binding=" + conflict
+                            for conflict in binding_conflicts
+                        )
                     if mismatch_reasons:
                         item["coverage"] = "representation_mismatch"
                         recoveries.append(
@@ -3107,6 +4840,18 @@ class GoalAssociationResolver:
                         + item.required_goal_shape
                         + f":{item.role}:{item.source_excerpt}"
                     )
+                if item.required_information_domain != "none":
+                    problems.append(
+                        "required_information_domain:"
+                        + item.required_information_domain
+                        + f":{item.role}:{item.source_excerpt}"
+                    )
+                if item.required_output_mode != "none":
+                    problems.append(
+                        "required_output_mode:"
+                        + item.required_output_mode
+                        + f":{item.role}:{item.source_excerpt}"
+                    )
             if item.role != "responsibility" or item.coverage not in {
                 "covered",
                 "clarification_required",
@@ -3175,13 +4920,44 @@ class GoalAssociationResolver:
             + self._bounded_json(problems, 3000)
             + "\n"
             + "Typed proof feedback is structural, not optional prose. When it says "
+            "required_goal_shape:ordinary, the corrected candidate must have no "
+            "resource_responsibility. Preserve requested body motion, locomotion, "
+            "gaze, gesture, posture, or vocal performance through its exact output_mode "
+            "and top-level semantic bindings; none of those effects is an object to "
+            "acquire and hand over. When the proof reports representation_mismatch for "
+            "an embodied or vocal modality, re-read the source effect and use body_action "
+            "for locomotion/gaze/blink/gesture/posture or the exact singing/recitation/"
+            "humming/styled_speech/nonverbal_vocalization mode for an authored vocal "
+            "performance. Keep each independently observable coordinated effect in its "
+            "own Goal. When feedback lists required_output_mode, preserve that exact "
+            "output_mode in the corrected candidate; descriptive prose cannot satisfy "
+            "this typed requirement. When it says "
             "required_goal_shape:information_resource, the corrected candidate must "
             "carry one resource_responsibility object with kind=information; "
             "output_mode=capability_work or a descriptive sentence alone does not "
             "satisfy that shape. Its top-level bindings must be empty and all query "
             "facts must live in resource_responsibility.query_scope. When feedback "
+            "lists required_information_domain, preserve that exact provider-neutral "
+            "domain in resource_responsibility.information_domain; never relabel a "
+            "nearby-person or local-observation need as weather, clock, or web research. "
+            "When feedback "
             "lists temporal_dimensions, preserve every listed entity_type in the "
-            "candidate's authoritative binding surface.\n"
+            "candidate's authoritative binding surface. In particular, "
+            "temporal_dimensions:date,day_part requires two separate bindings with "
+            "entity_type=date and entity_type=day_part; time=tonight does not satisfy "
+            "either typed requirement. Every query_scope item must "
+            "be entailed by the FINAL AUTHORITATIVE USER TURN, supplied Responsibility "
+            "evidence, or an explicitly resolved discourse referent. Never invent a "
+            "provider prerequisite, placeholder, default, current location, source, "
+            "device, or other query fact merely because it might help execution. A "
+            "request for Chromie's current local clock time carries the supplied "
+            "time=now fact; it does not imply a location query.\n"
+            "For a physical resource, source-grounded distance, direction, location, "
+            "or route feedback requires source.status=known plus one "
+            "source.acquisition_bindings item for every supplied fact. unknown is not "
+            "a placeholder for supplied spatial grounding, and prose cannot replace "
+            "these typed bindings. Omit optional quantity unless a normalized positive "
+            "numeric value is source-grounded.\n"
             + terminal_instruction
             + "Return one complete final DTO. This interpretation receives no "
             "contract repair; invalid or incomplete output fails closed."
@@ -3191,53 +4967,32 @@ class GoalAssociationResolver:
     def _responsibility_coverage_system_prompt() -> str:
         return (
             "You are Chromie's independent Goal responsibility-coverage auditor. "
-            "Read the authoritative user turn from scratch and compare its semantic "
-            "requirements with the supplied zero-based Goal candidates. Enumerate "
-            "material responsibilities, constraints, context, and conversational "
-            "framing without planning or selecting capabilities. Audit not only Goal "
-            "ownership but whether the candidate represents the same kind of human "
-            "outcome. A physical-object resource represents acquisition and handover "
-            "of a distinct concrete object to a recipient. If a candidate wraps "
-            "locomotion, body movement, gaze, blinking, waving, turning, posture, or "
-            "another bodily gesture itself as a physical resource, use "
-            "coverage=representation_mismatch for that responsibility. A future "
-            "reminder, list mutation, state change, message delivery, "
-            "or other persistent effect is not an information resource merely because "
-            "words or data are involved. Conversely, an immediate judgment, choice, "
-            "prioritization, or advice that needs no fresh external/private/runtime "
-            "evidence is conversational reasoning rather than information acquisition. "
-            "Use coverage=representation_mismatch when a candidate clearly attempts to "
-            "own the fragment but represents it incorrectly, including wrong completion "
-            "semantics or a dropped/generalized material qualifier, binding, result aspect, "
-            "severity, threshold, or scope. A supplied date and a supplied local day part "
-            "are separate temporal dimensions; a candidate that retains only one has a "
-            "representation mismatch. Binding entity_type, not the arbitrary binding name, "
-            "is the semantic authority: one entity_type=date binding plus one "
-            "entity_type=day_part binding preserves both dimensions even when their names "
-            "are time, period, or other schema-facing parameter names. Normalized values "
-            "such as today and morning preserve equivalent source wording. Never report a "
-            "representation mismatch merely because a binding name differs from its "
-            "entity_type or a source value is canonically normalized. Conversely, prose, "
-            "a binding name, and a day_part value never imply a missing date binding. For a "
-            "compound date-plus-day-part expression, declare both dimensions explicitly in "
-            "temporal_dimensions. Adjacent separable excerpts such as 'today morning' may "
-            "use one item per excerpt; one inseparable relative expression such as 'tonight' "
-            "uses one constraint item with temporal_dimensions=[date,day_part]. Before "
-            "marking it covered, enumerate the candidate's actual entity_type values; if "
-            "date or day_part is absent, mark the item representation_mismatch. "
-            "In that case identify "
-            "the mismatched candidate index. Use coverage=missing only when no candidate attempts to own the fragment, "
-            "with no candidate indices. A positive observable "
-            "outcome the user can independently judge is a responsibility, not a "
-            "constraint or decoration. Do not invent a vocal outcome from a broad "
-            "social impression when no words, information, or vocal performance were "
-            "requested. Audit reference grounding too: an unresolved pronoun, "
-            "demonstrative, ellipsis, correction, or other indirect reference cannot "
-            "be treated as resolved merely because a candidate description invented "
-            "a plausible referent. Use clarification_required when no supplied turn or "
-            "dialogue evidence uniquely grounds material meaning. Trusted code derives "
-            "whether any Goal candidate lacks a "
-            "positive responsibility owner. Return JSON only."
+            "Read the authoritative turn from scratch; candidate prose is not source "
+            "evidence. A positive observable outcome is a responsibility. Duration, "
+            "distance, direction, order, manner, prohibition, date, day part, and other "
+            "conditions on that same outcome are constraints, never independently "
+            "satisfiable responsibilities. Coordinated effects are separate only when a "
+            "person can judge each effect completed without the others. One evidence "
+            "lookup and the requested judgment of its result remain one responsibility. "
+            "Use the exact required_output_mode: body_action for embodied effects; the "
+            "exact singing/recitation/humming/styled_speech/nonverbal_vocalization mode "
+            "for authored performance; media_playback for media control; capability_work "
+            "for fresh evidence or persistent effects; and speech for ordinary dialogue. "
+            "Wrong completion mode or resource shape is "
+            "coverage=representation_mismatch. A physical resource means acquisition and "
+            "handover of a distinct concrete object; body motion is not a physical "
+            "resource. A state mutation or future delivery is a persistent effect, not "
+            "information acquisition. Binding entity_type, not the arbitrary binding "
+            "name, is semantic authority: one entity_type=date binding plus one "
+            "entity_type=day_part binding preserves both dimensions. Normalized values "
+            "may preserve equivalent wording, but prose, a binding name, and a day_part "
+            "value never imply a missing date binding. An inseparable expression such as "
+            "tonight uses one constraint with temporal_dimensions=[date,day_part]. Use "
+            "coverage=missing only when no candidate attempts the fragment and then use "
+            "no candidate index. Use clarification_required only when supplied evidence "
+            "cannot uniquely ground a material pronoun, demonstrative, ellipsis, "
+            "correction, or other indirect reference. Do not plan, select Capabilities, "
+            "execute, add Goals, or trust provider availability. Return JSON only."
         )
 
 
@@ -3248,6 +5003,12 @@ class GoalAssociationResolver:
         raw: dict[str, Any],
     ) -> str:
         context = request.context if isinstance(request.context, dict) else {}
+        raw_json = self._bounded_json(raw, 9000)
+        if self._uses_compact_coverage_contract(request=request, raw=raw):
+            return self._build_compact_responsibility_coverage_prompt(
+                request=request,
+                raw_json=raw_json,
+            )
         return (
             "Audit whether this candidate Goal segmentation completely accounts for "
             "the authoritative user's current semantic responsibilities. This is an "
@@ -3258,7 +5019,7 @@ class GoalAssociationResolver:
             "actually represents. Do not call a constraint missing when those fields "
             "materially preserve it on the Goal that it modifies.\n\n"
             "For each semantically material fragment of the current turn, emit one "
-            "items entry and copy source_excerpt as a verbatim contiguous span from "
+            "entry and copy source_excerpt as a verbatim contiguous span from "
             "the FINAL AUTHORITATIVE USER TURN. Use role=responsibility for a positive "
             "outcome Chromie owes, role=constraint for a modifier/prohibition/timing "
             "condition on such an outcome, role=context for reference/background that "
@@ -3281,10 +5042,14 @@ class GoalAssociationResolver:
             "an adjective, state directive, conjunction, or imperative grammar. Emit "
             "each semantic fragment once: never duplicate the same source_excerpt "
             "under both responsibility and constraint (or any other conflicting "
-            "roles); decide its one actual role. Every item must also set "
-            "temporal_dimensions to [] or the exact date/day_part dimensions carried by "
-            "that excerpt. Natural 'tonight' carries both date and day_part; a generic "
-            "night period without relative-date meaning carries only day_part.\n\n"
+            "roles); decide its one actual role. A responsibility item always uses "
+            "temporal_dimensions=[]; represent its material date/day-part scope with "
+            "separate role=constraint items mapped to that same Goal. A temporal "
+            "constraint sets temporal_dimensions to the exact dimensions carried by "
+            "its excerpt. Natural 'tonight' is one constraint carrying both date and "
+            "day_part; a generic night period carries only day_part. A duration such "
+            "as ten seconds or three minutes is not a calendar date or local day part "
+            "and must use temporal_dimensions=[].\n\n"
             "Set independently_satisfiable=true only when the user could reasonably "
             "judge that positive outcome completed even if sibling outcomes did not "
             "happen. A factual lookup and an interpretation requested from that same "
@@ -3333,7 +5098,15 @@ class GoalAssociationResolver:
             "something later) is represented as an information resource, when provider-"
             "backed evidence work is represented as ordinary speech, or when immediate "
             "reasoning/advice with no fresh evidence need is represented as external "
-            "information acquisition. Every responsibility item must set required_goal_shape: "
+            "information acquisition. Also use representation_mismatch when an ordinary "
+            "authored conversational response—such as greeting, empathy, reassurance, "
+            "restatement, or acknowledgement of the person's feeling—is represented as "
+            "capability_work or body_action. Preserve speaker and experiencer ownership; "
+            "the person's first-person state never authorizes a robot effect. If the user "
+            "asks what Chromie just said, the candidate must make Chromie repeat or "
+            "summarize the supplied assistant utterance; a candidate that instead asks "
+            "the user to repeat reverses speaker and addressee and is a representation "
+            "mismatch. Every responsibility item must set required_goal_shape: "
             "information_resource for acquiring grounded external/private/runtime information, "
             "physical_resource for acquiring and handing over an object, persistent_effect "
             "for a deferred or state-changing Capability outcome, and ordinary otherwise. "
@@ -3341,6 +5114,15 @@ class GoalAssociationResolver:
             "context, and framing item must set required_goal_shape=ordinary even when "
             "it modifies a non-ordinary Goal; map it to that Goal with candidate indices "
             "instead of repeating the Goal-shape classification. "
+            "Every information_resource responsibility must also set exactly one "
+            "required_information_domain: local_clock for Chromie's trusted current "
+            "date/time, weather_forecast for weather, external_grounded_information "
+            "for public facts/research, direct_environment_perception for current "
+            "nearby people/objects/events, or private_runtime_information for other "
+            "private live state. All non-information items must use none. Judge the "
+            "needed evidence domain from the authoritative turn, never from currently "
+            "available Capabilities or Agent Skills. A weather provider cannot turn a "
+            "person-presence question into weather. "
             "A covered item is invalid when the typed candidate lacks that declared shape. "
             "Speech cannot cover requested body motion, media "
             "control, external evidence work, or a vocal performance. Every Goal "
@@ -3353,14 +5135,22 @@ class GoalAssociationResolver:
             "fact, and a material contradiction between summary and typed truth is not "
             "covered. For an information resource, requested location, time, and result "
             "aspects are covered only by resource_responsibility.query_scope; its narrow "
-            "source object cannot own those query facts. Audit every supplied temporal "
-            "dimension independently: if the turn supplies both a calendar or relative "
+            "source object cannot own those query facts. Reject invented query "
+            "dimensions too: every query_scope item must be entailed by the final user "
+            "turn, supplied Responsibility bindings, or a resolved discourse referent. "
+            "A guessed current location, timezone, provider prerequisite, placeholder, "
+            "device, or source is a representation_mismatch even when it is called "
+            "unspecified or copied from a larger non-location clause. Audit every "
+            "supplied temporal dimension independently: if the turn supplies both a "
+            "calendar or relative "
             "date and a local day part, the query scope must contain separate date and "
             "day_part bindings. Judge their types by entity_type regardless of binding "
             "name. If both typed bindings carry equivalent normalized values, mark both "
-            "source constraints covered. Use temporal_dimensions=[date] and [day_part] for "
-            "separable source fragments, or temporal_dimensions=[date,day_part] on one item "
-            "when a single indivisible expression carries both. Candidate prose or either binding alone does not "
+            "source constraints covered. Use role=constraint with "
+            "temporal_dimensions=[date] and [day_part] for separable source fragments, "
+            "or one role=constraint item with temporal_dimensions=[date,day_part] when "
+            "a single indivisible expression carries both. Responsibility items keep "
+            "temporal_dimensions empty. Candidate prose or either binding alone does not "
             "cover the missing dimension; use coverage=representation_mismatch. For a physical resource, an "
             "acquisition location, distance, direction, or route constraint is covered "
             "only by resource_responsibility.source.acquisition_bindings. Descriptions "
@@ -3384,14 +5174,137 @@ class GoalAssociationResolver:
             "Do not add, remove, rename, plan, execute, or complete Goals. Do not use "
             "provider availability to decide whether a responsibility exists. An "
             "unavailable requested effect remains a responsibility.\n\n"
+            "Put every positive-outcome role=responsibility entry in the required "
+            "responsibility_items array. Set independently_satisfiable=true only when "
+            "that outcome can stand as a sibling Goal; one resource lookup whose "
+            "requested judgment depends on the same result may remain false. Put "
+            "role=constraint, context, and framing entries in supporting_items. Once independently observable component "
+            "Responsibilities have been enumerated, never add the whole compound "
+            "sentence as another Responsibility; coordination is not another outcome. "
+            "Every candidate Goal index must have a "
+            "covered responsibility owner. Never return only constraints, even when "
+            "the constraints are represented correctly. Keep a positive outcome and "
+            "its temporal, location, manner, or prohibition constraints in separate "
+            "entries; use distinct verbatim spans from the same turn when the grammar "
+            "allows it. Responsibility items always keep temporal_dimensions empty. "
+            "temporal_dimensions names only calendar date and local day-part scope: "
+            "duration, sequence/order, concurrency, and simultaneity always use []. "
+            "Before returning, reject your own draft if any temporal dimension appears "
+            "on a non-constraint item or if date/day_part was inferred from duration "
+            "or coordination.\n\n"
             "Candidate Goal DTO JSON:\n"
             f"{self._bounded_json(raw, 9000)}\n\n"
+            "Authoritative Responsibility evidence JSON (query facts may be "
+            "normalized but never invented beyond this evidence and the final turn):\n"
+            f"{self._bounded_json([item.model_dump(mode='json', exclude_none=True) for item in request.responsibilities], 3200)}\n\n"
             "GI unresolved-meaning evidence (the only authority for "
             "clarification_required coverage):\n"
             f"{self._bounded_json(request.interpretation_unresolved, 1600)}\n\n"
             "Recent conversation JSON (reference context only; current-turn Goal "
             "coverage must still be anchored by source_excerpt from the final turn):\n"
             f"{self._bounded_json((context.get('history') or request.history or [])[-6:], 3000)}\n\n"
+            f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
+        )
+
+    def _uses_compact_coverage_contract(
+        self,
+        *,
+        request: CognitiveWorkRequest,
+        raw: dict[str, Any],
+    ) -> bool:
+        """Select the bounded one-Responsibility transport shape mechanically."""
+
+        context = request.context if isinstance(request.context, dict) else {}
+        history = (context.get("history") or request.history or [])[-6:]
+        return bool(
+            len(request.responsibilities) == 1
+            and not request.interpretation_unresolved
+            and not history
+            and not self._discourse_referents(request)
+            and len(self._bounded_json(raw, 9000)) <= 2500
+        )
+
+    def _build_compact_responsibility_coverage_prompt(
+        self,
+        *,
+        request: CognitiveWorkRequest,
+        raw_json: str,
+    ) -> str:
+        """Audit one bounded, reference-free Responsibility without prompt repetition."""
+
+        responsibility_json = self._bounded_json(
+            [
+                item.model_dump(mode="json", exclude_none=True)
+                for item in request.responsibilities
+            ],
+            3200,
+        )
+        return (
+            "Independently audit the candidate DTO against the final user turn and GI "
+            "Responsibility evidence. Emit each material source fragment exactly once. "
+            "Use role=responsibility only for the positive outcome Chromie owes. A "
+            "duration, distance, direction, speed, location, order, simultaneity, manner, "
+            "prohibition, date, day part, threshold, comparison, severity, preference, or "
+            "answer-shaping detail is role=constraint on that outcome and must set "
+            "independently_satisfiable=false. Duration is never a second outcome. Stated "
+            "preferences that changes what counts as a valid decision must be "
+            "role=constraint. Context and framing are not owed outcomes. Multiple aspects "
+            "requested from one information result likewise remain one responsibility. "
+            "Never duplicate the same span under conflicting roles.\n\n"
+            "For coverage=covered, a responsibility maps to exactly one candidate index; "
+            "a represented constraint maps to the affected candidate. If nothing attempts "
+            "a material fragment use coverage=missing and candidate_goal_indices must be "
+            "empty. If a candidate attempts it but drops or generalizes a material "
+            "qualifier, binding, scope, threshold, or completion meaning, use "
+            "coverage=representation_mismatch and include its index. "
+            "clarification_required is allowed only from supplied GI unresolved evidence "
+            "(none is supplied here). Every candidate must have one covered positive "
+            "responsibility owner. Never return only constraints.\n\n"
+            "Set required_output_mode to the exact requested modality and require an exact "
+            "candidate output_mode match. Set required_goal_shape to information_resource "
+            "for fresh information, physical_resource for acquiring and handing over a "
+            "distinct concrete object, persistent_effect for deferred/state-changing "
+            "work, and ordinary otherwise. Non-responsibility items always use ordinary. "
+            "A state mutation or deferred effect represented as information, ordinary "
+            "dialogue represented as capability work, or body motion represented as a "
+            "physical object is a representation_mismatch. For information, set exact "
+            "required_information_domain; non-information uses none. requested location, "
+            "time, and result aspects are covered only by "
+            "resource_responsibility.query_scope. Physical acquisition location, distance, "
+            "direction, and route are covered only by source.acquisition_bindings. Prose "
+            "cannot replace a typed fact.\n\n"
+            "In this compact model DTO temporal_dimensions is one scalar enum: none, "
+            "date, day_part, or date_and_day_part. A responsibility item always uses "
+            "temporal_dimensions=none. Only a role=constraint may name date or day_part. "
+            "Duration, sequence, concurrency, and simultaneity use none. If "
+            "both typed bindings carry equivalent normalized values, mark both source "
+            "constraints covered. Use one role=constraint item with "
+            "temporal_dimensions=date_and_day_part for an indivisible expression such as "
+            "tonight. reject your own draft if any temporal dimension appears on a "
+            "non-constraint item.\n\n"
+            "Reference grounding is part of responsibility coverage. Candidate prose that "
+            "silently invents a generic object does not ground a reference; use "
+            "clarification_required when multiple scene candidates remain plausible. No "
+            "indirect-reference evidence is supplied in this bounded request.\n\n"
+            "Put positive outcomes in responsibility_items and constraints/context/framing "
+            "in supporting_items. Include required_goal_shape, "
+            "required_information_domain, required_output_mode, exact verbatim contiguous "
+            "source_excerpt, coverage, independently_satisfiable, candidate_goal_indices, "
+            "and temporal_dimensions. Before returning, audit field consistency: every "
+            "positive outcome that can stand alone uses independently_satisfiable=true; "
+            "each modifier uses the smallest distinct contiguous source span available; "
+            "a duration constraint uses temporal_dimensions=none; date or day_part may "
+            "appear only when that calendar/local-day dimension is actually expressed; "
+            "a duration measured in seconds, minutes, or hours is self-contained and "
+            "never requires or implies a calendar date or local day part; the absence of "
+            "date/day-part wording does not make such a duration unresolved; "
+            "and every non-responsibility uses required_output_mode=none. If your "
+            "reasoning says no date or day part exists, the JSON must contain neither. "
+            "Return the certificate JSON only.\n\n"
+            "Candidate Goal DTO JSON:\n"
+            f"{raw_json}\n\n"
+            "Authoritative Responsibility evidence JSON:\n"
+            f"{responsibility_json}\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
         )
 
@@ -3482,6 +5395,9 @@ class GoalAssociationResolver:
         turn_id: str,
     ) -> GoalAssociationResolution:
         candidate_goals = self._candidate_goals(request)
+        responsibility_by_ref = {
+            item.local_ref: item for item in request.responsibilities
+        }
         active_goal_ids = {
             str(item.get("goal_id") or "").strip()
             for item in candidate_goals
@@ -3727,6 +5643,14 @@ class GoalAssociationResolver:
                         binding.name: normalize_binding(binding)
                         for binding in resource_item.query_scope
                     }
+                    attribute_bindings["information_domain"] = (
+                        GoalEntityBinding(
+                            name="information_domain",
+                            entity_type="information_domain",
+                            value=resource_item.information_domain,
+                            confidence=1.0,
+                        ).model_dump(mode="json", exclude_none=True)
+                    )
                     source_bindings: dict[str, Any] = {}
                     source_description = ""
                     if resource_item.source.status == "known":
@@ -3828,6 +5752,18 @@ class GoalAssociationResolver:
                         "execution_lane": item.execution_lane,
                         "output_mode": item.output_mode,
                         "provider_required": item.provider_required,
+                        "completion_requires_work": any(
+                            responsibility_by_ref[source_ref].completion_requires_work
+                            for source_ref in item.source_responsibility_refs
+                            if source_ref in responsibility_by_ref
+                        ),
+                        "completion_requires_fresh_evidence": any(
+                            responsibility_by_ref[
+                                source_ref
+                            ].completion_requires_fresh_evidence
+                            for source_ref in item.source_responsibility_refs
+                            if source_ref in responsibility_by_ref
+                        ),
                         "media_operation": item.media_operation,
                         "resolved_references": [
                             reference.model_dump(mode="json", exclude_none=True)

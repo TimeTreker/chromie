@@ -162,7 +162,7 @@ cancellable deployment.
 | `ORCH_LOCK_FILE` | Host lock preventing duplicate Orchestrator processes. `start_chromie.sh` checks the same lock before generating runtime files or mutating containers, so a stale host process cannot remain attached across a rebuild. |
 | `ORCH_RUNTIME_OVERRIDE_FILE` | Optional shell env file sourced after `.env.runtime`; intended for supervised acceptance, not normal persistent configuration. |
 | `TTS_COSYVOICE_OLLAMA_MODEL` | Compact Ollama model used for fast and lightweight Agent lanes while the default CosyVoice service shares the GPU; default `qwen3:4b`. |
-| `TTS_COSYVOICE_COMPACT_COGNITION` | `1` only as a fallback for explicitly constrained profiles. The maintained RTX 4090 Laptop and RTX 5090 profiles set `0` and preserve a fast/quality topology, using `gemma4:e4b` and `gemma4:12b` respectively for quality stages. |
+| `TTS_COSYVOICE_COMPACT_COGNITION` | `1` only as a fallback for explicitly constrained profiles. The maintained RTX 4090 Laptop and RTX 5090 profiles set `0`. RTX 4090 Laptop uses `qwen3:8b` for Goal Interpretation/Deep Planning, `gemma4:e4b` for Agent/Goal Association, and `qwen3:4b` for Fast roles; RTX 5090 retains its `gemma4:12b` quality stages. |
 | `CHROMIE_TTS_BACKEND` | `cosyvoice3` by default; explicit alternatives are `oute` and `qwen3`. |
 
 The default launcher selects `chromie-tts` on port 5000 and validates the
@@ -172,8 +172,8 @@ source-controlled `assets/tts/voices` catalog before service creation.
 request for the singleton CosyVoice worker. Profiles with compact cognition enabled limit Ollama to one resident model.
 The maintained RTX 5090 and RTX 4090 Laptop profiles both opt out: RTX 5090 keeps
 `qwen3:4b` plus `gemma4:12b` resident when memory permits, while RTX 4090 Laptop
-keeps the same fast/quality role split with `qwen3:4b` and sparse
-`gemma4:e4b` but limits Ollama to one resident 32768-token runner at a time.
+uses `qwen3:4b`, `qwen3:8b`, and sparse `gemma4:e4b` in their declared roles but
+limits Ollama to one resident 32768-token runner at a time.
 Before the CosyVoice synthesis readiness probe, the supervised launcher restarts
 only `chromie-llm` to clear stale runners left by an earlier launch. Select a
 fallback explicitly with
@@ -266,7 +266,7 @@ Capabilities, or delegate HOW.
 
 | Variable | Default or profile behavior |
 |---|---|
-| `AGENT_GOAL_INTERPRETER_MODEL` | `qwen3:4b` in common configuration. |
+| `AGENT_GOAL_INTERPRETER_MODEL` | `qwen3:4b` in common configuration; RTX 4090 Laptop uses `qwen3:8b` for retained compound-meaning fidelity. |
 | `AGENT_DEEP_PLANNER_MODEL` | Existing profile-owned Deep cognition model. The maintained source also reuses this identity for at most one source-based Deep Goal Interpretation escalation with the same WHAT-only schema, only when Fast GI retains genuine consequential ambiguity in intended outcome, scope, Goal relation, or referent. It is never used for execution-input or evidence-source policy, and reuse grants no Planner authority to GI. |
 | `AGENT_GOAL_INTERPRETER_OLLAMA_URL` | Goal-Interpreter-to-Ollama base URL inside the Agent deployment. |
 | `AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | `5400`; per-invocation timeout for WHAT-only Fast interpretation, its optional mechanical DTO repair, or one allowed source-based Deep GI interpretation. |
@@ -305,7 +305,7 @@ failure otherwise fails closed as `interpretation_unavailable`.
 | `ORCH_EPISODE_LOG_PATH` | `.chromie/experience/episodes.jsonl`; stores rolling conversation-thread snapshots keyed by `conversation_id`. |
 | `ORCH_EPISODE_MAX_TURNS` | `12`; maximum recent turns retained in one episode snapshot. |
 
-The maintained profile at `config/mind/chromie_default.json` carries the owner-approved structured self model. Concrete name, age, pronouns, self-description, identity-answer guidance, and personality expression are configuration, not Python defaults. One configured entity owns first-person speech, perception, action, and embodiment; language and reasoning models are internal components with bounded roles. The same owner-approved identity projection is included in Goal Interpretation, Goal Association, Fast and Deep Planning, Response Composition, conversation, and direct fallback prompts. The LLM decides from meaning whether identity facts are relevant; there is no identity-question branch, fixed reply, or phrase/regex map. Core
+The maintained profile at `config/mind/chromie_default.json` carries the owner-approved structured self model. Concrete name, age, pronouns, self-description, identity-answer guidance, and personality expression are configuration, not Python defaults. One configured entity owns first-person speech, perception, action, and embodiment; language and reasoning models are internal components with bounded roles. The same owner-approved identity projection is included in Goal Interpretation, Goal Association, Fast and Deep Planning, Planner-owned Communicative Activities, conversation, and direct fallback prompts. The LLM decides from meaning whether identity facts are relevant; there is no identity-question branch, fixed reply, or phrase/regex map. Core
 principles require owner approval and are not changed by experience. The
 experience journal can support future prompt, test, strategy, and long-term-goal
 tuning, but proposals are never auto-applied. See
@@ -897,6 +897,8 @@ certificate-repair fallback.
 | `ORCH_GOAL_ASSOCIATION_TIMEOUT_MS` | `3500`; host timeout for the advisory endpoint. |
 | `AGENT_FAST_PLANNER_ENABLED` | `1`; exposes the advisory Fast Planner endpoint. |
 | `AGENT_FAST_PLANNER_MODEL` | `qwen3:4b`; compact model for complete common-goal coverage. |
+| `AGENT_FAST_FIRST_RESPONSE_MODEL` | Defaults to the active Agent model; owns the latency-critical first natural Communicative Activity. |
+| `AGENT_FAST_TRUTH_MODEL` | Defaults to `AGENT_FAST_FIRST_RESPONSE_MODEL`; qualifies that model's immutable wording for truth and semantic consistency without authoring a replacement. |
 | `AGENT_FAST_PLANNER_TIMEOUT_MS` | `2500`; Fast Planner model timeout. |
 | `AGENT_FAST_PLANNER_MIN_CONFIDENCE` | `0.80`; complete plans below this threshold are converted to escalation. |
 | `AGENT_FAST_PLANNER_NUM_CTX` | `8192`; bounded Fast Planner context with room for the capability prompt and a complete multi-goal result. |
@@ -905,7 +907,7 @@ certificate-repair fallback.
 | `ORCH_FAST_PLANNER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Fast Planning is integrated into the unified runtime. |
 | `ORCH_FAST_PLANNER_TIMEOUT_MS` | `3000`; host timeout for report-only planning. |
 | `AGENT_DEEP_PLANNER_ENABLED` | `1`; exposes the full-catalog advisory Deep Planner. |
-| `AGENT_DEEP_PLANNER_MODEL` | `gemma4:e2b`; model used after Fast Planner escalation. |
+| `AGENT_DEEP_PLANNER_MODEL` | `gemma4:e2b` in common configuration; RTX 4090 Laptop uses `qwen3:8b` after Fast Planner escalation. |
 | `AGENT_DEEP_PLANNER_TIMEOUT_MS` | `9000`; Deep Planner model timeout. |
 | `AGENT_DEEP_PLANNER_MIN_CONFIDENCE` | `0.65`; a complete Deep plan below this threshold fails closed. Confidence does not authorize another Deep semantic pass. |
 | `AGENT_DEEP_PLANNER_MIN_GOAL_SATISFACTION` | `0.75`; a complete Deep plan below this prospective goal-satisfaction threshold fails closed. It is not a replan trigger. |
@@ -1065,7 +1067,7 @@ conversation.
 | `ORCH_EPISODE_LOG_PATH` | `.chromie/experience/episodes.jsonl`; stores rolling conversation-thread snapshots keyed by `conversation_id`. |
 | `ORCH_EPISODE_MAX_TURNS` | `12`; maximum recent turns retained in one episode snapshot. |
 
-The maintained profile at `config/mind/chromie_default.json` carries the owner-approved structured self model. Concrete name, age, pronouns, self-description, identity-answer guidance, and personality expression are configuration, not Python defaults. One configured entity owns first-person speech, perception, action, and embodiment; language and reasoning models are internal components with bounded roles. The same owner-approved identity projection is included in Goal Interpretation, Goal Association, Fast and Deep Planning, Response Composition, conversation, and direct fallback prompts. The LLM decides from meaning whether identity facts are relevant; there is no identity-question branch, fixed reply, or phrase/regex map. Core
+The maintained profile at `config/mind/chromie_default.json` carries the owner-approved structured self model. Concrete name, age, pronouns, self-description, identity-answer guidance, and personality expression are configuration, not Python defaults. One configured entity owns first-person speech, perception, action, and embodiment; language and reasoning models are internal components with bounded roles. The same owner-approved identity projection is included in Goal Interpretation, Goal Association, Fast and Deep Planning, Planner-owned Communicative Activities, conversation, and direct fallback prompts. The LLM decides from meaning whether identity facts are relevant; there is no identity-question branch, fixed reply, or phrase/regex map. Core
 principles require owner approval and are not changed by experience. The
 experience journal can support future prompt, test, strategy, and long-term-goal
 tuning, but proposals are never auto-applied. See

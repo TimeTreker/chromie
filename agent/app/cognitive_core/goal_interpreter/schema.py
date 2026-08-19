@@ -61,7 +61,14 @@ class GoalInterpretationDecision(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     confidence: float = Field(ge=0.0, le=1.0)
-    responsibilities: list[CognitiveResponsibilityProposal] = Field(min_length=1)
+    responsibilities: list[CognitiveResponsibilityProposal] = Field(
+        min_length=1,
+        description=(
+            "Complete set of independently satisfiable outcomes: one item per "
+            "requested observable effect, including separate concurrent embodied and "
+            "authored-vocal effects. Coordination never merges effects."
+        ),
+    )
     unresolved: list[str] = Field(default_factory=list, max_length=12)
 
     @field_validator("unresolved", mode="before")

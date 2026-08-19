@@ -57,10 +57,17 @@ class CoreInterpretationUnavailable(BaseModel):
     retryable: bool = True
     reason: str = Field(min_length=1, max_length=500)
 
-    @field_validator("turn_id", "session_id", "failure_class", "reason", mode="before")
+    @field_validator("turn_id", "session_id", "failure_class", mode="before")
     @classmethod
     def normalize_unavailable_fields(cls, value: str) -> str:
         return normalize_turn_text(str(value or ""))
+
+    @field_validator("reason", mode="before")
+    @classmethod
+    def normalize_bounded_reason(cls, value: str) -> str:
+        # A nested validation report can be large. Keep the public failure DTO
+        # bounded so the intended HTTP 503 path cannot become an unrelated 500.
+        return normalize_turn_text(str(value or ""))[:500]
 
 
 class CognitiveResponsibilityProposal(BaseModel):
@@ -83,7 +90,12 @@ class CognitiveResponsibilityProposal(BaseModel):
         min_length=1,
         max_length=500,
         description=(
-            "The provider-neutral human outcome Chromie still owes. Preserve the "
+            "Exactly one independently satisfiable provider-neutral human outcome "
+            "Chromie still owes. Never combine two requested positive effects merely "
+            "because the user coordinates them with while, simultaneously, at the "
+            "same time, a conjunction, or an equivalent construction; each effect "
+            "that can be independently accepted or rejected requires its own sibling "
+            "Responsibility. Preserve the "
             "requested answer or judgment and proposition polarity: a question about "
             "whether P is true must not be rewritten as the assertion that P is true."
         ),
@@ -95,11 +107,38 @@ class CognitiveResponsibilityProposal(BaseModel):
             "semantic context only; never runtime/session identifiers or HOW fields."
         ),
     )
+    output_mode: Literal[
+        "unspecified",
+        "speech",
+        "styled_speech",
+        "recitation",
+        "singing",
+        "humming",
+        "nonverbal_vocalization",
+        "body_action",
+        "media_playback",
+        "capability_work",
+        "other",
+    ] = Field(
+        default="unspecified",
+        description=(
+            "Provider-neutral observable completion modality for this one outcome. "
+            "This preserves WHAT kind of effect is owed without selecting a "
+            "Capability, provider, Activity, executable argument, or wording."
+        ),
+    )
     relationship: GoalRelationship = "new"
     target_goal_ids: list[str] = Field(default_factory=list, max_length=8)
     completion_requires_work: bool = Field(
         default=False,
-        description="Whether Chromie still owes work before this outcome is satisfied.",
+        description=(
+            "Whether satisfying the outcome requires downstream work beyond the "
+            "immediate ordinary conversational response that Fast Planner can author "
+            "from supplied context. Use false for a greeting, empathy, social reply, "
+            "or direct contextual answer; use true for body/media/vocal-performance "
+            "effects, Capability work, fresh evidence, or other work that remains "
+            "after an immediate response."
+        ),
     )
     completion_requires_fresh_evidence: bool = Field(
         default=False,
@@ -145,11 +184,30 @@ class CognitiveResponsibilityProposal(BaseModel):
             raise ValueError(
                 "fresh evidence requirement implies completion_requires_work"
             )
+        if self.completion_requires_fresh_evidence and self.output_mode in {
+            "styled_speech",
+            "recitation",
+            "singing",
+            "humming",
+            "nonverbal_vocalization",
+            "body_action",
+            "media_playback",
+        }:
+            raise ValueError(
+                f"output_mode={self.output_mode} is the requested observable effect, "
+                "not a fresh-information Responsibility"
+            )
         if self.relationship == "new" and self.target_goal_ids:
             raise ValueError("relationship=new must not target an existing Goal")
         if self.relationship != "new" and not self.target_goal_ids:
             raise ValueError(
                 f"relationship={self.relationship} requires target_goal_ids"
+            )
+        if self.output_mode not in {"unspecified", "speech", "other"} and not (
+            self.completion_requires_work
+        ):
+            raise ValueError(
+                f"output_mode={self.output_mode} requires completion_requires_work"
             )
         return self
 
@@ -174,7 +232,15 @@ class CoreInterpretationResult(BaseModel):
     authority: Literal["goal_interpretation"] = "goal_interpretation"
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     language: str = Field(default="auto", min_length=1, max_length=64)
-    responsibilities: list[CognitiveResponsibilityProposal] = Field(min_length=1)
+    responsibilities: list[CognitiveResponsibilityProposal] = Field(
+        min_length=1,
+        description=(
+            "Complete set of independently satisfiable human outcomes. Emit one item "
+            "per requested observable effect, including separate concurrent embodied "
+            "and authored-vocal effects; coordination is a relation, not permission "
+            "to collapse two effects into one item."
+        ),
+    )
     unresolved: list[str] = Field(default_factory=list, max_length=12)
 
     @field_validator("turn_id", "session_id", "language", mode="before")

@@ -245,7 +245,7 @@ class RuntimeTraceTests(unittest.TestCase):
                         "reason_summary": "One independent conversational goal.",
                     }
                 return {
-                    "items": [
+                    "responsibility_items": [
                         {
                             "source_excerpt": "hello",
                             "role": "responsibility",
@@ -254,6 +254,7 @@ class RuntimeTraceTests(unittest.TestCase):
                             "candidate_goal_indices": [0],
                         }
                     ],
+                    "supporting_items": [],
                     "reason_summary": "The candidate covers the greeting.",
                 }
 

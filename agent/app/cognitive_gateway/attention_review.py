@@ -97,14 +97,19 @@ class AttentionReviewer:
                 self._prompt(request),
                 system=self._system_prompt(),
                 options=options,
-                response_format=self._response_schema(),
+                response_format=self._response_schema(
+                    active_engagement=engagement.get("active") is True
+                ),
                 prompt_family="cognitive_gateway_attention_review.primary",
                 turn_id=request.turn_id,
                 attempt=1,
             )
             if not isinstance(raw, dict):
                 raise ValueError("attention model did not return a JSON object")
-            result = self._validate_model_output(raw)
+            result = self._validate_model_output(
+                raw,
+                active_engagement=engagement.get("active") is True,
+            )
         except Exception as exc:
             logger.warning(
                 "attention_review_failed turn_id=%s error_type=%s error=%s",
@@ -155,9 +160,20 @@ class AttentionReviewer:
         return ""
 
     @staticmethod
-    def _validate_model_output(raw: dict[str, Any]) -> _AttentionModelOutput:
+    def _validate_model_output(
+        raw: dict[str, Any],
+        *,
+        active_engagement: bool = False,
+    ) -> _AttentionModelOutput:
         result = _AttentionModelOutput.model_validate(raw)
-        if not result.addressed and result.speech_act in DIRECTED_SPEECH_ACTS:
+        directed_acts = set(DIRECTED_SPEECH_ACTS)
+        if active_engagement:
+            # Within a live exchange, an utterance the model itself classifies
+            # as a reply is directed to the interlocutor. A restrictive rule or
+            # unrelated room speech must instead retain its actual ambient,
+            # narration, dictation, or unclear function.
+            directed_acts.add("reply")
+        if not result.addressed and result.speech_act in directed_acts:
             raise ValueError(
                 "addressed=false cannot carry an explicitly directed speech act; "
                 f"got speech_act={result.speech_act}"
@@ -184,7 +200,10 @@ class AttentionReviewer:
         )
 
     @staticmethod
-    def _response_schema() -> dict[str, Any]:
+    def _response_schema(*, active_engagement: bool = False) -> dict[str, Any]:
+        directed_acts = set(DIRECTED_SPEECH_ACTS)
+        if active_engagement:
+            directed_acts.add("reply")
         return {
             "type": "object",
             "properties": {
@@ -211,6 +230,19 @@ class AttentionReviewer:
             },
             "required": ["addressed", "speech_act", "confidence"],
             "additionalProperties": False,
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "speech_act": {"enum": sorted(directed_acts)},
+                        },
+                        "required": ["speech_act"],
+                    },
+                    "then": {
+                        "properties": {"addressed": {"const": True}},
+                    },
+                }
+            ],
         }
 
     @staticmethod
@@ -240,6 +272,9 @@ class AttentionReviewer:
             "an addressed request. With no active exchange, isolated 'Yeah.' is "
             "an unaddressed reply. A bare sequence such as 'Open the door, wave "
             "twice, then come back' is an addressed imperative, not dictation; "
+            "An instruction to continue, resume, change, stop, or cancel earlier "
+            "work is a request or imperative, not a reply. Reply is only an answer "
+            "or acknowledgement within an exchange. "
             "dictation requires clear transcription, quotation, or wording-for-"
             "another-recipient context. Recent bounded dialogue is context for "
             "addressedness only. A prior user-authored temporary interaction rule such "

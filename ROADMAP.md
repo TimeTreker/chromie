@@ -114,8 +114,8 @@ Exit criteria for this line:
 - no reviewed case requires a new top-level semantic authority;
 - GI emits no planning InformationGap or resolution strategy, while Planner resolves
   execution inputs without changing Responsibility meaning;
-- Planner-selected Communicative Acts and result propositions remain distinct from
-  their single downstream wording owner;
+- Planner-selected Communicative Acts retain their exact model-authored wording,
+  while Host delivery remains a mechanically validating non-authoring boundary;
 - evidence integrity and evidence sufficiency are explicitly distinct;
 - terminal history can teach bounded future cognition without reopening history;
 - local adaptation has separately bounded scope and lifetime and cannot self-promote to

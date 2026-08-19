@@ -266,8 +266,23 @@ _OUTPUT_STOP_PATTERNS = (
         re.IGNORECASE,
     ),
     re.compile(
-        r"^(?:请|麻烦你)?(?:闭嘴|别说了|不要说了|安静|停止说话|"
+        r"^(?:请|麻烦你)?(?:闭嘴|别说话|不要说话|别说了|不要说了|安静|停止说话|"
         r"别讲话|不要讲话)(?:现在|马上|立即|立刻|一下)*[。！!？?]*$"
+    ),
+)
+# Output-only control can be the first clause of a compound request. The reflex
+# owns deterministic silence while Core still receives the unchanged full
+# utterance and interprets the residual action.
+_OUTPUT_STOP_COMPOUND_PATTERNS = (
+    re.compile(
+        rf"^{_COMMAND_PREFIX}(?:quiet|shut\s+up|be\s+quiet|"
+        r"stop\s+(?:talking|speaking)|do\s+not\s+speak|don['’]t\s+speak)"
+        r"\s*[,;]\s*\S.+$",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"^(?:请|麻烦你)?(?:闭嘴|别说话|不要说话|别说了|不要说了|安静|"
+        r"停止说话|别讲话|不要讲话)\s*[，,、;；]\s*\S.+$"
     ),
 )
 _MEDIA_STOP_PATTERNS = (
@@ -326,6 +341,13 @@ _CURRENT_INTERACTION_STOP_PATTERNS = (
         r"(?:(?:停止|取消|暂停)(?:一切|全部|所有任务|所有工作)|"
         r"(?:一切|全部|所有任务|所有工作)(?:停止|取消|暂停))"
         r"(?:现在|马上|立即|立刻|一下)*[。！!？?]*$"
+    ),
+    re.compile(
+        r"^(?:请|麻烦你)?(?:算了)(?:[，,]?(?:不用了|不需要了|不必了))?"
+        r"[。！!？?]*$"
+    ),
+    re.compile(
+        r"^(?:请|麻烦你)?(?:不用了|不需要了|不必了)[。！!？?]*$"
     ),
 )
 _INTERRUPT_NEGATION_PATTERNS = (
@@ -438,7 +460,13 @@ class ReflexFilter:
                 cancellation_scope="global_emergency",
                 reason="Matched emergency stop command safety rule",
             )
-        if not is_negated and _matches(normalized, _OUTPUT_STOP_PATTERNS):
+        output_stop_compound = _matches(
+            normalized,
+            _OUTPUT_STOP_COMPOUND_PATTERNS,
+        )
+        if not is_negated and (
+            _matches(normalized, _OUTPUT_STOP_PATTERNS) or output_stop_compound
+        ):
             return ReflexOutcome(
                 matched=True,
                 action="interrupt",
@@ -450,6 +478,7 @@ class ReflexFilter:
                 interrupt_current=True,
                 cancellation_scope="output_only",
                 reason="Matched deterministic speech-output stop rule",
+                metadata={"residual_semantic_input": output_stop_compound},
             )
         if not is_negated and _matches(normalized, _MEDIA_STOP_PATTERNS):
             return ReflexOutcome(

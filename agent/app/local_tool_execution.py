@@ -4,6 +4,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
 from .capabilities.models import CapabilityRegistry, ToolCapability
@@ -54,12 +55,15 @@ class LocalToolExecutor:
         *,
         weather_client: OpenMeteoWeatherClient | None = None,
         external_information_client: HttpExternalInformationClient | None = None,
+        clock: Callable[[], datetime] | None = None,
     ) -> None:
         self.registry = registry
         self.weather_client = weather_client
         self.external_information_client = external_information_client
+        self.clock = clock or (lambda: datetime.now().astimezone())
         self._handlers: dict[str, ToolHandler] = {
             "chromie.weather.lookup": self._execute_weather,
+            "chromie.clock.local": self._execute_local_clock,
             "chromie.external_information.retrieve": self._execute_external_information,
         }
 
@@ -168,6 +172,41 @@ class LocalToolExecutor:
                     "matched_location": report.location_name,
                     "matched_admin1": report.provider_admin1,
                     "matched_country": report.country,
+                }
+            },
+        )
+
+    async def _execute_local_clock(self, args: dict[str, Any]) -> LocalToolResult:
+        args.pop("__request_language", None)
+        if args:
+            raise ValueError("local clock accepts no arguments")
+        now = self.clock()
+        if not isinstance(now, datetime):
+            raise TypeError("local clock provider must return datetime")
+        if now.tzinfo is None or now.utcoffset() is None:
+            now = now.astimezone()
+        offset = now.strftime("%z")
+        formatted_offset = (
+            f"{offset[:3]}:{offset[3:]}" if len(offset) == 5 else offset
+        )
+        timezone_name = now.tzname() or formatted_offset
+        output = {
+            "local_iso": now.isoformat(timespec="seconds"),
+            "local_date": now.date().isoformat(),
+            "local_time": now.strftime("%H:%M:%S"),
+            "weekday": now.strftime("%A"),
+            "timezone": timezone_name,
+            "utc_offset": formatted_offset,
+            "precision": "second",
+            "source": "host_local_clock",
+        }
+        return LocalToolResult(
+            output=output,
+            metadata={
+                "provider_resolution": {
+                    "provider": "host_local_clock",
+                    "timezone": timezone_name,
+                    "utc_offset": formatted_offset,
                 }
             },
         )

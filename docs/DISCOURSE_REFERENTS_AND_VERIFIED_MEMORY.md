@@ -3,7 +3,8 @@
 ## Status
 
 Implemented for bounded conversation state, Goal Association, Fast/Deep
-Planning, Response Composition, and host-runtime verified-result retrieval.
+Planning, Planner-owned Communicative Activities, and host-runtime
+verified-result retrieval.
 
 This design exists to prevent one task's structured evidence from silently
 resolving another task's pronouns or parameters. It deliberately does not use a

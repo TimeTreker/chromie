@@ -106,6 +106,7 @@ class PlaybackDeliveryLifecycle:
         stage: str,
         purpose: str,
         commitment: str = "",
+        fast_activity_id: str = "",
         turn_id: str | None = None,
         source_goal_ids: list[str] | None = None,
         canonical_plan_id: str = "",
@@ -120,6 +121,9 @@ class PlaybackDeliveryLifecycle:
         if not sid or not orders or not text:
             return None
         normalized_turn_id = " ".join(str(turn_id or sid).strip().split())
+        normalized_fast_activity_id = " ".join(
+            str(fast_activity_id or "").strip().split()
+        )
         normalized_goal_ids = self._normalized_text_values(source_goal_ids)
         normalized_claims = self._normalized_text_values(claims)
         normalized_plan_id = " ".join(str(canonical_plan_id or "").strip().split())
@@ -143,6 +147,7 @@ class PlaybackDeliveryLifecycle:
                 "claims": normalized_claims,
                 "commitment": str(commitment or ""),
                 "delivery_role": normalized_delivery_role,
+                "fast_activity_id": normalized_fast_activity_id,
                 "generation": int(generation),
                 "goal_association_fingerprint": normalized_association_fingerprint,
                 "must_not_claim_completion": must_not_claim_completion,
@@ -174,6 +179,7 @@ class PlaybackDeliveryLifecycle:
             "canonical_plan_fingerprint": normalized_plan_fingerprint,
             "goal_association_fingerprint": normalized_association_fingerprint,
             "delivery_role": normalized_delivery_role,
+            "fast_activity_id": normalized_fast_activity_id,
             "claims": normalized_claims,
             "must_not_claim_completion": must_not_claim_completion,
             "generation": int(generation),

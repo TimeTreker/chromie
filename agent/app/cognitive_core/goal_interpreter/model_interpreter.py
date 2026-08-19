@@ -5,6 +5,7 @@ import json
 import logging
 import re
 import time
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -136,6 +137,12 @@ class _GoalInterpretationAuthorityViolation(ValueError):
     """Goal Interpretation attempted to claim downstream identity/authority."""
 
 
+class _GoalInterpretationSemanticStructureViolation(
+    _GoalInterpretationAuthorityViolation
+):
+    """The DTO shape is valid but does not preserve atomic source meaning."""
+
+
 def _without_goal_interpretation_authority(value: Any) -> Any:
     """Strip downstream authority and retired route classifications from context."""
 
@@ -172,6 +179,125 @@ def _extract_json_object(text: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError("model response JSON is not an object")
     return value
+
+
+def _normalize_mechanical_goal_interpretation_dto(
+    parsed: dict[str, Any],
+) -> dict[str, Any]:
+    """Normalize provider-shaped JSON containers without changing semantics.
+
+    Some structured-output backends serialize a free-form JSON object as an
+    array of ``{name|key, value}`` entries. The representation is mechanically
+    isomorphic only when every entry has one unique explicit key, so normalize
+    exactly that form and leave every ambiguous/malformed variant for normal
+    contract rejection. A missing aggregate confidence is likewise derivable
+    without interpretation when every Responsibility already carries one.
+    """
+
+    responsibilities = parsed.get("responsibilities")
+    if not isinstance(responsibilities, list):
+        return parsed
+
+    for item in responsibilities:
+        if not isinstance(item, dict):
+            continue
+        bindings = item.get("bindings")
+        if not isinstance(bindings, list):
+            continue
+        normalized: dict[str, Any] = {}
+        valid = True
+        for entry in bindings:
+            if not isinstance(entry, dict):
+                valid = False
+                break
+            name_values = [entry[key] for key in ("name", "key") if key in entry]
+            if (
+                len(name_values) != 1
+                or "value" not in entry
+                or not set(entry).issubset({"name", "key", "value"})
+            ):
+                valid = False
+                break
+            name = " ".join(str(name_values[0] or "").strip().split())
+            if not name or name in normalized:
+                valid = False
+                break
+            normalized[name] = entry["value"]
+        if valid:
+            item["bindings"] = normalized
+
+    if "confidence" not in parsed:
+        confidence_values = [
+            item.get("confidence")
+            for item in responsibilities
+            if isinstance(item, dict)
+        ]
+        if confidence_values and all(
+            isinstance(value, (int, float)) and not isinstance(value, bool)
+            for value in confidence_values
+        ):
+            parsed["confidence"] = min(float(value) for value in confidence_values)
+    return parsed
+
+
+_EXPLICIT_NUMERIC_TOKEN = re.compile(r"(?<![\w.])[-+]?\d+(?:\.\d+)?(?![\w.])")
+
+
+def _decimal_values(value: Any) -> set[Decimal]:
+    if value is None or isinstance(value, bool):
+        return set()
+    if isinstance(value, (int, float, Decimal)):
+        try:
+            return {Decimal(str(value))}
+        except InvalidOperation:
+            return set()
+    if isinstance(value, str):
+        result: set[Decimal] = set()
+        for token in _EXPLICIT_NUMERIC_TOKEN.findall(value):
+            try:
+                result.add(Decimal(token))
+            except InvalidOperation:
+                continue
+        return result
+    if isinstance(value, dict):
+        return {
+            number
+            for item in value.values()
+            for number in _decimal_values(item)
+        }
+    if isinstance(value, (list, tuple)):
+        return {
+            number
+            for item in value
+            for number in _decimal_values(item)
+        }
+    return set()
+
+
+def _reject_dropped_explicit_numeric_bindings(
+    request: GoalInterpretationRequest,
+    parsed: dict[str, Any],
+) -> None:
+    """Require explicit user quantities to survive the WHAT handoff exactly."""
+
+    source_numbers = _decimal_values(request.text)
+    if not source_numbers:
+        return
+    responsibilities = parsed.get("responsibilities")
+    if not isinstance(responsibilities, list):
+        return
+    binding_numbers = {
+        number
+        for item in responsibilities
+        if isinstance(item, dict)
+        for number in _decimal_values(item.get("bindings"))
+    }
+    missing = sorted(source_numbers - binding_numbers)
+    if missing:
+        raise _GoalInterpretationAuthorityViolation(
+            "Goal Interpretation dropped or rewrote explicit numeric user binding(s): "
+            + ",".join(str(value) for value in missing)
+        )
 
 
 def _reject_planner_shaped_goal_interpretation(parsed: dict[str, Any]) -> None:
@@ -275,6 +401,98 @@ def _reject_unknown_goal_refs(
                 f"responsibilities[{index}] targets unknown Goal IDs: "
                 + ",".join(unknown_goals)
             )
+
+
+def _continuity_goal_contracts(context: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Return exact provider-neutral completion facts for retained Goals."""
+
+    contracts: dict[str, dict[str, Any]] = {}
+    active = context.get("active_goal_snapshots")
+    recent = context.get("recent_goal_snapshots")
+    raw = [
+        *(active if isinstance(active, list) else []),
+        *(recent if isinstance(recent, list) else []),
+    ]
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        goal = item.get("goal") if isinstance(item.get("goal"), dict) else {}
+        goal_id = " ".join(
+            str(item.get("goal_id") or goal.get("goal_id") or "").strip().split()
+        )
+        if not goal_id:
+            continue
+        metadata = goal.get("metadata") if isinstance(goal.get("metadata"), dict) else {}
+        output_mode = " ".join(str(metadata.get("output_mode") or "").split())
+        contract: dict[str, Any] = {}
+        if output_mode:
+            contract["output_mode"] = output_mode
+        if "completion_requires_work" in metadata:
+            contract["completion_requires_work"] = bool(
+                metadata["completion_requires_work"]
+            )
+        elif metadata.get("provider_required") is True:
+            # Legacy retained Goals predate explicit GI completion flags. A
+            # provider-required effect still cannot become immediate speech.
+            contract["completion_requires_work"] = True
+        if "completion_requires_fresh_evidence" in metadata:
+            contract["completion_requires_fresh_evidence"] = bool(
+                metadata["completion_requires_fresh_evidence"]
+            )
+        contracts[goal_id] = contract
+    return contracts
+
+
+def _reject_continuity_completion_contract_mismatch(
+    request: GoalInterpretationRequest,
+    parsed: dict[str, Any],
+) -> None:
+    """Reject a pure continue/resume DTO that changes the retained effect.
+
+    This is an exact cross-field contract check, not a new semantic decision:
+    the model selected one supplied Goal identity and declared that the person
+    wants to continue or resume it. Such a relationship cannot silently turn
+    retained work into an ordinary immediate speech Responsibility.
+    """
+
+    contracts = _continuity_goal_contracts(request.context)
+    if not contracts:
+        return
+    responsibilities = parsed.get("responsibilities")
+    if not isinstance(responsibilities, list):
+        return
+    for index, item in enumerate(responsibilities):
+        if not isinstance(item, dict):
+            continue
+        relationship = str(item.get("relationship") or "").strip()
+        target_ids = item.get("target_goal_ids")
+        if relationship not in {"continue", "resume"} or not isinstance(
+            target_ids, list
+        ):
+            continue
+        known_targets = [
+            target_id
+            for raw_target_id in target_ids
+            if (target_id := str(raw_target_id).strip()) in contracts
+        ]
+        if len(known_targets) != 1:
+            continue
+        target_id = known_targets[0]
+        expected = contracts[target_id]
+        for field in (
+            "output_mode",
+            "completion_requires_work",
+            "completion_requires_fresh_evidence",
+        ):
+            if field not in expected:
+                continue
+            actual = item.get(field)
+            if actual != expected[field]:
+                raise _GoalInterpretationAuthorityViolation(
+                    f"responsibilities[{index}] relationship={relationship!r} "
+                    f"changes retained Goal {target_id!r} {field}: "
+                    f"expected={expected[field]!r} actual={actual!r}"
+                )
 
 
 _GOAL_INTERPRETATION_PROVENANCE_CONTEXT_KEYS = (
@@ -397,6 +615,148 @@ def _reject_runtime_identity_bindings(
                     f"{binding_name}{suffix}. Runtime/session IDs are not human "
                     "semantic evidence."
                 )
+
+
+_TURN_ECHO_EDGE_PUNCTUATION = " \t\r\n.!?…。！？；;，,：:\"'“”‘’"
+
+
+def _normalized_turn_echo(value: str) -> str:
+    """Normalize only envelope-equivalent surface form, not semantic meaning."""
+
+    return " ".join(
+        value.strip(_TURN_ECHO_EDGE_PUNCTUATION).strip().casefold().split()
+    )
+
+
+def _reject_transport_echo_bindings(
+    request: GoalInterpretationRequest,
+    parsed: dict[str, Any],
+) -> None:
+    """Reject request-envelope fields masquerading as semantic bindings.
+
+    The admitted turn and its language tag are transport inputs to Goal
+    Interpretation. Copying either wholesale into ``bindings`` does not preserve
+    an atomic material fact and can conceal a collapsed multi-effect request.
+    This check compares exact normalized envelope values only; it does not infer
+    intent or manufacture replacement meaning.
+    """
+
+    turn_echo = _normalized_turn_echo(request.text or "")
+    language = " ".join(str(request.language or "").strip().casefold().split())
+    literal_turn = (request.text or "").casefold()
+    responsibilities = parsed.get("responsibilities")
+    if not isinstance(responsibilities, list):
+        return
+    for responsibility_index, item in enumerate(responsibilities):
+        if not isinstance(item, dict):
+            continue
+        bindings = item.get("bindings")
+        if not isinstance(bindings, dict):
+            continue
+        for binding_name, value in bindings.items():
+            values = value if isinstance(value, list) else [value]
+            for value_index, scalar in enumerate(values):
+                if not isinstance(scalar, str):
+                    continue
+                normalized = _normalized_turn_echo(scalar)
+                copied_turn = bool(turn_echo and normalized == turn_echo)
+                copied_language = bool(
+                    language
+                    and " ".join(scalar.strip().casefold().split()) == language
+                    and language not in literal_turn
+                )
+                if not (copied_turn or copied_language):
+                    continue
+                suffix = f"[{value_index}]" if isinstance(value, list) else ""
+                envelope_field = "whole admitted turn" if copied_turn else "language tag"
+                raise _GoalInterpretationSemanticStructureViolation(
+                    "Goal Interpretation binding copied request-envelope data instead "
+                    f"of an atomic semantic fact: responsibilities[{responsibility_index}]"
+                    f".bindings.{binding_name}{suffix} copied the {envelope_field}."
+                )
+
+
+def _reject_untyped_coordination_bindings(parsed: dict[str, Any]) -> None:
+    """Require coordination edges to reference sibling Responsibilities.
+
+    A free-form action phrase hidden in a coordination binding can collapse an
+    independently observable effect while leaving a schema-shaped DTO.  Exact
+    turn-local references make the relation auditable without interpreting the
+    phrase at this mechanical boundary.
+    """
+
+    responsibilities = parsed.get("responsibilities")
+    if not isinstance(responsibilities, list):
+        return
+    local_refs = {
+        str(item.get("local_ref") or "").strip()
+        for item in responsibilities
+        if isinstance(item, dict) and str(item.get("local_ref") or "").strip()
+    }
+    relation_tokens = {
+        "concurrent",
+        "concurrently",
+        "parallel",
+        "simultaneous",
+        "simultaneously",
+        "together",
+    }
+    for responsibility_index, item in enumerate(responsibilities):
+        if not isinstance(item, dict):
+            continue
+        own_ref = str(item.get("local_ref") or "").strip()
+        bindings = item.get("bindings")
+        if not isinstance(bindings, dict):
+            continue
+        for binding_name, value in bindings.items():
+            normalized_name = "_".join(
+                str(binding_name).strip().casefold().replace("-", "_").split()
+            )
+            scalar_values = value if isinstance(value, list) else [value]
+            normalized_scalar_values = {
+                "_".join(
+                    str(candidate).strip().casefold().replace("-", "_").split()
+                )
+                for candidate in scalar_values
+                if str(candidate).strip()
+            }
+            if not (
+                "coordinat" in normalized_name
+                or "combin" in normalized_name
+                or "simultan" in normalized_name
+                or normalized_name
+                in {"alongside", "concurrent_with", "parallel_with", "with"}
+                or (
+                    normalized_name == "mode"
+                    and normalized_scalar_values.issubset(relation_tokens)
+                )
+            ):
+                continue
+            normalized_values = {
+                str(candidate).strip()
+                for candidate in scalar_values
+                if str(candidate).strip()
+            }
+            if (
+                normalized_values
+                and normalized_values.issubset(local_refs - {own_ref})
+            ):
+                continue
+            # A controlled relation value is structural timing evidence and
+            # cannot conceal another effect's wording. It is safe only when the
+            # DTO already exposes multiple sibling Responsibilities.
+            if (
+                len(local_refs) > 1
+                and normalized_scalar_values
+                and normalized_scalar_values.issubset(relation_tokens)
+            ):
+                continue
+            raise _GoalInterpretationSemanticStructureViolation(
+                "Goal Interpretation coordination bindings must contain only exact "
+                "sibling local_ref values; free-form effect wording can conceal a "
+                f"missing Responsibility at responsibilities[{responsibility_index}]"
+                f".bindings.{binding_name}."
+            )
 
 
 def _bounded_json(value: Any, *, max_chars: int = 4000) -> str:
@@ -533,22 +893,29 @@ def _compact_active_task_snapshots(
 def _compact_active_goal_snapshots(
     context: dict[str, Any], *, limit: int = 4
 ) -> list[dict[str, Any]]:
-    raw = context.get("active_goal_snapshots")
-    if not isinstance(raw, list):
-        return []
+    active = context.get("active_goal_snapshots")
+    recent = context.get("recent_goal_snapshots")
+    raw = [
+        *(active if isinstance(active, list) else []),
+        *(recent if isinstance(recent, list) else []),
+    ]
     compact: list[dict[str, Any]] = []
+    seen: set[str] = set()
     for item in raw[-max(1, limit) :]:
         if not isinstance(item, dict):
             continue
         goal = item.get("goal") if isinstance(item.get("goal"), dict) else {}
+        metadata = goal.get("metadata") if isinstance(goal.get("metadata"), dict) else {}
         description = str(goal.get("description") or item.get("description") or "").strip()
         if not description:
             continue
+        goal_id = str(item.get("goal_id") or goal.get("goal_id") or "")
+        if not goal_id or goal_id in seen:
+            continue
+        seen.add(goal_id)
         compact.append(
             {
-                "goal_id": str(
-                    item.get("goal_id") or goal.get("goal_id") or ""
-                ),
+                "goal_id": goal_id,
                 "goal_version": item.get("goal_version") or goal.get("version"),
                 "responsibility_status": str(
                     item.get("responsibility_status")
@@ -559,6 +926,14 @@ def _compact_active_goal_snapshots(
                     "description": description[:240],
                     "object": goal.get("object") if isinstance(goal.get("object"), dict) else {},
                     "constraints": goal.get("constraints") if isinstance(goal.get("constraints"), dict) else {},
+                    "output_mode": metadata.get("output_mode"),
+                    "completion_requires_work": metadata.get(
+                        "completion_requires_work",
+                        True if metadata.get("provider_required") is True else None,
+                    ),
+                    "completion_requires_fresh_evidence": metadata.get(
+                        "completion_requires_fresh_evidence"
+                    ),
                 },
                 "open_information_gaps": [
                     {
@@ -607,6 +982,20 @@ def _compact_recent_dialogue(
                 projected["source"] = source
         compact.append(projected)
     return compact
+
+
+def _most_recent_assistant_utterance(context: dict[str, Any]) -> dict[str, Any]:
+    """Expose one accepted speaker-role fact without interpreting the new turn."""
+
+    for item in reversed(_compact_recent_dialogue(context)):
+        if item.get("role") == "assistant":
+            return {
+                "status": "available",
+                "speaker": "Chromie",
+                "role": "assistant",
+                "text": item["text"],
+            }
+    return {"status": "unavailable"}
 
 
 def _goal_interpretation_prompt_context(context: dict[str, Any]) -> dict[str, Any]:
@@ -722,13 +1111,17 @@ class OllamaGoalInterpreter:
             f"{_bounded_json(_without_goal_interpretation_authority(request.context.get('interaction_context') or {}), max_chars=2400)}\n"
             "Recent accepted dialogue JSON:"
             f"{_bounded_json_array(_compact_recent_dialogue(request.context), max_chars=1800)}\n"
-            "Active Goal semantics with commit-safe identity and Planner-owned pending gaps JSON:"
+            "Most recent accepted Chromie/assistant utterance JSON:"
+            f"{_bounded_json(_most_recent_assistant_utterance(request.context), max_chars=420)}\n"
+            "Retained active/recent Goal semantics with commit-safe identity and Planner-owned pending gaps JSON:"
             f"{_bounded_json_array(_compact_active_goal_snapshots(request.context), max_chars=1400)}\n"
             "Active Task/Activity progress with identity and pending clarification JSON:"
             f"{_bounded_json_array(_compact_active_task_snapshots(request.context), max_chars=1400)}\n\n"
-            "Interpret contextual WHAT. For every Responsibility, also state whether it "
-            "is new or modifies/continues/clarifies/cancels a supplied Goal and copy exact "
-            "target Goal IDs. A short answer to a pending clarification supplies the "
+            "Interpret contextual WHAT. For every Responsibility, copy exactly one "
+            "relationship protocol token from new, continue, modify, clarify, confirm, "
+            "reject, cancel, pause, resume, merge, split, or reference, and copy exact "
+            "target Goal IDs. Never inflect, conjugate, translate, or paraphrase a "
+            "relationship token. A short answer to a pending clarification supplies the "
             "applicable semantic binding and relates to that Goal; it is not an isolated "
             "new request. Do not create, resolve, classify, or copy an InformationGap. "
             "Do not decide that a Capability/execution parameter is missing or choose "
@@ -736,10 +1129,35 @@ class OllamaGoalInterpreter:
             "belong to Fast Planner. External Evidence is fresh Evidence, not semantic "
             "uncertainty or a value to ask the user for. Goal Association will verify and "
             "commit the Goal relationship. "
+            "Preserve speaker and actor perspective: the user's first person belongs "
+            "to the user, while second-person references addressed to Chromie belong "
+            "to Chromie. A question about what Chromie just said uses the most recent "
+            "accepted assistant utterance from dialogue and is new conversational work, "
+            "not continuation of the prior utterance's Goal. "
+            "A Responsibility that continues or resumes one supplied Goal must preserve "
+            "that Goal's provider-neutral output_mode, completion_requires_work, and "
+            "completion_requires_fresh_evidence contract. Continuation of body action, "
+            "media, information work, or vocal performance never becomes ordinary "
+            "speech merely because the current turn is a short reference. "
+            "Preserve deictic spatial meaning such as here/there, inside/outside, "
+            "ahead/behind, and equivalent expressions in any language as an exact "
+            "current-turn location or direction binding when it changes the outcome. "
             "Return responsibilities, confidence, and unresolved semantic uncertainty. "
             "For directly named entities, preserve "
             "the exact current-turn user-language surface in bindings; never translate or "
-            "provider-canonicalize it. No route, intent, response wording, Activity, Work, "
+            "provider-canonicalize it. Perform a literal surface audit before returning: "
+            "The request-envelope language tag and the whole Latest user input are not "
+            "semantic bindings; never copy either into bindings as a substitute for "
+            "atomic material facts. A coordination binding may contain only exact "
+            "sibling local_ref values, never another effect's free-form wording. "
+            "every current-turn named or deictic location binding value must occur as "
+            "one exact contiguous substring in Latest user input. For this rule the "
+            "authoritative input is "
+            f"{json.dumps(request.text, ensure_ascii=False)}; a translated equivalent "
+            "does not occur there and is invalid. Preserve every explicit Arabic "
+            "numeric token from Latest user input verbatim in an atomic material "
+            "binding; never spell it out, translate it, round it, or replace it with "
+            "a default. No route, intent, response wording, Activity, Work, "
             "Plan, Capability, Tool, provider, executable args, or input-resolution "
             "strategy. Copy only Goal IDs explicitly supplied in Context."
         )
@@ -749,6 +1167,7 @@ class OllamaGoalInterpreter:
         *,
         forbidden_unresolved_values: tuple[str, ...] = (),
         new_relationship_only: bool = False,
+        allowed_goal_ids: tuple[str, ...] = (),
     ) -> dict[str, Any]:
         schema = GoalInterpretationDecision.model_json_schema()
         schema["additionalProperties"] = False
@@ -768,6 +1187,7 @@ class OllamaGoalInterpreter:
                 "local_ref",
                 "outcome",
                 "bindings",
+                "output_mode",
                 "relationship",
                 "target_goal_ids",
                 "completion_requires_work",
@@ -786,6 +1206,127 @@ class OllamaGoalInterpreter:
                     if item not in {"relationship", "target_goal_ids"}
                 ]
             responsibility["required"] = required
+            outcome = responsibility.get("properties", {}).get("outcome")
+            if isinstance(outcome, dict):
+                outcome["description"] = (
+                    "Exactly one independently satisfiable provider-neutral outcome. "
+                    "Never combine coordinated positive effects: each embodied, vocal, "
+                    "media, information, or conversational effect that can be accepted "
+                    "or rejected on its own requires a sibling Responsibility."
+                )
+            output_mode = responsibility.get("properties", {}).get("output_mode")
+            if isinstance(output_mode, dict):
+                output_mode.pop("enum", None)
+                output_mode["oneOf"] = [
+                    {
+                        "const": "singing",
+                        "description": (
+                            "A requested act of singing or song, with or without lyrics."
+                        ),
+                    },
+                    {
+                        "const": "body_action",
+                        "description": "Locomotion, gaze, blink, gesture, or posture.",
+                    },
+                    {
+                        "const": "speech",
+                        "description": "Ordinary spoken conversation or answer.",
+                    },
+                    {
+                        "const": "capability_work",
+                        "description": "Fresh information or persistent world-state work.",
+                    },
+                    {
+                        "const": "styled_speech",
+                        "description": (
+                            "Spoken words with emotion/style but no song or melody."
+                        ),
+                    },
+                    {
+                        "const": "recitation",
+                        "description": "Recitation of authored text, not singing.",
+                    },
+                    {
+                        "const": "humming",
+                        "description": "Requested humming without words.",
+                    },
+                    {
+                        "const": "nonverbal_vocalization",
+                        "description": (
+                            "A non-speech voice sound such as laughing, sighing, or "
+                            "coughing; excludes singing, songs, melody, lyrics, and humming."
+                        ),
+                    },
+                    {
+                        "const": "media_playback",
+                        "description": "Control or playback of existing media.",
+                    },
+                ]
+                output_mode["description"] = (
+                    "Provider-neutral observable modality for this one atomic outcome. "
+                    "Singing or a song is singing, never styled_speech, speech, "
+                    "nonverbal_vocalization, capability_work, or body_action. "
+                    "nonverbal_vocalization excludes singing, songs, melody, lyrics, "
+                    "and humming. styled_speech means spoken "
+                    "words with requested emotion/style but no melody or song. "
+                    "Blinking/locomotion are body_action; ordinary conversation is "
+                    "speech. No catch-all mode "
+                    "is available: choose the exact source-grounded category."
+                )
+            relationship = responsibility.get("properties", {}).get(
+                "relationship"
+            )
+            if isinstance(relationship, dict):
+                relationship.pop("enum", None)
+                relationship["oneOf"] = [
+                    {
+                        "const": value,
+                        "description": description,
+                    }
+                    for value, description in (
+                        ("continue", "Advance the same unfinished Goal unchanged."),
+                        ("modify", "Change material meaning of the same Goal."),
+                        ("clarify", "Supply missing meaning for the same Goal."),
+                        ("confirm", "Approve a pending proposal for the Goal."),
+                        ("reject", "Decline a pending proposal for the Goal."),
+                        ("cancel", "Cancel the supplied Goal."),
+                        ("pause", "Pause the supplied Goal."),
+                        ("resume", "Resume a paused supplied Goal."),
+                        ("merge", "Merge multiple supplied Goals."),
+                        ("split", "Split one supplied Goal into distinct Goals."),
+                        ("reference", "Refer to supplied Goal meaning without changing it."),
+                        ("new", "Create a genuinely independent Responsibility."),
+                    )
+                ]
+                relationship["description"] = (
+                    "Copy exactly one canonical relationship token; never inflect, "
+                    "pluralize, or paraphrase it."
+                )
+            target_goal_ids = responsibility.get("properties", {}).get(
+                "target_goal_ids"
+            )
+            if isinstance(target_goal_ids, dict) and allowed_goal_ids:
+                target_goal_ids["items"] = {
+                    "type": "string",
+                    "enum": sorted(allowed_goal_ids),
+                }
+                target_goal_ids["uniqueItems"] = True
+            if not new_relationship_only:
+                responsibility.setdefault("allOf", []).append(
+                    {
+                        "if": {
+                            "properties": {"relationship": {"const": "new"}},
+                            "required": ["relationship"],
+                        },
+                        "then": {
+                            "properties": {"target_goal_ids": {"maxItems": 0}}
+                        },
+                        "else": {
+                            "properties": {"target_goal_ids": {"minItems": 1}},
+                            "required": ["target_goal_ids"],
+                        },
+                    }
+                )
         return schema
 
     @staticmethod
@@ -857,6 +1398,7 @@ class OllamaGoalInterpreter:
                 new_relationship_only=not bool(
                     _canonical_goal_ids_from_context(request.context)
                 ),
+                allowed_goal_ids=_canonical_goal_ids_from_context(request.context),
             ),
         }
         if self.keep_alive:
@@ -880,6 +1422,7 @@ class OllamaGoalInterpreter:
             new_relationship_only=not bool(
                 _canonical_goal_ids_from_context(request.context)
             ),
+            allowed_goal_ids=_canonical_goal_ids_from_context(request.context),
         )
         bound_uncertainty_repair = (
             " The rejected DTO copied already-resolved binding values into top-level "
@@ -894,17 +1437,23 @@ class OllamaGoalInterpreter:
                 "content": (
                     self.load_system_prompt()
                     + "\n\nDTO Repair: return one corrected WHAT-only Goal Interpretation JSON object. "
+                    "For every closed string field, copy one exact protocol token from "
+                    "the schema; never inflect, conjugate, translate, or paraphrase it. "
                     "Remove every field outside the schema. Never translate a rejected "
                     "route/intent/Capability/Activity/Work/Plan/provider field into another "
                     "implementation hint. Preserve only the human outcome, material semantic "
                     "bindings, supplied Goal relationships, "
+                    "the exact provider-neutral output_mode, "
                     "work/fresh-evidence requirements, confidence, and genuine "
                     "semantic uncertainty. Never create/resolve an InformationGap or "
                     "choose input-source/default/clarification policy. A directly named "
                     "entity binding must copy the exact "
                     "current-turn surface; never translate or transliterate it. Provider timezone "
                     "or clock-range choices for an already-preserved relative time are not semantic "
-                    "uncertainty."
+                    "uncertainty. The request-envelope language tag and the whole Latest "
+                    "user input are not semantic bindings. Decompose each independently "
+                    "observable requested effect into a sibling Responsibility and bind "
+                    "only its atomic material facts."
                     + bound_uncertainty_repair
                     + " Return JSON only."
                 ),
@@ -956,6 +1505,13 @@ class OllamaGoalInterpreter:
                     "external answer is not semantic ambiguity. Do not create or resolve "
                     "an InformationGap; do not choose ask_user, context, observation, "
                     "query, default, Work, a Capability, provider, or executable arguments. "
+                    "This source-based pass must complete an atomicity audit before JSON: "
+                    "count every independently observable effect coordinated by while, "
+                    "simultaneously, Chinese 边…边…, or equivalent grammar. If the source "
+                    "coordinates N effects that a person could accept or reject separately, "
+                    "responsibilities must contain N sibling items. Never hide one effect "
+                    "inside another item's outcome or binding. A coordination binding may "
+                    "contain only exact sibling local_ref values, not words naming an action. "
                     "Return one final JSON object only."
                 ),
             },
@@ -964,7 +1520,9 @@ class OllamaGoalInterpreter:
                 "content": (
                     self.build_interpretation_user_prompt(request)
                     + "\n\nPerform one fresh Deep interpretation from the source above. "
-                    "No prior interpretation DTO is supplied or authoritative."
+                    "No prior interpretation DTO is supplied or authoritative. First count "
+                    "the source's independently observable effects; the final number of "
+                    "responsibilities must equal that count."
                 ),
             },
         ]
@@ -974,7 +1532,13 @@ class OllamaGoalInterpreter:
     def _requires_deep_semantic_interpretation(
         decision: GoalInterpretationDecision,
     ) -> bool:
-        """Escalate only model-declared unresolved Responsibility meaning."""
+        """Escalate only genuinely unresolved meaning within GI authority.
+
+        A schema-valid compound result is not ambiguous merely because it preserves
+        multiple independently satisfiable outcomes. Atomicity and numeric-binding
+        validators protect dropped effects before this boundary; Planner owns HOW
+        complexity after the accepted WHAT handoff.
+        """
 
         return bool(decision.unresolved)
 
@@ -984,11 +1548,16 @@ class OllamaGoalInterpreter:
         content: str,
     ) -> GoalInterpretationDecision:
         parsed = _extract_json_object(content)
+        _normalize_mechanical_goal_interpretation_dto(parsed)
         _reject_planner_shaped_goal_interpretation(parsed)
         _reject_canonical_goal_identity_refs(request, parsed)
         _reject_unknown_goal_refs(request, parsed)
+        _reject_continuity_completion_contract_mismatch(request, parsed)
         _reject_unprovenanced_location_bindings(request, parsed)
         _reject_runtime_identity_bindings(request, parsed)
+        _reject_transport_echo_bindings(request, parsed)
+        _reject_untyped_coordination_bindings(parsed)
+        _reject_dropped_explicit_numeric_bindings(request, parsed)
         return GoalInterpretationDecision.model_validate(parsed)
 
     async def _accept_or_deepen_interpretation(
@@ -1037,6 +1606,28 @@ class OllamaGoalInterpreter:
         try:
             decision = self._validate_interpretation_content(request, content)
             return await self._accept_or_deepen_interpretation(request, decision)
+        except _GoalInterpretationSemanticStructureViolation as exc:
+            logger.warning(
+                "Fast Goal Interpretation lost atomic source structure sid=%s "
+                "error=%s; escalating once from source",
+                request.sid,
+                exc,
+            )
+            try:
+                deep = await self._chat_logged(
+                    self.build_deep_interpretation_payload(request),
+                    stage="goal_interpretation_deep",
+                    request=request,
+                )
+                return self._validate_interpretation_content(
+                    request,
+                    str(deep.get("message", {}).get("content") or ""),
+                )
+            except Exception as deep_exc:
+                raise InterpretationUnavailableError(
+                    "invalid_deep_goal_interpretation_after_source_structure_loss: "
+                    f"{type(deep_exc).__name__}: {deep_exc}"
+                ) from deep_exc
         except (_GoalInterpretationAuthorityViolation, ValueError, ValidationError) as exc:
             logger.warning(
                 "Invalid WHAT-only Goal Interpretation DTO sid=%s error=%s content=%r",

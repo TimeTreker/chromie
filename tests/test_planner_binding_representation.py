@@ -6,6 +6,8 @@ from agent.app.planner_contract import (
     EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
     PlannerDTOContractError,
     PlannerModelOutput,
+    canonical_goal_binding_argument_response_schema,
+    canonical_plan_response_schema,
     normalize_detached_parameter_resolutions,
     normalize_schema_default_parameter_provenance,
     validate_explicit_numeric_parameter_grounding,
@@ -125,6 +127,100 @@ def _information_weather_goal() -> dict:
 
 
 class PlannerBindingRepresentationTests(unittest.TestCase):
+    def test_decoder_projects_exact_same_name_speed_binding(self):
+        base = canonical_plan_response_schema(
+            planner_tier="deep",
+            expected_goal_ids=["goal-walk"],
+            allowed_capability_ids=["soridormi.walk_forward"],
+            capability_input_schemas={
+                "soridormi.walk_forward": {
+                    "type": "object",
+                    "properties": {
+                        "speed": {
+                            "type": "string",
+                            "enum": ["slow", "normal", "quick"],
+                        },
+                        "duration_s": {"type": "number"},
+                    },
+                    "additionalProperties": False,
+                }
+            },
+        )
+        schema = canonical_goal_binding_argument_response_schema(
+            base,
+            authoritative_goals=[
+                {
+                    "goal_id": "goal-walk",
+                    "object": {
+                        "bindings": {
+                            "speed": {
+                                "entity_type": "speed",
+                                "value": "quick",
+                            }
+                        }
+                    },
+                }
+            ],
+        )
+        branch = schema["$defs"]["PlannerModelStep"]["oneOf"][0]
+        args = branch["properties"]["args"]
+
+        self.assertEqual(args["properties"]["speed"], {"const": "quick"})
+        self.assertIn("speed", args["required"])
+
+    def test_same_name_supported_goal_binding_cannot_be_omitted(self):
+        output = PlannerModelOutput.model_validate(
+            {
+                "disposition": "execute",
+                "coverage": "complete",
+                "confidence": 1.0,
+                "steps": [
+                    {
+                        "step_id": "walk",
+                        "capability_id": "soridormi.walk_forward",
+                        "args": {},
+                        "timing": "sequential",
+                        "source_goal_ids": ["goal-walk"],
+                    }
+                ],
+                "goal_satisfaction": _satisfaction("goal-walk"),
+            }
+        )
+        with self.assertRaisesRegex(
+            PlannerDTOContractError,
+            "omitted same-name authoritative Goal binding",
+        ):
+            validate_goal_binding_argument_grounding(
+                output,
+                authoritative_goals=[
+                    {
+                        "goal_id": "goal-walk",
+                        "object": {
+                            "bindings": {
+                                "speed": {
+                                    "entity_type": "speed",
+                                    "value": "quick",
+                                }
+                            }
+                        },
+                    }
+                ],
+                capabilities=[
+                    {
+                        "capability_id": "soridormi.walk_forward",
+                        "input_schema": {
+                            "type": "object",
+                            "properties": {
+                                "speed": {
+                                    "type": "string",
+                                    "enum": ["slow", "normal", "quick"],
+                                }
+                            },
+                        },
+                    }
+                ],
+            )
+
     def test_numeric_grounding_prompt_forbids_sibling_goal_borrowing(self):
         self.assertIn(
             "Never borrow a numeric literal or typed binding from a sibling Goal",
@@ -556,6 +652,36 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                 extra_args={"date": "today", "period": "night"}
             ),
             authoritative_goals=[_information_weather_goal()],
+        )
+
+    def test_information_step_accepts_declared_fixed_temporal_scope(self):
+        goal = _information_weather_goal()
+        goal["resource_responsibility"]["resource"]["attributes"] = {
+            "time": {
+                "entity_type": "time",
+                "value": "now",
+            }
+        }
+        output = _weather_output()
+        output.steps[0].capability_id = "chromie.clock.local"
+        output.steps[0].args = {}
+
+        validate_goal_binding_argument_grounding(
+            output,
+            authoritative_goals=[goal],
+            capabilities=[
+                {
+                    "capability_id": "chromie.clock.local",
+                    "hints": {
+                        "semantic_scope": {
+                            "fixed_temporal_scope": {
+                                "entity_types": ["time"],
+                                "values": ["now"],
+                            }
+                        }
+                    },
+                }
+            ],
         )
 
     def test_information_step_preserves_exact_afternoon_argument(self):

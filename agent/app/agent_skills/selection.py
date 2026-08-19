@@ -289,6 +289,22 @@ class AgentSkillSelectionService:
                 or current_route in summary.applicable_routes
             )
 
+        def goal_applies(summary: AgentSkillSummary) -> bool:
+            if not request.goals:
+                return True
+            return any(
+                (
+                    not summary.applicable_output_modes
+                    or goal.output_mode in summary.applicable_output_modes
+                )
+                and (
+                    not summary.applicable_information_domains
+                    or goal.information_domain
+                    in summary.applicable_information_domains
+                )
+                for goal in request.goals
+            )
+
         if requested_ids:
             ordered: list[AgentSkillSummary] = []
             for agent_skill_id in requested_ids:
@@ -308,6 +324,11 @@ class AgentSkillSelectionService:
                         f"Agent Skill {agent_skill_id!r} is not applicable to "
                         f"route {current_route!r}"
                     )
+                if not goal_applies(summary):
+                    raise ValueError(
+                        f"Agent Skill {agent_skill_id!r} is not applicable to "
+                        "any supplied Goal output mode and information domain"
+                    )
                 ordered.append(summary)
         else:
             ordered = [
@@ -315,6 +336,7 @@ class AgentSkillSelectionService:
                 for summary in summaries.values()
                 if request.agent_role in summary.available_projections
                 and route_applies(summary)
+                and goal_applies(summary)
             ]
             ordered.sort(key=lambda item: item.agent_skill_id)
 
@@ -486,7 +508,10 @@ class AgentSkillSelectionService:
             "facts from an outside information source. A request for stable general "
             "knowledge does not require an external-information method merely because "
             "the answer is factual; use no_skill unless the Goal requires current, "
-            "external, private, or runtime evidence. A household/device/sensor state with "
+            "external, private, or runtime evidence. Fresh runtime evidence alone is not "
+            "an outside information source: a deterministic trusted local read such as "
+            "Chromie's local clock uses its exact Capability contract without an "
+            "external-information method. A household/device/sensor state with "
             "no supplied trusted sensor/provider is not external-information work, and a "
             "future reminder, list mutation, stored obligation, later message, or other "
             "persistent state change is not information retrieval. Use no_skill unless an "
@@ -610,6 +635,25 @@ class AgentSkillSelectionService:
                     constrain(value)
 
         constrain(schema)
+        schema.setdefault("allOf", []).append(
+            {
+                "if": {
+                    "properties": {"decision": {"const": "select_skills"}},
+                    "required": ["decision"],
+                },
+                "then": {
+                    "properties": {
+                        "selected_agent_skills": {"minItems": 1}
+                    },
+                    "required": ["selected_agent_skills"],
+                },
+                "else": {
+                    "properties": {
+                        "selected_agent_skills": {"maxItems": 0}
+                    }
+                },
+            }
+        )
         return schema
 
     @staticmethod

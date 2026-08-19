@@ -5001,8 +5001,15 @@ class ConversationStateManager:
         result: Any,
         *,
         confirmed_request_ids: set[str] | None = None,
+        bind_planned_execution: bool = True,
     ) -> None:
-        """Record assistant speech and lightweight task hints from AgentResult."""
+        """Record assistant speech and, when dispatched, planned execution bindings.
+
+        Preview and other planning-only callers retain the assistant turn and
+        canonical Goal/plan metadata, but must not turn an undispatched request
+        into authoritative Runtime Work.  Runtime-backed callers keep the
+        default and reconcile the resulting bindings from execution receipts.
+        """
         if not self.enabled:
             return
 
@@ -5038,6 +5045,19 @@ class ConversationStateManager:
         speech_parts: list[str] = []
         for key in ("speak_immediate", "speak_after", "speech"):
             for item in data.get(key, []) or []:
+                item_metadata = (
+                    item.get("metadata")
+                    if isinstance(item, dict)
+                    else getattr(item, "metadata", None)
+                )
+                if (
+                    isinstance(item_metadata, dict)
+                    and item_metadata.get("reuse_current_turn_speech") is True
+                ):
+                    # The Fast Communicative Activity was recorded when its
+                    # playback completed. This response only reuses that exact
+                    # event as an execution barrier; it is not a second turn.
+                    continue
                 text = item.get("text") if isinstance(item, dict) else getattr(item, "text", None)
                 text = self._compact_text(text)
                 if text:
@@ -5070,50 +5090,51 @@ class ConversationStateManager:
         # IDs generated from InteractionSpeech so only Capability Runtime evidence
         # can make that Goal terminal. Clarification speech is intentionally not
         # bound: its Goal must remain active while waiting for the user.
-        speech_items = [
-            item for item in (data.get("speech") or []) if isinstance(item, dict)
-        ]
-        for goal_id, outcome in goal_outcomes.items():
-            if str(outcome.get("disposition") or "").strip().lower() != "respond":
-                continue
-            scoped_speech: list[dict[str, Any]] = []
-            for item in speech_items:
-                item_metadata = item.get("metadata")
-                if not isinstance(item_metadata, dict):
-                    continue
-                covered_goal_ids = self._string_list(
-                    item_metadata.get("covers_goal_ids")
-                )
-                if goal_id in covered_goal_ids:
-                    scoped_speech.append(item)
-            request_ids = [
-                str(item.get("id"))
-                for item in scoped_speech
-                if str(item.get("id") or "").strip()
+        if bind_planned_execution:
+            speech_items = [
+                item for item in (data.get("speech") or []) if isinstance(item, dict)
             ]
-            if not request_ids:
-                continue
-            self._record_goal_pending_execution(
-                sid=sid,
-                goal_id=goal_id,
-                status="scheduled",
-                summary="chromie.speak",
-                request_ids=request_ids,
-                planning_result="respond",
-                planned_capabilities=[
-                    {
-                        "capability_id": "chromie.speak",
-                        "request_id": request_id,
-                        "source_goal_ids": [goal_id],
-                    }
-                    for request_id in request_ids
-                ],
-                confirmation_pending=False,
-                interaction_id=interaction_id,
-                turn_id=turn_id,
-                canonical_plan_id=canonical_plan_id,
-                canonical_plan_fingerprint=canonical_plan_fingerprint,
-            )
+            for goal_id, outcome in goal_outcomes.items():
+                if str(outcome.get("disposition") or "").strip().lower() != "respond":
+                    continue
+                scoped_speech: list[dict[str, Any]] = []
+                for item in speech_items:
+                    item_metadata = item.get("metadata")
+                    if not isinstance(item_metadata, dict):
+                        continue
+                    covered_goal_ids = self._string_list(
+                        item_metadata.get("covers_goal_ids")
+                    )
+                    if goal_id in covered_goal_ids:
+                        scoped_speech.append(item)
+                request_ids = [
+                    str(item.get("id"))
+                    for item in scoped_speech
+                    if str(item.get("id") or "").strip()
+                ]
+                if not request_ids:
+                    continue
+                self._record_goal_pending_execution(
+                    sid=sid,
+                    goal_id=goal_id,
+                    status="scheduled",
+                    summary="chromie.speak",
+                    request_ids=request_ids,
+                    planning_result="respond",
+                    planned_capabilities=[
+                        {
+                            "capability_id": "chromie.speak",
+                            "request_id": request_id,
+                            "source_goal_ids": [goal_id],
+                        }
+                        for request_id in request_ids
+                    ],
+                    confirmation_pending=False,
+                    interaction_id=interaction_id,
+                    turn_id=turn_id,
+                    canonical_plan_id=canonical_plan_id,
+                    canonical_plan_fingerprint=canonical_plan_fingerprint,
+                )
 
         actions = data.get("actions", []) or data.get("capabilities", []) or []
         primary_actions: list[dict[str, Any]] = []
@@ -5136,7 +5157,7 @@ class ConversationStateManager:
             item["metadata"] = action_metadata
             primary_actions.append(item)
 
-        if primary_actions:
+        if primary_actions and bind_planned_execution:
             planning_result = (
                 str(result_metadata.get("planning_result") or "").strip()
                 if isinstance(result_metadata, dict)

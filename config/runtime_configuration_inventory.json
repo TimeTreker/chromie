@@ -360,6 +360,24 @@
       ]
     },
     {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "AGENT_FAST_FIRST_RESPONSE_MODEL",
+      "owners": [
+        "agent/app/settings.py",
+        "docker-compose.yml",
+        "env/profiles/default.env",
+        "env/profiles/jetson_agx_orin.env",
+        "env/profiles/jetson_orin_nano_super.env",
+        "env/profiles/jetson_thor.env",
+        "env/profiles/nvidia_ada.env",
+        "env/profiles/nvidia_blackwell.env",
+        "env/profiles/rtx4090.env",
+        "env/profiles/rtx4090_laptop.env",
+        "env/profiles/rtx5090.env"
+      ]
+    },
+    {
       "boolean": true,
       "category": "service_internal",
       "key": "AGENT_FAST_PLANNER_ENABLED",
@@ -447,6 +465,15 @@
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
         "env/validation/architecture.env"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "AGENT_FAST_TRUTH_MODEL",
+      "owners": [
+        "agent/app/settings.py",
+        "docker-compose.yml"
       ]
     },
     {
@@ -4171,10 +4198,10 @@
       "bounded_compatibility_alias": 0,
       "profile_constant": 139,
       "public_choice": 9,
-      "service_internal": 216
+      "service_internal": 218
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 401
+    "total_keys": 403
   }
 }

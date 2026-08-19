@@ -352,6 +352,24 @@ def _goal_contexts(
                 if key not in merged and key in raw:
                     merged[key] = raw[key]
             raw = merged
+        metadata = raw.get("metadata")
+        metadata = metadata if isinstance(metadata, dict) else {}
+        resource_responsibility = raw.get("resource_responsibility")
+        resource_responsibility = (
+            resource_responsibility
+            if isinstance(resource_responsibility, dict)
+            else {}
+        )
+        resource = resource_responsibility.get("resource")
+        resource = resource if isinstance(resource, dict) else {}
+        attributes = resource.get("attributes")
+        attributes = attributes if isinstance(attributes, dict) else {}
+        information_domain_binding = attributes.get("information_domain")
+        information_domain_binding = (
+            information_domain_binding
+            if isinstance(information_domain_binding, dict)
+            else {}
+        )
         goal_id = str(raw.get("goal_id") or raw.get("id") or "").strip()
         description = str(
             raw.get("description") or raw.get("summary") or ""
@@ -367,6 +385,11 @@ def _goal_contexts(
                     description=description,
                     bindings=_bounded_items(raw.get("bindings") or raw.get("object")),
                     success_criteria=_bounded_items(raw.get("success_criteria")),
+                    output_mode=str(metadata.get("output_mode") or ""),
+                    information_domain=str(
+                        information_domain_binding.get("value") or ""
+                    ),
+                    resource_kind=str(resource.get("kind") or ""),
                 )
             )
         except ValidationError as exc:

@@ -22,6 +22,8 @@ def test_weather_capability_declares_bounded_temporal_scope() -> None:
     assert "night" in scope["supported_temporal_scopes"]
     assert "annual" in scope["unsupported_temporal_scopes"]
     assert scope["scope_mismatch_policy"] == "clarify_or_unavailable_never_narrow"
+    assert "person or object is present" in tool.llm_hints["when_not_to_use"]
+    assert "direct visual or auditory observation" in tool.llm_hints["when_not_to_use"]
     assert tool.input_schema["properties"]["period"]["enum"] == [
         "day",
         "morning",
@@ -94,6 +96,8 @@ def test_goal_and_planner_prompts_forbid_scope_narrowing() -> None:
     assert "Never silently rewrite annual" in goal_prompt
     assert "Never silently narrow a goal" in fast_prompt
     assert "Never silently narrow a canonical goal" in deep_prompt
+    assert "Capability domains are not interchangeable" in fast_prompt
+    assert "Capability domains are not interchangeable" in deep_prompt
     assert "calendar-date argument does not cover a finer day-part" in fast_prompt
     assert "calendar-date argument does not cover a finer day-part" in deep_prompt
     assert (

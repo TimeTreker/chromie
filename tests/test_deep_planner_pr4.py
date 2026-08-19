@@ -6,7 +6,10 @@ import unittest
 from agent.app.capabilities.catalog import CatalogCapability
 from agent.app.clients.ollama_client import OllamaGenerationError
 from agent.app.deep_planner import DeepPlannerResolver
-from agent.app.planner_contract import validate_planner_model_output
+from agent.app.planner_contract import (
+    qualify_capability_catalog_for_output_modes,
+    validate_planner_model_output,
+)
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 from tests.cognitive_work_test_support import cognitive_work_request
 from shared.chromie_contracts.plan import CanonicalPlan
@@ -23,6 +26,189 @@ class SequencedOllama:
         if isinstance(value, Exception):
             raise value
         return value
+
+
+class DeepPlannerMixedAccountingNormalizationTests(unittest.TestCase):
+    def test_output_mode_qualification_removes_information_tools_from_body_work(self):
+        capabilities = [
+            {
+                "capability_id": "soridormi.walk_forward",
+                "route": "robot_action",
+            },
+            {
+                "capability_id": "chromie.clock.local",
+                "route": "tool",
+                "semantic_scope": {
+                    "responsibility_type": "acquire_and_deliver_resource",
+                    "resource_kinds": ["information"],
+                },
+            },
+        ]
+        goals = [
+            {"goal_id": "walk", "metadata": {"output_mode": "body_action"}},
+            {"goal_id": "sing", "metadata": {"output_mode": "singing"}},
+        ]
+
+        qualified = qualify_capability_catalog_for_output_modes(
+            capabilities,
+            authoritative_goals=goals,
+        )
+
+        self.assertEqual(
+            [item["capability_id"] for item in qualified],
+            ["soridormi.walk_forward"],
+        )
+
+    def test_preserves_outcomes_and_drops_only_unowned_placeholder_step(self):
+        raw = {
+            "disposition": "mixed",
+            "coverage": "partial",
+            "goal_outcomes": {
+                "goal-walk": {
+                    "disposition": "execute",
+                    "step_ids": ["walk"],
+                },
+                "goal-sing": {
+                    "disposition": "unavailable",
+                    "step_ids": [],
+                },
+            },
+            "steps": [
+                {"step_id": "walk", "capability_id": "soridormi.walk_forward"},
+                {"step_id": "placeholder", "capability_id": "chromie.memory.retrieve"},
+            ],
+        }
+
+        normalized, repairs = (
+            DeepPlannerResolver._normalize_mixed_goal_outcome_accounting(
+                raw,
+                expected_goal_ids=["goal-walk", "goal-sing"],
+            )
+        )
+
+        self.assertEqual(normalized["coverage"], "complete")
+        self.assertEqual(
+            [item["step_id"] for item in normalized["steps"]],
+            ["walk"],
+        )
+        self.assertEqual(normalized["goal_outcomes"], raw["goal_outcomes"])
+        self.assertTrue(any(item["path"] == "coverage" for item in repairs))
+        self.assertTrue(
+            any(item.get("step_id") == "placeholder" for item in repairs)
+        )
+
+    def test_does_not_normalize_incomplete_goal_map(self):
+        raw = {
+            "disposition": "mixed",
+            "coverage": "partial",
+            "goal_outcomes": {
+                "goal-walk": {
+                    "disposition": "execute",
+                    "step_ids": ["walk"],
+                }
+            },
+            "steps": [{"step_id": "walk"}],
+        }
+
+        normalized, repairs = (
+            DeepPlannerResolver._normalize_mixed_goal_outcome_accounting(
+                raw,
+                expected_goal_ids=["goal-walk", "goal-sing"],
+            )
+        )
+
+        self.assertEqual(normalized, raw)
+        self.assertEqual(repairs, [])
+
+    def test_explicit_per_goal_outcomes_repair_redundant_aggregate_fields(self):
+        raw = {
+            "disposition": "execute",
+            "coverage": "partial",
+            "goal_outcomes": {
+                "goal-walk": {
+                    "disposition": "execute",
+                    "step_ids": ["walk"],
+                    "satisfaction": {
+                        "score": 0.95,
+                        "status": "exact",
+                        "satisfied_goal_ids": ["goal-walk"],
+                        "unmet_goal_ids": ["goal-walk"],
+                        "unmet_requirements": ["execution still pending"],
+                    },
+                },
+                "goal-sing": {
+                    "disposition": "unavailable",
+                    "step_ids": [],
+                    "satisfaction": {
+                        "score": 0.0,
+                        "status": "unsatisfied",
+                        "satisfied_goal_ids": [],
+                        "unmet_goal_ids": ["goal-sing"],
+                        "unmet_requirements": ["sing"],
+                    },
+                },
+            },
+            "steps": [
+                {
+                    "step_id": "walk",
+                    "capability_id": "soridormi.walk_forward",
+                    "source_goal_ids": ["goal-walk", "goal-sing"],
+                },
+                {
+                    "step_id": "decorative",
+                    "capability_id": "soridormi.look_direction",
+                    "source_goal_ids": ["goal-walk", "goal-sing"],
+                },
+            ],
+            "goal_satisfaction": {
+                "score": 0.95,
+                "status": "exact",
+                "satisfied_goal_ids": ["goal-walk"],
+                "unmet_goal_ids": ["goal-sing"],
+                "unmet_requirements": ["sing"],
+            },
+        }
+
+        normalized, repairs = (
+            DeepPlannerResolver._normalize_mixed_goal_outcome_accounting(
+                raw,
+                expected_goal_ids=["goal-walk", "goal-sing"],
+            )
+        )
+
+        self.assertEqual(normalized["disposition"], "mixed")
+        self.assertEqual(normalized["coverage"], "complete")
+        self.assertEqual(
+            normalized["goal_outcomes"]["goal-walk"]["satisfaction"][
+                "unmet_goal_ids"
+            ],
+            [],
+        )
+        self.assertEqual(
+            normalized["goal_outcomes"]["goal-walk"]["satisfaction"][
+                "unmet_requirements"
+            ],
+            [],
+        )
+        self.assertEqual(
+            normalized["steps"],
+            [
+                {
+                    "step_id": "walk",
+                    "capability_id": "soridormi.walk_forward",
+                    "source_goal_ids": ["goal-walk"],
+                }
+            ],
+        )
+        self.assertEqual(
+            normalized["goal_satisfaction"]["score"],
+            0.475,
+        )
+        self.assertEqual(
+            normalized["goal_satisfaction"]["status"],
+            "partial",
+        )
+        self.assertGreaterEqual(len(repairs), 6)
 
 
 class FullCatalog:
@@ -587,6 +773,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 },
                 "hints": {
                     "when_to_use": "Track a bounded body velocity command.",
+                    "when_not_to_use": "Do not use for static observation.",
                     "concurrency": {"duplicated": "x" * 5000},
                 },
             }
@@ -608,6 +795,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertIn("soridormi.walk_velocity", catalog_section)
         self.assertIn("vx_mps", catalog_section)
         self.assertIn('"maximum":0.25', catalog_section)
+        self.assertIn("Do not use for static observation.", catalog_section)
         self.assertNotIn("duplicated", catalog_section)
 
     def test_clear_goal_without_matching_capability_is_unavailable_not_clarify(self):
@@ -631,6 +819,11 @@ class DeepPlannerResolverTests(unittest.TestCase):
         )
         self.assertIn(
             "no exact available capability covers the required outcome, return unavailable",
+            prompt,
+        )
+        self.assertIn("Required response language: zh-CN", prompt)
+        self.assertIn(
+            "Do not switch languages merely because internal Goals",
             prompt,
         )
         self.assertIn("ledger-deep-marker", prompt)
@@ -1150,7 +1343,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "coverage": "complete",
                 "confidence": 1.0,
                 "goal_summary": "Walk while singing.",
-                "response_text": "",
+                "response_text": "I can walk, but I can't sing right now.",
                 "steps": [
                     {
                         "step_id": "walk",
@@ -1323,6 +1516,11 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertIn("singing", plan.unresolved)
         self.assertFalse(plan.metadata["execution_allowed"])
         self.assertEqual(plan.metadata["reason"], "coordinated_action_coverage_incomplete")
+        self.assertIn(
+            "Optional coordinated expression belongs to the separate Social Attention owner",
+            ollama.prompts[0][0],
+        )
+        self.assertIn("separate Social Attention owner", ollama.prompts[1][0])
 
     def test_invalid_first_plan_is_revised_once_in_same_tier(self):
         invalid = {"disposition":"execute","coverage":"complete","confidence":0.92,"goal_ids":["goal-action"],"steps":[
@@ -1338,7 +1536,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertIn("invalid_args", ollama.prompts[1][0])
         self.assertNotIn("Fast Planner decides again", ollama.prompts[1][0])
 
-    def test_explicit_numeric_goal_missing_provenance_fails_closed(self):
+    def test_explicit_numeric_goal_missing_provenance_is_normalized_without_replan(self):
         invalid = {
             "disposition": "execute",
             "coverage": "complete",
@@ -1354,44 +1552,54 @@ class DeepPlannerResolverTests(unittest.TestCase):
             ],
             "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
-        repaired = {
-            **invalid,
-            "parameter_resolutions": [
-                {
-                    "step_id": "walk",
-                    "parameter": "duration_s",
-                    "strategy": "user_supplied",
-                    "value": 2.0,
-                    "confidence": 1.0,
-                    "blocking": False,
-                    "rationale": "Copied from the authoritative Goal.",
-                    "source_goal_ids": ["goal-action"],
-                }
-            ],
-        }
         run_request = request("Walk for 2 seconds.")
         run_request.context["goal_association_resolution"]["new_goals"][0][
             "description"
         ] = "Walk for 2 seconds."
-        ollama = SequencedOllama([invalid, repaired])
+        ollama = SequencedOllama([invalid])
 
         plan = asyncio.run(
             DeepPlannerResolver(ollama, FullCatalog()).resolve(run_request)
         )
 
         self.assertEqual(len(ollama.prompts), 1)
-        self.assertEqual(plan.disposition, "clarify")
-        self.assertEqual(plan.steps, [])
-        self.assertEqual(plan.metadata["reason"], "deep_planner_semantic_validation_failed")
-        self.assertIn(
-            "Select a capability whose argument schema can represent the supplied value",
-            ollama.prompts[0][0],
+        self.assertEqual(plan.disposition, "execute")
+        self.assertEqual(len(plan.steps), 1)
+        self.assertFalse(plan.metadata["contract_repair_succeeded"])
+        self.assertEqual(plan.steps[0].args, {"duration_s": 2.0})
+        normalization = plan.metadata["numeric_provenance_normalization"]
+        self.assertTrue(normalization["semantic_plan_unchanged"])
+        self.assertEqual(normalization["repairs"][0]["step_id"], "walk")
+
+    def test_numeric_provenance_repair_cannot_rewrite_plan_semantics(self):
+        invalid = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 0.96,
+            "steps": [
+                {
+                    "step_id": "walk",
+                    "capability_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 2.0},
+                    "timing": "sequential",
+                    "source_goal_ids": ["goal-action"],
+                }
+            ],
+            "goal_satisfaction": {"score": 1.0, "status": "exact"},
+        }
+        run_request = request("Walk for 2 seconds.")
+        run_request.context["goal_association_resolution"]["new_goals"][0][
+            "description"
+        ] = "Walk for 2 seconds."
+        ollama = SequencedOllama([invalid])
+
+        plan = asyncio.run(
+            DeepPlannerResolver(ollama, FullCatalog()).resolve(run_request)
         )
-        self.assertIn(
-            "include a user_supplied parameter_resolution",
-            ollama.prompts[0][0],
-        )
-        self.assertIn("no matching user_supplied", plan.metadata["error"])
+
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertEqual(plan.disposition, "execute")
+        self.assertEqual(plan.steps[0].args, {"duration_s": 2.0})
 
     def test_unsafe_parallel_plan_fails_closed_without_deep_replan(self):
         parallel = {
@@ -1698,6 +1906,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         repaired = {
             **invalid,
             "confidence": 1.0,
+            "response_text": "I can walk and blink, but I can't sing right now.",
             "parameter_resolutions": [
                 {
                     "step_id": "walk",
@@ -1801,6 +2010,17 @@ class DeepPlannerResolverTests(unittest.TestCase):
         vocal_outcome = schema["properties"]["goal_outcomes"]["properties"][
             "goal-sing"
         ]
+        walk_outcome = schema["properties"]["goal_outcomes"]["properties"][
+            "goal-walk"
+        ]
+        self.assertEqual(
+            walk_outcome["properties"]["step_ids"]["maxItems"],
+            1,
+        )
+        self.assertIn(
+            "Optional or decorative effects require their own authoritative Goal",
+            walk_outcome["properties"]["step_ids"]["description"],
+        )
         self.assertEqual(
             vocal_outcome["properties"]["disposition"]["enum"],
             ["clarify", "unavailable", "refused"],
@@ -1809,8 +2029,19 @@ class DeepPlannerResolverTests(unittest.TestCase):
             vocal_outcome["properties"]["response_text"]["maxLength"],
             800,
         )
+        step_branches = schema["$defs"]["PlannerModelStep"]["oneOf"]
+        self.assertTrue(step_branches)
+        for branch in step_branches:
+            self.assertNotIn(
+                "goal-sing",
+                branch["properties"]["source_goal_ids"]["items"]["enum"],
+            )
         self.assertIn(
-            "never substitutes for the provider-required vocal performance",
+            "cannot be performed with the available capabilities",
+            vocal_outcome["properties"]["response_text"]["description"],
+        )
+        self.assertIn(
+            "Never claim or promise",
             vocal_outcome["properties"]["response_text"]["description"],
         )
         self.assertEqual(

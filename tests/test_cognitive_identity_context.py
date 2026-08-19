@@ -92,8 +92,19 @@ class CognitiveIdentityContextTests(unittest.TestCase):
         self.assertIn("Owner-approved Chromie identity JSON", prompt)
         self.assertIn('"name":"Chromie"', prompt)
         self.assertIn('"age_description":"6 years old"', prompt)
-        self.assertIn(IDENTITY_SEMANTIC_CONTRACT, prompt)
-        self.assertIn(PERSONALITY_SEMANTIC_CONTRACT, prompt)
+        self.assertIn("acting/perceiving/body ownership", prompt)
+        self.assertIn("personality expression never create an extra Goal", prompt)
+        self.assertNotIn("Owner-approved Personality Expression JSON", prompt)
+        layered = resolver._layered_prompt(
+            self.request,
+            [],
+            output_type=GoalSegmentationModelOutput,
+        )
+        self.assertLessEqual(
+            len(layered.render())
+            + len(resolver._system_prompt(GoalSegmentationModelOutput)),
+            11_264,
+        )
 
     def test_fast_and_deep_planner_prompts_share_same_identity(self) -> None:
         fast = FastPlannerResolver(_Dummy(), _Dummy())

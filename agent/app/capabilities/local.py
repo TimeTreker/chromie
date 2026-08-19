@@ -763,6 +763,12 @@ def chromie_manifests(
                         "evening, tonight, tomorrow, or upcoming weather or forecast for a "
                         "city/location."
                     ),
+                    "when_not_to_use": (
+                        "Do not use for whether a person or object is present, what is "
+                        "happening in Chromie's immediate environment, surveillance, or "
+                        "any direct visual or auditory observation. Weather evidence covers "
+                        "only declared weather and forecast facts."
+                    ),
                     "tool_name": "weather",
                     "semantic_type": "weather_lookup",
                     "fast_speech_guidance": (
@@ -811,6 +817,124 @@ def chromie_manifests(
             )
         ],
     )
+
+    clock = AgentManifest(
+        agent_id="chromie.clock",
+        display_name="Chromie Local Clock",
+        description=(
+            "Read-only access to the timezone-aware local clock shared by the "
+            "running Chromie service."
+        ),
+        transport=TransportSpec(kind="local_python", module="app.local_tool_execution"),
+        tags=["chromie", "tool", "clock", "runtime_state_read"],
+        tools=[
+            ToolCapability(
+                name="chromie.clock.local",
+                agent_id="chromie.clock",
+                display_name="Read local date and time",
+                description=(
+                    "Read Chromie's current local date, time, weekday, timezone, "
+                    "and UTC offset from the trusted host-synchronized process clock. "
+                    "Use for questions such as what time or date it is now; it does "
+                    "not require a location, phone, screen, camera, or network lookup."
+                ),
+                version="1.0.0",
+                input_schema={
+                    "type": "object",
+                    "properties": {},
+                    "required": [],
+                    "additionalProperties": False,
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "local_iso": {"type": "string", "minLength": 1},
+                        "local_date": {"type": "string", "minLength": 1},
+                        "local_time": {"type": "string", "minLength": 1},
+                        "weekday": {"type": "string", "minLength": 1},
+                        "timezone": {"type": "string", "minLength": 1},
+                        "utc_offset": {"type": "string", "minLength": 1},
+                        "precision": {"type": "string", "enum": ["second"]},
+                        "source": {"type": "string", "enum": ["host_local_clock"]},
+                    },
+                    "required": [
+                        "local_iso",
+                        "local_date",
+                        "local_time",
+                        "weekday",
+                        "timezone",
+                        "utc_offset",
+                        "precision",
+                        "source",
+                    ],
+                    "additionalProperties": False,
+                },
+                effects=["read_only", "runtime_state_read", "clock_lookup"],
+                safety_class="safe_read",
+                execution=ExecutionPolicy(
+                    can_run_parallel=True,
+                    timeout_s=1.0,
+                    idempotent=True,
+                    side_effect_free=True,
+                ),
+                default_failure_policy=FailurePolicy(strategy="stop_and_report"),
+                llm_hints={
+                    "interaction_executable": True,
+                    "prompt_tier": "common",
+                    "prompt_tier_reason": (
+                        "Current local date and time are common spoken information requests."
+                    ),
+                    "when_to_use": (
+                        "Use for the current local time, date, weekday, timezone, or UTC "
+                        "offset. Invoke with empty args and answer only after trusted clock "
+                        "evidence returns."
+                    ),
+                    "when_not_to_use": (
+                        "Do not use for weather, external search, environmental or "
+                        "person-presence questions, direct perception, a location "
+                        "argument, or an invented phone/screen observation."
+                    ),
+                    "tool_name": "local_clock",
+                    "semantic_type": "local_clock_lookup",
+                    "semantic_scope": {
+                        "responsibility_type": "acquire_and_deliver_resource",
+                        "resource_kinds": ["information"],
+                        "delivery_modes": ["spoken_explanation", "structured_result"],
+                        "acquisition": "trusted_runtime_clock_read",
+                        "provider_result": "evidence_material",
+                        "domain": "local_clock",
+                        "fixed_temporal_scope": {
+                            "entity_types": ["time", "time_frame", "temporal_scope"],
+                            "values": ["now"],
+                        },
+                        "supported_facts": [
+                            "current_time",
+                            "current_date",
+                            "weekday",
+                            "timezone",
+                            "utc_offset",
+                        ],
+                    },
+                    "resource_contract": {
+                        "provider_role": "acquire_information",
+                        "plan_requires": [],
+                        "plan_provides": ["resource_acquired"],
+                        "completion_evidence": "trusted_tool_result",
+                        "final_delivery_owner": "chromie_response_layer",
+                    },
+                    "fast_speech_guidance": (
+                        "Briefly acknowledge checking the local time without naming an "
+                        "instrument; do not state the time before the clock result returns."
+                    ),
+                    "pre_execution_speech_guidance": (
+                        "Use natural model-owned wording such as checking the current time. "
+                        "Do not claim to look at a phone, screen, camera, or external source."
+                    ),
+                },
+            )
+        ],
+    )
+
     external_information = AgentManifest(
         agent_id="chromie.external_information",
         display_name="Chromie External Information Provider Adapter",
@@ -949,13 +1073,17 @@ def chromie_manifests(
                     ),
                     "when_not_to_use": (
                         "Do not use as a topical substitute for physical objects, "
-                        "effectful actions, or a more exact registered Capability."
+                        "effectful actions, a more exact registered Capability, or direct "
+                        "visual/auditory observation of Chromie's immediate environment. "
+                        "Do not infer local person or object presence from unrelated "
+                        "current information."
                     ),
                     "semantic_type": "external_information_retrieval",
                     "semantic_scope": {
                         "responsibility_type": "acquire_and_deliver_resource",
                         "resource_kinds": ["information"],
                         "acquisition": "external_grounded_retrieval",
+                        "domain": "external_grounded_information",
                         "provider_result": "evidence_material",
                         "delivery_modes": ["spoken_explanation", "structured_result"],
                         "supported_request_kinds": [
@@ -984,7 +1112,7 @@ def chromie_manifests(
         ],
     )
 
-    return [speech, media, task, memory, weather, external_information]
+    return [speech, media, task, memory, weather, clock, external_information]
 
 
 def chromie_capability_bundle() -> CapabilityBundle:

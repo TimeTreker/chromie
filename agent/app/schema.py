@@ -37,6 +37,8 @@ class HealthResponse(BaseModel):
     goal_association_model: str | None = None
     fast_planner_enabled: bool = False
     fast_planner_model: str | None = None
+    fast_first_response_model: str | None = None
+    fast_truth_model: str | None = None
     deep_planner_enabled: bool = False
     deep_planner_model: str | None = None
     social_attention_mode: str = "on"

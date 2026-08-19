@@ -2,11 +2,11 @@ schema_version: "1.0"
 agent_skill_id: chromie.grounded-external-information
 version: 1.0.0
 title: Grounded External Information
-description: Select for provider-neutral information-resource Goals including weather, places, restaurants, web research, news, and how-to retrieval with exact bindings, evidence freshness, typed failure interpretation, and grounded delivery.
+description: Select only for provider-neutral Goals that require facts from an actually accessible outside information source, including weather, places, restaurants, web research, news, and how-to retrieval. Do not select for deterministic trusted local reads such as Chromie's local clock, direct visual or auditory observation of Chromie's immediate environment, or merely because a Goal needs fresh runtime evidence. Preserve exact bindings, evidence freshness, typed failure interpretation, and grounded delivery when an outside source is actually required.
 authority: agent_method_only
 execution_authority: none
 owner_approved: true
-content_digest: sha256:6e3c698ec6196970367ffd76c051ade10c7957ca03b03a681d4a7fbb4559191f
+content_digest: sha256:9b1df0afb49c53c3a208e4287a7f212c8cadc364196bcc1611c6576cdc452c2c
 extends: []
 required_capabilities: []
 optional_capabilities:
@@ -16,6 +16,11 @@ optional_capabilities:
 applicable_routes:
   - tool
   - chat
+applicable_output_modes:
+  - capability_work
+applicable_information_domains:
+  - weather_forecast
+  - external_grounded_information
 projections:
   goal_association: projections/goal_association.md
   fast_planner: projections/fast_planner.md

@@ -117,11 +117,24 @@
     {
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Fail closed after one invalid Goal Interpretation DTO repair; never accept malformed or authority-violating output.",
+      "contract": "Fail closed when one source-based Deep Goal Interpretation cannot restore atomic compound-responsibility structure; never accept the lossy preliminary meaning.",
       "review_status": "reviewed",
       "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
       "symbol": "OllamaGoalInterpreter.interpret_goal",
       "ordinal": 2,
+      "body_sha256": "9b8b03863002c11b7604dcd38e5c1109a5c7de8cb0cb59fe85c6fe89d0be5a82",
+      "failure_signals": [
+        "raise"
+      ]
+    },
+    {
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Fail closed after one invalid Goal Interpretation DTO repair; never accept malformed or authority-violating output.",
+      "review_status": "reviewed",
+      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
+      "symbol": "OllamaGoalInterpreter.interpret_goal",
+      "ordinal": 3,
       "body_sha256": "26fdefcac95c3cebfc18d38a28f735638bf203cbdfa90483ac8dbf29dfe15f77",
       "failure_signals": [
         "raise"
@@ -279,7 +292,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "f23e7242a8bb8f06ad29d7d984f06000d9252391806271d0d62fe9de12bb7c15",
+      "body_sha256": "94b142bdcd9fc051f11405affdbe3e51de9aa70ad9c5221318fa092e7048f851",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -1432,6 +1445,19 @@
       "body_sha256": "33f08a44748e28a8ef2989a27aad7c092f3aea70962d5688208ed04c00c713c1",
       "failure_signals": [
         "bare_reraise",
+        "diagnostic"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/interaction_coordinator.py",
+      "symbol": "InteractionRuntimeCoordinator.start_fast_planner_communicative_act.observe_completion",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator.interaction_runtime",
+      "contract": "Log an optional delivered-speech recorder failure without changing the already-completed Vocal execution or crashing Runtime.",
+      "review_status": "reviewed",
+      "body_sha256": "256b8fd73cab768931861de8a9ad6077696170845b32b0f2eec36d8c1c39b001",
+      "failure_signals": [
         "diagnostic"
       ]
     },
