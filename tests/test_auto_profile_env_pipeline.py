@@ -229,6 +229,9 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "0")
         self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "32768")
         self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "2")
+        self.assertEqual(values["OLLAMA_REQUIRE_ALL_WARM_MODELS_RESIDENT"], "1")
+        self.assertEqual(values["OLLAMA_FLASH_ATTENTION"], "1")
+        self.assertEqual(values["OLLAMA_KV_CACHE_TYPE"], "q8_0")
         for key in (
             "OLLAMA_NUM_CTX",
             "AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX",
@@ -293,34 +296,32 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             manifest = json.loads((root / ".chromie" / "runtime_profile.json").read_text())
 
         self.assertEqual(values["CHROMIE_ACTIVE_PROFILE"], "rtx4090_laptop")
-        fast_model = "qwen3:4b-instruct-2507-q4_K_M"
-        deep_model = "gemma4:12b"
+        single_model = "qwen3:4b-instruct-2507-q4_K_M"
         for key in (
             "AGENT_MODEL",
             "OLLAMA_MODEL",
             "AGENT_GOAL_INTERPRETER_MODEL",
             "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
+            "AGENT_GOAL_ASSOCIATION_MODEL",
             "AGENT_FAST_PLANNER_MODEL",
             "AGENT_FAST_FIRST_RESPONSE_MODEL",
             "AGENT_FAST_TRUTH_MODEL",
+            "AGENT_DEEP_PLANNER_MODEL",
             "AGENT_TASK_CONTINUITY_MODEL",
             "AGENT_SOCIAL_ATTENTION_MODEL",
             "AGENT_SKILL_SELECTION_MODEL",
             "TTS_COSYVOICE_OLLAMA_MODEL",
         ):
-            self.assertEqual(values[key], fast_model, key)
-        for key in (
-            "AGENT_GOAL_ASSOCIATION_MODEL",
-            "AGENT_DEEP_PLANNER_MODEL",
-        ):
-            self.assertEqual(values[key], deep_model, key)
-        self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "0")
+            self.assertEqual(values[key], single_model, key)
+        self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "1")
         self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "32768")
-        self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "2")
-        self.assertEqual(values["OLLAMA_REQUIRE_ALL_WARM_MODELS_RESIDENT"], "1")
+        self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "1")
+        self.assertNotIn("OLLAMA_REQUIRE_ALL_WARM_MODELS_RESIDENT", values)
+        self.assertNotIn("OLLAMA_FLASH_ATTENTION", values)
+        self.assertNotIn("OLLAMA_KV_CACHE_TYPE", values)
         self.assertEqual(
             manifest["active_ollama_models"],
-            [fast_model, deep_model],
+            [single_model],
         )
         for key in (
             "OLLAMA_CONTEXT_LENGTH",
@@ -330,10 +331,11 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_GOAL_ASSOCIATION_NUM_CTX",
             "AGENT_FAST_PLANNER_NUM_CTX",
             "AGENT_DEEP_PLANNER_NUM_CTX",
+            "AGENT_TASK_CONTINUITY_NUM_CTX",
+            "AGENT_SOCIAL_ATTENTION_NUM_CTX",
+            "AGENT_SKILL_SELECTION_NUM_CTX",
         ):
             self.assertEqual(values[key], "32768", key)
-        self.assertEqual(values["AGENT_SOCIAL_ATTENTION_NUM_CTX"], "32768")
-        self.assertEqual(values["AGENT_SKILL_SELECTION_NUM_CTX"], "32768")
         self.assertEqual(values["AGENT_SOCIAL_ATTENTION_NUM_PREDICT"], "160")
         self.assertEqual(values["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"], "2048")
         self.assertEqual(values["AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS"], "120000")

@@ -234,12 +234,14 @@ class RuntimeConfigurationTests(unittest.TestCase):
             "AGENT_FAST_FIRST_RESPONSE_MODEL=qwen3:4b-instruct-2507-q4_K_M",
             profile,
         )
-        self.assertIn("AGENT_GOAL_ASSOCIATION_MODEL=gemma4:12b", profile)
-        self.assertIn("AGENT_DEEP_PLANNER_MODEL=gemma4:12b", profile)
+        self.assertIn("AGENT_GOAL_ASSOCIATION_MODEL=qwen3:4b-instruct-2507-q4_K_M", profile)
+        self.assertIn("AGENT_DEEP_PLANNER_MODEL=qwen3:4b-instruct-2507-q4_K_M", profile)
         self.assertNotIn("AGENT_RESPONSE_COMPOSER_MODEL", profile)
-        self.assertIn("TTS_COSYVOICE_COMPACT_COGNITION=0", profile)
-        self.assertIn("OLLAMA_MAX_LOADED_MODELS=2", profile)
-        self.assertIn("OLLAMA_REQUIRE_ALL_WARM_MODELS_RESIDENT=1", profile)
+        self.assertIn("TTS_COSYVOICE_COMPACT_COGNITION=1", profile)
+        self.assertIn("OLLAMA_MAX_LOADED_MODELS=1", profile)
+        self.assertNotIn("OLLAMA_REQUIRE_ALL_WARM_MODELS_RESIDENT", profile)
+        self.assertNotIn("OLLAMA_FLASH_ATTENTION", profile)
+        self.assertNotIn("OLLAMA_KV_CACHE_TYPE", profile)
         self.assertIn("AGENT_DEEP_PLANNER_NUM_PREDICT=4096", profile)
 
         rtx5090 = (ROOT / "env" / "profiles" / "rtx5090.env").read_text(
@@ -255,6 +257,10 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("AGENT_FAST_FIRST_RESPONSE_MODEL=qwen3:4b-instruct-2507-q4_K_M", rtx5090)
         self.assertIn("AGENT_FAST_TRUTH_MODEL=qwen3:4b-instruct-2507-q4_K_M", rtx5090)
         self.assertIn("AGENT_SKILL_SELECTION_MODEL=qwen3:4b-instruct-2507-q4_K_M", rtx5090)
+        self.assertIn("OLLAMA_MAX_LOADED_MODELS=2", rtx5090)
+        self.assertIn("OLLAMA_REQUIRE_ALL_WARM_MODELS_RESIDENT=1", rtx5090)
+        self.assertIn("OLLAMA_FLASH_ATTENTION=1", rtx5090)
+        self.assertIn("OLLAMA_KV_CACHE_TYPE=q8_0", rtx5090)
         self.assertNotIn("AGENT_RESPONSE_COMPOSER_MODEL", rtx5090)
         self.assertIn("TTS_COSYVOICE_COMPACT_COGNITION=0", rtx5090)
         self.assertIn("TTS_COSYVOICE_OLLAMA_NUM_CTX=32768", rtx5090)
