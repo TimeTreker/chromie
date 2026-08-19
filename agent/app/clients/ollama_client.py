@@ -24,6 +24,10 @@ try:
     )
     from chromie_runtime.log_colors import colorize_for_cli
     from chromie_runtime.runtime_trace import TraceModule, runtime_tracer
+    from chromie_runtime.ollama_non_thinking import (
+        OllamaNonThinkingViolation,
+        enforce_non_thinking_ollama_response,
+    )
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_runtime.llm_diagnostics import (
         PrefixCacheTracker,
@@ -33,6 +37,10 @@ except ImportError:  # pragma: no cover - repository development path
     )
     from shared.chromie_runtime.log_colors import colorize_for_cli
     from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
+    from shared.chromie_runtime.ollama_non_thinking import (
+        OllamaNonThinkingViolation,
+        enforce_non_thinking_ollama_response,
+    )
 
 
 logger = logging.getLogger("chromie.agent.ollama")
@@ -631,12 +639,53 @@ class OllamaClient:
                 raise failure
 
             response.raise_for_status()
-            logger.info(
-                "ollama_generate_raw_body purpose=%s body=%s",
-                self.purpose,
-                response.text[:2000],
-            )
-            data = response.json()
+            provider_data = response.json()
+            try:
+                boundary = enforce_non_thinking_ollama_response(
+                    provider_data,
+                    structured_output=structured_output,
+                )
+            except OllamaNonThinkingViolation as exc:
+                failure = OllamaGenerationError(
+                    str(exc),
+                    failure_class="thinking_output_violation",
+                    failure_domain="provider_contract",
+                    architecture_attribution="ollama_or_model_template",
+                    retryable=True,
+                    details={
+                        "purpose": self.purpose,
+                        "model": self.model,
+                        "response_format": response_format_label,
+                        "violation": exc.reason,
+                        "result_trusted": False,
+                        "new_execution_allowed": False,
+                    },
+                )
+                logger.error(
+                    "ollama_non_thinking_boundary_rejected purpose=%s model=%s "
+                    "violation=%s",
+                    self.purpose,
+                    self.model,
+                    exc.reason,
+                )
+                record_evidence(
+                    status="rejected_provider_contract",
+                    error={
+                        "error_type": type(failure).__name__,
+                        "message": str(failure),
+                        **failure.metadata(),
+                    },
+                )
+                raise failure from exc
+            data = boundary.response
+            if boundary.recovered:
+                logger.warning(
+                    "ollama_non_thinking_boundary_recovered purpose=%s model=%s "
+                    "recovery=%s",
+                    self.purpose,
+                    self.model,
+                    boundary.recovery,
+                )
             if prefix_probe_call_id:
                 _PREFIX_CACHE_TRACKER.record_response(prefix_probe_call_id, data)
 

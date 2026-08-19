@@ -386,7 +386,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(text, "我醒啦，今天也一起开心吧！")
         self.assertEqual(source, "fallback")
 
-    async def test_runtime_ready_greeting_suppresses_separate_thinking_field(self) -> None:
+    async def test_runtime_ready_greeting_rejects_separate_thinking_field(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         self._configure_model_generation(assistant)
         assistant.runtime_ready_greeting_text = ""
@@ -438,10 +438,10 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         with self.assertLogs(level="WARNING") as warning_logs:
             text, source = await assistant._generate_runtime_ready_greeting()
 
-        self.assertEqual(text, "早呀，我醒啦！")
-        self.assertEqual(source, "llm:qwen3:4b")
+        self.assertEqual(text, "我醒啦，今天也一起开心吧！")
+        self.assertEqual(source, "fallback")
         self.assertTrue(
-            any("suppressed non-spoken model thinking" in line for line in warning_logs.output)
+            any("thinking/reasoning output although think=false" in line for line in warning_logs.output)
         )
 
     async def test_runtime_ready_greeting_generation_timeout_falls_back(self) -> None:

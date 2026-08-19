@@ -125,10 +125,11 @@ class CognitiveResponsibilityProposal(BaseModel):
             "Provider-neutral completion category for this one outcome, not its "
             "eventual response transport. Fresh external information is "
             "capability_work even when a later grounded answer will be spoken; "
-            "speech is an immediate ordinary answer authored without fresh "
-            "acquisition or downstream work. This "
-            "preserves WHAT kind of effect is owed without selecting a Capability, "
-            "provider, Activity, executable argument, or wording."
+            "requested physical-object acquisition/carrying/handover is body_action, "
+            "not capability_work. speech is an immediate ordinary answer authored "
+            "without fresh acquisition or downstream work. This preserves WHAT kind "
+            "of effect is owed without selecting a Capability, provider, Activity, "
+            "executable argument, or wording."
         ),
     )
     relationship: GoalRelationship = "new"
@@ -147,8 +148,11 @@ class CognitiveResponsibilityProposal(BaseModel):
     completion_requires_fresh_evidence: bool = Field(
         default=False,
         description=(
-            "Whether correct completion needs evidence absent from trusted context. "
-            "Reasoning from facts already supplied by the user is not fresh evidence."
+            "Whether the human-facing WHAT is to obtain information whose answer "
+            "evidence is absent from trusted context. Runtime execution/observation "
+            "evidence needed later to verify a requested body action, media effect, "
+            "physical handover, or vocal performance is not this flag. Reasoning from "
+            "facts already supplied by the user is not fresh evidence."
         ),
     )
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)

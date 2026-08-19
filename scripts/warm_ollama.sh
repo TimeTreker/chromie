@@ -139,6 +139,11 @@ PY
     rm -f "$body_file"
 
     if [ "$status" = "200" ]; then
+      if ! printf '%s' "$body" | python3 -c 'import json, sys; from shared.chromie_runtime.ollama_non_thinking import enforce_non_thinking_ollama_response; enforce_non_thinking_ollama_response(json.load(sys.stdin), structured_output=False)' >/dev/null; then
+        echo "[warm-ollama][error] Model violated Chromie's non-thinking output contract: $model" >&2
+        echo "[warm-ollama][hint] Use an explicit non-thinking/instruct model tag for cognition." >&2
+        exit 1
+      fi
       echo "[warm-ollama] Model warmed successfully: $model"
       echo "[warm-ollama] Response preview:"
       echo "$body" | head -c 800

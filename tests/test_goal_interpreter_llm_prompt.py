@@ -302,7 +302,7 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("does not become unresolved merely because its answer is unknown", prompt)
         self.assertIn("reasoning from facts already supplied by the user", prompt)
         self.assertIn("do not create or resolve an informationgap", prompt)
-        self.assertIn("external or changing facts", prompt)
+        self.assertIn("external or changing information", prompt)
         self.assertIn("declarative statement", prompt)
         self.assertIn("states a future plan is context", prompt)
         self.assertIn("do not invent a responsibility to confirm", prompt)
@@ -317,6 +317,10 @@ class GoalInterpreterPromptTests(unittest.TestCase):
 
         self.assertIn("Missing execution inputs belong to Fast Planner", prompt)
         self.assertIn("External Evidence is fresh Evidence", prompt)
+        self.assertIn("fresh INFORMATION from later EXECUTION EVIDENCE", prompt)
+        self.assertIn("acquiring/carrying/handing over a physical object", prompt)
+        self.assertIn("keep completion_requires_fresh_evidence=false", prompt)
+        self.assertIn("semantically independent new outcome", prompt)
 
     def test_deep_payload_reasons_from_source_without_prior_dto(self) -> None:
         interpreter = OllamaGoalInterpreter(
@@ -433,6 +437,14 @@ class GoalInterpreterPromptTests(unittest.TestCase):
             fresh_evidence_branch["properties"]["output_mode"].get("const"),
             "capability_work",
         )
+        self.assertIn(
+            "human-facing outcome itself is to obtain information",
+            fresh_evidence_branch["properties"]["completion_requires_fresh_evidence"]["description"],
+        )
+        self.assertIn(
+            "execution evidence",
+            non_fresh_work_branch["properties"]["completion_requires_fresh_evidence"]["description"],
+        )
         nonverbal = next(
             item
             for item in non_fresh_work_branch["properties"]["output_mode"]["oneOf"]
@@ -504,7 +516,7 @@ class GoalInterpreterPromptTests(unittest.TestCase):
                 language="en-US",
             )
         )
-        self.assertIn("audit whether trusted Context already contains", user_prompt)
+        self.assertIn("distinguish fresh INFORMATION from later EXECUTION EVIDENCE", user_prompt)
         self.assertIn("eventually being spoken never makes", user_prompt)
 
     def test_repair_schema_does_not_reintroduce_planning_gap_contract(self) -> None:

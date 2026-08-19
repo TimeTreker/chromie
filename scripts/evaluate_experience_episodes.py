@@ -18,6 +18,7 @@ if str(ROOT) not in sys.path:
 from orchestrator.runtime.episode import EpisodeEvaluation, EpisodeOfflineReview, EpisodeRecord
 from shared.chromie_contracts.mind import MindUpdateProposal
 from shared.chromie_runtime.scenario_candidates import persist_scenario_candidate_event
+from shared.chromie_runtime.ollama_non_thinking import enforce_non_thinking_ollama_response
 
 
 SOCIAL_FALLBACK_SKILLS = {
@@ -275,7 +276,10 @@ def evaluate_episode_with_llm(
         method="POST",
     )
     with urllib.request.urlopen(request, timeout=timeout_s) as response:
-        data = json.loads(response.read().decode("utf-8"))
+        provider_data = json.loads(response.read().decode("utf-8"))
+    data = enforce_non_thinking_ollama_response(
+        provider_data, structured_output=True
+    ).response
     text = str(data.get("response") or "")
     raw = _extract_json_object(text)
     candidate = json.loads(raw)

@@ -417,6 +417,126 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
             any("failure_class=context_limit_exceeded" in line for line in error_logs.output)
         )
 
+    async def test_generate_recovers_identical_structured_json_around_bare_closing_think_marker(self) -> None:
+        duplicated = (
+            '{"activity":{"role":"progress","text":"我去看看。"}}'
+            '</think>'
+            '{"activity":{"role":"progress","text":"我去看看。"}}'
+        )
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = json.dumps({"response": duplicated, "done_reason": "stop"})
+        response.json.return_value = {"response": duplicated, "done_reason": "stop"}
+        response.raise_for_status.return_value = None
+        http_client = mock.AsyncMock()
+        http_client.post.return_value = response
+        context = mock.AsyncMock()
+        context.__aenter__.return_value = http_client
+        schema = {
+            "type": "object",
+            "properties": {"activity": {"type": "object"}},
+            "required": ["activity"],
+        }
+
+        with mock.patch(
+            "agent.app.clients.ollama_client.httpx.AsyncClient",
+            return_value=context,
+        ), self.assertLogs("chromie.agent.ollama", level="WARNING") as logs:
+            result = await OllamaClient(
+                base_url="http://chromie-llm:11434",
+                model="qwen-test",
+                purpose="fast_planner",
+            ).generate("hello", response_format=schema)
+
+        self.assertEqual(result["activity"]["text"], "我去看看。")
+        self.assertTrue(
+            any("ollama_non_thinking_boundary_recovered" in line for line in logs.output)
+        )
+        self.assertIs(http_client.post.call_args.kwargs["json"]["think"], False)
+
+    async def test_generate_rejects_material_thinking_content_even_when_think_false(self) -> None:
+        leaked = '<think>private reasoning</think>{"decision":"continue"}'
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = json.dumps({"response": leaked, "done_reason": "stop"})
+        response.json.return_value = {"response": leaked, "done_reason": "stop"}
+        response.raise_for_status.return_value = None
+        http_client = mock.AsyncMock()
+        http_client.post.return_value = response
+        context = mock.AsyncMock()
+        context.__aenter__.return_value = http_client
+
+        with mock.patch(
+            "agent.app.clients.ollama_client.httpx.AsyncClient",
+            return_value=context,
+        ):
+            with self.assertRaises(OllamaGenerationError) as raised:
+                await OllamaClient(
+                    base_url="http://chromie-llm:11434",
+                    model="qwen-test",
+                    purpose="fast_planner",
+                ).generate(
+                    "hello",
+                    response_format={"type": "object"},
+                )
+
+        self.assertEqual(raised.exception.failure_class, "thinking_output_violation")
+        self.assertEqual(raised.exception.failure_domain, "provider_contract")
+        self.assertFalse(raised.exception.metadata()["result_trusted"])
+
+    async def test_generate_rejects_provider_thinking_field(self) -> None:
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = json.dumps(
+            {"response": '{"decision":"continue"}', "thinking": "hidden", "done_reason": "stop"}
+        )
+        response.json.return_value = {
+            "response": '{"decision":"continue"}',
+            "thinking": "hidden",
+            "done_reason": "stop",
+        }
+        response.raise_for_status.return_value = None
+        http_client = mock.AsyncMock()
+        http_client.post.return_value = response
+        context = mock.AsyncMock()
+        context.__aenter__.return_value = http_client
+
+        with mock.patch(
+            "agent.app.clients.ollama_client.httpx.AsyncClient",
+            return_value=context,
+        ):
+            with self.assertRaises(OllamaGenerationError) as raised:
+                await OllamaClient(
+                    base_url="http://chromie-llm:11434",
+                    model="qwen-test",
+                ).generate("hello", response_format={"type": "object"})
+
+        self.assertEqual(raised.exception.failure_class, "thinking_output_violation")
+        self.assertEqual(raised.exception.metadata()["violation"], "provider_field:thinking")
+
+    async def test_generate_rejects_thinking_marker_in_plain_text(self) -> None:
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = json.dumps({"response": "</think>hello", "done_reason": "stop"})
+        response.json.return_value = {"response": "</think>hello", "done_reason": "stop"}
+        response.raise_for_status.return_value = None
+        http_client = mock.AsyncMock()
+        http_client.post.return_value = response
+        context = mock.AsyncMock()
+        context.__aenter__.return_value = http_client
+
+        with mock.patch(
+            "agent.app.clients.ollama_client.httpx.AsyncClient",
+            return_value=context,
+        ):
+            with self.assertRaises(OllamaGenerationError) as raised:
+                await OllamaClient(
+                    base_url="http://chromie-llm:11434",
+                    model="qwen-test",
+                ).generate("hello")
+
+        self.assertEqual(raised.exception.failure_class, "thinking_output_violation")
+
 
 if __name__ == "__main__":
     unittest.main()

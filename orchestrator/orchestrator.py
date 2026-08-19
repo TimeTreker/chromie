@@ -143,6 +143,9 @@ from shared.chromie_contracts.semantic_authority import (
     SemanticAuthorityClaim,
     context_with_semantic_authority,
 )
+from shared.chromie_runtime.ollama_non_thinking import (
+    enforce_non_thinking_ollama_response,
+)
 from shared.chromie_runtime.llm_diagnostics import (
     log_llm_call_evidence,
     new_llm_call_id,
@@ -7307,7 +7310,10 @@ class VoiceAssistant:
                         f"runtime greeting model returned HTTP {response.status}: "
                         f"{body[:300]}"
                     )
-                return json.loads(body)
+                provider_data = json.loads(body)
+                return enforce_non_thinking_ollama_response(
+                    provider_data, structured_output=True
+                ).response
 
         generation_error: Exception | None = None
         for attempt in range(2):

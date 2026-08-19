@@ -250,7 +250,7 @@ ollama_generate() {
     http://127.0.0.1:11434/api/generate \
     -H 'Content-Type: application/json' \
     --data-binary @- \
-    | python3 -c 'import json, sys; data=json.load(sys.stdin); response=str(data.get("response") or "").strip(); assert response, data; print(response)'
+    | python3 -c 'import json, sys; from shared.chromie_runtime.ollama_non_thinking import enforce_non_thinking_ollama_response; provider=json.load(sys.stdin); data=enforce_non_thinking_ollama_response(provider, structured_output=False).response; response=str(data.get("response") or "").strip(); assert response, data; print(response)'
 import json
 import os
 

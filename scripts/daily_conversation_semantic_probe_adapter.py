@@ -21,6 +21,13 @@ import urllib.error
 import urllib.request
 
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from shared.chromie_runtime.ollama_non_thinking import enforce_non_thinking_ollama_response
+
+
 ARTIFACT_ROOT_ENV = "CHROMIE_DAILY_BENCHMARK_ARTIFACT_ROOT"
 OLLAMA_URL_ENV = "CHROMIE_SEMANTIC_PROBE_OLLAMA_URL"
 DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434"
@@ -241,11 +248,14 @@ def _call_ollama(
     )
     started = time.monotonic()
     with urllib.request.urlopen(request, timeout=timeout_s) as response:
-        result = json.loads(response.read().decode("utf-8"))
+        provider_result = json.loads(response.read().decode("utf-8"))
     elapsed_ms = (time.monotonic() - started) * 1000.0
-    if not isinstance(result, Mapping):
+    if not isinstance(provider_result, Mapping):
         raise ValueError("Ollama response must be an object")
-    return dict(result), elapsed_ms
+    result = enforce_non_thinking_ollama_response(
+        provider_result, structured_output=True
+    ).response
+    return result, elapsed_ms
 
 
 def _structural_invariants(

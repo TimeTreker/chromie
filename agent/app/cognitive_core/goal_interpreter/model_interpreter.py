@@ -17,6 +17,10 @@ from ...clients.ollama_client import OllamaGenerationError
 from ...settings import agent_service_settings
 
 try:
+    from chromie_runtime.ollama_non_thinking import (
+        OllamaNonThinkingViolation,
+        enforce_non_thinking_ollama_response,
+    )
     from chromie_runtime.llm_diagnostics import (
         log_llm_call_evidence,
         new_llm_call_id,
@@ -25,6 +29,10 @@ try:
     )
     from chromie_runtime.log_colors import colorize_for_cli
 except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_runtime.ollama_non_thinking import (
+        OllamaNonThinkingViolation,
+        enforce_non_thinking_ollama_response,
+    )
     from shared.chromie_runtime.llm_diagnostics import (
         log_llm_call_evidence,
         new_llm_call_id,
@@ -1291,7 +1299,12 @@ class OllamaGoalInterpreter:
             "ask_user, context, observation, query, or default. Missing execution inputs "
             "belong to Fast Planner. External Evidence is fresh Evidence, not semantic "
             "uncertainty or a value to ask the user for. Goal Association will verify and "
-            "commit the Goal relationship. "
+            "commit the Goal relationship. A semantically independent new outcome is "
+            "relationship=new even when completed or recent Goals are present in "
+            "Context. Use continue/modify/clarify/confirm/reference or another existing-"
+            "Goal relationship only when the current turn actually refers to that same "
+            "Goal; never attach an unrelated new request to the most recent Goal merely "
+            "because its ID is available. "
             "Preserve speaker and actor perspective: the user's first person belongs "
             "to the user, while second-person references addressed to Chromie belong "
             "to Chromie. A question about what Chromie just said uses the most recent "
@@ -1325,13 +1338,21 @@ class OllamaGoalInterpreter:
             "does not occur there and is invalid. Preserve every explicit Arabic "
             "numeric token from Latest user input verbatim in an atomic material "
             "binding; never spell it out, translate it, round it, or replace it with "
-            "a default. Before choosing a completion branch, audit whether trusted "
-            "Context already contains the complete answer evidence. If an external, "
-            "private, runtime, observed, or changing fact is requested but absent, "
-            "set output_mode=capability_work, completion_requires_work=true, and "
-            "completion_requires_fresh_evidence=true. The input being a question or "
-            "the result eventually being spoken never makes absent evidence into "
-            "output_mode=speech. No route, intent, response wording, Activity, Work, "
+            "a default. Before choosing a completion branch, distinguish fresh "
+            "INFORMATION from later EXECUTION EVIDENCE. completion_requires_fresh_evidence "
+            "is true only when the human-facing WHAT is to learn or receive information "
+            "whose answer evidence is absent from trusted Context. If such an external, "
+            "private, runtime-observed, or changing fact is requested but absent, set "
+            "output_mode=capability_work, completion_requires_work=true, and "
+            "completion_requires_fresh_evidence=true. In contrast, when the human asks "
+            "Chromie to cause an observable effect -- including a body action, media "
+            "effect, vocal performance, or acquiring/carrying/handing over a physical "
+            "object -- preserve that effect output_mode, set completion_requires_work=true, "
+            "and keep completion_requires_fresh_evidence=false. Runtime will later need "
+            "execution/observation evidence to prove the effect completed; that evidence "
+            "does not turn the WHAT into information acquisition. The input being a "
+            "question or the result eventually being spoken never makes absent information "
+            "evidence into output_mode=speech. No route, intent, response wording, Activity, Work, "
             "Plan, Capability, Tool, provider, executable args, or input-resolution "
             "strategy. Copy only Goal IDs explicitly supplied in Context."
         )
@@ -1524,19 +1545,20 @@ class OllamaGoalInterpreter:
             fresh_properties["completion_requires_fresh_evidence"] = {
                 "const": True,
                 "description": (
-                    "The correct answer needs absent external, private, runtime, "
-                    "observed, or changing evidence."
+                    "The human-facing outcome itself is to obtain information whose "
+                    "answer evidence is absent from trusted context. This is not the "
+                    "execution evidence later used to verify an observable effect."
                 ),
             }
             fresh_properties["completion_requires_work"] = {
                 "const": True,
-                "description": "Evidence acquisition remains after this interpretation.",
+                "description": "Fresh information acquisition remains after interpretation.",
             }
             fresh_properties["output_mode"] = {
                 "const": "capability_work",
                 "description": (
-                    "Provider-neutral fresh evidence acquisition, even when the "
-                    "grounded result will later be spoken."
+                    "Provider-neutral acquisition of absent information, even when the "
+                    "grounded answer will later be spoken."
                 ),
             }
             immediate_speech_properties = copy.deepcopy(base_properties)
@@ -1556,9 +1578,19 @@ class OllamaGoalInterpreter:
             }
             non_fresh_work_properties = copy.deepcopy(base_properties)
             non_fresh_work_properties["completion_requires_fresh_evidence"] = {
-                "const": False
+                "const": False,
+                "description": (
+                    "The requested WHAT is an effect or deliverable rather than absent "
+                    "information. Runtime may still require later execution evidence."
+                ),
             }
-            non_fresh_work_properties["completion_requires_work"] = {"const": True}
+            non_fresh_work_properties["completion_requires_work"] = {
+                "const": True,
+                "description": (
+                    "An observable effect or deliverable remains to be executed, such "
+                    "as body action, physical-object handover, media, or vocal performance."
+                ),
+            }
             work_output_mode = copy.deepcopy(base_properties["output_mode"])
             work_output_mode["oneOf"] = [
                 item
@@ -1568,7 +1600,7 @@ class OllamaGoalInterpreter:
             non_fresh_work_properties["output_mode"] = work_output_mode
             responsibility["oneOf"] = [
                 {
-                    "title": "Absent external or changing evidence",
+                    "title": "Fresh information acquisition",
                     "type": "object",
                     "properties": fresh_properties,
                     "required": branch_required,
@@ -1582,7 +1614,7 @@ class OllamaGoalInterpreter:
                     "additionalProperties": False,
                 },
                 {
-                    "title": "Non-fresh downstream work",
+                    "title": "Requested observable effect or deliverable",
                     "type": "object",
                     "properties": non_fresh_work_properties,
                     "required": branch_required,
@@ -2101,7 +2133,10 @@ class OllamaGoalInterpreter:
             ) as client:
                 response = await client.post(f"{self.ollama_url}/api/generate", json=payload)
                 response.raise_for_status()
-                data = response.json()
+                provider_data = response.json()
+                data = enforce_non_thinking_ollama_response(
+                    provider_data, structured_output=False
+                ).response
         except (httpx.HTTPError, ValueError, TypeError, OllamaGenerationError) as exc:
             log_llm_call_evidence(
                 logger,
@@ -2172,7 +2207,34 @@ class OllamaGoalInterpreter:
         async with httpx.AsyncClient(timeout=self.timeout_s, trust_env=False) as client:
             response = await client.post(f"{self.ollama_url}/api/chat", json=payload)
             response.raise_for_status()
-            data = response.json()
+            provider_data = response.json()
+        try:
+            boundary = enforce_non_thinking_ollama_response(
+                provider_data, structured_output=bool(payload.get("format"))
+            )
+        except OllamaNonThinkingViolation as exc:
+            raise OllamaGenerationError(
+                str(exc),
+                failure_class="thinking_output_violation",
+                failure_domain="provider_contract",
+                architecture_attribution="ollama_or_model_template",
+                retryable=True,
+                details={
+                    "purpose": f"goal_interpreter:{stage}",
+                    "model": payload.get("model") or self.model,
+                    "violation": exc.reason,
+                    "result_trusted": False,
+                    "new_execution_allowed": False,
+                },
+            ) from exc
+        data = boundary.response
+        if boundary.recovered:
+            logger.warning(
+                "goal_interpreter_non_thinking_boundary_recovered stage=%s model=%s recovery=%s",
+                stage,
+                payload.get("model") or self.model,
+                boundary.recovery,
+            )
         self._validate_completion(payload, data, stage=stage)
         return data
 

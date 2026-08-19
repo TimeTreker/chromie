@@ -544,7 +544,7 @@ if (( SKIP_GPU_LOAD == 0 )); then
     for index in $(seq 1 "$GPU_LOAD_REQUESTS"); do
       curl -fsS http://127.0.0.1:11434/api/generate \
         -H 'Content-Type: application/json' \
-        -d "{\"model\":\"$LOAD_MODEL\",\"prompt\":\"Give one concise family scheduling suggestion number $index.\",\"stream\":false,\"options\":{\"num_predict\":256}}" \
+        -d "{\"model\":\"$LOAD_MODEL\",\"prompt\":\"Give one concise family scheduling suggestion number $index.\",\"stream\":false,\"think\":false,\"options\":{\"num_predict\":256}}" \
         >/dev/null
     done
   ) > "$LOAD_LOG" 2>&1 &
