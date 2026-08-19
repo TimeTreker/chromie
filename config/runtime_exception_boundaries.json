@@ -130,11 +130,24 @@
     {
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Fail closed after one invalid Goal Interpretation DTO repair; never accept malformed or authority-violating output.",
+      "contract": "Fail closed when one fresh source-based Deep Goal Interpretation cannot restore semantic provenance or authority; never repair rejected meaning in place.",
       "review_status": "reviewed",
       "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
       "symbol": "OllamaGoalInterpreter.interpret_goal",
       "ordinal": 3,
+      "body_sha256": "064662502353418459fe11753a482e6dd6af5e9bb05f6325e7a8e95ec704e684",
+      "failure_signals": [
+        "raise"
+      ]
+    },
+    {
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Fail closed after one mechanically invalid Goal Interpretation DTO repair; never accept malformed output.",
+      "review_status": "reviewed",
+      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
+      "symbol": "OllamaGoalInterpreter.interpret_goal",
+      "ordinal": 4,
       "body_sha256": "26fdefcac95c3cebfc18d38a28f735638bf203cbdfa90483ac8dbf29dfe15f77",
       "failure_signals": [
         "raise"
@@ -162,7 +175,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "17922d0eaba7a07715d4f1df6c32461336fbde22c0cb1fcc493232fd85092af3",
+      "body_sha256": "328361cfb6646d2a08b122807f031efa8481593098c70f44b8f726cd7db432da",
       "failure_signals": [
         "continue",
         "diagnostic",
@@ -277,7 +290,7 @@
       "owner": "agent.fast_planner",
       "contract": "Map Fast Activity-Plan inference and contract failures into a typed unavailable FastPlannerAdvance without authorizing Work.",
       "review_status": "reviewed",
-      "body_sha256": "ff976e4ec01c8db2037d88454fa517bb10e5a4cf0fe42556fc49ff5d55f67ad9",
+      "body_sha256": "d1be8186855334247c6239b1076065e91170a1fde5e819dbac07f4f56a0ac502",
       "failure_signals": [
         "continue",
         "return",

@@ -4856,16 +4856,17 @@ class GoalDrivenRuntimeCoordinator:
                     or bool(retained_work_activities)
                 )
             )
+            goal_update_reconciliation_required = any(
+                bool(item.goal_update) for item in association.associations
+            )
+            canonical_fast_revision_reason = ""
             if work_reconciliation_required:
-                reconciliation_reason = (
+                canonical_fast_revision_reason = (
                     "provisional_work_goal_reconciliation"
                     if ready_fast_capability_execution is not None
                     else "goal_replacement_work_reconciliation"
                     if has_goal_replacement
                     else "retained_goal_work_reconciliation"
-                )
-                planning_context["canonical_fast_revision_reason"] = (
-                    reconciliation_reason
                 )
                 provisional_work_activities = (
                     [
@@ -4885,9 +4886,21 @@ class GoalDrivenRuntimeCoordinator:
                 work_reconciliation_activity_count = len(
                     planning_context["work_reconciliation_activities"]
                 )
+            elif goal_update_reconciliation_required:
+                # Fast Advance and Goal Association share the GI result but run
+                # concurrently. When GA authors an update to retained canonical
+                # Goal meaning, only a new Fast Planner pass may decide whether
+                # the provisional Activities or InformationGaps still apply.
+                canonical_fast_revision_reason = (
+                    "goal_association_update_reconciliation"
+                )
+            if canonical_fast_revision_reason:
+                planning_context["canonical_fast_revision_reason"] = (
+                    canonical_fast_revision_reason
+                )
             planner_gaps_by_goal_id = (
                 {}
-                if work_reconciliation_required
+                if canonical_fast_revision_reason
                 else self._planner_gaps_by_goal_id(
                     advance=fast_advance,
                     association=association,
@@ -5058,7 +5071,7 @@ class GoalDrivenRuntimeCoordinator:
                     raise CognitiveStageFailure("deep_planner", deep_failure)
             elif (
                 fast_advance.disposition in {"unavailable", "refused"}
-                or work_reconciliation_required
+                or canonical_fast_revision_reason
             ):
                 # A malformed/unavailable first Activity Plan, or a committed Goal
                 # intersecting retained/provisional Work, receives one canonical Fast
@@ -5073,8 +5086,8 @@ class GoalDrivenRuntimeCoordinator:
                         "user_text": text,
                         "goal_association": association,
                         "revision_reason": (
-                            reconciliation_reason
-                            if work_reconciliation_required
+                            canonical_fast_revision_reason
+                            if canonical_fast_revision_reason
                             else "fast_planner_advance_unavailable"
                         ),
                         "interaction_context": planning_context.get(

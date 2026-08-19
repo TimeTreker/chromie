@@ -527,6 +527,31 @@
           "description": "Walking and a requested vocal performance are independent simultaneous outcomes; unavailable singing must stay explicit rather than disappearing or becoming ordinary TTS."
         },
         {
+          "id": "debug_bundle_run_15_while_singing",
+          "text": "你往前跑15秒，然后在边跑边唱歌。",
+          "language": "zh-CN",
+          "expected_capabilities": [
+            "soridormi.walk_forward"
+          ],
+          "expected_args": [
+            "0:duration_s=15.0"
+          ],
+          "require_speech": true,
+          "expected_speech_any": [
+            "跑",
+            "唱"
+          ],
+          "forbidden_speech_any": [
+            "开始跑起来",
+            "正在跑",
+            "已经跑",
+            "已经唱"
+          ],
+          "min_new_goal_count": 2,
+          "min_goal_outcome_count": 2,
+          "description": "Retained 2026-08-19 debug-bundle episode: forward locomotion and singing remain separate Goals; the maintained forward-motion provider may cover the 15-second body Goal, while unavailable singing must be explicit and ordinary TTS or an execution-start claim cannot substitute for it."
+        },
+        {
           "id": "user_probe_fetch_milk_fifty_meters",
           "text": "there is a bottle of milk ahead of you about 50 meters, please bring it to me",
           "language": "en-US",
@@ -588,7 +613,7 @@
         },
         {
           "key": "goal_interpretation/chat_clarify_route_contract_fails_closed",
-          "rationale": "Planner-shaped GI output fails after one mechanical repair attempt."
+          "rationale": "Planner-shaped GI output fails after one fresh source-based Deep interpretation."
         },
         {
           "key": "cognitive_runtime/robot_lane_rollback",
@@ -608,6 +633,26 @@
         }
       ],
       "live_text_cases": [
+        {
+          "id": "debug_bundle_beijing_tomorrow_rain",
+          "text": "明天北京下雨吗？我明天要去北京出差。",
+          "language": "zh-CN",
+          "expected_capabilities": [
+            "chromie.weather.lookup"
+          ],
+          "expected_args": [
+            "0:location=北京",
+            "0:date=tomorrow"
+          ],
+          "require_speech": true,
+          "min_new_goal_count": 1,
+          "min_goal_outcome_count": 1,
+          "forbidden_speech_any": [
+            "暂时没法完成这个请求",
+            "请稍后再试"
+          ],
+          "description": "Retained 2026-08-19 debug-bundle episode: the directly named Chinese location must remain 北京 through Goal Interpretation, canonical weather grounding, and the trusted lookup instead of being translated and rejected as unprovenanced meaning."
+        },
         {
           "id": "chongqing_tonight_weather_truth_gate_and_lookup",
           "text": "今晚重庆会不会下雨哦？",

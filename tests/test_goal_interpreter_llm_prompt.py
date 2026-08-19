@@ -288,6 +288,9 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("reasoning from facts already supplied by the user", prompt)
         self.assertIn("do not create or resolve an informationgap", prompt)
         self.assertIn("external or changing facts", prompt)
+        self.assertIn("declarative statement", prompt)
+        self.assertIn("states a future plan is context", prompt)
+        self.assertIn("do not invent a responsibility to confirm", prompt)
 
     def test_current_turn_prompt_distinguishes_missing_binding_from_requested_evidence(self) -> None:
         prompt = self._interpreter().build_interpretation_user_prompt(
@@ -384,6 +387,19 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertNotIn("unspecified", output_modes)
         self.assertNotIn("other", output_modes)
         self.assertIn("singing", output_modes)
+        fresh_evidence_clause = next(
+            clause
+            for clause in responsibility_schema["allOf"]
+            if clause.get("if", {})
+            .get("properties", {})
+            .get("completion_requires_fresh_evidence", {})
+            .get("const")
+            is True
+        )
+        self.assertEqual(
+            fresh_evidence_clause["then"]["properties"]["output_mode"],
+            {"const": "capability_work"},
+        )
         nonverbal = next(
             item
             for item in responsibility_schema["properties"]["output_mode"]["oneOf"]
@@ -738,7 +754,7 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(interpreter._chat.await_count, 1)
 
-    async def test_spelled_out_explicit_number_receives_one_dto_repair(self) -> None:
+    async def test_rewritten_explicit_number_escalates_once_from_source(self) -> None:
         interpreter = self._interpreter()
         invalid = {
             "responsibilities": [
@@ -774,6 +790,14 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.responsibilities[0].bindings["duration"], "10 秒")
         self.assertEqual(interpreter._chat.await_count, 2)
+        self.assertEqual(
+            interpreter._chat.await_args_list[1].kwargs["stage"],
+            "goal_interpretation_deep",
+        )
+        deep_payload = interpreter._chat.await_args_list[1].args[0]
+        system_text, user_text, _all_text = _payload_message_texts(deep_payload)
+        self.assertIn("Audit declarative context before counting outcomes", system_text)
+        self.assertIn("states a future plan is context", user_text)
 
     def test_body_action_completion_is_not_fresh_information(self) -> None:
         with self.assertRaisesRegex(
@@ -854,18 +878,18 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(interpreter._chat.await_count, 2)
         self.assertEqual(
             interpreter._chat.await_args_list[1].kwargs["stage"],
-            "goal_interpretation_contract_repair",
+            "goal_interpretation_deep",
         )
 
-    async def test_unprovenanced_translated_location_gets_one_dto_repair(self) -> None:
+    async def test_bundle_beijing_translation_escalates_from_source(self) -> None:
         interpreter = self._interpreter()
         translated = {
             **_valid_output(),
             "responsibilities": [
                 {
                     **_valid_output()["responsibilities"][0],
-                    "outcome": "provide tonight's weather for Chongqing",
-                    "bindings": {"location": "Chongqing", "time": "tonight"},
+                    "outcome": "determine whether it will rain in Beijing tomorrow",
+                    "bindings": {"location": "Beijing", "date": "tomorrow"},
                 }
             ],
         }
@@ -874,7 +898,7 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             "responsibilities": [
                 {
                     **translated["responsibilities"][0],
-                    "bindings": {"location": "重庆", "time": "tonight"},
+                    "bindings": {"location": "北京", "date": "tomorrow"},
                 }
             ],
         }
@@ -886,14 +910,66 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         )
         result = await interpreter.interpret_goal(
             GoalInterpretationRequest(
-                text="今天晚上重庆会不会下雨啊？",
+                text="明天北京下雨吗？我明天要去北京出差。",
                 language="zh-CN",
             )
         )
-        self.assertEqual(result.responsibilities[0].bindings["location"], "重庆")
+        self.assertEqual(result.responsibilities[0].bindings["location"], "北京")
         self.assertEqual(interpreter._chat.await_count, 2)
+        self.assertEqual(
+            interpreter._chat.await_args_list[1].kwargs["stage"],
+            "goal_interpretation_deep",
+        )
+        deep_payload = interpreter._chat.await_args_list[1].args[0]
+        _system_text, user_text, all_text = _payload_message_texts(deep_payload)
+        self.assertIn("No prior interpretation DTO is supplied", user_text)
+        self.assertNotIn(json.dumps(translated), all_text)
+        location_contract = deep_payload["format"]["$defs"][
+            "CognitiveResponsibilityProposal"
+        ]["properties"]["bindings"]["properties"]["location"]
+        self.assertIn("北京", location_contract["enum"])
+        self.assertNotIn("Beijing", location_contract["enum"])
 
-    async def test_planner_gap_fields_get_one_mechanical_dto_repair(self) -> None:
+    async def test_multiple_fresh_evidence_claims_escalate_from_source(self) -> None:
+        interpreter = self._interpreter()
+        weather = _valid_output()
+        oversegmented = {
+            **weather,
+            "responsibilities": [
+                weather["responsibilities"][0],
+                {
+                    **weather["responsibilities"][0],
+                    "local_ref": "r2",
+                    "outcome": "confirm the user's travel plan",
+                },
+            ],
+        }
+        corrected = {
+            **weather,
+            "responsibilities": [weather["responsibilities"][0]],
+        }
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            side_effect=[
+                {"message": {"content": json.dumps(oversegmented)}},
+                {"message": {"content": json.dumps(corrected)}},
+            ]
+        )
+
+        result = await interpreter.interpret_goal(
+            GoalInterpretationRequest(
+                text="Will it rain in Chongqing tomorrow? I am traveling for work.",
+                language="en-US",
+            )
+        )
+
+        self.assertEqual(len(result.responsibilities), 1)
+        self.assertEqual(interpreter._chat.await_count, 2)
+        self.assertEqual(
+            interpreter._chat.await_args_list[1].kwargs["stage"],
+            "goal_interpretation_deep",
+        )
+
+    async def test_planner_gap_fields_escalate_once_from_source(self) -> None:
         interpreter = self._interpreter()
         invalid = {
             "confidence": 0.95,
@@ -967,6 +1043,10 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(hasattr(responsibility, "information_gaps"))
         self.assertTrue(responsibility.completion_requires_fresh_evidence)
         self.assertEqual(interpreter._chat.await_count, 2)
+        self.assertEqual(
+            interpreter._chat.await_args_list[1].kwargs["stage"],
+            "goal_interpretation_deep",
+        )
 
     async def test_genuine_semantic_ambiguity_escalates_once_to_deep(self) -> None:
         interpreter = self._interpreter()
@@ -1103,10 +1183,14 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(result.unresolved, [])
         self.assertEqual(interpreter._chat.await_count, 2)
-        repair_payload = interpreter._chat.await_args_list[1].args[0]
-        self.assertNotIn("InformationGap", repair_payload["format"]["$defs"])
-        system_text, _, _ = _payload_message_texts(repair_payload)
-        self.assertIn("Never create/resolve an InformationGap", system_text)
+        self.assertEqual(
+            interpreter._chat.await_args_list[1].kwargs["stage"],
+            "goal_interpretation_deep",
+        )
+        deep_payload = interpreter._chat.await_args_list[1].args[0]
+        self.assertNotIn("InformationGap", deep_payload["format"]["$defs"])
+        system_text, _, _ = _payload_message_texts(deep_payload)
+        self.assertIn("Do not create or resolve an InformationGap", system_text)
 
     async def test_context_backed_indirect_location_does_not_require_current_turn_surface(self) -> None:
         interpreter = self._interpreter()
@@ -1128,7 +1212,7 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.responsibilities[0].bindings["location"], "Chongqing")
         self.assertEqual(interpreter._chat.await_count, 1)
 
-    async def test_runtime_session_identity_in_binding_gets_one_dto_repair(self) -> None:
+    async def test_runtime_session_identity_in_binding_escalates_from_source(self) -> None:
         interpreter = self._interpreter()
         invalid = {
             **_valid_output(),
@@ -1171,6 +1255,10 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             {"device": "washing machine"},
         )
         self.assertEqual(interpreter._chat.await_count, 2)
+        self.assertEqual(
+            interpreter._chat.await_args_list[1].kwargs["stage"],
+            "goal_interpretation_deep",
+        )
 
     async def test_transport_echo_bindings_escalate_once_from_source(self) -> None:
         interpreter = self._interpreter()
@@ -1307,7 +1395,7 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             "goal_interpretation_deep",
         )
 
-    async def test_valid_compound_meaning_gets_one_source_based_deep_pass(self) -> None:
+    async def test_valid_atomic_compound_meaning_proceeds_without_deep_pass(self) -> None:
         interpreter = self._interpreter()
         primary = {
             "confidence": 0.95,
@@ -1333,12 +1421,8 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             ],
             "unresolved": [],
         }
-        deep = copy.deepcopy(primary)
         interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
-            side_effect=[
-                {"message": {"content": json.dumps(primary)}},
-                {"message": {"content": json.dumps(deep)}},
-            ]
+            return_value={"message": {"content": json.dumps(primary)}}
         )
 
         result = await interpreter.interpret_goal(
@@ -1349,10 +1433,10 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             [item.output_mode for item in result.responsibilities],
             ["body_action", "singing"],
         )
-        self.assertEqual(interpreter._chat.await_count, 2)
+        self.assertEqual(interpreter._chat.await_count, 1)
         self.assertEqual(
-            interpreter._chat.await_args_list[1].kwargs["stage"],
-            "goal_interpretation_deep",
+            interpreter._chat.await_args_list[0].kwargs["stage"],
+            "goal_interpretation",
         )
 
     def test_self_referential_action_combination_is_structural_loss(self) -> None:
@@ -1374,7 +1458,7 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError, "sibling local_ref"):
             _reject_untyped_coordination_bindings(parsed)
 
-    async def test_route_output_gets_one_mechanical_dto_repair(self) -> None:
+    async def test_route_output_escalates_once_from_source(self) -> None:
         interpreter = self._interpreter()
         invalid = {**_valid_output(), "route": "tool", "intent": "weather"}
         interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
@@ -1388,8 +1472,12 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(result.responsibilities[0].outcome, "provide today's weather for Chongqing")
         self.assertEqual(interpreter._chat.await_count, 2)
+        self.assertEqual(
+            interpreter._chat.await_args_list[1].kwargs["stage"],
+            "goal_interpretation_deep",
+        )
 
-    async def test_invalid_output_after_repair_is_unavailable(self) -> None:
+    async def test_invalid_authority_output_after_deep_pass_is_unavailable(self) -> None:
         interpreter = self._interpreter()
         invalid = {**_valid_output(), "route": "tool"}
         interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]

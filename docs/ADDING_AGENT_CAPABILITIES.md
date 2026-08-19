@@ -78,6 +78,11 @@ feature.
    - Include a semantic description, not phrase rules.
    - Include an `input_schema` with units, enums, ranges, required fields, and
      user-facing parameter descriptions.
+   - When an argument carries a typed canonical Goal dimension under a different
+     field name, declare `x-chromie-entity-type` on that argument (for example,
+     `period` carries `day_part`). Planner decoding then copies the exact Goal
+     value; if the dimension is absent, only the schema's declared default may
+     be used. Do not infer this mapping from user phrases or parameter names.
 
 3. **Set routing metadata.**
    - `effects` should describe what the capability does, for example

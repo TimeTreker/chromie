@@ -11,9 +11,11 @@ from agent.app.fast_planner import FastPlannerResolver
 from agent.app.planner_contract import (
     PlannerDTOContractError,
     PlannerModelOutput,
+    canonical_goal_binding_argument_response_schema,
     goal_association_prompt_projection,
     is_planner_step_capability,
     validate_external_response_evidence_boundary,
+    validate_goal_binding_argument_grounding,
     validate_goal_responsibility_outcomes,
     validate_planner_model_output,
 )
@@ -102,7 +104,11 @@ class WeatherCatalog(FakeCatalog):
                     "properties": {
                         "location": {"type": "string"},
                         "date": {"type": "string", "default": "today"},
-                        "period": {"type": "string", "default": "day"},
+                        "period": {
+                            "type": "string",
+                            "default": "day",
+                            "x-chromie-entity-type": "day_part",
+                        },
                     },
                     "required": ["location"],
                     "additionalProperties": False,
@@ -626,6 +632,139 @@ class CanonicalPlanContractTests(unittest.TestCase):
         self.assertFalse(is_planner_step_capability("soridormi.stop"))
         self.assertFalse(is_planner_step_capability("chromie.speak"))
         self.assertTrue(is_planner_step_capability("soridormi.walk_forward"))
+
+    def test_typed_capability_scope_uses_goal_value_or_provider_default(self):
+        base_schema = {
+            "$defs": {
+                "PlannerModelStep": {
+                    "oneOf": [
+                        {
+                            "properties": {
+                                "args": {
+                                    "properties": {
+                                        "period": {
+                                            "type": "string",
+                                            "enum": ["day", "evening", "night"],
+                                            "default": "day",
+                                            "x-chromie-entity-type": "day_part",
+                                        }
+                                    },
+                                    "required": [],
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+        whole_day_goal = {
+            "goal_id": "goal-weather",
+            "object": {
+                "bindings": {
+                    "date": {
+                        "entity_type": "date",
+                        "value": "tomorrow",
+                    }
+                }
+            },
+        }
+        whole_day_schema = canonical_goal_binding_argument_response_schema(
+            base_schema,
+            authoritative_goals=[whole_day_goal],
+        )
+        whole_day_args = whole_day_schema["$defs"]["PlannerModelStep"]["oneOf"][
+            0
+        ]["properties"]["args"]
+        self.assertEqual(
+            whole_day_args["properties"]["period"],
+            {"const": "day"},
+        )
+        self.assertNotIn("period", whole_day_args["required"])
+
+        evening_goal = copy.deepcopy(whole_day_goal)
+        evening_goal["object"]["bindings"]["scope"] = {
+            "entity_type": "day_part",
+            "value": "evening",
+        }
+        evening_schema = canonical_goal_binding_argument_response_schema(
+            base_schema,
+            authoritative_goals=[evening_goal],
+        )
+        evening_args = evening_schema["$defs"]["PlannerModelStep"]["oneOf"][0][
+            "properties"
+        ]["args"]
+        self.assertEqual(
+            evening_args["properties"]["period"],
+            {"const": "evening"},
+        )
+        self.assertIn("period", evening_args["required"])
+
+    def test_typed_capability_scope_rejects_invented_narrower_value(self):
+        goal_id = "goal-weather"
+        output = PlannerModelOutput.model_validate(
+            multi_goal_plan(
+                disposition="execute",
+                coverage="complete",
+                goal_summary="Check tomorrow's weather.",
+                steps=[
+                    execute_step(
+                        "weather",
+                        "chromie.weather.lookup",
+                        {"date": "tomorrow", "period": "night"},
+                        [goal_id],
+                        "Read the requested forecast.",
+                    )
+                ],
+                goal_outcomes={
+                    goal_id: execute_outcome(
+                        goal_id,
+                        ["weather"],
+                        "The weather lookup covers the Goal.",
+                    )
+                },
+                goal_satisfaction=exact_satisfaction([goal_id]),
+            )
+        )
+        authoritative_goals = [
+            {
+                "goal_id": goal_id,
+                "object": {
+                    "bindings": {
+                        "date": {
+                            "entity_type": "date",
+                            "value": "tomorrow",
+                        }
+                    }
+                },
+            }
+        ]
+        capabilities = [
+            {
+                "capability_id": "chromie.weather.lookup",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "date": {"type": "string"},
+                        "period": {
+                            "type": "string",
+                            "enum": ["day", "evening", "night"],
+                            "default": "day",
+                            "x-chromie-entity-type": "day_part",
+                        },
+                    },
+                },
+            }
+        ]
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "invented unsupported semantic scope",
+        ):
+            validate_goal_binding_argument_grounding(
+                output,
+                authoritative_goals=authoritative_goals,
+                capabilities=capabilities,
+            )
 
     def test_complete_execute_plan_cannot_retain_top_level_unresolved_work(self):
         goal_id = "goal-resource"
@@ -1441,6 +1580,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("continue/resume", prompt)
         self.assertIn("Generic stand-ins", prompt)
         self.assertIn("make the intention prospective", prompt)
+        self.assertIn("those claims require Runtime commitment", prompt)
         schema = FastPlannerResolver._first_response_schema(
             ["walk"],
             responsibilities=[responsibility],
@@ -1451,6 +1591,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         text_contract = schema["$defs"]["FastPlannerProgressAct"]["properties"][
             "text"
         ]["description"]
+        self.assertIn("never use an onset or progressive predicate", text_contract)
         self.assertIn('"relationship":"continue"', text_contract)
         self.assertIn("continue the previous action", text_contract)
         truth_prompt = str(
@@ -1471,6 +1612,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         self.assertIn("semantic relationship reversal", truth_prompt)
         self.assertIn("relationship=continue", truth_prompt)
+        self.assertIn("claims that work is underway", truth_prompt)
 
     def test_first_response_model_specialization_does_not_change_fast_planner_authority(self):
         first_response_ollama = ScriptedOllama(
@@ -1728,7 +1870,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             truth_prompt,
         )
         self.assertIn(
-            "Judge all three rejection conditions internally",
+            "Set each of the three audit flags explicitly",
             truth_prompt,
         )
         author_prompt = str(ollama.prompts[0][0])
@@ -2096,12 +2238,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             "unresolved": [],
             "reason_summary": "Walk forward for the requested duration.",
         }
-        corrected = copy.deepcopy(first)
-        corrected["activities"][0]["args"] = {
-            "speed": "normal",
-            "duration_s": 10.0,
-        }
-        ollama = ScriptedOllama([first, corrected])
+        ollama = ScriptedOllama([first])
         request = _work_request(
             sid="turn-explicit-duration-not-default",
             text="你往前走 10 秒。",
@@ -2128,23 +2265,11 @@ class FastPlannerResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(result.disposition, "execute")
-        self.assertEqual(result.activities[-1].args["duration_s"], 10.0)
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertEqual(
-            ollama.prompts[1][1]["prompt_family"],
-            "fast_planner.advance.revision",
-        )
-        revision_schema = ollama.prompts[1][1]["response_format"]
-        capability_branches = revision_schema["$defs"][
-            "FastPlannerCapabilityActivity"
-        ]["oneOf"]
-        self.assertEqual(
-            capability_branches[0]["properties"]["args"]["properties"][
-                "duration_s"
-            ]["enum"],
-            [10.0],
-        )
+        self.assertEqual(result.disposition, "unavailable")
+        self.assertEqual(result.activities, [])
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertIn("omitted explicit numeric", result.metadata["error"])
+        self.assertNotIn("contract_revision_attempted", result.metadata)
 
     def test_committed_first_response_is_merged_without_reauthoring(self):
         ollama = FakeOllama(
@@ -2758,36 +2883,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         invalid_clarification["activities"][0]["text"] = (
             "我已经查到重庆今晚的天气情况啦！"
         )
-        repaired = {
-            "disposition": "execute",
-            "coverage": "complete",
-            "covered_responsibility_refs": ["weather"],
-            "activities": [
-                {
-                    "activity_id": "weather_progress",
-                    "role": "progress",
-                    "text": "我来查一下重庆今晚的天气。",
-                    "progress_kind": "check_information",
-                    "source_responsibility_refs": ["weather"],
-                },
-                {
-                    "activity_id": "weather_lookup",
-                    "role": "capability",
-                    "capability_id": "chromie.weather.lookup",
-                    "args": {
-                        "location": "重庆",
-                        "date": "today",
-                        "period": "night",
-                    },
-                    "source_responsibility_refs": ["weather"],
-                },
-            ],
-            "continuations": [],
-            "confidence": 0.96,
-            "unresolved": [],
-            "reason_summary": "Retrieve the requested forecast.",
-        }
-        ollama = ScriptedOllama([invalid_clarification, repaired])
+        ollama = ScriptedOllama([invalid_clarification])
         run_request = _work_request(
             sid="turn-bundle-c6732fcc-advance",
             text="今晚重庆会不会下雨哦？",
@@ -2814,18 +2910,11 @@ class FastPlannerResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(advance.disposition, "execute")
-        self.assertEqual(
-            [activity.role for activity in advance.activities],
-            ["progress", "capability"],
-        )
-        self.assertEqual(advance.activities[1].args["period"], "night")
-        self.assertTrue(advance.metadata["contract_revision_attempted"])
-        self.assertEqual(
-            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
-            ["fast_planner.advance", "fast_planner.advance.revision"],
-        )
-        self.assertIn("required Capability inputs", str(ollama.prompts[1][0]))
+        self.assertEqual(advance.disposition, "unavailable")
+        self.assertEqual(advance.activities, [])
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertIn("required Capability inputs", advance.metadata["error"])
+        self.assertNotIn("contract_revision_attempted", advance.metadata)
 
     def test_planner_cannot_ask_for_weather_location_already_bound_by_gi(self):
         raw = self._clarification_output(
@@ -3324,7 +3413,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         self.assertEqual(gap["required_for"]["minItems"], 1)
 
-    def test_execute_revision_preserves_disposition_and_requires_capability_activity(self):
+    def test_semantic_advance_violation_fails_closed_without_dto_revision(self):
         initial = {
             "disposition": "execute",
             "coverage": "complete",
@@ -3348,29 +3437,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                             ],
                         }
                     ],
-                }
-            ],
-            "continuations": [],
-            "confidence": 0.95,
-            "unresolved": [],
-            "reason_summary": "Execute the matching weather lookup.",
-        }
-        corrected = {
-            "disposition": "execute",
-            "coverage": "complete",
-            "covered_responsibility_refs": ["weather"],
-            "activities": [
-                {
-                    "activity_id": "weather-lookup",
-                    "role": "capability",
-                    "capability_id": "chromie.weather.lookup",
-                    "args": {
-                        "location": "重庆",
-                        "date": "today",
-                        "period": "night",
-                    },
-                    "source_responsibility_refs": ["weather"],
-                    "timing": "parallel",
                 }
             ],
             "continuations": [],
@@ -3408,40 +3474,20 @@ class FastPlannerResolverTests(unittest.TestCase):
             ],
             context={"fast_planner_first_response": first_response},
         )
-        ollama = ScriptedOllama([initial, corrected])
+        ollama = ScriptedOllama([initial])
 
         advance = asyncio.run(
             FastPlannerResolver(ollama, WeatherCatalog()).resolve_advance(request)
         )
 
-        self.assertEqual(advance.disposition, "execute")
+        self.assertEqual(advance.disposition, "unavailable")
         self.assertEqual(
             [activity.role for activity in advance.activities],
-            ["progress", "capability"],
+            ["progress"],
         )
-        revision_schema = ollama.prompts[1][1]["response_format"]
-        self.assertEqual(
-            revision_schema["properties"]["disposition"]["enum"], ["execute"]
-        )
-        self.assertEqual(
-            revision_schema["properties"]["activities"]["items"]["oneOf"],
-            [{"$ref": "#/$defs/FastPlannerCapabilityActivity"}],
-        )
-        capability_branches = revision_schema["$defs"][
-            "FastPlannerCapabilityActivity"
-        ]["oneOf"]
-        weather_branch = next(
-            branch
-            for branch in capability_branches
-            if branch["properties"]["capability_id"]["enum"]
-            == ["chromie.weather.lookup"]
-        )
-        self.assertEqual(
-            weather_branch["properties"]["args"]["required"],
-            ["location", "date", "period"],
-        )
-        self.assertIn("args", weather_branch["required"])
-        self.assertTrue(advance.metadata["contract_revision_attempted"])
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertNotIn("contract_revision_attempted", advance.metadata)
+        self.assertIn("clarification", advance.metadata["error"])
 
     def test_daytime_weather_can_check_and_speak_in_parallel(self):
         ollama = FakeOllama(
@@ -3629,6 +3675,68 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(
             advance.metadata["salvaged_progress_activity_ids"],
             ["weather-progress-1"],
+        )
+
+    def test_fail_safe_collapses_duplicate_activity_ids(self):
+        invalid = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "covered_responsibility_refs": ["r1", "r2"],
+            "activities": [
+                {
+                    "activity_id": "duplicate-progress",
+                    "role": "progress",
+                    "text": "向前跑15秒",
+                    "progress_kind": "perform_action",
+                    "source_responsibility_refs": ["r1"],
+                },
+                {
+                    "activity_id": "duplicate-progress",
+                    "role": "progress",
+                    "text": "边跑边唱歌",
+                    "progress_kind": "perform_action",
+                    "source_responsibility_refs": ["r2"],
+                },
+            ],
+            "continuations": [],
+            "confidence": 0.95,
+            "unresolved": [],
+            "reason_summary": "Invalid progress-only terminal plan.",
+        }
+        run_request = _work_request(
+            sid="turn-duplicate-progress-ids",
+            text="Run forward and sing.",
+            language="en-US",
+            responsibilities=[
+                {
+                    "local_ref": "r1",
+                    "outcome": "run forward",
+                    "output_mode": "body_action",
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.95,
+                },
+                {
+                    "local_ref": "r2",
+                    "outcome": "sing",
+                    "output_mode": "singing",
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.95,
+                },
+            ],
+        )
+
+        advance = asyncio.run(
+            FastPlannerResolver(FakeOllama(invalid), WeatherCatalog()).resolve_advance(
+                run_request
+            )
+        )
+
+        self.assertEqual(advance.disposition, "unavailable")
+        self.assertEqual(
+            [item.activity_id for item in advance.activities],
+            ["duplicate-progress"],
         )
 
     def test_first_activity_plan_can_check_weather_and_speak_in_parallel(self):

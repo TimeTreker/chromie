@@ -2,7 +2,7 @@
 
 Status: current resume point; incomplete development snapshot
 Updated: 2026-08-19
-Base main before this delivery: `3f58dffdc9f26c92faf081c335aa0fc0b408333c`
+Base main before this delivery: `f4ec12e54b604f923752ff7d732b9227266e40cd`
 
 ## Read first
 
@@ -17,128 +17,142 @@ evidence-grounded interaction behavior.
 
 ## Current verdict
 
-**Do not treat this tree as behavior-qualified.** It contains the current
-cross-turn continuity, exact-speech provenance, evidence re-entry, Agent-Skill
-filtering, Planner truth qualification, and runtime-profile work, but the
-latest live-text probe fails before motion. All six owner-required gates remain
-open: semantic correctness, behavior, timing, natural speech, no
-repetition/fabrication, and human-like failure. Older 44/44 and canonical-gate
-records in status history apply only to their recorded revisions.
+**Do not treat this tree as fully behavior-qualified.** The current dirty-tree
+Level C replay now passes the retained two-turn user-outcome case: both walks
+execute once, both finish with terminal Evidence and safe idle, and the second
+turn continues the retained Goal with continuation-aware speech. It still misses
+the qualified warm Planner-local timing budget: validated-GI-handoff to first
+Communicative-Activity commitment is about 2.90 seconds on both turns, versus the
+2.00-second target. The run used injected text, generated TTS, discarded output,
+and a simulator; it proves no physical microphone, audible speaker, or physical
+robot behavior. Because Chromie was dirty, it is development evidence rather
+than clean current-revision qualification.
 
 The main probe is `你往前走 10 秒。` → `刚才那个事情继续。`. Treat it as a
 general continuity/action ability, never as a phrase target.
 
+## 2026-08-19 debug-bundle defect closure
+
+The uploaded `chromie_debug_bundle_20260819_100305.tar.gz` exposed two general
+workflows. The weather case translated `北京`, spent DTO repair on semantics,
+invented a travel-confirmation Goal, and later narrowed a whole day to night.
+Current GI deepens once from source, preserves exact entity surfaces, and keeps
+unrequested stated plans as context; GA commits one weather Goal; the typed
+Capability contract permits only `period=day` without a `day_part`. The run/sing
+case lost the singing effect and admitted a false start claim. Current GI/GA keep
+separate body/singing Goals, truth review suppresses that claim, Fast Advance
+fails closed cleanly, and Deep retains `walk_forward(duration_s=15)` while
+truthfully reporting singing unavailable with no substitute vocal promise.
+Direct Agent/Core replays `debug-bundle-final-run_sing` and
+`debug-bundle-final3-weather` pass. The run/sing replay preceded only the
+weather-specific argument annotation; the weather replay used final image manifest
+`sha256:65f15d18880407af4d3e5d94131ecc64501a6baf40fd6e4d7cace809e13a124d`.
+They are non-qualifying: the operator Host owns the exclusive lock, so no maintained
+live-text, weather result, TTS, microphone, simulator, or physical-robot claim is
+made. No document, environment key, switch, compatibility path, or layer was added.
+
 ## Latest actual workflow
 
-Retained v23 evidence:
-`.chromie/acceptance/general-ability/20260819-user-probe-continue-six-gates-v23-evidence-and-truth/`.
-It failed 0/1 on the first turn, so the continuation did not run.
+Retained v31 evidence:
+`.chromie/acceptance/general-ability/20260819-user-probe-continue-six-gates-v31-context-reuse/`.
+The runner passes 1/1 at Level C and records one completed simulator walk on
+each turn.
 
-| Boundary | Authoritative input → actual output | Verdict |
-|---|---|---|
-| Gateway / GI | Exact admitted text → one `body_action` Responsibility for forward motion lasting `10 秒` | Correct |
-| Fast first response | Responsibility → candidate speech rejected by the configured truth owner for perspective and ungrounded-claim defects | Correct containment; no natural replacement reached the user |
-| Fast Advance | Same Responsibility → `soridormi.walk_forward(duration_s=10)` after one mechanical DTO revision; about 26.75 s | Correct action semantics; timing fails |
-| Goal Association | Same Responsibility, no active Goals → three model calls, then `structured_output_validation`; about 32.13 s | **Earliest blocking wrong boundary in v23** |
-| Trusted Runtime / output | No canonical Goal → no dispatch, TTS, response text, or motion | Honest containment, but behavior and human-like failure fail |
+| Module / owner | Authoritative input | Actual output and handoff | Verdict |
+|---|---|---|---|
+| Gateway + Goal Interpretation / admission and WHAT | Exact admitted Chinese turn plus bounded continuity | First turn: one forward `body_action` Responsibility with duration 10 seconds. Second turn: one `continue` Responsibility targeting the retained walking Goal. The same evidence fans out to Fast Planner and Goal Association. | Correct |
+| Fast first response / Communicative Activity and truth | Accepted GI Responsibility, interaction context, and no terminal Evidence | `好，我这就往前走10秒。`, then `好的，我这就继续往前走。`; both pass the mandatory same-owner truth check and reach discarded-output playback. GI handoff to commitment: 2,894.680 ms and 2,940.814 ms; commitment to playback: 1,293.917 ms and 1,254.552 ms. | Semantics, provenance, and delivery correct; **Planner-local timing still fails** |
+| Fast Advance / HOW | The same Responsibility plus executable catalog and retained Goal context | One `soridormi.walk_forward(duration_s=10,speed=normal)` Activity per turn; no Deep Planner. | Correct; the stage events at about 13.72 s and 15.98 s remain slow diagnostics |
+| Goal Association / canonical Goal authority | GI Responsibility plus no Goal on turn one, then the retained completed Goal on turn two | Turn one creates one ordinary `body_action` Goal with typed direction/duration/unit bindings. Turn two emits one `continue` association and no new Goal. | Correct; 19.18 s and 9.57 s remain slow diagnostics |
+| Trusted Capability Runtime + Soridormi / execution and Evidence | Canonical Goal-bound Fast Plan at pinned Soridormi `fa8080d2…` | Exactly one 10-second walk completes on each turn; terminal Evidence re-enters cognition; duplicate completion speech is suppressed; both turns end safe idle. | Correct Level C simulator evidence |
 
 ```text
 admitted text
-  -> GI Responsibility (correct)
-  -> Fast speech truth rejection (contained)
-  -> Fast body-action plan (correct, ~26.75 s)
-  -> Goal Association schema failure (~32.13 s)
-  -> no Goal commit -> no Runtime dispatch -> no speech or motion
+  -> GI Responsibility
+  -> Fast speech + truth check -> TTS/discarded playback
+  -> Fast Advance || Goal Association
+  -> canonical Goal-bound Plan
+  -> Trusted Runtime -> pinned Soridormi simulator
+  -> terminal Evidence -> duplicate-speech suppression -> safe idle
+  -> follow-up GI continue -> same retained Goal -> one second walk
 ```
 
-The preceding v22 evidence is at
-`.chromie/acceptance/general-ability/20260819-user-probe-continue-six-gates-v22-timing-boundaries/`.
-It also failed 0/1, but both turns executed one walking action. The continuation
-acknowledgement, `好，我这就往前走十秒。`, sounded like a new request; dispatch
-took roughly 34–35 seconds and whole turns roughly 66–67 seconds. It also
-exposed a generic post-evidence fallback after duplicate suppression and an
-evidence-boundary rejection for completed body Work.
+The earliest v23 blocker was Goal Association, not Runtime. Its candidate
+validator treated missing semantic bindings and wrong resource shape as a
+mechanically malformed DTO before the independent coverage owner could reject
+them, consuming the sole DTO repair and feeding a coverage certificate into the
+wrong schema. A second live defect then showed that an ungrounded coverage
+`source_excerpt` stopped the transaction instead of triggering the already-owned
+fresh semantic reconsideration. Current source leaves those judgments with Goal
+Association: the first coverage audit may reject ungrounded provenance and invoke
+one fresh interpretation; the final audit still fails closed. The coverage
+contract now states that constraints belong on their responsibility's same Goal
+through typed bindings rather than requiring sibling Goals.
 
-## Current source changes, not yet live-qualified together
+The v29 execution already passed semantics and behavior but measured about
+10.76/10.90 seconds from GI handoff to Fast commitment. Trace evidence showed the
+same `gemma4:12b` model being reloaded at context 6,144 for response authorship and
+again at 32,768 for truth qualification. Agent assembly now reuses the same client
+and context topology for same-model consecutive Fast phases. v31 reduces those
+intervals to 2.89/2.94 seconds without removing the truth check. An isolated v32
+`qwen3:4b` experiment was faster but emitted extra JSON after the structured
+first-response object on both turns, so no profile model change was accepted.
 
-- exact `fast_activity_id` speech reuse and delivery provenance;
-- duplicate delivery suppression that does not trigger a fake generic fallback;
-- exact terminal-Evidence re-entry for completed Goal-bound Work;
-- declared Agent-Skill output/domain applicability;
-- continuation-aware Responsibility retention and Work reconciliation;
-- constrained Planner InformationGap DTOs;
-- profile-owned first-response and truth models;
-- regressions for playback, TTS alignment, conversation state, Cognitive
-  Runtime, evidence re-entry, Planner contracts, Agent Skills, and profiles.
+## Current source changes
 
-These are general boundary changes, not hardcoded utterance rules. v23 proves
-that Goal Association model-contract integrity and Fast/GA latency still block
-human behavior.
+- Goal Association sends semantic representation failures to its independent
+  coverage/reconsideration path instead of spending DTO repair;
+- first-audit source-provenance failure can trigger the existing one-shot fresh
+  interpretation, while final provenance failure remains fail-closed;
+- coverage prompts preserve constraints as typed facts on the same Goal;
+- Agent-Skill applicability selection is model-owned rather than inferred by
+  Host inspection of Goal prose;
+- a Goal Association update forces canonical Fast revision so a stale
+  provisional clarification cannot commit;
+- same-model Fast response/truth phases reuse one client and context topology;
+- the reviewed Deep Planner broad exception remains fail-closed and its policy
+  checksum now matches the audited source.
+
+No new document, environment variable, runtime switch, compatibility path, or
+first-class architectural term was added.
 
 ## Verification state
 
-- Recently passed: 31 Agent-Skill domain/selection tests; three focused
-  continuation/retained-Work Cognitive Runtime tests; focused evidence re-entry,
-  Planner schema, profile/settings, playback, TTS-alignment, and conversation
-  state tests.
-- The complete current-tree Level A run passes 44/44. This is deterministic
-  Level A evidence only and does not override the failed v23 live-text outcome.
-- The current focused rerun confirms two Goal Association failures:
-  `test_weather_material_modifier_and_planner_progress_recover_to_one_goal` and
-  `test_body_actions_miscast_as_physical_resources_are_reconsidered`.
-- The 2026-08-19 pre-handoff repository-policy check fails at three boundaries:
-  two Host inspections of `request.goals` in Agent-Skill discovery, and a stale
-  reviewed exception-handler checksum in `agent/app/deep_planner.py`.
-- Documentation, test ownership, runtime structure, semantic-authority, and
-  regenerated configuration-inventory checks pass. The inventory grows from
-  401 to 403 keys for the two documented service-owned model variables; modes
-  remain 4, public booleans 1, and aliases 0.
-- Benchmark tests pass 119/119, then the benchmark gate stops on the same policy
-  failures. `./scripts/run_tests.sh` also stops at repository policy before the
-  maintained suite, so no current full-suite result is claimed. `git diff
-  --check` passes. Physical microphone, audible speaker, simulator execution
-  for these probes, and physical robot behavior are not proven.
+- The directly affected Goal Association, Agent-Skill, Fast Planner, Goal
+  Interpreter, Cognitive Runtime, and communication suites pass 347/347.
+- `./scripts/run_tests.sh` passes, including all 13 repository-policy families,
+  test ownership, pinned static analysis, configuration inventory, runtime
+  structure, documentation, 119 benchmark tests, and the maintained tests.
+- The complete deterministic Level A suite passes 44/44.
+- Configuration inventory remains 403 keys, 4 modes, 1 public boolean, and 0
+  aliases; documentation remains 96 Markdown files.
+- v31 Level C execution passes the exact case 1/1 with score 100 and no outcome
+  errors, but manual timing review keeps full behavior qualification open.
+- Physical microphone, audible speaker, and physical robot behavior remain
+  unproven. The clean-current-revision live proof also remains open.
 
 ## Exact resume order
 
-1. Pull this handoff commit and generate a clean runtime. Rebuild rather than
-   trusting manually recreated containers. The local v23 experiment used
-   `qwen3.5:4b` for Fast first response/truth; committed profiles are the
-   authority elsewhere. Never edit `.env.runtime` directly.
-2. Reproduce the two Goal Association tests and v23
-   `structured_output_validation`. Fix Goal Association, the earliest wrong
-   owner; do not add a repair layer, semantic Host rule, or phrase rule.
-3. Remove the Agent-Skill Host semantic inspection or restore model-owned
-   selection without losing capability grounding. Re-audit the Deep Planner
-   exception handler before refreshing its checksum; never update the checksum
-   merely to silence the gate.
-4. Rerun the exact live case:
+1. Start from a clean committed Chromie revision, regenerate `.env.runtime`, and
+   rebuild/recreate the Agent. Never edit `.env.runtime` directly.
+2. Reduce the remaining Fast first-response interval from about 2.9 seconds to
+   at most 2.0 seconds through the existing Fast Planner owner. Preserve the
+   mandatory truth qualification, immutable wording, fail-closed behavior, and
+   profile-owned model choice. Do not adopt the failed v32 smaller-model result.
+3. Rerun the exact live case against a clean Soridormi checkout at the manifest
+   revision:
 
    ```bash
    python scripts/general_ability_acceptance.py --mode live-text \
      --only-case user_probe_continue_recent_walk --execute \
-     --evidence-dir .chromie/acceptance/general-ability/20260819-user-probe-continue-six-gates-v24 \
+     --soridormi-repo /path/to/clean/pinned/soridormi \
+     --evidence-dir .chromie/acceptance/general-ability/<current-revision-exact-case> \
      --timeout-s 240 --capability-timeout-s 180 --case-timeout-s 420
    ```
 
-5. Require all six gates on both turns. Fail-closed is not a behavioral pass;
+4. Require all six gates on both turns. Fail-closed is not a behavioral pass;
    motion completion is not a natural-speech or timing pass.
-6. Only after this case passes, run its general-ability class, all Level A
+5. Only after this case passes, run its general-ability class, all Level A
    cases, and canonical gates. Then resume the remaining user probes in
    scenario order. Do not add architecture while an existing owner can express
    correct behavior.
-
-## Verification commands
-
-```bash
-git status --short
-python scripts/check_repository_policies.py
-python scripts/check_test_ownership.py
-python scripts/runtime_configuration_inventory.py --check
-python scripts/check_runtime_structure.py
-python scripts/check_docs.py
-python scripts/semantic_authority_audit.py
-python scripts/general_ability_acceptance.py --mode level-a --no-write
-./scripts/benchmark_check.sh
-./scripts/run_tests.sh
-```

@@ -624,6 +624,7 @@ def chromie_manifests(
                                 "night",
                             ],
                             "default": "day",
+                            "x-chromie-entity-type": "day_part",
                             "description": (
                                 "Local-day evidence scope. Use the exact canonical day-part "
                                 "binding when the Goal asks for morning, afternoon, evening, "

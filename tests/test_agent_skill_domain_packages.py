@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import unittest
 from pathlib import Path
 
@@ -118,8 +119,14 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
         self.assertEqual(selection.selected_agent_skills, ())
         self.assertEqual(model.calls, [])
 
-    def test_declared_goal_applicability_excludes_external_skills_without_route_hint(self):
-        model = ScriptedModel([])
+    def test_model_uses_declared_goal_applicability_without_host_filtering(self):
+        model = ScriptedModel(
+            [
+                self._no_skill_output(
+                    "External-information methods do not apply to body action."
+                )
+            ]
+        )
         service = AgentSkillSelectionService(model, self.registry)
 
         selection = asyncio.run(
@@ -141,9 +148,20 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(selection.status, "no_candidates")
+        self.assertEqual(selection.status, "no_skill")
         self.assertEqual(selection.selected_agent_skills, ())
-        self.assertEqual(model.calls, [])
+        self.assertEqual(len(model.calls), 1)
+        candidates = json.loads(model.calls[0][0])["candidate_agent_skills"]
+        self.assertEqual(
+            {item["agent_skill_id"] for item in candidates},
+            {BASE_ID, WEATHER_ID},
+        )
+        self.assertTrue(
+            all(
+                item["applicable_output_modes"] == ["capability_work"]
+                for item in candidates
+            )
+        )
 
     def _both_skill_output(self, role: str) -> dict:
         return {
@@ -168,6 +186,15 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
             ],
             "confidence": 0.95,
             "reason_summary": "The base method and weather specialization both apply.",
+        }
+
+    @staticmethod
+    def _no_skill_output(reason: str) -> dict:
+        return {
+            "decision": "no_skill",
+            "selected_agent_skills": [],
+            "confidence": 0.95,
+            "reason_summary": reason,
         }
 
     def test_repository_loads_exact_owner_approved_domain_packages(self) -> None:
@@ -271,8 +298,14 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
             [BASE_ID],
         )
 
-    def test_non_external_goal_has_no_applicable_skill_candidates(self) -> None:
-        model = ScriptedModel([])
+    def test_model_rejects_disclosed_external_skills_for_non_external_goal(self) -> None:
+        model = ScriptedModel(
+            [
+                self._no_skill_output(
+                    "A conversational joke needs no external-information method."
+                )
+            ]
+        )
         payload = self._request("fast_planner").model_dump(mode="python")
         payload.update(
             {
@@ -292,12 +325,22 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
         selection = asyncio.run(
             AgentSkillSelectionService(model, self.registry).select(request)
         )
-        self.assertEqual(selection.status, "no_candidates")
+        self.assertEqual(selection.status, "no_skill")
         self.assertEqual(selection.selected_agent_skills, ())
-        self.assertEqual(model.calls, [])
+        self.assertEqual(len(model.calls), 1)
+        self.assertEqual(
+            len(json.loads(model.calls[0][0])["candidate_agent_skills"]),
+            2,
+        )
 
-    def test_declared_applicability_excludes_external_skills_for_vocal_work(self) -> None:
-        model = ScriptedModel([])
+    def test_model_rejects_disclosed_external_skills_for_vocal_work(self) -> None:
+        model = ScriptedModel(
+            [
+                self._no_skill_output(
+                    "Neither singing nor walking needs an external-information method."
+                )
+            ]
+        )
         selection = asyncio.run(
             AgentSkillSelectionService(model, self.registry).select(
                 AgentSkillSelectionRequest(
@@ -322,9 +365,14 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(selection.status, "no_candidates")
+        self.assertEqual(selection.status, "no_skill")
         self.assertEqual(selection.selected_agent_skills, ())
-        self.assertEqual(model.calls, [])
+        self.assertEqual(len(model.calls), 1)
+        prompt = json.loads(model.calls[0][0])
+        self.assertEqual(
+            [goal["output_mode"] for goal in prompt["goals"]],
+            ["singing", "body_action"],
+        )
 
     def test_real_fast_planner_projections_bind_content_free_plan_provenance(self) -> None:
         role = "fast_planner"

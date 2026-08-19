@@ -1300,6 +1300,22 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertIn("Do not broaden a Capability", prompt)
         self.assertIn("confirmation-bound plan relation", prompt)
         self.assertNotIn("walking is not running", prompt)
+        self.assertIn(
+            "coverage=complete on a mixed Plan",
+            prompt,
+        )
+        self.assertIn(
+            "source_text repeats the whole multi-effect turn",
+            prompt,
+        )
+        review_schema = ollama.prompts[0][1]["response_format"]
+        self.assertEqual(
+            review_schema["properties"]["uncovered_requirements"]["items"][
+                "maxLength"
+            ],
+            320,
+        )
+        self.assertEqual(review_schema["properties"]["reason"]["maxLength"], 600)
 
     def test_semantic_coverage_rejection_is_terminal_without_deep_replan(self):
         goal_ids = ["goal-walk", "goal-sing"]
@@ -1994,6 +2010,14 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.goal_satisfaction.status, "partial")
         self.assertEqual(plan.goal_satisfaction.unmet_goal_ids, ["goal-sing"])
         self.assertTrue(plan.metadata["contract_repair_succeeded"])
+        self.assertIn(
+            "An unavailable provider-backed vocal mode remains wholly unavailable",
+            ollama.prompts[0][0],
+        )
+        self.assertIn(
+            "without promising a substitute effect",
+            ollama.prompts[0][0],
+        )
         self.assertIn(
             "Complete plan coverage means every Goal has an explicit outcome",
             ollama.prompts[1][0],

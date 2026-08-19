@@ -274,6 +274,26 @@ def _decimal_values(value: Any) -> set[Decimal]:
     return set()
 
 
+def _short_exact_surface_substrings(text: str) -> list[str]:
+    """Enumerate exact source slices for a bounded decoder constraint.
+
+    This does not identify an entity or choose its meaning. It only makes an
+    invalid translated location impossible to emit during short source-based
+    recovery. Longer turns retain the normal validator and fail closed without
+    growing an unbounded response schema.
+    """
+
+    surface = " ".join(str(text or "").strip().split())
+    if not surface or len(surface) > 40:
+        return []
+    values = {
+        surface[start:end]
+        for start in range(len(surface))
+        for end in range(start + 1, len(surface) + 1)
+    }
+    return sorted(values, key=lambda value: (len(value), value))
+
+
 def _reject_dropped_explicit_numeric_bindings(
     request: GoalInterpretationRequest,
     parsed: dict[str, Any],
@@ -308,6 +328,18 @@ def _reject_planner_shaped_goal_interpretation(parsed: dict[str, Any]) -> None:
             raise _GoalInterpretationAuthorityViolation(
                 f"Goal Interpretation output contains downstream-owned field {field!r}"
             )
+    responsibilities = parsed.get("responsibilities")
+    if not isinstance(responsibilities, list):
+        return
+    for index, item in enumerate(responsibilities):
+        if not isinstance(item, dict):
+            continue
+        for field in ("information_gaps", "resolved_gap_ids"):
+            if field in item:
+                raise _GoalInterpretationAuthorityViolation(
+                    "Goal Interpretation responsibility "
+                    f"{index} contains Planner-owned field {field!r}"
+                )
 
 
 def _canonical_goal_ids_from_context(value: Any) -> set[str]:
@@ -334,6 +366,36 @@ def _canonical_goal_ids_from_context(value: Any) -> set[str]:
 
     collect(value)
     return found
+
+
+def _reject_fresh_evidence_output_mode_contradictions(
+    parsed: dict[str, Any],
+) -> None:
+    """Reject a semantic completion contract the decoder failed to enforce."""
+
+    contradictions: list[str] = []
+    for index, responsibility in enumerate(parsed.get("responsibilities") or []):
+        if not isinstance(responsibility, dict):
+            continue
+        if responsibility.get("completion_requires_fresh_evidence") is not True:
+            continue
+        output_mode = " ".join(
+            str(responsibility.get("output_mode") or "").strip().split()
+        )
+        if not output_mode:
+            # Current decoder schemas require the field. Retained pre-contract
+            # fixtures may omit it and remain subject to Pydantic's legacy default;
+            # this semantic contradiction check concerns an explicit downgrade.
+            continue
+        if output_mode != "capability_work":
+            contradictions.append(
+                f"responsibilities[{index}].output_mode={output_mode!r}"
+            )
+    if contradictions:
+        raise _GoalInterpretationAuthorityViolation(
+            "fresh-evidence Responsibilities cannot be downgraded to an ordinary "
+            "observable channel: " + ", ".join(contradictions)
+        )
 
 
 def _reject_canonical_goal_identity_refs(
@@ -535,8 +597,8 @@ def _reject_unprovenanced_location_bindings(
 
     This gate does not resolve or repair a location. It only verifies that the
     model copied a current-turn surface or a value already present in bounded
-    semantic continuity context. One same-stage DTO repair may then regenerate
-    from the authoritative turn.
+    semantic continuity context. A violation requires one fresh source-based
+    interpretation, never same-stage DTO repair of the rejected semantics.
     """
 
     current_turn = " ".join((request.text or "").strip().split()).casefold()
@@ -1134,6 +1196,11 @@ class OllamaGoalInterpreter:
             "to Chromie. A question about what Chromie just said uses the most recent "
             "accepted assistant utterance from dialogue and is new conversational work, "
             "not continuation of the prior utterance's Goal. "
+            "A declarative statement that explains why a requested answer matters, "
+            "describes the person's situation, or states a future plan is context "
+            "unless the person also asks Chromie to do something with it. Never invent "
+            "a Responsibility to confirm, acknowledge, remember, record, schedule, "
+            "monitor, or act on that statement. "
             "A Responsibility that continues or resumes one supplied Goal must preserve "
             "that Goal's provider-neutral output_mode, completion_requires_work, and "
             "completion_requires_fresh_evidence contract. Continuation of body action, "
@@ -1311,6 +1378,23 @@ class OllamaGoalInterpreter:
                     "enum": sorted(allowed_goal_ids),
                 }
                 target_goal_ids["uniqueItems"] = True
+            responsibility.setdefault("allOf", []).append(
+                {
+                    "if": {
+                        "properties": {
+                            "completion_requires_fresh_evidence": {"const": True}
+                        },
+                        "required": ["completion_requires_fresh_evidence"],
+                    },
+                    "then": {
+                        "properties": {
+                            "completion_requires_work": {"const": True},
+                            "output_mode": {"const": "capability_work"},
+                        },
+                        "required": ["completion_requires_work", "output_mode"],
+                    },
+                }
+            )
             if not new_relationship_only:
                 responsibility.setdefault("allOf", []).append(
                     {
@@ -1476,6 +1560,8 @@ class OllamaGoalInterpreter:
     def build_deep_interpretation_payload(
         self,
         request: GoalInterpretationRequest,
+        *,
+        constrain_location_provenance: bool = False,
     ) -> dict[str, Any]:
         """Build one source-based Deep GI escalation with unchanged authority.
 
@@ -1512,6 +1598,21 @@ class OllamaGoalInterpreter:
                     "responsibilities must contain N sibling items. Never hide one effect "
                     "inside another item's outcome or binding. A coordination binding may "
                     "contain only exact sibling local_ref values, not words naming an action. "
+                    "Audit semantic provenance before returning: every explicit current-turn "
+                    "entity, identity, number, and continuity binding must preserve the exact "
+                    "authoritative source or supplied typed Context. Never translate, "
+                    "transliterate, infer, or copy a transport/runtime identifier into a "
+                    "semantic binding. "
+                    "Audit the completion contract as one semantic unit: when correct "
+                    "completion requires fresh external/private/runtime/observed evidence, "
+                    "set completion_requires_fresh_evidence=true, "
+                    "completion_requires_work=true, and output_mode=capability_work. "
+                    "Never label that evidence work as ordinary speech merely because its "
+                    "result will later be spoken. "
+                    "Audit declarative context before counting outcomes: an explanation, "
+                    "personal situation, or stated future plan is not another "
+                    "Responsibility unless the source actually asks Chromie to confirm, "
+                    "acknowledge, remember, record, schedule, monitor, or act on it. "
                     "Return one final JSON object only."
                 ),
             },
@@ -1526,6 +1627,24 @@ class OllamaGoalInterpreter:
                 ),
             },
         ]
+        if constrain_location_provenance:
+            exact_surfaces = _short_exact_surface_substrings(request.text)
+            binding_schema = (
+                payload.get("format", {})
+                .get("$defs", {})
+                .get("CognitiveResponsibilityProposal", {})
+                .get("properties", {})
+                .get("bindings")
+            )
+            if exact_surfaces and isinstance(binding_schema, dict):
+                binding_schema.setdefault("properties", {})["location"] = {
+                    "type": "string",
+                    "enum": exact_surfaces,
+                    "description": (
+                        "If location is present, copy one exact contiguous source "
+                        "surface; never translate or transliterate it."
+                    ),
+                }
         return payload
 
     @staticmethod
@@ -1540,7 +1659,14 @@ class OllamaGoalInterpreter:
         complexity after the accepted WHAT handoff.
         """
 
-        return bool(decision.unresolved)
+        if decision.unresolved:
+            return True
+        fresh_evidence_count = sum(
+            1
+            for responsibility in decision.responsibilities
+            if responsibility.completion_requires_fresh_evidence
+        )
+        return fresh_evidence_count > 1
 
     @staticmethod
     def _validate_interpretation_content(
@@ -1550,6 +1676,7 @@ class OllamaGoalInterpreter:
         parsed = _extract_json_object(content)
         _normalize_mechanical_goal_interpretation_dto(parsed)
         _reject_planner_shaped_goal_interpretation(parsed)
+        _reject_fresh_evidence_output_mode_contradictions(parsed)
         _reject_canonical_goal_identity_refs(request, parsed)
         _reject_unknown_goal_refs(request, parsed)
         _reject_continuity_completion_contract_mismatch(request, parsed)
@@ -1570,7 +1697,11 @@ class OllamaGoalInterpreter:
         logger.info(
             "goal_interpretation_deep_escalation sid=%s reason=%s",
             request.sid,
-            "material_unresolved_responsibility_meaning",
+            (
+                "material_unresolved_responsibility_meaning"
+                if decision.unresolved
+                else "multiple_fresh_evidence_responsibility_claims"
+            ),
         )
         try:
             data = await self._chat_logged(
@@ -1628,7 +1759,33 @@ class OllamaGoalInterpreter:
                     "invalid_deep_goal_interpretation_after_source_structure_loss: "
                     f"{type(deep_exc).__name__}: {deep_exc}"
                 ) from deep_exc
-        except (_GoalInterpretationAuthorityViolation, ValueError, ValidationError) as exc:
+        except _GoalInterpretationAuthorityViolation as exc:
+            logger.warning(
+                "Fast Goal Interpretation crossed semantic authority sid=%s "
+                "error=%s; escalating once from source",
+                request.sid,
+                exc,
+            )
+            try:
+                deep = await self._chat_logged(
+                    self.build_deep_interpretation_payload(
+                        request,
+                        constrain_location_provenance=True,
+                    ),
+                    stage="goal_interpretation_deep",
+                    request=request,
+                )
+                decision = self._validate_interpretation_content(
+                    request,
+                    str(deep.get("message", {}).get("content") or ""),
+                )
+                return await self._accept_or_deepen_interpretation(request, decision)
+            except Exception as deep_exc:
+                raise InterpretationUnavailableError(
+                    "invalid_deep_goal_interpretation_after_authority_violation: "
+                    f"{type(deep_exc).__name__}: {deep_exc}"
+                ) from deep_exc
+        except (ValueError, ValidationError) as exc:
             logger.warning(
                 "Invalid WHAT-only Goal Interpretation DTO sid=%s error=%s content=%r",
                 request.sid,

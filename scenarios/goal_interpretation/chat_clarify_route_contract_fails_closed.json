@@ -3,7 +3,7 @@
   "id": "chat_clarify_route_contract_fails_closed",
   "suite": "goal_interpretation",
   "level": "integration",
-  "description": "Planner-shaped route fields are invalid in WHAT-only GI output; one mechanical DTO repair is allowed, then the turn fails closed.",
+  "description": "Planner-shaped route fields are invalid in WHAT-only GI output; one fresh source-based Deep interpretation is allowed, then the turn fails closed.",
   "tags": [
     "goal-interpretation-contract",
     "fail-closed",
@@ -25,7 +25,7 @@
         }
       },
       {
-        "stage": "goal_interpretation_contract_repair",
+        "stage": "goal_interpretation_deep",
         "decision": {
           "route": "clarify",
           "confidence": 0.95,
@@ -37,12 +37,12 @@
   "expect": {
     "status": "interpretation_unavailable",
     "failure_reason_contains": [
-      "invalid_goal_interpretation_after_one_dto_repair"
+      "invalid_deep_goal_interpretation_after_authority_violation"
     ],
     "llm_calls": 2,
     "llm_stages": [
       "goal_interpretation",
-      "goal_interpretation_contract_repair"
+      "goal_interpretation_deep"
     ]
   }
 }

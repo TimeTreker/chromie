@@ -94,28 +94,6 @@ class AgentSkillSelectionService:
             candidate_truncated,
         )
 
-        if request.agent_role == "goal_association" and not request.goals:
-            resolution = AgentSkillSelectionResolution(
-                selection_id=selection_id,
-                sid=request.sid,
-                turn_id=request.turn_id,
-                agent_role=request.agent_role,
-                decision="no_skill",
-                status="no_skill",
-                selected_agent_skills=(),
-                candidate_summaries=candidates,
-                confidence=1.0,
-                reason_summary=(
-                    "Goal Association must establish the current Goal before "
-                    "passive domain methods may be selected."
-                ),
-                candidate_total=candidate_total,
-                candidate_truncated=candidate_truncated,
-                model=model_name,
-            )
-            self._log_resolution(resolution)
-            return resolution
-
         if not candidates:
             return AgentSkillSelectionResolution(
                 selection_id=selection_id,
@@ -289,22 +267,6 @@ class AgentSkillSelectionService:
                 or current_route in summary.applicable_routes
             )
 
-        def goal_applies(summary: AgentSkillSummary) -> bool:
-            if not request.goals:
-                return True
-            return any(
-                (
-                    not summary.applicable_output_modes
-                    or goal.output_mode in summary.applicable_output_modes
-                )
-                and (
-                    not summary.applicable_information_domains
-                    or goal.information_domain
-                    in summary.applicable_information_domains
-                )
-                for goal in request.goals
-            )
-
         if requested_ids:
             ordered: list[AgentSkillSummary] = []
             for agent_skill_id in requested_ids:
@@ -324,11 +286,6 @@ class AgentSkillSelectionService:
                         f"Agent Skill {agent_skill_id!r} is not applicable to "
                         f"route {current_route!r}"
                     )
-                if not goal_applies(summary):
-                    raise ValueError(
-                        f"Agent Skill {agent_skill_id!r} is not applicable to "
-                        "any supplied Goal output mode and information domain"
-                    )
                 ordered.append(summary)
         else:
             ordered = [
@@ -336,7 +293,6 @@ class AgentSkillSelectionService:
                 for summary in summaries.values()
                 if request.agent_role in summary.available_projections
                 and route_applies(summary)
-                and goal_applies(summary)
             ]
             ordered.sort(key=lambda item: item.agent_skill_id)
 

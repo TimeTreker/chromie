@@ -599,8 +599,10 @@ class FastPlannerResolver:
             "only the four audit fields required by the JSON schema. Set each violation "
             "flag explicitly, then accept only when all three are false. Before action or Evidence, a "
             "present acknowledgement or future intention is supported, while an "
-            "already-completed action, result, invented method, or invented fact is "
-            "not. Resolve grammatical roles: in a human command addressed to Chromie, "
+            "already-started/completed action, result, invented method, or invented fact is "
+            "not. An onset or progressive predicate saying execution starts, has "
+            "started, or is underway is an already-started claim even when an immediacy "
+            "marker appears before it. Resolve grammatical roles: in a human command addressed to Chromie, "
             "Chromie is the commanded actor. Chromie's first-person subject is the "
             "correct actor; the user's second-person command does not make that reply "
             "a perspective contradiction. A reply telling the human to do Chromie's "
@@ -634,7 +636,10 @@ class FastPlannerResolver:
             "to check next is not an execution claim, and an intention to act next is "
             "not a completion claim. Chinese '我先…', '我这就…', '我马上…', '我会…', "
             "and '我将…', and English 'Let me…', 'I will…', and 'I'll do it now' are "
-            "prospective. In contrast, wording equivalent to 'I checked', 'I did it', "
+            "prospective only when they modify a future intention. An onset or "
+            "progressive predicate equivalent to 'I am starting', 'I start executing', "
+            "or 'I am doing it' claims that work is underway and must be rejected even "
+            "after one of those immediacy markers. In contrast, wording equivalent to 'I checked', 'I did it', "
             "'I finished', or a requested result says work already happened. "
             "Reject only when the sentence contains an unverified result, changed-world "
             "claim, already-started/completed claim, or when it invents a physical "
@@ -783,7 +788,10 @@ class FastPlannerResolver:
                             "been selected in this phase. It also must not answer the "
                             "request or imply a lookup, "
                             "action, result, or completion already happened. Keep only "
-                            "the acknowledgement/intention; omit an explanation of what "
+                            "the acknowledgement/intention. A willingness or immediacy "
+                            "marker must still describe a future action; never use an "
+                            "onset or progressive predicate that says execution is starting "
+                            "or underway before Runtime commitment. Omit an explanation of what "
                             "the check will reveal. Preserve the authoritative semantic "
                             "relationship and concrete resolved outcome in this decoder "
                             "contract: "
@@ -932,7 +940,9 @@ class FastPlannerResolver:
             "state-changing action, make the intention prospective with a natural "
             "willingness/immediacy marker (for example Chinese 好/我这就/我马上 or "
             "English okay/I'll), so a bare present-tense action is not mistaken for "
-            "execution already underway. Do not invent current activity, household "
+            "execution already underway. That marker must modify a future intention, "
+            "not wording equivalent to 'I am starting' or 'I am doing it now'; those "
+            "claims require Runtime commitment. Do not invent current activity, household "
             "work, personal state, or external facts."
         )
         responsibility_field_contract = (
@@ -1189,7 +1199,7 @@ class FastPlannerResolver:
             except Exception as exc:
                 if attempt < self.max_contract_repairs and isinstance(
                     exc,
-                    (PlannerDTOContractError, ValidationError, json.JSONDecodeError),
+                    (ValidationError, json.JSONDecodeError),
                 ):
                     revision_source = last_raw
                     previous_errors = self._validation_error_json(
@@ -1982,11 +1992,11 @@ class FastPlannerResolver:
         retained_ids = {
             item.activity_id for item in retained_communicative_activities
         }
-        retained_communicative_activities.extend(
-            item
-            for item in progress_activities
-            if item.activity_id not in retained_ids
-        )
+        for item in progress_activities:
+            if item.activity_id in retained_ids:
+                continue
+            retained_communicative_activities.append(item)
+            retained_ids.add(item.activity_id)
         return FastPlannerAdvance(
             turn_id=str(request.sid or "turn-fast-advance"),
             disposition="unavailable",

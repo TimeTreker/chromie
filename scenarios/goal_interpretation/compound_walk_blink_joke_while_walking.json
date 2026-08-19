@@ -29,7 +29,7 @@
         }
       },
       {
-        "stage": "goal_interpretation_contract_repair",
+        "stage": "goal_interpretation_deep",
         "decision": {
           "confidence": 0.87,
           "responsibilities": [
@@ -40,6 +40,7 @@
                 "direction": "forward",
                 "duration_s": 20
               },
+              "output_mode": "body_action",
               "completion_requires_work": true,
               "completion_requires_fresh_evidence": false,
               "confidence": 0.91,
@@ -48,11 +49,12 @@
             },
             {
               "local_ref": "r2",
-              "outcome": "tell a joke while walking",
+              "outcome": "blink six times after walking",
               "bindings": {
-                "concurrency": "while walking",
+                "after": "r1",
                 "count": 6
               },
+              "output_mode": "body_action",
               "completion_requires_work": true,
               "completion_requires_fresh_evidence": false,
               "confidence": 0.86,
@@ -61,10 +63,11 @@
             },
             {
               "local_ref": "r3",
-              "outcome": "blink repeatedly while walking",
+              "outcome": "tell a joke while walking",
               "bindings": {
-                "concurrency": "while walking"
+                "coordinate_with": "r1"
               },
+              "output_mode": "speech",
               "completion_requires_work": true,
               "completion_requires_fresh_evidence": false,
               "confidence": 0.88,
@@ -82,7 +85,7 @@
     "llm_calls": 2,
     "llm_stages": [
       "goal_interpretation",
-      "goal_interpretation_contract_repair"
+      "goal_interpretation_deep"
     ],
     "unresolved": [],
     "responsibilities": [
@@ -93,6 +96,7 @@
           "direction": "forward",
           "duration_s": 20
         },
+        "output_mode": "body_action",
         "completion_requires_work": true,
         "completion_requires_fresh_evidence": false,
         "confidence": 0.91,
@@ -101,11 +105,12 @@
       },
       {
         "local_ref": "r2",
-        "outcome": "tell a joke while walking",
+        "outcome": "blink six times after walking",
         "bindings": {
-          "concurrency": "while walking",
+          "after": "r1",
           "count": 6
         },
+        "output_mode": "body_action",
         "completion_requires_work": true,
         "completion_requires_fresh_evidence": false,
         "confidence": 0.86,
@@ -114,10 +119,11 @@
       },
       {
         "local_ref": "r3",
-        "outcome": "blink repeatedly while walking",
+        "outcome": "tell a joke while walking",
         "bindings": {
-          "concurrency": "while walking"
+          "coordinate_with": "r1"
         },
+        "output_mode": "speech",
         "completion_requires_work": true,
         "completion_requires_fresh_evidence": false,
         "confidence": 0.88,

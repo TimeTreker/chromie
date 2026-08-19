@@ -1839,34 +1839,40 @@ def canonical_goal_binding_argument_response_schema(
     *,
     authoritative_goals: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    """Project exact, same-name Goal bindings into compatible step branches.
+    """Project exact Goal bindings into compatible step branches.
 
     This is a read-only DTO projection, not semantic argument mapping. Values are
     constrained only when every current Goal using that binding name agrees and
-    the Capability argument schema accepts the canonical value unchanged.
+    the Capability argument schema accepts the canonical value unchanged. A
+    Capability owner may also declare ``x-chromie-entity-type`` on an argument;
+    that typed owner contract maps the argument to the same canonical Goal entity
+    type without relying on its arbitrary field name.
     """
 
     values_by_name: dict[str, list[Any]] = {}
+    values_by_entity_type: dict[str, list[Any]] = {}
     for goal in authoritative_goals:
-        if not isinstance(goal, dict) or isinstance(
-            goal.get("resource_responsibility"), dict
-        ):
+        if not isinstance(goal, dict):
             continue
         for name, binding in _goal_binding_map(goal).items():
             value = binding.get("value")
-            if not any(
+            entity_type = _normalized_entity_type(binding.get("entity_type"))
+            if not isinstance(goal.get("resource_responsibility"), dict):
+                if not any(
+                    _material_values_equal(existing, value, list_compatible=False)
+                    for existing in values_by_name.setdefault(name, [])
+                ):
+                    values_by_name[name].append(value)
+            if entity_type and not any(
                 _material_values_equal(existing, value, list_compatible=False)
-                for existing in values_by_name.setdefault(name, [])
+                for existing in values_by_entity_type.setdefault(entity_type, [])
             ):
-                values_by_name[name].append(value)
+                values_by_entity_type[entity_type].append(value)
     exact_bindings = {
         name: values[0]
         for name, values in values_by_name.items()
         if len(values) == 1
     }
-    if not exact_bindings:
-        return base_schema
-
     schema = copy.deepcopy(base_schema)
     step_schema = schema.get("$defs", {}).get("PlannerModelStep")
     branches = step_schema.get("oneOf") if isinstance(step_schema, dict) else None
@@ -1881,6 +1887,32 @@ def canonical_goal_binding_argument_response_schema(
         if not isinstance(argument_properties, dict):
             continue
         required = args.setdefault("required", [])
+        for argument_name, argument_schema in list(argument_properties.items()):
+            if not isinstance(argument_schema, dict):
+                continue
+            entity_type = _normalized_entity_type(
+                argument_schema.pop("x-chromie-entity-type", "")
+            )
+            if not entity_type:
+                continue
+            # The Capability owner, rather than Planner or Host heuristics,
+            # declares which canonical semantic dimension this argument carries.
+            # If that dimension is absent, only the provider's declared default
+            # may enter the Plan; a model-authored narrower scope is forbidden.
+            constrained = True
+            values = values_by_entity_type.get(entity_type, [])
+            if len(values) == 1 and _argument_schema_accepts_canonical_binding(
+                argument_schema, values[0]
+            ):
+                argument_properties[argument_name] = {
+                    "const": copy.deepcopy(values[0])
+                }
+                if isinstance(required, list) and argument_name not in required:
+                    required.append(argument_name)
+            elif not values and "default" in argument_schema:
+                argument_properties[argument_name] = {
+                    "const": copy.deepcopy(argument_schema["default"])
+                }
         for name, value in exact_bindings.items():
             argument_schema = argument_properties.get(name)
             if not isinstance(argument_schema, dict) or not (
@@ -2473,6 +2505,12 @@ async def review_coordinated_action_plan_coverage(
                 "Capability exists. It represents the unmet Goal only when it owns no "
                 "step, satisfaction remains non-exact, and the aggregate and per-Goal "
                 "wording truthfully disclose the limitation without promising the work. "
+                "Do not treat coverage=complete on a mixed Plan as a claim that every "
+                "Goal is satisfied: it means every Goal is explicitly accounted for, "
+                "including terminal unavailable/refused outcomes that remain unmet. "
+                "Each authoritative Goal item is atomic even when its source_text repeats "
+                "the whole multi-effect turn; sibling Goal descriptions and IDs preserve "
+                "the split, so repeated source_text never merges their satisfaction. "
                 "Reject terminal accounting that violates those conditions. For a material "
                 "adjustment or alternative, require the explicit confirmation-bound "
                 "plan relation. Reject any exact Plan that omits or contradicts one of "
@@ -2565,6 +2603,14 @@ def planner_coverage_review_response_schema() -> dict[str, Any]:
             ]
         }
     )
+    uncovered = schema.get("properties", {}).get("uncovered_requirements")
+    if isinstance(uncovered, dict):
+        items = uncovered.get("items")
+        if isinstance(items, dict):
+            items["maxLength"] = 320
+    reason = schema.get("properties", {}).get("reason")
+    if isinstance(reason, dict):
+        reason["maxLength"] = 600
     return schema
 
 
@@ -2806,6 +2852,79 @@ def validate_goal_binding_argument_grounding(
                     "planner step argument contradicts authoritative Goal binding: "
                     f"{step.step_id}.{name}={actual!r}, expected={expected!r}"
                 )
+
+        capability = capabilities_by_id.get(step.capability_id) or {}
+        input_schema = capability.get("input_schema")
+        argument_properties = (
+            input_schema.get("properties")
+            if isinstance(input_schema, dict)
+            else None
+        )
+        if isinstance(argument_properties, dict):
+            values_by_entity_type: dict[str, list[Any]] = {}
+            for binding in required.values():
+                entity_type = _normalized_entity_type(binding.get("entity_type"))
+                value = binding.get("value")
+                if entity_type and not any(
+                    _material_values_equal(
+                        existing,
+                        value,
+                        list_compatible=False,
+                    )
+                    for existing in values_by_entity_type.setdefault(
+                        entity_type, []
+                    )
+                ):
+                    values_by_entity_type[entity_type].append(value)
+            for argument_name, argument_schema in argument_properties.items():
+                if not isinstance(argument_schema, dict):
+                    continue
+                entity_type = _normalized_entity_type(
+                    argument_schema.get("x-chromie-entity-type")
+                )
+                if not entity_type:
+                    continue
+                values = values_by_entity_type.get(entity_type, [])
+                if len(values) > 1:
+                    raise ValueError(
+                        "one executable step cannot satisfy conflicting authoritative "
+                        f"Goal entity type {entity_type!r}"
+                    )
+                if len(values) == 1:
+                    if argument_name not in step.args:
+                        raise PlannerDTOContractError(
+                            "planner step omitted authoritative typed Goal binding: "
+                            f"{step.step_id}.{argument_name}={values[0]!r} "
+                            f"for entity_type={entity_type!r}"
+                        )
+                    if not _material_values_equal(
+                        step.args[argument_name],
+                        values[0],
+                        list_compatible=False,
+                    ):
+                        raise ValueError(
+                            "planner step argument contradicts authoritative typed Goal "
+                            f"binding: {step.step_id}.{argument_name}="
+                            f"{step.args[argument_name]!r}, expected={values[0]!r} "
+                            f"for entity_type={entity_type!r}"
+                        )
+                elif (
+                    argument_name in step.args
+                    and "default" in argument_schema
+                    and not _material_values_equal(
+                        step.args[argument_name],
+                        argument_schema["default"],
+                        list_compatible=False,
+                    )
+                ):
+                    raise ValueError(
+                        "planner step invented unsupported semantic scope instead of "
+                        "the Capability default: "
+                        f"{step.step_id}.{argument_name}="
+                        f"{step.args[argument_name]!r}, default="
+                        f"{argument_schema['default']!r}, "
+                        f"entity_type={entity_type!r}"
+                    )
 
         argument_values = nested_values(step.args)
         for goal_id in claimed_goal_ids:

@@ -7,6 +7,7 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse, ORJSONResponse
 
 from .settings import (
+    GoalInterpreterSettings,
     Settings,
     agent_service_settings as settings,
     goal_interpreter_settings,
@@ -119,6 +120,45 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
 )
 logger = logging.getLogger("chromie.agent")
+
+
+def _fast_truth_context_window(
+    service_settings: Settings,
+) -> int:
+    model = service_settings.fast_truth_model
+    if model == service_settings.fast_planner_model:
+        return service_settings.fast_planner_num_ctx
+    if model == service_settings.goal_association_model:
+        return service_settings.goal_association_num_ctx
+    if model == service_settings.cognitive_gateway_attention_model:
+        return service_settings.cognitive_gateway_attention_num_ctx
+    if model == service_settings.social_attention_model:
+        return service_settings.social_attention_num_ctx
+    if model == service_settings.agent_skill_selection_model:
+        return service_settings.agent_skill_selection_num_ctx
+    return min(service_settings.fast_planner_num_ctx, 6144)
+
+
+def _fast_first_response_context_window(
+    service_settings: Settings,
+    interpreter_settings: GoalInterpreterSettings,
+) -> int:
+    # First response and its mandatory truth qualification are consecutive phases
+    # of one Fast owner. When they share a model, one runner topology prevents a
+    # same-model unload/reload between the two bounded calls.
+    if (
+        service_settings.fast_first_response_model
+        == service_settings.fast_truth_model
+    ):
+        return _fast_truth_context_window(service_settings)
+    if (
+        service_settings.fast_first_response_model
+        == service_settings.fast_planner_model
+    ):
+        return service_settings.fast_planner_num_ctx
+    if service_settings.fast_first_response_model == interpreter_settings.model:
+        return interpreter_settings.llm_num_ctx
+    return min(service_settings.fast_planner_num_ctx, 6144)
 
 ollama_client = OllamaClient(
     settings.ollama_url,
@@ -361,7 +401,11 @@ fast_first_response_client = (
     else None
 )
 fast_truth_client = (
-    fast_planner_client
+    fast_first_response_client
+    if settings.use_llm
+    and settings.fast_planner_enabled
+    and settings.fast_truth_model == settings.fast_first_response_model
+    else fast_planner_client
     if settings.use_llm
     and settings.fast_planner_enabled
     and settings.fast_truth_model == settings.fast_planner_model
@@ -381,28 +425,12 @@ fast_planner_resolver = (
         capability_catalog,
         first_response_ollama=fast_first_response_client,
         truth_ollama=fast_truth_client,
-        truth_num_ctx=(
-            settings.fast_planner_num_ctx
-            if settings.fast_truth_model == settings.fast_planner_model
-            else settings.goal_association_num_ctx
-            if settings.fast_truth_model == settings.goal_association_model
-            else settings.cognitive_gateway_attention_num_ctx
-            if settings.fast_truth_model
-            == settings.cognitive_gateway_attention_model
-            else settings.social_attention_num_ctx
-            if settings.fast_truth_model == settings.social_attention_model
-            else settings.agent_skill_selection_num_ctx
-            if settings.fast_truth_model == settings.agent_skill_selection_model
-            else min(settings.fast_planner_num_ctx, 6144)
+        truth_num_ctx=_fast_truth_context_window(
+            settings,
         ),
-        first_response_num_ctx=(
-            settings.fast_planner_num_ctx
-            if settings.fast_first_response_model
-            == settings.fast_planner_model
-            else goal_interpreter_settings.llm_num_ctx
-            if settings.fast_first_response_model
-            == goal_interpreter_settings.model
-            else min(settings.fast_planner_num_ctx, 6144)
+        first_response_num_ctx=_fast_first_response_context_window(
+            settings,
+            goal_interpreter_settings,
         ),
         min_confidence=settings.fast_planner_min_confidence,
         num_ctx=settings.fast_planner_num_ctx,

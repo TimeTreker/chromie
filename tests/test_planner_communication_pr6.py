@@ -4,7 +4,14 @@ import unittest
 
 from pydantic import ValidationError
 
-from agent.app.main import app
+from agent.app.main import (
+    _fast_first_response_context_window,
+    _fast_truth_context_window,
+    app,
+    fast_first_response_client,
+    fast_truth_client,
+)
+from agent.app.settings import GoalInterpreterSettings, Settings
 from orchestrator.clients.agent_client import AgentClient
 from orchestrator.runtime.cognitive_runtime import GoalDrivenRuntimeCoordinator
 from shared.chromie_contracts.goal import (
@@ -19,6 +26,34 @@ from shared.chromie_contracts.plan import (
 
 
 class PlannerOwnedCommunicativeActivityTests(unittest.TestCase):
+    def test_same_model_first_response_and_truth_reuse_one_runner_topology(self) -> None:
+        service_settings = Settings().model_copy(
+            update={
+                "fast_planner_model": "qwen3:4b",
+                "fast_first_response_model": "gemma4:12b",
+                "fast_truth_model": "gemma4:12b",
+                "goal_association_model": "gemma4:12b",
+                "fast_planner_num_ctx": 32768,
+                "goal_association_num_ctx": 32768,
+            }
+        )
+        interpreter_settings = GoalInterpreterSettings().model_copy(
+            update={"model": "qwen3:4b", "llm_num_ctx": 32768}
+        )
+
+        self.assertEqual(
+            _fast_first_response_context_window(
+                service_settings,
+                interpreter_settings,
+            ),
+            32768,
+        )
+        self.assertEqual(
+            _fast_truth_context_window(service_settings),
+            32768,
+        )
+        self.assertIs(fast_first_response_client, fast_truth_client)
+
     def test_fast_activity_owns_exact_text_and_truth_stage(self) -> None:
         activity = FastPlannerProgressAct(
             activity_id="weather-progress",

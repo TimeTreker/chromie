@@ -96,6 +96,10 @@ except ImportError:  # pragma: no cover
 logger = logging.getLogger("chromie.agent.goal_association")
 
 
+class _CoverageSourceExcerptViolation(ValueError):
+    """Coverage audit cited text outside the authoritative user turn."""
+
+
 GoalSegmentationDecision = Literal["create_goals"]
 GoalAssociationDecision = Literal["associate", "create_goals"]
 InformationResourceDomain = Literal[
@@ -1182,13 +1186,16 @@ class GoalAssociationResolver:
                 for item in request.responsibilities
                 if item.output_mode != "unspecified"
             },
+            responsibility_fresh_evidence_refs={
+                item.local_ref
+                for item in request.responsibilities
+                if item.completion_requires_fresh_evidence
+            },
             responsibility_bindings={
                 item.local_ref: {
                     str(name): value
                     for name, value in item.bindings.items()
                     if isinstance(value, str)
-                    and " ".join(value.strip().casefold().split())
-                    in " ".join(request.text.strip().casefold().split())
                 }
                 for item in request.responsibilities
             },
@@ -1351,29 +1358,56 @@ class GoalAssociationResolver:
                             request=request,
                             raw=accepted_raw,
                         ),
+                        authoritative_turn=request.text,
                     ),
                     prompt_family="goal_association.responsibility_coverage",
                 )
-                certificate = self._validate_coverage_certificate(
-                    certificate_raw,
-                    request=request,
-                    goal_count=len(model_output.new_goals),
-                    candidate_goals=list(model_output.new_goals),
-                )
-                verdict, problems = self._coverage_verdict(
-                    certificate,
-                    goal_count=len(model_output.new_goals),
-                )
+                certificate: GoalResponsibilityCoverageCertificate | None
+                try:
+                    certificate = self._validate_coverage_certificate(
+                        certificate_raw,
+                        request=request,
+                        goal_count=len(model_output.new_goals),
+                        candidate_goals=list(model_output.new_goals),
+                    )
+                except _CoverageSourceExcerptViolation:
+                    # An ungrounded audit can never certify a candidate. Treat the
+                    # first audit as a rejection and use the existing one-shot fresh
+                    # semantic interpretation from the authoritative turn. This is
+                    # not DTO repair, and the final audit still fails closed on the
+                    # same provenance defect.
+                    certificate = None
+                    verdict = "reject"
+                    problems = ["coverage_source_excerpt_not_authoritative"]
+                    problems.extend(
+                        "missing_source_grounded_binding=" + conflict
+                        for conflict in self._source_grounded_binding_coverage_conflicts(
+                            model_output,
+                            request=request,
+                        )
+                    )
+                    coverage_metadata["initial_certificate_contract_error"] = (
+                        "source_excerpt_not_authoritative"
+                    )
+                else:
+                    verdict, problems = self._coverage_verdict(
+                        certificate,
+                        goal_count=len(model_output.new_goals),
+                    )
                 coverage_metadata["initial_verdict"] = verdict
-                coverage_metadata["certificate"] = certificate.model_dump(
-                    mode="json"
-                )
+                if certificate is not None:
+                    coverage_metadata["certificate"] = certificate.model_dump(
+                        mode="json"
+                    )
                 if verdict == "reject":
                     semantic_reconsideration_attempted = True
                     coverage_metadata["reconsidered"] = True
-                    clarification_required = any(
-                        item.coverage == "clarification_required"
-                        for item in certificate.items
+                    clarification_required = bool(
+                        certificate is not None
+                        and any(
+                            item.coverage == "clarification_required"
+                            for item in certificate.items
+                        )
                     )
                     reconsidered_raw = normalize_raw(
                         await invoke(
@@ -1479,6 +1513,7 @@ class GoalAssociationResolver:
                                     request=request,
                                     raw=accepted_raw,
                                 ),
+                                authoritative_turn=request.text,
                             ),
                             prompt_family=(
                                 "goal_association.responsibility_coverage_final"
@@ -2377,18 +2412,6 @@ class GoalAssociationResolver:
                 "evidence: "
                 + ", ".join(resource_source_conflicts)
             )
-        source_binding_conflicts = self._source_grounded_binding_coverage_conflicts(
-            model_output,
-            request=request,
-        )
-        if source_binding_conflicts:
-            raise ValueError(
-                "new Goal typed bindings must preserve every directly supplied "
-                "material Goal Interpretation value on the Goal that cites its "
-                "Responsibility; prose is not a binding and no supplied value may "
-                "be dropped: "
-                + ", ".join(source_binding_conflicts)
-            )
         location_bindings = self._non_verbatim_explicit_location_bindings(
             model_output,
             request=request,
@@ -2867,6 +2890,7 @@ class GoalAssociationResolver:
         responsibility_count: int | None = None,
         responsibility_refs: list[str] | None = None,
         responsibility_output_modes: dict[str, str] | None = None,
+        responsibility_fresh_evidence_refs: set[str] | None = None,
         responsibility_bindings: dict[str, dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         schema = copy.deepcopy(output_type.model_json_schema())
@@ -2889,6 +2913,9 @@ class GoalAssociationResolver:
         ]
         responsibility_refs = list(responsibility_refs or [])
         responsibility_output_modes = dict(responsibility_output_modes or {})
+        responsibility_fresh_evidence_refs = set(
+            responsibility_fresh_evidence_refs or set()
+        )
         responsibility_bindings = {
             str(source_ref): dict(bindings)
             for source_ref, bindings in (responsibility_bindings or {}).items()
@@ -3060,7 +3087,34 @@ class GoalAssociationResolver:
                             properties.get("bindings") or {}
                         )
                         bindings_schema["minItems"] = len(expected_bindings)
-                        bindings_schema.setdefault("maxItems", 12)
+                        bindings_schema["maxItems"] = len(expected_bindings)
+                        binding_item_template = copy.deepcopy(
+                            schema.get("$defs", {}).get(
+                                "GoalAssociationModelBinding"
+                            )
+                            or {}
+                        )
+                        binding_branches: list[dict[str, Any]] = []
+                        for name, value in expected_bindings:
+                            binding_branch = copy.deepcopy(binding_item_template)
+                            binding_properties = binding_branch.setdefault(
+                                "properties", {}
+                            )
+                            binding_properties["name"] = {"const": name}
+                            binding_properties["value"] = {"const": value}
+                            binding_branch["required"] = list(
+                                dict.fromkeys(
+                                    [
+                                        *(binding_branch.get("required") or []),
+                                        "name",
+                                        "value",
+                                        "entity_type",
+                                        "confidence",
+                                    ]
+                                )
+                            )
+                            binding_branches.append(binding_branch)
+                        bindings_schema["items"] = {"oneOf": binding_branches}
                         bindings_schema["allOf"] = [
                             {
                                 "contains": {
@@ -3108,6 +3162,13 @@ class GoalAssociationResolver:
 
             def resource_variants(source_ref: str) -> list[str]:
                 output_mode = responsibility_output_modes.get(source_ref)
+                if source_ref in responsibility_fresh_evidence_refs:
+                    # GI already authored the fresh-evidence semantic fact. At the
+                    # trusted Goal boundary that fact has exactly one canonical
+                    # representation: information resource work. Keeping the
+                    # ordinary branch would silently downgrade evidence acquisition
+                    # to conversational speech.
+                    return ["information"]
                 if output_mode == "body_action":
                     return ["ordinary", "physical_object"]
                 if output_mode == "capability_work":
@@ -4100,6 +4161,7 @@ class GoalAssociationResolver:
         candidate_goals: list[GoalAssociationModelGoal],
         *,
         temporal_scalar: bool = False,
+        authoritative_turn: str = "",
     ) -> dict[str, Any]:
         goal_count = len(candidate_goals)
         schema = copy.deepcopy(
@@ -4123,6 +4185,25 @@ class GoalAssociationResolver:
             indices = item_schema.get("properties", {}).get(
                 "candidate_goal_indices"
             )
+            surface = " ".join(str(authoritative_turn or "").strip().split())
+            if surface and len(surface) <= 40:
+                exact_surfaces = sorted(
+                    {
+                        surface[start:end]
+                        for start in range(len(surface))
+                        for end in range(start + 1, len(surface) + 1)
+                    },
+                    key=lambda value: (len(value), value),
+                )
+                source_excerpt = item_schema.get("properties", {}).get(
+                    "source_excerpt"
+                )
+                if isinstance(source_excerpt, dict):
+                    source_excerpt["enum"] = exact_surfaces
+                    source_excerpt["description"] = (
+                        "Copy one exact non-empty contiguous source slice; the decoder "
+                        "cannot translate, inflect, combine, or rewrite particles."
+                    )
             if isinstance(indices, dict):
                 indices["uniqueItems"] = True
                 index_items = indices.get("items")
@@ -4562,6 +4643,23 @@ class GoalAssociationResolver:
                 required_output_mode = str(
                     item.get("required_output_mode") or "none"
                 )
+                if role != "responsibility" and item.get(
+                    "independently_satisfiable"
+                ) is True:
+                    # The auditor already selected the non-responsibility branch.
+                    # Independent satisfiability is structurally impossible there;
+                    # clearing the redundant flag does not change role, ownership,
+                    # coverage, or any candidate mapping judgment.
+                    item["independently_satisfiable"] = False
+                    recoveries.append(
+                        {
+                            "item_index": item_index,
+                            "recovery": "cleared_supporting_independence",
+                            "role": role,
+                            "from": True,
+                            "to": False,
+                        }
+                    )
                 if role != "responsibility" and required_goal_shape != "ordinary":
                     # Goal shape classifies the independently owed result only. A
                     # supporting item can point at a resource Goal, but cannot own
@@ -4791,7 +4889,7 @@ class GoalAssociationResolver:
         for index, item in enumerate(certificate.items):
             excerpt = " ".join(item.source_excerpt.strip().split()).casefold()
             if excerpt not in authoritative_turn:
-                raise ValueError(
+                raise _CoverageSourceExcerptViolation(
                     "coverage source_excerpt must be a verbatim current-turn span: "
                     f"items[{index}]={item.source_excerpt!r}"
                 )
@@ -4968,12 +5066,32 @@ class GoalAssociationResolver:
         return (
             "You are Chromie's independent Goal responsibility-coverage auditor. "
             "Read the authoritative turn from scratch; candidate prose is not source "
-            "evidence. A positive observable outcome is a responsibility. Duration, "
+            "evidence. Copy every source_excerpt only from an exact contiguous span of "
+            "the FINAL AUTHORITATIVE USER TURN in its original language; never use a "
+            "translation or paraphrase from Responsibility outcome or binding text. "
+            "A positive observable outcome is a responsibility. Duration, "
             "distance, direction, order, manner, prohibition, date, day part, and other "
             "conditions on that same outcome are constraints, never independently "
-            "satisfiable responsibilities. Coordinated effects are separate only when a "
+            "satisfiable responsibilities. That role distinction is only the audit "
+            "shape: a constraint belongs on the same candidate Goal as the "
+            "responsibility it modifies, normally through a typed binding, and does "
+            "not need its own Goal. A constraint is covered when the candidate's "
+            "typed binding preserves its meaning; do not call it a representation "
+            "mismatch merely because the modifier also appears in the candidate "
+            "description or the binding uses an equivalent normalized value. "
+            "A reason or background event that only explains why the answer is useful "
+            "and does not change which answer would be correct is context, not a "
+            "constraint; context is covered without Goal ownership. Only background "
+            "that changes valid completion is a constraint. A whole relative calendar "
+            "day with no within-day period carries date only, never day_part. "
+            "Coordinated effects are separate only when a "
             "person can judge each effect completed without the others. One evidence "
             "lookup and the requested judgment of its result remain one responsibility. "
+            "Coordination grammar never demotes a positive effect to a constraint. If a "
+            "coordinated clause mixes a relation or manner with another observable effect, "
+            "give every effect its own role=responsibility item and put only the relation, "
+            "order, or manner material in role=constraint. Never leave the action or effect "
+            "word itself only in supporting_items. "
             "Use the exact required_output_mode: body_action for embodied effects; the "
             "exact singing/recitation/humming/styled_speech/nonverbal_vocalization mode "
             "for authored performance; media_playback for media control; capability_work "
@@ -4992,7 +5110,12 @@ class GoalAssociationResolver:
             "no candidate index. Use clarification_required only when supplied evidence "
             "cannot uniquely ground a material pronoun, demonstrative, ellipsis, "
             "correction, or other indirect reference. Do not plan, select Capabilities, "
-            "execute, add Goals, or trust provider availability. Return JSON only."
+            "execute, add Goals, or trust provider availability. Before returning, "
+            "cross-check the JSON against reason_summary: when the reason says an effect "
+            "is distinct, observable, standalone, independently satisfiable, or must have "
+            "its own Goal/responsibility, that effect must appear in responsibility_items "
+            "with role=responsibility and must not appear only in supporting_items. Return "
+            "JSON only."
         )
 
 
@@ -5009,6 +5132,14 @@ class GoalAssociationResolver:
                 request=request,
                 raw_json=raw_json,
             )
+        responsibility_cross_check = [
+            {
+                "local_ref": item.local_ref,
+                "outcome": item.outcome,
+                "output_mode": item.output_mode,
+            }
+            for item in request.responsibilities
+        ]
         return (
             "Audit whether this candidate Goal segmentation completely accounts for "
             "the authoritative user's current semantic responsibilities. This is an "
@@ -5029,7 +5160,10 @@ class GoalAssociationResolver:
             "must be role=constraint and must map to the Goal whose result it constrains; "
             "it cannot be downgraded to context merely because it is not an independent "
             "outcome. Only incidental background that does not change valid completion is "
-            "role=context. These facts are not independent responsibilities unless the user "
+            "role=context. In particular, a reason or future event that merely explains "
+            "why the requested answer will be useful is context when it does not alter "
+            "the correctness or required shape of that answer. These facts are not "
+            "independent responsibilities unless the user "
             "separately asks for an observable outcome for each. Stated preferences therefore "
             "remain material constraints when the user asks for a choice between them. A "
             "manner, mood, persona, or social-"
@@ -5047,7 +5181,9 @@ class GoalAssociationResolver:
             "separate role=constraint items mapped to that same Goal. A temporal "
             "constraint sets temporal_dimensions to the exact dimensions carried by "
             "its excerpt. Natural 'tonight' is one constraint carrying both date and "
-            "day_part; a generic night period carries only day_part. A duration such "
+            "day_part; a generic night period carries only day_part. A whole relative "
+            "calendar day with no morning/afternoon/evening/night period carries date "
+            "only, not day_part. A duration such "
             "as ten seconds or three minutes is not a calendar date or local day part "
             "and must use temporal_dimensions=[].\n\n"
             "Set independently_satisfiable=true only when the user could reasonably "
@@ -5173,7 +5309,13 @@ class GoalAssociationResolver:
             "typed referent-backed binding before marking it covered.\n\n"
             "Do not add, remove, rename, plan, execute, or complete Goals. Do not use "
             "provider availability to decide whether a responsibility exists. An "
-            "unavailable requested effect remains a responsibility.\n\n"
+            "unavailable requested effect remains a responsibility. Cross-check every "
+            "source-grounded authoritative GI Responsibility before returning: each "
+            "positive effect entailed by the final turn needs a role=responsibility owner, "
+            "even when it shares a coordinated clause or no provider can perform it.\n\n"
+            "Authoritative Responsibility cross-check list (audit every entry against "
+            "the source; do not silently omit an entry from the certificate):\n"
+            f"{self._bounded_json(responsibility_cross_check, 2200)}\n\n"
             "Put every positive-outcome role=responsibility entry in the required "
             "responsibility_items array. Set independently_satisfiable=true only when "
             "that outcome can stand as a sibling Goal; one resource lookup whose "
@@ -5181,6 +5323,10 @@ class GoalAssociationResolver:
             "role=constraint, context, and framing entries in supporting_items. Once independently observable component "
             "Responsibilities have been enumerated, never add the whole compound "
             "sentence as another Responsibility; coordination is not another outcome. "
+            "For grammar such as while, simultaneously, or Chinese 边…边…, split the "
+            "smallest exact contiguous source spans so each positive effect remains in "
+            "responsibility_items; supporting_items may contain only the relation, order, "
+            "or manner that modifies those effects. "
             "Every candidate Goal index must have a "
             "covered responsibility owner. Never return only constraints, even when "
             "the constraints are represented correctly. Keep a positive outcome and "
@@ -5191,7 +5337,11 @@ class GoalAssociationResolver:
             "duration, sequence/order, concurrency, and simultaneity always use []. "
             "Before returning, reject your own draft if any temporal dimension appears "
             "on a non-constraint item or if date/day_part was inferred from duration "
-            "or coordination.\n\n"
+            "or coordination. Also reject your own draft when reason_summary calls an "
+            "effect distinct, observable, standalone, independently satisfiable, or in "
+            "need of its own Goal/responsibility but the JSON places that effect only in "
+            "supporting_items. The structured arrays, role, and coverage must express the "
+            "same conclusion as reason_summary.\n\n"
             "Candidate Goal DTO JSON:\n"
             f"{self._bounded_json(raw, 9000)}\n\n"
             "Authoritative Responsibility evidence JSON (query facts may be "
@@ -5242,15 +5392,29 @@ class GoalAssociationResolver:
         return (
             "Independently audit the candidate DTO against the final user turn and GI "
             "Responsibility evidence. Emit each material source fragment exactly once. "
+            "Every source_excerpt must be copied from an exact contiguous span of the "
+            "FINAL AUTHORITATIVE USER TURN in its original language; never copy a "
+            "translated or paraphrased Responsibility outcome or binding. "
             "Use role=responsibility only for the positive outcome Chromie owes. A "
             "duration, distance, direction, speed, location, order, simultaneity, manner, "
             "prohibition, date, day part, threshold, comparison, severity, preference, or "
             "answer-shaping detail is role=constraint on that outcome and must set "
             "independently_satisfiable=false. Duration is never a second outcome. Stated "
             "preferences that changes what counts as a valid decision must be "
-            "role=constraint. Context and framing are not owed outcomes. Multiple aspects "
+            "role=constraint. A reason or future event that merely explains why the "
+            "requested answer is useful, without changing which answer is correct, is "
+            "role=context, coverage=covered, and owns no Goal. Context and framing are "
+            "not owed outcomes. Multiple aspects "
             "requested from one information result likewise remain one responsibility. "
-            "Never duplicate the same span under conflicting roles.\n\n"
+            "Never duplicate the same span under conflicting roles. This role split "
+            "describes the certificate, not separate Goal candidates: a constraint "
+            "belongs on the same candidate as the responsibility it modifies. Inspect "
+            "the candidate's typed bindings as authoritative candidate evidence. Mark "
+            "a constraint covered when one of those bindings preserves its meaning, "
+            "including an equivalent normalized value from the supplied Responsibility "
+            "evidence. Do not report representation_mismatch merely because the "
+            "modifier also appears in the candidate description or has no separate "
+            "Goal; those are correct for a non-independent constraint.\n\n"
             "For coverage=covered, a responsibility maps to exactly one candidate index; "
             "a represented constraint maps to the affected candidate. If nothing attempts "
             "a material fragment use coverage=missing and candidate_goal_indices must be "
@@ -5280,7 +5444,8 @@ class GoalAssociationResolver:
             "both typed bindings carry equivalent normalized values, mark both source "
             "constraints covered. Use one role=constraint item with "
             "temporal_dimensions=date_and_day_part for an indivisible expression such as "
-            "tonight. reject your own draft if any temporal dimension appears on a "
+            "tonight. A whole relative calendar day with no within-day period carries "
+            "date only, never day_part. reject your own draft if any temporal dimension appears on a "
             "non-constraint item.\n\n"
             "Reference grounding is part of responsibility coverage. Candidate prose that "
             "silently invents a generic object does not ground a reference; use "
