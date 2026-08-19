@@ -652,7 +652,11 @@ class SessionTracker:
             args=args,
             extra={"severity": severity},
         )
-        line = self._colorize_for_cli(f"[SID:{sid} +{elapsed:.1f}ms] {rendered}", level)
+        line = self._colorize_for_cli(
+            f"[SID:{sid} +{elapsed:.1f}ms] {rendered}",
+            level,
+            accent=self._event_cli_accent(rendered),
+        )
         logger.log(level, "%s", line)
 
     def maybe_done(self, sid: str | None) -> None:
@@ -854,6 +858,26 @@ class SessionTracker:
             return logging.WARNING
         return logging.INFO
 
+    @classmethod
+    def _event_cli_accent(cls, rendered: str) -> str | None:
+        """Highlight committed Goal-list deltas without changing log severity."""
+
+        event_name = rendered.split(":", 1)[0].strip()
+        if event_name != "goal_list_item":
+            return None
+        change = cls._field_value(rendered, "change").casefold()
+        if change == "added":
+            return "green"
+        if change in {"associated", "continued", "referenced", "confirmed", "resumed"}:
+            return "cyan"
+        if change in {"updated", "modified", "clarified", "corrected"}:
+            return "magenta"
+        if change in {"paused"}:
+            return "yellow"
+        if change in {"cancelled", "canceled", "rejected", "refused", "failed"}:
+            return "red"
+        return None
+
     @staticmethod
     def _field_value(rendered: str, key: str) -> str:
         match = re.search(rf"(?:^|\s){re.escape(key)}=([^\s]+)", rendered)
@@ -869,8 +893,18 @@ class SessionTracker:
             return 0
 
     @staticmethod
-    def _colorize_for_cli(line: str, level: int) -> str:
-        return colorize_for_cli(line, level, env_var="ORCH_CLI_COLOR")
+    def _colorize_for_cli(
+        line: str,
+        level: int,
+        *,
+        accent: str | None = None,
+    ) -> str:
+        return colorize_for_cli(
+            line,
+            level,
+            env_var="ORCH_CLI_COLOR",
+            accent=accent,
+        )
 
     def _compact_workflow_message(self, rendered: str, *, limit: int = 320) -> str:
         text = " ".join(rendered.split())

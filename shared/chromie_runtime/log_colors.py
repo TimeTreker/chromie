@@ -12,6 +12,7 @@ def colorize_for_cli(
     *,
     env_var: str = "CHROMIE_CLI_COLOR",
     fallback_env_var: str | None = "ORCH_CLI_COLOR",
+    accent: str | None = None,
 ) -> str:
     """Return ``line`` wrapped in ANSI color when terminal color is enabled.
 
@@ -36,4 +37,15 @@ def colorize_for_cli(
         return f"\033[31m{line}\033[0m"
     if level >= logging.WARNING:
         return f"\033[33m{line}\033[0m"
+    accent_codes = {
+        "green": "32",
+        "cyan": "36",
+        "blue": "34",
+        "magenta": "35",
+        "yellow": "33",
+        "red": "31",
+    }
+    accent_code = accent_codes.get(str(accent or "").strip().casefold())
+    if accent_code:
+        return f"\033[{accent_code}m{line}\033[0m"
     return line

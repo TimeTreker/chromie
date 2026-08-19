@@ -2106,6 +2106,148 @@ class VoiceAssistant:
             return text[:max_chars].rstrip() + "..."
         return text
 
+    @staticmethod
+    def _goal_list_change_by_task(
+        applied_operations: list[dict[str, Any]] | None,
+    ) -> dict[str, str]:
+        """Map committed Goal-state operations to concise console change labels."""
+
+        labels: dict[str, str] = {}
+        priorities = {
+            "unchanged": 0,
+            "associated": 10,
+            "updated": 20,
+            "confirmed": 25,
+            "resumed": 25,
+            "paused": 30,
+            "added": 40,
+            "cancelled": 50,
+            "rejected": 50,
+        }
+        for item in list(applied_operations or []):
+            if not isinstance(item, dict) or item.get("applied") is not True:
+                continue
+            task_id = " ".join(str(item.get("task_id") or "").split())
+            if not task_id:
+                continue
+            operation = str(item.get("operation") or "").strip().casefold()
+            relationship = str(item.get("relationship") or "").strip().casefold()
+            if operation == "create":
+                label = "added"
+            elif relationship in {"continue", "reference"}:
+                label = "associated"
+            elif operation in {"modify", "clarification_answer", "correct"}:
+                label = "updated"
+            elif operation == "confirm":
+                label = "confirmed"
+            elif operation == "resume":
+                label = "resumed"
+            elif operation == "pause":
+                label = "paused"
+            elif operation == "cancel":
+                label = "cancelled"
+            elif operation == "reject":
+                label = "rejected"
+            elif relationship:
+                label = "associated"
+            elif operation:
+                label = "updated"
+            else:
+                continue
+            previous = labels.get(task_id, "unchanged")
+            if priorities.get(label, 1) >= priorities.get(previous, 0):
+                labels[task_id] = label
+        return labels
+
+    @staticmethod
+    def _goal_list_item_text(
+        snapshot: dict[str, Any],
+        *,
+        bucket: str,
+        index: int,
+        total: int,
+        change: str = "unchanged",
+    ) -> str:
+        goal = snapshot.get("goal") if isinstance(snapshot.get("goal"), dict) else {}
+        metadata = (
+            snapshot.get("metadata")
+            if isinstance(snapshot.get("metadata"), dict)
+            else {}
+        )
+        description = " ".join(
+            str(goal.get("description") or snapshot.get("last_user_update") or "").split()
+        )
+        if len(description) > 180:
+            description = description[:179].rstrip() + "…"
+        goal_id = " ".join(
+            str(snapshot.get("goal_id") or goal.get("goal_id") or "unknown").split()
+        )
+        responsibility = " ".join(
+            str(
+                snapshot.get("responsibility_status")
+                or goal.get("responsibility_status")
+                or "unknown"
+            ).split()
+        )
+        work = " ".join(str(snapshot.get("work_status") or "unknown").split())
+        relation = " ".join(str(metadata.get("task_relation") or "unknown").split())
+        version = snapshot.get("goal_version") or goal.get("version") or 0
+        marker = {
+            "added": "+",
+            "associated": "~",
+            "updated": "~",
+            "confirmed": "✓",
+            "resumed": ">",
+            "paused": "||",
+            "cancelled": "x",
+            "rejected": "x",
+        }.get(change, " ")
+        return (
+            "goal_list_item: "
+            f"change={change} marker={marker} bucket={bucket} index={index}/{total} "
+            f"goal_id={goal_id} responsibility={responsibility} work={work} "
+            f"relation={relation} version={version} description={description!r}"
+        )
+
+    def _log_goal_list(
+        self,
+        session_id: str | None,
+        *,
+        phase: str,
+        active_goals: list[dict[str, Any]] | None,
+        recent_terminal_goals: list[dict[str, Any]] | None,
+        applied_operations: list[dict[str, Any]] | None = None,
+    ) -> None:
+        active = [item for item in list(active_goals or []) if isinstance(item, dict)]
+        recent = [
+            item
+            for item in list(recent_terminal_goals or [])
+            if isinstance(item, dict)
+        ]
+        change_by_task = self._goal_list_change_by_task(applied_operations)
+        self.session_log(
+            session_id,
+            "goal_list: phase=%s active_count=%s recent_terminal_count=%s",
+            phase,
+            len(active),
+            len(recent),
+        )
+        for bucket, goals in (("active", active), ("recent_terminal", recent)):
+            total = len(goals)
+            for index, snapshot in enumerate(goals, 1):
+                task_id = " ".join(str(snapshot.get("source_task_id") or "").split())
+                self.session_log(
+                    session_id,
+                    "%s",
+                    self._goal_list_item_text(
+                        snapshot,
+                        bucket=bucket,
+                        index=index,
+                        total=total,
+                        change=change_by_task.get(task_id, "unchanged"),
+                    ),
+                )
+
     def build_context(self, session_id: str | None) -> dict[str, Any]:
         conversation = self.conversation_state.snapshot()
         mind_context = self.mind.context()
@@ -2917,31 +3059,18 @@ class VoiceAssistant:
             created = [item for item in applied if item.get("operation") == "create"]
             try:
                 snapshot = self.conversation_state.snapshot()
-                task_contexts = snapshot.get("task_contexts")
-                active_task_contexts = snapshot.get("active_task_contexts")
                 active_goals = self.conversation_state.active_goal_snapshots(
                     limit=self.conversation_state.max_pending_tasks
                 )
-                current_thread = threading.current_thread()
                 recent_goals = snapshot.get("recent_goal_snapshots")
                 if not isinstance(recent_goals, list):
                     recent_goals = []
-                logger.info(
-                    "goal_list_after_association: applied_operations=%s created_goals=%s "
-                    "task_contexts=%s active_tasks=%s active_goals=%s "
-                    "thread=%s is_main_thread=%s active_goal_list=%s "
-                    "recent_terminal_goal_list=%s",
-                    self._compact_json_for_prompt(applied, max_chars=3000),
-                    len(created),
-                    len(task_contexts) if isinstance(task_contexts, list) else 0,
-                    len(active_task_contexts)
-                    if isinstance(active_task_contexts, list)
-                    else 0,
-                    len(active_goals),
-                    current_thread.name,
-                    current_thread is threading.main_thread(),
-                    self._compact_json_for_prompt(active_goals, max_chars=8000),
-                    self._compact_json_for_prompt(recent_goals, max_chars=4000),
+                self._log_goal_list(
+                    sid,
+                    phase="after_association",
+                    active_goals=active_goals,
+                    recent_terminal_goals=recent_goals,
+                    applied_operations=applied,
                 )
             except (AttributeError, KeyError, RuntimeError, TypeError, ValueError) as exc:
                 # Observability must never turn committed Goal state into a failed turn.
@@ -3575,20 +3704,11 @@ class VoiceAssistant:
                 separators=(",", ":"),
             ),
         )
-        self.session_log(
+        self._log_goal_list(
             session_id,
-            "goal_list_before_turn: active_count=%s recent_terminal_count=%s "
-            "active_goals=%s recent_terminal_goals=%s",
-            len(context.get("active_goal_snapshots") or []),
-            len(context.get("recent_goal_snapshots") or []),
-            self._compact_json_for_prompt(
-                context.get("active_goal_snapshots") or [],
-                max_chars=8000,
-            ),
-            self._compact_json_for_prompt(
-                context.get("recent_goal_snapshots") or [],
-                max_chars=4000,
-            ),
+            phase="before_turn",
+            active_goals=context.get("active_goal_snapshots") or [],
+            recent_terminal_goals=context.get("recent_goal_snapshots") or [],
         )
         context_snapshot = gateway.assemble_context(turn_capture, context)
         attention_request = gateway.attention_request(

@@ -668,5 +668,35 @@ class SessionEvidenceTests(unittest.TestCase):
         self.assertTrue(any("\033[31m" in line for line in error_logs.output))
 
 
+    def test_goal_list_changes_use_cli_accent_without_changing_severity(self) -> None:
+        tracker = SessionTracker(event_log_path=None)
+        sid = tracker.create()
+        with patch.dict(os.environ, {"ORCH_CLI_COLOR": "1"}, clear=False):
+            with self.assertLogs("orchestrator.runtime.session", level="INFO") as logs:
+                tracker.log(
+                    sid,
+                    "goal_list_item: change=added marker=+ bucket=active index=1/1 "
+                    "goal_id=goal_new responsibility=open work=planning "
+                    "relation=new_task version=1 description='get water'",
+                )
+                tracker.log(
+                    sid,
+                    "goal_list_item: change=associated marker=~ bucket=active index=1/1 "
+                    "goal_id=goal_old responsibility=open work=planning "
+                    "relation=continue_task version=2 description='keep going'",
+                )
+                tracker.log(
+                    sid,
+                    "goal_list_item: change=unchanged marker=- bucket=active index=1/1 "
+                    "goal_id=goal_same responsibility=open work=planning "
+                    "relation=continue_task version=1 description='same'",
+                )
+        rendered = "\n".join(logs.output)
+        self.assertIn("\033[32m", rendered)
+        self.assertIn("\033[36m", rendered)
+        unchanged = next(line for line in logs.output if "goal_id=goal_same" in line)
+        self.assertNotIn("\033[", unchanged)
+
+
 if __name__ == "__main__":
     unittest.main()
