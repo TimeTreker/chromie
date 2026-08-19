@@ -148,8 +148,16 @@ def run(base_url: str, *, timeout_s: float) -> dict[str, Any]:
             f"{len(interpretation.responsibilities)}"
         )
     responsibility = interpretation.responsibilities[0]
-    if not responsibility.completion_requires_work:
-        raise AssertionError("greeting Responsibility must still require conversational work")
+    if responsibility.output_mode != "speech":
+        raise AssertionError(
+            "greeting Responsibility must remain immediate ordinary speech"
+        )
+    if responsibility.completion_requires_work:
+        raise AssertionError(
+            "greeting Responsibility must not claim downstream completion work"
+        )
+    if responsibility.completion_requires_fresh_evidence:
+        raise AssertionError("greeting Responsibility must not claim fresh evidence")
 
     planner_request = build_fast_plan_request(interpretation)
     status, plan_payload = _post_json(

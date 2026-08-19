@@ -104,6 +104,20 @@ class GoalInterpreterContractTests(unittest.TestCase):
         self.assertTrue(decision.responsibilities[0].completion_requires_fresh_evidence)
         self.assertEqual(decision.unresolved, [])
 
+    def test_ordinary_speech_cannot_claim_downstream_work(self) -> None:
+        with self.assertRaisesRegex(
+            ValidationError, "immediate contextual answer.*downstream work"
+        ):
+            CognitiveResponsibilityProposal(
+                local_ref="weather",
+                outcome="determine whether it rains in Chongqing this afternoon",
+                bindings={"location": "重庆", "time": "afternoon"},
+                output_mode="speech",
+                completion_requires_work=True,
+                completion_requires_fresh_evidence=False,
+                confidence=0.95,
+            )
+
     def test_already_bound_values_are_not_top_level_uncertainty(self) -> None:
         with self.assertRaisesRegex(
             ValueError,
@@ -379,20 +393,34 @@ class GoalInterpreterPromptTests(unittest.TestCase):
             self.assertNotIn("relationship", branch["properties"])
             self.assertNotIn("target_goal_ids", branch["properties"])
         self.assertNotIn("InformationGap", payload["format"]["$defs"])
-        non_fresh_branch = next(
+        immediate_speech_branch = next(
+            branch
+            for branch in branches
+            if branch["properties"]["output_mode"].get("const") == "speech"
+        )
+        self.assertIs(
+            immediate_speech_branch["properties"]["completion_requires_work"].get(
+                "const"
+            ),
+            False,
+        )
+        non_fresh_work_branch = next(
             branch
             for branch in branches
             if branch["properties"]["completion_requires_fresh_evidence"].get(
                 "const"
             )
             is False
+            and branch["properties"]["completion_requires_work"].get("const")
+            is True
         )
         output_modes = {
             item["const"]
-            for item in non_fresh_branch["properties"]["output_mode"]["oneOf"]
+            for item in non_fresh_work_branch["properties"]["output_mode"]["oneOf"]
         }
         self.assertNotIn("unspecified", output_modes)
         self.assertNotIn("other", output_modes)
+        self.assertNotIn("speech", output_modes)
         self.assertIn("singing", output_modes)
         fresh_evidence_branch = next(
             branch
@@ -402,12 +430,12 @@ class GoalInterpreterPromptTests(unittest.TestCase):
             .get("const") is True
         )
         self.assertEqual(
-            fresh_evidence_branch["properties"]["output_mode"],
-            {"const": "capability_work"},
+            fresh_evidence_branch["properties"]["output_mode"].get("const"),
+            "capability_work",
         )
         nonverbal = next(
             item
-            for item in non_fresh_branch["properties"]["output_mode"]["oneOf"]
+            for item in non_fresh_work_branch["properties"]["output_mode"]["oneOf"]
             if item.get("const") == "nonverbal_vocalization"
         )
         self.assertIn("excludes singing", nonverbal["description"])
@@ -443,6 +471,23 @@ class GoalInterpreterPromptTests(unittest.TestCase):
             "completion_requires_fresh_evidence": False,
         }
         self.assertEqual(list(validator.iter_errors(ordinary_speech)), [])
+        invalid_work_speech = {
+            **ordinary_speech,
+            "completion_requires_work": True,
+        }
+        self.assertTrue(list(validator.iter_errors(invalid_work_speech)))
+        non_fresh_body_work = {
+            **ordinary_speech,
+            "outcome": "blink once",
+            "output_mode": "body_action",
+            "completion_requires_work": True,
+        }
+        self.assertEqual(list(validator.iter_errors(non_fresh_body_work)), [])
+        invalid_immediate_body = {
+            **non_fresh_body_work,
+            "completion_requires_work": False,
+        }
+        self.assertTrue(list(validator.iter_errors(invalid_immediate_body)))
 
     def test_output_mode_prompt_distinguishes_work_from_response_transport(self) -> None:
         prompt = self._interpreter().load_system_prompt()
@@ -451,6 +496,16 @@ class GoalInterpreterPromptTests(unittest.TestCase):
             "Fresh external information is capability_work even when Chromie will later speak",
             prompt,
         )
+        self.assertIn("Apply an evidence gate before choosing", prompt)
+        self.assertIn("fresh capability work, not ordinary speech", prompt)
+        user_prompt = self._interpreter().build_interpretation_user_prompt(
+            GoalInterpretationRequest(
+                text="Is the external state current?",
+                language="en-US",
+            )
+        )
+        self.assertIn("audit whether trusted Context already contains", user_prompt)
+        self.assertIn("eventually being spoken never makes", user_prompt)
 
     def test_repair_schema_does_not_reintroduce_planning_gap_contract(self) -> None:
         interpreter = self._interpreter()

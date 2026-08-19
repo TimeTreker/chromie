@@ -68,7 +68,7 @@
                 "coordinate_with": "r1"
               },
               "output_mode": "speech",
-              "completion_requires_work": true,
+              "completion_requires_work": false,
               "completion_requires_fresh_evidence": false,
               "confidence": 0.88,
               "relationship": "new",
@@ -124,7 +124,7 @@
           "coordinate_with": "r1"
         },
         "output_mode": "speech",
-        "completion_requires_work": true,
+        "completion_requires_work": false,
         "completion_requires_fresh_evidence": false,
         "confidence": 0.88,
         "relationship": "new",

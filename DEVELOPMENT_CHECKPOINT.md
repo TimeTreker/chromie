@@ -2,7 +2,7 @@
 
 Status: current resume point; incomplete development snapshot
 Updated: 2026-08-19
-Base main before this delivery: `f4ec12e54b604f923752ff7d732b9227266e40cd`
+Base main before this delivery: `5e134b98f240bd7f23d2df07b5e120faf5f31253`
 
 ## Read first
 
@@ -35,9 +35,10 @@ general continuity/action ability, never as a phrase target.
 
 The uploaded `chromie_debug_bundle_20260819_100305.tar.gz` exposed two general workflows. The weather case translated `北京`, spent DTO repair on semantics, invented a travel-confirmation Goal, and later narrowed a whole day to night. Current GI deepens once from source, preserves exact entity surfaces, and keeps unrequested stated plans as context; GA commits one weather Goal; the typed Capability contract permits only `period=day` without a `day_part`.
 The run/sing case lost the singing effect and admitted a false start claim. Current GI/GA keep separate body/singing Goals, truth review suppresses that claim, Fast Advance fails closed cleanly, and Deep retains `walk_forward(duration_s=15)` while truthfully reporting singing unavailable with no substitute vocal promise.
-A later physical-Host SID `7cd09453` exposed one remaining general decoder gap: qwen3:4b twice chose speech for fresh weather evidence, and Ollama accepted the illegal tuple because the model schema expressed it with `if`/`then`. GI correctly failed closed, but its same-model Deep pass repeated the tuple and caused HTTP 503.
-The model-facing contract now uses two complete disjoint `oneOf`/`const` object branches, so fresh evidence can generate only work=true and capability_work without post-hoc semantic repair; output-mode wording also distinguishes owed work from later speech transport.
-Exact current-image replay `sid-fix2-chongqing-afternoon-heavy-rain` passes Core → GA → Fast Plan with one Goal preserving 重庆, afternoon, and heavy-rain meaning and `chromie.weather.lookup(period=afternoon)`; image manifest list `sha256:9780ce34e3c44d96efb636209e0d7514b79101351050b95cd6892d54a99b5e0b`.
+A later physical-Host SID `7cd09453` exposed one decoder gap: qwen3:4b chose speech for fresh weather evidence, and Ollama accepted the illegal tuple because the schema expressed it with `if`/`then`. The first disjoint-schema fix blocked `fresh=true + speech` but still permitted `work=true + fresh=false + speech`.
+The current-revision bundle `chromie_debug_bundle_20260819_134519.tar.gz`, SID `b9894ca6`, exercised that remaining tuple for `下午重庆会不会下雨啊？`: GI mislabeled the absent forecast as ordinary speech with unfinished work; GA committed a non-provider speech Goal; canonical Fast treated the acknowledgement as completion; Runtime cancelled provisional weather Work and played the same acknowledgement twice; the weather provider was never invoked.
+The earliest responsible fix is now one shared completion contract plus three complete decoder branches: fresh evidence is capability work, immediate speech has no downstream work, and non-fresh downstream effects cannot be speech. The prompt's over-broad rule that treated any question as ordinary conversation was replaced by a provider-neutral evidence gate over external, private, runtime, observed, or changing facts. No phrase mapping or Host semantic inference was added.
+Exact current-image replay `direct-canonical-after-fix-b9894ca6` passes Core → GA → canonical Fast Plan with one fresh provider-required information Goal and `chromie.weather.lookup(location=重庆,period=afternoon)`; Agent image digest `sha256:9f938c0db927b4559d97bb2551ad5cfcea12eba9eff8a9ffb4a97c488d836fe0`. The exact utterance is retained in the truthful-embodied-speech live cohort, while the illegal tuple and all three schema branches have deterministic contract coverage.
 The operator Host still owns the exclusive lock, so maintained live-text, weather result, audible TTS, simulator, and physical behavior remain unclaimed. No document, environment key, switch, compatibility path, or architecture layer was added.
 
 ## Latest actual workflow
@@ -99,6 +100,8 @@ first-response object on both turns, so no profile model change was accepted.
 - a Goal Association update forces canonical Fast revision so a stale
   provisional clarification cannot commit;
 - same-model Fast response/truth phases reuse one client and context topology;
+- Goal Interpretation applies one evidence gate and a disjoint completion schema
+  so ordinary speech cannot absorb unfinished or fresh-information work;
 - the reviewed Deep Planner broad exception remains fail-closed and its policy
   checksum now matches the audited source.
 
@@ -108,7 +111,8 @@ first-class architectural term was added.
 ## Verification state
 
 - The directly affected Goal Association, Agent-Skill, Fast Planner, Goal
-  Interpreter, Cognitive Runtime, and communication suites pass 347/347.
+  Interpreter, Cognitive Runtime, control-plane, and communication suites pass
+  357/357.
 - `./scripts/run_tests.sh` passes, including all 13 repository-policy families,
   test ownership, pinned static analysis, configuration inventory, runtime
   structure, documentation, 119 benchmark tests, and the maintained tests.

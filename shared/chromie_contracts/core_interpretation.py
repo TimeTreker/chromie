@@ -125,7 +125,8 @@ class CognitiveResponsibilityProposal(BaseModel):
             "Provider-neutral completion category for this one outcome, not its "
             "eventual response transport. Fresh external information is "
             "capability_work even when a later grounded answer will be spoken; "
-            "speech is an ordinary answer authored without fresh acquisition. This "
+            "speech is an immediate ordinary answer authored without fresh "
+            "acquisition or downstream work. This "
             "preserves WHAT kind of effect is owed without selecting a Capability, "
             "provider, Activity, executable argument, or wording."
         ),
@@ -186,6 +187,11 @@ class CognitiveResponsibilityProposal(BaseModel):
         if self.completion_requires_fresh_evidence and not self.completion_requires_work:
             raise ValueError(
                 "fresh evidence requirement implies completion_requires_work"
+            )
+        if self.output_mode == "speech" and self.completion_requires_work:
+            raise ValueError(
+                "output_mode=speech is an immediate contextual answer and cannot "
+                "require downstream work"
             )
         if self.completion_requires_fresh_evidence and self.output_mode in {
             "styled_speech",

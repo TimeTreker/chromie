@@ -1225,7 +1225,13 @@ class OllamaGoalInterpreter:
             "does not occur there and is invalid. Preserve every explicit Arabic "
             "numeric token from Latest user input verbatim in an atomic material "
             "binding; never spell it out, translate it, round it, or replace it with "
-            "a default. No route, intent, response wording, Activity, Work, "
+            "a default. Before choosing a completion branch, audit whether trusted "
+            "Context already contains the complete answer evidence. If an external, "
+            "private, runtime, observed, or changing fact is requested but absent, "
+            "set output_mode=capability_work, completion_requires_work=true, and "
+            "completion_requires_fresh_evidence=true. The input being a question or "
+            "the result eventually being spoken never makes absent evidence into "
+            "output_mode=speech. No route, intent, response wording, Activity, Work, "
             "Plan, Capability, Tool, provider, executable args, or input-resolution "
             "strategy. Copy only Goal IDs explicitly supplied in Context."
         )
@@ -1298,7 +1304,10 @@ class OllamaGoalInterpreter:
                     },
                     {
                         "const": "speech",
-                        "description": "Ordinary spoken conversation or answer.",
+                        "description": (
+                            "An immediate conversational answer requiring no absent "
+                            "external, private, runtime, observed, or changing evidence."
+                        ),
                     },
                     {
                         "const": "capability_work",
@@ -1335,8 +1344,9 @@ class OllamaGoalInterpreter:
                     "Provider-neutral completion category for this one atomic outcome, "
                     "not its eventual response transport. Fresh external information "
                     "is capability_work even when Chromie will later speak the grounded "
-                    "answer; speech is only an ordinary answer authored from supplied "
-                    "trusted context without fresh acquisition. "
+                    "answer; speech is only an immediate ordinary answer authored from "
+                    "supplied trusted context without fresh acquisition or downstream "
+                    "work. "
                     "Singing or a song is singing, never styled_speech, speech, "
                     "nonverbal_vocalization, capability_work, or body_action. "
                     "nonverbal_vocalization excludes singing, songs, melody, lyrics, "
@@ -1404,31 +1414,77 @@ class OllamaGoalInterpreter:
             # if/then dependency here. Its grammar also treats a nested object
             # oneOf as the complete object shape rather than intersecting it with
             # sibling properties, so each disjoint branch must repeat the complete
-            # Responsibility contract. This makes the illegal fresh-evidence +
-            # speech tuple unrepresentable without dropping semantic fields.
+            # Responsibility contract. Complete disjoint branches make both an
+            # illegal fresh-evidence + speech tuple and an illegal downstream-work
+            # + speech tuple unrepresentable without dropping semantic fields.
             base_properties = responsibility.pop("properties")
             branch_required = responsibility.pop("required")
             responsibility.pop("additionalProperties", None)
             fresh_properties = copy.deepcopy(base_properties)
-            fresh_properties["completion_requires_fresh_evidence"] = {"const": True}
-            fresh_properties["completion_requires_work"] = {"const": True}
-            fresh_properties["output_mode"] = {"const": "capability_work"}
-            non_fresh_properties = copy.deepcopy(base_properties)
-            non_fresh_properties["completion_requires_fresh_evidence"] = {
+            fresh_properties["completion_requires_fresh_evidence"] = {
+                "const": True,
+                "description": (
+                    "The correct answer needs absent external, private, runtime, "
+                    "observed, or changing evidence."
+                ),
+            }
+            fresh_properties["completion_requires_work"] = {
+                "const": True,
+                "description": "Evidence acquisition remains after this interpretation.",
+            }
+            fresh_properties["output_mode"] = {
+                "const": "capability_work",
+                "description": (
+                    "Provider-neutral fresh evidence acquisition, even when the "
+                    "grounded result will later be spoken."
+                ),
+            }
+            immediate_speech_properties = copy.deepcopy(base_properties)
+            immediate_speech_properties["completion_requires_fresh_evidence"] = {
                 "const": False
             }
+            immediate_speech_properties["completion_requires_work"] = {
+                "const": False,
+                "description": "No evidence acquisition or downstream effect remains.",
+            }
+            immediate_speech_properties["output_mode"] = {
+                "const": "speech",
+                "description": (
+                    "Immediate ordinary conversation whose answer does not depend on "
+                    "absent external, private, runtime, observed, or changing evidence."
+                ),
+            }
+            non_fresh_work_properties = copy.deepcopy(base_properties)
+            non_fresh_work_properties["completion_requires_fresh_evidence"] = {
+                "const": False
+            }
+            non_fresh_work_properties["completion_requires_work"] = {"const": True}
+            work_output_mode = copy.deepcopy(base_properties["output_mode"])
+            work_output_mode["oneOf"] = [
+                item
+                for item in work_output_mode.get("oneOf", [])
+                if item.get("const") != "speech"
+            ]
+            non_fresh_work_properties["output_mode"] = work_output_mode
             responsibility["oneOf"] = [
                 {
-                    "title": "Fresh evidence work",
+                    "title": "Absent external or changing evidence",
                     "type": "object",
                     "properties": fresh_properties,
                     "required": branch_required,
                     "additionalProperties": False,
                 },
                 {
-                    "title": "No fresh evidence acquisition",
+                    "title": "Immediate answer with no evidence acquisition",
                     "type": "object",
-                    "properties": non_fresh_properties,
+                    "properties": immediate_speech_properties,
+                    "required": branch_required,
+                    "additionalProperties": False,
+                },
+                {
+                    "title": "Non-fresh downstream work",
+                    "type": "object",
+                    "properties": non_fresh_work_properties,
                     "required": branch_required,
                     "additionalProperties": False,
                 },
