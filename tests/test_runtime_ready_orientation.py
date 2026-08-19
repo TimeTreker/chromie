@@ -26,7 +26,7 @@ class _OrientationRuntime:
                 "type": "object",
                 "properties": {
                     "style": {"type": "string", "enum": ["neutral"]},
-                    "duration_s": {"type": "number"},
+                    "duration_s": {"type": "number", "minimum": 2.0},
                     "hold_fraction": {"type": "number"},
                 },
                 "required": ["style", "duration_s", "hold_fraction"],
@@ -75,7 +75,7 @@ class RuntimeReadyOrientationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(request.capability_id, "soridormi.express_attention")
         self.assertEqual(
             request.args,
-            {"style": "neutral", "duration_s": 1.2, "hold_fraction": 0.2},
+            {"style": "neutral", "duration_s": 2.0, "hold_fraction": 0.2},
         )
         self.assertTrue(request.metadata["untargeted"])
         self.assertEqual(request.metadata["execution_lane"], "activity")

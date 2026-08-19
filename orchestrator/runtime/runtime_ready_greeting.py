@@ -12,6 +12,37 @@ from shared.chromie_contracts.interaction import InteractionResponse, Capability
 logger = logging.getLogger("chromie-orchestrator")
 
 
+def _fit_startup_args_to_capability_schema(
+    args: Mapping[str, Any],
+    input_schema: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Clamp bounded numeric startup preferences to the provider contract.
+
+    Startup may prefer a subtle duration, but the provider owns the legal input
+    range. Reading the already-resolved CapabilityDefinition avoids duplicating
+    provider minima in Host code or tests.
+    """
+
+    fitted = dict(args)
+    properties = input_schema.get("properties")
+    if not isinstance(properties, Mapping):
+        return fitted
+    for name, value in list(fitted.items()):
+        schema = properties.get(name)
+        if not isinstance(schema, Mapping) or isinstance(value, bool):
+            continue
+        if not isinstance(value, (int, float)):
+            continue
+        minimum = schema.get("minimum")
+        maximum = schema.get("maximum")
+        if isinstance(minimum, (int, float)) and not isinstance(minimum, bool):
+            value = max(value, minimum)
+        if isinstance(maximum, (int, float)) and not isinstance(maximum, bool):
+            value = min(value, maximum)
+        fitted[name] = value
+    return fitted
+
+
 @dataclass(frozen=True, slots=True)
 class RuntimeReadyGreetingPolicy:
     """Bounded startup-orientation policy.
@@ -76,11 +107,15 @@ async def execute_default_runtime_ready_orientation(
                 reasons.append(f"{capability_id}:not_startup_orientation")
                 continue
 
+            fitted_args = _fit_startup_args_to_capability_schema(
+                args,
+                definition.input_schema,
+            )
             response = InteractionResponse(
                 capabilities=[
                     CapabilityRequest(
                         capability_id=capability_id,
-                        args=args,
+                        args=fitted_args,
                         timing="parallel",
                         timeout_ms=min(5000, definition.timeout_ms),
                         metadata={

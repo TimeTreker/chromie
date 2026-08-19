@@ -1369,6 +1369,39 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             "goal_interpretation_deep",
         )
 
+    async def test_request_language_echo_is_stripped_without_deep_escalation(self) -> None:
+        interpreter = self._interpreter()
+        greeting = {
+            "confidence": 0.95,
+            "responsibilities": [
+                {
+                    "local_ref": "greeting",
+                    "outcome": "respond naturally to the greeting",
+                    "bindings": {"language": "zh-CN"},
+                    "completion_requires_work": False,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.95,
+                }
+            ],
+            "unresolved": [],
+        }
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            return_value={
+                "message": {"content": json.dumps(greeting, ensure_ascii=False)}
+            }
+        )
+
+        result = await interpreter.interpret_goal(
+            GoalInterpretationRequest(text="你好。", language="zh-CN")
+        )
+
+        self.assertEqual(result.responsibilities[0].bindings, {})
+        self.assertEqual(interpreter._chat.await_count, 1)
+        self.assertEqual(
+            interpreter._chat.await_args_list[0].kwargs["stage"],
+            "goal_interpretation",
+        )
+
     async def test_transport_echo_bindings_escalate_once_from_source(self) -> None:
         interpreter = self._interpreter()
         invalid = {

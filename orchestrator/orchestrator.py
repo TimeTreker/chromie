@@ -2331,8 +2331,25 @@ class VoiceAssistant:
                 "execution": execution,
                 "session_id": session_id,
             }
-            if errors is not None:
-                record_kwargs["errors"] = errors
+            effective_errors = list(errors or ())
+            metadata = (
+                prepared.metadata
+                if isinstance(prepared.metadata, dict)
+                else {}
+            )
+            if metadata.get("semantic_status") == "failed":
+                stage = str(metadata.get("semantic_failure_stage") or "cognition")
+                failure_class = str(
+                    metadata.get("semantic_failure_class") or "semantic_failure"
+                )
+                failure_error = str(metadata.get("semantic_failure_error") or "").strip()
+                semantic_error = f"{stage}:{failure_class}"
+                if failure_error:
+                    semantic_error += f": {failure_error}"
+                if semantic_error not in effective_errors:
+                    effective_errors.append(semantic_error)
+            if effective_errors:
+                record_kwargs["errors"] = effective_errors
             self._record_experience(
                 **record_kwargs,
             )
@@ -2999,7 +3016,19 @@ class VoiceAssistant:
         if resolution.status != "applied" or resolution.interaction_response is None:
             fallback_started_ms = now_ms()
             fast_first_scheduled = fast_planner_vocal_scheduled
-            safe_response = self._cognitive_core_exception_safe_response(user_text)
+            safe_response = self._cognitive_core_exception_safe_response(
+                user_text,
+                failure_stage=str(
+                    resolution.metadata.get("failure_stage")
+                    or "cognitive_runtime"
+                ),
+                failure_class=str(
+                    resolution.metadata.get("failure_class")
+                    or resolution.fallback_reason
+                    or resolution.status
+                ),
+                failure_error=str(resolution.fallback_reason or ""),
+            )
             record_session_workflow_stage(
                 self,
                 session_id,
@@ -3713,6 +3742,9 @@ class VoiceAssistant:
             safe_response = self._cognitive_core_exception_safe_response(
                 user_text,
                 context=context,
+                failure_stage="goal_interpretation",
+                failure_class=type(exc).__name__,
+                failure_error=str(exc),
             )
             self.conversation_state.record_user_turn(
                 session_id,
@@ -4334,6 +4366,9 @@ class VoiceAssistant:
         user_text: str,
         *,
         context: dict[str, Any] | None = None,
+        failure_stage: str | None = None,
+        failure_class: str | None = None,
+        failure_error: str | None = None,
     ) -> InteractionResponse:
         """Return one non-semantic operational fallback after Core failure.
 
@@ -4357,12 +4392,23 @@ class VoiceAssistant:
             style="warning",
             source="host_cognitive_core_exception_safe_fallback",
         )
+        failure_metadata: dict[str, Any] = {}
+        if failure_stage or failure_class or failure_error:
+            failure_metadata = {
+                "semantic_status": "failed",
+                "semantic_failure_stage": str(failure_stage or "cognition"),
+                "semantic_failure_class": str(
+                    failure_class or "semantic_failure"
+                ),
+                "semantic_failure_error": str(failure_error or ""),
+            }
         return response.model_copy(
             update={
                 "metadata": {
                     **response.metadata,
                     "effect_execution": "not_authorized",
                     "semantic_fallback": False,
+                    **failure_metadata,
                 }
             }
         )

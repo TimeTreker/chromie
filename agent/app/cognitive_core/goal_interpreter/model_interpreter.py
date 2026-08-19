@@ -691,22 +691,72 @@ def _normalized_turn_echo(value: str) -> str:
     )
 
 
+def _strip_language_envelope_bindings(
+    request: GoalInterpretationRequest,
+    parsed: dict[str, Any],
+) -> None:
+    """Mechanically discard an exact request-language echo from GI bindings.
+
+    ``request.language`` is transport metadata, not WHAT evidence. Models may
+    nevertheless copy the exact tag (for example ``zh-CN``) into a generic
+    ``language`` binding on otherwise valid greetings and chat turns. That is
+    harmless envelope pollution, so remove only the exact copied scalar instead
+    of escalating or failing the whole interpretation.
+
+    This boundary deliberately does *not* infer or rewrite semantic language
+    facts: exact language-tag strings that occur literally in the user's turn are
+    retained, and all other binding values are untouched.
+    """
+
+    language = " ".join(str(request.language or "").strip().casefold().split())
+    if not language:
+        return
+    literal_turn = (request.text or "").casefold()
+    if language in literal_turn:
+        return
+    responsibilities = parsed.get("responsibilities")
+    if not isinstance(responsibilities, list):
+        return
+    for item in responsibilities:
+        if not isinstance(item, dict):
+            continue
+        bindings = item.get("bindings")
+        if not isinstance(bindings, dict):
+            continue
+        for binding_name, value in list(bindings.items()):
+            if isinstance(value, str):
+                normalized = " ".join(value.strip().casefold().split())
+                if normalized == language:
+                    bindings.pop(binding_name, None)
+                continue
+            if not isinstance(value, list):
+                continue
+            filtered = [
+                scalar
+                for scalar in value
+                if not (
+                    isinstance(scalar, str)
+                    and " ".join(scalar.strip().casefold().split()) == language
+                )
+            ]
+            if not filtered:
+                bindings.pop(binding_name, None)
+            elif len(filtered) != len(value):
+                bindings[binding_name] = filtered
+
+
 def _reject_transport_echo_bindings(
     request: GoalInterpretationRequest,
     parsed: dict[str, Any],
 ) -> None:
-    """Reject request-envelope fields masquerading as semantic bindings.
+    """Reject a whole admitted turn masquerading as an atomic semantic binding.
 
-    The admitted turn and its language tag are transport inputs to Goal
-    Interpretation. Copying either wholesale into ``bindings`` does not preserve
-    an atomic material fact and can conceal a collapsed multi-effect request.
-    This check compares exact normalized envelope values only; it does not infer
-    intent or manufacture replacement meaning.
+    Whole-turn copying can conceal collapsed multi-effect meaning, so it remains
+    a fail-closed semantic-structure violation. Exact request-language echoes are
+    sanitized separately as mechanically removable envelope noise.
     """
 
     turn_echo = _normalized_turn_echo(request.text or "")
-    language = " ".join(str(request.language or "").strip().casefold().split())
-    literal_turn = (request.text or "").casefold()
     responsibilities = parsed.get("responsibilities")
     if not isinstance(responsibilities, list):
         return
@@ -722,20 +772,13 @@ def _reject_transport_echo_bindings(
                 if not isinstance(scalar, str):
                     continue
                 normalized = _normalized_turn_echo(scalar)
-                copied_turn = bool(turn_echo and normalized == turn_echo)
-                copied_language = bool(
-                    language
-                    and " ".join(scalar.strip().casefold().split()) == language
-                    and language not in literal_turn
-                )
-                if not (copied_turn or copied_language):
+                if not (turn_echo and normalized == turn_echo):
                     continue
                 suffix = f"[{value_index}]" if isinstance(value, list) else ""
-                envelope_field = "whole admitted turn" if copied_turn else "language tag"
                 raise _GoalInterpretationSemanticStructureViolation(
                     "Goal Interpretation binding copied request-envelope data instead "
                     f"of an atomic semantic fact: responsibilities[{responsibility_index}]"
-                    f".bindings.{binding_name}{suffix} copied the {envelope_field}."
+                    f".bindings.{binding_name}{suffix} copied the whole admitted turn."
                 )
 
 
@@ -1771,6 +1814,7 @@ class OllamaGoalInterpreter:
         _reject_continuity_completion_contract_mismatch(request, parsed)
         _reject_unprovenanced_location_bindings(request, parsed)
         _reject_runtime_identity_bindings(request, parsed)
+        _strip_language_envelope_bindings(request, parsed)
         _reject_transport_echo_bindings(request, parsed)
         _reject_untyped_coordination_bindings(parsed)
         _reject_dropped_explicit_numeric_bindings(request, parsed)

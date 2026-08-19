@@ -1070,6 +1070,48 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.metadata["effect_execution"], "not_authorized")
         self.assertFalse(response.metadata["semantic_fallback"])
 
+    def test_cognitive_failure_metadata_is_recorded_as_experience_error(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        response = assistant._cognitive_core_exception_safe_response(
+            "你好。",
+            failure_stage="goal_interpretation",
+            failure_class="InterpretationUnavailableError",
+            failure_error="invalid deep interpretation",
+        )
+        captured: dict[str, Any] = {}
+
+        assistant._prepared_interaction_response_for_record = MethodType(
+            lambda self, response, *, session_id, confirmed_request_ids: response,
+            assistant,
+        )
+        assistant._record_experience = MethodType(
+            lambda self, **kwargs: captured.update(kwargs),
+            assistant,
+        )
+        assistant.session_log = MethodType(
+            lambda self, sid, message, *args: None,
+            assistant,
+        )
+
+        assistant._record_execution_experience_safely(
+            response=response,
+            execution=CapabilityRuntimeResult(
+                interaction_id=response.interaction_id,
+                status="completed",
+            ),
+            session_id="sid-greeting",
+            confirmed_request_ids=None,
+        )
+
+        self.assertEqual(response.metadata["semantic_status"], "failed")
+        self.assertEqual(
+            captured["errors"],
+            [
+                "goal_interpretation:InterpretationUnavailableError: "
+                "invalid deep interpretation"
+            ],
+        )
+
     def test_cognitive_core_exception_chinese_fallback_is_natural_and_fail_closed(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
 
