@@ -115,6 +115,12 @@ Soridormi: embodied planning, simulator/robot execution, monitoring, stop,
            emergency stop, recovery, and hardware commissioning
 ```
 
+The diagram above is the canonical ownership path. The complementary
+[episode-centered Continuous Mind workflow](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md#41412-human-like-behavior-emerges-across-time)
+shows how conversation, Work, Evidence, correction, waiting, and reactivation overlap
+over time to produce coherent human-like interaction without adding another semantic
+authority.
+
 The [Cognitive Gateway](docs/COGNITIVE_GATEWAY.md) is an ingress boundary,
 not the semantic brain. It normalizes and admits turns, applies deterministic
 protective reflexes, reviews attention, and assembles bounded context. Goal

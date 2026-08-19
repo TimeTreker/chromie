@@ -1626,18 +1626,64 @@ only the part of a responsibility that is still owed. This behavior must emerge 
 the existing truth owners and execution boundaries rather than from a `HumanManager`,
 emotion simulator, or another response author.
 
-The expected interaction shape is:
+The following episode-centered view complements the Charter's canonical ownership
+graph. It shows how the same owners cooperate over time; it is not another runtime
+pipeline or a replacement architecture.
 
-```text
-meaningful user/world event
-  -> revise bounded Situation from authoritative context and Evidence
-  -> make the smallest truthful progress that is currently ready
-       |-> communicate a useful conversational delta when one is owed
-       `-> advance validated Work without freezing unrelated interaction
-  -> observe delivery, provider, user, and world Evidence
-  -> reconsider only affected open Responsibilities
-  -> continue, ask, correct, wait, or close
-  -> remain quiet until another relevant state change
+```mermaid
+flowchart TD
+    EVENT["Meaningful user or world event"] --> GATEWAY["Cognitive Gateway<br/>attention, context, admission"]
+    GATEWAY --> CONTROL{"Protective control?"}
+    CONTROL -->|"stop, cancel, emergency"| REFLEX["Deterministic reflex<br/>revoke, cancel, or E-stop"]
+    CONTROL -->|"ordinary admitted event"| SITUATION["Revise bounded Situation<br/>from context and Evidence"]
+
+    REFLEX --> REFLEXEVIDENCE["Cancellation and safety Evidence"]
+    REFLEXEVIDENCE --> REENTRY["Fast Planner Evidence re-entry<br/>affected Responsibilities only"]
+
+    SITUATION --> GI["Goal Interpretation<br/>provider-neutral Responsibility"]
+    GI --> FAST["Fast Planner<br/>smallest useful truthful progress"]
+    GI --> GA["Goal Association<br/>when continuity is needed"]
+
+    FAST --> COMM["Useful conversational delta"]
+    FAST --> WORK["Ready planned Work"]
+    FAST --> SLOW["Deep Planner<br/>only when complex HOW warrants it"]
+    GA --> GOALS["Canonical Goals<br/>unfinished Responsibilities"]
+    WORK --> EARLY{"Eligible side-effect-free read<br/>before Goal binding?"}
+    EARLY -->|"yes, under Responsibility refs"| HOST
+    EARLY -->|"no"| BIND["Planner Work reconciliation<br/>preserve compatible Work"]
+    SLOW --> REVISION["Deeper or revised Plan"]
+    REVISION --> BIND
+    GOALS --> BIND
+
+    COMM --> OPENING{"Appropriate speaking opening?"}
+    OPENING -->|"yes"| VOCAL["Vocal delivery"]
+    OPENING -->|"not yet"| QUEUE["Wait without interrupting"]
+    QUEUE --> VOCAL
+
+    BIND --> HOST["Host validation<br/>authorization, confirmation,<br/>resources, versions, safety"]
+    HOST --> RUNTIME["Trusted Capability Runtime"]
+    RUNTIME --> PROVIDER["Tool, Vocal, and Soridormi Providers"]
+
+    VOCAL --> DELIVERY["Delivery Evidence"]
+    PROVIDER --> OUTCOME["Provider and world Evidence"]
+    DELIVERY --> REENTRY
+    OUTCOME --> REENTRY
+
+    REENTRY --> OWED{"What is still owed?"}
+    OWED -->|"continue"| FAST
+    OWED -->|"ask"| ASK["Specific clarification<br/>through Vocal"]
+    OWED -->|"correct"| CORRECT["Revise current meaning<br/>preserve compatible Work<br/>repair forward"]
+    OWED -->|"wait"| WAIT["Remain quiet until<br/>a relevant state change"]
+    OWED -->|"complete"| CLOSE["Close Responsibility<br/>with qualified Evidence"]
+
+    ASK --> OPENING
+    CORRECT --> SITUATION
+    WAIT --> EVENT
+    CLOSE --> QUIET["No background thinking loop"]
+    QUIET --> EVENT
+
+    EVENT -. "credible barge-in" .-> YIELD["Suppress stale output<br/>preserve unrelated Work"]
+    YIELD --> GATEWAY
 ```
 
 Fast communication, Goal continuity, Work, and Evidence may mature at different rates.
