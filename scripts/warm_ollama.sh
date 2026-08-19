@@ -21,6 +21,7 @@ KEEP_ALIVE="${OLLAMA_KEEP_ALIVE:-24h}"
 NUM_CTX="${OLLAMA_NUM_CTX:-${OLLAMA_CONTEXT_LENGTH:-2048}}"
 NUM_PREDICT="${OLLAMA_WARM_NUM_PREDICT:-1}"
 AUTO_RESTART_ON_CRASH="${OLLAMA_AUTO_RESTART_ON_CRASH:-1}"
+REQUIRE_ALL_WARM_MODELS_RESIDENT="${OLLAMA_REQUIRE_ALL_WARM_MODELS_RESIDENT:-0}"
 OLLAMA_SERVICE_NAME="${OLLAMA_SERVICE_NAME:-chromie-llm}"
 restart_attempted=0
 
@@ -188,5 +189,37 @@ PY
 for model in "${deduped_models[@]}"; do
   warm_one_model "$model"
 done
+
+if [[ "$REQUIRE_ALL_WARM_MODELS_RESIDENT" =~ ^(1|true|yes|on)$ ]] && [ "${#deduped_models[@]}" -gt 1 ]; then
+  ps_body="$(curl -fsS --max-time 10 "${OLLAMA_URL}/api/ps" || true)"
+  if [ -z "$ps_body" ]; then
+    echo "[warm-ollama][error] Could not verify concurrent model residency via ${OLLAMA_URL}/api/ps." >&2
+    exit 1
+  fi
+  if ! printf '%s' "$ps_body" | python3 -c '
+import json
+import sys
+
+expected = sys.argv[1:]
+payload = json.load(sys.stdin)
+loaded = {
+    str(item.get("model") or item.get("name") or "")
+    for item in payload.get("models", [])
+    if isinstance(item, dict)
+}
+missing = [model for model in expected if model not in loaded]
+if missing:
+    print(
+        "missing=" + ",".join(missing) + " loaded=" + ",".join(sorted(loaded)),
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+' "${deduped_models[@]}"; then
+    echo "[warm-ollama][error] Selected models did not remain loaded concurrently." >&2
+    echo "[warm-ollama][hint] This profile requires all warmed models to remain resident; check VRAM with nvidia-smi and loaded runners with: curl ${OLLAMA_URL}/api/ps" >&2
+    exit 1
+  fi
+  echo "[warm-ollama] Concurrent residency verified for all selected models."
+fi
 
 echo "[warm-ollama] All selected models warmed successfully."

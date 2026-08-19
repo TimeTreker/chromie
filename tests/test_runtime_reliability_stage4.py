@@ -10,6 +10,9 @@ class RuntimeReliabilityStage4Tests(unittest.TestCase):
 
         self.assertIn('NUM_PREDICT="${OLLAMA_WARM_NUM_PREDICT:-1}"', source)
         self.assertIn('"think": False', source)
+        self.assertIn('OLLAMA_REQUIRE_ALL_WARM_MODELS_RESIDENT', source)
+        self.assertIn('${OLLAMA_URL}/api/ps', source)
+        self.assertIn('Concurrent residency verified for all selected models.', source)
 
     def test_qualification_background_llm_load_disables_thinking(self) -> None:
         source = Path("scripts/qualification/run_comprehensive_test.sh").read_text(
