@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import logging
@@ -1284,7 +1285,7 @@ class OllamaGoalInterpreter:
             output_mode = responsibility.get("properties", {}).get("output_mode")
             if isinstance(output_mode, dict):
                 output_mode.pop("enum", None)
-                output_mode["oneOf"] = [
+                output_mode_variants = [
                     {
                         "const": "singing",
                         "description": (
@@ -1329,8 +1330,13 @@ class OllamaGoalInterpreter:
                         "description": "Control or playback of existing media.",
                     },
                 ]
+                output_mode["oneOf"] = output_mode_variants
                 output_mode["description"] = (
-                    "Provider-neutral observable modality for this one atomic outcome. "
+                    "Provider-neutral completion category for this one atomic outcome, "
+                    "not its eventual response transport. Fresh external information "
+                    "is capability_work even when Chromie will later speak the grounded "
+                    "answer; speech is only an ordinary answer authored from supplied "
+                    "trusted context without fresh acquisition. "
                     "Singing or a song is singing, never styled_speech, speech, "
                     "nonverbal_vocalization, capability_work, or body_action. "
                     "nonverbal_vocalization excludes singing, songs, melody, lyrics, "
@@ -1378,23 +1384,6 @@ class OllamaGoalInterpreter:
                     "enum": sorted(allowed_goal_ids),
                 }
                 target_goal_ids["uniqueItems"] = True
-            responsibility.setdefault("allOf", []).append(
-                {
-                    "if": {
-                        "properties": {
-                            "completion_requires_fresh_evidence": {"const": True}
-                        },
-                        "required": ["completion_requires_fresh_evidence"],
-                    },
-                    "then": {
-                        "properties": {
-                            "completion_requires_work": {"const": True},
-                            "output_mode": {"const": "capability_work"},
-                        },
-                        "required": ["completion_requires_work", "output_mode"],
-                    },
-                }
-            )
             if not new_relationship_only:
                 responsibility.setdefault("allOf", []).append(
                     {
@@ -1411,6 +1400,39 @@ class OllamaGoalInterpreter:
                         },
                     }
                 )
+            # Ollama's structured decoder accepted an object that violated an
+            # if/then dependency here. Its grammar also treats a nested object
+            # oneOf as the complete object shape rather than intersecting it with
+            # sibling properties, so each disjoint branch must repeat the complete
+            # Responsibility contract. This makes the illegal fresh-evidence +
+            # speech tuple unrepresentable without dropping semantic fields.
+            base_properties = responsibility.pop("properties")
+            branch_required = responsibility.pop("required")
+            responsibility.pop("additionalProperties", None)
+            fresh_properties = copy.deepcopy(base_properties)
+            fresh_properties["completion_requires_fresh_evidence"] = {"const": True}
+            fresh_properties["completion_requires_work"] = {"const": True}
+            fresh_properties["output_mode"] = {"const": "capability_work"}
+            non_fresh_properties = copy.deepcopy(base_properties)
+            non_fresh_properties["completion_requires_fresh_evidence"] = {
+                "const": False
+            }
+            responsibility["oneOf"] = [
+                {
+                    "title": "Fresh evidence work",
+                    "type": "object",
+                    "properties": fresh_properties,
+                    "required": branch_required,
+                    "additionalProperties": False,
+                },
+                {
+                    "title": "No fresh evidence acquisition",
+                    "type": "object",
+                    "properties": non_fresh_properties,
+                    "required": branch_required,
+                    "additionalProperties": False,
+                },
+            ]
         return schema
 
     @staticmethod
@@ -1629,22 +1651,33 @@ class OllamaGoalInterpreter:
         ]
         if constrain_location_provenance:
             exact_surfaces = _short_exact_surface_substrings(request.text)
-            binding_schema = (
+            responsibility_schema = (
                 payload.get("format", {})
                 .get("$defs", {})
                 .get("CognitiveResponsibilityProposal", {})
-                .get("properties", {})
-                .get("bindings")
             )
-            if exact_surfaces and isinstance(binding_schema, dict):
-                binding_schema.setdefault("properties", {})["location"] = {
-                    "type": "string",
-                    "enum": exact_surfaces,
-                    "description": (
-                        "If location is present, copy one exact contiguous source "
-                        "surface; never translate or transliterate it."
-                    ),
-                }
+            branches = (
+                responsibility_schema.get("oneOf", [])
+                if isinstance(responsibility_schema, dict)
+                else []
+            )
+            if exact_surfaces:
+                for branch in branches:
+                    binding_schema = (
+                        branch.get("properties", {}).get("bindings")
+                        if isinstance(branch, dict)
+                        else None
+                    )
+                    if not isinstance(binding_schema, dict):
+                        continue
+                    binding_schema.setdefault("properties", {})["location"] = {
+                        "type": "string",
+                        "enum": exact_surfaces,
+                        "description": (
+                            "If location is present, copy one exact contiguous source "
+                            "surface; never translate or transliterate it."
+                        ),
+                    }
         return payload
 
     @staticmethod

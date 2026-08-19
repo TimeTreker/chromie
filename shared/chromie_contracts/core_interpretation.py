@@ -122,9 +122,12 @@ class CognitiveResponsibilityProposal(BaseModel):
     ] = Field(
         default="unspecified",
         description=(
-            "Provider-neutral observable completion modality for this one outcome. "
-            "This preserves WHAT kind of effect is owed without selecting a "
-            "Capability, provider, Activity, executable argument, or wording."
+            "Provider-neutral completion category for this one outcome, not its "
+            "eventual response transport. Fresh external information is "
+            "capability_work even when a later grounded answer will be spoken; "
+            "speech is an ordinary answer authored without fresh acquisition. This "
+            "preserves WHAT kind of effect is owed without selecting a Capability, "
+            "provider, Activity, executable argument, or wording."
         ),
     )
     relationship: GoalRelationship = "new"

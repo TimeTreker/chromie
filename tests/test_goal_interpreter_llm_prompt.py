@@ -5,6 +5,7 @@ import json
 import unittest
 from unittest import mock
 
+from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
 from agent.app.clients.ollama_client import OllamaGenerationError
@@ -214,7 +215,7 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         responsibility = schema["$defs"]["CognitiveResponsibilityProposal"]
         self.assertIn(
             "Never combine coordinated positive effects",
-            responsibility["properties"]["outcome"]["description"],
+            responsibility["oneOf"][0]["properties"]["outcome"]["description"],
         )
 
     def test_system_prompt_preserves_speaker_and_immediate_conversation_boundaries(self) -> None:
@@ -358,54 +359,98 @@ class GoalInterpreterPromptTests(unittest.TestCase):
             set(payload["format"]["properties"]),
             {"confidence", "responsibilities", "unresolved"},
         )
-        self.assertEqual(
-            set(
-                payload["format"]["$defs"][
-                    "CognitiveResponsibilityProposal"
-                ]["required"]
-            ),
-            {
-                "local_ref",
-                "outcome",
-                "bindings",
-                "output_mode",
-                "completion_requires_work",
-                "completion_requires_fresh_evidence",
-                "confidence",
-            },
-        )
         responsibility_schema = payload["format"]["$defs"][
             "CognitiveResponsibilityProposal"
         ]
-        self.assertNotIn("relationship", responsibility_schema["properties"])
-        self.assertNotIn("target_goal_ids", responsibility_schema["properties"])
+        branches = responsibility_schema["oneOf"]
+        for branch in branches:
+            self.assertEqual(
+                set(branch["required"]),
+                {
+                    "local_ref",
+                    "outcome",
+                    "bindings",
+                    "output_mode",
+                    "completion_requires_work",
+                    "completion_requires_fresh_evidence",
+                    "confidence",
+                },
+            )
+            self.assertNotIn("relationship", branch["properties"])
+            self.assertNotIn("target_goal_ids", branch["properties"])
         self.assertNotIn("InformationGap", payload["format"]["$defs"])
+        non_fresh_branch = next(
+            branch
+            for branch in branches
+            if branch["properties"]["completion_requires_fresh_evidence"].get(
+                "const"
+            )
+            is False
+        )
         output_modes = {
             item["const"]
-            for item in responsibility_schema["properties"]["output_mode"]["oneOf"]
+            for item in non_fresh_branch["properties"]["output_mode"]["oneOf"]
         }
         self.assertNotIn("unspecified", output_modes)
         self.assertNotIn("other", output_modes)
         self.assertIn("singing", output_modes)
-        fresh_evidence_clause = next(
-            clause
-            for clause in responsibility_schema["allOf"]
-            if clause.get("if", {})
-            .get("properties", {})
+        fresh_evidence_branch = next(
+            branch
+            for branch in branches
+            if branch.get("properties", {})
             .get("completion_requires_fresh_evidence", {})
-            .get("const")
-            is True
+            .get("const") is True
         )
         self.assertEqual(
-            fresh_evidence_clause["then"]["properties"]["output_mode"],
+            fresh_evidence_branch["properties"]["output_mode"],
             {"const": "capability_work"},
         )
         nonverbal = next(
             item
-            for item in responsibility_schema["properties"]["output_mode"]["oneOf"]
+            for item in non_fresh_branch["properties"]["output_mode"]["oneOf"]
             if item.get("const") == "nonverbal_vocalization"
         )
         self.assertIn("excludes singing", nonverbal["description"])
+
+    def test_decoder_schema_structurally_rejects_fresh_evidence_as_speech(self) -> None:
+        responsibility_schema = self._interpreter()._goal_interpretation_response_schema(
+            new_relationship_only=True
+        )["$defs"]["CognitiveResponsibilityProposal"]
+        Draft202012Validator.check_schema(responsibility_schema)
+        validator = Draft202012Validator(responsibility_schema)
+        valid_fresh = {
+            "local_ref": "weather",
+            "outcome": "determine whether Chongqing gets heavy rain this afternoon",
+            "bindings": {
+                "location": "重庆",
+                "day_part": "下午",
+                "precipitation_severity": "大雨",
+            },
+            "output_mode": "capability_work",
+            "completion_requires_work": True,
+            "completion_requires_fresh_evidence": True,
+            "confidence": 0.95,
+        }
+        self.assertEqual(list(validator.iter_errors(valid_fresh)), [])
+        invalid_speech = {**valid_fresh, "output_mode": "speech"}
+        self.assertTrue(list(validator.iter_errors(invalid_speech)))
+        ordinary_speech = {
+            **valid_fresh,
+            "outcome": "answer from trusted supplied context",
+            "bindings": {},
+            "output_mode": "speech",
+            "completion_requires_work": False,
+            "completion_requires_fresh_evidence": False,
+        }
+        self.assertEqual(list(validator.iter_errors(ordinary_speech)), [])
+
+    def test_output_mode_prompt_distinguishes_work_from_response_transport(self) -> None:
+        prompt = self._interpreter().load_system_prompt()
+        self.assertIn("not the eventual response transport", prompt)
+        self.assertIn(
+            "Fresh external information is capability_work even when Chromie will later speak",
+            prompt,
+        )
 
     def test_repair_schema_does_not_reintroduce_planning_gap_contract(self) -> None:
         interpreter = self._interpreter()
@@ -466,11 +511,12 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         responsibility = payload["format"]["$defs"][
             "CognitiveResponsibilityProposal"
         ]
-        self.assertIn("relationship", responsibility["properties"])
-        self.assertIn("target_goal_ids", responsibility["properties"])
-        self.assertIn("relationship", responsibility["required"])
-        self.assertIn("target_goal_ids", responsibility["required"])
-        relationship = responsibility["properties"]["relationship"]
+        for branch in responsibility["oneOf"]:
+            self.assertIn("relationship", branch["properties"])
+            self.assertIn("target_goal_ids", branch["properties"])
+            self.assertIn("relationship", branch["required"])
+            self.assertIn("target_goal_ids", branch["required"])
+        relationship = responsibility["oneOf"][0]["properties"]["relationship"]
         self.assertNotIn("enum", relationship)
         self.assertEqual(
             {item["const"] for item in relationship["oneOf"]},
@@ -492,10 +538,11 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("never inflect", relationship["description"])
         self.assertNotIn("continues", json.dumps(relationship))
         self.assertNotIn("resumes", json.dumps(relationship))
-        self.assertEqual(
-            responsibility["properties"]["target_goal_ids"]["items"]["enum"],
-            ["goal-existing"],
-        )
+        for branch in responsibility["oneOf"]:
+            self.assertEqual(
+                branch["properties"]["target_goal_ids"]["items"]["enum"],
+                ["goal-existing"],
+            )
         relationship_targets = responsibility["allOf"][-1]
         self.assertEqual(
             relationship_targets["if"]["properties"]["relationship"],
@@ -533,17 +580,18 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         repair_responsibility = repair["format"]["$defs"][
             "CognitiveResponsibilityProposal"
         ]
-        self.assertEqual(
-            repair_responsibility["properties"]["target_goal_ids"]["items"]["enum"],
-            ["goal-existing"],
-        )
-        self.assertIn(
-            "continue",
-            {
-                item["const"]
-                for item in repair_responsibility["properties"]["relationship"]["oneOf"]
-            },
-        )
+        for branch in repair_responsibility["oneOf"]:
+            self.assertEqual(
+                branch["properties"]["target_goal_ids"]["items"]["enum"],
+                ["goal-existing"],
+            )
+            self.assertIn(
+                "continue",
+                {
+                    item["const"]
+                    for item in branch["properties"]["relationship"]["oneOf"]
+                },
+            )
         repair_system, _, _ = _payload_message_texts(repair)
         self.assertIn("copy one exact protocol token", repair_system)
 
@@ -579,12 +627,14 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("Retained active/recent Goal semantics", user_prompt)
         self.assertIn('"goal_id":"goal-walk"', user_prompt)
         self.assertIn("move forward for ten seconds", user_prompt)
-        self.assertEqual(
-            payload["format"]["$defs"]["CognitiveResponsibilityProposal"][
-                "properties"
-            ]["target_goal_ids"]["items"]["enum"],
-            ["goal-walk"],
-        )
+        responsibility = payload["format"]["$defs"][
+            "CognitiveResponsibilityProposal"
+        ]
+        for branch in responsibility["oneOf"]:
+            self.assertEqual(
+                branch["properties"]["target_goal_ids"]["items"]["enum"],
+                ["goal-walk"],
+            )
 
     def test_repair_schema_excludes_bound_values_from_unresolved(self) -> None:
         interpreter = self._interpreter()
@@ -924,11 +974,15 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         _system_text, user_text, all_text = _payload_message_texts(deep_payload)
         self.assertIn("No prior interpretation DTO is supplied", user_text)
         self.assertNotIn(json.dumps(translated), all_text)
-        location_contract = deep_payload["format"]["$defs"][
+        responsibility_contract = deep_payload["format"]["$defs"][
             "CognitiveResponsibilityProposal"
-        ]["properties"]["bindings"]["properties"]["location"]
-        self.assertIn("北京", location_contract["enum"])
-        self.assertNotIn("Beijing", location_contract["enum"])
+        ]
+        for branch in responsibility_contract["oneOf"]:
+            location_contract = branch["properties"]["bindings"]["properties"][
+                "location"
+            ]
+            self.assertIn("北京", location_contract["enum"])
+            self.assertNotIn("Beijing", location_contract["enum"])
 
     async def test_multiple_fresh_evidence_claims_escalate_from_source(self) -> None:
         interpreter = self._interpreter()

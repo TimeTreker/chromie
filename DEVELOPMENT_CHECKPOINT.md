@@ -33,23 +33,12 @@ general continuity/action ability, never as a phrase target.
 
 ## 2026-08-19 debug-bundle defect closure
 
-The uploaded `chromie_debug_bundle_20260819_100305.tar.gz` exposed two general
-workflows. The weather case translated `北京`, spent DTO repair on semantics,
-invented a travel-confirmation Goal, and later narrowed a whole day to night.
-Current GI deepens once from source, preserves exact entity surfaces, and keeps
-unrequested stated plans as context; GA commits one weather Goal; the typed
-Capability contract permits only `period=day` without a `day_part`. The run/sing
-case lost the singing effect and admitted a false start claim. Current GI/GA keep
-separate body/singing Goals, truth review suppresses that claim, Fast Advance
-fails closed cleanly, and Deep retains `walk_forward(duration_s=15)` while
-truthfully reporting singing unavailable with no substitute vocal promise.
-Direct Agent/Core replays `debug-bundle-final-run_sing` and
-`debug-bundle-final3-weather` pass. The run/sing replay preceded only the
-weather-specific argument annotation; the weather replay used final image manifest
-`sha256:65f15d18880407af4d3e5d94131ecc64501a6baf40fd6e4d7cace809e13a124d`.
-They are non-qualifying: the operator Host owns the exclusive lock, so no maintained
-live-text, weather result, TTS, microphone, simulator, or physical-robot claim is
-made. No document, environment key, switch, compatibility path, or layer was added.
+The uploaded `chromie_debug_bundle_20260819_100305.tar.gz` exposed two general workflows. The weather case translated `北京`, spent DTO repair on semantics, invented a travel-confirmation Goal, and later narrowed a whole day to night. Current GI deepens once from source, preserves exact entity surfaces, and keeps unrequested stated plans as context; GA commits one weather Goal; the typed Capability contract permits only `period=day` without a `day_part`.
+The run/sing case lost the singing effect and admitted a false start claim. Current GI/GA keep separate body/singing Goals, truth review suppresses that claim, Fast Advance fails closed cleanly, and Deep retains `walk_forward(duration_s=15)` while truthfully reporting singing unavailable with no substitute vocal promise.
+A later physical-Host SID `7cd09453` exposed one remaining general decoder gap: qwen3:4b twice chose speech for fresh weather evidence, and Ollama accepted the illegal tuple because the model schema expressed it with `if`/`then`. GI correctly failed closed, but its same-model Deep pass repeated the tuple and caused HTTP 503.
+The model-facing contract now uses two complete disjoint `oneOf`/`const` object branches, so fresh evidence can generate only work=true and capability_work without post-hoc semantic repair; output-mode wording also distinguishes owed work from later speech transport.
+Exact current-image replay `sid-fix2-chongqing-afternoon-heavy-rain` passes Core → GA → Fast Plan with one Goal preserving 重庆, afternoon, and heavy-rain meaning and `chromie.weather.lookup(period=afternoon)`; image manifest list `sha256:9780ce34e3c44d96efb636209e0d7514b79101351050b95cd6892d54a99b5e0b`.
+The operator Host still owns the exclusive lock, so maintained live-text, weather result, audible TTS, simulator, and physical behavior remain unclaimed. No document, environment key, switch, compatibility path, or architecture layer was added.
 
 ## Latest actual workflow
 

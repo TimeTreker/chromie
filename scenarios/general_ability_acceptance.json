@@ -634,6 +634,26 @@
       ],
       "live_text_cases": [
         {
+          "id": "chongqing_afternoon_heavy_rain_fresh_evidence",
+          "text": "重庆下午会下大雨吗？",
+          "language": "zh-CN",
+          "expected_capabilities": [
+            "chromie.weather.lookup"
+          ],
+          "expected_args": [
+            "0:location=重庆",
+            "0:period=afternoon"
+          ],
+          "require_speech": true,
+          "min_new_goal_count": 1,
+          "min_goal_outcome_count": 1,
+          "forbidden_speech_any": [
+            "我刚才卡住了",
+            "你再说一遍好吗"
+          ],
+          "description": "Retained SID 7cd09453 regression: a changing weather question must remain fresh capability work even though its grounded result will later be spoken, while preserving Chongqing, afternoon, and the heavy-rain qualifier."
+        },
+        {
           "id": "debug_bundle_beijing_tomorrow_rain",
           "text": "明天北京下雨吗？我明天要去北京出差。",
           "language": "zh-CN",
