@@ -127,7 +127,15 @@ def _fast_truth_context_window(
 ) -> int:
     model = service_settings.fast_truth_model
     if model == service_settings.fast_planner_model:
+        # Reuse the already-resident Fast runner exactly when the roles genuinely
+        # share the same model. This is the preferred low-latency topology.
         return service_settings.fast_planner_num_ctx
+    if model == service_settings.fast_first_response_model:
+        # A dedicated response/truth model must stay bounded even when those same
+        # weights also happen to own a 32K deliberative role such as Goal
+        # Association. Role identity does not justify inheriting another role's
+        # context window; that regression made a ten-word greeting allocate 32K.
+        return min(service_settings.fast_planner_num_ctx, 6144)
     if model == service_settings.goal_association_model:
         return service_settings.goal_association_num_ctx
     if model == service_settings.cognitive_gateway_attention_model:
@@ -143,14 +151,9 @@ def _fast_first_response_context_window(
     service_settings: Settings,
     interpreter_settings: GoalInterpreterSettings,
 ) -> int:
-    # First response and its mandatory truth qualification are consecutive phases
-    # of one Fast owner. When they share a model, one runner topology prevents a
-    # same-model unload/reload between the two bounded calls.
-    if (
-        service_settings.fast_first_response_model
-        == service_settings.fast_truth_model
-    ):
-        return _fast_truth_context_window(service_settings)
+    # Prefer exact reuse of the Fast or GI runner. A dedicated response model is
+    # intentionally bounded; it must not inherit a large context merely because
+    # the same weights are also assigned to a deliberative role.
     if (
         service_settings.fast_first_response_model
         == service_settings.fast_planner_model
@@ -158,6 +161,11 @@ def _fast_first_response_context_window(
         return service_settings.fast_planner_num_ctx
     if service_settings.fast_first_response_model == interpreter_settings.model:
         return interpreter_settings.llm_num_ctx
+    if (
+        service_settings.fast_first_response_model
+        == service_settings.fast_truth_model
+    ):
+        return _fast_truth_context_window(service_settings)
     return min(service_settings.fast_planner_num_ctx, 6144)
 
 ollama_client = OllamaClient(

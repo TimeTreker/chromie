@@ -79,11 +79,17 @@ class InputQualityEvidence(BaseModel):
 
 
 class AttentionFinding(BaseModel):
-    """A bounded admission finding, never a normal intent decision."""
+    """A bounded admission finding, never a normal intent decision.
+
+    ``speech_act`` is preserved as immutable Gateway evidence so later latency
+    phases can distinguish an already-qualified greeting from semantic work
+    without reclassifying the user's words or calling a second reviewer.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     disposition: AttentionDisposition
+    speech_act: AttentionSpeechAct = "unclear"
     source: str = Field(min_length=1, max_length=120)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reason: str = Field(default="", max_length=500)
@@ -161,6 +167,7 @@ class AttentionReviewResult(BaseModel):
     def as_finding(self) -> AttentionFinding:
         return AttentionFinding(
             disposition=self.disposition,
+            speech_act=self.speech_act,
             source=self.source,
             confidence=self.confidence,
             reason=self.reason,

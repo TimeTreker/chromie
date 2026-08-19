@@ -480,7 +480,7 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(
             safe_response.speech[0].text,
-            "对不起，我刚才卡住了，什么都还没做呢。你再说一遍好吗？",
+            "咦？我刚刚没弄明白。你再跟我说一遍嘛。",
         )
         self.assertEqual(safe_response.metadata["effect_execution"], "not_authorized")
         self.assertEqual(len(assistant._launch_interaction_calls), 1)

@@ -357,10 +357,10 @@ class FastPlannerResolver:
                 options={
                     "temperature": 0,
                     "top_p": 0.9,
-                    # The specialized response client does not share the full
-                    # planner's runner. Size this bounded phase to its compact
-                    # input instead of allocating the qualification profile's 32K
-                    # planning window for a ten-word acknowledgement.
+                    # The bootstrap topology chooses this context explicitly:
+                    # reuse the Fast runner when models match, otherwise keep the
+                    # latency-critical response phase bounded rather than inheriting
+                    # a deliberate role's context window.
                     "num_ctx": self.first_response_num_ctx,
                     "num_predict": min(self.num_predict, 192),
                 },
@@ -409,20 +409,48 @@ class FastPlannerResolver:
                 raise PlannerDTOContractError(
                     "immediate conversational work requires a complete response"
                 )
-            truth_certificate = await self._qualify_first_response_truth(
-                request,
-                activity=activity,
-                responsibilities=responsibilities,
+            gateway_speech_act = self._gateway_speech_act(request)
+            deterministic_greeting = bool(
+                not needs_work
+                and gateway_speech_act == "greeting"
+                and activity.role == "complete_response"
+                and activity.truth_stage == "context_grounded"
+                and not activity.evidence_refs
             )
-            qualification_metadata = {
-                "truth_qualification_owner": "fast_planner",
-                "truth_qualification_call_count": 1,
-                "truth_qualification": truth_certificate.model_dump(
-                    mode="json",
-                    exclude_none=True,
-                    exclude_defaults=True,
-                ),
-            }
+            if deterministic_greeting:
+                # Gateway has already classified this admitted turn as a greeting,
+                # and GI says the single communicative outcome requires neither
+                # Work nor fresh Evidence. A second LLM cannot add authoritative
+                # truth here; it only lengthens the human-facing critical path.
+                # Keep the same immutable Activity acceptance surface, but let
+                # trusted contract evidence close the qualification locally.
+                truth_certificate = FastPlannerFirstResponseTruthCertificate(
+                    decision="accept"
+                )
+                qualification_metadata = {
+                    "truth_qualification_owner": "trusted_gateway_greeting_contract",
+                    "truth_qualification_call_count": 0,
+                    "truth_qualification": truth_certificate.model_dump(
+                        mode="json",
+                        exclude_none=True,
+                        exclude_defaults=True,
+                    ),
+                }
+            else:
+                truth_certificate = await self._qualify_first_response_truth(
+                    request,
+                    activity=activity,
+                    responsibilities=responsibilities,
+                )
+                qualification_metadata = {
+                    "truth_qualification_owner": "fast_planner",
+                    "truth_qualification_call_count": 1,
+                    "truth_qualification": truth_certificate.model_dump(
+                        mode="json",
+                        exclude_none=True,
+                        exclude_defaults=True,
+                    ),
+                }
             if truth_certificate.decision != "accept":
                 logger.warning(
                     "fast_planner_first_response_truth_rejected sid=%s activity_id=%s",
@@ -481,6 +509,21 @@ class FastPlannerResolver:
                 },
             )
 
+    @staticmethod
+    def _gateway_speech_act(request: CognitiveWorkRequest) -> str:
+        """Return immutable Gateway speech-act evidence when the envelope carries it."""
+
+        context = request.context if isinstance(request.context, dict) else {}
+        envelope = context.get("user_turn_envelope")
+        if not isinstance(envelope, dict):
+            return ""
+        attention = envelope.get("attention")
+        if not isinstance(attention, dict):
+            return ""
+        return " ".join(
+            str(attention.get("speech_act") or "").strip().split()
+        ).casefold()
+
     async def _qualify_first_response_truth(
         self,
         request: CognitiveWorkRequest,
@@ -490,8 +533,9 @@ class FastPlannerResolver:
     ) -> FastPlannerFirstResponseTruthCertificate:
         """Accept or reject immutable wording without authoring a replacement.
 
-        This is the single owner-approved Epistemic Qualification inside Fast
-        Planner.  A failure, malformed certificate, or uncertain acceptance is
+        This is Fast Planner's LLM Epistemic Qualification for responses whose
+        truth cannot be closed by an immutable Gateway/GI contract. A failure,
+        malformed certificate, or uncertain acceptance is
         terminal for the first-response Activity and is never repaired.
         """
 
@@ -1009,6 +1053,97 @@ class FastPlannerResolver:
             operating_contract=(progress_contract,),
         )
 
+    @staticmethod
+    def _restore_required_capability_args_from_responsibilities(
+        raw: dict[str, Any],
+        *,
+        responsibilities: list[CognitiveResponsibilityProposal],
+        capabilities: list[dict[str, Any]],
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        """Restore omitted required args when GI already owns the exact value.
+
+        The model still owns Capability selection. Once it selects a Capability,
+        copying an identically named required input from every cited Responsibility
+        is mechanical provenance preservation, not a new HOW decision. Conflicting,
+        partial, transformed, optional, or defaulted inputs remain model-owned and
+        fail through the normal contract boundary.
+        """
+
+        activities = raw.get("activities")
+        if not isinstance(activities, list):
+            return raw, []
+        by_ref = {item.local_ref: item for item in responsibilities}
+        by_capability = {
+            str(item.get("capability_id") or ""): item
+            for item in capabilities
+            if isinstance(item, dict) and str(item.get("capability_id") or "")
+        }
+        normalized = copy.deepcopy(raw)
+        normalized_activities = normalized.get("activities")
+        if not isinstance(normalized_activities, list):
+            return raw, []
+        repairs: list[dict[str, Any]] = []
+        for activity_index, activity in enumerate(normalized_activities):
+            if not isinstance(activity, dict) or activity.get("role") != "capability":
+                continue
+            capability_id = str(activity.get("capability_id") or "")
+            definition = by_capability.get(capability_id)
+            if not isinstance(definition, dict):
+                continue
+            input_schema = definition.get("input_schema")
+            if not isinstance(input_schema, dict):
+                continue
+            properties = input_schema.get("properties")
+            if not isinstance(properties, dict):
+                properties = {}
+            required = [str(item) for item in input_schema.get("required") or []]
+            source_refs = [
+                str(item)
+                for item in activity.get("source_responsibility_refs") or []
+                if str(item) in by_ref
+            ]
+            if not source_refs:
+                continue
+            args = activity.get("args")
+            if not isinstance(args, dict):
+                args = {}
+            else:
+                args = dict(args)
+            changed = False
+            for parameter in required:
+                if parameter in args:
+                    continue
+                parameter_schema = properties.get(parameter)
+                if isinstance(parameter_schema, dict) and "default" in parameter_schema:
+                    continue
+                if not all(
+                    parameter in by_ref[source_ref].bindings
+                    for source_ref in source_refs
+                ):
+                    continue
+                values = [
+                    by_ref[source_ref].bindings[parameter]
+                    for source_ref in source_refs
+                ]
+                first = values[0]
+                if any(value != first for value in values[1:]):
+                    continue
+                args[parameter] = copy.deepcopy(first)
+                changed = True
+                repairs.append(
+                    {
+                        "activity_index": activity_index,
+                        "activity_id": str(activity.get("activity_id") or ""),
+                        "capability_id": capability_id,
+                        "parameter": parameter,
+                        "source_responsibility_refs": source_refs,
+                        "recovery": "restored_required_arg_from_authoritative_responsibility",
+                    }
+                )
+            if changed:
+                activity["args"] = args
+        return (normalized if repairs else raw), repairs
+
     async def resolve_advance(self, request: CognitiveWorkRequest) -> FastPlannerAdvance:
         """Produce Fast Planner's first Activity Plan from GI Responsibilities."""
 
@@ -1155,6 +1290,19 @@ class FastPlannerResolver:
                     raise PlannerDTOContractError(
                         "Fast Planner advance response is not a JSON object"
                     )
+                last_raw, authoritative_arg_repairs = (
+                    self._restore_required_capability_args_from_responsibilities(
+                        last_raw,
+                        responsibilities=responsibilities,
+                        capabilities=capability_payload,
+                    )
+                )
+                if authoritative_arg_repairs:
+                    logger.info(
+                        "fast_planner_advance_authoritative_args_restored sid=%s repairs=%s",
+                        request.sid,
+                        self._bounded(authoritative_arg_repairs, 2000),
+                    )
                 output = FastPlannerAdvanceModelOutput.model_validate(last_raw)
                 if first_response_decided and any(
                     activity.role == "progress" for activity in output.activities
@@ -1194,6 +1342,11 @@ class FastPlannerResolver:
                         "phase": "responsibility_activity_planning",
                         "execution_authority": "trusted_capability_runtime",
                         "contract_revision_attempted": bool(attempt),
+                        **(
+                            {"authoritative_arg_repairs": authoritative_arg_repairs}
+                            if authoritative_arg_repairs
+                            else {}
+                        ),
                     },
                 )
             except Exception as exc:

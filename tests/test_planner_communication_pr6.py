@@ -26,7 +26,7 @@ from shared.chromie_contracts.plan import (
 
 
 class PlannerOwnedCommunicativeActivityTests(unittest.TestCase):
-    def test_same_model_first_response_and_truth_reuse_one_runner_topology(self) -> None:
+    def test_dedicated_response_model_does_not_inherit_deliberative_context(self) -> None:
         service_settings = Settings().model_copy(
             update={
                 "fast_planner_model": "qwen3:4b",
@@ -46,13 +46,36 @@ class PlannerOwnedCommunicativeActivityTests(unittest.TestCase):
                 service_settings,
                 interpreter_settings,
             ),
-            32768,
+            6144,
         )
         self.assertEqual(
             _fast_truth_context_window(service_settings),
-            32768,
+            6144,
         )
         self.assertIs(fast_first_response_client, fast_truth_client)
+
+    def test_fast_response_reuses_fast_runner_when_models_match(self) -> None:
+        service_settings = Settings().model_copy(
+            update={
+                "fast_planner_model": "qwen3:4b",
+                "fast_first_response_model": "qwen3:4b",
+                "fast_truth_model": "qwen3:4b",
+                "goal_association_model": "gemma4:12b",
+                "fast_planner_num_ctx": 32768,
+                "goal_association_num_ctx": 32768,
+            }
+        )
+        interpreter_settings = GoalInterpreterSettings().model_copy(
+            update={"model": "qwen3:4b", "llm_num_ctx": 32768}
+        )
+
+        self.assertEqual(
+            _fast_first_response_context_window(
+                service_settings, interpreter_settings
+            ),
+            32768,
+        )
+        self.assertEqual(_fast_truth_context_window(service_settings), 32768)
 
     def test_fast_activity_owns_exact_text_and_truth_stage(self) -> None:
         activity = FastPlannerProgressAct(

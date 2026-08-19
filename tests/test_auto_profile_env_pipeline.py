@@ -223,7 +223,8 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_MODEL"], "gemma4:12b")
         self.assertEqual(values["AGENT_DEEP_PLANNER_MODEL"], "gemma4:12b")
         self.assertEqual(values["AGENT_FAST_PLANNER_MODEL"], "qwen3:4b")
-        self.assertEqual(values["AGENT_FAST_FIRST_RESPONSE_MODEL"], "gemma4:12b")
+        self.assertEqual(values["AGENT_FAST_FIRST_RESPONSE_MODEL"], "qwen3:4b")
+        self.assertEqual(values["AGENT_FAST_TRUTH_MODEL"], "qwen3:4b")
         self.assertEqual(values["AGENT_SOCIAL_ATTENTION_MODEL"], "qwen3:4b")
         self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "0")
         self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "32768")
@@ -237,10 +238,11 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_DEEP_PLANNER_NUM_CTX",
         ):
             self.assertEqual(values[key], "32768", key)
+        self.assertEqual(values["AGENT_SOCIAL_ATTENTION_NUM_CTX"], "32768")
+        self.assertEqual(values["AGENT_SKILL_SELECTION_NUM_CTX"], "32768")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT"], "2048")
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_NUM_PREDICT"], "2048")
         self.assertEqual(values["AGENT_FAST_PLANNER_NUM_PREDICT"], "4096")
-        self.assertEqual(values["AGENT_SOCIAL_ATTENTION_NUM_CTX"], "4096")
         self.assertEqual(values["AGENT_SOCIAL_ATTENTION_NUM_PREDICT"], "160")
         self.assertEqual(values["AGENT_SOCIAL_ATTENTION_TIMEOUT_MS"], "2500")
         self.assertEqual(values["AGENT_DEEP_PLANNER_NUM_PREDICT"], "4096")
@@ -313,7 +315,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_DEEP_PLANNER_NUM_CTX",
         ):
             self.assertEqual(values[key], "32768", key)
-        self.assertEqual(values["AGENT_SOCIAL_ATTENTION_NUM_CTX"], "4096")
         self.assertEqual(values["AGENT_SOCIAL_ATTENTION_NUM_PREDICT"], "160")
         self.assertEqual(values["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"], "2048")
         self.assertEqual(values["AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS"], "120000")

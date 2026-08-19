@@ -276,6 +276,49 @@ class ExperienceManagerTests(unittest.TestCase):
 
 
 
+    def test_semantic_failure_is_not_recorded_as_completed_fallback_delivery(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manager = ExperienceManager(
+                enabled=True,
+                log_path=root / "experience.jsonl",
+                proposal_path=root / "proposals.jsonl",
+            )
+            response = InteractionResponse(
+                metadata={
+                    "semantic_status": "failed",
+                    "experience_context": {
+                        "conversation_id": "conv-fallback",
+                        "user_text": "你好。",
+                    },
+                },
+                speech=[{"text": "咦？我刚刚没弄明白。你再跟我说一遍嘛。"}],
+            )
+            execution = CapabilityRuntimeResult(
+                interaction_id=response.interaction_id,
+                status="completed",
+                results=[
+                    CapabilityResult(
+                        request_id="fallback-speech",
+                        capability_id="chromie.speak",
+                        status="completed",
+                    )
+                ],
+            )
+
+            record = manager.record_interaction(
+                response=response,
+                execution=execution,
+                session_id="sid-fallback",
+                mind_profile=default_mind_profile(),
+                errors=["goal_association:structured_output_validation"],
+            )
+
+            self.assertIsNotNone(record)
+            assert record is not None
+            self.assertEqual(record.execution_status, "error")
+            self.assertEqual(record.capability_results[0]["status"], "completed")
+
     def test_preflight_block_creates_review_proposal_from_summary(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

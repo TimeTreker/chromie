@@ -446,6 +446,16 @@ class EpisodeRecorder:
                         message=result.message,
                     )
                 )
+        if (
+            isinstance(response.metadata, dict)
+            and response.metadata.get("semantic_status") == "failed"
+        ):
+            # As in ExperienceRecord, fallback speech may have completed at the
+            # transport layer while the semantic interaction failed before its
+            # requested work. Preserve both facts instead of calling the turn
+            # completed.
+            execution_status = "error"
+
         return EpisodeTurnRecord(
             sid=session_id,
             turn_index=turn_index,

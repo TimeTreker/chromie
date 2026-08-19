@@ -1519,6 +1519,59 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(truth_kwargs["options"]["num_ctx"], 8192)
         self.assertEqual(result.metadata["truth_qualification_call_count"], 1)
 
+    def test_gateway_qualified_greeting_skips_redundant_truth_llm(self):
+        ollama = ScriptedOllama(
+            [
+                {
+                    "activity": {
+                        "activity_id": "greeting-response",
+                        "role": "complete_response",
+                        "text": "你好呀！",
+                        "source_responsibility_refs": ["greeting"],
+                    }
+                }
+            ]
+        )
+        request = _work_request(
+            sid="turn-fast-greeting",
+            text="你好。",
+            language="zh-CN",
+            responsibilities=[
+                {
+                    "local_ref": "greeting",
+                    "outcome": "greet the user warmly",
+                    "bindings": {},
+                    "output_mode": "speech",
+                    "completion_requires_work": False,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.98,
+                }
+            ],
+            context={
+                "user_turn_envelope": {
+                    "attention": {"speech_act": "greeting"}
+                }
+            },
+        )
+
+        result = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve_first_response(
+                request
+            )
+        )
+
+        self.assertIsNotNone(result.activity)
+        self.assertEqual(result.activity.text, "你好呀！")
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertEqual(result.metadata["truth_qualification_call_count"], 0)
+        self.assertEqual(
+            result.metadata["truth_qualification_owner"],
+            "trusted_gateway_greeting_contract",
+        )
+        self.assertEqual(
+            result.metadata["truth_qualification"], {"decision": "accept"}
+        )
+
     def test_first_response_receives_resolved_target_goal_meaning_for_continuation(self):
         responsibility = CognitiveResponsibilityProposal.model_validate(
             {
@@ -3737,6 +3790,77 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(
             [item.activity_id for item in advance.activities],
             ["duplicate-progress"],
+        )
+
+    def test_advance_restores_required_weather_location_from_gi_bindings(self):
+        raw = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "covered_responsibility_refs": ["r1", "r2"],
+            "activities": [
+                {
+                    "activity_id": "weather_lookup",
+                    "role": "capability",
+                    "capability_id": "chromie.weather.lookup",
+                    "source_responsibility_refs": ["r1", "r2"],
+                }
+            ],
+            "continuations": [],
+            "confidence": 0.95,
+            "unresolved": [],
+            "reason_summary": "Check the requested weather.",
+        }
+        request = _work_request(
+            sid="turn-weather-required-arg-grounding",
+            text="今天晚上重庆会不会下大雨，温度高不高？",
+            language="zh-CN",
+            responsibilities=[
+                {
+                    "local_ref": "r1",
+                    "outcome": "determine whether it rains heavily in Chongqing tonight",
+                    "bindings": {"location": "重庆", "time": "今天晚上"},
+                    "output_mode": "capability_work",
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.95,
+                },
+                {
+                    "local_ref": "r2",
+                    "outcome": "determine whether Chongqing is hot tonight",
+                    "bindings": {"location": "重庆", "time": "今天晚上"},
+                    "output_mode": "capability_work",
+                    "completion_requires_work": True,
+                    "completion_requires_fresh_evidence": True,
+                    "confidence": 0.95,
+                },
+            ],
+            context={
+                "fast_planner_first_response": {
+                    "turn_id": "turn-weather-required-arg-grounding",
+                    "activity": {
+                        "activity_id": "weather-progress",
+                        "role": "progress",
+                        "text": "好，我看看重庆今晚的天气。",
+                        "progress_kind": "check_information",
+                        "source_responsibility_refs": ["r1", "r2"],
+                    },
+                }
+            },
+        )
+        ollama = ScriptedOllama([raw])
+
+        advance = asyncio.run(
+            FastPlannerResolver(ollama, WeatherCatalog()).resolve_advance(request)
+        )
+
+        capability = next(
+            activity for activity in advance.activities if activity.role == "capability"
+        )
+        self.assertEqual(capability.args, {"location": "重庆"})
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertEqual(
+            advance.metadata["authoritative_arg_repairs"][0]["parameter"],
+            "location",
         )
 
     def test_first_activity_plan_can_check_weather_and_speak_in_parallel(self):

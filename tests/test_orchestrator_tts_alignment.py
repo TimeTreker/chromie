@@ -1048,7 +1048,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assert response is not None
         self.assertEqual(
             response.speech[0].text,
-            "Sorry, I got stuck for a moment and haven't done anything yet. Can you say it again?",
+            "Huh? I didn't quite get that. Can you tell me again?",
         )
         self.assertEqual(
             response.metadata["source"],
@@ -1065,7 +1065,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             response.speech[0].text,
-            "Sorry, I got stuck for a moment and haven't done anything yet. Can you say it again?",
+            "Huh? I didn't quite get that. Can you tell me again?",
         )
         self.assertEqual(response.metadata["effect_execution"], "not_authorized")
         self.assertFalse(response.metadata["semantic_fallback"])
@@ -1122,7 +1122,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             response.speech[0].text,
-            "对不起，我刚才卡住了，什么都还没做呢。你再说一遍好吗？",
+            "咦？我刚刚没弄明白。你再跟我说一遍嘛。",
         )
         self.assertNotIn("执行任何操作", response.speech[0].text)
         self.assertNotIn("处理好你的请求", response.speech[0].text)

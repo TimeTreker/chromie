@@ -166,6 +166,48 @@ class EpisodeRecorderTests(unittest.TestCase):
             self.assertEqual(episode.turns[0].turn_index, 1)
 
 
+    def test_semantic_failure_keeps_fallback_transport_success_but_marks_turn_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            recorder = EpisodeRecorder(
+                enabled=True,
+                log_path=Path(tmp) / "episodes.jsonl",
+            )
+            response = InteractionResponse(
+                metadata={
+                    "semantic_status": "failed",
+                    "experience_context": {
+                        "conversation_id": "conv-fallback",
+                        "user_text": "你好。",
+                    },
+                },
+                speech=[{"text": "咦？我刚刚没弄明白。你再跟我说一遍嘛。"}],
+            )
+            execution = CapabilityRuntimeResult(
+                interaction_id=response.interaction_id,
+                status="completed",
+                results=[
+                    CapabilityResult(
+                        request_id="fallback-speech",
+                        capability_id="chromie.speak",
+                        status="completed",
+                    )
+                ],
+            )
+
+            episode = recorder.record_interaction(
+                response=response,
+                execution=execution,
+                session_id="sid-fallback",
+                mind_profile=default_mind_profile(),
+                errors=["goal_association:structured_output_validation"],
+            )
+
+            self.assertIsNotNone(episode)
+            assert episode is not None
+            turn = episode.turns[-1]
+            self.assertEqual(turn.execution.status, "error")
+            self.assertEqual(turn.execution.capability_results[0].status, "completed")
+
     def test_episode_snapshot_can_emit_runtime_event(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

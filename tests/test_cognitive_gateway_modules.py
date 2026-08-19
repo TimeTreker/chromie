@@ -257,6 +257,32 @@ class CognitiveGatewayModuleTests(unittest.TestCase):
         self.assertNotIn("capability", payload)
         self.assertNotIn("plan", payload)
 
+    def test_attention_speech_act_is_preserved_in_admitted_envelope(self) -> None:
+        gateway = CognitiveGateway(clock=self.clock)
+        capture = gateway.capture(
+            "Hello",
+            session_id="turn-greeting",
+            conversation_id="conversation-greeting",
+            channel="text",
+        )
+        snapshot = gateway.assemble_context(capture, {})
+        review = AttentionReviewResult(
+            turn_id=capture.turn_id,
+            session_id=capture.session_id,
+            context_digest=snapshot.digest,
+            disposition="admit",
+            speech_act="greeting",
+            confidence=0.99,
+            source="test",
+            reason="direct greeting",
+        )
+
+        envelope = gateway.admit_attention(capture, snapshot, review)
+
+        self.assertIsNotNone(envelope.attention)
+        assert envelope.attention is not None
+        self.assertEqual(envelope.attention.speech_act, "greeting")
+
     def test_attention_result_must_match_context_snapshot(self) -> None:
         gateway = CognitiveGateway(clock=self.clock)
         capture = gateway.capture(

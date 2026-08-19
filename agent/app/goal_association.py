@@ -3241,6 +3241,72 @@ class GoalAssociationResolver:
                 "confidence",
                 "reason_summary",
             ]
+        if responsibility_refs:
+            def contains_source_ref(source_ref: str) -> dict[str, Any]:
+                return {
+                    "contains": {
+                        "type": "object",
+                        "properties": {
+                            "source_responsibility_refs": {
+                                "type": "array",
+                                "contains": {"const": source_ref},
+                                "minContains": 1,
+                                "maxContains": 1,
+                            }
+                        },
+                        "required": ["source_responsibility_refs"],
+                    },
+                    "minContains": 1,
+                    "maxContains": 1,
+                }
+
+            new_goal_conservation = {
+                "minItems": len(responsibility_refs),
+                "maxItems": len(responsibility_refs),
+                "allOf": [
+                    contains_source_ref(source_ref)
+                    for source_ref in responsibility_refs
+                ],
+            }
+            if output_type is GoalSegmentationModelOutput:
+                # With no retained Goal candidate, every GI Responsibility must
+                # become exactly one new Goal. Encode the already-enforced Host
+                # invariant in the decoder so contract repair cannot emit r1,r1
+                # for an r1,r2 turn. This is identity conservation, not semantic
+                # reassociation.
+                properties["new_goals"].update(new_goal_conservation)
+            else:
+                # Goal Association owns the branch choice. Once it chooses
+                # create_goals, associations are inactive and every Responsibility
+                # necessarily belongs to the new-goal branch. Conversely, an
+                # association branch must conserve each supplied ref exactly once.
+                schema.setdefault("allOf", []).append(
+                    {
+                        "if": {
+                            "properties": {"decision": {"const": "create_goals"}},
+                            "required": ["decision"],
+                        },
+                        "then": {
+                            "properties": {
+                                "associations": {"maxItems": 0},
+                                "new_goals": new_goal_conservation,
+                            }
+                        },
+                        "else": {
+                            "properties": {
+                                "new_goals": {"maxItems": 0},
+                                "associations": {
+                                    "minItems": 1,
+                                    "allOf": [
+                                        contains_source_ref(source_ref)
+                                        for source_ref in responsibility_refs
+                                    ],
+                                },
+                            }
+                        },
+                    }
+                )
+
         schema["required"] = list(dict.fromkeys([*ordered_required, *required]))
         schema.pop("oneOf", None)
         schema.pop("anyOf", None)

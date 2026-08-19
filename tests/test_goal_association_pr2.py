@@ -667,6 +667,11 @@ class GoalExecutionContractTests(unittest.TestCase):
             list(bounded_goal_validator.iter_errors(two_body_actions)),
             [],
         )
+        duplicated_provenance = copy.deepcopy(two_body_actions)
+        duplicated_provenance["new_goals"][1]["source_responsibility_refs"] = ["r1"]
+        self.assertTrue(
+            list(bounded_goal_validator.iter_errors(duplicated_provenance))
+        )
         two_body_actions["new_goals"][1]["output_mode"] = "body_action"
         self.assertTrue(list(bounded_goal_validator.iter_errors(two_body_actions)))
         two_body_actions["new_goals"][1]["output_mode"] = "singing"

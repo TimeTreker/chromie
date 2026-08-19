@@ -97,6 +97,17 @@ class ExperienceManager:
                 }
                 for result in execution.results
             ]
+        semantic_failed = (
+            isinstance(response.metadata, dict)
+            and response.metadata.get("semantic_status") == "failed"
+        )
+        if semantic_failed:
+            # Successful delivery of an emergency speech fallback is transport
+            # success, not completion of the user's cognitive interaction. Keep
+            # the capability result as completed while recording the turn itself
+            # as an error so Experience/Reflection cannot learn a false success.
+            execution_status = "error"
+
         record = ExperienceRecord(
             sid=session_id,
             conversation_id=self._str_or_none(context.get("conversation_id")),

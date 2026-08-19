@@ -4383,9 +4383,9 @@ class VoiceAssistant:
         del context
         zh = self._looks_zh(user_text)
         text = (
-            "对不起，我刚才卡住了，什么都还没做呢。你再说一遍好吗？"
+            "咦？我刚刚没弄明白。你再跟我说一遍嘛。"
             if zh
-            else "Sorry, I got stuck for a moment and haven't done anything yet. Can you say it again?"
+            else "Huh? I didn't quite get that. Can you tell me again?"
         )
         response = self._host_speech_response(
             text,
