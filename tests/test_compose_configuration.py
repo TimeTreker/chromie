@@ -57,6 +57,12 @@ class ComposeConfigurationTests(unittest.TestCase):
             llm_block,
         )
         self.assertIn("OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-1}", llm_block)
+        self.assertIn(
+            "OLLAMA_FLASH_ATTENTION: ${OLLAMA_FLASH_ATTENTION:-0}", llm_block
+        )
+        self.assertIn(
+            "OLLAMA_KV_CACHE_TYPE: ${OLLAMA_KV_CACHE_TYPE:-f16}", llm_block
+        )
 
     def test_agent_embeds_fast_goal_interpreter_by_default(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")

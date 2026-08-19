@@ -49,9 +49,60 @@ if [ "${#deduped_models[@]}" -eq 0 ]; then
   exit 1
 fi
 
+context_for_model() {
+  local model="$1"
+  python3 - "$model" "$NUM_CTX" <<'PYCTX'
+import os
+import sys
+
+model = sys.argv[1]
+fallback = int(sys.argv[2])
+
+# Warm each model with the largest context actually assigned to that model by
+# the active profile. This matters for asymmetric Fast/Deep profiles: warming
+# every model with the global OLLAMA_NUM_CTX would either over-allocate the Fast
+# runner or under-qualify the deliberate runner.
+role_contexts = (
+    ("OLLAMA_MODEL", "OLLAMA_NUM_CTX"),
+    ("AGENT_MODEL", "OLLAMA_NUM_CTX"),
+    ("AGENT_GOAL_INTERPRETER_MODEL", "AGENT_GOAL_INTERPRETER_LLM_NUM_CTX"),
+    (
+        "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
+        "AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX",
+    ),
+    ("AGENT_GOAL_ASSOCIATION_MODEL", "AGENT_GOAL_ASSOCIATION_NUM_CTX"),
+    ("AGENT_FAST_PLANNER_MODEL", "AGENT_FAST_PLANNER_NUM_CTX"),
+    # Fast first-response/truth share the Fast Planner topology in the current
+    # runtime composition when they use the same model.
+    ("AGENT_FAST_FIRST_RESPONSE_MODEL", "AGENT_FAST_PLANNER_NUM_CTX"),
+    ("AGENT_FAST_TRUTH_MODEL", "AGENT_FAST_PLANNER_NUM_CTX"),
+    ("AGENT_DEEP_PLANNER_MODEL", "AGENT_DEEP_PLANNER_NUM_CTX"),
+    ("AGENT_TASK_CONTINUITY_MODEL", "AGENT_TASK_CONTINUITY_NUM_CTX"),
+    ("AGENT_SOCIAL_ATTENTION_MODEL", "AGENT_SOCIAL_ATTENTION_NUM_CTX"),
+    ("AGENT_SKILL_SELECTION_MODEL", "AGENT_SKILL_SELECTION_NUM_CTX"),
+    ("TTS_COSYVOICE_OLLAMA_MODEL", "TTS_COSYVOICE_OLLAMA_NUM_CTX"),
+)
+
+contexts = []
+for model_key, context_key in role_contexts:
+    if os.environ.get(model_key, "") != model:
+        continue
+    raw = os.environ.get(context_key, "")
+    try:
+        value = int(raw) if raw else fallback
+    except ValueError:
+        value = fallback
+    if value > 0:
+        contexts.append(value)
+
+print(max(contexts or [fallback]))
+PYCTX
+}
+
 echo "[warm-ollama] Hardware profile: ${CHROMIE_ACTIVE_PROFILE:-unknown}"
 echo "[warm-ollama] Ollama URL: $OLLAMA_URL"
 echo "[warm-ollama] Models: ${deduped_models[*]}"
+echo "[warm-ollama] Flash attention: ${OLLAMA_FLASH_ATTENTION:-0}; KV cache: ${OLLAMA_KV_CACHE_TYPE:-f16}"
 echo "[warm-ollama] Max wait: ${WARM_TIMEOUT_SECONDS}s"
 
 deadline=$((SECONDS + WARM_TIMEOUT_SECONDS))
@@ -103,8 +154,11 @@ echo "[warm-ollama] Warming model(s). Large models may take several minutes on f
 
 warm_one_model() {
   local model="$1"
+  local model_num_ctx
   local payload
-  payload="$(python3 - "$model" "$KEEP_ALIVE" "$NUM_CTX" "$NUM_PREDICT" <<'PY'
+  model_num_ctx="$(context_for_model "$model")"
+  echo "[warm-ollama] Warming model topology: model=$model num_ctx=$model_num_ctx"
+  payload="$(python3 - "$model" "$KEEP_ALIVE" "$model_num_ctx" "$NUM_PREDICT" <<'PY'
 import json
 import sys
 
@@ -145,7 +199,7 @@ PY
         echo "[warm-ollama][hint] Use an explicit non-thinking/instruct model tag for cognition." >&2
         exit 1
       fi
-      echo "[warm-ollama] Model warmed successfully: $model"
+      echo "[warm-ollama] Model warmed successfully: $model context=$model_num_ctx"
       echo "[warm-ollama] Response preview:"
       echo "$body" | head -c 800
       echo
