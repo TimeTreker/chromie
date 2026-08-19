@@ -213,6 +213,13 @@ cognitive_gateway_attention_reviewer = AttentionReviewer(
     min_suppression_confidence=(
         settings.cognitive_gateway_attention_min_suppression_confidence
     ),
+    # TEMPORARY: keep Cognitive Gateway admission deterministic and non-blocking.
+    # The current reviewer is fail-open, so synchronously loading/running an LLM
+    # before obvious conversation can enter Goal Interpretation adds latency without
+    # changing the default safety outcome.  Re-enable model review only when the
+    # ambiguous/ambient addressedness policy is reintroduced with a qualified
+    # latency budget and retained interaction evidence.
+    model_review_enabled=False,
     num_ctx=settings.cognitive_gateway_attention_num_ctx,
     num_predict=settings.cognitive_gateway_attention_num_predict,
 )
