@@ -1617,6 +1617,57 @@ resumable cognitive artifacts, durable scoped
 consent/privacy, and multi-user identity—must be solved against these invariants
 without reopening the whole ontology or pre-creating one manager per concept.
 
+#### 4.14.12 Human-like behavior emerges across time
+
+Chromie should not imitate human biology or claim consciousness. The useful target is
+observable temporal coherence: one stable self remains attentive to a changing
+situation, makes proportionate progress, notices what actually happened, and continues
+only the part of a responsibility that is still owed. This behavior must emerge from
+the existing truth owners and execution boundaries rather than from a `HumanManager`,
+emotion simulator, or another response author.
+
+The expected interaction shape is:
+
+```text
+meaningful user/world event
+  -> revise bounded Situation from authoritative context and Evidence
+  -> make the smallest truthful progress that is currently ready
+       |-> communicate a useful conversational delta when one is owed
+       `-> advance validated Work without freezing unrelated interaction
+  -> observe delivery, provider, user, and world Evidence
+  -> reconsider only affected open Responsibilities
+  -> continue, ask, correct, wait, or close
+  -> remain quiet until another relevant state change
+```
+
+Fast communication, Goal continuity, Work, and Evidence may mature at different rates.
+That overlap should feel like ordinary attentive behavior rather than a visible module
+pipeline:
+
+- a simple complete answer should not create durable Goal state or wait for unrelated
+  cognition;
+- an acknowledgement should add useful common ground, not fill silence while nothing
+  has been committed;
+- ready safe Work may advance while speech, Goal Association, or unrelated slower
+  cognition continues within existing resource and authority rules;
+- result arrival should update cognition immediately but should enter speech at a
+  natural opening unless safety or an explicit delivery obligation requires pre-emption;
+- a follow-up should use retained Goal and Interaction Ledger state and communicate
+  only the still-needed delta instead of replaying the whole prior turn;
+- a correction should revise current meaning, preserve compatible Work, and repair
+  already-spoken or already-executed commitments forward;
+- Stable Mind should keep identity, values, and expression coherent while Situation,
+  Goals, Plans, and Memory remain appropriately revisable; and
+- harmless awkwardness or missed optional expression may remain imperfect, while
+  unsupported claims, unsafe effects, and material misunderstanding still fail closed.
+
+This temporal behavior does not add a new runtime state called `rhythm`. It is assessed
+through existing episode evidence: Planner commitment, first PCM and playback timing,
+barge-in and cancellation, Goal/Work continuity, Evidence re-entry, response-delta
+delivery, repetition, unsupported claims, and safe-idle outcomes. Improvements should
+remove avoidable serial waits and duplicate cognition before weakening any truth,
+authorization, or safety boundary.
+
 ## 5. Continuous cognitive loop
 
 The maintained architecture is a state-driven loop with multiple cognitive

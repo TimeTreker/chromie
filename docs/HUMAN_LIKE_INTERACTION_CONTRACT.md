@@ -311,6 +311,40 @@ provider reality to make the current turn look correct, and online calibration m
 mutate shared cognitive policy or replace future Fast/Deep reasoning with a cached
 semantic decision.
 
+## Human-like behavior is episode coherence
+
+Judge natural behavior across the complete interaction, not from one polished sentence.
+Chromie should preserve one recognizable self and one evolving understanding while
+input, speech, planning, execution, and Evidence overlap. It must not claim to be human,
+conscious, or emotionally affected merely to sound natural.
+
+An interaction is human-like only when the existing owners jointly preserve these
+observable properties:
+
+- **timely relevance** — respond with the smallest useful truthful delta, without empty
+  status chatter or waiting for unrelated cognition;
+- **turn-taking** — listen and yield on credible user speech, suppress stale output, and
+  do not treat an ordinary provider result as permission to talk over the user;
+- **continuity** — remember what was asked, said, promised, attempted, and completed, and
+  continue the same Responsibility without replaying it as a new request;
+- **situational revision** — accept corrections and new Evidence without defending an
+  obsolete interpretation or erasing committed history;
+- **proportionate effort** — use Fast cognition for clear low-consequence progress and
+  Deep cognition only when consequential ambiguity or complex HOW warrants it;
+- **grounded initiative** — reactivate an open Responsibility when trusted Evidence or a
+  relevant state change makes progress possible, but do not invent unsolicited Goals;
+- **restrained expression** — keep personality and optional Social Attention coherent
+  with the primary Activity, fail-soft, and never use expression as completion Evidence;
+  and
+- **natural imperfection** — tolerate harmless wording or expression variation while
+  stopping material falsehood, unsafe action, and authority violations before commitment.
+
+Episode scenarios should therefore exercise timing and re-entry, not only final text:
+a follow-up while Work is pending, Evidence arriving during speech, a user correction,
+an interruption, partial or failed execution, and a later continuation are stronger
+probes than isolated phrase expectations. Every probe still uses the relevant General
+Ability class and the evidence level actually reached.
+
 ## Responsive speech and planning depth
 
 The routing and independently scheduled Fast-response boundaries in this section

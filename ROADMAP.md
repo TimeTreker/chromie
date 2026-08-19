@@ -188,6 +188,52 @@ baseline**, not another broad concept-expansion phase:
    resumable cognition remain later detail work unless a current implementation
    slice requires them.
 
+### Incremental implementation rhythm for human-like behavior
+
+This sequence does not reorder the binding current execution order. It begins only
+after the current-revision evidence line and the already-queued structural
+simplification permit later semantic work. Here, `rhythm` means delivery cadence only;
+it is not architecture vocabulary, a runtime mode, a persistent state, or another
+manager. Each item should be one focused Issue/patch with an originating episode, the
+earliest wrong boundary, a General Ability regression, canonical gates, and the highest
+safe evidence profile available.
+
+1. **Make simple interaction promptly useful.** Meet the approved Fast-Planner and
+   audible-start budgets by removing avoidable model reloads, duplicate generations,
+   and serial waits inside existing owners. A provider-free answer should close without
+   durable Goal state; a pending-work acknowledgement must add truthful common ground
+   and must not claim execution. Preserve Epistemic Qualification and every existing
+   truth/safety validator.
+2. **Keep conversation available while Work continues.** Exercise a follow-up or
+   correction while safe read-only or embodied Work is queued/running. Gateway keeps
+   accepting input, GI/GA preserve responsibility continuity, Planner revises only
+   affected Work, and independent Work survives. Barge-in stops stale output without
+   silently cancelling unrelated Goals.
+3. **Speak from state changes, not pipeline milestones.** On progress, terminal
+   Evidence, timeout, refusal, or cancellation, reactivate the existing Fast Planner
+   with the bounded current snapshot. Deliver only the still-needed response delta at
+   an appropriate conversational opening; suppress duplicate acknowledgement and
+   completion speech. Safety/control obligations retain deterministic pre-emption.
+4. **Make correction and waiting feel continuous.** Retain open Responsibility while
+   waiting for user input, time, provider readiness, or trustworthy Evidence. A later
+   event should resume from current Goal/Work/Evidence state rather than restart the
+   whole request. Corrections revise current meaning, reuse compatible Work, and repair
+   incompatible speech or effects forward without rewriting history.
+5. **Add restrained embodied expression.** Qualify Social Attention only around an
+   explicit primary Activity with current target/scene evidence. Optional gaze, posture,
+   or expression remains resource-aware and fail-soft, never delays the primary outcome,
+   and never becomes Goal-completion Evidence. Missing expression is preferable to a
+   mismatched or unsafe gesture.
+6. **Learn selectively after the interaction.** Use existing Reflection and Memory
+   boundaries to retain only supported, reusable, scope- and lifetime-bounded meaning.
+   Prove in a later episode that the retained lesson improves context without replacing
+   fresh grounding, mutating Stable Mind/shared policy, or reopening completed history.
+
+Do not bundle affect simulation, ambient autonomy, multi-user identity, or new durable
+Mind objects into these slices. Those require their separately governed evidence,
+privacy, consent, and authority decisions. The target is coherent behavior over time,
+not a claim that Chromie is a human being.
+
 Architecture review may remove or replace pre-release compatibility/workflow
 structures when they obstruct this model. `Use less to solve more` means ending
 with fewer truth owners and processes, not preserving an obsolete pipeline or
