@@ -1402,6 +1402,37 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             "goal_interpretation",
         )
 
+    async def test_atomic_speech_turn_echo_is_stripped_without_deep_escalation(self) -> None:
+        interpreter = self._interpreter()
+        acknowledgement = {
+            "confidence": 0.95,
+            "responsibilities": [
+                {
+                    "local_ref": "reply",
+                    "outcome": "respond to the user's acknowledgement",
+                    "bindings": {"user_input": "Yeah."},
+                    "output_mode": "speech",
+                    "completion_requires_work": False,
+                    "completion_requires_fresh_evidence": False,
+                    "confidence": 0.95,
+                }
+            ],
+            "unresolved": [],
+        }
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            return_value={
+                "message": {"content": json.dumps(acknowledgement, ensure_ascii=False)}
+            }
+        )
+
+        result = await interpreter.interpret_goal(
+            GoalInterpretationRequest(text="Yeah.", language="en-US")
+        )
+
+        self.assertEqual(result.responsibilities[0].bindings, {})
+        self.assertEqual(result.responsibilities[0].output_mode, "speech")
+        self.assertEqual(interpreter._chat.await_count, 1)
+
     async def test_transport_echo_bindings_escalate_once_from_source(self) -> None:
         interpreter = self._interpreter()
         invalid = {

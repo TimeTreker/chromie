@@ -116,7 +116,11 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
     async def test_delivered_fast_communicative_act_is_recorded_for_continuity(self) -> None:
         recorded: list[tuple[str | None, str, dict[str, Any]]] = []
         coordinator = InteractionRuntimeCoordinator(
-            lambda _args: {"scheduled": True, "playback_started": True},
+            lambda _args: {
+                "scheduled": True,
+                "playback_started": True,
+                "voice_released": True,
+            },
             communicative_delivery_recorder=(
                 lambda sid, text, metadata: recorded.append((sid, text, metadata))
             ),
@@ -144,6 +148,54 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             recorded[0][2]["source"],
             "fast_planner_communicative_delivery",
         )
+
+    async def test_completed_fast_response_can_bind_to_later_canonical_goal(self) -> None:
+        completed: list[tuple[str | None, list[str], dict[str, Any]]] = []
+        coordinator = InteractionRuntimeCoordinator(
+            lambda _args: {
+                "scheduled": True,
+                "playback_started": True,
+                "voice_released": True,
+            },
+            communicative_goal_completion_recorder=(
+                lambda sid, goal_ids, metadata: completed.append(
+                    (sid, goal_ids, metadata)
+                )
+            ),
+        )
+
+        ready = await coordinator.start_fast_planner_communicative_act(
+            FastPlannerCompleteResponseAct.model_validate({
+                "activity_id": "a-complete",
+                "role": "complete_response",
+                "speech_act": "respond",
+                "text": "你好呀！",
+                "truth_stage": "context_grounded",
+                "source_responsibility_refs": ["r1"],
+            }),
+            session_id="sid-late-bind",
+            turn_id="turn-late-bind",
+            language="zh-CN",
+        )
+        # Fast speech may finish before Goal Association has canonical Goal IDs.
+        await ready.task
+        bound = coordinator.bind_fast_planner_communicative_execution(
+            ready,
+            session_id="sid-late-bind",
+            goal_ids_by_responsibility={"r1": ["goal-greeting"]},
+        )
+        await asyncio.sleep(0)
+
+        self.assertEqual(bound, ["goal-greeting"])
+        self.assertEqual(len(completed), 1)
+        self.assertEqual(completed[0][0], "sid-late-bind")
+        self.assertEqual(completed[0][1], ["goal-greeting"])
+        self.assertEqual(
+            completed[0][2]["source"],
+            "fast_planner_communicative_completion",
+        )
+        self.assertEqual(completed[0][2]["delivery_role"], "complete_response")
+        self.assertEqual(completed[0][2]["source_responsibility_refs"], ["r1"])
 
     async def test_failed_fast_communicative_act_is_not_recorded(self) -> None:
         recorded: list[tuple[str | None, str, dict[str, Any]]] = []

@@ -155,4 +155,11 @@ def build_interaction_runtime(
                 metadata=metadata,
             )
         ),
+        communicative_goal_completion_recorder=(
+            lambda sid, goal_ids, metadata: assistant.conversation_state.reconcile_fast_communicative_goal_completion(
+                sid,
+                goal_ids,
+                metadata=metadata,
+            )
+        ),
     )

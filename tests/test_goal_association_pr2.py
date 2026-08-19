@@ -1620,6 +1620,130 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertEqual(repairs[0]["from"], "string")
         self.assertTrue(repairs[0]["value_unchanged"])
 
+    def test_coverage_reconciles_self_contradictory_typed_temporal_constraint(self):
+        req = request("今天晚上重庆会不会下大雨啊？")
+        candidate = GoalAssociationModelGoal.model_validate(
+            goal(
+                "Determine whether it will rain heavily in Chongqing tonight",
+                "capability_work",
+                resource=resource_responsibility(
+                    kind="information",
+                    information_domain="weather_forecast",
+                    description="Chongqing heavy rain tonight",
+                    attributes=[
+                        binding("location", "place", "重庆"),
+                        binding("date", "date", "today"),
+                        binding("day_part", "day_part", "night"),
+                        binding("weather_aspect", "weather_attribute", "heavy rain"),
+                    ],
+                    source_status="provider_resolved",
+                ),
+            )
+        )
+        raw = certificate(
+            coverage_item(
+                "重庆会不会下大雨",
+                0,
+                independently_satisfiable=False,
+                required_goal_shape="information_resource",
+            ),
+            coverage_item(
+                "今天",
+                0,
+                coverage="representation_mismatch",
+                independently_satisfiable=False,
+                required_output_mode="capability_work",
+            ),
+            coverage_item(
+                "晚上",
+                0,
+                coverage="representation_mismatch",
+                independently_satisfiable=False,
+                required_output_mode="capability_work",
+            ),
+            coverage_item(
+                "今天",
+                0,
+                role="constraint",
+                temporal_dimensions=["date"],
+            ),
+            coverage_item(
+                "晚上",
+                0,
+                role="constraint",
+                coverage="representation_mismatch",
+                temporal_dimensions=["day_part"],
+            ),
+        )
+
+        parsed = GoalAssociationResolver._validate_coverage_certificate(
+            raw,
+            request=req,
+            goal_count=1,
+            candidate_goals=[candidate],
+        )
+
+        self.assertEqual(
+            [item.source_excerpt for item in parsed.responsibility_items],
+            ["重庆会不会下大雨"],
+        )
+        self.assertEqual(
+            [item.coverage for item in parsed.supporting_items],
+            ["covered", "covered"],
+        )
+        verdict, problems = GoalAssociationResolver._coverage_verdict(
+            parsed, goal_count=1
+        )
+        self.assertEqual(verdict, "accept")
+        self.assertEqual(problems, [])
+
+    def test_temporal_mismatch_still_rejects_when_typed_dimension_is_absent(self):
+        req = request("今天晚上重庆会不会下大雨啊？")
+        candidate = GoalAssociationModelGoal.model_validate(
+            goal(
+                "Determine whether it will rain heavily in Chongqing tonight",
+                "capability_work",
+                resource=resource_responsibility(
+                    kind="information",
+                    information_domain="weather_forecast",
+                    description="Chongqing heavy rain tonight",
+                    attributes=[
+                        binding("location", "place", "重庆"),
+                        binding("date", "date", "today"),
+                    ],
+                    source_status="provider_resolved",
+                ),
+            )
+        )
+
+        parsed = GoalAssociationResolver._validate_coverage_certificate(
+            certificate(
+                coverage_item(
+                    "重庆会不会下大雨",
+                    0,
+                    independently_satisfiable=True,
+                    required_goal_shape="information_resource",
+                ),
+                coverage_item(
+                    "晚上",
+                    0,
+                    role="constraint",
+                    coverage="representation_mismatch",
+                    temporal_dimensions=["day_part"],
+                ),
+            ),
+            request=req,
+            goal_count=1,
+            candidate_goals=[candidate],
+        )
+
+        self.assertEqual(parsed.supporting_items[0].coverage, "representation_mismatch")
+        verdict, problems = GoalAssociationResolver._coverage_verdict(
+            parsed, goal_count=1
+        )
+        self.assertEqual(verdict, "reject")
+        self.assertIn("representation_mismatch:constraint:晚上", problems)
+
     def test_coverage_typed_claims_reject_missing_date_and_information_resource(self):
         req = request("今晚重庆会不会下雨哦？")
         candidate = GoalAssociationModelGoal.model_validate(

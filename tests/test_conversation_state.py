@@ -211,6 +211,95 @@ class ConversationStateTests(unittest.TestCase):
         self.assertEqual(manager.discourse_referents(), [])
         self.assertEqual(manager.discourse_focus(), [])
 
+    def test_delivered_fast_complete_response_closes_no_work_speech_goal(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="fast-speech")
+        manager.apply_semantic_task_operations_atomically(
+            [
+                {
+                    "operation_id": "create-greeting",
+                    "operation": "create",
+                    "goal": {
+                        "goal_id": "goal-greeting",
+                        "description": "Greet the user warmly.",
+                        "source_text": "你好。",
+                        "source_responsibility_refs": ["r1"],
+                        "metadata": {
+                            "output_mode": "speech",
+                            "completion_requires_work": False,
+                            "completion_requires_fresh_evidence": False,
+                        },
+                    },
+                }
+            ],
+            sid="sid-greeting",
+            user_text="你好。",
+        )
+        self.assertEqual(
+            [item["goal_id"] for item in manager.active_goal_snapshots()],
+            ["goal-greeting"],
+        )
+
+        results = manager.reconcile_fast_communicative_goal_completion(
+            "sid-greeting",
+            ["goal-greeting"],
+            metadata={
+                "delivery_role": "complete_response",
+                "fast_activity_id": "fast-greeting",
+                "interaction_id": "interaction-greeting",
+            },
+        )
+
+        self.assertEqual(results[0]["responsibility_status"], "satisfied")
+        self.assertTrue(results[0]["changed"])
+        self.assertEqual(manager.active_goal_snapshots(), [])
+        recent = manager.recent_goal_snapshots()
+        self.assertEqual(len(recent), 1)
+        self.assertEqual(recent[0]["goal_id"], "goal-greeting")
+        self.assertEqual(recent[0]["responsibility_status"], "satisfied")
+        self.assertEqual(recent[0]["work_status"], "done")
+
+    def test_fast_speech_completion_cannot_close_work_requiring_goal(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="fast-speech-work")
+        manager.apply_semantic_task_operations_atomically(
+            [
+                {
+                    "operation_id": "create-weather",
+                    "operation": "create",
+                    "goal": {
+                        "goal_id": "goal-weather",
+                        "description": "Check tonight's weather.",
+                        "source_text": "今晚会下雨吗？",
+                        "source_responsibility_refs": ["r1"],
+                        "metadata": {
+                            "output_mode": "capability_work",
+                            "completion_requires_work": True,
+                            "completion_requires_fresh_evidence": True,
+                        },
+                    },
+                }
+            ],
+            sid="sid-weather",
+            user_text="今晚会下雨吗？",
+        )
+
+        results = manager.reconcile_fast_communicative_goal_completion(
+            "sid-weather",
+            ["goal-weather"],
+            metadata={
+                "delivery_role": "complete_response",
+                "fast_activity_id": "fast-weather",
+            },
+        )
+
+        self.assertEqual(
+            results[0]["reason"],
+            "goal_requires_nontrivial_completion_evidence",
+        )
+        self.assertEqual(
+            [item["goal_id"] for item in manager.active_goal_snapshots()],
+            ["goal-weather"],
+        )
+
     def test_ambiguous_cancellation_does_not_clear_all_goal_context(self) -> None:
         manager = ConversationStateManager(base_conversation_id="test")
         manager.apply_semantic_task_operations_atomically(

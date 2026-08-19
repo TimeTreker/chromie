@@ -3825,6 +3825,61 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             "goal_association",
         )
 
+    def test_fast_complete_response_is_back_bound_after_goal_association_commit(self):
+        class Runtime(FastAdvanceRuntime):
+            def __init__(self):
+                super().__init__()
+                self.bound_communicative_goals: list[tuple[str | None, dict[str, list[str]]]] = []
+
+            def bind_fast_planner_communicative_execution(
+                self,
+                execution,
+                *,
+                session_id: str | None,
+                goal_ids_by_responsibility: dict[str, list[str]],
+            ):
+                del execution
+                self.bound_communicative_goals.append(
+                    (session_id, dict(goal_ids_by_responsibility))
+                )
+                return list(goal_ids_by_responsibility.get("r1", []))
+
+        client = ScriptedClient(
+            association=new_goal_association(),
+            fast_plans=[respond_plan()],
+            fast_first_responses=[
+                FastPlannerFirstResponse(
+                    turn_id="turn-greeting",
+                    activity=FastPlannerCompleteResponseAct(
+                        activity_id="greeting-complete",
+                        role="complete_response",
+                        speech_act="respond",
+                        text="你好呀！",
+                        truth_stage="context_grounded",
+                        source_responsibility_refs=["r1"],
+                    ),
+                )
+            ],
+        )
+        runtime = Runtime()
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(runtime),
+            policy=CognitiveRuntimePolicy(
+                mode="apply",
+                apply_lanes=frozenset({"chat"}),
+            ),
+            goal_state_apply=lambda *args, **kwargs: [],
+        )
+
+        result = self.run_resolution(coordinator, client)
+
+        self.assertEqual(result.status, "applied")
+        self.assertEqual(
+            runtime.bound_communicative_goals,
+            [("sid-pr7", {"r1": ["goal-1"]})],
+        )
+
     def test_followup_context_can_see_goal_while_planner_is_still_running(self):
         manager = ConversationStateManager(enabled=True)
 

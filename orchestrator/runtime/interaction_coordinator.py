@@ -77,6 +77,9 @@ SpeechCancelScheduler = Callable[
     None | Awaitable[None],
 ]
 CommunicativeDeliveryRecorder = Callable[[str | None, str, dict[str, Any]], None]
+CommunicativeGoalCompletionRecorder = Callable[
+    [str | None, list[str], dict[str, Any]], None
+]
 _TASK_GRAPH_CAPABILITY_ID = "chromie.task_graph.execute"
 
 
@@ -162,6 +165,9 @@ class InteractionRuntimeCoordinator:
         catalog_refresh_ttl_s: float | None = None,
         interaction_ledger: Any | None = None,
         communicative_delivery_recorder: CommunicativeDeliveryRecorder | None = None,
+        communicative_goal_completion_recorder: (
+            CommunicativeGoalCompletionRecorder | None
+        ) = None,
     ) -> None:
         self.registry = CapabilityRegistry()
         self.registry.register(local_speech_definition())
@@ -228,6 +234,9 @@ class InteractionRuntimeCoordinator:
         self._catalog_lock = asyncio.Lock()
         self.interaction_ledger = interaction_ledger
         self.communicative_delivery_recorder = communicative_delivery_recorder
+        self.communicative_goal_completion_recorder = (
+            communicative_goal_completion_recorder
+        )
         self._preexecuted: dict[tuple[str, str], tuple[CapabilityResult, CapabilityTrace | None]] = {}
 
     async def ensure_capability_definitions(self, capability_ids: Iterable[str]) -> None:
@@ -286,6 +295,7 @@ class InteractionRuntimeCoordinator:
                 "execution_lane": "vocal",
                 "delivery_role": activity.role,
                 "wait_for_playback_start": True,
+                "wait_for_voice_release": activity.role == "complete_response",
                 "playback_start_required_for_delivery": True,
             },
         )
@@ -339,6 +349,9 @@ class InteractionRuntimeCoordinator:
                         "fast_activity_id": activity.activity_id,
                         "delivery_role": activity.role,
                         "speech_act": activity.speech_act,
+                        "source_responsibility_refs": list(
+                            activity.source_responsibility_refs
+                        ),
                         "truth_stage": activity.truth_stage,
                     },
                 )
@@ -359,6 +372,87 @@ class InteractionRuntimeCoordinator:
             speech,
             task,
         )
+
+    def bind_fast_planner_communicative_execution(
+        self,
+        execution: ReadyPlannerCommunicativeExecution,
+        *,
+        session_id: str | None,
+        goal_ids_by_responsibility: dict[str, list[str]],
+    ) -> list[str]:
+        """Bind delivered Fast complete-response evidence to canonical Goal IDs.
+
+        Fast Planner may start a safe Communicative Activity before Goal Association
+        has produced canonical Goal identity.  Once GA is committed, this bridge
+        attaches the already-running (or already-completed) ``chromie.speak``
+        execution to the exact Goals owned by the Activity's Responsibility refs.
+        Only a delivered ``complete_response`` can close a conversational Goal;
+        progress/acknowledgement speech never receives completion authority.
+        """
+
+        activity = execution.activity
+        if activity.role != "complete_response":
+            return []
+        goal_ids: list[str] = []
+        for responsibility_ref in activity.source_responsibility_refs:
+            raw_goal_ids = goal_ids_by_responsibility.get(responsibility_ref)
+            if not isinstance(raw_goal_ids, list):
+                continue
+            for goal_id in raw_goal_ids:
+                normalized = " ".join(str(goal_id or "").strip().split())
+                if normalized and normalized not in goal_ids:
+                    goal_ids.append(normalized)
+        if not goal_ids or self.communicative_goal_completion_recorder is None:
+            return goal_ids
+
+        def reconcile_completion(
+            completed: asyncio.Task[CapabilityRuntimeResult],
+        ) -> None:
+            if completed.cancelled():
+                return
+            exc = completed.exception()
+            if exc is not None:
+                return
+            result = completed.result()
+            delivered = any(
+                item.capability_id == "chromie.speak" and item.status == "completed"
+                for item in result.results
+            )
+            if not delivered:
+                return
+            try:
+                self.communicative_goal_completion_recorder(
+                    session_id,
+                    goal_ids,
+                    {
+                        "source": "fast_planner_communicative_completion",
+                        "turn_id": execution.speech.metadata.get("turn_id"),
+                        "interaction_id": execution.interaction_id,
+                        "fast_activity_id": activity.activity_id,
+                        "delivery_role": activity.role,
+                        "speech_act": activity.speech_act,
+                        "source_responsibility_refs": list(
+                            activity.source_responsibility_refs
+                        ),
+                        "source_goal_ids": list(goal_ids),
+                    },
+                )
+            except Exception as recorder_exc:
+                logger.warning(
+                    "fast_planner_vocal_goal_completion_record_failed "
+                    "activity_id=%s goal_ids=%s error_type=%s error=%s",
+                    activity.activity_id,
+                    goal_ids,
+                    type(recorder_exc).__name__,
+                    recorder_exc,
+                )
+
+        if execution.task.done():
+            reconcile_completion(execution.task)
+        else:
+            execution.task.add_done_callback(reconcile_completion)
+        return goal_ids
+
 
     async def start_fast_planner_capability_activities(
         self,

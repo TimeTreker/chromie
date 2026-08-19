@@ -4521,6 +4521,133 @@ class ConversationStateManager:
     ) -> dict[str, Any]:
         return goal_completion_qualification_summary(bundle, outcome)
 
+    def reconcile_fast_communicative_goal_completion(
+        self,
+        sid: str | None,
+        goal_ids: list[str],
+        *,
+        metadata: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Close no-work speech Goals from delivered Fast Planner speech evidence.
+
+        Fast Planner may deliver a ``complete_response`` before Goal Association
+        has canonical Goal IDs.  The Interaction Runtime binds that already-trusted
+        ``chromie.speak`` completion back to Goal IDs after GA commits.  This method
+        performs only lifecycle reconciliation: it never decides wording, semantic
+        ownership, or whether an Activity was complete.
+        """
+
+        if not self.enabled:
+            return []
+        evidence = dict(metadata or {})
+        if str(evidence.get("delivery_role") or "") != "complete_response":
+            return []
+        normalized_sid = " ".join(str(sid or "").strip().split())
+        activity_id = " ".join(
+            str(evidence.get("fast_activity_id") or "").strip().split()
+        )
+        evidence_ref = (
+            f"fast_communicative:{activity_id}"
+            if activity_id
+            else "fast_communicative:delivered"
+        )
+        results: list[dict[str, Any]] = []
+        changed = False
+        now = _now_ms()
+        for raw_goal_id in goal_ids:
+            goal_id = " ".join(str(raw_goal_id or "").strip().split())
+            if not goal_id:
+                continue
+            context = self._task_context_by_goal_id(goal_id)
+            if context is None:
+                results.append(
+                    {
+                        "goal_id": goal_id,
+                        "changed": False,
+                        "reason": "unknown_goal",
+                    }
+                )
+                continue
+            if normalized_sid:
+                related_sids = {
+                    " ".join(str(item or "").strip().split())
+                    for item in context.get("related_sids") or []
+                    if str(item or "").strip()
+                }
+                if related_sids and normalized_sid not in related_sids:
+                    results.append(
+                        {
+                            "goal_id": goal_id,
+                            "changed": False,
+                            "reason": "delivery_turn_does_not_match_goal",
+                        }
+                    )
+                    continue
+            goal = self._semantic_goal_from_context(context)
+            goal_metadata = goal.metadata if isinstance(goal.metadata, dict) else {}
+            if not (
+                str(goal_metadata.get("output_mode") or "") == "speech"
+                and goal_metadata.get("completion_requires_work") is False
+                and goal_metadata.get("completion_requires_fresh_evidence") is False
+            ):
+                results.append(
+                    {
+                        "goal_id": goal_id,
+                        "changed": False,
+                        "reason": "goal_requires_nontrivial_completion_evidence",
+                    }
+                )
+                continue
+            previous = self._goal_responsibility_status(context)
+            if previous != "open":
+                results.append(
+                    {
+                        "goal_id": goal_id,
+                        "previous_status": previous,
+                        "responsibility_status": previous,
+                        "changed": False,
+                        "reason": "responsibility_already_terminal",
+                    }
+                )
+                continue
+
+            self._set_goal_responsibility_status(
+                context,
+                "satisfied",
+                source="fast_planner_communicative_completion",
+                evidence_refs=[evidence_ref],
+            )
+            context["status"] = "done"
+            context["commitment_state"] = "completed"
+            context["plan_status"] = "done"
+            context["updated_ms"] = now
+            evidence_summary = context.get("evidence_summary")
+            if not isinstance(evidence_summary, dict):
+                evidence_summary = {}
+            evidence_summary["fast_communicative_completion"] = {
+                **evidence,
+                "evidence_ref": evidence_ref,
+                "goal_id": goal_id,
+            }
+            context["evidence_summary"] = evidence_summary
+            changed = True
+            results.append(
+                {
+                    "goal_id": goal_id,
+                    "previous_status": previous,
+                    "responsibility_status": "satisfied",
+                    "work_status": "done",
+                    "changed": True,
+                    "evidence_ref": evidence_ref,
+                }
+            )
+
+        if changed:
+            self._persist_task_contexts_if_enabled()
+            self.last_activity_ms = now
+        return results
+
+
     def reconcile_execution_outcome_responsibilities(
         self,
         bundle: ExecutionOutcomeBundle,

@@ -4611,6 +4611,54 @@ class GoalAssociationResolver:
                     unique_items.append(item)
                 normalized_raw[field_name] = unique_items
                 normalized_items.extend(unique_items)
+        # A coverage certificate can contradict its own role split: small models
+        # sometimes repeat the same source span as both a non-independent
+        # ``responsibility`` and a supporting constraint.  The non-independent
+        # responsibility branch cannot own a standalone Goal by the auditor's own
+        # fields, so discard only that exact conflicting duplicate.  This is DTO
+        # normalization, not Host interpretation of the user's words.
+        responsibility_items = normalized_raw.get("responsibility_items")
+        supporting_items = normalized_raw.get("supporting_items")
+        self_contradictory_support_spans: set[str] = set()
+        if isinstance(responsibility_items, list) and isinstance(supporting_items, list):
+            supporting_spans = {
+                " ".join(str(item.get("source_excerpt") or "").strip().casefold().split())
+                for item in supporting_items
+                if isinstance(item, dict)
+                and str(item.get("role") or "") in {"constraint", "context", "framing"}
+                and str(item.get("source_excerpt") or "").strip()
+            }
+            retained_responsibilities: list[Any] = []
+            for item_index, item in enumerate(responsibility_items):
+                normalized_excerpt = (
+                    " ".join(str(item.get("source_excerpt") or "").strip().casefold().split())
+                    if isinstance(item, dict)
+                    else ""
+                )
+                if (
+                    isinstance(item, dict)
+                    and str(item.get("role") or "") == "responsibility"
+                    and item.get("independently_satisfiable") is False
+                    and normalized_excerpt
+                    and normalized_excerpt in supporting_spans
+                ):
+                    self_contradictory_support_spans.add(normalized_excerpt)
+                    recoveries.append(
+                        {
+                            "field": "responsibility_items",
+                            "item_index": item_index,
+                            "recovery": "removed_nonindependent_role_duplicate",
+                            "source_excerpt": item.get("source_excerpt"),
+                        }
+                    )
+                    continue
+                retained_responsibilities.append(item)
+            normalized_raw["responsibility_items"] = retained_responsibilities
+            normalized_items = [
+                *retained_responsibilities,
+                *supporting_items,
+            ]
+
         if normalized_items:
             for item_index, item in enumerate(normalized_items):
                 if not isinstance(item, dict):
@@ -4769,6 +4817,52 @@ class GoalAssociationResolver:
                             "candidate_goal_indices": list(indices),
                         }
                     )
+                normalized_source_excerpt = " ".join(
+                    str(item.get("source_excerpt") or "").strip().casefold().split()
+                )
+                if (
+                    item.get("coverage") == "representation_mismatch"
+                    and role == "constraint"
+                    and normalized_source_excerpt in self_contradictory_support_spans
+                    and candidate_goals is not None
+                    and item.get("temporal_dimensions")
+                ):
+                    # The auditor has already authored the semantic role and exact
+                    # temporal dimension(s).  If every named candidate visibly carries
+                    # those same typed dimensions, a bare representation_mismatch is
+                    # internally inconsistent: the model cannot both point to the typed
+                    # fact and deny that the typed fact is represented.  Normalize only
+                    # that contradiction.  Missing dimensions, wrong Goal shape/domain/
+                    # mode, and source-grounded binding loss remain fail-closed below.
+                    required_dimensions = {
+                        str(value) for value in item.get("temporal_dimensions") or []
+                    }
+                    dimension_coverage = True
+                    for goal_index in indices:
+                        if not isinstance(goal_index, int) or not (
+                            0 <= goal_index < len(candidate_goals)
+                        ):
+                            dimension_coverage = False
+                            break
+                        binding_types = {
+                            binding.entity_type.casefold()
+                            for binding in candidate_goals[goal_index].semantic_bindings
+                        }
+                        if not required_dimensions.issubset(binding_types):
+                            dimension_coverage = False
+                            break
+                    if dimension_coverage:
+                        item["coverage"] = "covered"
+                        recoveries.append(
+                            {
+                                "item_index": item_index,
+                                "recovery": "reconciled_typed_temporal_constraint",
+                                "from": "representation_mismatch",
+                                "to": "covered",
+                                "candidate_goal_indices": list(indices),
+                                "temporal_dimensions": sorted(required_dimensions),
+                            }
+                        )
                 if (
                     item.get("coverage") == "covered"
                     and candidate_goals is not None

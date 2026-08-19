@@ -4328,6 +4328,7 @@ class GoalDrivenRuntimeCoordinator:
         needs_deep_planner = False
         fast_advance_task: asyncio.Task[FastPlannerAdvance] | None = None
         fast_vocal_activity_ids: list[str] = []
+        ready_fast_communicative_executions: list[Any] = []
         fast_communicative_realization_status = "not_started"
         social_attention_opportunity_count = 0
         ready_fast_capability_execution: Any | None = None
@@ -4518,12 +4519,16 @@ class GoalDrivenRuntimeCoordinator:
                         )
                         if self.adapter.social_attention_mode != "off":
                             social_attention_opportunity_count += 1
-                        await self.adapter.interaction_runtime.start_fast_planner_communicative_act(
-                            first_activity,
-                            session_id=sid,
-                            turn_id=turn_id,
-                            language=language,
+                        ready_execution = (
+                            await self.adapter.interaction_runtime.start_fast_planner_communicative_act(
+                                first_activity,
+                                session_id=sid,
+                                turn_id=turn_id,
+                                language=language,
+                            )
                         )
+                        if first_activity.role == "complete_response":
+                            ready_fast_communicative_executions.append(ready_execution)
                         fast_vocal_activity_ids.append(
                             first_activity.activity_id
                         )
@@ -4637,12 +4642,16 @@ class GoalDrivenRuntimeCoordinator:
                             )
                             if self.adapter.social_attention_mode != "off":
                                 social_attention_opportunity_count += 1
-                            await self.adapter.interaction_runtime.start_fast_planner_communicative_act(
-                                activity,
-                                session_id=sid,
-                                turn_id=turn_id,
-                                language=language,
+                            ready_execution = (
+                                await self.adapter.interaction_runtime.start_fast_planner_communicative_act(
+                                    activity,
+                                    session_id=sid,
+                                    turn_id=turn_id,
+                                    language=language,
+                                )
                             )
+                            if activity.role == "complete_response":
+                                ready_fast_communicative_executions.append(ready_execution)
                             fast_vocal_activity_ids.append(activity.activity_id)
                     return advance
 
@@ -4835,6 +4844,21 @@ class GoalDrivenRuntimeCoordinator:
                 time.perf_counter() - fast_started
             ) * 1000.0
             needs_deep_planner = "deep_planner" in fast_advance.continuations
+
+            if (
+                self.policy.mode == "apply"
+                and goal_state_commit_stage == "goal_association"
+                and ready_fast_communicative_executions
+            ):
+                goal_ids_by_responsibility = self._goal_ids_by_responsibility(
+                    association
+                )
+                for ready_execution in ready_fast_communicative_executions:
+                    self.adapter.interaction_runtime.bind_fast_planner_communicative_execution(
+                        ready_execution,
+                        session_id=sid,
+                        goal_ids_by_responsibility=goal_ids_by_responsibility,
+                    )
 
             association_goal_ids = self._association_goal_ids(association)
             retained_reconciliation_goal_ids = {

@@ -745,6 +745,63 @@ def _strip_language_envelope_bindings(
                 bindings[binding_name] = filtered
 
 
+def _strip_redundant_conversational_turn_echo_bindings(
+    request: GoalInterpretationRequest,
+    parsed: dict[str, Any],
+) -> None:
+    """Discard a whole-turn echo only for one already-atomic speech Responsibility.
+
+    A model may redundantly preserve a short acknowledgement such as ``Yeah.`` in
+    ``bindings.user_input`` even though the same single conversational WHAT is
+    already carried by ``outcome``.  For one explicit ``output_mode=speech``
+    Responsibility with no downstream work or fresh-evidence requirement, that
+    exact whole-turn scalar is envelope redundancy rather than hidden structure.
+
+    The rule is intentionally narrow.  Embodied, capability, media, authored-vocal,
+    multi-Responsibility, or work-requiring interpretations retain the fail-closed
+    whole-turn guard below because an opaque copied turn can conceal coordinated
+    independently satisfiable effects.
+    """
+
+    responsibilities = parsed.get("responsibilities")
+    if not isinstance(responsibilities, list) or len(responsibilities) != 1:
+        return
+    item = responsibilities[0]
+    if not isinstance(item, dict):
+        return
+    if str(item.get("output_mode") or "") != "speech":
+        return
+    if item.get("completion_requires_work") is not False:
+        return
+    if item.get("completion_requires_fresh_evidence") is not False:
+        return
+    bindings = item.get("bindings")
+    if not isinstance(bindings, dict):
+        return
+    turn_echo = _normalized_turn_echo(request.text or "")
+    if not turn_echo:
+        return
+    for binding_name, value in list(bindings.items()):
+        if isinstance(value, str):
+            if _normalized_turn_echo(value) == turn_echo:
+                bindings.pop(binding_name, None)
+            continue
+        if not isinstance(value, list):
+            continue
+        filtered = [
+            scalar
+            for scalar in value
+            if not (
+                isinstance(scalar, str)
+                and _normalized_turn_echo(scalar) == turn_echo
+            )
+        ]
+        if not filtered:
+            bindings.pop(binding_name, None)
+        elif len(filtered) != len(value):
+            bindings[binding_name] = filtered
+
+
 def _reject_transport_echo_bindings(
     request: GoalInterpretationRequest,
     parsed: dict[str, Any],
@@ -1815,6 +1872,7 @@ class OllamaGoalInterpreter:
         _reject_unprovenanced_location_bindings(request, parsed)
         _reject_runtime_identity_bindings(request, parsed)
         _strip_language_envelope_bindings(request, parsed)
+        _strip_redundant_conversational_turn_echo_bindings(request, parsed)
         _reject_transport_echo_bindings(request, parsed)
         _reject_untyped_coordination_bindings(parsed)
         _reject_dropped_explicit_numeric_bindings(request, parsed)
