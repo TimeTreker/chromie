@@ -139,12 +139,13 @@ CognitiveOpportunityMode = Literal["local", "fast", "slow"]
 
 
 class CognitiveOpportunity(BaseModel):
-    """Ephemeral derived condition that may justify another cognitive act.
+    """Ephemeral readiness signal derived from a meaningful trusted state transition.
 
     This is not durable Mind state and is never an authority over the referenced
-    Goal or Evidence. It exists only long enough for the current runtime to decide
-    whether no cognition, local handling, Fast cognition, or Slow cognition is
-    useful after a meaningful state transition.
+    Goal, Evidence, or next Activity. It carries exact Goal/Evidence provenance only
+    long enough to decide whether no cognition, local handling, Planner fast-pass
+    cognition, or slower/deeper cognition is useful. A Runtime callback never becomes
+    a response/action decision merely by creating this object.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)

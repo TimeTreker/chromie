@@ -2268,7 +2268,13 @@ class FastPlannerResolver:
         )
         reentry_goal_ids = result_evidence_reentry_goal_ids(context)
         if reentry_goal_ids == set(expected_goal_ids_for_turn):
-            response_only = True
+            # Terminal Evidence satisfies the just-completed provider prerequisite,
+            # but it does not force a response-only callback.  Planner must see the
+            # executable catalog so the new trusted state can legitimately yield a
+            # response, genuinely new follow-up Work, clarification/waiting, or no
+            # new Activity.  The just-completed Activity is rejected separately by
+            # the Host re-entry boundary rather than hidden by this schema.
+            response_only = False
             requires_execution = False
             response_goal_ids = list(expected_goal_ids_for_turn)
         capabilities = await self.catalog.prompt_entries(scope="common", refresh=False)
@@ -2960,7 +2966,7 @@ class FastPlannerResolver:
         """
 
         raw_activities = (context or {}).get(
-            "work_reconciliation_activities"
+            "existing_work_activities"
         )
         activities = (
             [item for item in raw_activities if isinstance(item, dict)]
@@ -3047,13 +3053,15 @@ class FastPlannerResolver:
             "step.args.material_args object. "
         )
         result_evidence_contract = (
-            "Host-bound terminal Evidence completes the provider-read prerequisite for "
-            "the exact canonical Goals. Answer from trusted_terminal_evidence only, "
-            "preserve its values, scope, and epistemic strength, and return a respond "
-            "Plan with zero steps. An observation, forecast, estimate, and probability "
-            "are different claims. A probability below 100% must remain uncertain in "
-            "the answer and must not become an unqualified claim that the event will "
-            "occur. "
+            "Host-bound terminal Evidence records the trusted state transition for the "
+            "exact canonical Goals. Reconsider the still-open Responsibility from the "
+            "current Goal, Situation, actual Work, and trusted_terminal_evidence. You "
+            "may answer from that Evidence, author genuinely new follow-up Work when it "
+            "is now necessary, clarify/wait, or produce no new Activity. Do not repeat "
+            "the Capability Activity that just completed merely because Evidence "
+            "arrived. Preserve Evidence values, scope, and epistemic strength: an "
+            "observation, forecast, estimate, and probability are different claims, and "
+            "a probability below 100% must remain uncertain. "
             if isinstance(context.get("result_evidence_reentry"), dict)
             else ""
         )
@@ -3092,7 +3100,7 @@ class FastPlannerResolver:
             "justification across multiple fields. "
         )
         provisional_fast_activities = context.get(
-            "work_reconciliation_activities"
+            "existing_work_activities"
         )
         provisional_work_contract = (
             "The listed retained or provisional Runtime Activities may already be "
@@ -3125,9 +3133,9 @@ class FastPlannerResolver:
                 f"Delivered evidence-bound dialogue JSON (trusted spoken projection, not the full provider result):\n{self._bounded(evidence_bound_dialogue(context, fallback_history=request.history), 3600)}\n\n"
                 f"Host-bound terminal Evidence JSON:\n{self._bounded(context.get('trusted_terminal_evidence') or [], 6000)}\n\n"
                 f"Active and recoverable task bindings JSON:\n{self._bounded(context.get('active_task_snapshots') or [], 5000)}\n\n"
-                f"Retained or provisional Runtime Activities for Work reconciliation JSON:\n{self._bounded(provisional_fast_activities or [], 3500)}\n\n"
+                f"Existing retained or provisional Runtime Activities JSON:\n{self._bounded(provisional_fast_activities or [], 3500)}\n\n"
                 f"Bounded live Situation projection JSON (soft/revisable relevance only; referenced owners remain authoritative):\n{self._bounded(situation_prompt_projection(context), 3600)}\n\n"
-                f"{goal_progress_communication_prompt('Fast Planner')}\n\n"
+                f"{goal_progress_communication_prompt('Planner fast pass')}\n\n"
                 f"Goal-scoped Interaction Context JSON:\n{self._bounded(context.get('interaction_context') or {}, 7000)}\n\n"
                 "Use Interaction Context to plan only the still-needed conversational and effectful delta. Preserve each typed event's owner and state: generated or scheduled speech is not proof the user heard it, committed work is not completion, and only execution_closure terminal events reference trusted Activity completion evidence. Do not treat missing or undelivered speech as fulfilled communication. Decide whether any new planner response_text materially helps the current human interaction, and prefer no extra speech when it would be filler or repetition. Do not repeat an already delivered or pending semantic act, or re-plan an already completed effect, unless the current meaning requires an explicit repeat, retry after failure, correction, changed state, new evidence, or clarification. It cannot override the authoritative current Goals or Canonical Plan contract. "
                 f"Previous Fast Planner output when doing a mechanical DTO regeneration:\n{self._bounded(previous_raw, 3500) if previous_raw is not None else 'null'}\n\n"
@@ -3167,9 +3175,9 @@ class FastPlannerResolver:
             f"Delivered evidence-bound dialogue JSON (trusted spoken projection, not the full provider result):\n{self._bounded(evidence_bound_dialogue(context, fallback_history=request.history), 3600)}\n\n"
             f"Host-bound terminal Evidence JSON:\n{self._bounded(context.get('trusted_terminal_evidence') or [], 6000)}\n\n"
             f"Active and recoverable task bindings JSON:\n{self._bounded(context.get('active_task_snapshots') or [], 5000)}\n\n"
-            f"Retained or provisional Runtime Activities for Work reconciliation JSON:\n{self._bounded(provisional_fast_activities or [], 3500)}\n\n"
+            f"Existing retained or provisional Runtime Activities JSON:\n{self._bounded(provisional_fast_activities or [], 3500)}\n\n"
             f"Bounded live Situation projection JSON (soft/revisable relevance only; referenced owners remain authoritative):\n{self._bounded(situation_prompt_projection(context), 3600)}\n\n"
-            f"{goal_progress_communication_prompt('Fast Planner')}\n\n"
+            f"{goal_progress_communication_prompt('Planner fast pass')}\n\n"
                 f"Goal-scoped Interaction Context JSON:\n{self._bounded(context.get('interaction_context') or {}, 7000)}\n\n"
             "Use Interaction Context to plan only the still-needed conversational and effectful delta. Preserve each typed event's owner and state: generated or scheduled speech is not proof the user heard it, committed work is not completion, and only execution_closure terminal events reference trusted Activity completion evidence. Do not treat missing or undelivered speech as fulfilled communication. Decide whether any new planner response_text materially helps the current human interaction, and prefer no extra speech when it would be filler or repetition. Do not repeat an already delivered or pending semantic act, or re-plan an already completed effect, unless the current meaning requires an explicit repeat, retry after failure, correction, changed state, new evidence, or clarification. It cannot override the authoritative current Goals or Canonical Plan contract. "
             f"Previous Fast Planner output when doing a mechanical DTO regeneration:\n{self._bounded(previous_raw, 3500) if previous_raw is not None else 'null'}\n\n"

@@ -519,3 +519,141 @@ async def test_late_result_after_goal_cancellation_cannot_reenter_speech():
     provider.release_second.set()
     result_task = next(iter(assistant.active_capability_result_tasks))
     await asyncio.wait_for(asyncio.shield(result_task), timeout=1.0)
+
+class _FollowUpProvider:
+    provider_id = "test.followup"
+
+    def __init__(self) -> None:
+        self.started = asyncio.Event()
+        self.release = asyncio.Event()
+
+    async def execute(
+        self,
+        request: CapabilityRequest,
+        definition: CapabilityDefinition,
+        context: CapabilityExecutionContext,
+    ) -> CapabilityResult:
+        del definition, context
+        self.started.set()
+        await self.release.wait()
+        return CapabilityResult(
+            request_id=request.request_id,
+            capability_id=request.capability_id,
+            provider_id=self.provider_id,
+            status="completed",
+            output={"user_summary": "follow-up result"},
+        )
+
+    async def cancel(
+        self,
+        request: CapabilityRequest,
+        definition: CapabilityDefinition,
+        context: CapabilityExecutionContext,
+    ) -> None:
+        del request, definition, context
+
+
+class _FollowUpAgentClient(_AgentClient):
+    async def resolve_fast_plan(self, _session, *, request, timeout_ms):
+        del timeout_ms
+        self.requests.append(request)
+        evidence = request.context["trusted_terminal_evidence"][0]
+        goal_ids = request.context["result_evidence_reentry"]["source_goal_ids"]
+        if evidence["tool_id"] == "chromie.test.first":
+            return CanonicalPlan(
+                plan_id=f"plan-follow-up-{evidence['evidence_id']}",
+                planner_tier="fast",
+                disposition="execute",
+                coverage="complete",
+                confidence=1.0,
+                goal_ids=goal_ids,
+                steps=[
+                    {
+                        "step_id": "step-follow-up",
+                        "capability_id": "chromie.test.followup",
+                        "args": {},
+                        "timing": "sequential",
+                        "source_goal_ids": goal_ids,
+                    }
+                ],
+                goal_outcomes=[
+                    {
+                        "goal_id": goal_id,
+                        "disposition": "execute",
+                        "coverage": "complete",
+                        "step_ids": ["step-follow-up"],
+                    }
+                    for goal_id in goal_ids
+                ],
+                goal_satisfaction={
+                    "score": 1.0,
+                    "status": "exact",
+                    "satisfied_goal_ids": goal_ids,
+                },
+            )
+        return await super().resolve_fast_plan(
+            _session,
+            request=request,
+            timeout_ms=1000,
+        )
+
+
+@pytest.mark.asyncio
+async def test_terminal_evidence_can_start_follow_up_work_while_sibling_is_running():
+    coordinator = InteractionRuntimeCoordinator(
+        lambda _args: {"scheduled": True, "playback_started": True}
+    )
+    provider = _TwoResultProvider()
+    for capability_id in ("chromie.test.first", "chromie.test.second"):
+        coordinator.registry.register(
+            CapabilityDefinition(
+                capability_id=capability_id,
+                provider_id=provider.provider_id,
+                output_schema=_SCHEMA,
+                can_run_parallel=True,
+            )
+        )
+    coordinator.runtime.register_provider(provider)
+
+    follow_up = _FollowUpProvider()
+    coordinator.registry.register(
+        CapabilityDefinition(
+            capability_id="chromie.test.followup",
+            provider_id=follow_up.provider_id,
+            output_schema=_SCHEMA,
+        )
+    )
+    coordinator.runtime.register_provider(follow_up)
+
+    assistant = _assistant(coordinator)
+    assistant.agent_client = _FollowUpAgentClient()
+    response = _response()
+
+    assistant._launch_interaction(response, "sid-detached", reset_playback=False)
+    foreground = assistant.active_interaction_task
+    assert foreground is not None
+    await asyncio.wait_for(provider.first_started.wait(), timeout=1.0)
+    await asyncio.wait_for(provider.second_started.wait(), timeout=1.0)
+    await asyncio.wait_for(asyncio.shield(foreground), timeout=1.0)
+
+    # One terminal sibling is enough to create a cognitive opportunity. Planner may
+    # schedule genuinely new Work without waiting for the unrelated sibling to finish.
+    provider.release_first.set()
+    await asyncio.wait_for(follow_up.started.wait(), timeout=1.0)
+
+    assert not provider.release_second.is_set()
+    assert len(assistant.agent_client.requests) == 1
+    request = assistant.agent_client.requests[0]
+    assert request.context["terminal_request_id"] == "request-first"
+    assert request.context["result_evidence_reentry"]["source_goal_ids"] == [
+        "goal-first"
+    ]
+    assert "goal-first" in request.context["situation"].get("focus_goal_ids", [])
+
+    # Clean up provider work. The important assertion is that follow-up Work became
+    # ready before the original second sibling reached terminal state.
+    assistant.conversation_state.goal_status["goal-first"] = "cancelled"
+    provider.release_second.set()
+    follow_up.release.set()
+    for task in list(assistant.active_capability_result_tasks):
+        await asyncio.wait_for(asyncio.shield(task), timeout=1.0)

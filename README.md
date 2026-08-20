@@ -12,61 +12,33 @@ Chromie can retain correlated traces, events, resource samples, and reviewed
 experience artifacts. See
 [Runtime Observability Architecture](docs/RUNTIME_OBSERVABILITY.md).
 
-> **Current state:** the Goal-driven Runtime is implemented as Chromie's single
-> semantic authority with readiness-driven continuous progress. Goal Interpretation
-> emits contextual WHAT-only Responsibility evidence, and the same result enters
-> Fast Planner and Goal Association concurrently. Fast Planner authors the first
-> Communicative-Act/Capability Activity Plan, including exact natural wording,
-> truth stage, and provenance for each Communicative Activity. The Host validates
-> it mechanically; a complete answer may enter the Vocal runtime immediately, and a trusted side-effect-free read may start
-> while Goal Association commits its canonical Goal. The approved contract makes Fast
-> Planner—not GI—the owner of execution-input completeness, source/default policy, and
-> clarification selection; it asks only for a user-resolvable blocker after applicable
-> trusted sources and permitted defaults are insufficient. Only genuinely complex HOW
-> enters Deep Planner. The source and typed Runtime continuity implement this ownership;
-> see `docs/STATUS.md` for its validation level.
-> Goal Association alone creates or modifies canonical Goals, and Runtime groups the
-> resulting task-list view by Goal while preserving one execution identity for shared
-> Work. Every canonical Goal commit that intersects provisional or retained Work
-> reactivates Fast Planner Work Reconciliation; GA does not emit a replan or compatibility
-> decision. Fast Planner compares Goal, Responsibility, Situation, Evidence, and actual
-> Work, explicitly selects any stable Activity identity to reuse, and otherwise proposes
-> complete replacement Work. Runtime validates only exact identity/state/arguments and
-> cancels replaceable Work through trusted receipts before dispatching the revision.
-> Background Social Attention may prepare optional body decoration attached
-> to the same observable Main Activity without delaying speech. Trusted execution,
-> Host-bound Evidence re-entry to Fast Planner, and deterministic per-goal
-> reconciliation own completion truth. A frozen
-> `UserTurnEnvelope` now preserves the admitted Gateway input through this loop.
-> The contracts and host path are automatically verified and default to
-> authoritative chat plus registered safe read-only tools in the common safe
-> base; the maintained Soridormi launcher widens authority to simulator robot
-> actions. The complete microphone/automated-audio -> Chromie -> Soridormi ->
-> MuJoCo path is implemented. Retained evidence includes full synthetic and
-> virtual-microphone MuJoCo runs, clean Goal-driven generated-voice evidence,
-> clean Goal-driven MuJoCo execution/cancellation, and one supervised physical
-> microphone -> audible-speaker turn. These artifacts are revision-bound, so a
-> later source change does not silently inherit their exact-revision claim, but
-> that provenance rule does not make the implemented core path unfinished.
-> Issues #1, #5, #6, and #7
-> have been merged to `main`; their retained evidence remains bound to the
-> exact recorded revisions and does not automatically become evidence for a
-> later merge commit. Any gate claim must use
-> the exact output of a fresh `./scripts/run_tests.sh` run rather than a copied
-> test count. A strict source-bound verifier for
-> the current-revision microphone-to-audible-response loop is implemented. The
-> latest automated generated-speech run exercised VAD, ASR, the live
-> Gateway/Core, TTS, playback, and deterministic interruption on an RTX 5090.
-> A separate clean supervised run has already validated the basic physical
-> microphone -> ASR -> cognition -> TTS -> audible-speaker chain. Default
-> audio selections now follow OS device changes during runtime, while explicit
-> selections remain pinned; broader device distribution, acoustic barge-in,
-> hot-plug, and latency characterization are optional qualification scopes, not
-> missing core interaction functionality. Physical-robot deployment is likewise
-> an optional Soridormi/provider integration and is not a Chromie completion
-> condition. No release version
-> or publication target is planned. See
-> [Status](docs/STATUS.md) and [Roadmap](ROADMAP.md).
+> **Current state:** Chromie uses one Goal-driven semantic authority with
+> event-driven, readiness-driven continuation. Goal Interpretation owns
+> provider-neutral Responsibility / WHAT. The same admitted meaning can enter
+> Planner and Goal Association concurrently: Planner owns detailed HOW, exact
+> Communicative Activities and Capability Work, while Goal Association alone owns
+> canonical Goal continuity. Planner has fast/deep cognition passes of the same
+> authority; deep is used only when HOW warrants broader reasoning.
+>
+> Trusted Capability Runtime is asynchronous. Provider/Runtime events report what
+> happened; Host correlation and validation materialize Evidence describing what
+> is true. Responsibility/Goal state says what remains owed. A meaningful trusted
+> Goal/Work/Evidence/Situation change may create an ephemeral
+> `CognitiveOpportunity`, which can reactivate Planner with the bounded current
+> state. Planner may answer, author genuinely new Work, reuse/cancel/replace
+> existing Work, clarify, wait, or produce no new Activity. A callback never
+> selects speech/action itself, and `Work Reconciliation` is not a mandatory
+> cognitive stage.
+>
+> Safe side-effect-free reads may start before GA finishes when their declared
+> Capability contract permits it. Terminal Evidence can then trigger a Planner
+> decision while independent sibling Work is still running. Newly planned Work
+> returns through the same trusted asynchronous Runtime; confirmation, privacy,
+> safety, resource and provider contracts remain authoritative, and an internal
+> event is never user consent. Background Social Attention remains optional
+> body-only decoration attached to a concrete Main Activity and never delays or
+> completes the primary Responsibility. Current implementation and qualification
+> evidence are tracked separately in [Status](docs/STATUS.md).
 >
 > **Implemented Agent Skills architecture:** Agent Skills are passive,
 > owner-approved methods selected by Agents to inform Plans. The repository now
@@ -90,29 +62,49 @@ experience artifacts. See
 ## Architecture
 
 ```text
-Host Orchestrator
-  microphone -> VAD -> ASR -> Cognitive Gateway
-    |-> Protective Reflex -> immediate stop/cancel (no model wait)
-    `-> immutable admitted UserTurnEnvelope -> Goal-driven Cognitive Core
-        -> Goal Interpretation (Responsibility + Goal relation + bounded unresolved meaning)
-        -> same GI result + immutable original UserTurn, concurrent fan-out
-           |-> Fast Planner -> input resolution + exact Communicative/Capability Activities --.
-           |      |-> validated Communicative Activity -> Vocal/TTS      |
-           |      |-> eligible safe read -> provisional Runtime task ----|
-           |      `-> Deep Planner only for complex HOW                  |
-           |-> Goal Association -> canonical Goal state --------+-> Goal-bound tasks
-           `-> background Social Attention decoration            |
-        -> GA result re-enters Planner -> Work Reconciliation over Canonical Goal + actual Runtime Work
-        -> resource-aware Trusted Capability Runtime <-----------'
-        -> named capability -> Soridormi / peer providers
-        -> structured results and traces
-        -> exact request/Goal-bound Evidence -> Fast Planner re-entry
-        -> per-goal outcome reconciliation
-        -> speech-only final response -> TTS -> speaker
+Person / World
+      │
+  Perception
+      ▼
+Cognitive Gateway
+      ▼
+Goal Interpretation
+      ▼
+Responsibility / WHAT
+      │
+      ├───────────────────┐
+      ▼                   ▼
+Planner              Goal Association
+fast/deep passes       Goal continuity
+      │                   │
+      ▼                   ▼
+Plan / Activities    Canonical Goals
+      │                   │
+      └─────────┬─────────┘
+                ▼
+      Trusted Capability Runtime
+                ▼
+             Provider
+                ▼
+     asynchronous Runtime events   -- what happened
+                │
+          Host correlation
+                ▼
+             Evidence              -- what is true
+                │
+ Responsibility + Goal + Situation + Work + Evidence
+                ▼
+       meaningful state transition
+                ▼
+       CognitiveOpportunity
+                ▼
+          Planner re-entry
+                │
+     0..N Activity changes or none
+                └──────────────→ Trusted Capability Runtime
 
-Docker: ASR, Agent (Cognitive Core), Ollama, TTS
-Soridormi: embodied planning, simulator/robot execution, monitoring, stop,
-           emergency stop, recovery, and hardware commissioning
+Vocal/TTS is one Activity realization; Soridormi is a peer embodied Provider.
+Protective Reflex stays deterministic and may stop/cancel without model wait.
 ```
 
 The diagram above is the canonical ownership path. The complementary

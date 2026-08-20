@@ -29,23 +29,25 @@ to ordinary Core cognition; there is no Attention repair or suppression-review c
 
 ## 1. Decision
 
-Chromie uses a **manager-owned, evidence-driven cognitive turn loop**:
+Chromie uses an **evidence-grounded, event-driven and readiness-driven cognitive
+turn/continuation loop**. The loop is not a requirement to run cognition after every
+mechanical event:
 
 ```text
-receive
+receive person input
   -> admit or protect
-  -> Goal Interpretation reads bounded Session Context
-  -> concurrently:
-       Fast Planner authors the first Activity Plan
-       Goal Association commits canonical Goal identity/updates
-  -> realize the Planner's exact Communicative-Activity wording without
-     adding another semantic response author
-  -> bind Activities into per-Goal task-list views
-  -> validate, authorize, and resource-schedule ready Work
-  -> resolve execution inputs or ask a user-resolvable clarification; use Deep Planner for complex HOW
-  -> observe structured results and reconcile every Goal against Evidence
-  -> re-enter Fast Planner on trusted Evidence for the still-needed response
-  -> close, wait, or reactivate later from new evidence/state
+  -> Goal Interpretation preserves Responsibility / WHAT
+  -> concurrently when useful:
+       Planner fast pass authors detailed Activities
+       Goal Association commits canonical Goal continuity
+  -> Trusted Capability Runtime validates and submits ready Work asynchronously
+  -> Provider / Runtime lifecycle events report what happened
+  -> Host correlation turns qualified terminal observations into Evidence
+  -> meaningful Goal / Work / Evidence / Situation transition creates CognitiveOpportunity
+  -> Planner re-enters with Responsibility + Goal + Situation + actual Work + Evidence
+       -> 0..N new Activity changes, or no new Activity
+       -> deep Planner pass only when HOW genuinely warrants it
+  -> remain active, wait, listen, speak, act, or close naturally
 ```
 
 This is the robot equivalent of a general tool-using agent loop, but it is not
@@ -127,11 +129,11 @@ composer or execution specialist.
 |---|---|---|---|
 | Cognitive Gateway | captured turn, bounded Host context, deterministic protective controls | admitted immutable `UserTurnEnvelope` or protective outcome | user Goal, Capability, Plan, or social expression |
 | Goal Interpretation | admitted turn plus bounded Situation/continuity context | provider-neutral Responsibilities, bindings, qualifiers, and unresolved meaning | Capability input gaps, clarification policy, Goal continuity, or Work |
-| Fast Planner first/advance phases | GI Responsibilities, applicable schemas/catalog, trusted context | exact early Communicative Activity and provisional safe Work where eligible | canonical Goal identity or result claims without Evidence |
+| Planner fast pass / deep pass | GI Responsibilities plus applicable Goal, Situation, Work, Evidence, schemas/catalog, and trusted context | complete desired `CanonicalPlan`, exact Communicative Activities, and Capability Work; fast/deep differ only in cognition depth | canonical Goal identity, execution truth, or Host/runtime mutation |
 | Goal Association | unchanged GI result plus bounded retained Goals | Canonical Goal create/associate/update DTO | `requires_replan`, Work compatibility, Capability, cancellation, or next action |
-| Fast/Deep Planner Work Reconciliation | Canonical Goals, open Responsibilities, Situation, Evidence, and bounded queued/running/completed Work | complete desired `CanonicalPlan`; explicit `reuse_activity_id` selections | execution truth or Host/runtime mutation |
+| Planner current-state re-entry | Canonical Goals, open Responsibilities, Situation, Evidence, and bounded queued/running/completed Work after a meaningful state transition | 0..N desired Activity changes, including explicit reuse/cancel/replace/follow-up/response decisions | execution truth or mutation without Runtime validation |
 | Host Orchestrator and Trusted Capability Runtime | validated Plan plus exact live request/version/state/resource/safety bindings | accepted/rejected dispatch, reuse/cancellation receipts, traces, and typed Evidence | semantic compatibility, Goal meaning, or rewritten Planner wording |
-| Evidence re-entry and Responsibility reconciliation | Host-bound terminal Evidence plus still-open Canonical Goal | truthful response, follow-on Plan, wait/failure state, and eventual Responsibility closure | fabricated completion or conversion of stale/unbound output into Goal Evidence |
+| Runtime event → Evidence → `CognitiveOpportunity` | exact Runtime event/request provenance plus affected Goal IDs and admitted Evidence | ephemeral readiness signal for Planner; no fabricated user turn and no response decision | Goal ownership, Evidence truth, or any Activity by itself |
 
 ## 3. Turn state machine
 
@@ -243,17 +245,16 @@ clarification and active Goal/Activity Context, emitted as a `modify`/`clarify`
 relationship with the resolved semantic binding, and committed by GA as a new Goal
 version. The pending Activity retains whether the question came from GI unresolved
 meaning or a Planner-owned input need; this continuity does not transfer source-policy
-ownership into GI. Deep Planner is reserved for complex HOW, dependencies, alternatives,
-or consequential planning—not for asking a question Fast Planner already knows it must
+ownership into GI. Planner's deep pass is reserved for complex HOW, dependencies, alternatives,
+or consequential planning—not for asking a question the fast pass already knows it must
 ask.
 
 Safe, side-effect-free, schema-valid reads may start without awaiting GA once their
 Capability also explicitly declares parallel safety, needs no confirmation, and is
 available. Their stable runtime request identity initially carries GI Responsibility
 refs, never an inferred Goal ID. GA commits only Canonical Goal continuity and emits no
-Work/replan decision. When a Goal commit intersects retained or provisional Work, the
-canonical Fast Planner receives that Goal plus the relevant queued/running/completed
-Activity and result state. It semantically decides which existing Activities still
+Work/replan decision. When a Goal commit intersects retained or provisional Work, Planner receives that
+Goal plus the relevant queued/running/completed Activity and result state. It semantically decides which existing Activities still
 advance the Responsibility and authors the complete desired Plan. A task shared by
 multiple Goals still has one request identity and executes once.
 
@@ -273,7 +274,7 @@ revisions follow the same cancel-pending/preserve-completed rule; neither result
 nor the Host infer a semantic correction.
 
 Retained Runtime Work and same-turn provisional Work share the bounded
-`work_reconciliation_activities` Planner input. Each item exposes one stable Activity
+`existing_work_activities` Planner input. Each item exposes one stable Activity
 identity and its immutable Capability/argument/ownership/timing projection. A retained
 request may be reused only when Planner selects the complete retained set with no
 additional step; the new Plan is reconciliation-only, Runtime leaves the original
@@ -283,7 +284,7 @@ selections and authors the complete replacement Plan; Runtime validates and canc
 old cancellable group before replacement dispatch. This atomic-group rule is the current
 safe Runtime boundary, not a semantic judgment by Host.
 
-This reconciliation repeats from meaningful state changes while Responsibility remains
+Planner re-entry may repeat from meaningful state changes while Responsibility remains
 open. A user update may require GI/GA before planning; provider Evidence, failure,
 timeout, dependency readiness, or another trusted Work/Situation event can reactivate
 Planner directly with the already-canonical Goal. Ordinary progress churn is filtered,
@@ -530,18 +531,18 @@ The live layer is projected by responsibility:
   semantics to recognize what kind of progress is being requested.
 - Goal Association receives the richer Goal/Task/discourse view needed to decide
   continuity, reference, modification, relationship, or genuinely new work.
-- Fast Planner receives the resolved work plus only relevant exact capability
-  candidates, schemas, dependencies, resource/confirmation facts, and current
-  evidence. It is fast because the problem and live projection are bounded, not
-  merely because a smaller model happens to be configured.
-- Fast Planner Evidence re-entry receives the existing Goal responsibility,
-  exact Host-bound terminal Evidence, already-delivered interaction delta, and
-  the compact stable Mind rather than unrelated live state. The result cannot
-  infer a new Goal from its contents.
+- Planner fast pass receives the resolved Work plus only relevant exact Capability
+  candidates, schemas, dependencies, resource/confirmation facts, and current Evidence.
+  It is fast because the problem and live projection are bounded, not merely because a
+  smaller model happens to be configured.
+- Planner state re-entry receives the existing Responsibility/Goal, bounded Situation,
+  actual queued/running/terminal Work, exact Host-bound Evidence, already-delivered
+  interaction delta, and compact Stable Mind. It may author response or genuinely new
+  Work, but result contents cannot infer a new Goal or repeat the terminal Activity.
 - Social Attention receives current interaction events, scene/target evidence,
   recent expressive history, primary activity state, eligible exact social
   capabilities, and the compact stable Mind.
-- Deep Planner is the deliberate rich-context HOW path. When planning complexity or
+- Planner deep pass is the deliberate rich-context HOW path. When planning complexity or
   consequence warrants escalation, it may receive broader Goal relationships,
   relevant long-term memory, environment, capability state, trustworthy
   evidence, alternatives, long-horizon context, and the explicit reason deeper

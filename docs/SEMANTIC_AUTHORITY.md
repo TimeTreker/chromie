@@ -35,9 +35,10 @@ output preparation does not create another semantic owner. Planner owns each
 Communicative Activity's function, exact words, timing, truth stage, provenance,
 and constraints; Goal Interpretation owns none of those fields. Trusted Runtime
 and Host bind terminal results to exact request/Goal provenance as Evidence, then
-reactivate Fast Planner. Result contents cannot bypass Planner or infer their own
-Goal. A later Planner pass may omit an already-delivered act or author a genuinely
-different delta.
+reactivate Planner with a bounded current-state view. Result contents cannot bypass
+Planner or infer their own Goal. A later Planner pass may answer, author genuinely new
+Work, reuse/cancel/replace current Work, wait, or emit no Activity; it must not repeat
+the terminal Activity merely because Evidence arrived.
 
 Cross-cutting evidence qualification, retention/privacy policy, and bounded
 adaptation are not additional semantic owners. They refine factual/context input to
@@ -62,8 +63,8 @@ Goal relationships, and bounded unresolved meaning. It does not author Work, Pri
 Activities, Plan structure, execution lanes, realization, Capability IDs, executable
 arguments, provider requests, planning InformationGaps, input-source/default policy,
 clarification selection, or `actions[]`; Goal Association owns canonical Goal state and
-Planner owns the first Work/Activity contract. Fast Planner also owns execution-input
-completeness and source strategy. That ownership cannot be used to reinterpret,
+Planner owns the first Work/Activity contract, execution-input completeness, and
+source strategy. Fast/deep are cognition passes of that same Planner authority. That ownership cannot be used to reinterpret,
 widen, narrow, or invent Responsibility meaning. No maintained `RouteDecision` or
 legacy Agent semantic compatibility surface remains on the Core path.
 
@@ -71,13 +72,13 @@ legacy Agent semantic compatibility surface remains on the Core path.
 
 | Entrypoint | Semantic owner | Role | Planner path | Failure behavior |
 |---|---|---|---|---|
-| Orchestrator turn in `apply` | Goal-Driven Cognitive Core | authoritative | Goal Interpretation → concurrent Fast Planner / Goal Association → optional Deep Planner for complex HOW → Goal-grouped Trusted Capability Runtime → Evidence re-entry | Once ownership is acquired, any semantic, validation, execution-preparation, or Goal-state error fails closed. |
+| Orchestrator turn in `apply` | Goal-Driven Cognitive Core | authoritative | Goal Interpretation → concurrent Planner fast pass / Goal Association → optional Planner deep pass for complex HOW → asynchronous Trusted Capability Runtime → Runtime event / Evidence → CognitiveOpportunity → Planner re-entry when useful | Once ownership is acquired, any semantic, validation, execution-preparation, or Goal-state error fails closed. |
 | Orchestrator turn in `report_only` | Goal-Driven Cognitive Core | observer | Same bounded cognitive stages, evidence only | No semantic state, user-visible speech, or execution authority is committed by the observer result. |
 | Cognitive Gateway protective reflex | Host deterministic control | pre-semantic | Stop/cancel/emergency/silence policy only | Never enters ordinary Goal semantics merely to enact a reflex. |
 | Agent module endpoints | The named cognitive owner only | bounded module authority | `/cognitive-core/interpret`, Planner, Goal Association, Reflection, Social Attention, Agent Skill, tool, and TaskGraph contracts | Endpoint failure remains local to that bounded contract; it cannot reopen a second semantic planner. |
 
-The maintained first user-facing speech path is Fast-Planner-owned. Goal
-Interpretation emits Responsibility evidence only. Fast Planner may author one
+The maintained first user-facing speech path is Planner-owned. Goal
+Interpretation emits Responsibility evidence only. Planner's fast pass may author one
 immediately realizable Communicative Activity before Goal Association has
 finished committing canonical Goal identity. Once GA commits, Runtime binds that
 same delivered/scheduled Activity to the canonical Goal; Goal binding is not a

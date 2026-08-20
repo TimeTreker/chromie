@@ -289,13 +289,15 @@ Implement this line as separate focused Issues and separate patches:
 - **Issue — Decouple interaction lifetime from capability lifetime — source implementation complete.**
   All maintained interaction responses now submit through `submit_response(...)`; the foreground
   interaction task ends after Runtime acceptance while a Runtime-correlated result consumer owns
-  lifecycle observation until terminal closure. Each non-final terminal Capability result may
-  become exact incremental `ExecutionEvidence`, then an internal `CognitiveOpportunity`, then the
-  bounded Host Evidence binding and Fast Planner re-entry when current Goal responsibility is still open.
-  Result arrival is never fabricated as a user turn. Planner-authored `after_capabilities` terminal
-  wording is excluded from detached execution because completion language belongs to terminal
-  Evidence. Final aggregate closure remains available for whole-scope truth and filters evidence
-  already delivered incrementally so facts are not spoken twice. Runtime open-interaction ownership
+  lifecycle observation until terminal closure. Each terminal Capability result may become exact incremental `ExecutionEvidence`, then an
+  internal `CognitiveOpportunity`, then Planner re-entry when the affected Responsibility remains
+  relevant. Result arrival is never fabricated as a user turn and the callback never chooses speech.
+  Planner receives the current Goal/Responsibility/Situation/Work/Evidence view and may answer,
+  author genuinely new follow-up Work, wait, or emit no Activity; newly planned Work returns through
+  the same detached Runtime boundary. Planner-authored `after_capabilities` terminal wording is
+  excluded from detached execution because completion language belongs to terminal Evidence. Final
+  aggregate closure remains available for whole-scope truth and filters Evidence already consumed
+  incrementally so the same transition is not planned or spoken twice. Runtime open-interaction ownership
   also remains visible to scoped cancellation after the foreground Python task has exited.
 - **Issue — Harden cancellation, supersession, and late-result semantics — source implementation complete.**
   Late terminal Evidence remains valid execution history, but cognitive re-entry now fails closed

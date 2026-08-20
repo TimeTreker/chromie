@@ -114,119 +114,114 @@ Chromie is a local-first realtime interaction control plane for voice assistants
 that can invoke embodied capabilities safely.
 
 The following expanded flow is the canonical primary architecture and mental
-model for Chromie:
+model for Chromie. It is **event-driven and readiness-driven**, not a mandatory
+pipeline or an always-running cognition loop:
 
 ```mermaid
 flowchart TD
     U["Person / world input"] --> GW["Cognitive Gateway"]
-    GW --> CTX["Bounded Session Context<br/>dialogue, active Goals, Activities,<br/>pending clarification, Evidence"]
-    CTX --> GI["Goal Interpretation (GI)<br/>Responsibility + Goal relation + unresolved meaning"]
+    GW --> GI["Goal Interpretation<br/>Responsibility / WHAT"]
 
-    GI --> FFA["Fast Planner<br/>authors first Communicative Activity"]
-    FFA --> EQ{"same-owner Epistemic Qualification<br/>accept or reject only"}
-    EQ -->|"accepted or rejected, concurrent fan-out"| FP["same Fast Planner<br/>remaining Activity Plan + input resolution"]
-    EQ -->|"accepted or rejected, concurrent fan-out"| GA["Goal Association (GA)<br/>sole Canonical Goal commit authority"]
+    GI --> P0["Planner<br/>fast pass; deep pass only when HOW warrants it"]
+    GI --> GA["Goal Association<br/>canonical Goal continuity"]
+    P0 --> ACT["Detailed Plan / Activities<br/>speech, body, information, tool, or other Capability Work"]
+    GA --> GOALS["Canonical Goals<br/>what persistent Responsibility is still owed"]
 
-    EQ -->|"accepted"| COMM["Immediate Communicative Activity<br/>exact text + truth provenance"]
-    EQ -->|"rejected / unavailable"| SILENCE["No first speech<br/>remaining planning continues"]
-    FP --> COMM["Later communicative deltas"]
-    FP --> SAFE["ready safe/read-only<br/>Capability Activities"]
-    FP -->|"complex HOW only"| DP["Deep Planner"]
-    FP -->|"only user-resolvable blocker"| ASK["Clarification Activity"]
+    ACT --> RT["Trusted Capability Runtime"]
+    RT --> PROV["Vocal / tool / Soridormi / peer Providers"]
+    PROV --> EVT["Asynchronous Runtime Events<br/>what happened"]
+    EVT --> WORK["Current Work state<br/>queued / running / terminal"]
+    EVT --> CORR["Host correlation + schema / provenance validation"]
+    CORR --> EVID["Trusted Evidence<br/>what is true"]
 
-    GA --> GOALS["Canonical Goals<br/>each Goal has a Task-list view"]
-    GOALS --> WREC["Fast Planner Work Reconciliation<br/>Canonical Goal + relevant actual Work"]
-    SAFE -. "provisional Activity state" .-> WREC
-    SAFE --> TCR["Trusted Capability Runtime<br/>one task identity; Goal-grouped views"]
-    TCR -. "queued / running / completed state" .-> WREC
-    WREC --> BIND["Planner-selected exact Activity reuse<br/>Host validates identity/version/state"]
-    BIND --> TCR
-    WREC -->|"corrected complete Plan"| TCR
-    DP -->|"new Plan revision"| TCR
+    GI --> RESP["Responsibility<br/>what is owed"]
+    RESP --> STATE["Current bounded cognitive state<br/>derived view, not a new truth store"]
+    GOALS --> STATE
+    WORK --> STATE
+    EVID --> STATE
+    SIT["Situation / interaction state"] --> STATE
 
-    COMM --> ARB["Host validation + resource-aware scheduling"]
-    ASK --> ARB
-    TCR --> ARB
-    ARB --> PAR["Parallel when declared resources allow;<br/>sequential when dependency/resource requires"]
-    PAR --> PROVIDERS["Vocal / tool / Soridormi Providers"]
-    PROVIDERS --> EVIDENCE["Trusted Evidence"]
-    EVIDENCE --> ATTACH["Host validates and binds<br/>request → Activity → exact Goal(s)"]
-    ATTACH --> CTX
-    ATTACH -->|"bounded Goal/Evidence snapshot"| FP
-    FP -->|"post-Evidence answer candidate"| POSTEQ{"same-owner Epistemic Qualification<br/>accept or reject only"}
-    POSTEQ -->|"accepted"| COMM
-    POSTEQ -->|"rejected / unavailable"| DP
-    ATTACH --> RECON["Per-Goal reconciliation / Reflection"]
+    EVT -. "meaningful trusted transition" .-> OPP["CognitiveOpportunity<br/>ephemeral trigger, no semantic authority"]
+    EVID -. "new relevant Evidence" .-> OPP
+    GOALS -. "material Goal continuity change" .-> OPP
+    SIT -. "material relevant change" .-> OPP
+    OPP --> P1["Planner re-entry<br/>fast pass; deep pass only if needed"]
+    STATE --> P1
+
+    P1 --> DELTA["0..N desired Activity changes<br/>answer / act / query / reuse / cancel / replace / clarify"]
+    P1 --> NONE["No new Activity<br/>keep acting / wait / listen / remain silent / close naturally"]
+    DELTA --> RT
 ```
 
-This expanded diagram is the stable architecture invariant. It describes
-ownership and information flow, not a mandatory synchronous wall-clock pipeline.
-It does **not** add new semantic authorities between Planner and Provider:
-`planned Work`, semantic Primary Activities, and their realization are the
-explicit internal expansion of how Planner advances Goals.
+The four stable truths are deliberately separate:
 
-The following close-up is the normative flow for a clear, low-consequence
-information request such as a weather lookup. It makes the asynchronous join in
-the expanded diagram explicit:
+1. asynchronous Runtime/Provider events report **what happened**;
+2. validated Evidence records **what is true**;
+3. Responsibility and canonical Goal state record **what Chromie still owes**; and
+4. Planner decides **what to do now**, including the valid decision to do nothing.
+
+`Current bounded cognitive state` in the diagram is not a new database, manager,
+or semantic authority. It is the bounded Planner view reconstructed from the existing
+authoritative owners: Responsibility/Goal, Situation, actual Work, Evidence, and
+Interaction state. `CognitiveOpportunity` is likewise only an ephemeral bridge from a
+meaningful trusted state transition to possible cognition. A callback never chooses a
+response or an action by itself.
+
+Goal Association has a narrower role than Planner re-entry. A **new person-authored
+semantic change** enters Gateway → Goal Interpretation and may require Goal Association
+to create, continue, refine, replace, or otherwise relate canonical Goals. A trusted
+Runtime event or terminal Evidence already carries immutable request/Activity/Goal
+provenance, so it normally re-enters Planner directly rather than fabricating another
+user turn or asking Goal Association to rediscover ownership.
+
+The following close-up is the normative asynchronous information path. Weather is an
+example of the general contract, not a phrase- or domain-specific architecture rule:
 
 ```mermaid
 flowchart TD
-    A["Person: Will it rain in Chongqing tonight?"] --> B["Goal Interpretation<br/>Responsibility + supplied semantic bindings"]
-    B --> C["Fast Planner<br/>check Capability inputs and early-execution policy"]
-
-    C --> D["Communicative Activity<br/>I will check"]
-    C --> E["weather.lookup Activity<br/>Chongqing + today + night"]
-    D --> F["Vocal Runtime starts immediately"]
-    E --> G["Trusted Capability Runtime starts the safe read<br/>under Responsibility refs"]
-    G --> N["Provisional execution result / trace"]
-
-    B --> H["Goal Association runs concurrently<br/>and commits Canonical Goal identity"]
-    H --> K["Canonical Fast Planner Work Reconciliation<br/>Goal + provisional Work/result state"]
-    G --> K
-    K --> L{"Planner selects the exact provisional Activity<br/>as still advancing the Goal?"}
-
-    L -- "Yes: explicit reuse" --> J["Host validates identity/version/state<br/>then binds the same task and Evidence"]
-    N --> J
-    L -- "No: replace or supplement" --> M["Runtime cancels pending/cancellable provisional Work<br/>only after the Planner decision"]
-    N -. "if the revised Plan rejects it" .-> Q["If incompatible and already completed:<br/>retain as unbound audit Evidence"]
-    M --> R["Trusted Runtime executes corrected Work"]
-
-    J --> O["Fast Planner Evidence re-entry"]
-    R --> S["Corrected trusted Evidence"]
-    S --> O
-    O --> P["Truth-qualified answer"]
+    A["Person asks for changing information"] --> B["Goal Interpretation<br/>preserve human Responsibility and semantic scope"]
+    B --> C["Planner fast pass"]
+    B --> G["Goal Association<br/>runs concurrently when persistent continuity is needed"]
+    C --> D["optional truthful progress Communicative Activity"]
+    C --> E["information Capability Activity"]
+    E --> R["Trusted Capability Runtime submits asynchronously"]
+    R --> P["Provider"]
+    P --> X["terminal Runtime event"]
+    X --> V["Host validates exact request / Activity / Goal provenance"]
+    V --> EV["Trusted terminal Evidence"]
+    G --> CG["Canonical Goal"]
+    CG --> S["Current bounded state"]
+    EV --> S
+    R --> S
+    EV --> O["CognitiveOpportunity"]
+    O --> NP["Planner re-entry"]
+    S --> NP
+    NP --> A1["answer from Evidence"]
+    NP --> A2["genuinely new follow-up Work"]
+    NP --> A3["clarify / wait / no new Activity"]
+    A2 --> R
 ```
 
-“Before GA” is an authority statement, not a race against GA's wall-clock finish.
-Once Fast Planner has a complete, available, schema-valid safe read whose provider
-explicitly declares it side-effect-free and parallel-safe, Runtime submits it without
-awaiting GA. The request initially carries GI-local Responsibility refs, never a
-provisional Goal ID. Once GA commits Goal identity, the existing Fast Planner receives
-the Canonical Goal plus relevant provisional/retained Work state and semantically decides
-what still advances the Responsibility. GA neither chooses replanning nor compares Work;
-the Host never infers semantic compatibility from Goal IDs, relationship enums, argument
-equality, or a missing Plan step. Planner explicitly selects an existing Activity for
-reuse by reproducing its complete semantics and stable Activity identity. Orchestrator
-then checks only that the selected request, version, state, Capability, arguments,
-ownership, and timing are exactly the Work the Planner saw. A stale snapshot fails
-closed for the current dispatch; the corresponding Runtime/Evidence change is the next
-Planner-reactivation event, so Host never guesses. Runtime reuses a validated selection or
-cancels pending/cancellable Work only after the Planner decision and executes the
-corrected complete Plan. A completed
-observation cannot be undone; incompatible output remains immutable unbound audit
-Evidence and cannot support the Goal or user-facing claims. Effectful,
-confirmation-requiring, privacy-sensitive, materially costly, or undeclared-concurrency
-Work never uses this early path.
+A safe read may begin under Responsibility provenance before Goal Association finishes
+when its current Capability contract explicitly permits that early execution. Once GA
+commits Goal continuity, Planner may compare the canonical Goal with actual queued,
+running, or completed Work and decide whether to reuse, supplement, cancel, or replace
+that Work. **This comparison is a Planner operation, not a mandatory `Work
+Reconciliation` stage or another authority.** Runtime applies only the validated Activity
+delta and preserves stable execution identity; Host never infers semantic compatibility
+from Goal IDs, argument equality, or Plan omission.
 
-The bounded Planner input `work_reconciliation_activities` covers both the provisional
-same-turn Activity above and still-owned retained Runtime requests from prior turns.
-Planner alone selects reuse through `CanonicalPlanStep.reuse_activity_id`. Same-turn
-provisional Work can be rebound into the current canonical Plan. Retained Work remains
-owned by its original submission: current Runtime reuse is atomic and
-reconciliation-only, so Planner selects the complete retained set with no additional
-step and Host dispatches nothing twice. If different or additional Work is needed,
-Planner emits one complete replacement Plan with no reuse selection; Runtime closes
-cancellable old Work through exact receipts before dispatching replacement Work.
+When terminal Evidence later arrives, the async event path creates one bounded
+`CognitiveOpportunity` for the exact affected Goal set. Planner receives the original
+Responsibility provenance, canonical Goals, current Situation/interaction state, actual
+Work, and the new Evidence. It may answer, schedule genuinely new Work, or make no new
+outward change. It must not repeat the Capability Activity that just completed merely
+because cognition was reactivated. If newly planned Work itself completes later, that
+new terminal transition can create another independent opportunity.
+
+Effectful, confirmation-requiring, privacy-sensitive, materially costly, or otherwise
+restricted Work retains all ordinary authorization and safety barriers. An internal
+CognitiveOpportunity is never user consent and cannot auto-confirm an effect.
 
 The runtime has several entry shapes, and **having no canonical Goal is not the
 same as having no turn**:
@@ -235,8 +230,8 @@ same as having no turn**:
 |---|---|---|---|
 | Startup orientation | None | None | Host lifecycle may offer one quiet baseline Activity. It is not a user interaction or Social Attention. |
 | Protective Reflex | A received `NormalizedTurnCapture` | Not required | Gateway applies deterministic pre-semantic stop/cancel/emergency/silence/unusable-input policy to the turn before GI exists, then retains the reflex evidence. |
-| Ordinary admitted interaction | An admitted `UserTurnEnvelope` | None until GA commits one | GI interprets Responsibility; Fast Planner advances HOW while GA independently owns canonical Goal continuity. |
-| `CognitiveOpportunity` reactivation | No fabricated new user turn; exact originating interaction/request provenance remains retained | One or more `goal_ids` are required | A meaningful trusted state transition may reactivate bounded cognition for those Goals. The opportunity is ephemeral and owns neither Goal nor Evidence truth. |
+| Ordinary admitted interaction | An admitted `UserTurnEnvelope` | None until GA commits one | GI interprets Responsibility; Planner may advance safe HOW while GA independently owns canonical Goal continuity. |
+| `CognitiveOpportunity` reactivation | No fabricated new user turn; exact originating interaction/request provenance remains retained | One or more `goal_ids` are required | A meaningful trusted state transition may reactivate Planner for those Goals. The opportunity is ephemeral, owns neither Goal nor Evidence truth, and may legitimately produce zero new Activities. |
 
 Therefore Protective Reflex is a deterministic **pre-semantic turn path**, not a
 turn-free path. Result reactivation is an internal continuation of grounded prior
@@ -303,18 +298,18 @@ Read the diagram with these boundaries:
 - Goal Association remains the only canonical Responsibility/Goal-state authority.
   GA independently associates, creates, continues, corrects, merges, splits, or
   supersedes canonical Goals from the same GI result without waiting for or
-  rewriting Fast Planner output. It emits no `requires_replan`, Work-compatibility,
-  Capability, cancellation, or next-action decision. A Canonical Goal commit that
-  intersects retained or provisional Work reactivates Fast Planner Work Reconciliation.
-  Planner compares the committed Goal with its already-authored Plan and the Trusted
-  Runtime's actual queued/running/completed Work, then emits only the necessary HOW
-  delta; Runtime validates and applies that lifecycle delta. This is a structural
+  rewriting Planner output. It emits no `requires_replan`, Work-compatibility,
+  Capability, cancellation, or next-action decision. When a Canonical Goal commit
+  materially changes the state relevant to retained or provisional Work, Planner may be
+  re-entered with the committed Goal and the Trusted Runtime's actual
+  queued/running/completed Work, then emits only the necessary HOW delta; Runtime validates and applies that lifecycle delta. This is a structural
   continuation of an open Responsibility, not a Host semantic judgment, and it gives GA
   no Capability or planning authority.
 - Canonical Goal owns **what outcome Chromie still owes persistently**.
-- Fast/Deep Planner owns **what Work can advance those Goals now**, constrained by
-  the currently available Capability/provider contracts. Fast Planner owns ordinary
-  input-source resolution; Deep Planner is used for complex HOW, not as a reviewer
+- Planner owns **what Work can advance those Goals now**, constrained by the currently
+  available Capability/provider contracts. Fast/deep are cognition passes of that same
+  authority: the fast pass owns ordinary input-source resolution; the deep pass is used
+  for complex HOW, not as a reviewer
   for a missing input or as a way to make GI choose an execution strategy.
   Available Capabilities are therefore Planner input and realization constraints even
   though they are not drawn as a separate box in the expanded view.

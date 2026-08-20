@@ -3379,7 +3379,7 @@ class GoalDrivenRuntimeCoordinator:
         return plan.model_copy(deep=True, update={"steps": updated_steps})
 
     @staticmethod
-    def _retained_work_reconciliation_activities(
+    def _retained_existing_work_activities(
         *,
         context: dict[str, Any],
         goal_ids: set[str],
@@ -4697,7 +4697,7 @@ class GoalDrivenRuntimeCoordinator:
                     for goal_id in goal.supersedes_goal_ids
                 ),
             }
-            retained_work_activities = self._retained_work_reconciliation_activities(
+            retained_work_activities = self._retained_existing_work_activities(
                 context=planning_context,
                 goal_ids=retained_reconciliation_goal_ids,
             )
@@ -4731,12 +4731,12 @@ class GoalDrivenRuntimeCoordinator:
                     if ready_fast_capability_execution is not None
                     else []
                 )
-                planning_context["work_reconciliation_activities"] = [
+                planning_context["existing_work_activities"] = [
                     *retained_work_activities,
                     *provisional_work_activities,
                 ]
                 work_reconciliation_activity_count = len(
-                    planning_context["work_reconciliation_activities"]
+                    planning_context["existing_work_activities"]
                 )
             elif goal_update_reconciliation_required:
                 # Fast Advance and Goal Association share the GI result but run

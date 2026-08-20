@@ -12,8 +12,8 @@
   "ollama": {
     "agent_models": [
       "gemma4:e2b",
-      "gemma4:e4b",
-      "gemma4:12b"
+      "gemma4:12b",
+      "qwen3:4b-instruct-2507-q4_K_M"
     ],
     "digest_source": "The active profile model digests are captured from /api/tags in build-provenance.json when provenance is collected",
     "goal_interpreter_models": [

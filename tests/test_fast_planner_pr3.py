@@ -4074,7 +4074,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             "Check Chongqing weather today.",
             goal_ids=["goal-weather"],
         )
-        planner_request.context["work_reconciliation_activities"] = [
+        planner_request.context["existing_work_activities"] = [
             {
                 "activity_id": "weather-provisional",
                 "role": "capability",
@@ -4094,7 +4094,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             response_schema={},
         )
 
-        self.assertIn("Runtime Activities for Work reconciliation JSON", prompt)
+        self.assertIn("Existing retained or provisional Runtime Activities JSON", prompt)
         self.assertIn("weather-provisional", prompt)
         self.assertIn("may already be running or completed", prompt)
         self.assertIn("step.reuse_activity_id", prompt)
@@ -4130,7 +4130,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             )
         )
         context = {
-            "work_reconciliation_activities": [
+            "existing_work_activities": [
                 {
                     "activity_id": "weather-provisional",
                     "capability_id": "chromie.weather.lookup",

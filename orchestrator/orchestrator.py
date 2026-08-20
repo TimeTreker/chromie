@@ -95,6 +95,7 @@ from orchestrator.runtime.runtime_ready_greeting import (
     RuntimeReadyGreetingPolicy,
     execute_default_runtime_ready_orientation,
 )
+from orchestrator.runtime.situation import build_situation_projection
 from orchestrator.runtime.session import (
     now_ms,
     record_session_workflow_stage,
@@ -5160,6 +5161,15 @@ class VoiceAssistant:
             )
             if str(item).strip()
         }
+        planner_handled_incremental_evidence = {
+            str(item).strip()
+            for item in response.metadata.get(
+                "incremental_planner_reentry_evidence_ids",
+                [],
+            )
+            if str(item).strip()
+        }
+        terminal_evidence_ids = {item.evidence_id for item in bundle.evidence}
         completed_evidence_ids = {
             item.evidence_id
             for item in bundle.evidence
@@ -5185,6 +5195,27 @@ class VoiceAssistant:
                 goal_state_results=goal_state_results,
             )
             return "incremental_result_delivery_completed"
+        if (
+            terminal_evidence_ids
+            and terminal_evidence_ids.issubset(
+                planner_handled_incremental_evidence
+            )
+        ):
+            self.session_log(
+                session_id,
+                "cognitive_outcome_response_suppressed: "
+                "reason=incremental_planner_reentry_already_handled evidence=%s",
+                len(terminal_evidence_ids),
+            )
+            self._record_cognitive_outcome_evidence(
+                bundle,
+                session_id=session_id,
+                final_response=None,
+                delivery_status="incremental_planner_reentry_handled",
+                suppression_reason="incremental_planner_reentry_already_handled",
+                goal_state_results=goal_state_results,
+            )
+            return "incremental_planner_reentry_handled"
 
         try:
             final_response = await self._plan_evidence_bound_capability_result_response(
@@ -5224,7 +5255,6 @@ class VoiceAssistant:
             )
             return "response_planning_failed"
 
-        detached_delivery = False
         if defer_for_ordinary_overlap:
             goal_ids = tuple(
                 str(item.goal_id)
@@ -5274,7 +5304,6 @@ class VoiceAssistant:
                     goal_state_results=goal_state_results,
                 )
                 return f"suppressed_{window.status}"
-            detached_delivery = True
             final_response.metadata["deferred_outcome_delivery"] = {
                 "reason": "ordinary_overlap",
                 "origin_session_id": session_id,
@@ -5287,10 +5316,9 @@ class VoiceAssistant:
                 ",".join(window.waited_for_session_ids),
             )
 
-        delivery_status = await self._execute_cognitive_outcome_response(
+        delivery_status = await self._apply_planner_reentry_response(
             final_response,
             session_id=session_id,
-            detached_delivery=detached_delivery,
         )
         response.metadata["post_execution_response"] = final_response.model_dump(
             mode="json"
@@ -5356,10 +5384,12 @@ class VoiceAssistant:
     ) -> None:
         """Turn one exact terminal Runtime result into an internal cognitive event.
 
-        The result is never encoded as a user message. Runtime owns the lifecycle
-        fact, deterministic closure creates terminal Evidence, and Fast Planner
-        is reactivated with the exact Goal/request binding to decide whether one
-        grounded spoken update is useful while sibling work continues.
+        The result is never encoded as a user message and never decides a response
+        by callback convention. Runtime owns the lifecycle fact, deterministic
+        closure creates terminal Evidence, and a bounded CognitiveOpportunity
+        reactivates Planner against the still-current Responsibility, Goal,
+        Situation, Work, and Evidence state. Planner may answer, author genuinely
+        new follow-up Work, clarify, refuse, or make no useful outward change.
         """
 
         try:
@@ -5447,15 +5477,15 @@ class VoiceAssistant:
                 evidence.request_id,
             )
             return
-        if evidence.status != "completed":
-            return
         observation = evidence.observation
-        if (
+        if evidence.status == "completed" and (
             observation is None
             or observation.status != "available"
             or not observation.schema_validated
-            or not observation.data
         ):
+            # A provider-completed event without qualified observation is not
+            # admitted as successful factual Evidence. Aggregate closure retains
+            # the failure/qualification details and may raise a slower opportunity.
             return
 
         try:
@@ -5478,12 +5508,23 @@ class VoiceAssistant:
         if result_response is None:
             return
 
-        delivery_status = await self._execute_cognitive_outcome_response(
+        # Planner has consumed this Evidence once a valid next-state decision exists.
+        # Record semantic consumption before realization so aggregate closure cannot
+        # plan from the same Evidence again merely because the new Activity is still
+        # being accepted or executed asynchronously. Any later Runtime failure is a
+        # new state transition with its own Evidence/CognitiveOpportunity.
+        handled = response.metadata.setdefault(
+            "incremental_planner_reentry_evidence_ids",
+            [],
+        )
+        if evidence.evidence_id not in handled:
+            handled.append(evidence.evidence_id)
+
+        apply_status = await self._apply_planner_reentry_response(
             result_response,
             session_id=session_id,
-            detached_delivery=True,
         )
-        if delivery_status == "speech_runtime_completed":
+        if apply_status == "speech_runtime_completed":
             delivered = response.metadata.setdefault(
                 "incremental_result_delivery_evidence_ids",
                 [],
@@ -5492,10 +5533,10 @@ class VoiceAssistant:
                 delivered.append(evidence.evidence_id)
         self.session_log(
             session_id,
-            "incremental_cognitive_reentry_done: request_id=%s evidence_id=%s delivery=%s",
+            "incremental_cognitive_reentry_done: request_id=%s evidence_id=%s apply=%s",
             evidence.request_id,
             evidence.evidence_id,
-            delivery_status,
+            apply_status,
         )
 
     def _terminal_evidence_is_currently_relevant(
@@ -5565,11 +5606,10 @@ class VoiceAssistant:
         session_id: str | None,
     ) -> InteractionResponse | None:
         observation = evidence.observation
-        if (
+        if evidence.status == "completed" and (
             observation is None
             or observation.status != "available"
             or not observation.schema_validated
-            or not observation.data
         ):
             return None
         metadata = (
@@ -5599,12 +5639,19 @@ class VoiceAssistant:
             )
             or "en-US"
         )
+        evidence_data = (
+            dict(observation.data)
+            if observation is not None
+            and observation.status == "available"
+            and observation.schema_validated
+            else {}
+        )
         bounded_evidence = ToolResultEvidence(
             evidence_id=evidence.evidence_id,
             tool_id=evidence.capability_id,
             status=evidence.status,
-            data=observation.data,
-            output_sha256=canonical_value_sha256(observation.data),
+            data=evidence_data,
+            output_sha256=canonical_value_sha256(evidence_data),
         )
         try:
             canonical_plan = CanonicalPlan.model_validate(
@@ -5637,6 +5684,142 @@ class VoiceAssistant:
                 "cognitive_opportunity": opportunity.prompt_projection(),
             },
         )
+
+    def _planner_reentry_responsibilities(
+        self,
+        *,
+        source_response: InteractionResponse,
+        goal_ids: list[str],
+    ) -> list[CognitiveResponsibilityProposal]:
+        """Reuse originating GI WHAT; never fabricate a callback user turn."""
+
+        metadata = source_response.metadata if isinstance(source_response.metadata, dict) else {}
+        raw_interpretation = metadata.get("goal_interpretation")
+        responsibilities = (
+            raw_interpretation.get("responsibilities")
+            if isinstance(raw_interpretation, dict)
+            else []
+        )
+        parsed: dict[str, CognitiveResponsibilityProposal] = {}
+        for item in responsibilities if isinstance(responsibilities, list) else []:
+            if not isinstance(item, dict):
+                continue
+            try:
+                responsibility = CognitiveResponsibilityProposal.model_validate(item)
+            except (TypeError, ValueError):
+                continue
+            parsed[responsibility.local_ref] = responsibility
+
+        wanted_refs: set[str] = set()
+        association = metadata.get("goal_association")
+        if isinstance(association, dict):
+            for item in association.get("associations") or []:
+                if not isinstance(item, dict):
+                    continue
+                if set(map(str, item.get("target_goal_ids") or [])).intersection(goal_ids):
+                    wanted_refs.update(map(str, item.get("source_responsibility_refs") or []))
+            for item in association.get("new_goals") or []:
+                if not isinstance(item, dict) or str(item.get("goal_id") or "") not in goal_ids:
+                    continue
+                wanted_refs.update(map(str, item.get("source_responsibility_refs") or []))
+        selected = [value for key, value in parsed.items() if not wanted_refs or key in wanted_refs]
+        if selected:
+            return selected
+
+        return [
+            CognitiveResponsibilityProposal(
+                local_ref=f"reentry:{goal_id}"[:80],
+                outcome="Continue the existing canonical Responsibility after trusted state changed.",
+                relationship="reference",
+                target_goal_ids=[goal_id],
+                completion_requires_work=True,
+                confidence=1.0,
+            )
+            for goal_id in goal_ids
+        ]
+
+    @staticmethod
+    def _planner_reentry_repeats_completed_activity(
+        *,
+        source_response: InteractionResponse,
+        plan: CanonicalPlan,
+        extra_context: dict[str, Any] | None,
+        evidence: list[ToolResultEvidence],
+    ) -> bool:
+        """Reject re-execution of the exact Activity that just completed."""
+
+        completed_request_ids: set[str] = set()
+        context = extra_context if isinstance(extra_context, dict) else {}
+        terminal_request_id = str(context.get("terminal_request_id") or "").strip()
+        if terminal_request_id and evidence and evidence[0].status == "completed":
+            completed_request_ids.add(terminal_request_id)
+        bundle = context.get("execution_outcome_bundle")
+        if isinstance(bundle, dict):
+            for item in bundle.get("evidence") or []:
+                if not isinstance(item, dict) or item.get("status") != "completed":
+                    continue
+                request_id = str(item.get("request_id") or "").strip()
+                if request_id:
+                    completed_request_ids.add(request_id)
+        if not completed_request_ids:
+            return False
+
+        completed = [
+            request
+            for request in source_response.capabilities
+            if request.request_id in completed_request_ids
+        ]
+        for step in plan.steps:
+            for request in completed:
+                source_goal_ids = {
+                    str(value).strip()
+                    for value in request.metadata.get("source_goal_ids") or []
+                    if str(value).strip()
+                }
+                if (
+                    step.capability_id == request.capability_id
+                    and step.args == request.args
+                    and set(step.source_goal_ids) == source_goal_ids
+                ):
+                    return True
+        return False
+
+    async def _apply_planner_reentry_response(
+        self,
+        response: InteractionResponse,
+        *,
+        session_id: str | None,
+    ) -> str:
+        """Apply a Planner delta without turning asynchronous cognition into a join.
+
+        Speech-only deltas use the ordinary delivery path. A new safe/authorized
+        Capability delta is submitted through the same detached Runtime boundary as
+        foreground work, so its own terminal events can create later opportunities.
+        Confirmation-requiring Work is not auto-authorized by an internal event.
+        """
+
+        if not response.capabilities:
+            return await self._execute_cognitive_outcome_response(
+                response,
+                session_id=session_id,
+                detached_delivery=True,
+            )
+        confirmation_ids = await self.interaction_runtime.confirmation_request_ids(response)
+        if confirmation_ids:
+            self.session_log(
+                session_id,
+                "planner_reentry_dispatch_suppressed: reason=confirmation_required requests=%s",
+                ",".join(sorted(confirmation_ids)),
+            )
+            return "planner_reentry_confirmation_required"
+        await self._dispatch_detached_interaction(
+            response,
+            session_id,
+            confirmed_request_ids=None,
+            reset_playback=False,
+            mark_session_done=False,
+        )
+        return "planner_reentry_dispatched"
 
     async def _planner_evidence_reentry_response(
         self,
@@ -5704,12 +5887,24 @@ class VoiceAssistant:
                 "result_evidence_reentry": {
                     "phase": phase,
                     "source_goal_ids": normalized_goal_ids,
-                    "wording_owner": "fast_planner",
+                    "evidence_refs": [item.evidence_id for item in evidence],
+                    "planner_authority": "planner",
                 },
             }
         )
+        if isinstance(metadata.get("user_turn_envelope"), dict):
+            context["user_turn_envelope"] = dict(metadata["user_turn_envelope"])
+        if isinstance(metadata.get("goal_interpretation"), dict):
+            context["core_interpretation"] = dict(metadata["goal_interpretation"])
         if isinstance(extra_context, dict):
             context.update(extra_context)
+        situation = build_situation_projection(
+            context=context,
+            turn_id=str(metadata.get("turn_id") or f"evidence:{evidence[0].evidence_id}"),
+            focus_goal_ids=normalized_goal_ids,
+            revision=1,
+        )
+        context["situation"] = situation.prompt_projection()
         interaction_ledger = getattr(
             getattr(self, "cognitive_runtime", None),
             "interaction_ledger",
@@ -5722,23 +5917,15 @@ class VoiceAssistant:
                 turn_id=str(metadata.get("turn_id") or ""),
             ).model_dump(mode="json")
 
+        responsibilities = self._planner_reentry_responsibilities(
+            source_response=source_response,
+            goal_ids=normalized_goal_ids,
+        )
         request = CognitiveWorkRequest(
             sid=f"{sid}:evidence:{evidence[0].evidence_id}"[:160],
             text=user_request,
             language=language,
-            responsibilities=[
-                CognitiveResponsibilityProposal(
-                    local_ref=f"evidence:{goal_id}"[:160],
-                    outcome=(
-                        "Choose the next Main Activity for the original request "
-                        "from Host-bound terminal Evidence."
-                    ),
-                    completion_requires_work=False,
-                    completion_requires_fresh_evidence=False,
-                    confidence=1.0,
-                )
-                for goal_id in normalized_goal_ids
-            ],
+            responsibilities=responsibilities,
             interpretation_confidence=1.0,
             context=context,
             history=list(context.get("history") or []),
@@ -5787,20 +5974,68 @@ class VoiceAssistant:
         )
         if set(replanned.goal_ids) != set(normalized_goal_ids):
             raise ValueError("Evidence re-entry Plan changed the bound Goal set")
-        if replanned.steps or replanned.disposition != "respond":
-            self.session_log(
-                session_id,
-                "planner_evidence_reentry_no_response: disposition=%s steps=%s",
-                replanned.disposition,
-                len(replanned.steps),
+        if replanned.disposition == "escalate":
+            deep_call = getattr(self.agent_client, "resolve_deep_plan", None)
+            if not callable(deep_call):
+                self.session_log(
+                    session_id,
+                    "planner_evidence_reentry_deep_unavailable",
+                )
+                return None
+            deep_started_ms = now_ms()
+            replanned = await deep_call(
+                session,
+                request=request,
+                timeout_ms=self.cognitive_runtime_policy.deep_planner_timeout_ms,
             )
-            return None
+            record_session_workflow_stage(
+                self,
+                session_id,
+                stage="planner_deep_pass_evidence_reentry",
+                started_monotonic_ms=deep_started_ms,
+                finished_monotonic_ms=now_ms(),
+                status="resolved",
+                input_payload={
+                    "source_goal_ids": normalized_goal_ids,
+                    "evidence_refs": [item.evidence_id for item in evidence],
+                    "phase": phase,
+                },
+                output_payload=replanned,
+                errors=[],
+                metadata={"planner_pass": "deep"},
+            )
+            if set(replanned.goal_ids) != set(normalized_goal_ids):
+                raise ValueError("Deep Evidence re-entry Plan changed the bound Goal set")
+        if self._planner_reentry_repeats_completed_activity(
+            source_response=source_response,
+            plan=replanned,
+            extra_context=extra_context,
+            evidence=evidence,
+        ):
+            raise ValueError(
+                "Evidence re-entry Planner attempted to repeat the completed terminal Activity"
+            )
         response = await self.cognitive_runtime.adapter.build_planner_owned_response(
             plan=replanned,
             session_id=sid,
             language=language,
             context=context,
         )
+        response.metadata.update(
+            {
+                "goal_association": association,
+                "planner_state_reentry": True,
+                "planner_state_reentry_phase": phase,
+                "planner_state_reentry_evidence_refs": [
+                    item.evidence_id for item in evidence
+                ],
+                "parent_interaction_id": source_response.interaction_id,
+            }
+        )
+        if isinstance(metadata.get("goal_interpretation"), dict):
+            response.metadata["goal_interpretation"] = dict(
+                metadata["goal_interpretation"]
+            )
         delivered_texts = {
             normalized
             for item in self._delivered_turn_speech_events(sid)
@@ -5826,13 +6061,15 @@ class VoiceAssistant:
         for speech in response.speech:
             speech.metadata.update(
                 {
-                    "source": "fast_planner_evidence_reentry",
+                    "source": "planner_state_reentry",
                     "phase": phase,
-                    "truth_stage": "post_evidence",
                     "source_goal_ids": normalized_goal_ids,
-                    "evidence_refs": evidence_refs,
                 }
             )
+            if not speech.metadata.get("truth_stage"):
+                speech.metadata["truth_stage"] = "post_evidence"
+            if not speech.metadata.get("evidence_refs"):
+                speech.metadata["evidence_refs"] = evidence_refs
         response.metadata.update(
             {
                 "source": "fast_planner_evidence_reentry",
@@ -5890,9 +6127,19 @@ class VoiceAssistant:
             )
             if str(item).strip()
         }
+        planner_handled_incremental_evidence = {
+            str(item).strip()
+            for item in metadata.get(
+                "incremental_planner_reentry_evidence_ids",
+                [],
+            )
+            if str(item).strip()
+        }
         evidence: list[ToolResultEvidence] = []
         for item in bundle.evidence:
             if item.evidence_id in delivered_incremental_evidence:
+                continue
+            if item.evidence_id in planner_handled_incremental_evidence:
                 continue
             observation = item.observation
             if (
@@ -6241,13 +6488,12 @@ class VoiceAssistant:
                         - len(terminal_capability_ids),
                     ),
                 )
-                if len(terminal_capability_ids) < len(source_capability_request_ids):
-                    await self._reenter_cognition_for_terminal_capability(
-                        response=response,
-                        result=event.result,
-                        session_id=session_id,
-                        generation=generation,
-                    )
+                await self._reenter_cognition_for_terminal_capability(
+                    response=response,
+                    result=event.result,
+                    session_id=session_id,
+                    generation=generation,
+                )
 
         try:
             execution = await self.interaction_runtime.wait_dispatch(

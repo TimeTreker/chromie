@@ -194,9 +194,9 @@ schema-valid, available, side-effect-free safe reads before GA finishes; effects
 behind canonical Goal, confirmation, authorization, resource, and provider-safety gates.
 Parallel-timed early reads additionally require explicit provider parallel-safety
 metadata. The same task identity is then bound into applicable per-Goal Runtime task-list
-views only after semantic Work reconciliation when provisional Work exists. GA emits no
+views only after Planner has compared provisional Work with the canonical Goal when that comparison is needed. GA emits no
 replan or compatibility flag. `/fast-plan` receives the Canonical Goal plus a bounded
-`work_reconciliation_activities` projection of relevant retained/provisional Runtime
+`existing_work_activities` projection of relevant retained/provisional Runtime
 Work and active task bindings without cancelling
 first. The Planner explicitly sets `CanonicalPlanStep.reuse_activity_id` to an existing
 stable Activity identity when it wants reuse and authors the complete desired Plan;
@@ -218,8 +218,8 @@ it does not call a second wording model or rewrite the act. A pre-evidence act
 cannot cite Evidence or claim a result, while a post-evidence act must cite exact
 Host-admitted Evidence.
 
-On terminal Evidence re-entry, `/fast-plan` also performs one bounded same-owner
-accept/reject Epistemic Qualification over immutable result wording. The certificate
+On terminal Evidence re-entry, `/fast-plan` receives the bounded current Responsibility/Goal/Situation/Work/Evidence state and may answer or author genuinely new follow-up Work. Any post-Evidence wording still receives the same bounded same-owner
+accept/reject Epistemic Qualification before delivery. The certificate
 has no wording or planning fields. Rejection or checker unavailability returns a
 semantic escalation for the existing Deep Planner (or fails closed); the Host never
 rewrites the sentence. This prevents a forecast probability below 100% from being
@@ -227,11 +227,10 @@ promoted to certainty without adding a second result-semantic or response-author
 
 `POST /fast-plan` is the bounded re-entrant canonical Fast Planner endpoint, available only when `AGENT_FAST_PLANNER_ENABLED=1` and Agent LLM use is enabled. A valid `/fast-advance` may still finish a provider-free easy turn directly. Canonical Goal commit with provisional Work, association to retained Goal state, trusted Evidence/result re-entry, or another relevant open-Responsibility event calls `/fast-plan` with a bounded current Work snapshot. It decides whether existing Work remains in the complete desired Plan; GA and Orchestrator do not make that semantic choice. The endpoint never executes by itself, and trusted Runtime revalidates exact identity, version, authorization, resources, and safety before applying the Plan.
 
-For Work Reconciliation, `work_reconciliation_activities` is the single bounded input
-projection for same-turn provisional and retained Runtime Work. A Planner step selects
+`existing_work_activities` is the single bounded Planner input projection for same-turn provisional and retained Runtime Work. A Planner step selects
 reuse only by setting `reuse_activity_id` to one supplied stable identity while
 preserving Capability, arguments, Goal ownership, and timing. Retained-work reuse is
-currently atomic and reconciliation-only: it selects the complete retained set with no
+currently atomic and reuse-only: it selects the complete retained set with no
 additional step, preserves the original Runtime submission/Goal execution binding, and
 dispatches nothing twice. A replacement Plan omits reuse IDs; Host validation and exact
 cancellation receipts must close cancellable old Work before replacement dispatch.

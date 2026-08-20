@@ -85,110 +85,96 @@ contract is produced and consumed.
 
 ## Canonical human-like cognitive flow
 
-The Project Charter fixes the following **expanded flow** as Chromie's primary
-architecture and mental model. It is an ownership graph, not a requirement that
-every box run serially on every turn.
-
-The Charter's normative
-[safe-observation close-up](PROJECT_CHARTER.md#mission) additionally shows the
-asynchronous weather path: Fast Planner may start an eligible safe read under
-Responsibility refs while GA commits Goal identity; Canonical Fast Planner then compares
-that Goal with provisional Work, explicitly selects valid reuse or authors correction,
-and Runtime changes Work only after that semantic decision.
+The [Project Charter](PROJECT_CHARTER.md#mission) owns the canonical diagram. The
+Core is intentionally **event-driven and readiness-driven**, not a fixed serial
+pipeline. Its compact cognitive spine is:
 
 ```text
-                         WORLD / PERSON
-                               │
-                          Perception
-                               ↓
-                      Cognitive Gateway
-                               ↓
-                    Goal Interpretation
-                       Fast / Deep
-                               ↓
-                    Responsibility evidence
-                               ↓
-                         Fast Planner
-                               │
-             ┌─────────────────┼─────────────────┐
-             │                 │                 │
-             ▼                 ▼                 ▼
-      immediate safe      Goal continuity      HOW exceeds
-         Activity             needed           fast budget
-             │                 │                 │
-             │                 ▼                 │
-             │          Goal Association         │
-             │                 │                 │
-             │                 ▼                 │
-             │           Canonical Goal          │
-             │                 │                 │
-             │          ┌──────┴──────┐          │
-             │          │             │          │
-             │          ▼             ▼          │
-             │    canonical Fast   Deep Planner ◄┘
-             │       Planner          │
-             │          │             │
-             └──────────┴──────┬──────┘
-                               ↓
-                          planned Work
-                               │
-                 ┌─────────────┴─────────────┐
-                 │                           │
-                 ▼                           ▼
-          Primary Activity A          Primary Activity B
-                 │                           │
-        ┌────────┴────────┐          ┌───────┴────────┐
-        │                 │          │                │
- realization       optional SA   realization      optional SA
-        │                 │          │                │
- Vocal / Activity     auxiliary   Vocal / Activity  auxiliary
- lane / Capability    expression lane / Capability expression
-        │                            │
-        └──────────┬─────────────────┘
-                   ↓
-                Provider
-                   ↓
-                 Action
-                   ↓
-                Evidence
-                   ↓
-          Response / Reflection
+Person / World
+      │
+      ▼
+Cognitive Gateway
+      │
+      ▼
+Goal Interpretation
+      │
+      ▼
+Responsibility / WHAT
+      │
+      ├──────────────────────┐
+      ▼                      ▼
+Planner                 Goal Association
+fast pass / deep pass     Goal continuity
+      │                      │
+      ▼                      ▼
+Plan / Activities       Canonical Goals
+      │                      │
+      └──────────┬───────────┘
+                 ▼
+       Trusted Capability Runtime
+                 │
+                 ▼
+              Provider
+                 │
+                 ▼
+       asynchronous Runtime event
+                 │
+          ┌──────┴──────┐
+          ▼             ▼
+      Work state     Host validation
+                        │
+                        ▼
+                    Evidence
+                        │
+      Responsibility + Goal + Situation
+             + Work + Evidence
+                        │
+                        ▼
+              CognitiveOpportunity
+                        │
+                        ▼
+                  Planner re-entry
+                        │
+             0..N Activity changes
+             or no new Activity
 ```
 
-The upstream seam is equally deliberate. Fast and Deep Goal Interpretation are two
-cognition depths of the same function and produce only provider-neutral Responsibility
-evidence. They may preserve material semantic bindings and explicitly preserve unresolved
-material meaning, but they may not describe Work, author a Primary-Activity contract,
-choose Plan steps, execution lanes, realization, Capabilities, executable arguments, or
-provider requests. **Fast Planner is the first Work/Activity authority once Responsibility
-meaning is sufficient.** It may author the smallest safe turn-local advancement and state
-whether canonical Goal continuity and/or deeper HOW planning are also required. It does
-not create Goals or invoke other semantic owners itself; the Core mechanically follows
-its typed continuation disposition. Goal Association remains the only canonical
-Responsibility/Goal-state authority.
+The architecture separates four questions that must not collapse into one callback:
 
-The middle expansion does not create another cognitive pipeline. Planner still
-owns Work selection from canonical Goals and current Capability/provider contracts.
-Semantic Primary Activity is the human-observable meaning of a concrete Work/Plan
-act; `realization` is only its execution form. Vocal/Activity lanes, Vocal Expression
-modes, Capability IDs, request IDs, and provider transports therefore live below
-Activity meaning.
+- Runtime/Provider events report **what happened**.
+- Evidence records **what is true** after trusted correlation and validation.
+- Responsibility/Goal state records **what remains owed**.
+- Planner decides **what to do now** from the bounded current state.
 
-Social Attention is shown as an optional sibling of each Primary Activity's
-realization because it decorates that Activity rather than following Vocal,
-Activity-lane execution, Provider completion, or a cognition milestone. It is
-subordinate and fail-soft and has no Goal-completion authority. The compact ownership
-spine for persistent work remains `Responsibility evidence → Goal Association → Canonical
-Goal → Planner → Provider → Action → Evidence`; the responsive turn path additionally
-allows Fast Planner to author an immediate safe Activity before or while that persistent
-continuity is established.
+This state view is reconstructable context, not another persistent Mind object or
+manager. A `CognitiveOpportunity` is an ephemeral readiness signal tied to exact Goal
+and Evidence provenance. It may reactivate Planner, but it owns neither the Goal, the
+Evidence, nor the resulting action. Planner may author speech, body/tool/information
+Work, reuse/cancellation/replacement, clarification, waiting, or no new Activity.
 
-When that Activity communicates, it is a **Communicative Act**. Planner owns
-the act's exact wording, function (`acknowledge`, `ask`, `answer`, `explain`,
-`refuse`, or no speech), semantic provenance, timing, and truth constraints. The Host
-validates but does not rewrite it; TTS/playback owns acoustic production and delivery
-Evidence. This refines the Activity expansion without adding a separate response-authoring stage or
-another semantic manager.
+Goal Association is used when person-authored semantics need canonical continuity. A
+Runtime result is not a new utterance: exact request/Activity/Goal provenance already
+identifies its responsibility scope, so terminal Evidence normally re-enters Planner
+directly. Likewise, comparing a changed Goal with already queued/running/completed Work
+is simply one Planner operation. **`Work Reconciliation` is not a mandatory cognitive
+stage or separate semantic authority.**
+
+Planner's fast and deep paths are two cognition depths of the same planning authority.
+The fast pass should produce a complete detailed Plan whenever HOW is sufficiently clear;
+the deep pass is reserved for genuinely complex dependencies, alternatives, resource or
+safety reasoning. The depth label never changes Planner's authority.
+
+A safe, side-effect-free read may begin before Goal Association finishes when the
+Capability contract explicitly permits it. Later Goal continuity, Runtime state, terminal
+Evidence, failure, timeout, dependency readiness, or another material Situation change can
+create a new opportunity. No ordinary progress tick, heartbeat, audio chunk, or queue-size
+change should wake cognition merely because an event exists.
+
+When terminal Evidence arrives, Planner is not constrained to "say the result." It may
+answer from Evidence, decide that genuinely new Work is now necessary, or make no new
+outward change. Newly scheduled Work returns to the same Trusted Capability Runtime; its
+terminal event may later create another opportunity. The Activity that just completed must
+not be repeated merely because Planner was reactivated.
 
 ### Human-like does not mean perfectionist
 
@@ -1622,57 +1608,47 @@ pipeline or a replacement architecture.
 
 ```mermaid
 flowchart TD
-    EVENT["Meaningful user or world event"] --> GATEWAY["Cognitive Gateway<br/>attention, context, admission"]
+    USER["Person-authored input"] --> GATEWAY["Cognitive Gateway<br/>attention, context, admission"]
     GATEWAY --> CONTROL{"Protective control?"}
     CONTROL -->|"stop, cancel, emergency"| REFLEX["Deterministic reflex<br/>revoke, cancel, or E-stop"]
-    CONTROL -->|"ordinary admitted event"| SITUATION["Revise bounded Situation<br/>from context and Evidence"]
+    CONTROL -->|"ordinary admitted turn"| GI["Goal Interpretation<br/>Responsibility / WHAT"]
 
-    REFLEX --> REFLEXEVIDENCE["Cancellation and safety Evidence"]
-    REFLEXEVIDENCE --> REENTRY["Fast Planner Evidence re-entry<br/>affected Responsibilities only"]
+    GI --> PLAN["Planner fast pass<br/>detailed useful progress"]
+    GI --> GA["Goal Association<br/>canonical continuity when needed"]
+    PLAN --> WORK["Communicative / Capability Activities"]
+    PLAN --> DEEP["Planner deep pass<br/>only for complex HOW"]
+    DEEP --> WORK
+    GA --> GOALS["Canonical Goals<br/>unfinished Responsibility"]
 
-    SITUATION --> GI["Goal Interpretation<br/>provider-neutral Responsibility"]
-    GI --> FAST["Fast Planner<br/>smallest useful truthful progress"]
-    GI --> GA["Goal Association<br/>when continuity is needed"]
-
-    FAST --> COMM["Useful conversational delta"]
-    FAST --> WORK["Ready planned Work"]
-    FAST --> SLOW["Deep Planner<br/>only when complex HOW warrants it"]
-    GA --> GOALS["Canonical Goals<br/>unfinished Responsibilities"]
-    WORK --> EARLY{"Eligible side-effect-free read<br/>before Goal binding?"}
-    EARLY -->|"yes, under Responsibility refs"| HOST
-    EARLY -->|"no"| BIND["Planner Work reconciliation<br/>preserve compatible Work"]
-    SLOW --> REVISION["Deeper or revised Plan"]
-    REVISION --> BIND
-    GOALS --> BIND
-
-    COMM --> OPENING{"Appropriate speaking opening?"}
-    OPENING -->|"yes"| VOCAL["Vocal delivery"]
-    OPENING -->|"not yet"| QUEUE["Wait without interrupting"]
-    QUEUE --> VOCAL
-
-    BIND --> HOST["Host validation<br/>authorization, confirmation,<br/>resources, versions, safety"]
+    WORK --> HOST["Host validation<br/>authorization, confirmation,<br/>resources, versions, safety"]
     HOST --> RUNTIME["Trusted Capability Runtime"]
-    RUNTIME --> PROVIDER["Tool, Vocal, and Soridormi Providers"]
+    RUNTIME --> PROVIDER["Vocal, tool, Soridormi / peer Providers"]
+    PROVIDER --> EVENT["Asynchronous Runtime event<br/>what happened"]
 
-    VOCAL --> DELIVERY["Delivery Evidence"]
-    PROVIDER --> OUTCOME["Provider and world Evidence"]
-    DELIVERY --> REENTRY
-    OUTCOME --> REENTRY
+    EVENT --> WORKSTATE["Actual Work state"]
+    EVENT --> CORRELATE["Host request / Activity / Goal correlation"]
+    CORRELATE --> EVIDENCE["Trusted Evidence<br/>what is true"]
+    REFLEX --> EVIDENCE
 
-    REENTRY --> OWED{"What is still owed?"}
-    OWED -->|"continue"| FAST
-    OWED -->|"ask"| ASK["Specific clarification<br/>through Vocal"]
-    OWED -->|"correct"| CORRECT["Revise current meaning<br/>preserve compatible Work<br/>repair forward"]
-    OWED -->|"wait"| WAIT["Remain quiet until<br/>a relevant state change"]
-    OWED -->|"complete"| CLOSE["Close Responsibility<br/>with qualified Evidence"]
+    GI --> RESP["Responsibility<br/>what remains owed"]
+    RESP --> STATE["Bounded current state"]
+    GOALS --> STATE
+    WORKSTATE --> STATE
+    EVIDENCE --> STATE
+    SITUATION["Situation / interaction state"] --> STATE
 
-    ASK --> OPENING
-    CORRECT --> SITUATION
-    WAIT --> EVENT
-    CLOSE --> QUIET["No background thinking loop"]
-    QUIET --> EVENT
+    EVENT -. "meaningful transition" .-> OPP["CognitiveOpportunity"]
+    EVIDENCE -. "new relevant truth" .-> OPP
+    GOALS -. "material continuity change" .-> OPP
+    SITUATION -. "material relevant change" .-> OPP
+    OPP --> REENTRY["Planner re-entry"]
+    STATE --> REENTRY
 
-    EVENT -. "credible barge-in" .-> YIELD["Suppress stale output<br/>preserve unrelated Work"]
+    REENTRY --> DELTA["0..N Activity changes<br/>answer / act / query / reuse / cancel / replace / clarify"]
+    REENTRY --> QUIET["No new Activity<br/>continue / wait / listen / remain quiet / close"]
+    DELTA --> HOST
+
+    USER -. "credible barge-in" .-> YIELD["Suppress stale output<br/>preserve unrelated Work"]
     YIELD --> GATEWAY
 ```
 
