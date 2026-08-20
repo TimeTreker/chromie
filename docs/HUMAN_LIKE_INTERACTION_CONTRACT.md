@@ -215,11 +215,11 @@ duration and speed are Planner-owned execution inputs governed by safety, defaul
 clarification policy rather than GI-owned intent gaps.
 
 The unknown answer to an already-defined external lookup is never unresolved user
-meaning or a reason to ask the user for the result Chromie was asked to find. GA
-preserves the user's natural temporal wording in the Goal description while normalizing
-typed `day_part` scope to the shared canonical values `day`, `morning`, `afternoon`,
-`evening`, or `night`, and typed `date` scope to `today`, `tomorrow`, or an exact
-ISO 8601 calendar date, so Planner and Capability contracts agree.
+meaning or a reason to ask the user for the result Chromie was asked to find. GI and
+GA preserve the person's human temporal scope rather than converting it into provider
+arguments. Planner receives that source-grounded scope together with the immutable
+original turn and realizes provider-local temporal arguments only after selecting a
+Capability whose current contract explicitly declares that realization boundary.
 
 Trusted Capability Runtime exposes one task-list view per canonical Goal. A task
 serving multiple Goals appears in each applicable view under the same stable request

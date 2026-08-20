@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from .goal_progress_communication import goal_progress_communication_prompt
 import copy
-from datetime import date
 import hashlib
 import json
 import logging
@@ -312,12 +311,11 @@ class GoalAssociationModelBinding(BaseModel):
     value: str = Field(
         min_length=1,
         description=(
-            "Resolved semantic value. A directly named entity must preserve the exact "
+            "Resolved semantic value. A directly supplied value preserves the exact "
             "contiguous user-language surface from the authoritative current turn; "
             "only an indirect reference backed by supplied discourse provenance may "
-            "use a contextual canonical value. Typed temporal bindings are the explicit "
-            "exception: day_part, date, and qualitative speed use their shared canonical "
-            "semantic vocabularies."
+            "use a contextual resolved value. Goal Association never rewrites human "
+            "temporal wording into Capability argument vocabulary."
         ),
     )
     referent_id: str = ""
@@ -331,33 +329,7 @@ class GoalAssociationModelBinding(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def validate_canonical_temporal_value(self) -> "GoalAssociationModelBinding":
-        if self.entity_type.casefold() == "day_part" and self.value not in {
-            "day",
-            "morning",
-            "afternoon",
-            "evening",
-            "night",
-        }:
-            raise ValueError(
-                "day_part bindings require a canonical day-part value: "
-                "day, morning, afternoon, evening, or night"
-            )
-        if self.entity_type.casefold() == "date":
-            if self.value in {"today", "tomorrow"}:
-                return self
-            try:
-                parsed = date.fromisoformat(self.value)
-            except ValueError as exc:
-                raise ValueError(
-                    "date bindings require a canonical relative date (today or "
-                    "tomorrow) or an ISO 8601 calendar date (YYYY-MM-DD)"
-                ) from exc
-            if parsed.isoformat() != self.value:
-                raise ValueError(
-                    "date bindings require a canonical relative date (today or "
-                    "tomorrow) or an ISO 8601 calendar date (YYYY-MM-DD)"
-                )
+    def validate_semantic_value(self) -> "GoalAssociationModelBinding":
         if (
             self.entity_type.casefold() == "speed"
             and not any(character.isdigit() for character in self.value)
@@ -597,10 +569,10 @@ class GoalAssociationModelInformationResourceResponsibility(BaseModel):
         min_length=1,
         max_length=12,
         description=(
-            "Every material information-query dimension exactly once. Preserve each "
-            "dimension of compound temporal scope separately: a supplied calendar or "
-            "relative date uses entity_type=date, while a supplied local day part uses "
-            "entity_type=day_part. Neither binding may replace the other."
+            "Every material human information-query constraint exactly once. Preserve "
+            "source-grounded temporal wording as semantic scope; do not translate it "
+            "into Capability argument names or values. A natural compound time scope "
+            "may remain one binding with entity_type=temporal_scope."
         ),
     )
     source: GoalAssociationModelInformationSource
@@ -945,10 +917,6 @@ class GoalResponsibilityCoverageItem(BaseModel):
     coverage: Literal["covered", "missing", "clarification_required", "representation_mismatch"]
     independently_satisfiable: bool = False
     candidate_goal_indices: list[int] = Field(default_factory=list, max_length=8)
-    temporal_dimensions: list[Literal["date", "day_part"]] = Field(
-        default_factory=list,
-        max_length=2,
-    )
     required_goal_shape: Literal[
         "ordinary",
         "information_resource",
@@ -991,21 +959,9 @@ class GoalResponsibilityCoverageItem(BaseModel):
             raise ValueError("candidate_goal_indices must be unique")
         return value
 
-    @field_validator("temporal_dimensions")
-    @classmethod
-    def unique_temporal_dimensions(
-        cls, value: list[Literal["date", "day_part"]]
-    ) -> list[Literal["date", "day_part"]]:
-        if len(value) != len(set(value)):
-            raise ValueError("temporal_dimensions must be unique")
-        return value
 
     @model_validator(mode="after")
     def validate_shape(self) -> "GoalResponsibilityCoverageItem":
-        if self.temporal_dimensions and self.role != "constraint":
-            raise ValueError(
-                "temporal_dimensions are valid only on constraint coverage items"
-            )
         if self.required_goal_shape != "ordinary" and self.role != "responsibility":
             raise ValueError(
                 "required_goal_shape is valid only on responsibility coverage items"
@@ -1209,7 +1165,6 @@ class GoalAssociationResolver:
         certificate_raw: dict[str, Any] | None = None
         contract_repair_attempted = False
         semantic_reconsideration_attempted = False
-        fresh_temporal_contract_repair: list[str] = []
         optional_referent_recovery: list[dict[str, Any]] = []
         redundant_resource_binding_recovery: list[dict[str, Any]] = []
         invalid_optional_quantity_recovery: list[dict[str, Any]] = []
@@ -1350,10 +1305,6 @@ class GoalAssociationResolver:
                     system=self._responsibility_coverage_system_prompt(),
                     response_format=self._coverage_certificate_response_schema(
                         list(model_output.new_goals),
-                        temporal_scalar=self._uses_compact_coverage_contract(
-                            request=request,
-                            raw=accepted_raw,
-                        ),
                         authoritative_turn=request.text,
                     ),
                     prompt_family="goal_association.responsibility_coverage",
@@ -1423,75 +1374,16 @@ class GoalAssociationResolver:
                         ),
                         stage="fresh interpretation",
                     )
-                    # Semantic reconsideration receives no semantic repair.  One
-                    # still-unused DTO repair may normalize only non-canonical
-                    # temporal value fields.  The Host proves that every other
-                    # byte-semantic JSON field is unchanged before accepting it.
-                    try:
-                        resolution = await self._validate_contract_output(
-                            reconsidered_raw,
-                            request=request,
-                            turn_id=turn_id,
-                            output_type=output_type,
-                        )
-                        accepted_raw = reconsidered_raw
-                    except ValidationError as fresh_exc:
-                        temporal_paths = self._noncanonical_temporal_binding_paths(
-                            reconsidered_raw
-                        )
-                        if not (
-                            not contract_repair_attempted
-                            and logical_invocations <= 3
-                            and temporal_paths
-                            and self._only_canonical_temporal_validation_errors(
-                                fresh_exc
-                            )
-                        ):
-                            raise
-                        contract_repair_attempted = True
-                        temporal_repaired = normalize_raw(
-                            self._apply_temporal_value_repairs(
-                                before=reconsidered_raw,
-                                repair_output=await invoke(
-                                    self._build_temporal_contract_repair_prompt(
-                                        raw=reconsidered_raw,
-                                        validation_error=self._validation_error_json(
-                                            fresh_exc
-                                        ),
-                                        temporal_paths=temporal_paths,
-                                    ),
-                                    system=self._temporal_contract_repair_system_prompt(),
-                                    response_format=self._temporal_value_repair_response_schema(
-                                        reconsidered_raw,
-                                        temporal_paths,
-                                    ),
-                                    prompt_family=(
-                                        "goal_association.fresh_temporal_contract_repair"
-                                    ),
-                                ),
-                                temporal_paths=temporal_paths,
-                            ),
-                            stage="fresh temporal contract repair",
-                        )
-                        if not self._temporal_repair_preserves_semantics(
-                            before=reconsidered_raw,
-                            after=temporal_repaired,
-                            temporal_paths=temporal_paths,
-                        ):
-                            raise ValueError(
-                                "fresh temporal DTO repair changed non-temporal "
-                                "semantic content"
-                            )
-                        resolution = await self._validate_contract_output(
-                            temporal_repaired,
-                            request=request,
-                            turn_id=turn_id,
-                            output_type=output_type,
-                        )
-                        accepted_raw = temporal_repaired
-                        fresh_temporal_contract_repair = [
-                            self._json_path_text(path) for path in temporal_paths
-                        ]
+                    # Semantic reconsideration is validated as authored. Goal Association
+                    # preserves human temporal meaning and never repairs it into
+                    # Planner/Capability argument vocabulary.
+                    resolution = await self._validate_contract_output(
+                        reconsidered_raw,
+                        request=request,
+                        turn_id=turn_id,
+                        output_type=output_type,
+                    )
+                    accepted_raw = reconsidered_raw
                     reconsidered_output = output_type.model_validate(accepted_raw)
                     if self._responsibility_coverage_required(
                         reconsidered_output,
@@ -1505,10 +1397,6 @@ class GoalAssociationResolver:
                             system=self._responsibility_coverage_system_prompt(),
                             response_format=self._coverage_certificate_response_schema(
                                 list(reconsidered_output.new_goals),
-                                temporal_scalar=self._uses_compact_coverage_contract(
-                                    request=request,
-                                    raw=accepted_raw,
-                                ),
                                 authoritative_turn=request.text,
                             ),
                             prompt_family=(
@@ -1597,12 +1485,6 @@ class GoalAssociationResolver:
                     "strategy": "copy_exact_source_responsibility_outcome",
                     "changed_count": len(missing_description_recovery),
                     "entries": missing_description_recovery,
-                }
-            if fresh_temporal_contract_repair:
-                metadata["fresh_temporal_contract_repair"] = {
-                    "strategy": "bounded_same_stage_dto_repair",
-                    "changed_fields": fresh_temporal_contract_repair,
-                    "semantic_fields_unchanged": True,
                 }
             resolution = resolution.model_copy(update={"metadata": metadata})
             return self._validate(
@@ -2160,181 +2042,6 @@ class GoalAssociationResolver:
                     )
         return normalized, repaired
 
-    @staticmethod
-    def _only_canonical_temporal_validation_errors(exc: ValidationError) -> bool:
-        errors = exc.errors()
-        if not errors:
-            return False
-        return all(
-            "bindings require a canonical" in str(item.get("msg") or "")
-            for item in errors
-        )
-
-    @classmethod
-    def _noncanonical_temporal_binding_paths(
-        cls,
-        raw: dict[str, Any],
-    ) -> list[tuple[str | int, ...]]:
-        """Locate model-declared temporal bindings with invalid DTO values.
-
-        This inspects typed fields already authored by the model.  It does not
-        infer a date or day part from user wording.
-        """
-
-        paths: list[tuple[str | int, ...]] = []
-
-        def visit(value: Any, path: tuple[str | int, ...]) -> None:
-            if isinstance(value, dict):
-                entity_type = str(value.get("entity_type") or "").casefold()
-                if entity_type in {"date", "day_part"} and "value" in value:
-                    try:
-                        GoalAssociationModelBinding.model_validate(value)
-                    except ValidationError as exc:
-                        if cls._only_canonical_temporal_validation_errors(exc):
-                            paths.append((*path, "value"))
-                for key, item in value.items():
-                    visit(item, (*path, key))
-            elif isinstance(value, list):
-                for index, item in enumerate(value):
-                    visit(item, (*path, index))
-
-        visit(raw, ())
-        return paths
-
-    @staticmethod
-    def _value_at_json_path(value: Any, path: tuple[str | int, ...]) -> Any:
-        current = value
-        for part in path:
-            current = current[part]
-        return current
-
-    @classmethod
-    def _temporal_repair_preserves_semantics(
-        cls,
-        *,
-        before: dict[str, Any],
-        after: dict[str, Any],
-        temporal_paths: list[tuple[str | int, ...]],
-    ) -> bool:
-        if not temporal_paths:
-            return False
-        normalized_before = copy.deepcopy(before)
-        try:
-            for path in temporal_paths:
-                repaired_value = cls._value_at_json_path(after, path)
-                parent = cls._value_at_json_path(after, path[:-1])
-                if not isinstance(parent, dict):
-                    return False
-                if str(parent.get("entity_type") or "").casefold() not in {
-                    "date",
-                    "day_part",
-                }:
-                    return False
-                target = cls._value_at_json_path(normalized_before, path[:-1])
-                target[path[-1]] = repaired_value
-        except (KeyError, IndexError, TypeError):
-            return False
-        return normalized_before == after
-
-    @classmethod
-    def _temporal_value_repair_response_schema(
-        cls,
-        raw: dict[str, Any],
-        temporal_paths: list[tuple[str | int, ...]],
-    ) -> dict[str, Any]:
-        path_schemas: list[dict[str, Any]] = []
-        for path in temporal_paths:
-            parent = cls._value_at_json_path(raw, path[:-1])
-            entity_type = str(parent.get("entity_type") or "").casefold()
-            value_schema: dict[str, Any]
-            if entity_type == "day_part":
-                value_schema = {
-                    "type": "string",
-                    "enum": ["day", "morning", "afternoon", "evening", "night"],
-                }
-            else:
-                value_schema = {
-                    "type": "string",
-                    "pattern": (
-                        r"^(?:today|tomorrow|"
-                        r"[0-9]{4}-[0-9]{2}-[0-9]{2})$"
-                    ),
-                }
-            path_schemas.append(
-                {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {
-                        "path": {"const": cls._json_path_text(path)},
-                        "value": value_schema,
-                    },
-                    "required": ["path", "value"],
-                }
-            )
-        return {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "repairs": {
-                    "type": "array",
-                    "items": {"oneOf": path_schemas},
-                    "minItems": len(temporal_paths),
-                    "maxItems": len(temporal_paths),
-                }
-            },
-            "required": ["repairs"],
-        }
-
-    @classmethod
-    def _apply_temporal_value_repairs(
-        cls,
-        *,
-        before: dict[str, Any],
-        repair_output: Any,
-        temporal_paths: list[tuple[str | int, ...]],
-    ) -> dict[str, Any]:
-        if not isinstance(repair_output, dict):
-            raise ValueError("temporal value repair output must be an object")
-        repairs = repair_output.get("repairs")
-        if not isinstance(repairs, list):
-            raise ValueError("temporal value repair output requires repairs")
-        expected = {
-            cls._json_path_text(path): path for path in temporal_paths
-        }
-        authored: dict[str, Any] = {}
-        for item in repairs:
-            if not isinstance(item, dict) or set(item) != {"path", "value"}:
-                raise ValueError("temporal value repair entries require only path and value")
-            path_text = str(item.get("path") or "")
-            if path_text not in expected or path_text in authored:
-                raise ValueError(
-                    "temporal value repair must cover each authorized path exactly once"
-                )
-            authored[path_text] = item.get("value")
-        if set(authored) != set(expected):
-            raise ValueError(
-                "temporal value repair must cover each authorized path exactly once"
-            )
-
-        repaired = copy.deepcopy(before)
-        for path_text, path in expected.items():
-            parent = cls._value_at_json_path(repaired, path[:-1])
-            candidate = dict(parent)
-            candidate["value"] = authored[path_text]
-            GoalAssociationModelBinding.model_validate(candidate)
-            parent[path[-1]] = authored[path_text]
-        return repaired
-
-    @staticmethod
-    def _json_path_text(path: tuple[str | int, ...]) -> str:
-        rendered = "$"
-        for part in path:
-            if isinstance(part, int):
-                rendered += f"[{part}]"
-            else:
-                rendered += f".{part}"
-        return rendered
-
     async def _validate_contract_output(
         self,
         raw: dict[str, Any],
@@ -2715,17 +2422,6 @@ class GoalAssociationResolver:
                     and value in normalized_description
                 )
             elif resource.kind == "information":
-                temporal_names = {
-                    "date",
-                    "day_part",
-                    "period",
-                    "temporal_scope",
-                    "time",
-                    "time_of_day",
-                }
-                expected_pairs = {
-                    pair for pair in expected_pairs if pair[0] not in temporal_names
-                }
                 actual = {
                     " ".join(binding.value.strip().casefold().split())
                     for binding in resource.query_scope
@@ -3354,28 +3050,6 @@ class GoalAssociationResolver:
         clauses.append(
             {
                 "if": {
-                    "properties": {"entity_type": {"const": "day_part"}},
-                    "required": ["entity_type"],
-                },
-                "then": {
-                    "properties": {
-                        "value": {
-                            "enum": [
-                                "day",
-                                "morning",
-                                "afternoon",
-                                "evening",
-                                "night",
-                            ]
-                        }
-                    },
-                    "required": ["value"],
-                },
-            }
-        )
-        clauses.append(
-            {
-                "if": {
                     "properties": {"entity_type": {"const": "speed"}},
                     "required": ["entity_type"],
                 },
@@ -3386,25 +3060,6 @@ class GoalAssociationResolver:
                                 {"enum": ["slow", "normal", "quick"]},
                                 {"pattern": r".*[0-9].*"},
                             ]
-                        }
-                    },
-                    "required": ["value"],
-                },
-            }
-        )
-        clauses.append(
-            {
-                "if": {
-                    "properties": {"entity_type": {"const": "date"}},
-                    "required": ["entity_type"],
-                },
-                "then": {
-                    "properties": {
-                        "value": {
-                            "pattern": (
-                                r"^(?:today|tomorrow|"
-                                r"[0-9]{4}-[0-9]{2}-[0-9]{2})$"
-                            )
                         }
                     },
                     "required": ["value"],
@@ -3644,10 +3299,11 @@ class GoalAssociationResolver:
             "source.status=provider_resolved; source.status=unknown preserves an "
             "unavailable local/private/runtime source; source.status=known is only for an "
             "explicitly named source. Never invent location, timezone, source, provider, "
-            "device, coordinates, or another query fact. When one source expression "
-            "carries both a calendar/relative-date dimension and a local day-part dimension, "
-            "emit separate query_scope bindings for entity_type=date and entity_type=day_part. "
-            "A duration is not a calendar date or day part. Never narrow broader temporal scope.\n\n"
+            "device, coordinates, or another query fact. Preserve source-grounded "
+            "temporal wording as human semantic scope in query_scope. A compound natural "
+            "expression stays intact instead of being decomposed into Capability date, period, "
+            "or clock-range arguments. A duration remains duration. Never narrow broader "
+            "temporal scope.\n\n"
             "Resolve a pronoun, demonstrative, ellipsis, correction, or task mention only "
             "from explicit current meaning, a supplied scoped discourse referent, a "
             "candidate binding, or accepted dialogue, in that order. There are no "
@@ -3675,7 +3331,7 @@ class GoalAssociationResolver:
             "Recent accepted conversation JSON (reference evidence only):\n"
             f"{self._bounded_json((context.get('history') or request.history or [])[-6:], 2600)}\n\n"
             f"Language hint: {request.language or 'auto'}\n"
-            f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
+            f"FINAL AUTHORITATIVE USER TURN:\n{request.original_user_text}"
         )
 
     @staticmethod
@@ -3875,7 +3531,7 @@ class GoalAssociationResolver:
             "Accepted dialogue JSON:\n"
             f"{self._bounded_json(self._association_dialogue_projection(history), 1400)}\n\n"
             f"Language hint: {request.language or 'auto'}\n"
-            f"FINAL AUTHORITATIVE USER TURN:\n{request.text}\n\n"
+            f"FINAL AUTHORITATIVE USER TURN:\n{request.original_user_text}\n\n"
             "FINAL CANDIDATE GOAL IDS JSON:\n"
             f"{self._bounded_json([item.get('goal_id') for item in candidate_goals], 900)}"
         )
@@ -3947,7 +3603,7 @@ class GoalAssociationResolver:
             "Information acquisition and a requested interpretation of that same evidence are one Goal when one result can satisfy both. Multiple requested aspects derived from one information result remain one information responsibility when the same result satisfies them. Do not split evidence acquisition, requested result aspects, or interpretation of that result into separate Goals. "
             "A physical action and a conversational answer or spoken performance are independent goals when the answer or performance is genuinely requested. Separate independently requested outcomes that can be accepted or rejected on their own. However, acquisition and delivery stages that together constitute one human responsibility are one Goal: navigating/searching, locating, grasping or retrieving, carrying, returning, and handing over are provider-owned stages of one physical resource delivery; external search, evidence retrieval, evaluation, and spoken explanation are stages of one information resource delivery. Do not split those implementation stages into separate Goals unless the user independently requests one stage as its own outcome. A simple acknowledgement, confirmation, willingness statement, or progress prelude for capability work is not a separate vocal_output Goal; it is prospective conversational output attached to the existing responsibility and every cognitive stage must use Interaction Context to avoid repeating an already fulfilled act. Before returning, verify that every independently satisfiable user responsibility appears in exactly one new_goals item: no merged unrelated outcomes and no duplicated responsibility across Goals. "
             "For a responsibility whose human-level outcome is to obtain something and make it available to a recipient, include exactly one nested resource_responsibility. It is the sole writable resource authority and is discriminated by top-level kind. A physical_object resource means a distinct concrete object that exists independently of Chromie's body motion and whose acquisition plus handover completes the human outcome. It is never a generic wrapper for embodied work: locomotion, body motion, gaze, blinking, waving, turning, posture, and gestures are non-resource body_action Goals, keep resource_responsibility absent, and preserve their material semantic parameters in top-level bindings. For kind=information, use output_mode=capability_work, classify the provider-neutral information_domain from the evidence actually needed (local_clock, weather_forecast, external_grounded_information, direct_environment_perception, or private_runtime_information), and write every requested query fact—location, time, requested aspect, comparison, threshold, or other answer-shaping scope—exactly once in query_scope. Current nearby person/object/event presence is direct_environment_perception, never weather merely because both concern outside. Its source object is intentionally narrow: source.status=provider_resolved delegates public/external source selection; source.status=unknown preserves an unavailable local/private/runtime source; source.status=known is only for a user- or discourse-named information source and then source_name is required. Never copy query_scope facts into source. For kind=physical_object, use output_mode=body_action and delivery_mode=physical_handover; identity and quantity live at resource_responsibility.description/quantity, while source.acquisition_bindings is the only writable location/distance/direction/route surface. When the user or a resolved discourse referent supplies any spatial acquisition fact, source.status must be known and acquisition_bindings must preserve every supplied distance, direction, location, or route separately. source.status=unknown is valid only when no acquisition grounding was supplied. Preserve explicit distance and direction separately; source.description is summary only and any numeric fact in it must also exist in acquisition_bindings. Resource Goals keep top-level bindings empty. No flat compatibility copy is created. resource_responsibility must never name or imply a Capability, provider implementation, website, search engine, coordinates, grasp pose, execution mode, or plan. Human-readable descriptions never override typed fields. "
-            "Also preserve semantic qualifiers such as temporal scope, comparison period, and requested answer shape. Temporal scope can contain more than one material dimension. When one source expression carries both a calendar/relative-date dimension and a local day-part dimension, emit separate query_scope bindings for entity_type=date and entity_type=day_part; neither dimension covers or replaces the other. Canonical values must follow the typed binding contract while the Goal description preserves the user's natural wording. This is semantic normalization, not Capability selection. Never silently narrow broader, historical, comparative, or otherwise scoped meaning. If the intended scope is materially ambiguous, preserve it in a provisional Goal without choosing a narrower interpretation. "
+            "Also preserve semantic qualifiers such as temporal scope, comparison period, and requested answer shape. Keep source-grounded temporal wording as human semantic scope rather than translating it into provider date/day-part parameters. One compound source expression may remain one temporal_scope binding; separately stated independent scopes remain separate semantic constraints. Never silently narrow broader, historical, comparative, or otherwise scoped meaning. If the intended scope is materially ambiguous, preserve it in a provisional Goal without choosing a narrower interpretation. "
             "Resolve references, pronouns, demonstratives, ellipsis, and task mentions before planning. Authority order is: explicit current user meaning; foreground scoped discourse referents; candidate Goal bindings; recent dialogue. First identify every material indirect referring expression, then require a unique value from that authority order before writing a resolved binding or supplied referent. Imperative grammar and a plausible generic noun such as device, object, person, task, or setting are never reference evidence. If two or more contextual candidates remain plausible, or none is supplied, preserve the unresolved reference in the provisional Goal description without selecting a candidate; Fast Planner owns the narrow clarification decision. Phrases such as ‘the last task I told you’ may semantically associate with an active, recoverable, or retained recent terminal Goal, but the model must decide that relationship from the supplied Goal state and dialogue—not from a Host phrase table. Tool-result memory is not reference-resolution authority and must never decide what an unresolved expression refers to. "
             "When the user introduces or explicitly corrects a salient entity, emit referent_updates only when the required discourse-index provenance is available. Use operation=correct with non-empty target_referent_ids copied from supplied discourse context when a new value supersedes an earlier referent; never emit an unscoped correction when no target referent ID was supplied. The canonical Goal association and typed bindings still preserve a correction even when no discourse-index update can be authored. The old referent remains available in its own task scope but becomes background. Use operation=introduce for a new salient entity, and focus/background/retire only for supplied referent IDs. "
             "Use resolved_references only for indirect references whose denotation is uniquely selected from a supplied discourse referent or active Goal binding, such as pronouns, demonstratives, ellipsis, aliases, corrections, or task mentions. Do not emit resolved_references for an ordinary explicit entity mention such as a directly named place; represent that meaning in the new Goal bindings and, when it is salient for future dialogue, in referent_updates. Every resolved_references item must copy a supplied referent_id and include explicit confidence. If resolution is materially ambiguous, omit the invented binding/reference and preserve a provisional Goal instead. "
@@ -3985,7 +3641,7 @@ class GoalAssociationResolver:
             "For an open safe-read Goal whose bound Work is scheduled, running, or recoverable, associate a semantic follow-up with that exact Goal when appropriate; do not answer from another task's result. "
             "Do not reason from prior routing labels, planner states, validation failures, fallback states, or other runtime diagnostics; they are not user-semantic evidence.\n\n"
             f"Language hint: {request.language or 'auto'}\n"
-            f"FINAL AUTHORITATIVE USER TURN:\n{request.text}\n\n"
+            f"FINAL AUTHORITATIVE USER TURN:\n{request.original_user_text}\n\n"
             f"FINAL CANDIDATE GOAL IDS JSON:\n{self._bounded_json([item.get('goal_id') for item in candidate_goals], 1600)}"
         )
 
@@ -4065,34 +3721,9 @@ class GoalAssociationResolver:
             + output_instructions
             + "Select exactly one Goal-state decision branch. Do not author clarification wording or planning gaps. Each new_goals item contains description, output_mode, optional media_operation, bindings, optional supersedes_goal_ids, and optional provider-neutral resource_responsibility only. Choose output_mode from the work that actually completes the Goal; the Host derives the internal responsibility class, lane, and provider-evidence requirement. media_playback requires one exact media_operation; non-media Goals may omit it. "
             + _EXECUTION_CONTRACT_PROMPT
-            + " Preserve one nested resource_responsibility when the responsibility is genuinely to acquire and deliver a physical object or grounded information; never add it to a vocal performance or insert provider details. It is the sole writable resource authority. Use kind=information with output_mode=capability_work, an exact provider-neutral information_domain, query_scope for all requested information facts, and a narrow source object that can only delegate, remain unknown, or name one explicit information source. Classify present nearby people, objects, or events as direct_environment_perception, not weather_forecast. Use kind=physical_object with output_mode=body_action, delivery_mode=physical_handover, and source.acquisition_bindings as the sole spatial/acquisition fact surface. Never duplicate one fact across fields and never create top-level Goal bindings for a resource Goal. In physical acquisition bindings, distance uses name=distance and entity_type=distance, direction uses name=direction and entity_type=direction, and a relative place may use name=location and entity_type=relative_location. Generic measurement or string types do not replace these canonical types. Preserve every supplied temporal dimension separately: use entity_type=date for a resolved calendar or relative date and normalize its value to today, tomorrow, or an exact ISO 8601 calendar date (YYYY-MM-DD); use entity_type=day_part for a resolved local day part. A compound date-plus-day-part scope requires both bindings; neither replaces the other. Never repair missing human-level scope by inventing a default: preserve unresolved scope in a provisional Goal and leave the exact missing value unset. Preserve or repair explicit discourse resolution and referent updates; never use tool-result contents to infer a reference. "
+            + " Preserve one nested resource_responsibility when the responsibility is genuinely to acquire and deliver a physical object or grounded information; never add it to a vocal performance or insert provider details. It is the sole writable resource authority. Use kind=information with output_mode=capability_work, an exact provider-neutral information_domain, query_scope for all requested information facts, and a narrow source object that can only delegate, remain unknown, or name one explicit information source. Classify present nearby people, objects, or events as direct_environment_perception, not weather_forecast. Use kind=physical_object with output_mode=body_action, delivery_mode=physical_handover, and source.acquisition_bindings as the sole spatial/acquisition fact surface. Never duplicate one fact across fields and never create top-level Goal bindings for a resource Goal. In physical acquisition bindings, distance uses name=distance and entity_type=distance, direction uses name=direction and entity_type=direction, and a relative place may use name=location and entity_type=relative_location. Generic measurement or string types do not replace these canonical types. Preserve human temporal scope in source-grounded semantic form, preferably entity_type=temporal_scope for a compound natural expression; do not derive Capability date/period enums or clock windows. Never repair missing human-level scope by inventing a default: preserve unresolved scope in a provisional Goal and leave the exact missing value unset. Preserve or repair explicit discourse resolution and referent updates; never use tool-result contents to infer a reference. "
             "The host owns every ID and persistence field. Re-segment every independently satisfiable responsibility from the authoritative user turn; do not preserve an invalid merge merely because it appeared in the previous output.\n\n"
-            f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
-        )
-
-    @classmethod
-    def _build_temporal_contract_repair_prompt(
-        cls,
-        *,
-        raw: dict[str, Any],
-        validation_error: str,
-        temporal_paths: list[tuple[str | int, ...]],
-    ) -> str:
-        return (
-            "The semantic decision below is already final and authoritative. Repair "
-            "only temporal binding value fields named by the validation errors. For "
-            "entity_type=date, use today, tomorrow, or an exact ISO 8601 calendar "
-            "date (YYYY-MM-DD). For entity_type=day_part, use day, morning, "
-            "afternoon, evening, or night. Return only a repairs array containing "
-            "one object with path and normalized value for each authorized path. Do "
-            "not return or rewrite the semantic DTO. The Host applies only those exact "
-            "value fields and rejects missing, duplicate, or unauthorized paths.\n\n"
-            "AUTHORIZED TEMPORAL VALUE PATHS JSON:\n"
-            f"{cls._bounded_json([cls._json_path_text(path) for path in temporal_paths], 2400)}\n\n"
-            "FINAL SEMANTIC DTO JSON:\n"
-            f"{cls._bounded_json(raw, 9000)}\n\n"
-            "TEMPORAL VALUE VALIDATION ERRORS JSON:\n"
-            f"{validation_error}"
+            f"FINAL AUTHORITATIVE USER TURN:\n{request.original_user_text}"
         )
 
     def _layered_prompt(
@@ -4192,7 +3823,6 @@ class GoalAssociationResolver:
     def _coverage_certificate_response_schema(
         candidate_goals: list[GoalAssociationModelGoal],
         *,
-        temporal_scalar: bool = False,
         authoritative_turn: str = "",
     ) -> dict[str, Any]:
         goal_count = len(candidate_goals)
@@ -4209,7 +3839,6 @@ class GoalAssociationResolver:
                 "coverage",
                 "independently_satisfiable",
                 "candidate_goal_indices",
-                "temporal_dimensions",
                 "required_goal_shape",
                 "required_information_domain",
                 "required_output_mode",
@@ -4242,26 +3871,6 @@ class GoalAssociationResolver:
                 if isinstance(index_items, dict):
                     index_items["type"] = "integer"
                     index_items["enum"] = list(range(max(0, goal_count)))
-            if temporal_scalar:
-                temporal_dimensions = item_schema.get("properties", {}).get(
-                    "temporal_dimensions"
-                )
-                if isinstance(temporal_dimensions, dict):
-                    temporal_dimensions.clear()
-                    temporal_dimensions.update(
-                        {
-                            "type": "string",
-                            "enum": [
-                                "none",
-                                "date",
-                                "day_part",
-                                "date_and_day_part",
-                            ],
-                            "description": (
-                                "Calendar/local-day dimensions only; durations use none."
-                            ),
-                        }
-                    )
             item_schema.setdefault("allOf", []).extend(
                 [
                     {
@@ -4278,11 +3887,6 @@ class GoalAssociationResolver:
                                 },
                                 "independently_satisfiable": {"enum": [False]},
                                 "candidate_goal_indices": {"maxItems": 0},
-                                "temporal_dimensions": (
-                                    {"const": "none"}
-                                    if temporal_scalar
-                                    else {"maxItems": 0}
-                                ),
                                 "required_goal_shape": {"const": "ordinary"},
                                 "required_information_domain": {"const": "none"},
                                 "required_output_mode": {"const": "none"},
@@ -4346,23 +3950,6 @@ class GoalAssociationResolver:
                         "then": {
                             "properties": {
                                 "required_information_domain": {"const": "none"}
-                            }
-                        },
-                    },
-                    {
-                        "if": {
-                            "properties": {
-                                "role": {"enum": ["responsibility"]}
-                            },
-                            "required": ["role"],
-                        },
-                        "then": {
-                            "properties": {
-                                "temporal_dimensions": (
-                                    {"const": "none"}
-                                    if temporal_scalar
-                                    else {"maxItems": 0}
-                                )
                             }
                         },
                     },
@@ -4513,12 +4100,6 @@ class GoalAssociationResolver:
                     )
                     branch_properties["role"] = {"const": "responsibility"}
                     branch_properties["coverage"] = {"const": coverage}
-                    branch_properties["temporal_dimensions"] = {
-                        **copy.deepcopy(
-                            branch_properties.get("temporal_dimensions") or {}
-                        ),
-                        "maxItems": 0,
-                    }
                     branch_properties["candidate_goal_indices"] = {
                         "const": (
                             []
@@ -4583,12 +4164,6 @@ class GoalAssociationResolver:
                     "type": "string",
                     "enum": ["constraint", "context", "framing"],
                 }
-                supporting_item["properties"]["temporal_dimensions"][
-                    "description"
-                ] = (
-                    "Calendar-date and local day-part dimensions only. Durations, "
-                    "ordering, concurrency, and simultaneity always use []."
-                )
                 supporting_items["items"] = supporting_item
         schema["required"] = [
             "responsibility_items",
@@ -4695,24 +4270,6 @@ class GoalAssociationResolver:
             for item_index, item in enumerate(normalized_items):
                 if not isinstance(item, dict):
                     continue
-                temporal_value = item.get("temporal_dimensions")
-                if isinstance(temporal_value, str):
-                    temporal_map = {
-                        "none": [],
-                        "date": ["date"],
-                        "day_part": ["day_part"],
-                        "date_and_day_part": ["date", "day_part"],
-                    }
-                    if temporal_value in temporal_map:
-                        item["temporal_dimensions"] = temporal_map[temporal_value]
-                        recoveries.append(
-                            {
-                                "item_index": item_index,
-                                "recovery": "expanded_temporal_dimension_scalar",
-                                "from": temporal_value,
-                                "to": temporal_map[temporal_value],
-                            }
-                        )
                 required_goal_shape = str(
                     item.get("required_goal_shape") or "ordinary"
                 )
@@ -4853,58 +4410,11 @@ class GoalAssociationResolver:
                     str(item.get("source_excerpt") or "").strip().casefold().split()
                 )
                 if (
-                    item.get("coverage") == "representation_mismatch"
-                    and role == "constraint"
-                    and normalized_source_excerpt in self_contradictory_support_spans
-                    and candidate_goals is not None
-                    and item.get("temporal_dimensions")
-                ):
-                    # The auditor has already authored the semantic role and exact
-                    # temporal dimension(s).  If every named candidate visibly carries
-                    # those same typed dimensions, a bare representation_mismatch is
-                    # internally inconsistent: the model cannot both point to the typed
-                    # fact and deny that the typed fact is represented.  Normalize only
-                    # that contradiction.  Missing dimensions, wrong Goal shape/domain/
-                    # mode, and source-grounded binding loss remain fail-closed below.
-                    required_dimensions = {
-                        str(value) for value in item.get("temporal_dimensions") or []
-                    }
-                    dimension_coverage = True
-                    for goal_index in indices:
-                        if not isinstance(goal_index, int) or not (
-                            0 <= goal_index < len(candidate_goals)
-                        ):
-                            dimension_coverage = False
-                            break
-                        binding_types = {
-                            binding.entity_type.casefold()
-                            for binding in candidate_goals[goal_index].semantic_bindings
-                        }
-                        if not required_dimensions.issubset(binding_types):
-                            dimension_coverage = False
-                            break
-                    if dimension_coverage:
-                        item["coverage"] = "covered"
-                        recoveries.append(
-                            {
-                                "item_index": item_index,
-                                "recovery": "reconciled_typed_temporal_constraint",
-                                "from": "representation_mismatch",
-                                "to": "covered",
-                                "candidate_goal_indices": list(indices),
-                                "temporal_dimensions": sorted(required_dimensions),
-                            }
-                        )
-                if (
                     item.get("coverage") == "covered"
                     and candidate_goals is not None
                     and isinstance(indices, list)
                     and indices
                 ):
-                    temporal_dimensions = {
-                        str(value)
-                        for value in item.get("temporal_dimensions") or []
-                    }
                     required_goal_shape = str(
                         item.get("required_goal_shape") or "ordinary"
                     )
@@ -4925,13 +4435,6 @@ class GoalAssociationResolver:
                             binding.entity_type.casefold()
                             for binding in candidate.semantic_bindings
                         }
-                        if not temporal_dimensions.issubset(binding_types):
-                            mismatch_reasons.append(
-                                "missing_temporal_dimensions="
-                                + ",".join(
-                                    sorted(temporal_dimensions - binding_types)
-                                )
-                            )
                         resource = candidate.resource_responsibility
                         shape_matches = {
                             "ordinary": (
@@ -5052,12 +4555,6 @@ class GoalAssociationResolver:
                 # one already-authorized fresh interpretation.  The Host does not
                 # infer these facts from user wording; it only forwards fields the
                 # GA-owned coverage model explicitly declared.
-                if item.temporal_dimensions:
-                    problems.append(
-                        "temporal_dimensions:"
-                        + ",".join(item.temporal_dimensions)
-                        + f":{item.role}:{item.source_excerpt}"
-                    )
                 if item.required_goal_shape != "ordinary":
                     problems.append(
                         "required_goal_shape:"
@@ -5164,12 +4661,10 @@ class GoalAssociationResolver:
             "lists required_information_domain, preserve that exact provider-neutral "
             "domain in resource_responsibility.information_domain; never relabel a "
             "nearby-person or local-observation need as weather, clock, or web research. "
-            "When feedback "
-            "lists temporal_dimensions, preserve every listed entity_type in the "
-            "candidate's authoritative binding surface. In particular, "
-            "temporal_dimensions:date,day_part requires two separate bindings with "
-            "entity_type=date and entity_type=day_part; a combined free-form time binding "
-            "does not satisfy either typed requirement. Every query_scope item must "
+            "Every query_scope item must preserve source-grounded human semantic "
+            "scope. Temporal wording belongs here as the user's semantic constraint, "
+            "not as Planner/Capability date, period, or clock-range arguments. Every "
+            "query_scope item must "
             "be entailed by the FINAL AUTHORITATIVE USER TURN, supplied Responsibility "
             "evidence, or an explicitly resolved discourse referent. Never invent a "
             "provider prerequisite, placeholder, default, current location, source, "
@@ -5196,7 +4691,7 @@ class GoalAssociationResolver:
             "the FINAL AUTHORITATIVE USER TURN in its original language; never use a "
             "translation or paraphrase from Responsibility outcome or binding text. "
             "A positive observable outcome is a responsibility. Duration, "
-            "distance, direction, order, manner, prohibition, date, day part, and other "
+            "distance, direction, order, manner, prohibition, temporal scope, and other "
             "conditions on that same outcome are constraints, never independently "
             "satisfiable responsibilities. That role distinction is only the audit "
             "shape: a constraint belongs on the same candidate Goal as the "
@@ -5208,9 +4703,9 @@ class GoalAssociationResolver:
             "A reason or background event that only explains why the answer is useful "
             "and does not change which answer would be correct is context, not a "
             "constraint; context is covered without Goal ownership. Only background "
-            "that changes valid completion is a constraint. A whole relative calendar "
-            "day with no within-day period carries date only, never day_part. "
-            "Coordinated effects are separate only when a "
+            "that changes valid completion is a constraint. Preserve temporal source "
+            "wording as one human semantic constraint rather than decomposing it into "
+            "provider-facing date/day-part fields. Coordinated effects are separate only when a "
             "person can judge each effect completed without the others. One evidence "
             "lookup and the requested judgment of its result remain one responsibility. "
             "Coordination grammar never demotes a positive effect to a constraint. If a "
@@ -5226,13 +4721,9 @@ class GoalAssociationResolver:
             "coverage=representation_mismatch. A physical resource means acquisition and "
             "handover of a distinct concrete object; body motion is not a physical "
             "resource. A state mutation or future delivery is a persistent effect, not "
-            "information acquisition. Binding entity_type, not the arbitrary binding "
-            "name, is semantic authority: one entity_type=date binding plus one "
-            "entity_type=day_part binding preserves both dimensions. Normalized values "
-            "may preserve equivalent wording, but prose, a binding name, and a day_part "
-            "value never imply a missing date binding. A single source expression that "
-            "jointly carries both dimensions uses one constraint with "
-            "temporal_dimensions=[date,day_part]. Use "
+            "information acquisition. For temporal constraints, coverage means the "
+            "candidate preserves the source-grounded human scope without silently "
+            "narrowing, translating, or decomposing it into Capability arguments. Use "
             "coverage=missing only when no candidate attempts the fragment and then use "
             "no candidate index. Use clarification_required only when supplied evidence "
             "cannot uniquely ground a material pronoun, demonstrative, ellipsis, "
@@ -5303,15 +4794,11 @@ class GoalAssociationResolver:
             "an adjective, state directive, conjunction, or imperative grammar. Emit "
             "each semantic fragment once: never duplicate the same source_excerpt "
             "under both responsibility and constraint (or any other conflicting "
-            "roles); decide its one actual role. A responsibility item always uses "
-            "temporal_dimensions=[]; represent its material date/day-part scope with "
-            "separate role=constraint items mapped to that same Goal. A temporal "
-            "constraint sets temporal_dimensions to the exact dimensions carried by "
-            "its excerpt. A source expression carrying both a calendar/relative-date "
-            "dimension and a local day-part dimension carries both; an expression that "
-            "carries only one dimension must not invent the other. A duration such "
-            "as ten seconds or three minutes is not a calendar date or local day part "
-            "and must use temporal_dimensions=[].\n\n"
+            "roles); decide its one actual role. Temporal wording is audited as a "
+            "source-grounded constraint on the affected Goal. Preserve the human scope "
+            "itself; do not require or infer provider date/day-part dimensions in this "
+            "Goal-coverage stage. A duration remains a duration rather than becoming a "
+            "calendar or local-day parameter.\n\n"
             "Set independently_satisfiable=true only when the user could reasonably "
             "judge that positive outcome completed even if sibling outcomes did not "
             "happen. A factual lookup and an interpretation requested from that same "
@@ -5402,17 +4889,12 @@ class GoalAssociationResolver:
             "A guessed current location, timezone, provider prerequisite, placeholder, "
             "device, or source is a representation_mismatch even when it is called "
             "unspecified or copied from a larger non-location clause. Audit every "
-            "supplied temporal dimension independently: if the turn supplies both a "
-            "calendar or relative "
-            "date and a local day part, the query scope must contain separate date and "
-            "day_part bindings. Judge their types by entity_type regardless of binding "
-            "name. If both typed bindings carry equivalent normalized values, mark both "
-            "source constraints covered. Use role=constraint with "
-            "temporal_dimensions=[date] and [day_part] for separable source fragments, "
-            "or one role=constraint item with temporal_dimensions=[date,day_part] when "
-            "a single indivisible expression carries both. Responsibility items keep "
-            "temporal_dimensions empty. Candidate prose or either binding alone does not "
-            "cover the missing dimension; use coverage=representation_mismatch. For a physical resource, an "
+            "supplied temporal scope as source-grounded human meaning. For an information "
+            "Goal, resource_responsibility.query_scope must retain that scope without "
+            "silently narrowing, translating, or converting it into provider arguments. "
+            "A compound natural expression may remain one temporal_scope binding. If the "
+            "candidate drops or changes that human scope, use coverage=representation_mismatch. "
+            "For a physical resource, an "
             "acquisition location, distance, direction, or route constraint is covered "
             "only by resource_responsibility.source.acquisition_bindings. Descriptions "
             "are summary only. The schema deliberately exposes one writable owner per "
@@ -5455,14 +4937,9 @@ class GoalAssociationResolver:
             "Every candidate Goal index must have a "
             "covered responsibility owner. Never return only constraints, even when "
             "the constraints are represented correctly. Keep a positive outcome and "
-            "its temporal, location, manner, or prohibition constraints in separate "
-            "entries; use distinct verbatim spans from the same turn when the grammar "
-            "allows it. Responsibility items always keep temporal_dimensions empty. "
-            "temporal_dimensions names only calendar date and local day-part scope: "
-            "duration, sequence/order, concurrency, and simultaneity always use []. "
-            "Before returning, reject your own draft if any temporal dimension appears "
-            "on a non-constraint item or if date/day_part was inferred from duration "
-            "or coordination. Also reject your own draft when reason_summary calls an "
+            "its temporal, location, manner, or prohibition constraints in separate audit "
+            "entries when the source grammar permits, but never decompose one human "
+            "temporal expression into Capability-facing fields. Also reject your own draft when reason_summary calls an "
             "effect distinct, observable, standalone, independently satisfiable, or in "
             "need of its own Goal/responsibility but the JSON places that effect only in "
             "supporting_items. The structured arrays, role, and coverage must express the "
@@ -5478,7 +4955,7 @@ class GoalAssociationResolver:
             "Recent conversation JSON (reference context only; current-turn Goal "
             "coverage must still be anchored by source_excerpt from the final turn):\n"
             f"{self._bounded_json((context.get('history') or request.history or [])[-6:], 3000)}\n\n"
-            f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
+            f"FINAL AUTHORITATIVE USER TURN:\n{request.original_user_text}"
         )
 
     def _uses_compact_coverage_contract(
@@ -5522,7 +4999,7 @@ class GoalAssociationResolver:
             "translated or paraphrased Responsibility outcome or binding. "
             "Use role=responsibility only for the positive outcome Chromie owes. A "
             "duration, distance, direction, speed, location, order, simultaneity, manner, "
-            "prohibition, date, day part, threshold, comparison, severity, preference, or "
+            "prohibition, temporal scope, threshold, comparison, severity, preference, or "
             "answer-shaping detail is role=constraint on that outcome and must set "
             "independently_satisfiable=false. Duration is never a second outcome. Stated "
             "preferences that changes what counts as a valid decision must be "
@@ -5561,17 +5038,9 @@ class GoalAssociationResolver:
             "time, and result aspects are covered only by "
             "resource_responsibility.query_scope. Physical acquisition location, distance, "
             "direction, and route are covered only by source.acquisition_bindings. Prose "
-            "cannot replace a typed fact.\n\n"
-            "In this compact model DTO temporal_dimensions is one scalar enum: none, "
-            "date, day_part, or date_and_day_part. A responsibility item always uses "
-            "temporal_dimensions=none. Only a role=constraint may name date or day_part. "
-            "Duration, sequence, concurrency, and simultaneity use none. If "
-            "both typed bindings carry equivalent normalized values, mark both source "
-            "constraints covered. Use one role=constraint item with "
-            "temporal_dimensions=date_and_day_part for an indivisible expression such as "
-            "tonight. A whole relative calendar day with no within-day period carries "
-            "date only, never day_part. reject your own draft if any temporal dimension appears on a "
-            "non-constraint item.\n\n"
+            "cannot replace a typed fact. A temporal constraint is covered when the Goal "
+            "preserves its source-grounded human scope; do not require date/period fields "
+            "that belong to a later Capability realization.\n\n"
             "Reference grounding is part of responsibility coverage. Candidate prose that "
             "silently invents a generic object does not ground a reference; use "
             "clarification_required when multiple scene candidates remain plausible. No "
@@ -5579,23 +5048,17 @@ class GoalAssociationResolver:
             "Put positive outcomes in responsibility_items and constraints/context/framing "
             "in supporting_items. Include required_goal_shape, "
             "required_information_domain, required_output_mode, exact verbatim contiguous "
-            "source_excerpt, coverage, independently_satisfiable, candidate_goal_indices, "
-            "and temporal_dimensions. Before returning, audit field consistency: every "
-            "positive outcome that can stand alone uses independently_satisfiable=true; "
-            "each modifier uses the smallest distinct contiguous source span available; "
-            "a duration constraint uses temporal_dimensions=none; date or day_part may "
-            "appear only when that calendar/local-day dimension is actually expressed; "
-            "a duration measured in seconds, minutes, or hours is self-contained and "
-            "never requires or implies a calendar date or local day part; the absence of "
-            "date/day-part wording does not make such a duration unresolved; "
-            "and every non-responsibility uses required_output_mode=none. If your "
-            "reasoning says no date or day part exists, the JSON must contain neither. "
+            "source_excerpt, coverage, independently_satisfiable, and candidate_goal_indices. "
+            "Before returning, audit field consistency: every positive outcome that can "
+            "stand alone uses independently_satisfiable=true; each modifier uses the "
+            "smallest distinct contiguous source span available; and every "
+            "non-responsibility uses required_output_mode=none. "
             "Return the certificate JSON only.\n\n"
             "Candidate Goal DTO JSON:\n"
             f"{raw_json}\n\n"
             "Authoritative Responsibility evidence JSON:\n"
             f"{responsibility_json}\n\n"
-            f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
+            f"FINAL AUTHORITATIVE USER TURN:\n{request.original_user_text}"
         )
 
 
@@ -5643,14 +5106,6 @@ class GoalAssociationResolver:
         return (
             f"You repair one minimal {contract_name} semantic DTO using semantic reasoning and the supplied exact JSON Schema. "
             "Return only the corrected JSON object. Do not add commentary, markdown, lexical mappings, or hidden reasoning."
-        )
-
-    @staticmethod
-    def _temporal_contract_repair_system_prompt() -> str:
-        return (
-            "You are a bounded DTO temporal-value normalizer. Return only authorized "
-            "JSON-path/value repairs for invalid date or day_part strings. Never return "
-            "or rewrite the semantic DTO. Return JSON only."
         )
 
     @staticmethod
@@ -6028,7 +5483,7 @@ class GoalAssociationResolver:
                     goal_id=goal_id,
                     source_responsibility_refs=item.source_responsibility_refs,
                     description=item.description,
-                    source_text=request.text,
+                    source_text=request.original_user_text,
                     object={"bindings": binding_map} if binding_map else {},
                     constraints={},
                     success_criteria=[item.description],

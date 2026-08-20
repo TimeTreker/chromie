@@ -260,9 +260,12 @@ Capability authorization and execution.
 
 `POST /tools/execute` is a trusted provider boundary, not a semantic router. It accepts an exact `capability_id` and schema-valid arguments already produced by the Goal-driven planner. The Agent rejects unknown, unavailable, non-local, side-effecting, confirmation-gated, or non-`safe_read` capabilities and returns structured output without composing user speech. The Trusted Capability Runtime (`CapabilityRuntime`) remains responsible for provider registration, input validation, timing, cancellation, and correlated execution evidence. The first maintained binding is `chromie.weather.lookup`; additional local tools require an explicit manifest declaration and trusted provider binding rather than phrase rules.
 
-`chromie.weather.lookup` accepts the canonical place, `date=today|tomorrow`,
-and `period=day|morning|afternoon|evening|night`. Natural “tonight” is represented
-without conflating two dimensions: `date=today` plus `period=night`. Its completed output therefore includes a
+`chromie.weather.lookup` accepts the canonical place plus Capability-local
+`date=today|tomorrow` and `period=day|morning|afternoon|evening|night`. GI and GA
+retain human temporal scope; the Capability's model-visible `argument_realization`
+contract tells Planner how to map that scope into these provider arguments. For this
+Capability, a current-local-night scope realizes as `date=today` plus `period=night`.
+Its completed output therefore includes a
 non-null `forecast_period` with local start/end timestamps and period-scoped
 temperature, apparent-temperature, precipitation-probability, and condition
 evidence. When `forecast_period` is present, the top-level `condition`,

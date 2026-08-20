@@ -867,8 +867,9 @@ which returns `FastPlannerFirstResponse` containing zero or one exact immediatel
 realizable Communicative Activity. It has no Capability, parameter-resolution, or
 clarification authority separate from Fast Planner. After that commitment, the same
 Planner continues the remaining Activity decision and Goal Association begins
-concurrently from the unchanged GI result. The continued Planner returns a typed
-`FastPlannerAdvance` that mechanically retains the committed act and completes the
+concurrently from the unchanged GI result. Both branches retain the immutable admitted
+UserTurn as source evidence alongside the structured Responsibility projection. The
+continued Planner returns a typed `FastPlannerAdvance` that mechanically retains the committed act and completes the
 first real Activity Plan:
 exact Responsibility refs covered, zero or more Communicative Acts and Capability Activities,
 their sequential/parallel relation, and an optional `deep_planner` continuation for
@@ -2154,9 +2155,10 @@ material current-turn fragment as one of:
 Each item carries a verbatim current-turn `source_excerpt`. A covered positive
 responsibility owns exactly one Goal candidate; constraints may bind to affected
 Goals; context and framing own none. The model also states whether a positive
-responsibility is independently satisfiable, which `date`/`day_part` dimensions a
-temporal constraint carries, and whether a responsibility requires an information
-resource, physical resource, persistent effect, or ordinary Goal shape. The trusted
+responsibility is independently satisfiable and whether it requires an information
+resource, physical resource, persistent effect, or ordinary Goal shape. Temporal
+constraints are audited for source-grounded human semantic preservation only; Goal
+Association does not decompose them into provider date/period dimensions. The trusted
 Host compares those authored claims only with typed candidate fields, then checks
 structure and provenance:
 

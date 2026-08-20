@@ -95,14 +95,14 @@ Host Orchestrator
     |-> Protective Reflex -> immediate stop/cancel (no model wait)
     `-> immutable admitted UserTurnEnvelope -> Goal-driven Cognitive Core
         -> Goal Interpretation (Responsibility + Goal relation + bounded unresolved meaning)
-        -> same GI result, concurrent fan-out
+        -> same GI result + immutable original UserTurn, concurrent fan-out
            |-> Fast Planner -> input resolution + exact Communicative/Capability Activities --.
            |      |-> validated Communicative Activity -> Vocal/TTS      |
            |      |-> eligible safe read -> provisional Runtime task ----|
            |      `-> Deep Planner only for complex HOW                  |
            |-> Goal Association -> canonical Goal state --------+-> Goal-bound tasks
            `-> background Social Attention decoration            |
-        -> Fast Planner Work Reconciliation over Canonical Goal + actual Work
+        -> GA result re-enters Planner -> Work Reconciliation over Canonical Goal + actual Runtime Work
         -> resource-aware Trusted Capability Runtime <-----------'
         -> named capability -> Soridormi / peer providers
         -> structured results and traces

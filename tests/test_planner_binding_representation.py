@@ -30,7 +30,13 @@ def _satisfaction(goal_id: str) -> dict:
     }
 
 
-def _weather_output(*, resolution_value=None, aspects=None, extra_args=None) -> PlannerModelOutput:
+def _weather_output(
+    *,
+    resolution_value=None,
+    aspects=None,
+    extra_args=None,
+    semantic_realizations=(),
+) -> PlannerModelOutput:
     goal_id = "goal-weather"
     parameter_resolutions = []
     if resolution_value is not None:
@@ -43,6 +49,23 @@ def _weather_output(*, resolution_value=None, aspects=None, extra_args=None) -> 
                 "confidence": 1.0,
                 "blocking": False,
                 "rationale": "Copied from the authoritative Goal binding.",
+                "source_goal_ids": [goal_id],
+            }
+        )
+    realized_args = dict(extra_args or {})
+    for parameter in semantic_realizations:
+        parameter_resolutions.append(
+            {
+                "step_id": "weather",
+                "parameter": parameter,
+                "strategy": "semantic_realization",
+                "value": realized_args[parameter],
+                "confidence": 1.0,
+                "blocking": False,
+                "rationale": (
+                    "Realized the source-grounded human temporal scope under "
+                    "the selected Capability contract."
+                ),
                 "source_goal_ids": [goal_id],
             }
         )
@@ -59,7 +82,7 @@ def _weather_output(*, resolution_value=None, aspects=None, extra_args=None) -> 
                     "capability_id": "chromie.weather.lookup",
                     "args": {
                         "aspects": list(aspects or ASPECTS),
-                        **dict(extra_args or {}),
+                        **realized_args,
                     },
                     "timing": "sequential",
                     "source_goal_ids": [goal_id],
@@ -107,9 +130,9 @@ def _weather_goal() -> dict:
 def _information_weather_goal() -> dict:
     goal = _weather_goal()
     attributes = dict(goal["object"]["bindings"])
-    attributes["time_frame"] = {
-        "entity_type": "day_part",
-        "value": "night",
+    attributes["temporal_scope"] = {
+        "entity_type": "temporal_scope",
+        "value": "今晚",
     }
     goal["object"]["bindings"] = {}
     goal["resource_responsibility"] = {
@@ -124,6 +147,27 @@ def _information_weather_goal() -> dict:
         "delivery_mode": "spoken_explanation",
     }
     return goal
+
+
+def _weather_capability_with_temporal_realization() -> dict:
+    return {
+        "capability_id": "chromie.weather.lookup",
+        "hints": {
+            "argument_realization": {
+                "temporal_scope": {
+                    "source_entity_type": "temporal_scope",
+                    "planner_owned": True,
+                    "arguments": ["date", "period"],
+                    "minimum_arguments": 1,
+                    "contract": (
+                        "Interpret source-grounded human temporal scope after this "
+                        "Capability is selected; a current-local-night scope realizes "
+                        "as date=today and period=night."
+                    ),
+                }
+            }
+        },
+    }
 
 
 class PlannerBindingRepresentationTests(unittest.TestCase):
@@ -636,23 +680,41 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
             authoritative_goals=[_weather_goal()],
         )
 
-    def test_information_step_rejects_calendar_date_that_omits_day_part(self):
+    def test_information_step_rejects_provider_temporal_args_without_realization_contract(self):
         with self.assertRaisesRegex(
             PlannerDTOContractError,
             "omits authoritative temporal scope",
         ):
             validate_goal_binding_argument_grounding(
-                _weather_output(extra_args={"date": "today"}),
+                _weather_output(
+                    extra_args={"date": "today", "period": "night"},
+                    semantic_realizations=("date", "period"),
+                ),
                 authoritative_goals=[_information_weather_goal()],
             )
 
-    def test_information_step_preserves_exact_day_part_argument(self):
+    def test_information_step_accepts_capability_owned_temporal_realization(self):
         validate_goal_binding_argument_grounding(
             _weather_output(
-                extra_args={"date": "today", "period": "night"}
+                extra_args={"date": "today", "period": "night"},
+                semantic_realizations=("date", "period"),
             ),
             authoritative_goals=[_information_weather_goal()],
+            capabilities=[_weather_capability_with_temporal_realization()],
         )
+
+    def test_information_step_requires_planner_provenance_for_semantic_realization(self):
+        with self.assertRaisesRegex(
+            PlannerDTOContractError,
+            "semantic realization requires explicit Planner provenance",
+        ):
+            validate_goal_binding_argument_grounding(
+                _weather_output(
+                    extra_args={"date": "today", "period": "night"},
+                ),
+                authoritative_goals=[_information_weather_goal()],
+                capabilities=[_weather_capability_with_temporal_realization()],
+            )
 
     def test_information_step_accepts_declared_fixed_temporal_scope(self):
         goal = _information_weather_goal()
@@ -683,59 +745,6 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                 }
             ],
         )
-
-    def test_information_step_preserves_exact_afternoon_argument(self):
-        goal = _information_weather_goal()
-        goal["resource_responsibility"]["resource"]["attributes"]["time_frame"] = {
-            "entity_type": "day_part",
-            "value": "afternoon",
-        }
-        validate_goal_binding_argument_grounding(
-            _weather_output(
-                extra_args={"date": "today", "period": "afternoon"}
-            ),
-            authoritative_goals=[goal],
-        )
-
-    def test_information_step_preserves_compound_date_and_day_part(self):
-        goal = _information_weather_goal()
-        attributes = goal["resource_responsibility"]["resource"]["attributes"]
-        attributes["date"] = {
-            "entity_type": "date",
-            "value": "today",
-        }
-        attributes["time_frame"] = {
-            "entity_type": "day_part",
-            "value": "evening",
-        }
-
-        validate_goal_binding_argument_grounding(
-            _weather_output(
-                extra_args={"date": "today", "period": "evening"}
-            ),
-            authoritative_goals=[goal],
-        )
-
-    def test_information_step_rejects_omitted_compound_date_dimension(self):
-        goal = _information_weather_goal()
-        attributes = goal["resource_responsibility"]["resource"]["attributes"]
-        attributes["date"] = {
-            "entity_type": "date",
-            "value": "today",
-        }
-        attributes["time_frame"] = {
-            "entity_type": "day_part",
-            "value": "evening",
-        }
-
-        with self.assertRaisesRegex(
-            PlannerDTOContractError,
-            "value='today'",
-        ):
-            validate_goal_binding_argument_grounding(
-                _weather_output(extra_args={"period": "evening"}),
-                authoritative_goals=[goal],
-            )
 
     def test_typed_list_binding_accepts_chinese_list_separators(self):
         goal = _weather_goal()

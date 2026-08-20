@@ -614,7 +614,12 @@ def chromie_manifests(
                             "type": "string",
                             "enum": ["today", "tomorrow"],
                             "default": "today",
-                            "description": "Forecast date requested by the user.",
+                            "description": (
+                                "Capability-local calendar-day argument. Planner realizes "
+                                "this from source-grounded human temporal scope under the "
+                                "declared argument_realization contract; Goal Association "
+                                "does not author this provider-facing value."
+                            ),
                         },
                         "period": {
                             "type": "string",
@@ -626,11 +631,11 @@ def chromie_manifests(
                                 "night",
                             ],
                             "default": "day",
-                            "x-chromie-entity-type": "day_part",
                             "description": (
-                                "Local-day evidence scope. Use the exact canonical day-part "
-                                "binding when the Goal asks for morning, afternoon, evening, "
-                                "or night; a whole-day date is not equivalent evidence."
+                                "Capability-local within-day forecast period. Planner realizes "
+                                "this from source-grounded human temporal scope under the "
+                                "declared argument_realization contract; a whole-day request "
+                                "must not be silently narrowed to one period."
                             ),
                         },
                         "units": {
@@ -803,6 +808,24 @@ def chromie_manifests(
                             "climate_normals",
                         ],
                         "scope_mismatch_policy": "clarify_or_unavailable_never_narrow",
+                    },
+                    "argument_realization": {
+                        "temporal_scope": {
+                            "source_entity_type": "temporal_scope",
+                            "planner_owned": True,
+                            "arguments": ["date", "period"],
+                            "minimum_arguments": 1,
+                            "contract": (
+                                "Interpret the source-grounded human temporal scope against "
+                                "the current local calendar only after this Capability is "
+                                "selected. Populate date when the scope fixes a supported "
+                                "relative calendar day and populate period when it fixes a "
+                                "supported local within-day period; a compound scope may "
+                                "require both. A current-local-night scope therefore realizes "
+                                "as date=today and period=night. Do not narrow broader scope, "
+                                "invent a missing dimension, or rewrite the canonical Goal."
+                            ),
+                        }
                     },
                     "resource_contract": {
                         "provider_role": "acquire_information",

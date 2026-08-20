@@ -274,7 +274,9 @@ Read the diagram with these boundaries:
   new response-authoring or semantic-review stage. As soon as that
   bounded decision exists, the same Fast Planner continues the remaining
   Activity Plan while Goal Association independently begins from the unchanged GI
-  result. The two continuations run concurrently. This is one Planner with phased
+  result. Both retain the immutable admitted UserTurn as source evidence in addition to
+  the structured GI Responsibility; source wording can expose lost qualifiers but does
+  not grant Planner a second WHAT authority. The two continuations run concurrently. This is one Planner with phased
   readiness, not a response stage followed by a Planner, and the progress sentence
   does not stand in for the still-required Plan. Fast Planner is the first **HOW /
   Work-advancement authority**. Planner owns
@@ -303,9 +305,12 @@ Read the diagram with these boundaries:
   supersedes canonical Goals from the same GI result without waiting for or
   rewriting Fast Planner output. It emits no `requires_replan`, Work-compatibility,
   Capability, cancellation, or next-action decision. A Canonical Goal commit that
-  intersects retained or provisional Work reactivates Fast Planner Work Reconciliation;
-  this is a structural continuation of an open Responsibility, not a Host semantic
-  judgment. This gives GA no Capability or planning authority.
+  intersects retained or provisional Work reactivates Fast Planner Work Reconciliation.
+  Planner compares the committed Goal with its already-authored Plan and the Trusted
+  Runtime's actual queued/running/completed Work, then emits only the necessary HOW
+  delta; Runtime validates and applies that lifecycle delta. This is a structural
+  continuation of an open Responsibility, not a Host semantic judgment, and it gives GA
+  no Capability or planning authority.
 - Canonical Goal owns **what outcome Chromie still owes persistently**.
 - Fast/Deep Planner owns **what Work can advance those Goals now**, constrained by
   the currently available Capability/provider contracts. Fast Planner owns ordinary

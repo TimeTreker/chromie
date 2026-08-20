@@ -88,3 +88,44 @@ def test_concrete_cases_remain_as_regression_evidence_outside_production_prompts
     assert "76%" in fast_tests
     assert "所以会下雨" in fast_tests
     assert "tonight" in ga_tests
+
+
+def test_temporal_realization_lives_in_capability_contract_not_gi_or_ga() -> None:
+    gi_prompt = _text(
+        "agent/app/cognitive_core/goal_interpreter/prompts/goal_interpreter_system.txt"
+    )
+    ga_source = _text("agent/app/goal_association.py")
+    weather_source = _text("agent/app/capabilities/local.py")
+    weather_start = weather_source.index('name="chromie.weather.lookup"')
+    weather_end = weather_source.index(
+        'name="chromie.external_information.retrieve"', weather_start
+    )
+    weather_block = weather_source[weather_start:weather_end]
+
+    for retired in (
+        "temporal_dimensions",
+        "date_and_day_part",
+        "date=today",
+        "day_part=night",
+        "period=night",
+    ):
+        assert retired not in gi_prompt
+        assert retired not in ga_source
+
+    assert "argument_realization" in weather_block
+    assert '"source_entity_type": "temporal_scope"' in weather_block
+    assert "date=today" in weather_block
+    assert "period=night" in weather_block
+
+
+def test_weather_skill_defers_temporal_mapping_to_selected_capability_contract() -> None:
+    for path in (
+        "agent-skills/weather-information/SKILL.md",
+        "agent-skills/weather-information/projections/fast_planner.md",
+        "agent-skills/weather-information/projections/deep_planner.md",
+    ):
+        text = _text(path)
+        assert "argument_realization" in text
+        assert "date=today" not in text
+        assert "period=night" not in text
+        assert "day_part" not in text

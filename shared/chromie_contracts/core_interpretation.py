@@ -313,3 +313,23 @@ class CognitiveWorkRequest(BaseModel):
     @classmethod
     def normalize_interpretation_unresolved(cls, value: Any) -> list[str]:
         return CoreInterpretationResult.normalize_unresolved(value)
+
+    @property
+    def original_user_text(self) -> str:
+        """Return immutable Gateway source wording when it is available.
+
+        ``text`` is transport-normalized so model-facing work can compare turns
+        deterministically.  Semantic owners must still be able to inspect the
+        exact admitted source wording; the UserTurnEnvelope already owns that
+        immutable evidence, so do not create another persisted copy here.
+        """
+
+        context = self.context if isinstance(self.context, dict) else {}
+        envelope = context.get("user_turn_envelope")
+        if isinstance(envelope, dict):
+            original = envelope.get("original_input")
+            if isinstance(original, dict):
+                value = original.get("text")
+                if isinstance(value, str) and value:
+                    return value
+        return self.text

@@ -217,7 +217,9 @@ truth stage and admitted Evidence. It cannot rewrite, repair, retry, choose anot
 or affect Goal/Capability decisions; failure is silence for this phase. After that
 decision, Fast Advance cannot author or salvage substitute progress wording, and the same Fast Planner's
 remaining Activity planning and Goal Association fan out concurrently from the
-unchanged GI result. GA independently remains the only canonical Goal commit authority.
+unchanged GI result. Both branches also retain the immutable admitted UserTurn as source
+evidence; the GI Responsibility is a structured projection over that source, not a
+replacement for it. GA independently remains the only canonical Goal commit authority.
 This is phased readiness inside one Planner, not an independent response author. The
 resulting Fast Plan mechanically retains the already-committed Act and may contain
 additional Communicative Acts and Capability Activities with explicit

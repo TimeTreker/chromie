@@ -167,7 +167,6 @@ def coverage_item(
             independently_satisfiable if role == "responsibility" else False
         ),
         "candidate_goal_indices": list(goal_indices),
-        "temporal_dimensions": list(temporal_dimensions or []),
         "required_goal_shape": required_goal_shape,
         "required_information_domain": (
             required_information_domain
@@ -285,40 +284,6 @@ class GoalExecutionContractTests(unittest.TestCase):
                 confidence=1.0,
             )
 
-    def test_day_part_binding_uses_canonical_runtime_vocabulary(self):
-        with self.assertRaisesRegex(ValueError, "canonical day-part value"):
-            GoalAssociationModelBinding.model_validate(
-                binding("time", "day_part", "daytime")
-            )
-
-        parsed = GoalAssociationModelBinding.model_validate(
-            binding("time", "day_part", "day")
-        )
-        self.assertEqual(parsed.value, "day")
-
-        night = GoalAssociationModelBinding.model_validate(
-            binding("time", "day_part", "night")
-        )
-        self.assertEqual(night.value, "night")
-        with self.assertRaisesRegex(ValueError, "canonical day-part value"):
-            GoalAssociationModelBinding.model_validate(
-                binding("time", "day_part", "tonight")
-            )
-
-    def test_date_binding_uses_canonical_runtime_vocabulary(self):
-        for noncanonical in ("今天", "明天", "next Tuesday", "2026-8-19"):
-            with self.subTest(noncanonical=noncanonical):
-                with self.assertRaisesRegex(ValueError, "canonical relative date"):
-                    GoalAssociationModelBinding.model_validate(
-                        binding("date", "date", noncanonical)
-                    )
-
-        for canonical in ("today", "tomorrow", "2026-08-19"):
-            with self.subTest(canonical=canonical):
-                parsed = GoalAssociationModelBinding.model_validate(
-                    binding("date", "date", canonical)
-                )
-                self.assertEqual(parsed.value, canonical)
 
     def test_host_execution_projection_is_derived_from_output_mode(self):
         item = GoalAssociationModelGoal.model_validate(
@@ -571,18 +536,10 @@ class GoalExecutionContractTests(unittest.TestCase):
         weather_scope = weather["new_goals"][0]["resource_responsibility"][
             "query_scope"
         ]
-        weather_scope.append(binding("time", "day_part", "daytime"))
-        self.assertTrue(list(goal_validator.iter_errors(weather)))
-        weather_scope[-1]["value"] = "day"
+        weather_scope.append(
+            binding("temporal_scope", "temporal_scope", "tonight")
+        )
         self.assertEqual(list(goal_validator.iter_errors(weather)), [])
-        weather_scope.append(binding("date", "date", "今天"))
-        self.assertTrue(list(goal_validator.iter_errors(weather)))
-        weather_scope[-1]["value"] = "today"
-        self.assertEqual(list(goal_validator.iter_errors(weather)), [])
-        weather_scope[-1]["value"] = "2026-08-19"
-        self.assertEqual(list(goal_validator.iter_errors(weather)), [])
-        weather_scope[-1]["value"] = "2026-8-19"
-        self.assertTrue(list(goal_validator.iter_errors(weather)))
 
         bounded_goal_schema = GoalAssociationResolver._response_schema(
             GoalSegmentationModelOutput,
@@ -752,11 +709,9 @@ class GoalExecutionContractTests(unittest.TestCase):
             "body_action",
         )
         supporting_items_schema = coverage_schema["properties"]["supporting_items"]
-        self.assertIn(
-            "Durations",
-            supporting_items_schema["items"]["properties"][
-                "temporal_dimensions"
-            ]["description"],
+        self.assertNotIn(
+            "temporal_dimensions",
+            supporting_items_schema["items"]["properties"],
         )
         self.assertIn(
             "required_information_domain",
@@ -770,7 +725,6 @@ class GoalExecutionContractTests(unittest.TestCase):
             coverage_item(
                 "tonight",
                 role="constraint",
-                temporal_dimensions=["date", "day_part"],
             )
         )
         self.assertTrue(list(coverage_validator.iter_errors(constraint_only)))
@@ -806,7 +760,6 @@ class GoalExecutionContractTests(unittest.TestCase):
                     "coverage": "covered",
                     "independently_satisfiable": True,
                     "candidate_goal_indices": [],
-                    "temporal_dimensions": [],
                     "required_goal_shape": "ordinary",
                     "required_information_domain": "none",
                     "required_output_mode": "none",
@@ -895,43 +848,15 @@ class GoalExecutionContractTests(unittest.TestCase):
             coverage_prompt,
         )
         coverage_system = resolver._responsibility_coverage_system_prompt()
-        self.assertIn(
-            "Binding entity_type, not the arbitrary binding name",
-            coverage_system,
-        )
-        self.assertIn(
-            "one entity_type=date binding plus one entity_type=day_part binding preserves "
-            "both dimensions",
-            coverage_system,
-        )
-        self.assertIn(
-            "If both typed bindings carry equivalent normalized values, mark both source "
-            "constraints covered",
-            coverage_prompt,
-        )
-        self.assertIn(
-            "one role=constraint item with temporal_dimensions=date_and_day_part",
-            coverage_prompt,
-        )
-        self.assertIn(
-            "A responsibility item always uses temporal_dimensions=none",
-            coverage_prompt,
-        )
+        self.assertIn("source-grounded human scope", coverage_system)
+        self.assertIn("do not require date/period fields", coverage_prompt)
+        self.assertNotIn("temporal_dimensions", coverage_system)
+        self.assertNotIn("date_and_day_part", coverage_prompt)
         self.assertIn(
             "Never return only constraints",
             coverage_prompt,
         )
-        self.assertIn(
-            "reject your own draft if any temporal dimension appears on a "
-            "non-constraint item",
-            coverage_prompt,
-        )
         self.assertIn("required_goal_shape", coverage_prompt)
-        self.assertIn(
-            "prose, a binding name, and a day_part value never imply a missing date "
-            "binding",
-            coverage_system,
-        )
         self.assertIn("Reference grounding is part of responsibility coverage", coverage_prompt)
         self.assertIn("silently invents a generic object", coverage_prompt)
         self.assertIn("multiple scene candidates remain plausible", coverage_prompt)
@@ -1146,41 +1071,6 @@ class GoalExecutionContractTests(unittest.TestCase):
 
         self.assertEqual(parsed.supporting_items[0].required_output_mode, "none")
 
-    def test_compact_coverage_temporal_scalar_is_mechanical_transport(self):
-        schema = GoalAssociationResolver._coverage_certificate_response_schema(
-            [
-                GoalAssociationModelGoal.model_validate(
-                    goal("Walk forward for 10 seconds.", "body_action")
-                )
-            ],
-            temporal_scalar=True,
-        )
-        Draft202012Validator.check_schema(schema)
-        temporal = schema["$defs"]["GoalResponsibilityCoverageItem"][
-            "properties"
-        ]["temporal_dimensions"]
-        self.assertEqual(
-            temporal["enum"],
-            ["none", "date", "day_part", "date_and_day_part"],
-        )
-
-        raw = certificate(
-            {
-                **coverage_item(
-                    "Walk forward for 10 seconds.",
-                    0,
-                    required_output_mode="body_action",
-                ),
-                "temporal_dimensions": "none",
-            }
-        )
-        parsed = GoalAssociationResolver._validate_coverage_certificate(
-            raw,
-            request=request("Walk forward for 10 seconds.", language="en-US"),
-            goal_count=1,
-        )
-
-        self.assertEqual(parsed.responsibility_items[0].temporal_dimensions, [])
 
     def test_context_coverage_clears_ineligible_goal_ownership(self):
         req = request("there is a bottle ahead; bring it", language="en-US")
@@ -1625,183 +1515,8 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertEqual(repairs[0]["from"], "string")
         self.assertTrue(repairs[0]["value_unchanged"])
 
-    def test_coverage_reconciles_self_contradictory_typed_temporal_constraint(self):
-        req = request("今天晚上重庆会不会下大雨啊？")
-        candidate = GoalAssociationModelGoal.model_validate(
-            goal(
-                "Determine whether it will rain heavily in Chongqing tonight",
-                "capability_work",
-                resource=resource_responsibility(
-                    kind="information",
-                    information_domain="weather_forecast",
-                    description="Chongqing heavy rain tonight",
-                    attributes=[
-                        binding("location", "place", "重庆"),
-                        binding("date", "date", "today"),
-                        binding("day_part", "day_part", "night"),
-                        binding("weather_aspect", "weather_attribute", "heavy rain"),
-                    ],
-                    source_status="provider_resolved",
-                ),
-            )
-        )
-        raw = certificate(
-            coverage_item(
-                "重庆会不会下大雨",
-                0,
-                independently_satisfiable=False,
-                required_goal_shape="information_resource",
-            ),
-            coverage_item(
-                "今天",
-                0,
-                coverage="representation_mismatch",
-                independently_satisfiable=False,
-                required_output_mode="capability_work",
-            ),
-            coverage_item(
-                "晚上",
-                0,
-                coverage="representation_mismatch",
-                independently_satisfiable=False,
-                required_output_mode="capability_work",
-            ),
-            coverage_item(
-                "今天",
-                0,
-                role="constraint",
-                temporal_dimensions=["date"],
-            ),
-            coverage_item(
-                "晚上",
-                0,
-                role="constraint",
-                coverage="representation_mismatch",
-                temporal_dimensions=["day_part"],
-            ),
-        )
 
-        parsed = GoalAssociationResolver._validate_coverage_certificate(
-            raw,
-            request=req,
-            goal_count=1,
-            candidate_goals=[candidate],
-        )
 
-        self.assertEqual(
-            [item.source_excerpt for item in parsed.responsibility_items],
-            ["重庆会不会下大雨"],
-        )
-        self.assertEqual(
-            [item.coverage for item in parsed.supporting_items],
-            ["covered", "covered"],
-        )
-        verdict, problems = GoalAssociationResolver._coverage_verdict(
-            parsed, goal_count=1
-        )
-        self.assertEqual(verdict, "accept")
-        self.assertEqual(problems, [])
-
-    def test_temporal_mismatch_still_rejects_when_typed_dimension_is_absent(self):
-        req = request("今天晚上重庆会不会下大雨啊？")
-        candidate = GoalAssociationModelGoal.model_validate(
-            goal(
-                "Determine whether it will rain heavily in Chongqing tonight",
-                "capability_work",
-                resource=resource_responsibility(
-                    kind="information",
-                    information_domain="weather_forecast",
-                    description="Chongqing heavy rain tonight",
-                    attributes=[
-                        binding("location", "place", "重庆"),
-                        binding("date", "date", "today"),
-                    ],
-                    source_status="provider_resolved",
-                ),
-            )
-        )
-
-        parsed = GoalAssociationResolver._validate_coverage_certificate(
-            certificate(
-                coverage_item(
-                    "重庆会不会下大雨",
-                    0,
-                    independently_satisfiable=True,
-                    required_goal_shape="information_resource",
-                ),
-                coverage_item(
-                    "晚上",
-                    0,
-                    role="constraint",
-                    coverage="representation_mismatch",
-                    temporal_dimensions=["day_part"],
-                ),
-            ),
-            request=req,
-            goal_count=1,
-            candidate_goals=[candidate],
-        )
-
-        self.assertEqual(parsed.supporting_items[0].coverage, "representation_mismatch")
-        verdict, problems = GoalAssociationResolver._coverage_verdict(
-            parsed, goal_count=1
-        )
-        self.assertEqual(verdict, "reject")
-        self.assertIn("representation_mismatch:constraint:晚上", problems)
-
-    def test_coverage_typed_claims_reject_missing_date_and_information_resource(self):
-        req = request("今晚重庆会不会下雨哦？")
-        candidate = GoalAssociationModelGoal.model_validate(
-            goal(
-                "determine whether it will rain in Chongqing tonight",
-                "capability_work",
-                bindings=[
-                    binding("location", "location", "重庆"),
-                    binding("time", "day_part", "night"),
-                ],
-            )
-        )
-        parsed = GoalAssociationResolver._validate_coverage_certificate(
-            certificate(
-                coverage_item(
-                    "今晚",
-                    0,
-                    role="constraint",
-                    independently_satisfiable=False,
-                    temporal_dimensions=["date", "day_part"],
-                ),
-                coverage_item(
-                    "重庆会不会下雨",
-                    0,
-                    required_goal_shape="information_resource",
-                ),
-            ),
-            request=req,
-            goal_count=1,
-            candidate_goals=[candidate],
-        )
-
-        self.assertEqual(
-            [item.coverage for item in parsed.items],
-            ["representation_mismatch", "representation_mismatch"],
-        )
-        verdict, problems = GoalAssociationResolver._coverage_verdict(
-            parsed, goal_count=1
-        )
-        self.assertEqual(verdict, "reject")
-        self.assertIn("representation_mismatch:constraint:今晚", problems)
-        self.assertIn(
-            "representation_mismatch:responsibility:重庆会不会下雨",
-            problems,
-        )
-        self.assertIn(
-            "temporal_dimensions:date,day_part:constraint:今晚",
-            problems,
-        )
-        self.assertIn(
-            "required_goal_shape:information_resource:responsibility:重庆会不会下雨",
-            problems,
-        )
 
     def test_coverage_rejects_wrong_information_domain(self):
         req = request("你觉得外面有人吗？")
@@ -1861,7 +1576,6 @@ class GoalExecutionContractTests(unittest.TestCase):
                 0,
                 role="constraint",
                 independently_satisfiable=False,
-                temporal_dimensions=["date", "day_part"],
             ),
             coverage_item(
                 "重庆",
@@ -1885,8 +1599,7 @@ class GoalExecutionContractTests(unittest.TestCase):
                     description="重庆今晚降雨情况",
                     attributes=[
                         binding("location", "location", "重庆"),
-                        binding("date", "date", "today"),
-                        binding("day_part", "day_part", "night"),
+                        binding("temporal_scope", "temporal_scope", "今晚"),
                         binding("requested_aspect", "weather_aspect", "rain"),
                     ],
                     source_status="provider_resolved",
@@ -1899,7 +1612,6 @@ class GoalExecutionContractTests(unittest.TestCase):
                 0,
                 role="constraint",
                 independently_satisfiable=False,
-                temporal_dimensions=["date", "day_part"],
             ),
             coverage_item(
                 "重庆",
@@ -1937,17 +1649,14 @@ class GoalExecutionContractTests(unittest.TestCase):
 
         self.assertEqual(result.resolution_status, "resolved")
         resource = result.new_goals[0].resource_responsibility.resource
-        self.assertEqual(resource.attributes["date"]["value"], "today")
-        self.assertEqual(resource.attributes["day_part"]["value"], "night")
+        self.assertEqual(resource.attributes["temporal_scope"]["value"], "今晚")
         fresh_prompt = str(ollama.prompts[2][0])
         self.assertIn(
             "required_goal_shape:information_resource:responsibility:会不会下雨",
             fresh_prompt,
         )
-        self.assertIn(
-            "temporal_dimensions:date,day_part:constraint:今晚",
-            fresh_prompt,
-        )
+        self.assertIn("source-grounded WHAT", fresh_prompt)
+        self.assertNotIn("temporal_dimensions", fresh_prompt)
         self.assertEqual(
             [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
             [
@@ -2303,6 +2012,25 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertEqual([item["name"] for item in query_scope], ["time"])
         self.assertEqual(dropped[0]["value"], "current location")
 
+    def test_goal_association_prompt_uses_gateway_original_user_wording(self):
+        resolver = GoalAssociationResolver(FakeOllama({}))
+        req = request("今晚，重庆热不热？")
+        context = dict(req.context)
+        context["user_turn_envelope"] = {
+            "original_input": {"text": "  今晚，重庆热不热？  "}
+        }
+        req = req.model_copy(update={"context": context})
+
+        self.assertEqual(req.text, "今晚，重庆热不热？")
+        self.assertEqual(req.original_user_text, "  今晚，重庆热不热？  ")
+        prompt = resolver._build_prompt(
+            req, [], output_type=GoalSegmentationModelOutput
+        )
+        self.assertIn(
+            "FINAL AUTHORITATIVE USER TURN:\n  今晚，重庆热不热？  ",
+            prompt,
+        )
+
     def test_goal_prompts_distinguish_body_action_from_physical_resource(self):
         resolver = GoalAssociationResolver(FakeOllama({}))
         req = request(
@@ -2493,6 +2221,23 @@ class GoalExecutionContractTests(unittest.TestCase):
 
 
 
+    def test_temporal_binding_preserves_human_semantic_surface(self):
+        value = GoalAssociationModelBinding(
+            name="temporal_scope",
+            entity_type="temporal_scope",
+            value="今晚",
+            confidence=1.0,
+        )
+        self.assertEqual(value.value, "今晚")
+
+    def test_coverage_contract_has_no_provider_temporal_realization_fields(self):
+        schema = GoalAssociationResolver._coverage_certificate_response_schema(
+            [GoalAssociationModelGoal.model_validate(goal("Check weather.", "capability_work", resource=resource_responsibility(kind="information", description="weather", attributes=[binding("temporal_scope", "temporal_scope", "今晚")], source_status="provider_resolved")))]
+        )
+        properties = schema["$defs"]["GoalResponsibilityCoverageItem"]["properties"]
+        self.assertNotIn("temporal_dimensions", properties)
+
+
 class GoalAssociationTransactionTests(unittest.TestCase):
     def _resolve(self, ollama, req: CognitiveWorkRequest) -> GoalAssociationResolution:
         return asyncio.run(GoalAssociationResolver(ollama).resolve(req))
@@ -2558,7 +2303,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
                     description="Chongqing rain tonight",
                     attributes=[
                         binding("location", "place", "重庆"),
-                        binding("time", "day_part", "evening"),
+                        binding("temporal_scope", "temporal_scope", "今天晚上"),
                     ],
                     source_status="provider_resolved",
                 ),
@@ -2590,8 +2335,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
                     description="重庆今晚大雨情况",
                     attributes=[
                         binding("location", "place", "重庆"),
-                        binding("date", "date", "today"),
-                        binding("time", "day_part", "evening"),
+                        binding("temporal_scope", "temporal_scope", "今天晚上"),
                         binding(
                             "precipitation_severity",
                             "severity",
@@ -2628,8 +2372,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             resource.attributes["precipitation_severity"]["value"],
             "heavy",
         )
-        self.assertEqual(resource.attributes["date"]["value"], "today")
-        self.assertEqual(resource.attributes["time"]["value"], "evening")
+        self.assertEqual(resource.attributes["temporal_scope"]["value"], "今天晚上")
         families = [kwargs["prompt_family"] for _, kwargs in ollama.prompts]
         self.assertEqual(
             families,
@@ -2642,93 +2385,14 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         )
         primary_prompt = str(ollama.prompts[0][0])
         self.assertNotIn("我看看今晚会不会有大雨～", primary_prompt)
-        self.assertIn("emit separate query_scope bindings for entity_type=date and entity_type=day_part", primary_prompt)
+        self.assertIn("compound natural", primary_prompt)
         coverage_prompt = str(ollama.prompts[1][0])
-        self.assertIn("date_and_day_part", coverage_prompt)
-        self.assertIn("both typed bindings", coverage_prompt)
+        self.assertIn("source-grounded human scope", coverage_prompt)
+        self.assertNotIn("date_and_day_part", coverage_prompt)
         fresh_prompt = str(ollama.prompts[2][0])
         self.assertIn("restore that source-grounded WHAT", fresh_prompt)
         self.assertIn("Planner Activity metadata is never a Responsibility source", fresh_prompt)
 
-    def test_bundle_tonight_contract_repair_splits_date_and_night(self):
-        invalid_primary = create_goals(
-            goal(
-                "确认重庆今晚是否下雨。",
-                "capability_work",
-                resource=resource_responsibility(
-                    kind="information",
-                    description="重庆今晚降雨情况",
-                    attributes=[
-                        binding("location", "place", "重庆"),
-                        binding("date", "date", "tonight"),
-                    ],
-                    source_status="provider_resolved",
-                ),
-            )
-        )
-        repaired = create_goals(
-            goal(
-                "确认重庆今晚是否下雨。",
-                "capability_work",
-                resource=resource_responsibility(
-                    kind="information",
-                    description="重庆今晚降雨情况",
-                    attributes=[
-                        binding("location", "place", "重庆"),
-                        binding("date", "date", "today"),
-                        binding("day_part", "day_part", "night"),
-                    ],
-                    source_status="provider_resolved",
-                ),
-            )
-        )
-        accepted = certificate(
-            coverage_item(
-                "今晚",
-                0,
-                role="constraint",
-                independently_satisfiable=False,
-                temporal_dimensions=["date", "day_part"],
-            ),
-            coverage_item(
-                "重庆会不会下雨",
-                0,
-                required_goal_shape="information_resource",
-            ),
-        )
-        ollama = ScriptedOllama([invalid_primary, repaired, accepted])
-        req = request("今晚重庆会不会下雨哦？")
-        req = req.model_copy(
-            update={
-                "responsibilities": typed_responsibilities(
-                    {
-                        "local_ref": "r1",
-                        "outcome": "确认重庆今晚是否下雨",
-                        "bindings": {"location": "重庆", "time": "tonight"},
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": True,
-                        "confidence": 0.95,
-                    }
-                )
-            }
-        )
-
-        result = self._resolve(ollama, req)
-
-        self.assertEqual(result.resolution_status, "resolved")
-        attributes = result.new_goals[0].resource_responsibility.resource.attributes
-        self.assertEqual(attributes["date"]["value"], "today")
-        self.assertEqual(attributes["day_part"]["value"], "night")
-        self.assert_transaction(
-            result,
-            ollama,
-            terminal="resolved",
-            families=[
-                "goal_association.primary",
-                "goal_association.contract_repair",
-                "goal_association.responsibility_coverage",
-            ],
-        )
 
     def test_ordinary_conversation_commits_after_required_coverage(self):
         ollama = ScriptedOllama(
@@ -3344,165 +3008,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             ],
         )
 
-    def test_fresh_interpretation_allows_one_checked_temporal_dto_repair(self):
-        first = create_goals(
-            goal(
-                "Check Chongqing weather this morning.",
-                "capability_work",
-                resource=resource_responsibility(
-                    kind="information",
-                    description="Chongqing weather this morning",
-                    attributes=[
-                        binding("location", "location", "重庆"),
-                        binding("date", "date", "today"),
-                        binding("day_part", "day_part", "morning"),
-                    ],
-                    source_status="provider_resolved",
-                ),
-            )
-        )
-        rejected = certificate(
-            coverage_item(
-                "重庆会不会下雨",
-                0,
-                required_goal_shape="information_resource",
-            ),
-            coverage_item(
-                "今天上午",
-                0,
-                role="constraint",
-                coverage="representation_mismatch",
-                independently_satisfiable=False,
-                temporal_dimensions=["date", "day_part"],
-            )
-        )
-        invalid_fresh = create_goals(
-            goal(
-                "Check Chongqing weather this morning.",
-                "capability_work",
-                resource=resource_responsibility(
-                    kind="information",
-                    description="Chongqing weather this morning",
-                    attributes=[
-                        binding("location", "location", "重庆"),
-                        binding("date", "date", "今天"),
-                        binding("day_part", "day_part", "morning"),
-                    ],
-                    source_status="provider_resolved",
-                ),
-            )
-        )
-        repaired = {
-            "repairs": [
-                {
-                    "path": (
-                        "$.new_goals[0].resource_responsibility."
-                        "query_scope[1].value"
-                    ),
-                    "value": "today",
-                }
-            ]
-        }
-        accepted = certificate(
-            coverage_item(
-                "今天上午重庆会不会下雨",
-                0,
-                required_goal_shape="information_resource",
-            )
-        )
-        ollama = ScriptedOllama(
-            [first, rejected, invalid_fresh, repaired, accepted]
-        )
 
-        result = self._resolve(
-            ollama,
-            request("哎，今天上午重庆会不会下雨？"),
-        )
-
-        self.assertEqual(result.resolution_status, "resolved")
-        self.assertEqual(
-            result.new_goals[0]
-            .resource_responsibility.resource.attributes["date"]["value"],
-            "today",
-        )
-        self.assertEqual(
-            result.metadata["fresh_temporal_contract_repair"],
-            {
-                "strategy": "bounded_same_stage_dto_repair",
-                "changed_fields": [
-                    "$.new_goals[0].resource_responsibility.query_scope[1].value"
-                ],
-                "semantic_fields_unchanged": True,
-            },
-        )
-        self.assert_transaction(
-            result,
-            ollama,
-            terminal="resolved",
-            families=[
-                "goal_association.primary",
-                "goal_association.responsibility_coverage",
-                "goal_association.fresh_interpretation",
-                "goal_association.fresh_temporal_contract_repair",
-                "goal_association.responsibility_coverage_final",
-            ],
-        )
-
-    def test_fresh_temporal_repair_rejects_any_unauthorized_path(self):
-        first = create_goals(
-            goal(
-                "Check Chongqing weather this morning.",
-                "capability_work",
-                bindings=[binding("date", "date", "today")],
-            )
-        )
-        rejected = certificate(
-            coverage_item("重庆会不会下雨", 0),
-            coverage_item(
-                "今天上午",
-                0,
-                role="constraint",
-                coverage="representation_mismatch",
-                independently_satisfiable=False,
-            )
-        )
-        invalid_fresh = create_goals(
-            goal(
-                "Check Chongqing weather this morning.",
-                "capability_work",
-                bindings=[binding("date", "date", "今天")],
-            )
-        )
-        changed = {
-            "repairs": [
-                {
-                    "path": "$.new_goals[0].bindings[0].value",
-                    "value": "today",
-                },
-                {
-                    "path": "$.new_goals[0].description",
-                    "value": "A changed responsibility.",
-                },
-            ]
-        }
-        ollama = ScriptedOllama([first, rejected, invalid_fresh, changed])
-
-        result = self._resolve(
-            ollama,
-            request("哎，今天上午重庆会不会下雨？"),
-        )
-
-        self.assert_transaction(
-            result,
-            ollama,
-            terminal="fail_closed",
-            families=[
-                "goal_association.primary",
-                "goal_association.responsibility_coverage",
-                "goal_association.fresh_interpretation",
-                "goal_association.fresh_temporal_contract_repair",
-            ],
-        )
 
     def test_final_coverage_reject_fails_closed(self):
         first = create_goals(

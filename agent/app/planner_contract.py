@@ -1813,6 +1813,33 @@ def canonical_resource_argument_response_schema(
     return schema
 
 
+def _argument_realization_contract(
+    capability: dict[str, Any],
+    entity_type: str,
+) -> dict[str, Any] | None:
+    """Return a Capability-owned semantic-to-argument realization contract.
+
+    Goal Association owns human semantic scope.  A selected Capability may declare
+    how Planner is allowed to realize one semantic entity type into provider-local
+    arguments.  The Host validates only that the declared boundary and provenance
+    are respected; it never interprets the user's natural-language scope itself.
+    """
+
+    hints = capability.get("hints")
+    if not isinstance(hints, dict):
+        return None
+    contracts = hints.get("argument_realization")
+    if not isinstance(contracts, dict):
+        return None
+    normalized = _normalized_entity_type(entity_type)
+    for contract in contracts.values():
+        if not isinstance(contract, dict):
+            continue
+        if _normalized_entity_type(contract.get("source_entity_type")) == normalized:
+            return contract
+    return None
+
+
 def _argument_schema_accepts_canonical_binding(
     argument_schema: dict[str, Any],
     value: Any,
@@ -2774,6 +2801,11 @@ def validate_goal_binding_argument_grounding(
         for item in (capabilities or [])
         if isinstance(item, dict) and str(item.get("capability_id") or "")
     }
+    resolutions_by_step_parameter = {
+        (resolution.step_id, resolution.parameter): resolution
+        for resolution in output.parameter_resolutions
+        if not resolution.blocking
+    }
 
     bindings_by_goal: dict[str, dict[str, dict[str, Any]]] = {}
     information_goal_ids: set[str] = set()
@@ -2942,6 +2974,50 @@ def validate_goal_binding_argument_grounding(
                 ):
                     continue
                 capability = capabilities_by_id.get(step.capability_id) or {}
+                realization = _argument_realization_contract(
+                    capability, binding["entity_type"]
+                )
+                if realization is not None:
+                    declared_arguments = [
+                        str(name)
+                        for name in realization.get("arguments") or []
+                        if str(name)
+                    ]
+                    minimum_arguments = max(
+                        1, int(realization.get("minimum_arguments") or 1)
+                    )
+                    realized_arguments = [
+                        name for name in declared_arguments if name in step.args
+                    ]
+                    if len(realized_arguments) < minimum_arguments:
+                        raise PlannerDTOContractError(
+                            "planner step did not realize authoritative semantic scope "
+                            "through the selected Capability contract: "
+                            f"goal_id={goal_id!r}, binding={name!r}, "
+                            f"entity_type={binding['entity_type']!r}, "
+                            f"capability_id={step.capability_id!r}"
+                        )
+                    for argument_name in realized_arguments:
+                        resolution = resolutions_by_step_parameter.get(
+                            (step.step_id, argument_name)
+                        )
+                        if (
+                            resolution is None
+                            or resolution.strategy != "semantic_realization"
+                            or goal_id not in resolution.source_goal_ids
+                            or not _material_values_equal(
+                                resolution.value,
+                                step.args[argument_name],
+                                list_compatible=False,
+                            )
+                        ):
+                            raise PlannerDTOContractError(
+                                "Capability semantic realization requires explicit "
+                                "Planner provenance: "
+                                f"step_id={step.step_id!r}, parameter={argument_name!r}, "
+                                f"goal_id={goal_id!r}"
+                            )
+                    continue
                 semantic_scope = (
                     (capability.get("hints") or {}).get("semantic_scope") or {}
                 )

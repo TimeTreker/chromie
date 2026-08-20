@@ -3100,6 +3100,47 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("Executable common Capability catalog", rendered)
         self.assertIn("soridormi.walk_forward", rendered)
 
+    def test_fast_planner_prompt_uses_gateway_original_user_wording(self):
+        resolver = FastPlannerResolver(FakeOllama({}), FakeCatalog())
+        responsibility = {
+            "local_ref": "weather",
+            "outcome": "determine whether Chongqing is hot tonight",
+            "bindings": {
+                "location": "重庆",
+                "temporal_scope": "今晚",
+            },
+            "completion_requires_work": True,
+            "completion_requires_fresh_evidence": True,
+            "confidence": 0.95,
+        }
+        run_request = _work_request(
+            sid="turn-original-source",
+            text="今晚，重庆热不热？",
+            language="zh-CN",
+            responsibilities=[responsibility],
+            context={
+                "user_turn_envelope": {
+                    "original_input": {"text": "  今晚，重庆热不热？  "}
+                },
+                "active_goal_snapshots": [],
+                "interaction_context": {},
+            },
+            history=[],
+        )
+        prompt = resolver._advance_layered_prompt(
+            run_request,
+            responsibilities=[
+                CognitiveResponsibilityProposal.model_validate(responsibility)
+            ],
+            capabilities=[],
+        )
+
+        self.assertEqual(run_request.text, "今晚，重庆热不热？")
+        self.assertEqual(
+            run_request.original_user_text, "  今晚，重庆热不热？  "
+        )
+        self.assertIn("Current user turn:\n  今晚，重庆热不热？  ", str(prompt))
+
     def test_first_activity_weather_prompt_fits_declared_context_budget(self):
         resolver = FastPlannerResolver(FakeOllama({}), FakeCatalog())
         responsibility = {
@@ -3107,8 +3148,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             "outcome": "Tell the user whether it will rain in Chongqing tonight.",
             "bindings": {
                 "location": "Chongqing",
-                "date": "2026-08-15",
-                "time": "night",
+                "temporal_scope": "今天晚上",
             },
             "completion_requires_work": True,
             "completion_requires_fresh_evidence": True,
@@ -3189,10 +3229,10 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertNotIn("identity_answer_guidance", str(prompt))
         self.assertIn("Executable common Capability catalog", str(prompt))
         self.assertIn(
-            "GI bindings are resolved input evidence, including relative dates and local "
-            "day parts normalized into canonical values",
+            "GI bindings are resolved human-semantic input evidence",
             str(prompt),
         )
+        self.assertIn("argument_realization", str(prompt))
         self.assertIn(
             "physical-object acquisition, handover, body gestures, or attention motions "
             "cannot acquire external information",
@@ -5364,7 +5404,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         initial = multi_goal_plan(
             disposition="execute",
             coverage="complete",
-            goal_summary="Check Chongqing weather this evening.",
+            goal_summary="Check Chongqing weather tonight.",
             steps=[
                 execute_step(
                     "weather",
@@ -5390,12 +5430,34 @@ class FastPlannerResolverTests(unittest.TestCase):
                     {
                         "location": "重庆",
                         "date": "today",
-                        "period": "evening",
+                        "period": "night",
                         "units": "metric",
                     },
                     [goal_id],
                     "Retrieve the requested weather.",
                 )
+            ],
+            "parameter_resolutions": [
+                {
+                    "step_id": "weather",
+                    "parameter": "date",
+                    "strategy": "semantic_realization",
+                    "value": "today",
+                    "confidence": 1.0,
+                    "blocking": False,
+                    "rationale": "Realized the human temporal scope for this Capability.",
+                    "source_goal_ids": [goal_id],
+                },
+                {
+                    "step_id": "weather",
+                    "parameter": "period",
+                    "strategy": "semantic_realization",
+                    "value": "night",
+                    "confidence": 1.0,
+                    "blocking": False,
+                    "rationale": "Realized the human temporal scope for this Capability.",
+                    "source_goal_ids": [goal_id],
+                },
             ],
         }
         catalog = FakeCatalog()
@@ -5427,6 +5489,18 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "resource_kinds": ["information"],
                         "delivery_modes": ["spoken_explanation"],
                     },
+                    "argument_realization": {
+                        "temporal_scope": {
+                            "source_entity_type": "temporal_scope",
+                            "planner_owned": True,
+                            "arguments": ["date", "period"],
+                            "minimum_arguments": 1,
+                            "contract": (
+                                "Realize source-grounded human temporal scope into "
+                                "Capability-local date and period arguments."
+                            ),
+                        }
+                    },
                     "resource_contract": {
                         "plan_requires": [],
                         "plan_provides": ["resource_acquired"],
@@ -5436,7 +5510,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             )
         )
         run_request = request(
-            "今天晚上重庆天气怎么样？",
+            "今晚重庆天气怎么样？",
             goal_ids=[goal_id],
             goal_metadata={
                 "responsibility_kind": "capability_dependent",
@@ -5450,13 +5524,13 @@ class FastPlannerResolverTests(unittest.TestCase):
         ][0]
         canonical_goal.update(
             {
-                "description": "Report Chongqing weather this evening.",
+                "description": "Report Chongqing weather tonight.",
                 "resource_responsibility": {
                     "schema_version": 1,
                     "responsibility_type": "acquire_and_deliver_resource",
                     "resource": {
                         "kind": "information",
-                        "description": "Chongqing weather this evening",
+                        "description": "Chongqing weather tonight",
                         "quantity": "",
                         "attributes": {
                             "location": {
@@ -5465,16 +5539,10 @@ class FastPlannerResolverTests(unittest.TestCase):
                                 "value": "重庆",
                                 "confidence": 1.0,
                             },
-                            "date": {
-                                "name": "date",
-                                "entity_type": "date",
-                                "value": "today",
-                                "confidence": 1.0,
-                            },
-                            "time": {
-                                "name": "time",
-                                "entity_type": "day_part",
-                                "value": "evening",
+                            "temporal_scope": {
+                                "name": "temporal_scope",
+                                "entity_type": "temporal_scope",
+                                "value": "今晚",
                                 "confidence": 1.0,
                             },
                         },
@@ -5494,7 +5562,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             "decision": "accept",
             "confidence": 1.0,
             "uncovered_requirements": [],
-            "reason": "The repaired lookup preserves both supplied temporal dimensions.",
+            "reason": "The repaired lookup preserves the source-grounded temporal scope.",
         }
         ollama = ScriptedOllama([initial, repaired, coverage_review])
 
@@ -5502,11 +5570,11 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         self.assertEqual(plan.disposition, "execute")
         self.assertEqual(plan.steps[0].args["date"], "today")
-        self.assertEqual(plan.steps[0].args["period"], "evening")
+        self.assertEqual(plan.steps[0].args["period"], "night")
         self.assertEqual(len(ollama.prompts), 3)
         self.assertTrue(plan.metadata["contract_repair_succeeded"])
         self.assertIn(
-            "omitted same-name authoritative Goal binding: weather.date='today'",
+            "did not realize authoritative semantic scope",
             str(ollama.prompts[1][0]),
         )
 

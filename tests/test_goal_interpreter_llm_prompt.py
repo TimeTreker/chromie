@@ -277,10 +277,12 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("deictic spatial language", prompt)
         self.assertIn("verbatim contiguous span", prompt)
         self.assertIn("Never translate, transliterate, shorten, expand", prompt)
-        self.assertIn("emit a `date` binding and a `day_part` binding", prompt)
-        self.assertIn("contextual WHAT normalization only", prompt)
-        self.assertIn("timezone conversion", prompt)
+        self.assertIn("Preserve temporal scope as human semantic meaning", prompt)
+        self.assertIn("never derive provider-facing temporal dimensions", prompt)
+        self.assertIn("timezone conversions", prompt)
         self.assertIn("do not make it unresolved WHAT", prompt)
+        self.assertNotIn("day_part", prompt)
+        self.assertNotIn("date=today", prompt)
 
         turn_prompt = self._interpreter().build_interpretation_user_prompt(
             GoalInterpretationRequest(

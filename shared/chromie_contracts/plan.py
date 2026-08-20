@@ -40,6 +40,7 @@ ParameterResolutionStrategy = Literal[
     "safe_default",
     "observed_context",
     "trusted_service",
+    "semantic_realization",
     "ask_user",
     "unresolvable",
 ]

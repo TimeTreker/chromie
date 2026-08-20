@@ -78,11 +78,12 @@ feature.
    - Include a semantic description, not phrase rules.
    - Include an `input_schema` with units, enums, ranges, required fields, and
      user-facing parameter descriptions.
-   - When an argument carries a typed canonical Goal dimension under a different
-     field name, declare `x-chromie-entity-type` on that argument (for example,
-     `period` carries `day_part`). Planner decoding then copies the exact Goal
-     value; if the dimension is absent, only the schema's declared default may
-     be used. Do not infer this mapping from user phrases or parameter names.
+   - When a provider argument can copy one canonical Goal binding unchanged under a
+     different field name, `x-chromie-entity-type` may declare that exact read-only
+     projection. When provider arguments require semantic transformation of a human
+     scope, declare `llm_hints.argument_realization` instead. Planner owns that HOW
+     mapping after capability selection and records `semantic_realization` provenance;
+     GI/GA do not pre-shape Goal semantics to the provider schema.
 
 3. **Set routing metadata.**
    - `effects` should describe what the capability does, for example
