@@ -39,7 +39,6 @@ class ReflexOutcome(BaseModel):
     matched: bool = False
     action: ReflexAction = "continue"
     trigger: ReflexTrigger = "none"
-    intent: str = "none"
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     language: str = "auto"
     priority: ReflexPriority = "normal"
@@ -452,7 +451,6 @@ class ReflexFilter:
                 matched=True,
                 action="interrupt",
                 trigger="emergency_stop_command",
-                intent="global_emergency_stop",
                 confidence=0.99,
                 language=resolved_language,
                 priority="urgent",
@@ -471,7 +469,6 @@ class ReflexFilter:
                 matched=True,
                 action="interrupt",
                 trigger="stop_command",
-                intent="stop_current_output",
                 confidence=0.99,
                 language=resolved_language,
                 priority="high",
@@ -485,7 +482,6 @@ class ReflexFilter:
                 matched=True,
                 action="interrupt",
                 trigger="stop_command",
-                intent="stop_media_output",
                 confidence=0.99,
                 language=resolved_language,
                 priority="high",
@@ -498,7 +494,6 @@ class ReflexFilter:
                 matched=True,
                 action="interrupt",
                 trigger="stop_command",
-                intent="stop_embodied_motion",
                 confidence=0.99,
                 language=resolved_language,
                 priority="urgent",
@@ -514,7 +509,6 @@ class ReflexFilter:
                 matched=True,
                 action="interrupt",
                 trigger="stop_command",
-                intent="cancel_current_interaction",
                 confidence=0.99,
                 language=resolved_language,
                 priority="urgent",
@@ -527,7 +521,6 @@ class ReflexFilter:
                 matched=True,
                 action="ignore",
                 trigger="noise_or_filler",
-                intent="noise_or_filler",
                 confidence=0.90,
                 language=resolved_language,
                 priority="low",
@@ -538,7 +531,6 @@ class ReflexFilter:
                 matched=True,
                 action="ignore",
                 trigger="repeated_filler_or_asr_hallucination",
-                intent="repeated_filler_or_asr_hallucination",
                 confidence=0.94,
                 language=resolved_language,
                 priority="low",

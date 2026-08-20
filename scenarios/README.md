@@ -68,63 +68,11 @@ Each file contains exactly one scenario object. The file stem must match the
 scenario `id`; for example `goal_interpretation/normal_greeting.json` must contain
 `"id": "normal_greeting"`.
 
-`dialogue` scenarios contain ordered turns instead of a single `input.text`.
-Each turn can use `ask` plus a deterministic `stub` and `expect` block:
-
-```json
-{
-  "schema_version": 1,
-  "id": "walk_then_followup_status",
-  "suite": "dialogue",
-  "turns": [
-    {
-      "id": "walk_request",
-      "ask": "Walk forward slowly.",
-      "stub": {"route_decision": {"route": "robot_action"}},
-      "expect": {"skills": ["soridormi.walk_velocity"]}
-    },
-    {
-      "id": "followup_status",
-      "ask": "Did you do that?",
-      "stub": {"route_decision": {"route": "chat"}},
-      "expect": {"history_contains": ["Walk forward slowly."]}
-    }
-  ]
-}
-```
-
-Dialogue expectations can check the same speech, skill, confirmation, status,
-and metadata fields as interaction scenarios. They can also check
-`history_contains`, `history_any`, `session_memory_contains`,
-`post_history_contains`, `post_session_memory_contains`,
-`extracted_memory_contains`, `post_extracted_memory_contains`,
-`memory_summary_contains`, `post_memory_summary_contains`, and
-`current_task_context_contains`. Prefer the extracted-memory fields when the
-scenario is proving that refined memory, not raw transcript history, survives
-into the next turn.
-
-Interaction scenarios may set `stub.host_prepare_response=true` when they need
-to exercise the host `InteractionRuntimeCoordinator.prepare_response()` layer.
-That path attaches static `preflight_validation` metadata without executing live
-TTS, simulator, or hardware work. Expectations can use `metadata_json_contains`
-and `metadata_json_forbid` for preflight diagnostics. Preflight does not create a
-second proposal ledger and does not prove execution.
-
-The committed dialogue suite includes 300+ real-world conversation scenarios
-that score social recall, preference memory, clarification, safe refusal,
-tool/perception honesty, confirmation-gated movement, multilingual requests,
-low-level runtime boundaries, and daily-life human-like judgment around
-privacy, uncertainty, nearby people, spills, calls, medicine, allergies, and
-truthful correction. The `batch2_*` files are generated from reviewable
-deterministic templates:
-
-```bash
-python scripts/generate_dialogue_scenario_batch.py --target-count 300
-```
-
-LLMs may help author new candidate scenarios, but committed scenario files must
-contain deterministic expectations. Normal regression runs must not depend on
-an LLM to decide whether the robot behaved correctly.
+The maintained scenario registry is defined by `scripts/behavior_scenarios.py`.
+Historical `scenarios/dialogue/` route-decision fixtures and their generator were retired
+because they encoded the removed `route`/`intent` architecture rather than the current
+Responsibility → canonical Goal → Planner → Capability/Evidence contracts. Multi-turn
+behavior belongs in maintained suites that exercise the current typed owners directly.
 
 
 ### Scripted bounded Goal Interpretation scenarios
@@ -139,15 +87,15 @@ and, only when that output is mechanically invalid, one DTO-repair stage:
 {
   "llm_script": [
     {
-      "stage": "quick_intent",
+      "stage": "goal_interpretation",
       "content": "{not valid JSON"
     },
     {
-      "stage": "quick_intent_contract_repair",
+      "stage": "goal_interpretation_contract_repair",
       "decision": {
-        "route": "clarify",
-        "intent": "ambiguous_reference",
-        "confidence": 0.85
+        "confidence": 0.85,
+        "responsibilities": [],
+        "unresolved": ["ambiguous reference"]
       }
     }
   ]

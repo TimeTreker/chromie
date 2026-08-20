@@ -32,7 +32,6 @@ RUNTIME_KEYS = (
     "CHROMIE_ACTIVE_PROFILE",
     "CHROMIE_ACTIVE_VALIDATION_PROFILE",
     "ORCH_COGNITIVE_RUNTIME_MODE",
-    "ORCH_COGNITIVE_APPLY_LANES",
 )
 
 MODEL_KEYS = (
@@ -374,9 +373,6 @@ def capture_identity(args: argparse.Namespace) -> dict[str, Any]:
             "effective_cognitive_budgets": effective_cognitive_budgets,
             "cognitive_runtime_mode": orchestrator_env.get(
                 "ORCH_COGNITIVE_RUNTIME_MODE"
-            ),
-            "cognitive_apply_lanes": orchestrator_env.get(
-                "ORCH_COGNITIVE_APPLY_LANES"
             ),
         },
         "capability_manifests": manifests,

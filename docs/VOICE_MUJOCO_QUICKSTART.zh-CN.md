@@ -71,8 +71,9 @@ ORCH_OUTPUT_DEVICE=扬声器名称或编号
 3. 启动 Chromie ASR、TTS、Ollama 和 Agent（含内嵌 Goal Interpreter）；
 4. 验证 Soridormi capability contract；
 5. 启动主机 Orchestrator，并打开麦克风和扬声器；
-6. 启用统一 Goal-driven Runtime，对 `chat,memory,robot_action,tool` 使用权威
-   `apply`；旧 CapabilityAgent 语义回退已经从维护架构中删除。
+6. 启用统一 Goal-driven Runtime 的权威 `apply` 路径；具体对话、信息读取和
+   身体 Work 是否可执行，只由 typed Goal/Capability contract 与实时 Provider
+   availability 决定；旧 CapabilityAgent 语义回退已经从维护架构中删除。
 
 看到下面的信息后即可说话：
 
@@ -185,7 +186,6 @@ ORCH_ENABLE_INTERACTION_RESPONSE=1
 ORCH_ENABLE_SORIDORMI_CAPABILITIES=1
 SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp
 ORCH_COGNITIVE_RUNTIME_MODE=apply
-ORCH_COGNITIVE_APPLY_LANES=chat,memory,robot_action,tool
 ```
 
 此启动流程用于日常 MuJoCo 交互，不会自动生成发布证据。需要保留

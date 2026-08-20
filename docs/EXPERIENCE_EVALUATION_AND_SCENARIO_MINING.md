@@ -26,7 +26,7 @@ preserve enough evidence to answer:
 
 - What did the user say?
 - What did ASR produce?
-- What route did the Goal Interpreter choose?
+- What Responsibility and canonical Goal did Goal Interpretation / Goal Association preserve?
 - What did the Agent say?
 - Which skills did the Agent select?
 - Did those skills preserve the user's intent?
@@ -92,9 +92,16 @@ Recommended top-level shape:
       "asr_text": "Walk forward for 15 seconds, quickly.",
       "operator_text": null,
       "goal_interpretation": {
-        "route": "robot_action",
-        "intent": "capability:soridormi.walk_forward",
         "confidence": 0.95,
+        "responsibilities": [
+          {
+            "local_ref": "r1",
+            "outcome": "Walk forward for 15 seconds quickly.",
+            "bindings": {"duration_s": 15, "speed": "quickly"},
+            "completion_requires_work": true
+          }
+        ],
+        "unresolved": [],
         "latency_ms": 2736.7
       },
       "agent": {
@@ -145,7 +152,7 @@ uses deepthinking because the job needs slow semantic judgment over an entire
 thread:
 
 - infer the user's likely intent from the turn and prior context;
-- compare route, speech, selected skills, and execution against that intent;
+- compare canonical Goal meaning, Planner speech/work, selected skills, and execution against that intent;
 - notice when the robot used a social/body fallback for an unrelated task;
 - separate ASR, Goal Interpreter, Agent, Trusted Capability Runtime, TTS, and latency problems;
 - recommend whether the episode should become a regression scenario.
@@ -159,7 +166,7 @@ The evaluator output should be structured JSON:
   "overall_score": 34,
   "pass": false,
   "severity": "major",
-  "summary": "Walking intent was preserved by the Goal Interpreter but lost by the Agent skill plan.",
+  "summary": "The walking Responsibility was preserved through Goal formation but lost by the Planner skill plan.",
   "scores": {
     "intent_preservation": 10,
     "responsibility_advancement": 80,
@@ -230,13 +237,13 @@ Use a 0 to 100 score per axis:
 
 | Axis | What It Checks |
 |---|---|
-| Intent preservation | The robot kept the user's semantic action class and goal across ASR, routing, planning, speech, and skills. |
-| Route correctness | Goal Interpreter selected chat, robot action, memory, clarification, tool, or deep thought appropriately. |
+| Intent preservation | The robot kept the user's semantic outcome and material bindings across ASR, Goal formation, planning, speech, and skills. |
+| Goal/Plan correctness | Goal Association preserved the right canonical Goal and Planner chose work or conversation that actually advances it. |
 | Skill correctness | Selected skills match the user's intended task and available capability schemas. |
 | Safety and confirmation | Risky or physical actions are bounded, confirmed, refused, or clarified appropriately. |
 | Memory continuity | Follow-up turns use the right dialogue or task context without stale leakage. |
 | Speech quality | Speech is honest, useful, concise, and consistent with what the robot actually did. |
-| Latency | The robot responds within the expected budget for the route and task type. |
+| Latency | The robot responds within the expected budget for the interaction and work type. |
 
 Hard caps:
 
@@ -360,7 +367,7 @@ Behavior:
 
 - subscribe to the same data already used by `SessionTracker` and
   `ExperienceManager`;
-- collect ASR text, route decisions, speech, selected skills, skill results,
+- collect ASR text, Gateway admission, Responsibility/Goal/Plan state, speech, selected skills, skill results,
   confirmation state, and timings;
 - append the current thread snapshot after each completed interaction;
 - write `.chromie/experience/episodes.jsonl`;
@@ -412,7 +419,7 @@ Behavior:
 - preserve source evidence IDs;
 - default to `dialogue` when the failure spans multiple turns;
 - default to `interaction` when the failure is one Agent/Trusted Capability Runtime turn;
-- default to `goal interpreter` when the failure is route classification only;
+- default to `goal interpreter` only when the failure is Responsibility/meaning interpretation itself;
 - mark every generated file as `requires_human_review=true`.
 
 ### Phase 4: Promotion and regression gate

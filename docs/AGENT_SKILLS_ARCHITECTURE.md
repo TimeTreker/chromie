@@ -17,16 +17,18 @@ planning, capability execution, and evidence
   location/time/aspect scope, weather memory matching, lookup planning, and
   result interpretation. It declares the grounded method as its parent.
 
-Both packages expose projections for the five maintained Agent roles. Parent
-metadata informs model-authored composition; the Host does not automatically
-select a parent or domain Skill. Neither package registers or executes a
-Capability.
+Both packages expose Planner projections for Fast Planner and Deep Planner.
+Parent metadata informs model-authored composition; the Host does not
+automatically select a parent or domain Skill. Neither package registers or
+executes a Capability. Goal Association does not load domain Agent Skills: its
+canonical Goal representation is governed by the shared Goal/Resource contracts,
+not by an optional domain playbook.
 
-Both packages also declare `applicable_routes`. The selection service filters
-bounded summaries by the current structured route before the model chooses
-zero or more methods. This is package-owned applicability disclosure, not Host
-semantic selection: empty metadata remains unrestricted for compatibility,
-while an out-of-scope Skill is never disclosed as a candidate.
+Before the Planner model sees candidates, the selection service mechanically
+intersects each package's declared `applicable_output_modes` and
+`applicable_information_domains` with the current canonical Goals. This is a
+typed disclosure boundary, not semantic classification: the Host does not infer
+a route or choose a Skill from user wording.
 
 ## Purpose
 
@@ -81,7 +83,8 @@ Skills, generate a Plan, evaluate results, and request replanning.
 
 Examples include:
 
-- Goal Association: resolve discourse and Goal relationships;
+- Goal Association: resolve discourse and Goal relationships without Agent Skill
+  disclosure;
 - Fast Planner: produce a complete low-latency Plan, exact Communicative
   Activities, and evidence-bound follow-up when confidence is high;
 - Deep Planner: reason over broader context and alternatives, including exact
@@ -272,12 +275,14 @@ A weather Skill may expose:
 
 | Agent | Projection |
 |---|---|
-| Goal Association | Semantic Goal bindings such as location, date, and weather aspect; discourse resolution remains model-authored |
 | Fast/Deep Planner | Evidence strategy, capability options, freshness, alternatives, failure recovery, exact pre/post-evidence wording, and result relevance |
 
-The Host selects the requested projection only after the responsible Agent has
-selected the Skill or after an earlier authoritative Agent has supplied the relevant
-Skill selection for the same canonical Goal. Goal Association has no canonical Goal
+Goal Association intentionally has no Agent Skill projection. Stable semantic
+representation rules such as typed location/time/resource bindings belong to the
+shared Goal/Resource contracts so canonical meaning does not depend on whether a
+domain Skill happened to load. Planner Skills begin at HOW, after canonical Goal
+identity exists. The Host loads a requested Planner projection only after that
+Planner has selected the Skill for one or more current canonical Goals.
 identity yet, so its pre-association Agent-Skill path receives no historical
 active/recent Goal IDs and deterministically returns `no_skill` without a model call.
 This prevents an unrelated unfinished Goal from injecting a stale domain method into
@@ -385,11 +390,11 @@ required_capabilities:
   - chromie.weather.lookup
 optional_capabilities:
   - chromie.memory.retrieve_verified_tool_result
-applicable_routes:
-  - tool
-  - chat
+applicable_output_modes:
+  - capability_work
+applicable_information_domains:
+  - weather_forecast
 projections:
-  goal_association: projections/goal_association.md
   fast_planner: projections/fast_planner.md
   deep_planner: projections/deep_planner.md
 ```

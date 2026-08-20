@@ -57,13 +57,11 @@ def test_e2e_run_profile_retains_effective_runtime_identity() -> None:
         mind_profile="owner-profile-v1",
         social_interaction_style="courteous",
         social_attention_mode="on",
-        apply_lanes=("chat", "robot_action"),
         semantic_authority_owner="goal_driven_cognitive_core",
         runtime_topology="launcher-effective-compact-cognition",
         sample_count=1,
     ).to_dict()
     assert run["effective_model_topology"]["fast_planner"] == "qwen3:4b"
-    assert run["apply_lanes"] == ["chat", "robot_action"]
     assert run["semantic_authority_owner"] == "goal_driven_cognitive_core"
     assert run["social_attention_mode"] == "on"
 
@@ -230,7 +228,6 @@ def _passing_e2e_reports(cases: list[dict]) -> list[dict]:
                     "mind_profile": f"owner-profile-{style}-v1",
                     "social_interaction_style": style,
                     "social_attention_mode": mode,
-                    "apply_lanes": ["chat", "robot_action"],
                     "semantic_authority_owner": "goal_driven_cognitive_core",
                     "runtime_topology": "launcher-effective-compact-cognition",
                     "sample_count": 1,

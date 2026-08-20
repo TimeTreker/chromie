@@ -201,8 +201,8 @@ operator to assemble many feature booleans:
 | `scripts/start_chromie.sh` / `scripts/start_voice_mujoco.sh` | `voice_mujoco` |
 | target-evidence closure | `qualification` |
 
-The generated runtime manifest records the selected mode. Maintained modes use
-Goal-driven apply lanes and keep legacy direct-LLM fallback disabled. See the
+The generated runtime manifest records the selected mode. Maintained modes use the single Goal-driven `apply` path and keep legacy direct-LLM
+fallback disabled. Capability eligibility comes from typed provider contracts. See the
 [Configuration Reference](docs/CONFIGURATION.md#maintained-operator-modes).
 
 For the complete microphone -> Chromie -> Soridormi -> MuJoCo path, keep the
@@ -251,8 +251,8 @@ For fresh-machine bootstrap, use [Chromie Deployment](docs/DEPLOYMENT.md) and
 | Mode | Key setting | State |
 |---|---|---|
 | Diagnostic cognition | cognitive runtime disabled or report-only | Fail-closed / evidence-only diagnostics; never a legacy semantic fallback |
-| Goal-driven speech | cognitive apply on, `chat,memory,tool` lanes, Soridormi skills off | Common safe base |
-| Goal-driven MuJoCo | cognitive apply on, `chat,memory,robot_action,tool`, Soridormi skills on | Maintained simulator launcher |
+| Goal-driven speech | cognitive apply on, Soridormi body provider off | Common safe base; eligible work comes from typed Goal/Capability contracts |
+| Goal-driven MuJoCo | cognitive apply on, Soridormi body provider enabled | Maintained simulator launcher; body work is available only through declared provider capabilities |
 | Physical robot | commissioned Soridormi plus physical gates | Optional provider integration; experimental and outside core acceptance |
 
 Effectful providers and physical gates remain default-off in the common safe

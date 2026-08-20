@@ -96,19 +96,15 @@ def _field(value: Any, name: str, default: Any = None) -> Any:
 
 def validate_contract(
     *,
-    route: Any,
+    interpretation: Any,
     response: Any,
-    expected_route: str | None,
     expected_capabilities: list[str],
     expect_no_capabilities: bool,
     expected_args: list[tuple[int, str, Any]],
     arg_tolerance: float,
 ) -> list[str]:
+    del interpretation
     errors: list[str] = []
-    route_actions = [
-        str(item.get("capability_id") or "")
-        for item in _field(route, "actions", [])
-    ]
     capabilities = [
         item
         for item in getattr(response, "capabilities", [])
@@ -116,21 +112,7 @@ def validate_contract(
     ]
     capability_ids = [item.capability_id for item in capabilities]
 
-    route_name = str(_field(route, "route", "") or "")
-    if expected_route and route_name != expected_route:
-        errors.append(f"route={route_name!r}, expected {expected_route!r}")
-
     if expected_capabilities:
-        expects_only_soridormi = all(
-            capability_id.startswith("soridormi.") for capability_id in expected_capabilities
-        )
-        if expects_only_soridormi and route_name and route_name != "robot_action":
-            errors.append(f"route={route_name!r}, expected 'robot_action'")
-        if expects_only_soridormi and route_actions and route_actions != expected_capabilities:
-            errors.append(
-                "goal interpretation actions mismatch: "
-                f"expected {expected_capabilities!r}, got {route_actions!r}"
-            )
         if capability_ids != expected_capabilities:
             errors.append(
                 "interaction capabilities mismatch: "
@@ -138,8 +120,6 @@ def validate_contract(
             )
 
     if expect_no_capabilities:
-        if route_actions:
-            errors.append(f"goal interpretation emitted Soridormi actions, expected none: {route_actions!r}")
         if capability_ids:
             errors.append(f"interaction emitted executable capabilities, expected none: {capability_ids!r}")
 
@@ -195,14 +175,8 @@ def safe_idle_errors(status: dict[str, Any]) -> list[str]:
     return errors
 
 
-def should_require_tts_speech(route: Any, *, require_speech: bool) -> bool:
-    if not require_speech:
-        return False
-    if _field(route, "route", "") == "interrupt":
-        return False
-    if _field(route, "should_speak", True) is False:
-        return False
-    return True
+def should_require_tts_speech(*, require_speech: bool) -> bool:
+    return bool(require_speech)
 
 
 def _workflow_field(message: str, key: str) -> str:
@@ -270,118 +244,33 @@ def required_speech_delivery_errors(
     return errors
 
 
-def should_apply_cognitive_runtime(
-    route: Any,
-    *,
-    enabled: bool,
-    apply_lanes: str,
-) -> bool:
-    lanes = {item.strip() for item in apply_lanes.split(",") if item.strip()}
-    route_name = str(getattr(route, "route", "") or "")
-    lane = (
-        "chat"
-        if route_name in {"chat", "clarify", "deep_thought"}
-        else route_name
-    )
-    return bool(
-        enabled
-        and not getattr(route, "interrupt_current", False)
-        and route_name not in {"interrupt", "ignore"}
-        and lane in lanes
-    )
-
-
-def _short_capability_id(item: dict[str, Any]) -> str:
-    capability_id = str(item.get("capability_id") or "").strip()
-    return capability_id or "unknown"
-
-
-def _describe_task(item: dict[str, Any], index: int) -> str:
-    stage = str(item.get("source_stage") or "?")
-    task_type = str(item.get("task_type") or "?")
-    priority = str(item.get("priority") or "normal")
-    bits = [f"{index}:{stage}:{task_type}", f"priority={priority}"]
-    capability_id = str(item.get("capability_id") or "").strip()
-    if capability_id:
-        bits.append(f"skill={capability_id}")
-    action_type = str(item.get("action_type") or "").strip()
-    if action_type:
-        bits.append(f"action={action_type}")
-    status = str(item.get("status") or "").strip()
-    if status and status != "proposed":
-        bits.append(f"status={status}")
-    return " ".join(bits)
-
-
 def build_debug_summary(
     *,
-    route: Any,
+    interpretation: Any,
     response: Any,
     errors: list[str],
 ) -> dict[str, Any]:
-    route_metadata = _field(route, "metadata", {}) or {}
-    route_actions = [
-        _short_capability_id(item)
-        for item in _field(route, "actions", [])
-        if isinstance(item, dict)
-    ]
-    candidates = [
-        _short_capability_id(item)
-        for item in _field(route, "candidate_capabilities", [])[:5]
-        if isinstance(item, dict)
-    ]
     responsibilities = [
         item
-        for item in _field(route, "responsibilities", [])
+        for item in _field(interpretation, "responsibilities", [])
         if isinstance(item, dict)
     ]
-    task_list = [
-        _describe_task(item, index)
-        for index, item in enumerate(route_metadata.get("task_list") or [])
-        if isinstance(item, dict)
-    ]
-    stages = []
-    for stage in route_metadata.get("route_stage_outputs") or []:
-        if not isinstance(stage, dict):
-            continue
-        tasks = stage.get("tasks") or []
-        stages.append(
-            "{stage}:{status} route={route} intent={intent} tasks={count}".format(
-                stage=stage.get("stage") or "?",
-                status=stage.get("status") or "?",
-                route=stage.get("route") or "-",
-                intent=stage.get("intent") or "-",
-                count=len(tasks) if isinstance(tasks, list) else 0,
-            )
-        )
     capabilities = [
         str(item.capability_id)
         for item in getattr(response, "capabilities", [])
-        if str(item.capability_id).startswith("soridormi.")
+        if str(item.capability_id) != "chromie.speak"
     ]
     speech = [str(item.text) for item in getattr(response, "speech", [])]
     interpretation_summary = (
         f"responsibilities={len(responsibilities)} "
-        f"confidence={float(_field(route, 'confidence', 0.0)):.2f}"
-        if responsibilities
-        else (
-            f"route={_field(route, 'route', '?')} "
-            f"intent={_field(route, 'intent', '?')} "
-            f"source={_field(route, 'source', '?')} "
-            f"confidence={float(_field(route, 'confidence', 0.0)):.2f} "
-            f"actions={len(route_actions)}"
-        )
+        f"confidence={float(_field(interpretation, 'confidence', 0.0)):.2f} "
+        f"unresolved={len(_field(interpretation, 'unresolved', []) or [])}"
     )
     return {
         "interpretation": interpretation_summary,
-        "route": interpretation_summary,
         "responsibility_outcomes": [
             str(item.get("outcome") or "") for item in responsibilities
         ],
-        "route_actions": route_actions,
-        "candidate_capabilities": candidates,
-        "stages": stages,
-        "task_list": task_list,
         "capabilities": capabilities,
         "speech_items": len(speech),
         "speech_preview": speech[0][:160] if speech else "",
@@ -392,25 +281,9 @@ def build_debug_summary(
 def print_debug_summary(debug_summary: dict[str, Any]) -> None:
     print(
         f"[interaction-text-mujoco][debug] "
-        f"{debug_summary.get('interpretation') or debug_summary.get('route')}",
+        f"{debug_summary.get('interpretation') or '?'}",
         file=sys.stderr,
     )
-    if debug_summary.get("stages"):
-        print(
-            "[interaction-text-mujoco][debug] stages: "
-            + " | ".join(debug_summary["stages"]),
-            file=sys.stderr,
-        )
-    if debug_summary.get("task_list"):
-        print("[interaction-text-mujoco][debug] task_list:", file=sys.stderr)
-        for item in debug_summary["task_list"]:
-            print(f"[interaction-text-mujoco][debug]   - {item}", file=sys.stderr)
-    if debug_summary.get("route_actions"):
-        print(
-            "[interaction-text-mujoco][debug] route_actions: "
-            + ", ".join(debug_summary["route_actions"]),
-            file=sys.stderr,
-        )
     if debug_summary.get("capabilities"):
         print(
             "[interaction-text-mujoco][debug] emitted_skills: "
@@ -505,7 +378,6 @@ def collect_run_provenance(
     *,
     manifest: Path,
     cognitive_runtime: bool,
-    cognitive_apply_lanes: str,
     cognitive_runtime_selected: bool | None = None,
     soridormi_repo: Path | None = None,
     endpoint_revision: str | None = None,
@@ -534,7 +406,6 @@ def collect_run_provenance(
         if soridormi_repo_path is not None
         else None
     )
-    lanes = [item.strip() for item in cognitive_apply_lanes.split(",") if item.strip()]
     selected = cognitive_runtime if cognitive_runtime_selected is None else bool(
         cognitive_runtime_selected
     )
@@ -579,15 +450,14 @@ def collect_run_provenance(
                     "goal_driven_cognitive_runtime"
                     if selected
                     else (
-                        "goal_driven_runtime_lane_not_selected"
+                        "goal_driven_cognitive_runtime_disabled"
                     )
                 )
             ),
             "configured_cognitive_runtime_mode": (
                 "apply" if cognitive_runtime else "off"
             ),
-            "cognitive_runtime_selected_for_route": selected,
-            "cognitive_apply_lanes": lanes if cognitive_runtime else [],
+            "cognitive_runtime_selected": selected,
         },
     }
 
@@ -640,7 +510,6 @@ def _configure_environment(args: argparse.Namespace, evidence_dir: Path) -> None
     if runtime_identity:
         os.environ["ORCH_COGNITIVE_RUN_IDENTITY_PATH"] = str(runtime_identity)
     if args.cognitive_runtime:
-        os.environ["ORCH_COGNITIVE_APPLY_LANES"] = args.cognitive_apply_lanes
         os.environ["ORCH_COGNITIVE_EVIDENCE_ENABLED"] = "1"
         os.environ["ORCH_COGNITIVE_EVIDENCE_PATH"] = str(
             evidence_dir / "cognitive_runtime_events.jsonl"
@@ -818,11 +687,6 @@ async def dispatch_initial_reflex(
             "production reflex action mismatch: "
             f"expected {outcome.action!r}, got {retained_reflex.get('action')!r}"
         )
-    if retained_reflex.get("intent") != outcome.intent:
-        errors.append(
-            "production reflex intent mismatch: "
-            f"expected {outcome.intent!r}, got {retained_reflex.get('intent')!r}"
-        )
     if recorded_outcome.get("cancellation_scope") != outcome.cancellation_scope:
         errors.append(
             "production reflex cancellation scope mismatch: "
@@ -839,23 +703,7 @@ async def dispatch_initial_reflex(
         "recorded_turn": recorded_turn,
         "goal_interpretation_bypassed": True,
     }
-    reflex_decision = {
-            "route": outcome.action,
-            "intent": outcome.intent,
-            "confidence": outcome.confidence,
-            "language": outcome.language,
-            "priority": outcome.priority,
-            "interrupt_current": outcome.interrupt_current,
-            "needs_agent": False,
-            "should_speak": outcome.should_speak,
-            "reason": outcome.reason,
-            "source": "rules",
-            "metadata": {
-                "cancellation_scope": outcome.cancellation_scope,
-                "reflex_outcome": recorded_outcome,
-                "goal_interpretation_bypassed": True,
-            },
-        }
+    reflex_projection = outcome.model_dump(mode="json")
     response = InteractionResponse(
         metadata={
             "source": "cognitive_gateway_reflex",
@@ -863,7 +711,7 @@ async def dispatch_initial_reflex(
             "no_interaction_response": True,
         }
     )
-    return reflex_decision, response, reflex_evidence, errors
+    return reflex_projection, response, reflex_evidence, errors
 
 
 async def run_check(
@@ -951,7 +799,7 @@ async def run_check(
                     "non-preview retained run so cancellation evidence is real"
                 )
             reflex_start = time.perf_counter()
-            reflex_decision, response, reflex_evidence, reflex_errors = (
+            reflex_projection, response, reflex_evidence, reflex_errors = (
                 await dispatch_initial_reflex(
                     assistant=assistant,
                     text=args.text,
@@ -966,10 +814,9 @@ async def run_check(
             errors.extend(reflex_errors)
             errors.extend(
                 validate_contract(
-                    route=reflex_decision,
+                    interpretation=reflex_projection,
                     response=response,
-                    expected_route=args.expect_route,
-                    expected_capabilities=args.expect_capability,
+                        expected_capabilities=args.expect_capability,
                     expect_no_capabilities=args.expect_no_capabilities,
                     expected_args=args.expect_arg,
                     arg_tolerance=args.arg_tolerance,
@@ -987,7 +834,6 @@ async def run_check(
             )
 
             _write_json(evidence_dir / "reflex.json", reflex_evidence)
-            _write_json(evidence_dir / "reflex_decision.json", reflex_decision)
             _write_json(
                 evidence_dir / "interaction_response.json",
                 response.model_dump(mode="json"),
@@ -1017,7 +863,7 @@ async def run_check(
                 errors.extend(safe_idle_errors(status_after))
 
             debug_summary = build_debug_summary(
-                route=reflex_decision,
+                interpretation={},
                 response=response,
                 errors=errors,
             )
@@ -1041,7 +887,7 @@ async def run_check(
                 },
                 "debug_summary": debug_summary,
                 "errors": errors,
-                "reflex_decision": reflex_decision,
+                "reflex_outcome": reflex_projection,
                 "interaction_response": response.model_dump(mode="json"),
                 "reflex": reflex_evidence,
                 "cognitive_runtime": None,
@@ -1056,7 +902,6 @@ async def run_check(
                 "provenance": collect_run_provenance(
                     manifest=Path(args.manifest),
                     cognitive_runtime=bool(args.cognitive_runtime),
-                    cognitive_apply_lanes=str(args.cognitive_apply_lanes),
                     cognitive_runtime_selected=False,
                     soridormi_repo=(
                         Path(raw_soridormi_repo)
@@ -1236,9 +1081,8 @@ async def run_check(
         }
         errors.extend(
             validate_contract(
-                route=interpretation_projection,
+                interpretation=interpretation_projection,
                 response=response,
-                expected_route=args.expect_route,
                 expected_capabilities=args.expect_capability,
                 expect_no_capabilities=args.expect_no_capabilities,
                 expected_args=args.expect_arg,
@@ -1418,10 +1262,7 @@ async def run_check(
                 errors.extend(safe_idle_errors(status_after))
 
             session_state = assistant.sessions.state.get(sid) or {}
-            require_tts = should_require_tts_speech(
-                interpretation_projection,
-                require_speech=args.require_speech,
-            )
+            require_tts = should_require_tts_speech(require_speech=args.require_speech)
             if require_tts:
                 errors.extend(
                     required_speech_delivery_errors(
@@ -1431,7 +1272,7 @@ async def run_check(
                 )
 
         debug_summary = build_debug_summary(
-            route=interpretation_projection,
+            interpretation=interpretation_projection,
             response=response,
             errors=errors,
         )
@@ -1463,7 +1304,6 @@ async def run_check(
             "provenance": collect_run_provenance(
                 manifest=Path(args.manifest),
                 cognitive_runtime=bool(args.cognitive_runtime),
-                cognitive_apply_lanes=str(args.cognitive_apply_lanes),
                 cognitive_runtime_selected=cognitive_runtime_selected,
                 soridormi_repo=(
                     Path(raw_soridormi_repo) if raw_soridormi_repo else None
@@ -1568,11 +1408,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Play Chromie TTS through the configured speaker; use --no-speaker for headless checks.",
     )
     parser.set_defaults(cognitive_runtime=True)
-    parser.add_argument(
-        "--cognitive-apply-lanes",
-        default="chat,memory,robot_action,tool",
-        help="Comma-separated PR7 apply lanes used with --cognitive-runtime.",
-    )
     parser.add_argument("--preview-only", action="store_true", help="Run the maintained cognitive path without executing Soridormi capabilities.")
     parser.add_argument("--allow-non-sim", action="store_true", help="Permit non-sim Soridormi modes. Use only under separate supervision.")
     parser.add_argument(
@@ -1585,20 +1420,6 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("--require-speech", action=argparse.BooleanOptionalAction, default=True)
-    parser.add_argument(
-        "--expect-route",
-        choices=[
-            "chat",
-            "deep_thought",
-            "robot_action",
-            "tool",
-            "memory",
-            "clarify",
-            "interrupt",
-            "ignore",
-        ],
-        help="Optional post-run assertion; this is not sent to the Cognitive Core or Agent runtime.",
-    )
     parser.add_argument(
         "--expect-no-capabilities",
         action="store_true",

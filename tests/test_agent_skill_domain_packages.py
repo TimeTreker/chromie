@@ -31,7 +31,6 @@ except ImportError:  # pragma: no cover - repository test path
 ROOT = Path(__file__).resolve().parents[1]
 SKILL_ROOT = ROOT / "agent-skills"
 ROLES = (
-    "goal_association",
     "fast_planner",
     "deep_planner",
 )
@@ -110,7 +109,6 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
                             "description": "Walk forward.",
                         }
                     ],
-                    context_summary=["route=robot_action"],
                 )
             )
         )
@@ -119,7 +117,7 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
         self.assertEqual(selection.selected_agent_skills, ())
         self.assertEqual(model.calls, [])
 
-    def test_model_uses_declared_goal_applicability_without_host_filtering(self):
+    def test_typed_goal_applicability_filters_without_model_call(self):
         model = ScriptedModel(
             [
                 self._no_skill_output(
@@ -148,20 +146,9 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(selection.status, "no_skill")
+        self.assertEqual(selection.status, "no_candidates")
         self.assertEqual(selection.selected_agent_skills, ())
-        self.assertEqual(len(model.calls), 1)
-        candidates = json.loads(model.calls[0][0])["candidate_agent_skills"]
-        self.assertEqual(
-            {item["agent_skill_id"] for item in candidates},
-            {BASE_ID, WEATHER_ID},
-        )
-        self.assertTrue(
-            all(
-                item["applicable_output_modes"] == ["capability_work"]
-                for item in candidates
-            )
-        )
+        self.assertEqual(model.calls, [])
 
     def _both_skill_output(self, role: str) -> dict:
         return {
@@ -237,7 +224,7 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
             self.assertNotIn("source", encoded)
             self.assertNotIn("path", encoded)
 
-    def test_model_authors_base_then_weather_for_all_semantic_agents(self) -> None:
+    def test_model_authors_base_then_weather_for_planner_roles(self) -> None:
         for role in ROLES:
             with self.subTest(role=role):
                 model = ScriptedModel([self._both_skill_output(role)])
@@ -325,13 +312,9 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
         selection = asyncio.run(
             AgentSkillSelectionService(model, self.registry).select(request)
         )
-        self.assertEqual(selection.status, "no_skill")
+        self.assertEqual(selection.status, "no_candidates")
         self.assertEqual(selection.selected_agent_skills, ())
-        self.assertEqual(len(model.calls), 1)
-        self.assertEqual(
-            len(json.loads(model.calls[0][0])["candidate_agent_skills"]),
-            2,
-        )
+        self.assertEqual(model.calls, [])
 
     def test_model_rejects_disclosed_external_skills_for_vocal_work(self) -> None:
         model = ScriptedModel(
@@ -365,14 +348,9 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(selection.status, "no_skill")
+        self.assertEqual(selection.status, "no_candidates")
         self.assertEqual(selection.selected_agent_skills, ())
-        self.assertEqual(len(model.calls), 1)
-        prompt = json.loads(model.calls[0][0])
-        self.assertEqual(
-            [goal["output_mode"] for goal in prompt["goals"]],
-            ["singing", "body_action"],
-        )
+        self.assertEqual(model.calls, [])
 
     def test_real_fast_planner_projections_bind_content_free_plan_provenance(self) -> None:
         role = "fast_planner"
@@ -413,10 +391,8 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
         encoded = informed.model_dump(mode="json")
         self.assertNotIn("content", encoded["selected_agent_skills"][0])
         self.assertNotIn("source", encoded["selected_agent_skills"][0])
-        self.assertEqual(
-            CanonicalPlanRuntimeAdapter.lane_for_plan(base_plan),
-            CanonicalPlanRuntimeAdapter.lane_for_plan(informed),
-        )
+        self.assertEqual(informed.steps, base_plan.steps)
+        self.assertEqual(informed.goal_ids, base_plan.goal_ids)
 
     def test_skill_loading_does_not_modify_capability_registry(self) -> None:
         capability_registry = build_chromie_registry()
@@ -443,12 +419,10 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
         self.assertIn("exact Evidence references", method)
         self.assertNotIn("if user_text", "\n".join((fast, deep, method)))
 
-    def test_weather_method_preserves_binding_and_typed_weather_outcomes(self) -> None:
-        goal = self.registry.load_projection(WEATHER_ID, "goal_association").content
+    def test_weather_method_preserves_planner_binding_and_typed_outcomes(self) -> None:
         fast = self.registry.load_projection(WEATHER_ID, "fast_planner").content
         deep = self.registry.load_projection(WEATHER_ID, "deep_planner").content
         method = self.registry.load_document(WEATHER_ID).content
-        self.assertIn("Resolve “there,”", goal)
         self.assertIn("args.location", fast)
         self.assertIn("exactly equal to the canonical Goal binding", fast)
         self.assertIn("entity_type=date", fast)
@@ -457,8 +431,6 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
         self.assertIn("args.period", fast)
         self.assertIn("probability, not certainty", fast)
         self.assertIn("forecast_period", fast)
-        self.assertIn("value `today`", goal)
-        self.assertIn("value `night`", goal)
         self.assertIn("mismatched location", deep)
         self.assertIn("location_not_found", method)
         self.assertIn("no-rain/no-snow", method)

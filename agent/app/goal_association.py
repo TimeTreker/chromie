@@ -26,7 +26,6 @@ from .clients.ollama_client import (
     OllamaGenerationError,
     llm_failure_metadata,
 )
-from .agent_skills import agent_skill_prompt_section
 from .cognitive_identity import (
     IDENTITY_SEMANTIC_CONTRACT,
     PERSONALITY_SEMANTIC_CONTRACT,
@@ -3595,10 +3594,6 @@ class GoalAssociationResolver:
             if identity_json != "null"
             else ""
         )
-        skill_section = agent_skill_prompt_section(
-            context,
-            agent_role="goal_association",
-        )
         responsibilities_json = self._bounded_json(
             [
                 item.model_dump(mode="json", exclude_none=True)
@@ -3674,7 +3669,6 @@ class GoalAssociationResolver:
             "InformationGap, or pretends work is complete.\n\n"
             "Owner-approved Chromie identity JSON:\n"
             f"{identity_json}\n\n"
-            + skill_section
             + "Responsibility evidence JSON:\n"
             f"{responsibilities_json}\n\n"
             "GI unresolved-meaning evidence JSON:\n"
@@ -3821,10 +3815,6 @@ class GoalAssociationResolver:
             if identity_json != "null"
             else ""
         )
-        skill_section = agent_skill_prompt_section(
-            context,
-            agent_role="goal_association",
-        )
         responsibilities = [
             item.model_dump(mode="json", exclude_none=True)
             for item in request.responsibilities
@@ -3875,7 +3865,6 @@ class GoalAssociationResolver:
             f"{identity_section}"
             f"{identity_contract}"
             f"{_EXECUTION_CONTRACT_PROMPT}\n\n"
-            f"{skill_section}"
             "Candidate Goal semantic evidence JSON:\n"
             f"{self._bounded_json(self._association_goal_projection(candidate_goals), 2600)}\n\n"
             "GI Responsibility evidence JSON:\n"
@@ -3912,10 +3901,6 @@ class GoalAssociationResolver:
         context = request.context if isinstance(request.context, dict) else {}
         identity_json = bounded_identity_json(context)
         personality_json = bounded_personality_json(context)
-        skill_section = agent_skill_prompt_section(
-            context,
-            agent_role="goal_association",
-        )
         if output_type is GoalSegmentationModelOutput:
             state_instructions = (
                 "There are no active or retained recent Goals, so no existing-goal relationship is possible and the contract intentionally has no associations field. "
@@ -3983,7 +3968,6 @@ class GoalAssociationResolver:
             f"{identity_json}\n\n"
             "Owner-approved Personality Expression JSON:\n"
             f"{personality_json}\n\n"
-            + skill_section
             + "Bounded active goals JSON:\n"
             f"{self._bounded_json(candidate_goals, 6500)}\n\n"
             "Responsibility evidence JSON (Core-authored provider-neutral semantic handoff from Goal Interpretation. These are not canonical Goals. Preserve the WHAT and material bindings; use the authoritative user turn, discourse, retained Goal state, and Situation only to associate continuity or identify a real representation mismatch, never to silently rewrite the Responsibility. Goal Association alone decides create/continue/modify/supersede canonical Goal state. Never infer a Capability, provider, execution method, executable argument, or response wording here):\n"
@@ -4023,10 +4007,6 @@ class GoalAssociationResolver:
         context = request.context if isinstance(request.context, dict) else {}
         identity_json = bounded_identity_json(context)
         personality_json = bounded_personality_json(context)
-        skill_section = agent_skill_prompt_section(
-            context,
-            agent_role="goal_association",
-        )
         if output_type is GoalSegmentationModelOutput:
             contract_name = "Goal Segmentation"
             revision_action = "Re-evaluate the independent goal segmentation"
@@ -4063,7 +4043,6 @@ class GoalAssociationResolver:
             + "\n\nOwner-approved Personality Expression JSON:\n"
             + personality_json
             + "\n\n"
-            + skill_section
             + f"Latest user turn:\n{request.text}\n\n"
             "For a location named directly in that user turn, copy the complete location binding value verbatim as one contiguous span. Never translate, transliterate, shorten, or expand it. Responsibility evidence may contain a normalized or incorrectly translated spelling; the FINAL AUTHORITATIVE USER TURN owns the direct entity surface and must win. Do not ask the user for provider canonicalization or extra administrative granularity merely because multiple real-world places might share the supplied value; bind it exactly and let the downstream Capability resolve it or report provider ambiguity. Only an indirect reference resolved from a supplied referent may use the referent's canonical value.\n\n"
             "Bounded active goals JSON:\n"
@@ -4134,10 +4113,6 @@ class GoalAssociationResolver:
             "Owner-approved Chromie identity JSON:\n"
             f"{identity_json}\n\n"
         )
-        skill_contract = agent_skill_prompt_section(
-            context,
-            agent_role="goal_association",
-        )
         identity_contracts = (
             (_GOAL_SEGMENTATION_IDENTITY_CONTRACT,)
             if identity_json != "null"
@@ -4155,7 +4130,6 @@ class GoalAssociationResolver:
                 *identity_contracts,
                 _EXECUTION_CONTRACT_PROMPT,
             ),
-            capability_contract=(skill_contract,),
         )
 
     def _layered_repair_prompt(
@@ -4172,10 +4146,6 @@ class GoalAssociationResolver:
     ) -> LayeredPrompt:
         context = request.context if isinstance(request.context, dict) else {}
         identity_world = self._stable_identity_world_layer(context)
-        skill_contract = agent_skill_prompt_section(
-            context,
-            agent_role="goal_association",
-        )
         rendered = self._build_repair_prompt(
             request=request,
             candidate_goals=candidate_goals,
@@ -4192,7 +4162,6 @@ class GoalAssociationResolver:
                 PERSONALITY_SEMANTIC_CONTRACT,
                 _EXECUTION_CONTRACT_PROMPT,
             ),
-            capability_contract=(skill_contract,),
         )
 
     @staticmethod

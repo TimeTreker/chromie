@@ -872,7 +872,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
 
-    async def test_interaction_speech_reuses_fast_first_audio_without_resynthesis(self) -> None:
+    async def test_interaction_speech_reuses_existing_turn_audio_without_resynthesis(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.playback_start_waiters = {}
         assistant._turn_speech_events = {}

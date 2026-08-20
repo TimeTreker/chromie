@@ -75,7 +75,6 @@ class ReflexFilterTests(unittest.TestCase):
                 self.assertTrue(outcome.matched)
                 self.assertEqual(outcome.action, "interrupt")
                 self.assertEqual(outcome.trigger, "emergency_stop_command")
-                self.assertEqual(outcome.intent, "global_emergency_stop")
                 self.assertEqual(
                     outcome.cancellation_scope,
                     "global_emergency",
@@ -107,34 +106,29 @@ class ReflexFilterTests(unittest.TestCase):
     def test_fixed_stop_phrases_map_to_closed_cancellation_scopes(self) -> None:
         reflex_filter = ReflexFilter()
 
-        for text, scope, intent in (
-            ("Stop talking.", "output_only", "stop_current_output"),
-            ("别说了。", "output_only", "stop_current_output"),
-            ("别说话。", "output_only", "stop_current_output"),
-            ("Stop moving.", "embodied_motion", "stop_embodied_motion"),
-            ("Stop all motion.", "embodied_motion", "stop_embodied_motion"),
-            ("停止移动。", "embodied_motion", "stop_embodied_motion"),
-            ("停止机器人。", "embodied_motion", "stop_embodied_motion"),
-            ("请让机器人停下。", "embodied_motion", "stop_embodied_motion"),
-            ("Stop.", "current_interaction", "cancel_current_interaction"),
-            (
-                "Stop everything.",
-                "current_interaction",
-                "cancel_current_interaction",
-            ),
-            ("停止。", "current_interaction", "cancel_current_interaction"),
-            ("Cancel.", "current_interaction", "cancel_current_interaction"),
-            ("取消。", "current_interaction", "cancel_current_interaction"),
-            ("取消一切。", "current_interaction", "cancel_current_interaction"),
-            ("算了，不用了。", "current_interaction", "cancel_current_interaction"),
-            ("不用了。", "current_interaction", "cancel_current_interaction"),
+        for text, scope in (
+            ("Stop talking.", "output_only"),
+            ("别说了。", "output_only"),
+            ("别说话。", "output_only"),
+            ("Stop moving.", "embodied_motion"),
+            ("Stop all motion.", "embodied_motion"),
+            ("停止移动。", "embodied_motion"),
+            ("停止机器人。", "embodied_motion"),
+            ("请让机器人停下。", "embodied_motion"),
+            ("Stop.", "current_interaction"),
+            ("Stop everything.", "current_interaction"),
+            ("停止。", "current_interaction"),
+            ("Cancel.", "current_interaction"),
+            ("取消。", "current_interaction"),
+            ("取消一切。", "current_interaction"),
+            ("算了，不用了。", "current_interaction"),
+            ("不用了。", "current_interaction"),
         ):
             with self.subTest(text=text):
                 outcome = reflex_filter.evaluate(text)
 
                 self.assertEqual(outcome.action, "interrupt")
                 self.assertEqual(outcome.cancellation_scope, scope)
-                self.assertEqual(outcome.intent, intent)
 
     def test_output_stop_compound_preserves_residual_semantic_input(self) -> None:
         for text in ("别说话，过来。", "Don't speak, come here."):
@@ -143,7 +137,6 @@ class ReflexFilterTests(unittest.TestCase):
 
                 self.assertEqual(outcome.action, "interrupt")
                 self.assertEqual(outcome.cancellation_scope, "output_only")
-                self.assertEqual(outcome.intent, "stop_current_output")
                 self.assertTrue(outcome.metadata["residual_semantic_input"])
 
         exact = ReflexFilter().evaluate("别说话。")
@@ -515,13 +508,6 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(assistant.sessions.state["sid-stop"]["llm_done"], True)
         self.assertNotIn("route", recorded_turn)
         self.assertNotIn("intent", recorded_turn)
-        expected_intent = (
-            "global_emergency_stop"
-            if recorded_turn["metadata"]["reflex_outcome"]["trigger"]
-            == "emergency_stop_command"
-            else "cancel_current_interaction"
-        )
-        self.assertEqual(recorded_turn["metadata"]["reflex_outcome"]["intent"], expected_intent)
         self.assertEqual(recorded_turn["metadata"]["source"], "cognitive_gateway_reflex")
         self.assertEqual(recorded_turn["metadata"]["reflex_outcome"]["action"], "interrupt")
         self.assertEqual(

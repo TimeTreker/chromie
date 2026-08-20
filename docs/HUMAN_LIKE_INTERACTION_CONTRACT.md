@@ -79,9 +79,10 @@ Classify the root cause before choosing a fix:
 - **Cognitive Gateway/ingress** - normalization, protective reflex, attention,
   or turn admission is wrong. Current traces expose this through Gateway evidence and the
   admitted `UserTurnEnvelope`.
-- **Cognitive Core/goal meaning** - goal association, intent, decomposition,
-  planning, affordance grounding, or outcome synthesis is wrong. A bounded advisory route/effect projection may originate in the fast Goal
-  Interpreter inside the Core, but Goal Association and canonical planning own meaning.
+- **Cognitive Core/goal meaning** - Responsibility interpretation, Goal association,
+  typed meaning, planning, affordance grounding, or outcome synthesis is wrong. Goal
+  Interpretation owns provider-neutral WHAT; Goal Association owns canonical Goal
+  continuity; Planner owns HOW.
 - **Agent contract** - the model is allowed to invent speech acts, tool results,
   skill proposals, or physical execution claims.
 - **Prompt wording** - the state and authority are correct, but the generated
@@ -695,11 +696,11 @@ was dispatched, the response may state only understanding and the supported limi
 processing failure. Host/runtime code enforces the typed state and speech envelope without
 using a phrase blacklist.
 
-The missing-ability repair schema exposes the same cross-field invariants as its Pydantic
-decoder: `missing_or_unsupported_ability` requires `route=clarify`, a complete limitation,
-missing-ability metadata, and zero actions. Any non-empty action list requires
-`route=robot_action`. This makes invalid repair states unrepresentable to constrained
-generation instead of relying on a later repair to discover them.
+Capability limitation is represented through typed Goal outcomes and Plan structure,
+not a repair route. An unavailable or unsupported Capability outcome has no executable
+steps and cannot claim provider execution. Any executable step must name a currently
+declared Capability, carry schema-valid arguments and exact Goal ownership, and pass the
+trusted Runtime's authorization, safety, confirmation, resource, and availability checks.
 
 ### Evidence-qualified completion and one-act delivery
 
@@ -955,9 +956,9 @@ when it would have caught the user-visible failure that motivated the change.
 
 Use this evidence hierarchy when making claims:
 
-1. **Live or retained trace evidence** - microphone/ASR text, route decision,
-   scheduled TTS text, interaction result, skill proposals, CapabilityRuntime result,
-   and Soridormi/provider result from the same turn.
+1. **Live or retained trace evidence** - microphone/ASR text, Gateway admission,
+   GI Responsibility, canonical Goal, Planner output, scheduled TTS text, Capability
+   request/result, and Soridormi/provider Evidence from the same turn.
 2. **Black-box interaction tests** - a user utterance enters the same public
    boundary used by the orchestrator or scenario runner, and assertions inspect
    route, speech, skills, confirmation, and forbidden output.
@@ -1016,7 +1017,7 @@ capability recovery:
 |---|---|
 | `Hello, how are you.` | One natural greeting answer; no duplicate fast-first plus final greeting loop. |
 | `你能查天信吗？` | Clarify what the user means; do not treat `天信` as `天气`; no weather lookup; no `checking_only` TTS. |
-| `重庆今天天气情况怎么样？` | Weather tool route when `chromie.weather.lookup` is available; short Chinese acknowledgement; weather result later. |
+| `重庆今天天气情况怎么样？` | Typed information Goal; Planner may select `chromie.weather.lookup` when its declared contract matches; short Chinese acknowledgement; grounded weather result later. |
 | `往前走个15秒。` | Catalog-backed physical proposal path for the exact walk skill when available; no direct hardware command; no internal fallback sentence. |
 | `walk forward for 15 seconds quickly` | Preserve duration and speed semantics; Planner, trusted Runtime, and Soridormi may bound or request confirmation according to their owned contracts. |
 | `B.` | Clarify; do not blink or execute a weakly related skill. |
@@ -1048,8 +1049,8 @@ Before submitting a fix for a user-visible interaction problem, write down:
 
 1. What did the user actually say, and what did ASR produce?
 2. What reflex or admission decision did the Cognitive Gateway make?
-3. What bounded advisory route/effect projection did fast Goal Interpretation
-   produce, and what Goal meaning and canonical Plan did the Cognitive Core resolve?
+3. What provider-neutral Responsibility did Goal Interpretation produce, and what
+   canonical Goal meaning and Planner Plan did downstream cognition resolve?
 4. What uncertainty or missing argument existed?
 5. Which component first violated the human-like interaction contract?
 6. Which later component amplified the bad behavior?

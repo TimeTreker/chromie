@@ -959,7 +959,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "5d10a17b5f9bab1d02ae43b9f692d81da56a589167535c37c1ebf1b48937ac44",
+      "body_sha256": "45a4c9c3fd7747bdcbf97e84706aae33ed050df983f18366f432369bba4778dd",
       "failure_signals": [
         "state_update"
       ]
@@ -1252,7 +1252,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "a6e19c4042bd53ffdfc15a65f36e94a82578c98508669c15448970ff23709eaf",
+      "body_sha256": "548d896104330cc291c4f3b4a7344001db46cdb6925b89ec8b3152c682863319",
       "failure_signals": [
         "return"
       ]
@@ -1350,48 +1350,6 @@
       "failure_signals": [
         "diagnostic",
         "return"
-      ]
-    },
-    {
-      "path": "orchestrator/runtime/fast_first_audio.py",
-      "symbol": "FastFirstAudioCache._resolve_cache_identity",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "94601368e231e2849a38dca6bc23f308be356b20849d911b6216fe9aca266000",
-      "failure_signals": [
-        "diagnostic"
-      ]
-    },
-    {
-      "path": "orchestrator/runtime/fast_first_audio.py",
-      "symbol": "FastFirstAudioCache.prime_missing",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "661e03e65f6ea49f6c6476cb2bd0337d371f7db12ff764d0c6c1155283eefc73",
-      "failure_signals": [
-        "continue",
-        "diagnostic"
-      ]
-    },
-    {
-      "path": "orchestrator/runtime/fast_first_audio.py",
-      "symbol": "FastFirstAudioCache.prime_missing",
-      "ordinal": 2,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "06c86271a70b03841802bde79fa3dc6f3be5ec7515fde6a5e13f39b74702a02c",
-      "failure_signals": [
-        "break",
-        "diagnostic",
-        "state_update"
       ]
     },
     {

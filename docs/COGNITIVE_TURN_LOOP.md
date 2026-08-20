@@ -722,9 +722,9 @@ need not wait for Goal Association or unrelated later response fields. Goal
 Interpretation has no parallel early-speech contract beside Fast Planner Activity.
 
 Current-turn Communicative-Act reuse is correlated by the exact speech-event
-ID together with its turn, structured stage, purpose, route, intent,
-commitment, source Goal IDs, canonical Plan identity/fingerprint, delivery
-role, claim types, and completion-claim restriction. An event created before
+ID together with its turn, structured stage, purpose, commitment, source Goal
+IDs, canonical Plan identity/fingerprint, delivery role, claim types, and
+completion-claim restriction. An event created before
 Goal Association remains explicitly unbound; the Host does not invent Goal or
 Plan provenance after delivery. Once an event is Goal-bound, a later response
 stage cannot reassign it to unrelated canonical Goals or a different Plan.

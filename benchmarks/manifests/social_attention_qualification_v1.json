@@ -22,23 +22,19 @@
     ],
     "live_service_text": [
       "provider_revision",
-      "hardware_profile",
-      "apply_lanes"
+      "hardware_profile"
     ],
     "live_service_virtual_audio": [
       "provider_revision",
-      "hardware_profile",
-      "apply_lanes"
+      "hardware_profile"
     ],
     "simulated_mujoco": [
       "provider_revision",
-      "hardware_profile",
-      "apply_lanes"
+      "hardware_profile"
     ],
     "physical_supervised": [
       "provider_revision",
       "hardware_profile",
-      "apply_lanes",
       "operator"
     ]
   },

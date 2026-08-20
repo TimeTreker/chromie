@@ -132,21 +132,6 @@ class RuntimeConfigurationTests(unittest.TestCase):
 
     def test_common_profile_uses_one_coherent_cognitive_runtime(self) -> None:
         values = _common_env()
-        self.assertEqual(values["ORCH_FAST_FIRST_RESPONSE_ENABLED"], "1")
-        self.assertEqual(values["ORCH_FAST_FIRST_AUDIO_ENABLED"], "1")
-        self.assertEqual(values["ORCH_FAST_FIRST_AUDIO_HEDGE_MS"], "750")
-        self.assertEqual(
-            values["ORCH_FAST_FIRST_AUDIO_CACHE_DIR"],
-            ".chromie/cache/fast-first-audio",
-        )
-        self.assertEqual(values["ORCH_FAST_FIRST_AUDIO_PRIME_ON_STARTUP"], "1")
-        self.assertEqual(values["ORCH_FAST_FIRST_AUDIO_PRIME_TIMEOUT_MS"], "120000")
-        self.assertEqual(values["ORCH_FAST_FIRST_AUDIO_CONTENT_GATE_ENABLED"], "1")
-        self.assertEqual(values["ORCH_FAST_FIRST_AUDIO_MAX_CUE_SECONDS"], "4")
-        self.assertEqual(
-            values["ORCH_FAST_FIRST_AUDIO_TRANSCRIPT_MIN_SIMILARITY"],
-            "0.65",
-        )
         self.assertEqual(values["ORCH_ADDRESSEDNESS_GATE_ENABLED"], "1")
         self.assertEqual(values["ORCH_ADDRESSEDNESS_ENGAGEMENT_TIMEOUT_SEC"], "45")
         self.assertEqual(values["ORCH_ENABLE_INTERACTION_RESPONSE"], "1")
@@ -160,7 +145,6 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["TTS_CANDIDATE_REQUEST_TIMEOUT_SEC"], "60")
         self.assertEqual(values["TTS_PYTORCH_ALLOC_CONF"], "expandable_segments:True")
         self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_MODE"], "apply")
-        self.assertEqual(values["ORCH_COGNITIVE_APPLY_LANES"], "chat,memory,tool")
         self.assertEqual(values["ORCH_GOAL_ASSOCIATION_MODE"], "off")
         self.assertEqual(values["ORCH_FAST_PLANNER_MODE"], "off")
         self.assertEqual(values["ORCH_DEEP_PLANNER_MODE"], "off")
@@ -387,8 +371,6 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("from scripts.tts_reference import validate_reference_dir", launcher)
         self.assertIn("TTS_URL=ws://127.0.0.1:5000", launcher)
         self.assertIn("TTS_SPEAKER_ID=default", launcher)
-        self.assertIn("ORCH_FAST_FIRST_AUDIO_CACHE_REVISION=cosyvoice3-", launcher)
-        self.assertIn("ORCH_FAST_FIRST_AUDIO_PRIME_ON_STARTUP=0", launcher)
         self.assertIn('echo "ORCH_TTS_CONCURRENCY=1"', launcher)
         self.assertIn("TTS_COSYVOICE_OLLAMA_MODEL:-qwen3:4b", launcher)
         self.assertIn("TTS_COSYVOICE_OLLAMA_NUM_CTX:-8192", launcher)
@@ -451,7 +433,6 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn('torch.OutOfMemoryError', cosy_provider)
         self.assertIn('os._exit(70)', cosy_provider)
         self.assertEqual(_common_env()["TTS_COSYVOICE_EN_WARMUP_TEXT"], "Hello.")
-        self.assertEqual(_common_env()["ORCH_FAST_FIRST_AUDIO_GENERATION_ATTEMPTS"], "2")
 
         verifier = (ROOT / "scripts" / "verify_runtime_profile.sh").read_text(
             encoding="utf-8"

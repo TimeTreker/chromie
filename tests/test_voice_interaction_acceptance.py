@@ -63,6 +63,26 @@ def event(name: str, message: str, sid: str = "sid-1") -> dict[str, object]:
     return {"event": name, "message": message, "sid": sid}
 
 
+
+
+def cognitive_core_done_event(sid: str = "sid-1") -> dict[str, object]:
+    return event(
+        "cognitive_core_done",
+        "cognitive_core_done: core_ms=1.0 responsibilities=1 "
+        "confidence=0.95 unresolved=0 authority=authoritative",
+        sid,
+    )
+
+
+def interrupt_reflex_event(sid: str = "sid-1") -> dict[str, object]:
+    return event(
+        "cognitive_gateway_reflex_applied",
+        "cognitive_gateway_reflex_applied: action=interrupt "
+        "trigger=stop_command goal_interpretation_bypassed=True",
+        sid,
+    )
+
+
 def tts_completion_events(
     sid: str,
     text: str,
@@ -146,7 +166,7 @@ def speech_capability_runtime_events(
 ) -> list[dict[str, object]]:
     records = [
         event("asr_final", "asr_final: text='Please nod twice.'", "sid-1"),
-        event("goal_interpretation_done", "goal_interpretation_done: route=robot_action", "sid-1"),
+        cognitive_core_done_event("sid-1"),
         event(
             "interaction_done",
             "interaction_done: speech=1 capabilities=1 requires_confirmation=True",
@@ -208,21 +228,20 @@ def fixture_case_session_ids(index: int, case_id: str) -> list[str]:
 
 GOAL_DRIVEN_OVERRIDE_TEXT = (
     "ORCH_COGNITIVE_RUNTIME_MODE=apply\n"
-    "ORCH_COGNITIVE_APPLY_LANES=chat,memory,robot_action,tool\n"
     "ORCH_COGNITIVE_EVIDENCE_ENABLED=1\n"
 )
 
 
 def write_cognitive_runtime_fixture(root: Path) -> None:
     events = [
-        {"sid": "sid-0", "mode": "apply", "status": "applied", "lane": "chat"},
-        {"sid": "sid-1", "mode": "apply", "status": "applied", "lane": "robot_action"},
-        {"sid": "sid-2", "mode": "apply", "status": "applied", "lane": "robot_action"},
-        {"sid": "sid-3", "mode": "apply", "status": "applied", "lane": "chat"},
-        {"sid": "sid-4", "mode": "apply", "status": "applied", "lane": "robot_action"},
-        {"sid": "sid-5", "mode": "apply", "status": "applied", "lane": "chat"},
-        {"sid": "sid-6", "mode": "apply", "status": "applied", "lane": "chat"},
-        {"sid": "sid-6-follow", "mode": "apply", "status": "applied", "lane": "chat"},
+        {"sid": "sid-0", "mode": "apply", "status": "applied"},
+        {"sid": "sid-1", "mode": "apply", "status": "applied"},
+        {"sid": "sid-2", "mode": "apply", "status": "applied"},
+        {"sid": "sid-3", "mode": "apply", "status": "applied"},
+        {"sid": "sid-4", "mode": "apply", "status": "applied"},
+        {"sid": "sid-5", "mode": "apply", "status": "applied"},
+        {"sid": "sid-6", "mode": "apply", "status": "applied"},
+        {"sid": "sid-6-follow", "mode": "apply", "status": "applied"},
     ]
     (root / "cognitive-runtime.jsonl").write_text(
         "".join(json.dumps(item) + "\n" for item in events),
@@ -234,11 +253,11 @@ def write_cognitive_runtime_fixture(root: Path) -> None:
     )
     runtime_events = [
         event("asr_final", "asr_final: text='Moon fact'", "sid-0"),
-        event("goal_interpretation_done", "goal_interpretation_done: route=chat", "sid-0"),
+        cognitive_core_done_event("sid-0"),
         event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 capabilities=0 requires_confirmation=False", "sid-0"),
         *tts_completion_events("sid-0", "The Moon has lower gravity than Earth."),
         event("asr_final", "asr_final: text='nod twice'", "sid-1"),
-        event("goal_interpretation_done", "goal_interpretation_done: route=robot_action", "sid-1"),
+        cognitive_core_done_event("sid-1"),
         event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 capabilities=1 requires_confirmation=True", "sid-1"),
         event("cognitive_capability_proposed", 'cognitive_capability_proposed: request_id=nod-2 capability_id=soridormi.nod_yes timing=parallel requires_confirmation=True args={"count":2}', "sid-1"),
         event("confirmation_requested", "confirmation_requested: confirmation_id=c1 interaction_id=i1 request_ids=nod-2 fingerprint=fp1 expires_at=1.0", "sid-1"),
@@ -249,7 +268,7 @@ def write_cognitive_runtime_fixture(root: Path) -> None:
         event("capability_result", "capability_result: request_id=nod-2 capability_id=soridormi.nod_yes status=completed", "sid-1"),
         event("soridormi_post_status", status_message, "sid-1"),
         event("asr_final", "asr_final: text='nod twice'", "sid-2"),
-        event("goal_interpretation_done", "goal_interpretation_done: route=robot_action", "sid-2"),
+        cognitive_core_done_event("sid-2"),
         event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 capabilities=1 requires_confirmation=True", "sid-2"),
         event("cognitive_capability_proposed", 'cognitive_capability_proposed: request_id=nod-denied capability_id=soridormi.nod_yes timing=parallel requires_confirmation=True args={"count":2}', "sid-2"),
         event("confirmation_requested", "confirmation_requested: confirmation_id=c2 interaction_id=i2 request_ids=nod-denied fingerprint=fp2 expires_at=1.0", "sid-2"),
@@ -257,7 +276,7 @@ def write_cognitive_runtime_fixture(root: Path) -> None:
         event("confirmation_rejected", "confirmation_rejected: confirmation_id=c2 reason=denied fingerprint=fp2", "sid-2"),
         *tts_completion_events("sid-2", "Okay, I will not perform that action."),
         event("asr_final", "asr_final: text='tell me a long story'", "sid-3"),
-        event("goal_interpretation_done", "goal_interpretation_done: route=chat", "sid-3"),
+        cognitive_core_done_event("sid-3"),
         event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 capabilities=0 requires_confirmation=False", "sid-3"),
         event("tts_schedule", "tts_schedule: order=0 chars=20 scheduled_tts=1 generation=1 text='A long Moon story begins.'", "sid-3"),
         event("playback_start", "playback_start: order=0 source_rate=44100 output_rate=44100 audio_ms=30000.0 generation=1", "sid-3"),
@@ -266,35 +285,35 @@ def write_cognitive_runtime_fixture(root: Path) -> None:
         event("asr_final", "asr_final: text='stop talking'", "sid-3-follow"),
         event("barge_in_external_speech_confirmed", "barge_in_external_speech_confirmed: scope=output_only cancel_cognitive_work=false playback_generation_at_start=1 confirmed_speech_to_silence_ms=20.0", "sid-3-follow"),
         event("cognitive_gateway_cancellation_dispatched", "cognitive_gateway_cancellation_dispatched: requested_scope=output_only effective_scope=output_only interactions=none selected=0 active=0 queued=0 non_interruptible=0 provider_failures=0 dispatch_failures=0", "sid-3-follow"),
-        event("cognitive_gateway_reflex_applied", "cognitive_gateway_reflex_applied: action=interrupt trigger=stop_output_command goal_interpretation_bypassed=True", "sid-3-follow"),
+        event("cognitive_gateway_reflex_applied", "cognitive_gateway_reflex_applied: action=interrupt trigger=stop_command goal_interpretation_bypassed=True", "sid-3-follow"),
         event("playback_aborted_by_interrupt", "playback_aborted_by_interrupt: order=0 playback_ms=100.0 generation=1", "sid-3"),
         event("asr_final", "asr_final: text='nod eight times'", "sid-4"),
-        event("goal_interpretation_done", "goal_interpretation_done: route=robot_action", "sid-4"),
+        cognitive_core_done_event("sid-4"),
         event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 capabilities=1 requires_confirmation=True", "sid-4"),
         event("cognitive_capability_proposed", 'cognitive_capability_proposed: request_id=nod-8 capability_id=soridormi.nod_yes timing=parallel requires_confirmation=True args={"count":8}', "sid-4"),
         event("confirmation_requested", "confirmation_requested: confirmation_id=c4 interaction_id=i4 request_ids=nod-8 fingerprint=fp4 expires_at=1.0", "sid-4"),
         event("confirmation_reply", "confirmation_reply: confirmation_id=c4 decision=approved fingerprint=fp4", "sid-4"),
         event("confirmation_authorized", "confirmation_authorized: confirmation_id=c4 interaction_id=i4 request_ids=nod-8 fingerprint=fp4", "sid-4"),
         event("asr_final", "asr_final: text='stop talking'", "sid-4-follow"),
-        event("goal_interpretation_done", "goal_interpretation_done: route=interrupt", "sid-4-follow"),
+        interrupt_reflex_event("sid-4-follow"),
         event("capability_runtime_cancelled", "capability_runtime_cancelled: runtime_ms=10.0", "sid-4"),
         event("soridormi_post_status", status_message, "sid-4"),
         event("interrupt_previous_audio_done", "interrupt_previous_audio_done: playback_generation=3", "sid-4-follow"),
         event("asr_final", "asr_final: text='tell me a long space story'", "sid-5"),
-        event("goal_interpretation_done", "goal_interpretation_done: route=chat", "sid-5"),
+        cognitive_core_done_event("sid-5"),
         event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 capabilities=0 requires_confirmation=False", "sid-5"),
         event("tts_schedule", "tts_schedule: order=0 chars=20 scheduled_tts=1 generation=3 text='A long space story begins.'", "sid-5"),
         event("playback_start", "playback_start: order=0 source_rate=44100 output_rate=44100 audio_ms=30000.0 generation=3", "sid-5"),
         event("session_interrupted_by_new_session", "session_interrupted_by_new_session: new_sid=sid-5-follow", "sid-5"),
         event("asr_final", "asr_final: text='stop talking'", "sid-5-follow"),
-        event("goal_interpretation_done", "goal_interpretation_done: route=interrupt", "sid-5-follow"),
+        interrupt_reflex_event("sid-5-follow"),
         event("interrupt_previous_audio_done", "interrupt_previous_audio_done: playback_generation=4", "sid-5-follow"),
         event("asr_final", "asr_final: text='remember blue'", "sid-6"),
-        event("goal_interpretation_done", "goal_interpretation_done: route=chat", "sid-6"),
+        cognitive_core_done_event("sid-6"),
         event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 capabilities=0 requires_confirmation=False", "sid-6"),
         event("context_snapshot", "context_snapshot: conversation_id=conv-1 history_turns=0", "sid-6"),
         event("asr_final", "asr_final: text='what color'", "sid-6-follow"),
-        event("goal_interpretation_done", "goal_interpretation_done: route=chat", "sid-6-follow"),
+        cognitive_core_done_event("sid-6-follow"),
         event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 capabilities=0 requires_confirmation=False", "sid-6-follow"),
         event("context_snapshot", "context_snapshot: conversation_id=conv-1 history_turns=2", "sid-6-follow"),
         *tts_completion_events("sid-6-follow", "Your test color was blue."),
@@ -369,7 +388,6 @@ def write_live_voice_fixture(root: Path) -> None:
         "ORCH_AUDIO_INPUT_MODE=device\n"
         "ORCH_AUDIO_OUTPUT_MODE=device\n"
         "ORCH_COGNITIVE_RUNTIME_MODE=apply\n"
-        "ORCH_COGNITIVE_APPLY_LANES=chat,memory,tool\n"
                 "ORCH_COGNITIVE_EVIDENCE_ENABLED=1\n"
         f"ORCH_COGNITIVE_RUN_IDENTITY_PATH={root / 'runtime-identity.json'}\n",
         encoding="utf-8",
@@ -451,7 +469,6 @@ def write_live_voice_fixture(root: Path) -> None:
             "sid": sid,
             "mode": "apply",
             "status": "applied",
-            "lane": "chat",
             "run_identity": reference,
             "terminal_plan": {"capability_ids": []},
             "interaction": {"capability_ids": [], "speech_count": 1},
@@ -465,7 +482,7 @@ def write_live_voice_fixture(root: Path) -> None:
     )
     runtime_events = [
         event("asr_final", "asr_final: text='Tell me a Moon fact.'", sid),
-        event("goal_interpretation_done", "goal_interpretation_done: route=chat", sid),
+        cognitive_core_done_event(sid),
         event(
             "cognitive_interaction_ready",
             "cognitive_interaction_ready: speech=1 capabilities=0 requires_confirmation=False",
@@ -926,7 +943,6 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
 
             text = path.read_text(encoding="utf-8")
             self.assertIn("ORCH_ENABLE_SORIDORMI_CAPABILITIES=0", text)
-            self.assertIn("ORCH_COGNITIVE_APPLY_LANES=chat,memory,tool", text)
             self.assertIn(f"ORCH_COGNITIVE_RUN_IDENTITY_PATH={identity}", text)
 
     def test_host_speaker_player_uses_pw_play_when_available(self) -> None:
@@ -1099,7 +1115,6 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             self.assertIn("ORCH_AUDIO_OUTPUT_MODE=discard", text)
             self.assertIn("ORCH_MIN_AUDIO_MS=250", text)
             self.assertIn("ORCH_COGNITIVE_RUNTIME_MODE=apply", text)
-            self.assertIn("ORCH_COGNITIVE_APPLY_LANES=chat,memory,robot_action,tool", text)
             self.assertNotIn("ORCH_COGNITIVE_FALLBACK_POLICY", text)
             self.assertNotIn("ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED", text)
             self.assertIn("cognitive-runtime.jsonl", text)
@@ -1261,7 +1276,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             path = Path(temp_dir) / "events.jsonl"
             path.write_text(
                 json.dumps(event("asr_final", "text='old'")) + "\n"
-                + json.dumps(event("goal_interpretation_done", "route=chat")) + "\n"
+                + json.dumps(cognitive_core_done_event()) + "\n"
             )
             self.assertIsNone(
                 wait_for_any_event(
@@ -1392,7 +1407,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             "speech-only",
             [
                 event("asr_final", "asr_final: text='hello'"),
-                event("goal_interpretation_done", "goal_interpretation_done: route=chat"),
+                cognitive_core_done_event(),
                 event("interaction_done", "interaction_done: speech=1 capabilities=0"),
                 *tts_completion_events("sid-1", "A short spoken answer."),
             ],
@@ -1404,10 +1419,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             "speech-only",
             [
                 event("asr_final", "asr_final: text='hello'"),
-                event(
-                    "cognitive_core_done",
-                    "cognitive_core_done: lane=chat intent=greeting",
-                ),
+                cognitive_core_done_event(),
                 event(
                     "cognitive_interaction_ready",
                     "cognitive_interaction_ready: speech=1 capabilities=0",
@@ -1422,7 +1434,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             "speech-only",
             [
                 event("asr_final", "asr_final: text='hello'"),
-                event("goal_interpretation_done", "goal_interpretation_done: route=chat"),
+                cognitive_core_done_event(),
                 event("interaction_done", "interaction_done: speech=1 capabilities=0"),
                 event(
                     "session_done",
@@ -1440,7 +1452,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             path = Path(temp_dir) / "events.jsonl"
             records = [
                 event("asr_final", "asr_final: text='hello'"),
-                event("goal_interpretation_done", "goal_interpretation_done: route=chat"),
+                cognitive_core_done_event(),
                 event("interaction_done", "interaction_done: speech=1 capabilities=0"),
                 *tts_completion_events("sid-1", "A short spoken answer."),
             ]
@@ -1460,7 +1472,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             "body-cancel",
             [
                 event("asr_final", "asr_final: text='nod eight times'", "body-session"),
-                event("goal_interpretation_done", "goal_interpretation_done: route=robot_action", "body-session"),
+                cognitive_core_done_event("body-session"),
                 event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 capabilities=1 requires_confirmation=True", "body-session"),
                 event("cognitive_capability_proposed", 'cognitive_capability_proposed: request_id=body-1 capability_id=soridormi.nod_yes timing=parallel requires_confirmation=True args={"count":8}', "body-session"),
                 event(
@@ -1488,11 +1500,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                     "asr_final: text='stop talking'",
                     "stop-session",
                 ),
-                event(
-                    "goal_interpretation_done",
-                    "goal_interpretation_done: route=interrupt",
-                    "stop-session",
-                ),
+                interrupt_reflex_event("stop-session"),
                 event(
                     "capability_runtime_cancelled",
                     "capability_runtime_cancelled: runtime_ms=10.0",
@@ -1552,7 +1560,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             event(
                 "cognitive_gateway_reflex_applied",
                 "cognitive_gateway_reflex_applied: action=interrupt "
-                "trigger=stop_output_command goal_interpretation_bypassed=True",
+                "trigger=stop_command goal_interpretation_bypassed=True",
                 "stop",
             ),
             event(
@@ -1610,7 +1618,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             event(
                 "cognitive_gateway_reflex_applied",
                 "cognitive_gateway_reflex_applied: action=interrupt "
-                "trigger=stop_output_command goal_interpretation_bypassed=True",
+                "trigger=stop_command goal_interpretation_bypassed=True",
                 "retry",
             ),
         ]
@@ -1718,7 +1726,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                 "old",
             ),
             event("asr_final", "asr_final: text='stop talking'", "stop"),
-            event("goal_interpretation_done", "goal_interpretation_done: route=interrupt", "stop"),
+            interrupt_reflex_event("stop"),
             event(
                 "interrupt_previous_audio_done",
                 "interrupt_previous_audio_done: playback_generation=2",
@@ -1798,7 +1806,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             "speech-capability",
             [
                 event("asr_final", "asr_final: text='Please nod twice.'"),
-                event("goal_interpretation_done", "goal_interpretation_done: route=robot_action"),
+                cognitive_core_done_event(),
                 event("interaction_done", "interaction_done: speech=1 capabilities=1"),
                 event(
                     "capability_proposed",
@@ -1837,7 +1845,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             "refusal",
             [
                 event("asr_final", "asr_final: text='Please nod twice.'", "sid-1"),
-                event("goal_interpretation_done", "goal_interpretation_done: route=robot_action", "sid-1"),
+                cognitive_core_done_event("sid-1"),
                 event(
                     "interaction_done",
                     "interaction_done: speech=1 capabilities=1 requires_confirmation=True",
@@ -1879,7 +1887,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
     def test_refusal_rejects_denial_without_spoken_output(self) -> None:
         records = [
             event("asr_final", "asr_final: text='Please nod twice.'"),
-            event("goal_interpretation_done", "goal_interpretation_done: route=robot_action"),
+            cognitive_core_done_event(),
             event("interaction_done", "interaction_done: speech=1 capabilities=1"),
             event(
                 "capability_proposed",
@@ -1917,11 +1925,11 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             "follow-up",
             [
                 event("asr_final", "asr_final: text='remember blue'", "sid-1"),
-                event("goal_interpretation_done", "goal_interpretation_done: route=chat", "sid-1"),
+                cognitive_core_done_event("sid-1"),
                 event("interaction_done", "interaction_done: speech=1 capabilities=0", "sid-1"),
                 event("context_snapshot", "context_snapshot: conversation_id=conv-1 history_turns=0", "sid-1"),
                 event("asr_final", "asr_final: text='what color'", "sid-2"),
-                event("goal_interpretation_done", "goal_interpretation_done: route=chat", "sid-2"),
+                cognitive_core_done_event("sid-2"),
                 event("interaction_done", "interaction_done: speech=1 capabilities=0", "sid-2"),
                 event("context_snapshot", "context_snapshot: conversation_id=conv-1 history_turns=2", "sid-2"),
                 *tts_completion_events("sid-2", "Your test color was blue."),
@@ -1934,11 +1942,11 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             "follow-up",
             [
                 event("asr_final", "asr_final: text='remember blue'", "sid-1"),
-                event("goal_interpretation_done", "goal_interpretation_done: route=chat", "sid-1"),
+                cognitive_core_done_event("sid-1"),
                 event("interaction_done", "interaction_done: speech=1 capabilities=0", "sid-1"),
                 event("context_snapshot", "context_snapshot: conversation_id=conv-1 history_turns=0", "sid-1"),
                 event("asr_final", "asr_final: text='what color'", "sid-2"),
-                event("goal_interpretation_done", "goal_interpretation_done: route=chat", "sid-2"),
+                cognitive_core_done_event("sid-2"),
                 event("interaction_done", "interaction_done: speech=1 capabilities=0", "sid-2"),
                 event("context_snapshot", "context_snapshot: conversation_id=conv-1 history_turns=2", "sid-2"),
                 *tts_completion_events("sid-2", "I do not remember."),
@@ -1984,7 +1992,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             self.assertFalse(report["human_voice_device_claim_eligible"])
             self.assertTrue(report["runtime_identity"]["source_bound"])
             self.assertTrue(report["artifact_manifest"]["valid"])
-            self.assertEqual(report["cognitive_runtime"]["applied_lanes"], ["chat"])
+            self.assertGreater(report["cognitive_runtime"]["applied_event_count"], 0)
             full_report = verify_bundle(
                 root,
                 expected_chromie_revision="abc123",

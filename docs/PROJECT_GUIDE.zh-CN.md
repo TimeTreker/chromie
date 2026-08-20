@@ -58,8 +58,8 @@ Soridormi 负责：
 
 - Host 驱动的 Gateway/Core/Planner 原生交互闭环；
 - Goal Association、Fast/Deep Planner（含 Communicative Activity）与统一主机协调器；
-- 公共安全配置对 `chat,memory,tool` 使用权威 `apply`，维护的 Soridormi 启动器在启用可信
-  Provider 后把权威范围扩大到 `chat,memory,robot_action,tool`；
+- 公共安全配置使用统一权威 `apply` Runtime；维护的 Soridormi 启动器只是在注册可信
+  body Provider 后增加其明确声明的 Capability，可执行范围由 typed Goal/Capability contract 决定；
 - 请求绑定的口头确认与拒绝；
 - Soridormi 命名技能；
 - 打断、取消、停止与恢复；

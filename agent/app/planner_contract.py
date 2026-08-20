@@ -1154,8 +1154,8 @@ def qualify_capability_catalog_for_output_modes(
     """Remove capabilities whose typed lane cannot serve any current Goal.
 
     Goal Association already owns each Goal's provider-neutral output mode. The
-    catalog owns executable route and semantic-scope metadata. Intersecting those
-    declarations prevents an information tool from becoming decorative body work,
+    catalog owns executable typed semantic-scope and effect metadata. Intersecting
+    those declarations prevents an information tool from becoming decorative body work,
     or a body action from standing in for an exact vocal/media provider, without
     inferring intent from user phrases or capability names.
     """
@@ -1186,7 +1186,11 @@ def qualify_capability_catalog_for_output_modes(
         capability_id = " ".join(
             str(capability.get("capability_id") or "").strip().split()
         )
-        route = " ".join(str(capability.get("route") or "").strip().split())
+        effects = {
+            " ".join(str(item or "").strip().split()).casefold()
+            for item in capability.get("effects") or []
+            if str(item or "").strip()
+        }
         hints = capability.get("hints")
         hints = hints if isinstance(hints, dict) else {}
         scope = capability.get("semantic_scope")
@@ -1203,7 +1207,22 @@ def qualify_capability_catalog_for_output_modes(
         is_information = (
             responsibility_type == "acquire_and_deliver_resource"
             and "information" in resource_kinds
-        ) or route in {"tool", "memory"}
+        )
+        is_body = bool(
+            effects.intersection(
+                {
+                    "physical_motion",
+                    "visual_expression",
+                    "object_manipulation",
+                    "resource_delivery",
+                    "body_activity_execution",
+                    "embodied_task_request",
+                }
+            )
+        ) or (
+            responsibility_type == "acquire_and_deliver_resource"
+            and "physical_object" in resource_kinds
+        )
         is_vocal = capability_id == VOCAL_PERFORMANCE_CAPABILITY_ID
         is_media = capability_id in set(MEDIA_CAPABILITY_IDS.values())
         if is_vocal:
@@ -1218,14 +1237,13 @@ def qualify_capability_catalog_for_output_modes(
             if has_information:
                 qualified.append(capability)
             continue
-        if route == "robot_action":
+        if is_body:
             if has_body:
                 qualified.append(capability)
             continue
-        # Unknown provider-neutral routes remain visible only for capability work;
-        # their later semantic/resource validators still decide applicability.
-        if has_information:
-            qualified.append(capability)
+        # Untyped capabilities are not made semantically applicable by their
+        # transport/provider shape. Providers must declare the semantic scope or
+        # effect that makes the capability relevant to the Goal.
     return qualified
 
 

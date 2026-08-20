@@ -16,14 +16,6 @@
   },
   "stub": {
     "mode": "apply",
-    "apply_lanes": [
-      "robot_action"
-    ],
-    "route_decision": {
-      "route": "robot_action",
-      "intent": "mixed_action_and_ambiguous_manipulation",
-      "language": "zh-CN"
-    },
     "goal_association": {
       "turn_id": "turn-blink-move",
       "new_goals": [
@@ -197,7 +189,6 @@
   },
   "expect": {
     "status": "applied",
-    "lane": "robot_action",
     "planner_tier": "deep",
     "disposition": "mixed",
     "coverage": "complete",

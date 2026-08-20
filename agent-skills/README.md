@@ -24,9 +24,9 @@ content_digest: sha256:<generated digest>
 extends: []
 required_capabilities: []
 optional_capabilities: []
-applicable_routes: []
+applicable_output_modes: []
+applicable_information_domains: []
 projections:
-  goal_association: projections/goal_association.md
   fast_planner: projections/fast_planner.md
   deep_planner: projections/deep_planner.md
 ```
@@ -63,6 +63,9 @@ inherited projection content. Selecting a specialization does not load its
 parent; when both methods are useful, the model explicitly selects the base
 method before the specialization.
 Package presence still grants no Capability registration or execution authority.
-`applicable_routes` is a package-owned candidate-disclosure boundary. An empty
-list permits every structured route for compatibility; a non-empty list keeps
-the Skill out of the model's candidate set on other current-turn routes.
+Candidate disclosure is mechanically bounded by the current canonical Goals.
+When a package declares `applicable_output_modes` or
+`applicable_information_domains`, every disclosed candidate must match at least
+one current Goal on those typed fields before the Planner model sees it. Empty
+lists leave that dimension unrestricted. No semantic route label participates in
+Agent Skill selection.

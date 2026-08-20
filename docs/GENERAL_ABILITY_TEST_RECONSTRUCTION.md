@@ -243,10 +243,10 @@ Exit criteria:
 Scope:
 
 - attach a first-pass failure classification to retained summaries:
-  ASR/audio, Goal Interpreter/intent, Agent contract, Prompt wording, Orchestrator policy,
-  Trusted Capability Runtime/provider, or Test evidence;
-- include route, response, speech, skill, provider, and fallback facts needed to
-  inspect the classification;
+  ASR/audio, Goal Interpretation/Responsibility, Goal Association, Planner contract,
+  Prompt wording, Orchestrator policy, Trusted Capability Runtime/provider, or Test evidence;
+- include Goal, Plan, response, speech, capability/skill, provider, and Evidence facts
+  needed to inspect the classification;
 - keep the classifier advisory and auditable.
 
 Exit criteria:

@@ -18,9 +18,7 @@ class HostSettingsSnapshotTests(unittest.TestCase):
                 project_root=root,
                 environ={
                     "ORCH_ENABLE_AGENT": "true",
-                    "ORCH_COGNITIVE_APPLY_LANES": "chat,tool",
                     "ORCH_TTS_CONCURRENCY": "2",
-                    "ORCH_FAST_FIRST_AUDIO_CACHE_DIR": "cache/audio",
                     "RECORDINGS_DIR": "captures",
                     "ORCH_DATA_LOOP_INTERACTION_SESSION_CAPTURE_POLICY_PATH": "policies/session.json",
                     "CHROMIE_RUNTIME_EVENT_ROOT": "events",
@@ -29,9 +27,7 @@ class HostSettingsSnapshotTests(unittest.TestCase):
             )
 
         self.assertTrue(settings.cognition.enable_agent)
-        self.assertEqual(settings.cognition.apply_lanes, frozenset({"chat", "tool"}))
         self.assertEqual(settings.playback.concurrency, 2)
-        self.assertEqual(settings.playback.fast_audio_cache_dir, root / "cache/audio")
         self.assertEqual(settings.evidence.recordings_dir, root / "captures")
         self.assertEqual(
             settings.evidence.interaction_session_capture_policy_path,
@@ -139,14 +135,4 @@ class HostSettingsSnapshotTests(unittest.TestCase):
             HostSettingsSnapshot.from_env(
                 project_root=Path("/tmp"),
                 environ={"ORCH_AUDIO_OUTPUT_MODE": "speaker-ish"},
-            )
-
-    def test_empty_apply_lane_set_is_rejected(self) -> None:
-        with self.assertRaisesRegex(
-            HostConfigurationError,
-            "ORCH_COGNITIVE_APPLY_LANES must contain at least one lane",
-        ):
-            HostSettingsSnapshot.from_env(
-                project_root=Path("/tmp"),
-                environ={"ORCH_COGNITIVE_APPLY_LANES": " , "},
             )

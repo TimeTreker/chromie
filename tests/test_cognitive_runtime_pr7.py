@@ -552,7 +552,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             adapter=CanonicalPlanRuntimeAdapter(runtime),
             policy=CognitiveRuntimePolicy(
                 mode="apply",
-                apply_lanes=frozenset({"tool", "chat"}),
             ),
         )
         core, envelope = admitted_core(
@@ -785,7 +784,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             adapter=CanonicalPlanRuntimeAdapter(runtime),
             policy=CognitiveRuntimePolicy(
                 mode="apply",
-                apply_lanes=frozenset({"tool", "chat"}),
             ),
         )
         core, envelope = admitted_core(
@@ -913,10 +911,9 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         client,
         *,
         text="hello",
-        route="chat",
         intent=None,
     ):
-        del route, intent
+        del intent
         core, envelope = admitted_core(
             text, sid="sid-pr7", language="zh-CN"
         )
@@ -994,7 +991,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         coordinator = GoalDrivenRuntimeCoordinator(
             agent_client=client,
             adapter=CanonicalPlanRuntimeAdapter(runtime),
-            policy=CognitiveRuntimePolicy(mode="apply", apply_lanes=frozenset({"chat", "tool"})),
+            policy=CognitiveRuntimePolicy(mode="apply"),
         )
         original_queue = coordinator._queue_social_attention_for_activity
 
@@ -1073,7 +1070,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             adapter=CanonicalPlanRuntimeAdapter(runtime),
             policy=CognitiveRuntimePolicy(
                 mode="apply",
-                apply_lanes=frozenset({"chat"}),
             ),
         )
 
@@ -1153,7 +1149,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             adapter=CanonicalPlanRuntimeAdapter(runtime),
             policy=CognitiveRuntimePolicy(
                 mode="apply",
-                apply_lanes=frozenset({"chat"}),
             ),
             goal_state_apply=manager.apply_goal_association_resolution,
             planner_gap_apply=manager.apply_planner_information_gaps,
@@ -1277,7 +1272,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             adapter=CanonicalPlanRuntimeAdapter(FastAdvanceRuntime()),
             policy=CognitiveRuntimePolicy(
                 mode="apply",
-                apply_lanes=frozenset({"chat"}),
             ),
             planner_gap_apply=record_gaps,
         )
@@ -1439,7 +1433,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             adapter=CanonicalPlanRuntimeAdapter(runtime),
             policy=CognitiveRuntimePolicy(
                 mode="apply",
-                apply_lanes=frozenset({"tool", "chat"}),
             ),
         )
         core, envelope = admitted_core(
@@ -1606,7 +1599,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             adapter=CanonicalPlanRuntimeAdapter(runtime),
             policy=CognitiveRuntimePolicy(
                 mode="apply",
-                apply_lanes=frozenset({"tool", "chat"}),
             ),
         )
         core, envelope = admitted_core(
@@ -1772,7 +1764,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             adapter=CanonicalPlanRuntimeAdapter(runtime),
             policy=CognitiveRuntimePolicy(
                 mode="apply",
-                apply_lanes=frozenset({"tool", "chat"}),
             ),
         )
         core, envelope = admitted_core(
@@ -1855,7 +1846,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         coordinator = GoalDrivenRuntimeCoordinator(
             agent_client=client,
             adapter=CanonicalPlanRuntimeAdapter(runtime),
-            policy=CognitiveRuntimePolicy(mode="apply", apply_lanes=frozenset({"chat", "robot_action"})),
+            policy=CognitiveRuntimePolicy(mode="apply"),
         )
         core, envelope = admitted_core(
             "去那边把水拿回来给我。",
@@ -1944,7 +1935,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
             policy=CognitiveRuntimePolicy(
                 mode="apply",
-                apply_lanes=frozenset({"chat"}),
             ),
             workflow_stage_sink=retain_stage,
         )
@@ -2100,7 +2090,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
             policy=CognitiveRuntimePolicy(
                 mode="apply",
-                apply_lanes=frozenset({"chat"}),
             ),
         )
 
@@ -2188,7 +2177,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             adapter=adapter,
             policy=CognitiveRuntimePolicy(
                 mode="apply",
-                apply_lanes=frozenset({"chat"}),
             ),
             delivered_turn_speech_provider=lambda sid: [
                 {**event, "session_id": sid}
@@ -2323,7 +2311,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         coordinator = GoalDrivenRuntimeCoordinator(
             agent_client=client,
             adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
-            policy=CognitiveRuntimePolicy(mode="apply", apply_lanes=frozenset({"chat"})),
+            policy=CognitiveRuntimePolicy(mode="apply"),
             goal_state_apply=manager.apply_goal_association_resolution,
             planner_gap_apply=manager.apply_planner_information_gaps,
         )
@@ -2395,11 +2383,10 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         coordinator = GoalDrivenRuntimeCoordinator(
             agent_client=client,
             adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
-            policy=CognitiveRuntimePolicy(mode="apply", apply_lanes=frozenset({"chat"})),
+            policy=CognitiveRuntimePolicy(mode="apply"),
         )
         result = self.run_resolution(coordinator, client)
         self.assertEqual(result.status, "applied")
-        self.assertEqual(result.lane, "chat")
         self.assertEqual(result.interaction_response.capabilities, [])
         self.assertEqual(result.interaction_response.speech[0].text, "你好。")
         self.assertEqual(result.metadata["fast_planner_path"], "terminal")
@@ -2489,7 +2476,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             adapter=CanonicalPlanRuntimeAdapter(runtime),
             policy=CognitiveRuntimePolicy(
                 mode="apply",
-                apply_lanes=frozenset({"chat", "robot_action"}),
             ),
         )
 
@@ -2497,11 +2483,9 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             coordinator,
             client,
             text="Blink your eyes.",
-            route="chat",
         )
 
         self.assertEqual(result.status, "applied")
-        self.assertEqual(result.lane, "robot_action")
         self.assertEqual(client.calls[0], "first_response")
         self.assertCountEqual(client.calls[1:3], ["advance", "association"])
         self.assertEqual(client.calls[3:], ["fast"])
@@ -3353,7 +3337,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             adapter=CanonicalPlanRuntimeAdapter(FakeRuntime([blink_definition()])),
             policy=CognitiveRuntimePolicy(
                 mode="apply",
-                apply_lanes=frozenset({"robot_action"}),
             ),
         )
 
@@ -3361,7 +3344,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             coordinator,
             client,
             text="Blink twice and tell me a short joke.",
-            route="robot_action",
         )
 
         self.assertEqual(result.status, "applied")
@@ -3395,12 +3377,12 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             agent_client=client,
             adapter=CanonicalPlanRuntimeAdapter(FakeRuntime([blink_definition()])),
             policy=CognitiveRuntimePolicy(
-                mode="apply", apply_lanes=frozenset({"robot_action"})
+                mode="apply"
             ),
         )
 
         result = self.run_resolution(
-            coordinator, client, text="眨眼。", route="robot_action"
+            coordinator, client, text="眨眼。"
         )
 
         self.assertEqual(result.status, "applied")
@@ -3446,12 +3428,12 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             agent_client=client,
             adapter=CanonicalPlanRuntimeAdapter(FakeRuntime([blink_definition()])),
             policy=CognitiveRuntimePolicy(
-                mode="apply", apply_lanes=frozenset({"robot_action"})
+                mode="apply"
             ),
         )
 
         result = self.run_resolution(
-            coordinator, client, text="眨眼。", route="robot_action"
+            coordinator, client, text="眨眼。"
         )
 
         self.assertEqual(result.status, "error")
@@ -3489,12 +3471,12 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             agent_client=client,
             adapter=CanonicalPlanRuntimeAdapter(FakeRuntime([blink_definition()])),
             policy=CognitiveRuntimePolicy(
-                mode="apply", apply_lanes=frozenset({"robot_action"})
+                mode="apply"
             ),
         )
 
         result = self.run_resolution(
-            coordinator, client, text="眨眼。", route="robot_action"
+            coordinator, client, text="眨眼。"
         )
 
         self.assertEqual(result.status, "error")
@@ -3533,14 +3515,13 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 FakeRuntime([blink_definition(confirmation=True)])
             ),
             policy=CognitiveRuntimePolicy(
-                mode="apply", apply_lanes=frozenset({"robot_action"})
+                mode="apply"
             ),
         )
         result = self.run_resolution(
-            coordinator, client, text="眨眼。", route="robot_action"
+            coordinator, client, text="眨眼。"
         )
         self.assertEqual(result.status, "applied")
-        self.assertEqual(result.lane, "robot_action")
         request = result.interaction_response.capabilities[0]
         self.assertTrue(request.requires_confirmation)
         self.assertEqual(request.args, {"count": 4})
@@ -3581,7 +3562,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             ]
         )
 
-    def test_disabled_apply_lane_fails_closed(self):
+    def test_apply_runtime_does_not_require_semantic_lane_allowlist(self):
         client = ScriptedClient(
             association=body_goal_association(),
             fast_plans=[
@@ -3599,14 +3580,17 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         coordinator = GoalDrivenRuntimeCoordinator(
             agent_client=client,
             adapter=CanonicalPlanRuntimeAdapter(FakeRuntime([blink_definition()])),
-            policy=CognitiveRuntimePolicy(mode="apply", apply_lanes=frozenset({"chat"})),
+            policy=CognitiveRuntimePolicy(mode="apply"),
         )
         result = self.run_resolution(
-            coordinator, client, text="眨眼。", route="robot_action"
+            coordinator, client, text="眨眼。"
         )
-        self.assertEqual(result.status, "error")
-        self.assertEqual(result.fallback_reason, "terminal_plan_lane_not_enabled_for_apply")
-        self.assertIsNone(result.interaction_response)
+        self.assertEqual(result.status, "applied")
+        self.assertIsNotNone(result.interaction_response)
+        self.assertEqual(
+            [item.capability_id for item in result.interaction_response.capabilities],
+            ["soridormi.blink_eyes"],
+        )
 
     def test_single_step_parallel_plan_is_allowed(self):
         plan = execute_plan().model_copy(
@@ -3739,11 +3723,10 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             adapter=CanonicalPlanRuntimeAdapter(FakeRuntime([walk, blink])),
             policy=CognitiveRuntimePolicy(
                 mode="apply",
-                apply_lanes=frozenset({"robot_action"}),
             ),
         )
         result = self.run_resolution(
-            coordinator, client, text="边走边眨眼。", route="robot_action"
+            coordinator, client, text="边走边眨眼。"
         )
         self.assertEqual(result.status, "error")
         self.assertIn(
@@ -3865,7 +3848,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             adapter=CanonicalPlanRuntimeAdapter(runtime),
             policy=CognitiveRuntimePolicy(
                 mode="apply",
-                apply_lanes=frozenset({"chat"}),
             ),
             goal_state_apply=lambda *args, **kwargs: [],
         )

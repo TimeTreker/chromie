@@ -359,18 +359,19 @@ summaries, not durable user-profile memory and not authorization for side
 effects. Fast Goal Interpretation prompts sanitize raw `history` and `conversation` fields
 from their bounded context payload and rely on these compact memory fields
 instead.
-For explicit `memory` routes, Goal Interpretation must return a typed
-`memory_update` proposal. `memory_agent` validates and applies that exact model
-decision, emits an `extracted_memory` entry plus a bounded compatibility
-`user_statement` derived from it, and clarifies when the proposal is missing.
-It never infers memory semantics from raw text. The Orchestrator consumes only
-the refined entry into prompt-facing session memory.
+Durable or session memory is not a Goal Interpretation route. Explicit memory
+changes flow through typed, consent-bound memory proposals and the existing
+Conversation State / memory capability boundary. The Host validates persistence
+scope and explicit-current-turn consent mechanically; no separate memory semantic
+agent or route label owns memory semantics. Retrieved verified tool results remain typed
+Capability/Evidence work and cannot become factual speech without Planner and
+Evidence qualification.
 
-`InteractionResponse` can contain speech items and executable Capability requests; the `skills` container name remains a bounded compatibility surface. Shared
-contracts reject unknown fields and recursively reject low-level motor, joint,
-torque, and actuator fields. Native mode is the Agent default. The response
-metadata includes `interaction_output_mode` (`native`, `legacy-adapter`, or
-`legacy-fallback`) for operator diagnostics. When `AGENT_SOCIAL_ATTENTION_MODE` allows it, the independent
+`InteractionResponse` can contain speech items and executable Capability requests.
+Shared contracts reject unknown fields and recursively reject low-level motor,
+joint, torque, and actuator fields. The maintained response is projected from
+Planner-owned Communicative and Capability Activities; there is no legacy
+response-adapter/fallback mode. When `AGENT_SOCIAL_ATTENTION_MODE` allows it, the independent
 `SocialAttentionPlanner` may attach its advisory `social_attention_plan`. The plan identifies the
 `social_attention` behavior domain, the `auxiliary_expression` role, a social
 purpose, and optional small body behaviors selected from the reviewed catalog.

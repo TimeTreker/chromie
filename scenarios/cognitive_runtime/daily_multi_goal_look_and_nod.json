@@ -16,14 +16,6 @@
   },
   "stub": {
     "mode": "apply",
-    "apply_lanes": [
-      "robot_action"
-    ],
-    "route_decision": {
-      "route": "robot_action",
-      "intent": "multi_goal_social_motion",
-      "language": "zh-CN"
-    },
     "goal_association": {
       "turn_id": "turn-look-nod",
       "new_goals": [
@@ -171,7 +163,6 @@
   },
   "expect": {
     "status": "applied",
-    "lane": "robot_action",
     "planner_tier": "fast",
     "disposition": "execute",
     "coverage": "complete",

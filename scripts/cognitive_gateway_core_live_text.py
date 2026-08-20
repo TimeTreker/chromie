@@ -88,7 +88,6 @@ def _configure_environment(args: argparse.Namespace, output_dir: Path) -> None:
         os.environ.setdefault("ORCH_DISCARD_PLAYBACK_REALTIME", "0")
     os.environ["ORCH_EVENT_LOG_PATH"] = str(output_dir / "session_events.jsonl")
     os.environ["ORCH_COGNITIVE_RUNTIME_MODE"] = "apply"
-    os.environ["ORCH_COGNITIVE_APPLY_LANES"] = "chat,memory,tool"
     os.environ["ORCH_COGNITIVE_EVIDENCE_ENABLED"] = "1"
     os.environ["ORCH_COGNITIVE_EVIDENCE_INCLUDE_TEXT"] = "0"
     os.environ["ORCH_COGNITIVE_EVIDENCE_PATH"] = str(

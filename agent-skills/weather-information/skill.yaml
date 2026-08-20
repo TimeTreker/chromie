@@ -6,21 +6,17 @@ description: Select for weather Goals involving location and time scope, rain, p
 authority: agent_method_only
 execution_authority: none
 owner_approved: true
-content_digest: sha256:e72b3bc2bbbaf1b368882350fdae610520680f2fdbe9d241864b58160468b6cf
+content_digest: sha256:34c7252868ffc3d62a2df98ff662533246b76fefb788b289338b26a73556b812
 extends:
   - chromie.grounded-external-information
 required_capabilities:
   - chromie.weather.lookup
 optional_capabilities:
   - chromie.memory.retrieve_verified_tool_result
-applicable_routes:
-  - tool
-  - chat
 applicable_output_modes:
   - capability_work
 applicable_information_domains:
   - weather_forecast
 projections:
-  goal_association: projections/goal_association.md
   fast_planner: projections/fast_planner.md
   deep_planner: projections/deep_planner.md

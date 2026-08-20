@@ -27,7 +27,6 @@ class CognitiveRuntimeAcceptanceTests(unittest.TestCase):
                 {
                     "mode": "apply",
                     "status": "applied",
-                    "lane": "robot_action",
                     "timings_ms": {"total": 123.4},
                     "interaction": {"capability_ids": ["soridormi.blink_eyes"]},
                 }
@@ -46,7 +45,6 @@ class CognitiveRuntimeAcceptanceTests(unittest.TestCase):
                     "event": "cognitive_runtime_resolution",
                     "mode": "apply",
                     "status": "applied",
-                    "lane": "chat",
                 },
                 {
                     "event": "cognitive_execution_outcome",
@@ -66,7 +64,6 @@ class CognitiveRuntimeAcceptanceTests(unittest.TestCase):
                     {
                         "mode": "apply",
                         "status": "applied",
-                        "lane": "chat",
                         "timings_ms": {"total": 10},
                     }
                 )
@@ -94,7 +91,7 @@ class CognitiveRuntimeAcceptanceTests(unittest.TestCase):
                             "semantic_runtime": {
                                 "path": "goal_driven_cognitive_runtime",
                                 "configured_cognitive_runtime_mode": "apply",
-                                "cognitive_runtime_selected_for_route": True,
+                                "cognitive_runtime_selected": True,
                             },
                         },
                         "cognitive_runtime": {"status": "applied"},
@@ -214,7 +211,7 @@ class CognitiveRuntimeAcceptanceTests(unittest.TestCase):
                             "semantic_runtime": {
                                 "path": "goal_driven_cognitive_runtime",
                                 "configured_cognitive_runtime_mode": "apply",
-                                "cognitive_runtime_selected_for_route": True,
+                                "cognitive_runtime_selected": True,
                             },
                         },
                         "cognitive_runtime": {"status": "applied"},

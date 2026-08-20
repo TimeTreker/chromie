@@ -24,7 +24,6 @@ from scripts.interaction_text_mujoco_check import (
     record_execution_bindings,
     required_speech_delivery_errors,
     safe_idle_errors,
-    should_apply_cognitive_runtime,
     should_require_tts_speech,
     validate_contract,
     validate_speech_contract,
@@ -33,29 +32,6 @@ from scripts.interaction_text_mujoco_check import (
 )
 from shared.chromie_contracts.interaction import InteractionResponse
 from shared.chromie_contracts.reflex import ReflexFilter
-
-
-class _HarnessDecision(BaseModel):
-    """Structural input used only to exercise the retained live-check helpers."""
-
-    model_config = ConfigDict(extra="allow")
-
-    route: str = "chat"
-    routes: list[dict[str, object]] = Field(default_factory=list)
-    agents: list[str] = Field(default_factory=list)
-    intent: str = "unknown"
-    confidence: float = 0.0
-    language: str = "auto"
-    priority: str = "normal"
-    interrupt_current: bool = False
-    needs_agent: bool = True
-    should_speak: bool = True
-    speak_first: str | None = None
-    actions: list[dict[str, object]] = Field(default_factory=list)
-    candidate_capabilities: list[dict[str, object]] = Field(default_factory=list)
-    reason: str | None = None
-    source: str = "fallback"
-    metadata: dict[str, object] = Field(default_factory=dict)
 
 
 class InteractionTextMujocoCheckTests(unittest.TestCase):
@@ -89,8 +65,6 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
                     {
                         "role": "user",
                         "text": text,
-                        "route": "interrupt",
-                        "intent": "stop_media_output",
                         "metadata": {
                             "source": "cognitive_gateway_reflex",
                             "reflex_outcome": outcome.model_dump(mode="json"),
@@ -103,7 +77,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
                 self.sessions.state[sid]["done_logged"] = True
 
         assistant = Assistant()
-        route, response, evidence, errors = asyncio.run(
+        reflex, response, evidence, errors = asyncio.run(
             dispatch_initial_reflex(
                 assistant=assistant,
                 text="停止音乐。",
@@ -118,10 +92,9 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
             [("停止音乐。", "sid-reflex", "text")],
         )
         self.assertEqual(errors, [])
-        self.assertEqual(route["route"], "interrupt")
-        self.assertEqual(route["intent"], "stop_media_output")
-        self.assertEqual(route["source"], "rules")
-        self.assertEqual(route["metadata"]["cancellation_scope"], "media_output")
+        self.assertEqual(reflex["action"], "interrupt")
+        self.assertEqual(reflex["trigger"], "stop_command")
+        self.assertEqual(reflex["cancellation_scope"], "media_output")
         self.assertFalse(response.speech)
         self.assertFalse(response.capabilities)
         self.assertTrue(evidence["goal_interpretation_bypassed"])
@@ -179,7 +152,6 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
                 provenance = collect_run_provenance(
                     manifest=manifest,
                     cognitive_runtime=True,
-                    cognitive_apply_lanes="chat, robot_action",
                     soridormi_repo=soridormi_repo,
                     root=root,
                 )
@@ -205,8 +177,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
             {
                 "path": "goal_driven_cognitive_runtime",
                 "configured_cognitive_runtime_mode": "apply",
-                "cognitive_runtime_selected_for_route": True,
-                "cognitive_apply_lanes": ["chat", "robot_action"],
+                "cognitive_runtime_selected": True,
             },
         )
 
@@ -222,7 +193,6 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
                 provenance = collect_run_provenance(
                     manifest=manifest,
                     cognitive_runtime=True,
-                    cognitive_apply_lanes="chat,robot_action",
                     cognitive_runtime_selected=False,
                     semantic_runtime_path="cognitive_gateway_reflex",
                     root=root,
@@ -230,47 +200,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
 
         semantic = provenance["semantic_runtime"]
         self.assertEqual(semantic["path"], "cognitive_gateway_reflex")
-        self.assertFalse(semantic["cognitive_runtime_selected_for_route"])
-
-    def test_cognitive_runtime_selection_matches_maintained_apply_lanes(self) -> None:
-        robot_route = _HarnessDecision.model_validate(
-            {
-                "route": "robot_action",
-                "intent": "robot_action",
-                "confidence": 0.9,
-                "source": "llm",
-            }
-        )
-        clarify_route = _HarnessDecision.model_validate(
-            {
-                "route": "clarify",
-                "intent": "clarify",
-                "confidence": 0.5,
-                "source": "llm",
-            }
-        )
-
-        self.assertTrue(
-            should_apply_cognitive_runtime(
-                robot_route,
-                enabled=True,
-                apply_lanes="chat,robot_action",
-            )
-        )
-        self.assertTrue(
-            should_apply_cognitive_runtime(
-                clarify_route,
-                enabled=True,
-                apply_lanes="chat,robot_action",
-            )
-        )
-        self.assertFalse(
-            should_apply_cognitive_runtime(
-                robot_route,
-                enabled=False,
-                apply_lanes="chat,robot_action",
-            )
-        )
+        self.assertFalse(semantic["cognitive_runtime_selected"])
 
     def test_voice_mujoco_wrapper_uses_the_canonical_runtime(self) -> None:
         source = (
@@ -298,7 +228,6 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
                 speaker=False,
                 manifest=Path("capabilities/soridormi.json"),
                 cognitive_runtime=True,
-                cognitive_apply_lanes="chat,robot_action",
                 soridormi_mcp_url="http://127.0.0.1:8000/mcp",
                 conversation_id="ga-live-case-one",
             )
@@ -329,7 +258,6 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
                 speaker=False,
                 manifest=Path("capabilities/soridormi.json"),
                 cognitive_runtime=True,
-                cognitive_apply_lanes="chat,robot_action",
                 soridormi_mcp_url="http://127.0.0.1:8000/mcp",
                 conversation_id="ga-live-budget-check",
             )
@@ -348,30 +276,21 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         with self.assertRaises(argparse.ArgumentTypeError):
             parse_expected_arg("vx_mps=0.2")
 
+    @staticmethod
+    def _interpretation(*, confidence: float = 0.99) -> dict[str, object]:
+        return {
+            "confidence": confidence,
+            "responsibilities": [
+                {
+                    "local_ref": "resp-1",
+                    "outcome": "Complete the requested outcome.",
+                    "output_mode": "body_action",
+                }
+            ],
+            "unresolved": [],
+        }
+
     def test_validate_contract_checks_ordered_skills_and_args(self) -> None:
-        route = _HarnessDecision.model_validate(
-            {
-                "route": "robot_action",
-                "intent": "compound_robot_action",
-                "confidence": 0.99,
-                "language": "en-US",
-                "source": "catalog",
-                "actions": [
-                    {
-                        "capability_id": "soridormi.walk_velocity",
-                        "args": {"vx_mps": 0.2, "duration_s": 10.0},
-                    },
-                    {
-                        "capability_id": "soridormi.nod_yes",
-                        "args": {"count": 2},
-                    },
-                    {
-                        "capability_id": "soridormi.turn_in_place",
-                        "args": {"yaw_radps": 0.12},
-                    },
-                ],
-            }
-        )
         response = InteractionResponse.model_validate(
             {
                 "capabilities": [
@@ -385,24 +304,17 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
                         },
                         "timing": "sequential",
                     },
-                    {
-                        "capability_id": "soridormi.nod_yes",
-                        "args": {"count": 2},
-                        "timing": "sequential",
-                    },
+                    {"capability_id": "soridormi.nod_yes", "args": {"count": 2}},
                     {
                         "capability_id": "soridormi.turn_in_place",
                         "args": {"yaw_radps": 0.12},
-                        "timing": "sequential",
                     },
                 ]
             }
         )
-
         errors = validate_contract(
-            route=route,
+            interpretation=self._interpretation(),
             response=response,
-            expected_route=None,
             expected_capabilities=[
                 "soridormi.walk_velocity",
                 "soridormi.nod_yes",
@@ -417,229 +329,103 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
             ],
             arg_tolerance=1e-6,
         )
-
         self.assertEqual(errors, [])
 
-    def test_validate_contract_accepts_agent_skills_when_goal_interpreter_has_no_actions(self) -> None:
-        route = _HarnessDecision.model_validate(
-            {
-                "route": "robot_action",
-                "intent": "robot_action",
-                "confidence": 0.81,
-                "language": "en-US",
-                "source": "llm",
-                "actions": [],
-            }
-        )
+    def test_validate_contract_accepts_planner_capabilities_without_gi_actions(self) -> None:
         response = InteractionResponse.model_validate(
             {
                 "capabilities": [
                     {
                         "capability_id": "soridormi.walk_velocity",
                         "args": {"vx_mps": 0.2, "duration_s": 10.0},
-                        "timing": "sequential",
                     },
-                    {
-                        "capability_id": "soridormi.blink_eyes",
-                        "args": {"count": 2},
-                        "timing": "sequential",
-                    },
+                    {"capability_id": "soridormi.blink_eyes", "args": {"count": 2}},
                 ]
             }
         )
-
         errors = validate_contract(
-            route=route,
+            interpretation=self._interpretation(confidence=0.81),
             response=response,
-            expected_route=None,
-            expected_capabilities=[
-                "soridormi.walk_velocity",
-                "soridormi.blink_eyes",
-            ],
+            expected_capabilities=["soridormi.walk_velocity", "soridormi.blink_eyes"],
             expect_no_capabilities=False,
-            expected_args=[
-                (0, "vx_mps", 0.2),
-                (1, "count", 2),
-            ],
+            expected_args=[(0, "vx_mps", 0.2), (1, "count", 2)],
             arg_tolerance=1e-6,
         )
-
         self.assertEqual(errors, [])
 
     def test_validate_contract_accepts_exact_local_tool_skill(self) -> None:
-        route = _HarnessDecision.model_validate(
-            {
-                "route": "tool",
-                "intent": "weather_lookup",
-                "confidence": 0.99,
-                "language": "en-US",
-                "source": "llm",
-                "actions": [],
-            }
-        )
         response = InteractionResponse.model_validate(
             {
                 "capabilities": [
                     {
                         "capability_id": "chromie.weather.lookup",
-                        "args": {
-                            "location": "chongqing",
-                            "period": "night",
-                        },
-                        "timing": "sequential",
+                        "args": {"location": "chongqing", "period": "night"},
                     }
                 ]
             }
         )
-
         errors = validate_contract(
-            route=route,
+            interpretation=self._interpretation(),
             response=response,
-            expected_route="tool",
             expected_capabilities=["chromie.weather.lookup"],
             expect_no_capabilities=False,
-            expected_args=[
-                (0, "location", "chongqing"),
-                (0, "period", "night"),
-            ],
+            expected_args=[(0, "location", "chongqing"), (0, "period", "night")],
             arg_tolerance=1e-6,
         )
-
         self.assertEqual(errors, [])
 
-    def test_build_debug_summary_describes_route_stages_tasks_and_skills(self) -> None:
-        route = _HarnessDecision.model_validate(
-            {
-                "route": "deep_thought",
-                "intent": "deep_thought_low_confidence",
-                "confidence": 0.0,
-                "language": "en-US",
-                "source": "llm",
-                "candidate_capabilities": [
-                    {"capability_id": "soridormi.walk_velocity"},
-                    {"capability_id": "soridormi.blink_eyes"},
-                ],
-                "metadata": {
-                    "route_stage_outputs": [
-                        {"stage": "emergency_filter", "status": "passed", "tasks": []},
-                        {
-                            "stage": "quick_intent",
-                            "status": "delegated",
-                            "route": "deep_thought",
-                            "intent": "deep_thought_low_confidence",
-                            "tasks": [
-                                {
-                                    "source_stage": "quick_intent",
-                                    "task_type": "cognition.delegate_deep_thought",
-                                    "priority": "normal",
-                                }
-                            ],
-                        },
-                    ],
-                    "task_list": [
-                        {
-                            "source_stage": "quick_intent",
-                            "task_type": "cognition.delegate_deep_thought",
-                            "priority": "normal",
-                        },
-                        {
-                            "source_stage": "deep_thought",
-                            "task_type": "cognition.deep_think",
-                            "priority": "normal",
-                        },
-                    ],
-                    "thinking_ack_allowed": False,
-                },
-            }
-        )
+    def test_build_debug_summary_describes_responsibilities_and_skills(self) -> None:
+        interpretation = {
+            "confidence": 0.87,
+            "responsibilities": [
+                {"outcome": "Walk forward.", "output_mode": "body_action"},
+                {"outcome": "Blink twice.", "output_mode": "body_action"},
+            ],
+            "unresolved": [],
+        }
         response = InteractionResponse.model_validate(
             {
                 "capabilities": [
-                    {
-                        "capability_id": "soridormi.blink_eyes",
-                        "args": {"count": 2},
-                        "timing": "sequential",
-                    }
+                    {"capability_id": "soridormi.blink_eyes", "args": {"count": 2}}
                 ],
-                "speech": [{"text": "Let me think.", "timing": "immediate"}],
+                "speech": [{"text": "Okay.", "timing": "immediate"}],
             }
         )
-
         summary = build_debug_summary(
-            route=route,
+            interpretation=interpretation,
             response=response,
-            errors=["route='deep_thought', expected 'robot_action'"],
+            errors=["example failure"],
         )
-
-        self.assertIn("route=deep_thought", summary["route"])
-        self.assertEqual(
-            summary["candidate_capabilities"],
-            ["soridormi.walk_velocity", "soridormi.blink_eyes"],
-        )
-        self.assertTrue(
-            any("quick_intent:delegated" in item for item in summary["stages"])
-        )
-        self.assertEqual(
-            summary["task_list"],
-            [
-                "0:quick_intent:cognition.delegate_deep_thought priority=normal",
-                "1:deep_thought:cognition.deep_think priority=normal",
-            ],
-        )
+        self.assertIn("responsibilities=2", summary["interpretation"])
+        self.assertEqual(summary["responsibility_outcomes"], ["Walk forward.", "Blink twice."])
         self.assertEqual(summary["capabilities"], ["soridormi.blink_eyes"])
         self.assertEqual(summary["speech_items"], 1)
-        self.assertEqual(len(summary["errors"]), 1)
+        self.assertEqual(summary["errors"], ["example failure"])
 
-    def test_validate_contract_reports_mismatch(self) -> None:
-        route = _HarnessDecision.model_validate(
-            {
-                "route": "chat",
-                "intent": "general_conversation",
-                "confidence": 0.5,
-                "language": "en-US",
-                "source": "fallback",
-            }
-        )
-        response = InteractionResponse()
-
+    def test_validate_contract_reports_capability_and_argument_mismatch(self) -> None:
         errors = validate_contract(
-            route=route,
-            response=response,
-            expected_route=None,
+            interpretation=self._interpretation(confidence=0.5),
+            response=InteractionResponse(),
             expected_capabilities=["soridormi.walk_velocity"],
             expect_no_capabilities=False,
             expected_args=[(0, "vx_mps", 0.2)],
             arg_tolerance=1e-6,
         )
-
-        self.assertGreaterEqual(len(errors), 3)
-        self.assertTrue(any("route=" in item for item in errors))
+        self.assertGreaterEqual(len(errors), 2)
         self.assertTrue(any("interaction capabilities mismatch" in item for item in errors))
 
-    def test_validate_contract_accepts_chat_without_soridormi_skills(self) -> None:
-        route = _HarnessDecision.model_validate(
-            {
-                "route": "chat",
-                "intent": "general_conversation",
-                "confidence": 0.91,
-                "language": "en-US",
-                "source": "llm",
-            }
-        )
+    def test_validate_contract_accepts_conversation_without_execution_capabilities(self) -> None:
         response = InteractionResponse.model_validate(
-            {"speech": [{"text": "Here is a short song.", "timing": "immediate"}]}
+            {"speech": [{"text": "Here is a short answer.", "timing": "immediate"}]}
         )
-
         errors = validate_contract(
-            route=route,
+            interpretation=self._interpretation(confidence=0.91),
             response=response,
-            expected_route="chat",
             expected_capabilities=[],
             expect_no_capabilities=True,
             expected_args=[],
             arg_tolerance=1e-6,
         )
-
         self.assertEqual(errors, [])
 
     def test_validate_speech_contract_rejects_internal_planner_leakage(self) -> None:
@@ -705,34 +491,9 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
             4,
         )
 
-    def test_tts_speech_requirement_skips_interrupt_routes(self) -> None:
-        route = _HarnessDecision.model_validate(
-            {
-                "route": "interrupt",
-                "intent": "stop_current_output",
-                "confidence": 0.99,
-                "language": "en-US",
-                "source": "rules",
-                "should_speak": False,
-            }
-        )
-
-        self.assertFalse(should_require_tts_speech(route, require_speech=True))
-
-    def test_tts_speech_requirement_keeps_normal_speech_routes(self) -> None:
-        route = _HarnessDecision.model_validate(
-            {
-                "route": "chat",
-                "intent": "general_conversation",
-                "confidence": 0.91,
-                "language": "en-US",
-                "source": "llm",
-                "should_speak": True,
-            }
-        )
-
-        self.assertTrue(should_require_tts_speech(route, require_speech=True))
-        self.assertFalse(should_require_tts_speech(route, require_speech=False))
+    def test_tts_speech_requirement_is_explicit_harness_policy(self) -> None:
+        self.assertTrue(should_require_tts_speech(require_speech=True))
+        self.assertFalse(should_require_tts_speech(require_speech=False))
 
     def test_required_speech_delivery_rejects_skipped_undelivered_speech(self) -> None:
         errors = required_speech_delivery_errors(

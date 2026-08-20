@@ -63,8 +63,8 @@ class ScriptedOllama:
 class FakeCatalog:
     def __init__(self):
         self.items = [
-            CatalogCapability(capability_id="soridormi.blink_eyes", agent_id="capability_agent", description="Blink eyes", input_schema={"type":"object","properties":{"count":{"type":"integer","minimum":1,"maximum":10}},"required":["count"]}, route="robot_action", available=True, interaction_executable=True, prompt_tier="common"),
-            CatalogCapability(capability_id="soridormi.walk_forward", agent_id="capability_agent", description="Walk forward", input_schema={"type":"object","properties":{"duration_s":{"type":"number","minimum":0.1}},"required":["duration_s"]}, route="robot_action", available=True, interaction_executable=True, prompt_tier="common"),
+            CatalogCapability(capability_id="soridormi.blink_eyes", agent_id="capability_agent", description="Blink eyes", input_schema={"type":"object","properties":{"count":{"type":"integer","minimum":1,"maximum":10}},"required":["count"]}, effects=["physical_motion"], available=True, interaction_executable=True, prompt_tier="common"),
+            CatalogCapability(capability_id="soridormi.walk_forward", agent_id="capability_agent", description="Walk forward", input_schema={"type":"object","properties":{"duration_s":{"type":"number","minimum":0.1}},"required":["duration_s"]}, effects=["physical_motion"], available=True, interaction_executable=True, prompt_tier="common"),
             CatalogCapability(
                 capability_id="soridormi.walk_velocity",
                 agent_id="capability_agent",
@@ -79,12 +79,12 @@ class FakeCatalog:
                     },
                     "required": ["vx_mps", "duration_s"],
                 },
-                route="robot_action",
+                effects=["physical_motion"],
                 available=True,
                 interaction_executable=True,
                 prompt_tier="common",
             ),
-            CatalogCapability(capability_id="chromie.speak", agent_id="capability_agent", description="Speak text", input_schema={"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}, route="chat", available=True, interaction_executable=True, prompt_tier="common"),
+            CatalogCapability(capability_id="chromie.speak", agent_id="capability_agent", description="Speak text", input_schema={"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}, available=True, interaction_executable=True, prompt_tier="common"),
         ]
 
     async def prompt_entries(self, **kwargs):
@@ -113,7 +113,6 @@ class WeatherCatalog(FakeCatalog):
                     "required": ["location"],
                     "additionalProperties": False,
                 },
-                route="tool",
                 available=True,
                 interaction_executable=True,
                 prompt_tier="common",
@@ -122,7 +121,13 @@ class WeatherCatalog(FakeCatalog):
                 resource_claims=(),
                 effects=(),
                 safety_class="safe_read",
-                hints={"side_effect_free": True},
+                hints={
+                    "side_effect_free": True,
+                    "semantic_scope": {
+                        "responsibility_type": "acquire_and_deliver_resource",
+                        "resource_kinds": ["information"],
+                    },
+                },
             )
         )
 
@@ -137,7 +142,6 @@ class GranularResourceCatalog(FakeCatalog):
                     agent_id="capability_agent",
                     description="Acquire a physical resource.",
                     input_schema={"type": "object", "properties": {}},
-                    route="robot_action",
                     available=True,
                     interaction_executable=True,
                     prompt_tier="common",
@@ -158,7 +162,6 @@ class GranularResourceCatalog(FakeCatalog):
                     agent_id="capability_agent",
                     description="Deliver an acquired physical resource.",
                     input_schema={"type": "object", "properties": {}},
-                    route="robot_action",
                     available=True,
                     interaction_executable=True,
                     prompt_tier="common",
@@ -200,7 +203,7 @@ class CompleteResourceCatalog(FakeCatalog):
                     "required": ["resource", "source", "recipient"],
                     "additionalProperties": False,
                 },
-                route="robot_action",
+                effects=["physical_motion"],
                 available=True,
                 interaction_executable=True,
                 prompt_tier="common",
@@ -254,7 +257,7 @@ def _work_request(**kwargs):
         context=context,
     )
 
-def request(text: str, route="robot_action", *, goal_ids=None, goal_metadata=None):
+def request(text: str, *, goal_ids=None, goal_metadata=None):
     goal_ids = list(goal_ids or [])
     new_goals = [
         {
@@ -424,7 +427,6 @@ def retained_weather_followup_fixture() -> tuple[dict, AgentRunRequest]:
     }
     planner_request = request(
         "那我出门需要带伞吗？",
-        route="chat",
         goal_ids=[],
     )
     context = dict(planner_request.context)
@@ -1313,7 +1315,6 @@ class FastPlannerResolverTests(unittest.TestCase):
         }
         planner_request = request(
             "今晚重庆会不会下雨？",
-            route="tool",
             goal_ids=["goal-weather"],
             goal_metadata={"responsibility_kind": "capability_dependent"},
         )
@@ -1386,7 +1387,6 @@ class FastPlannerResolverTests(unittest.TestCase):
         }
         planner_request = request(
             "今晚重庆会不会下雨？",
-            route="tool",
             goal_ids=["goal-weather"],
             goal_metadata={"responsibility_kind": "capability_dependent"},
         )
@@ -2265,7 +2265,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                             },
                             "additionalProperties": False,
                         },
-                        route="robot_action",
+                        effects=["physical_motion"],
                         available=True,
                         interaction_executable=True,
                         prompt_tier="common",
@@ -4518,7 +4518,6 @@ class FastPlannerResolverTests(unittest.TestCase):
             FastPlannerResolver(ollama, FakeCatalog()).resolve(
                 request(
                     "Blink twice.",
-                    route="chat",
                     goal_ids=["goal-blink"],
                     goal_metadata={
                         "responsibility_kind": "executable_action",
@@ -4566,7 +4565,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             },
             goal_satisfaction=exact_satisfaction(["goal-greet"]),
         )
-        plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("你好。", route="chat", goal_ids=["goal-greet"], goal_metadata={"responsibility_kind": "vocal_output", "output_mode": "speech", "provider_required": False})))
+        plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("你好。", goal_ids=["goal-greet"], goal_metadata={"responsibility_kind": "vocal_output", "output_mode": "speech", "provider_required": False})))
         self.assertEqual(plan.disposition, "respond")
         self.assertEqual(plan.steps, [])
 
@@ -4762,7 +4761,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         ollama = FakeOllama(raw)
         plan = asyncio.run(
             FastPlannerResolver(ollama, FakeCatalog()).resolve(
-                request("Hello.", route="chat", goal_ids=["goal-greet"], goal_metadata={"responsibility_kind": "vocal_output", "output_mode": "speech", "provider_required": False})
+                request("Hello.", goal_ids=["goal-greet"], goal_metadata={"responsibility_kind": "vocal_output", "output_mode": "speech", "provider_required": False})
             )
         )
         self.assertEqual(plan.disposition, "respond")
@@ -5419,7 +5418,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "required": ["location"],
                     "additionalProperties": False,
                 },
-                route="tool",
                 available=True,
                 interaction_executable=True,
                 prompt_tier="common",
@@ -5439,7 +5437,6 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         run_request = request(
             "今天晚上重庆天气怎么样？",
-            route="tool",
             goal_ids=[goal_id],
             goal_metadata={
                 "responsibility_kind": "capability_dependent",
@@ -5827,10 +5824,15 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "required": ["evidence_id", "tool_id", "material_args"],
                     "additionalProperties": False,
                 },
-                route="tool",
                 available=True,
                 interaction_executable=True,
                 prompt_tier="common",
+                hints={
+                    "semantic_scope": {
+                        "responsibility_type": "acquire_and_deliver_resource",
+                        "resource_kinds": ["information"],
+                    }
+                },
             )
         )
         step = execute_step(
@@ -5874,7 +5876,6 @@ class FastPlannerResolverTests(unittest.TestCase):
         ollama = ScriptedOllama([invalid, repaired])
         run_request = request(
             "刚才那个天气结果，简单告诉我现在有没有下雨。",
-            route="tool",
             goal_ids=["goal-weather"],
         )
         goal = run_request.context["goal_association_resolution"]["new_goals"][0]
@@ -6148,7 +6149,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 goal_satisfaction=exact_satisfaction(["goal-greet"]),
             )
         )
-        planner_request = request("你好。", route="chat", goal_ids=["goal-greet"], goal_metadata={"responsibility_kind": "vocal_output", "output_mode": "speech", "provider_required": False})
+        planner_request = request("你好。", goal_ids=["goal-greet"], goal_metadata={"responsibility_kind": "vocal_output", "output_mode": "speech", "provider_required": False})
         context = dict(planner_request.context)
         context["history"] = [
             {
@@ -6188,7 +6189,6 @@ class FastPlannerResolverTests(unittest.TestCase):
         })
         planner_request = request(
             "是得赶紧走啊。",
-            route="chat",
             goal_ids=["goal-reaction"],
         )
         context = dict(planner_request.context)
@@ -6237,7 +6237,6 @@ class FastPlannerResolverTests(unittest.TestCase):
         ollama = ScriptedOllama([primary])
         planner_request = request(
             "那我出门需要带伞吗？",
-            route="chat",
             goal_ids=[],
         )
         context = dict(planner_request.context)
@@ -6427,7 +6426,7 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         plan = asyncio.run(
             FastPlannerResolver(ollama, FakeCatalog()).resolve(
-                request("Tell me a short joke.", route="chat", goal_ids=["goal-joke"], goal_metadata={"responsibility_kind": "vocal_output", "output_mode": "speech", "provider_required": False})
+                request("Tell me a short joke.", goal_ids=["goal-joke"], goal_metadata={"responsibility_kind": "vocal_output", "output_mode": "speech", "provider_required": False})
             )
         )
 

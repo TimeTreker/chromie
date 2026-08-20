@@ -77,10 +77,6 @@ from orchestrator.runtime.cognitive_gateway import (
 from orchestrator.runtime.evidence_identity import (
     load_runtime_evidence_identity,
 )
-from orchestrator.runtime.fast_first_audio import (
-    CachedFastFirstAudio,
-    FastFirstAudioCache,
-)
 from orchestrator.runtime.host_components import (
     build_agent_client,
     build_host_support,
@@ -230,50 +226,6 @@ class VoiceAssistant:
         self.addressedness_engagement_timeout_s = (
             session_settings.addressedness_engagement_timeout_s
         )
-        self.fast_first_response_enabled = (
-            cognition_settings.fast_first_response_enabled
-        )
-        self.fast_first_audio_enabled = playback_settings.fast_audio_enabled
-        self.fast_first_audio_hedge_ms = playback_settings.fast_audio_hedge_ms
-        self.fast_first_audio_prime_on_startup = (
-            playback_settings.fast_audio_prime_on_startup
-        )
-        self.fast_first_audio_prime_timeout_ms = (
-            playback_settings.fast_audio_prime_timeout_ms
-        )
-        self.fast_first_audio_content_gate_enabled = (
-            playback_settings.fast_audio_content_gate_enabled
-        )
-        self.fast_first_audio_max_cue_seconds = (
-            playback_settings.fast_audio_max_cue_seconds
-        )
-        self.fast_first_audio_transcript_min_similarity = (
-            playback_settings.fast_audio_transcript_min_similarity
-        )
-        self.fast_first_audio_generation_attempts = (
-            playback_settings.fast_audio_generation_attempts
-        )
-        self.fast_first_audio_cache = FastFirstAudioCache(
-            playback_settings.fast_audio_cache_dir,
-            enabled=(
-                self.fast_first_response_enabled
-                and self.fast_first_audio_enabled
-            ),
-            prime_on_startup=self.fast_first_audio_prime_on_startup,
-            request_timeout_s=min(
-                30.0,
-                self.fast_first_audio_prime_timeout_ms / 1000.0,
-            ),
-            content_validation_enabled=self.fast_first_audio_content_gate_enabled,
-            max_cue_seconds=self.fast_first_audio_max_cue_seconds,
-            transcript_min_similarity=min(
-                1.0,
-                self.fast_first_audio_transcript_min_similarity,
-            ),
-            generation_attempts=self.fast_first_audio_generation_attempts,
-            cache_revision=playback_settings.fast_audio_cache_revision,
-        )
-
         self.fast_planner_mode = cognition_settings.fast_planner_mode
         self.fast_planner_timeout_ms = cognition_settings.fast_planner_timeout_ms
         self.deep_planner_mode = cognition_settings.deep_planner_mode
@@ -283,7 +235,6 @@ class VoiceAssistant:
             cognition_settings.goal_association_timeout_ms
         )
         self.cognitive_runtime_mode = cognition_settings.runtime_mode
-        self.cognitive_apply_lanes = cognition_settings.apply_lanes
         self.cognitive_runtime_timeout_ms = cognition_settings.runtime_timeout_ms
         self.cognitive_evidence_enabled = evidence_settings.cognitive_enabled
         self.cognitive_evidence_include_text = (
@@ -472,13 +423,12 @@ class VoiceAssistant:
             self.discard_playback_realtime,
         )
         logger.info(
-            "Control plane: cognitive_gateway=embedded cognitive_core=%s enabled=%s action_url=%s dry_run=%s cognitive_runtime_mode=%s cognitive_apply_lanes=%s",
+            "Control plane: cognitive_gateway=embedded cognitive_core=%s enabled=%s action_url=%s dry_run=%s cognitive_runtime_mode=%s",
             self.agent_url,
             self.enable_agent,
             self.action_executor_url,
             self.action_dry_run,
             self.cognitive_runtime_mode,
-            ",".join(sorted(self.cognitive_apply_lanes)) or "none",
         )
 
         self.target_asr_rate = 16000
@@ -515,7 +465,6 @@ class VoiceAssistant:
         self.interaction_runtime = build_interaction_runtime(self, self.host_settings, interaction_ledger=host_support.interaction_ledger)
         self.cognitive_runtime_policy = CognitiveRuntimePolicy(
             mode=self.cognitive_runtime_mode,
-            apply_lanes=self.cognitive_apply_lanes,
             max_total_ms=self.cognitive_runtime_timeout_ms,
             goal_association_timeout_ms=self.goal_association_timeout_ms,
             fast_planner_timeout_ms=self.fast_planner_timeout_ms,
@@ -551,19 +500,10 @@ class VoiceAssistant:
             workflow_stage_sink=host_support.sessions.record_cognitive_stage,
         )
         logger.info(
-            "Interaction runtime: endpoint=%s soridormi_skills=%s "
-            "confirmation_ttl_s=%.1f fast_first_response=%s "
-            "fast_first_audio=%s hedge_ms=%s "
-            "cache_dir=%s prime_on_startup=%s prime_timeout_ms=%s",
+            "Interaction runtime: endpoint=%s soridormi_skills=%s confirmation_ttl_s=%.1f",
             self.enable_interaction_response,
             self.enable_soridormi_capabilities,
             self.confirmation_dialogue.ttl_s,
-            self.fast_first_response_enabled,
-            self.fast_first_audio_cache.enabled,
-            self.fast_first_audio_hedge_ms,
-            self.fast_first_audio_cache.cache_dir,
-            self.fast_first_audio_prime_on_startup,
-            self.fast_first_audio_prime_timeout_ms,
         )
 
     @property
@@ -2315,10 +2255,17 @@ class VoiceAssistant:
         for turn in history:
             if not isinstance(turn, dict):
                 continue
-            # Ambient speech is recorded for traceability, but accepting it as
-            # a conversation turn would make the next ambient fragment look
-            # actively addressed for the whole engagement window.
-            if str(turn.get("route") or "").strip().casefold() == "ignore":
+            role = str(turn.get("role") or "").strip().casefold()
+            metadata = turn.get("metadata")
+            metadata = metadata if isinstance(metadata, dict) else {}
+            # Gateway-suppressed room speech remains bounded evidence, but it is
+            # not conversational evidence and must not open the follow-up window.
+            # Admitted user turns publish this fact explicitly at the Gateway ->
+            # conversation boundary. Assistant turns are user-facing dialogue by
+            # construction and may extend the exchange after a slow response.
+            if role == "user" and metadata.get("accepted_dialogue_evidence") is not True:
+                continue
+            if role not in {"user", "assistant"}:
                 continue
             try:
                 last_exchange_ms = max(
@@ -2582,7 +2529,6 @@ class VoiceAssistant:
         return {
             "mode": resolution.mode,
             "status": resolution.status,
-            "lane": resolution.lane,
             "interaction_response_constructed": interaction is not None,
             "provider_request_count": (
                 len(interaction.capabilities) if interaction is not None else 0
@@ -2680,7 +2626,6 @@ class VoiceAssistant:
             resolution = CognitiveRuntimeResolution(
                 mode=self.cognitive_runtime_mode,
                 status="error",
-                lane="unsupported",
                 timings_ms={"total": round(now_ms() - started_ms, 1)},
                 fallback_reason="missing_admitted_user_turn_envelope",
                 metadata={
@@ -2745,7 +2690,6 @@ class VoiceAssistant:
             resolution = CognitiveRuntimeResolution(
                 mode=self.cognitive_runtime_mode,
                 status=status,
-                lane="unsupported",
                 turn_envelope=turn_envelope,
                 timings_ms={"total": round(now_ms() - started_ms, 1)},
                 fallback_reason=f"{type(exc).__name__}: {str(exc)[:500]}",
@@ -2785,12 +2729,11 @@ class VoiceAssistant:
         )
         self.session_log(
             session_id,
-            "cognitive_runtime_done: mode=%s status=%s lane=%s total_ms=%.1f "
+            "cognitive_runtime_done: mode=%s status=%s total_ms=%.1f "
             "planner=%s disposition=%s steps=%s failure_stage=%s failure_class=%s "
             "architecture_attribution=%s fallback=%s",
             resolution.mode,
             resolution.status,
-            resolution.lane,
             float(resolution.timings_ms.get("total", now_ms() - started_ms)),
             terminal.planner_tier if terminal is not None else "none",
             terminal.disposition if terminal is not None else "none",
@@ -3469,10 +3412,10 @@ class VoiceAssistant:
         if reflex_outcome.action == "interrupt":
             self.session_log(
                 session_id,
-                "cognitive_gateway_reflex_detected: action=%s trigger=%s intent=%s confidence=%.2f",
+                "cognitive_gateway_reflex_detected: action=%s trigger=%s scope=%s confidence=%.2f",
                 reflex_outcome.action,
                 reflex_outcome.trigger,
-                reflex_outcome.intent,
+                reflex_outcome.cancellation_scope,
                 reflex_outcome.confidence,
             )
             revoked_confirmation = self._revoke_pending_confirmation_for_reflex(
@@ -5288,25 +5231,6 @@ class VoiceAssistant:
         return delivery_status
 
     @staticmethod
-    def _execution_outcome_route(
-        source_response: InteractionResponse,
-        plan: Any,
-    ) -> str:
-        metadata = (
-            source_response.metadata
-            if isinstance(source_response.metadata, dict)
-            else {}
-        )
-        for key in ("source_route", "route"):
-            value = str(metadata.get(key) or "").strip()
-            if value in {"tool", "robot_action", "memory"}:
-                return value
-        capability_ids = [str(step.capability_id or "") for step in getattr(plan, "steps", [])]
-        if any(capability_id.startswith("soridormi.") for capability_id in capability_ids):
-            return "robot_action"
-        return "tool"
-
-    @staticmethod
     def _execution_outcome_user_text(
         source_response: InteractionResponse,
         plan: Any,
@@ -7090,39 +7014,6 @@ class VoiceAssistant:
     async def _session_idle_sweeper(self) -> None:
         return await input_session_runtime_for(self)._session_idle_sweeper()
 
-    async def _prime_fast_first_audio(self) -> dict[str, int]:
-        fast_first_cache = getattr(self, "fast_first_audio_cache", None)
-        if fast_first_cache is None or not fast_first_cache.enabled:
-            return {"loaded": 0, "generated": 0, "failed": 0}
-        prime_started_ms = now_ms()
-        try:
-            stats = await asyncio.wait_for(
-                fast_first_cache.prime_missing(
-                    tts_url=self.tts_url,
-                    speaker_id=self.speaker_id,
-                    asr_url=self.asr_url,
-                    asr_sample_rate=self.target_asr_rate,
-                ),
-                timeout=self.fast_first_audio_prime_timeout_ms / 1000.0,
-            )
-        except asyncio.TimeoutError:
-            stats = {"loaded": fast_first_cache.ready_count, "generated": 0, "failed": 1}
-            logger.warning(
-                "Fast-first audio cache priming exceeded total timeout_ms=%s; "
-                "continuing with ready=%s",
-                self.fast_first_audio_prime_timeout_ms,
-                fast_first_cache.ready_count,
-            )
-        logger.info(
-            "Fast-first audio cache ready=%s loaded=%s generated=%s failed=%s ms=%.1f",
-            fast_first_cache.ready_count,
-            stats.get("loaded", 0),
-            stats.get("generated", 0),
-            stats.get("failed", 0),
-            now_ms() - prime_started_ms,
-        )
-        return stats
-
     @staticmethod
     def _spoken_text_response_schema(
         *,
@@ -7497,7 +7388,6 @@ class VoiceAssistant:
             enable_agent=self.enable_agent,
         )
         self.asr_ws = await gate.wait_until_ready()
-        await self._prime_fast_first_audio()
         self.playback_task = asyncio.create_task(self.playback_worker())
         if any(
             self._uses_followed_system_default(kind)

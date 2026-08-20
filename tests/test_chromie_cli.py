@@ -107,8 +107,8 @@ class ChromieCliTests(unittest.TestCase):
                             "timestamp_utc": "2026-06-27T00:00:01+00:00",
                             "sid": "sid-1",
                             "elapsed_ms": 100.0,
-                            "event": "goal_interpretation_done",
-                            "message": "goal_interpretation_done: route=chat confidence=0.91",
+                            "event": "cognitive_core_done",
+                            "message": "cognitive_core_done: core_ms=50.0 responsibilities=1 confidence=0.91 unresolved=0 authority=authoritative",
                         },
                         {
                             "timestamp_utc": "2026-06-27T00:00:02+00:00",
@@ -138,7 +138,7 @@ class ChromieCliTests(unittest.TestCase):
         self.assertEqual(artifact["kind"], "session_events_jsonl")
         self.assertEqual(artifact["identifiers"]["session"], ["sid-1", "sid-2"])
         messages = [record["message"] for record in artifact["records"]]
-        self.assertIn("goal_interpretation_done: route=chat confidence=0.91", messages)
+        self.assertTrue(any("cognitive_core_done:" in message for message in messages))
         self.assertEqual(stderr, "")
 
     def test_trace_view_adds_bounded_jsonl_event_timeline(self) -> None:
@@ -159,9 +159,9 @@ class ChromieCliTests(unittest.TestCase):
                         {
                             "sid": "sid-timeline",
                             "elapsed_ms": 110.0,
-                            "event": "goal_interpretation_done",
+                            "event": "cognitive_gateway_reflex_applied",
                             "status": "ok",
-                            "message": "goal_interpretation_done: route=interrupt intent=stop_current_output",
+                            "message": "cognitive_gateway_reflex_applied: action=interrupt trigger=stop_command goal_interpretation_bypassed=True",
                         },
                         {
                             "sid": "sid-timeline",
@@ -205,7 +205,7 @@ class ChromieCliTests(unittest.TestCase):
         self.assertEqual(timeline["record_count"], 4)
         self.assertEqual(
             timeline["events"],
-            ["session_start", "goal_interpretation_done", "capability_runtime_done"],
+            ["session_start", "cognitive_gateway_reflex_applied", "capability_runtime_done"],
         )
         self.assertEqual(timeline["event_counts"]["session_start"], 1)
         self.assertEqual(timeline["status_counts"], {"ok": 2, "cancelled": 1})
@@ -247,10 +247,10 @@ class ChromieCliTests(unittest.TestCase):
                     {
                         "id": "n2",
                         "index": 2,
-                        "event": "goal_interpretation_done",
+                        "event": "cognitive_core_done",
                         "elapsed_ms": 420.0,
                         "delta_from_previous_ms": 300.0,
-                        "message": "goal_interpretation_done: route=robot_action",
+                        "message": "cognitive_core_done: core_ms=300.0 responsibilities=1 confidence=0.95 unresolved=0 authority=authoritative",
                     },
                     {
                         "id": "n3",
@@ -387,34 +387,27 @@ class ChromieCliTests(unittest.TestCase):
                             "queued_tts": 1,
                             "large_nested": {"unneeded": "details"},
                         },
-                        "route": {
-                            "route": "robot_action",
-                            "intent": "capability:soridormi.walk_velocity",
-                            "confidence": 0.99,
-                            "source": "catalog",
-                            "actions": [
-                                {
-                                    "capability_id": "soridormi.walk_velocity",
-                                    "sequence": 0,
-                                    "timing": "sequential",
-                                    "args": {"duration_s": 15, "vx_mps": 0.2},
-                                }
-                            ],
-                            "candidate_capabilities": [
-                                {
-                                    "capability_id": "soridormi.walk_velocity",
-                                    "description": long_description,
-                                    "input_schema": {"properties": {"vx_mps": {"type": "number"}}},
-                                },
-                                {
-                                    "capability_id": "soridormi.nod_yes",
-                                    "description": "Nod yes.",
-                                },
-                                {
-                                    "capability_id": "soridormi.turn_in_place",
-                                    "description": "Turn.",
-                                },
-                            ],
+                        "cognitive_runtime": {
+                            "goal_association": {
+                                "new_goals": [
+                                    {
+                                        "goal_id": "goal-walk",
+                                        "description": "Walk forward for fifteen seconds.",
+                                    }
+                                ]
+                            },
+                            "terminal_plan": {
+                                "plan_id": "plan-walk",
+                                "goal_ids": ["goal-walk"],
+                                "steps": [
+                                    {
+                                        "step_id": "step-walk",
+                                        "capability_id": "soridormi.walk_velocity",
+                                        "args": {"duration_s": 15, "vx_mps": 0.2},
+                                        "source_goal_ids": ["goal-walk"],
+                                    }
+                                ],
+                            },
                         },
                         "interaction_response": {
                             "interaction_id": "interaction-real",
@@ -435,7 +428,7 @@ class ChromieCliTests(unittest.TestCase):
                                     "args": {"duration_s": 15, "vx_mps": 0.2},
                                 }
                             ],
-                            "metadata": {"trace": ["capability_agent accepted"]},
+                            "metadata": {"goal_ids": ["goal-walk"]},
                         },
                         "execution": {
                             "interaction_id": "interaction-real",
@@ -470,13 +463,7 @@ class ChromieCliTests(unittest.TestCase):
         payload = json.loads(stdout)
         artifact = payload["details"]["artifacts"][0]
         summary = artifact["summary"]
-        self.assertEqual(summary["route"]["route"], "robot_action")
-        self.assertEqual(summary["route"]["candidate_count"], 3)
-        self.assertEqual(
-            summary["route"]["candidate_capability_ids"],
-            ["soridormi.walk_velocity", "soridormi.nod_yes"],
-        )
-        self.assertNotIn("candidate_capabilities", summary["route"])
+        self.assertNotIn("route", summary)
         self.assertEqual(summary["interaction_response"]["capability_count"], 1)
         self.assertEqual(summary["session_state"]["done_logged"], True)
         self.assertNotIn(long_description, stdout)

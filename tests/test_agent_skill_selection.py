@@ -214,51 +214,6 @@ class AgentSkillSelectionTests(unittest.TestCase):
             branch["else"]["properties"]["selected_agent_skills"]["maxItems"],
             0,
         )
-    def test_goal_association_without_current_goals_is_model_authored_no_skill(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            self._write_package(
-                root,
-                "weather-information",
-                projections=("goal_association",),
-            )
-            model = ScriptedModel(
-                [
-                    {
-                        "decision": "no_skill",
-                        "selected_agent_skills": [],
-                        "confidence": 0.96,
-                        "reason_summary": (
-                            "Establish the current Goal before selecting a domain method."
-                        ),
-                    }
-                ]
-            )
-            request = AgentSkillSelectionRequest(
-                sid="sid-selection",
-                turn_id="turn-location-only",
-                agent_role="goal_association",
-                text="我在重庆两江新区龙兴天街。",
-                language="zh-CN",
-                goals=[],
-                context_summary=["route=chat", "intent=user_statement"],
-            )
-
-            result = asyncio.run(
-                AgentSkillSelectionService(model, self._registry(root)).select(request)
-            )
-
-        self.assertEqual(result.decision, "no_skill")
-        self.assertEqual(result.status, "no_skill")
-        self.assertIn("Establish the current Goal", result.reason_summary)
-        self.assertEqual(len(model.prompts), 1)
-        prompt = json.loads(model.prompts[0][0])
-        self.assertEqual(prompt["goals"], [])
-        self.assertEqual(
-            [item["agent_skill_id"] for item in prompt["candidate_agent_skills"]],
-            ["chromie.weather-information"],
-        )
-
     def test_empty_registry_returns_no_candidates_without_model_call(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             registry = self._registry(Path(temp_dir))

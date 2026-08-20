@@ -311,7 +311,6 @@ def validate_operator_mode(
         "ORCH_ENABLE_INTERACTION_RESPONSE",
         "ORCH_ENABLE_SORIDORMI_CAPABILITIES",
         "ORCH_COGNITIVE_RUNTIME_MODE",
-        "ORCH_COGNITIVE_APPLY_LANES",
         "ORCH_ACTION_DRY_RUN",
     }
     missing = sorted(required - set(mode))
@@ -323,28 +322,7 @@ def validate_operator_mode(
         raise ConfigurationError(
             f"operator mode {mode_name} must use ORCH_COGNITIVE_RUNTIME_MODE=apply"
         )
-        raise ConfigurationError(
-            f"operator mode {mode_name} cannot enable legacy direct-LLM fallback"
-        )
-    lanes = {
-        item.strip()
-        for item in mode["ORCH_COGNITIVE_APPLY_LANES"].split(",")
-        if item.strip()
-    }
-    if not {"chat", "tool"}.issubset(lanes):
-        raise ConfigurationError(
-            f"operator mode {mode_name} must retain chat and tool apply lanes"
-        )
-    soridormi_enabled = enabled(mode.get("ORCH_ENABLE_SORIDORMI_CAPABILITIES"))
-    if "robot_action" in lanes and not soridormi_enabled:
-        raise ConfigurationError(
-            f"operator mode {mode_name} cannot enable robot_action without "
-            "ORCH_ENABLE_SORIDORMI_CAPABILITIES=1"
-        )
-    if soridormi_enabled and "robot_action" not in lanes:
-        raise ConfigurationError(
-            f"operator mode {mode_name} enables Soridormi but omits robot_action"
-        )
+
 
 
 def resolve_validation_profile(local: Mapping[str, str]) -> str:

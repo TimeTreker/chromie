@@ -666,7 +666,6 @@ def verify(
             requires_runtime = any(
                 key in expectation
                 for key in (
-                    "runtime_lane",
                     "required_agent_skill_ids",
                     "required_capability_ids",
                     "forbidden_capability_ids",
@@ -689,11 +688,6 @@ def verify(
             _record_new_goal_bindings(runtime_event, goal_binding_registry)
             if runtime_event.get("run_identity", {}).get("identity_sha256") != identity_digest:
                 errors.append(f"{label}: runtime event identity does not match")
-            expected_lane = expectation.get("runtime_lane")
-            if expected_lane and runtime_event.get("lane") != expected_lane:
-                errors.append(
-                    f"{label}: runtime lane {runtime_event.get('lane')!r} != {expected_lane!r}"
-                )
             plan = runtime_event.get("terminal_plan")
             _validate_provenance(plan, errors, label=label)
             actual_skills = _plan_skill_ids(plan)

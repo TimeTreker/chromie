@@ -568,23 +568,46 @@ def audit_agent_skill_selection(root: Path) -> list[PolicyFinding]:
             )
         )
     else:
-        semantic_attributes = {"text", "language", "goals", "context_summary"}
+        forbidden_request_attributes = {"text", "language", "context_summary"}
+        forbidden_goal_attributes = {
+            "goal_id",
+            "description",
+            "bindings",
+            "success_criteria",
+            "resource_kind",
+        }
         for node in ast.walk(discover):
-            if isinstance(node, ast.Attribute):
-                chain = _attribute_chain(node)
-                if chain.startswith("request.") and node.attr in semantic_attributes:
-                    findings.append(
-                        PolicyFinding(
-                            rule_id=RULE_AGENT_SKILL_SELECTION,
-                            path=_relative(path, root),
-                            line=node.lineno,
-                            symbol="AgentSkillSelectionService._discover_candidates",
-                            message=(
-                                f"Host candidate discovery may not inspect semantic input {chain!r}; "
-                                "only the model may make the final Skill choice"
-                            ),
-                        )
+            if not isinstance(node, ast.Attribute):
+                continue
+            chain = _attribute_chain(node)
+            if chain.startswith("request.") and node.attr in forbidden_request_attributes:
+                findings.append(
+                    PolicyFinding(
+                        rule_id=RULE_AGENT_SKILL_SELECTION,
+                        path=_relative(path, root),
+                        line=node.lineno,
+                        symbol="AgentSkillSelectionService._discover_candidates",
+                        message=(
+                            f"Host candidate discovery may not inspect semantic input {chain!r}; "
+                            "only exact typed Goal applicability fields may narrow candidates "
+                            "before the model makes the final Skill choice"
+                        ),
                     )
+                )
+            if chain.startswith("goal.") and node.attr in forbidden_goal_attributes:
+                findings.append(
+                    PolicyFinding(
+                        rule_id=RULE_AGENT_SKILL_SELECTION,
+                        path=_relative(path, root),
+                        line=node.lineno,
+                        symbol="AgentSkillSelectionService._discover_candidates",
+                        message=(
+                            f"Host candidate discovery may not inspect Goal semantic field {chain!r}; "
+                            "only output_mode and information_domain are allowed for mechanical "
+                            "Agent Skill applicability filtering"
+                        ),
+                    )
+                )
 
     for candidate in ast.walk(tree):
         if isinstance(candidate, (ast.FunctionDef, ast.AsyncFunctionDef)) and any(

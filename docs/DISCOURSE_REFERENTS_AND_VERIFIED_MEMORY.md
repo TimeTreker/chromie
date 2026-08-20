@@ -14,9 +14,10 @@ single global field such as `current_location`.
 
 Chromie's cognitive stages have distinct responsibilities:
 
-1. **Cognitive Gateway** admits the turn and selects a broad lane such as
-   `chat`, `tool`, or `robot_action`. It does not decide what `那边`, `那里`,
-   `there`, or another reference means.
+1. **Cognitive Gateway** normalizes/admit-suppresses the turn, applies only
+   deterministic protective reflexes, and supplies bounded context evidence. It
+   does not choose semantic work or decide what `那边`, `那里`, `there`, or another
+   reference means.
 2. **Goal Association** uses the current user meaning, scoped discourse
    referents, focus, active or bounded recent terminal Goal bindings, and
    recent dialogue to resolve references and create explicit Goal bindings.

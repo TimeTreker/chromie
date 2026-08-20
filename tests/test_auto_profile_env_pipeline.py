@@ -121,7 +121,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "ORCH_ENABLE_INTERACTION_RESPONSE",
             "ORCH_ENABLE_SORIDORMI_CAPABILITIES",
             "ORCH_COGNITIVE_RUNTIME_MODE",
-            "ORCH_COGNITIVE_APPLY_LANES",
             "ORCH_ACTION_DRY_RUN",
         }
         modes = {}
@@ -137,12 +136,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
                 self.assertEqual(required - values.keys(), set())
                 self.assertEqual(values["CHROMIE_OPERATOR_MODE"], path.stem)
                 self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_MODE"], "apply")
-                lanes = set(values["ORCH_COGNITIVE_APPLY_LANES"].split(","))
-                self.assertTrue({"chat", "tool"}.issubset(lanes))
-                self.assertEqual(
-                    "robot_action" in lanes,
-                    values["ORCH_ENABLE_SORIDORMI_CAPABILITIES"] == "1",
-                )
         self.assertEqual(
             set(modes),
             {"qualification", "services", "speech", "voice_mujoco"},
@@ -186,8 +179,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["CHROMIE_OPERATOR_MODE"], "voice_mujoco")
         self.assertEqual(values["ORCH_ENABLE_SORIDORMI_CAPABILITIES"], "1")
         self.assertEqual(values["ORCH_ACTION_DRY_RUN"], "false")
-        self.assertIn("robot_action", values["ORCH_COGNITIVE_APPLY_LANES"]
-        )
         self.assertEqual(manifest["active_operator_mode"], "voice_mujoco")
 
     def test_every_profile_owns_the_complete_model_plan(self) -> None:

@@ -31,7 +31,6 @@ def passing_summary() -> dict:
     return {
         "ok": True,
         "errors": [],
-        "route": {"route": "robot_action"},
         "provenance": {
             "chromie": {"revision": REVISION, "dirty": False},
             "runtime_identity": {"complete": True, "identity_sha256": "c" * 64},
@@ -392,7 +391,7 @@ class VocalIssueClosureTests(unittest.TestCase):
         self.assertEqual(command.count("--capability-timeout-s"), 1)
         parsed = build_live_parser().parse_args(command[2:])
         self.assertEqual(parsed.text, "你好，你往前走个15秒，然后边走边唱歌，同时眨眼睛。")
-        self.assertIsNone(parsed.expect_route)
+        self.assertFalse(hasattr(parsed, "expect_route"))
         self.assertTrue(parsed.grant_confirmation)
         self.assertFalse(parsed.speaker)
         self.assertEqual(parsed.capability_timeout_s, 180.0)

@@ -29,7 +29,6 @@ class _Catalog:
                 safety_class="physical_motion",
                 requires_confirmation=False,
                 available=True,
-                route="robot_action",
                 interaction_executable=True,
                 behavior_domains=["social_attention"],
                 can_run_parallel=True,
@@ -46,7 +45,6 @@ class _Catalog:
                 safety_class="physical_motion",
                 requires_confirmation=False,
                 available=True,
-                route="robot_action",
                 interaction_executable=True,
                 behavior_domains=["social_attention"],
                 can_run_parallel=True,
@@ -279,7 +277,6 @@ class SocialAttentionPolicyClosureTests(unittest.TestCase):
                 agent_id="soridormi.skill",
                 description="Provider-calibrated head target.",
                 available=True,
-                route="robot_action",
                 interaction_executable=True,
                 behavior_domains=["social_attention"],
                 input_schema={

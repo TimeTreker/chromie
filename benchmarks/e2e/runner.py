@@ -34,7 +34,6 @@ class E2ERunProfile:
     mind_profile: str | None = None
     social_interaction_style: str | None = None
     social_attention_mode: str | None = None
-    apply_lanes: tuple[str, ...] = ()
     semantic_authority_owner: str | None = None
     runtime_topology: str | None = None
     sample_count: int = 1
@@ -54,9 +53,6 @@ class E2ERunProfile:
             raise ValueError(
                 "effective_model_topology must map non-empty component names to models"
             )
-        if not all(isinstance(item, str) and item.strip() for item in self.apply_lanes):
-            raise ValueError("apply_lanes must contain non-empty strings")
-
     def to_dict(self) -> dict[str, Any]:
         return {
             "mode": "e2e",
@@ -76,7 +72,6 @@ class E2ERunProfile:
             "mind_profile": self.mind_profile,
             "social_interaction_style": self.social_interaction_style,
             "social_attention_mode": self.social_attention_mode,
-            "apply_lanes": list(self.apply_lanes),
             "semantic_authority_owner": self.semantic_authority_owner,
             "runtime_topology": self.runtime_topology,
             "sample_count": self.sample_count,

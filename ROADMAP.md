@@ -156,9 +156,9 @@ baseline**, not another broad concept-expansion phase:
    this separation and delete any remaining duplicate commitment/work truth when
    encountered.
 2. **The minimal live Situation projection is implemented.** A frozen bounded
-   projection now carries only current relevance/interpretation references: turn
-   lane/intent, focused Goal IDs, discourse focus, unresolved condition refs,
-   ready progress IDs, and evidence refs. It is rebuilt in-process, revisioned
+   projection now carries only current relevance/interpretation references: the
+   current turn ID, focused Goal IDs, discourse focus, unresolved condition refs,
+   and evidence refs. It is rebuilt in-process, revisioned
    between Goal Association and planning, prompt-validated, and never owns or
    copies the referenced Goal/Evidence/provider truth.
 3. **Goal materialization, refinement, and replacement are implemented.** Fully

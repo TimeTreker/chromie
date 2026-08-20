@@ -78,13 +78,11 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         case = TextScenarioCase(
             case_id="weather",
             text="今天北京下雨了没有？",
-            expected_routes=("tool",),
             require_speech=False,
             require_fast_communicative_act=True,
             expected_fast_communicative_speech_acts=("acknowledge_and_check",),
         )
         summary = {
-            "route": {"route": "tool"},
             "interaction_response": {"speech": [], "capabilities": []},
             "preview_only": True,
             "cognitive_runtime": {},
@@ -343,7 +341,6 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                     "speaker": False,
                     "assertion_scope": "full",
                     "goal_driven_runtime": "apply",
-                    "cognitive_apply_lanes": "tool",
                     "passed": 1,
                     "failed": 0,
                     "cases": [
@@ -383,12 +380,10 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         case = TextScenarioCase(
             case_id="weather",
             text="今天北京下雨了没有？",
-            expected_routes=("tool",),
             require_speech=False,
             forbid_fast_communicative_act=True,
         )
         summary = {
-            "route": {"route": "tool"},
             "interaction_response": {"speech": [], "capabilities": []},
             "preview_only": True,
             "cognitive_runtime": {
@@ -728,8 +723,6 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                 "live-text",
                 "--goal-driven-runtime",
                 "apply",
-                "--cognitive-apply-lanes",
-                "robot_action",
                 "--soridormi-repo",
                 "/tmp/soridormi-checkout",
                 "--no-write",
@@ -739,7 +732,6 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         namespace = _live_case_namespace(args, case, Path("/tmp/multi-goal"))
 
         self.assertTrue(namespace.cognitive_runtime)
-        self.assertEqual(namespace.cognitive_apply_lanes, "robot_action")
         self.assertEqual(namespace.soridormi_repo, "/tmp/soridormi-checkout")
         self.assertEqual(
             namespace.conversation_id,
@@ -776,7 +768,6 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         )
         case = ability.live_text_cases[-1].case
         summary = {
-            "route": {"route": "robot_action"},
             "interaction_response": {
                 "capabilities": [
                     {
@@ -817,7 +808,6 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         )
         case = ability.live_text_cases[0].case
         summary = {
-            "route": {"route": "chat"},
             "interaction_response": {
                 "capabilities": [
                     {
@@ -866,7 +856,6 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         )
         case = ability.live_text_cases[0].case
         summary = {
-            "route": {"route": "robot_action"},
             "interaction_response": {
                 "capabilities": [
                     {
@@ -907,7 +896,6 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         )
         case = ability.live_text_cases[0].case
         summary = {
-            "route": {"route": "robot_action"},
             "interaction_response": {"capabilities": [], "speech": [{"text": "Done."}]},
             "session_state": {
                 "workflow_events": [
@@ -940,7 +928,6 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         case = episode.turns[1]
         summary = {
             "preview_only": True,
-            "route": {"route": "robot_action"},
             "interaction_response": {
                 "capabilities": [
                     {
@@ -985,7 +972,6 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         case = TextScenarioCase(case_id="runtime-failure", text="do it")
         summary = {
             "preview_only": True,
-            "route": {"route": "robot_action"},
             "interaction_response": {
                 "capabilities": [],
                 "speech": [{"text": "I could not complete that."}],
@@ -1029,7 +1015,6 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                 "ok": True,
                 "errors": [],
                 "preview_only": True,
-                "route": {"route": "chat"},
                 "interaction_response": {
                     "capabilities": [],
                     "speech": [{"text": "ok"}],
@@ -1044,7 +1029,6 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                 "ok": True,
                 "errors": [],
                 "preview_only": True,
-                "route": {"route": "chat"},
                 "interaction_response": {
                     "capabilities": [],
                     "speech": [{"text": "ok"}],

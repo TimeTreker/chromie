@@ -34,7 +34,6 @@ except ImportError:  # pragma: no cover - repository development path
 logger = logging.getLogger("chromie.agent.agent_skills.selection")
 
 _ROLE_LABELS: dict[AgentSkillProjectionName, str] = {
-    "goal_association": "Goal Association Agent",
     "fast_planner": "Fast Planner Agent",
     "deep_planner": "Deep Planner Agent",
 }
@@ -258,14 +257,24 @@ class AgentSkillSelectionService:
             for item in self.registry.list_summaries()
         }
         requested_ids = request.candidate_agent_skill_ids
-        current_route = self._current_route(request)
 
-        def route_applies(summary: AgentSkillSummary) -> bool:
-            return bool(
-                not current_route
-                or not summary.applicable_routes
-                or current_route in summary.applicable_routes
-            )
+        def typed_goal_applies(summary: AgentSkillSummary) -> bool:
+            if not request.goals:
+                return False
+            for goal in request.goals:
+                if (
+                    summary.applicable_output_modes
+                    and goal.output_mode not in summary.applicable_output_modes
+                ):
+                    continue
+                if (
+                    summary.applicable_information_domains
+                    and goal.information_domain
+                    not in summary.applicable_information_domains
+                ):
+                    continue
+                return True
+            return False
 
         if requested_ids:
             ordered: list[AgentSkillSummary] = []
@@ -281,10 +290,10 @@ class AgentSkillSelectionService:
                         f"Agent Skill {agent_skill_id!r} does not expose projection "
                         f"{request.agent_role!r}"
                     )
-                if not route_applies(summary):
+                if not typed_goal_applies(summary):
                     raise ValueError(
-                        f"Agent Skill {agent_skill_id!r} is not applicable to "
-                        f"route {current_route!r}"
+                        f"Agent Skill {agent_skill_id!r} is not applicable to the "
+                        "supplied typed Goal output/domain contract"
                     )
                 ordered.append(summary)
         else:
@@ -292,23 +301,13 @@ class AgentSkillSelectionService:
                 summary
                 for summary in summaries.values()
                 if request.agent_role in summary.available_projections
-                and route_applies(summary)
+                and typed_goal_applies(summary)
             ]
             ordered.sort(key=lambda item: item.agent_skill_id)
 
         candidate_total = len(ordered)
         bounded = tuple(ordered[: self.max_candidates])
         return bounded, candidate_total, candidate_total > len(bounded)
-
-    @staticmethod
-    def _current_route(request: AgentSkillSelectionRequest) -> str:
-        for item in request.context_summary:
-            key, separator, value = item.partition("=")
-            if separator and key.strip().casefold() == "route":
-                return "_".join(
-                    value.strip().casefold().replace("-", "_").split()
-                )
-        return ""
 
     def _validate_output(
         self,
@@ -456,7 +455,6 @@ class AgentSkillSelectionService:
             "its parent projection. Evaluate each candidate independently; when both "
             "a reusable base method and its domain specialization are useful, select "
             "both explicitly and order the base method before the specialization. "
-            "For the Goal Association role, if no current Goals are supplied, return no_skill; establish the user Goal before selecting a domain method. "
             "Judge applicability from the current "
             "Goal meanings, not from an older Goal, generic context, or a shared "
             "field such as a number, duration, date, or location. External-information "

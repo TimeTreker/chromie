@@ -387,13 +387,21 @@ class SessionEvidenceTests(unittest.TestCase):
             path = Path(temp_dir) / "events.jsonl"
             tracker = SessionTracker(event_log_path=path)
             sid = tracker.create()
-            tracker.log(sid, "goal_interpretation_done: route=%s confidence=%.2f", "chat", 0.91)
+            tracker.log(
+                sid,
+                "cognitive_core_done: core_ms=%.1f responsibilities=%s confidence=%.2f unresolved=%s authority=%s",
+                50.0,
+                1,
+                0.91,
+                0,
+                "authoritative",
+            )
 
             records = [json.loads(line) for line in path.read_text().splitlines()]
             self.assertEqual(records[0]["event"], "session_start")
             self.assertEqual(records[0]["sid"], sid)
-            self.assertEqual(records[1]["event"], "goal_interpretation_done")
-            self.assertIn("route=chat", records[1]["message"])
+            self.assertEqual(records[1]["event"], "cognitive_core_done")
+            self.assertIn("responsibilities=1", records[1]["message"])
             self.assertGreaterEqual(records[1]["elapsed_ms"], 0.0)
 
     def test_session_done_reports_compact_workflow(self) -> None:
@@ -404,16 +412,13 @@ class SessionEvidenceTests(unittest.TestCase):
             tracker.log(sid, "asr_final: asr_ms=%.1f text_chars=%s text=%r", 12.0, 12, "Please walk.")
             tracker.log(
                 sid,
-                "goal_interpretation_done: interpretation_ms=%.1f route=%s agents=%s intent=%s confidence=%.2f interrupt=%s needs_agent=%s",
+                "cognitive_core_done: core_ms=%.1f responsibilities=%s confidence=%.2f unresolved=%s authority=%s",
                 50.0,
-                "robot_action",
-                "capability_agent,speaker_agent",
-                "robot_action",
+                1,
                 0.72,
-                False,
-                True,
+                0,
+                "authoritative",
             )
-            tracker.log(sid, "agent_start: route=%s agents=%s intent=%s", "robot_action", "capability_agent,speaker_agent", "robot_action")
             tracker.log(
                 sid,
                 "interaction_done: agent_ms=%.1f speech=%s capabilities=%s requires_confirmation=%s",
@@ -445,8 +450,7 @@ class SessionEvidenceTests(unittest.TestCase):
             self.assertEqual(len(workflow), 1)
             message = workflow[0]["message"]
             self.assertIn("asr_final:", message)
-            self.assertIn("goal_interpretation_done:", message)
-            self.assertIn("agent_start:", message)
+            self.assertIn("cognitive_core_done:", message)
             self.assertIn("interaction_done:", message)
             self.assertIn("capability_runtime_done:", message)
             self.assertIn("tts_schedule:", message)
@@ -463,7 +467,7 @@ class SessionEvidenceTests(unittest.TestCase):
             self.assertEqual(graph["nodes"][0]["event"], "session_start")
             self.assertIn("delta_from_previous_ms", graph["nodes"][1])
             self.assertTrue(
-                any(node["event"] == "goal_interpretation_done" for node in graph["nodes"])
+                any(node["event"] == "cognitive_core_done" for node in graph["nodes"])
             )
             node_records = [record for record in records if record["event"] == "session_workflow_node"]
             self.assertEqual(node_records, [])
@@ -578,11 +582,12 @@ class SessionEvidenceTests(unittest.TestCase):
             with self.assertLogs("orchestrator.runtime.session", level="WARNING") as warning_logs:
                 tracker.log(
                     sid,
-                    "goal_interpretation_done: route=%s agents=%s intent=%s confidence=%.2f",
-                    "robot_action",
-                    "capability_agent,speaker_agent",
-                    "capability:chromie.speak",
-                    1.0,
+                    "capability_result: request_id=%s capability_id=%s status=%s reason=%s message=%s",
+                    "move-cancelled",
+                    "soridormi.walk_forward",
+                    "cancelled",
+                    "user_cancelled",
+                    "cancelled before completion",
                 )
             self.assertTrue(any("WARNING" in line for line in warning_logs.output))
 
@@ -599,9 +604,8 @@ class SessionEvidenceTests(unittest.TestCase):
             self.assertTrue(any("ERROR" in line for line in error_logs.output))
 
             records = [json.loads(line) for line in path.read_text().splitlines()]
-            interpretation_records = [record for record in records if record["event"] == "goal_interpretation_done"]
             skill_records = [record for record in records if record["event"] == "capability_result"]
-            self.assertEqual(interpretation_records[-1]["severity"], "warning")
+            self.assertEqual(skill_records[-2]["severity"], "warning")
             self.assertEqual(skill_records[-1]["severity"], "error")
 
     def test_tts_text_does_not_determine_log_severity_or_color(self) -> None:

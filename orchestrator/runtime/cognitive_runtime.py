@@ -85,7 +85,6 @@ CognitiveRuntimeStatus = Literal[
     "skipped",
     "error",
 ]
-CognitiveLane = Literal["chat", "robot_action", "tool", "memory", "unsupported"]
 
 
 class CognitiveStageFailure(RuntimeError):
@@ -112,7 +111,6 @@ class CognitiveRuntimeResolution(BaseModel):
     schema_version: int = Field(default=1, ge=1)
     mode: CognitiveRuntimeMode
     status: CognitiveRuntimeStatus
-    lane: CognitiveLane
     turn_envelope: UserTurnEnvelope | None = None
     goal_association: GoalAssociationResolution | None = None
     fast_advance: FastPlannerAdvance | None = None
@@ -128,14 +126,10 @@ class CognitiveRuntimeResolution(BaseModel):
 @dataclass(frozen=True)
 class CognitiveRuntimePolicy:
     mode: CognitiveRuntimeMode = "off"
-    apply_lanes: frozenset[str] = frozenset({"chat", "memory", "robot_action", "tool"})
     max_total_ms: int = 25000
     goal_association_timeout_ms: int = 3500
     fast_planner_timeout_ms: int = 3000
     deep_planner_timeout_ms: int = 10000
-
-    def lane_enabled(self, lane: str) -> bool:
-        return lane in self.apply_lanes
 
 
 class CognitiveAgentClient(Protocol):
@@ -235,7 +229,6 @@ class CognitiveEvidenceRecorder:
 
     def record(self, resolution: CognitiveRuntimeResolution, *, sid: str, text: str) -> None:
         self.counters[f"status:{resolution.status}"] += 1
-        self.counters[f"lane:{resolution.lane}"] += 1
         self.counters[f"mode:{resolution.mode}"] += 1
         failure_class = str(resolution.metadata.get("failure_class") or "").strip()
         attribution = str(resolution.metadata.get("architecture_attribution") or "").strip()
@@ -286,7 +279,6 @@ class CognitiveEvidenceRecorder:
             "run_identity": self._identity_reference(),
             "mode": resolution.mode,
             "status": resolution.status,
-            "lane": resolution.lane,
             "user_turn_envelope": (
                 resolution.turn_envelope.model_dump(mode="json")
                 if resolution.turn_envelope is not None
@@ -482,25 +474,6 @@ class CanonicalPlanRuntimeAdapter:
             }
         )
 
-    @staticmethod
-    def lane_for_plan(plan: CanonicalPlan) -> CognitiveLane:
-        if not plan.steps:
-            return "chat"
-        capability_ids = {step.capability_id for step in plan.steps}
-        soridormi_ids = {
-            capability_id
-            for capability_id in capability_ids
-            if capability_id.startswith("soridormi.")
-        }
-        if soridormi_ids and capability_ids.issubset(
-            soridormi_ids | set(MEDIA_CAPABILITY_IDS.values())
-        ):
-            return "robot_action"
-        if all(step.capability_id.startswith("chromie.memory.") for step in plan.steps):
-            return "memory"
-        if all(step.capability_id.startswith("chromie.") for step in plan.steps):
-            return "tool"
-        return "unsupported"
 
     def is_pure_safe_read_plan(self, plan: CanonicalPlan) -> bool:
         if plan.disposition != "execute" or not plan.steps:
@@ -1514,7 +1487,6 @@ class CanonicalPlanRuntimeAdapter:
         )
         residual_effects_permitted = bool(
             deterministic_interrupt
-            and reflex.get("intent") == "stop_current_output"
             and reflex.get("cancellation_scope") == "output_only"
             and isinstance(reflex.get("metadata"), dict)
             and reflex["metadata"].get("residual_semantic_input") is True
@@ -2641,7 +2613,6 @@ class GoalDrivenRuntimeCoordinator:
         projection = CognitiveRuntimeResolution(
             mode="apply",
             status="applied",
-            lane="chat",
             interaction_response=response,
         )
         for activity in self._resolution_social_activities(
@@ -4121,7 +4092,6 @@ class GoalDrivenRuntimeCoordinator:
                     resolution = attach_core_identity(resolution)
                     queue_resolution_social_attention(resolution)
                     span.set_attribute("result_status", resolution.status)
-                    span.set_attribute("lane", resolution.lane)
                     if resolution.status == "error":
                         span.set_status("error")
         except BaseException:
@@ -4174,7 +4144,6 @@ class GoalDrivenRuntimeCoordinator:
         stage_diagnostics: list[dict[str, Any]] = []
         fast_planner_path = ""
         deep_planner_invocation_reasons: list[str] = []
-        lane: CognitiveLane = "unsupported"
         needs_deep_planner = False
         fast_advance_task: asyncio.Task[FastPlannerAdvance] | None = None
         fast_vocal_activity_ids: list[str] = []
@@ -4353,7 +4322,6 @@ class GoalDrivenRuntimeCoordinator:
                     fast_communicative_realization_status = "planner_owned"
                     if (
                         self.policy.mode == "apply"
-                        and self.policy.lane_enabled("chat")
                     ):
                         self._queue_social_attention_for_activity(
                             session,
@@ -4462,7 +4430,6 @@ class GoalDrivenRuntimeCoordinator:
                         fast_communicative_realization_status = "planner_owned"
                     if (
                         self.policy.mode == "apply"
-                        and self.policy.lane_enabled("chat")
                     ):
                         has_capability = any(
                             item.role == "capability" for item in advance.activities
@@ -4474,7 +4441,7 @@ class GoalDrivenRuntimeCoordinator:
                                 continue
                             # Progress and clarification can accompany concurrent
                             # Goal work. A standalone complete answer may also start;
-                            # mixed answer+Capability wording stays with final lane
+                            # mixed answer+Capability wording stays with final Plan coordination
                             # coordination to avoid duplicate delivery.
                             if activity.role == "complete_response" and has_capability:
                                 continue
@@ -5063,7 +5030,6 @@ class GoalDrivenRuntimeCoordinator:
             # Runtime authority starts from the validated canonical Plan and is
             # bounded by registered Capability, authorization, confirmation, resource,
             # and provider-safety contracts below. Goal Interpretation contributes WHAT only.
-            lane = self.adapter.lane_for_plan(terminal_plan)
             runtime_errors = await self._observe_workflow_stage(
                 sid=sid,
                 stage="canonical_plan_validation",
@@ -5171,28 +5137,8 @@ class GoalDrivenRuntimeCoordinator:
                 and not terminal_plan.steps
                 and terminal_plan.disposition in {"respond", "clarify"}
             ):
-                lane = "chat"
                 timings["planner_communicative_activity_validation"] = 0.0
                 if self.policy.mode == "apply":
-                    if not self.policy.lane_enabled(lane):
-                        return self._finish(
-                            mode="apply",
-                            status="error",
-                            lane=lane,
-                            association=association,
-                            fast_plan=fast_plan,
-                            terminal_plan=terminal_plan,
-                            timings=timings,
-                            started=started,
-                            fallback_reason="fast_activity_chat_lane_not_enabled",
-                            metadata={
-                                "failure_stage": "authority_boundary",
-                                "failure_class": "fast_activity_lane_mismatch",
-                                "failure_domain": "cognitive_runtime",
-                                "retryable": False,
-                                **path_metadata(),
-                            },
-                        )
                     interaction = self.adapter.build_fast_advance_response(
                         advance=fast_advance,
                         plan=terminal_plan,
@@ -5209,7 +5155,6 @@ class GoalDrivenRuntimeCoordinator:
                     return self._finish(
                         mode="apply",
                         status="applied",
-                        lane=lane,
                         association=association,
                         fast_plan=fast_plan,
                         terminal_plan=terminal_plan,
@@ -5227,7 +5172,6 @@ class GoalDrivenRuntimeCoordinator:
                 return self._finish(
                     mode="report_only",
                     status="report_only",
-                    lane=lane,
                     association=association,
                     fast_plan=fast_plan,
                     terminal_plan=terminal_plan,
@@ -5241,27 +5185,7 @@ class GoalDrivenRuntimeCoordinator:
                 )
 
             if self.adapter.is_pure_safe_read_plan(terminal_plan):
-                lane = "tool"
                 if self.policy.mode == "apply":
-                    if not self.policy.lane_enabled(lane):
-                        return self._finish(
-                            mode="apply",
-                            status="error",
-                            lane=lane,
-                            association=association,
-                            fast_plan=fast_plan,
-                            terminal_plan=terminal_plan,
-                            timings=timings,
-                            started=started,
-                            fallback_reason="safe_read_lane_not_enabled_for_apply",
-                            metadata={
-                                "failure_stage": "authority_boundary",
-                                "failure_class": "safe_read_lane_mismatch",
-                                "failure_domain": "cognitive_runtime",
-                                "retryable": False,
-                                **path_metadata(),
-                            },
-                        )
                     stage = time.perf_counter()
                     interaction = await self._observe_workflow_stage(
                         sid=sid,
@@ -5295,7 +5219,6 @@ class GoalDrivenRuntimeCoordinator:
                     return self._finish(
                         mode="apply",
                         status="applied",
-                        lane=lane,
                         association=association,
                         fast_plan=fast_plan,
                         terminal_plan=terminal_plan,
@@ -5313,7 +5236,6 @@ class GoalDrivenRuntimeCoordinator:
                 return self._finish(
                     mode="report_only",
                     status="report_only",
-                    lane=lane,
                     association=association,
                     fast_plan=fast_plan,
                     terminal_plan=terminal_plan,
@@ -5339,27 +5261,6 @@ class GoalDrivenRuntimeCoordinator:
             timings["planner_communicative_activity_validation"] = 0.0
 
             if self.policy.mode == "apply":
-                if not self.policy.lane_enabled(lane):
-                    return self._finish(
-                        mode="apply",
-                        status="error",
-                        lane=lane,
-                        association=association,
-                        fast_plan=fast_plan,
-                        terminal_plan=terminal_plan,
-                        timings=timings,
-                        started=started,
-                        fallback_reason="terminal_plan_lane_not_enabled_for_apply",
-                        metadata={
-                            "failure_stage": "authority_boundary",
-                            "failure_class": "terminal_plan_lane_mismatch",
-                            "failure_domain": "cognitive_runtime",
-                            "architecture_attribution": "not_evaluated",
-                            "retryable": False,
-                            "stage_diagnostics": stage_diagnostics,
-                            **path_metadata(),
-                        },
-                    )
                 stage = time.perf_counter()
                 interaction = await self._observe_workflow_stage(
                     sid=sid,
@@ -5384,7 +5285,6 @@ class GoalDrivenRuntimeCoordinator:
                 return self._finish(
                     mode="apply",
                     status="applied",
-                    lane=lane,
                     association=association,
                     fast_plan=fast_plan,
                     terminal_plan=terminal_plan,
@@ -5404,7 +5304,6 @@ class GoalDrivenRuntimeCoordinator:
             return self._finish(
                 mode="report_only",
                 status="report_only",
-                lane=lane,
                 association=association,
                 fast_plan=fast_plan,
                 terminal_plan=terminal_plan,
@@ -5429,7 +5328,6 @@ class GoalDrivenRuntimeCoordinator:
             return self._finish(
                 mode=self.policy.mode,
                 status="error",
-                lane=lane,
                 association=association,
                 fast_plan=fast_plan,
                 terminal_plan=terminal_plan,
@@ -5445,7 +5343,6 @@ class GoalDrivenRuntimeCoordinator:
             return self._finish(
                 mode=self.policy.mode,
                 status="error",
-                lane=lane,
                 association=association,
                 fast_plan=fast_plan,
                 terminal_plan=terminal_plan,
@@ -5522,7 +5419,6 @@ class GoalDrivenRuntimeCoordinator:
         *,
         mode: CognitiveRuntimeMode,
         status: CognitiveRuntimeStatus,
-        lane: CognitiveLane,
         association: GoalAssociationResolution | None,
         fast_plan: CanonicalPlan | None,
         terminal_plan: CanonicalPlan | None,
@@ -5546,7 +5442,6 @@ class GoalDrivenRuntimeCoordinator:
         return CognitiveRuntimeResolution(
             mode=mode,
             status=status,
-            lane=lane,
             goal_association=association,
             fast_advance=fast_advance,
             fast_plan=fast_plan,

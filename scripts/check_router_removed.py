@@ -99,7 +99,6 @@ CURRENT_FILES = (
     Path("scripts/status_voice_mujoco.sh"),
     Path("scripts/interaction_text_mujoco_check.py"),
     Path("scripts/general_ability_acceptance.py"),
-    Path("scripts/deep_thought_response_check.py"),
     Path("scripts/gpu_smoke_test.sh"),
     Path("scripts/release_provenance.py"),
     Path("benchmarks/manifests/runtime_adapters.json"),

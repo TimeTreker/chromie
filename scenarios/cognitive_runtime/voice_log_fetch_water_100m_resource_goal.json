@@ -17,14 +17,6 @@
   },
   "stub": {
     "mode": "apply",
-    "apply_lanes": [
-      "robot_action"
-    ],
-    "route_decision": {
-      "route": "robot_action",
-      "intent": "semantic_capability_planning",
-      "language": "zh-CN"
-    },
     "goal_association": {
       "turn_id": "turn-voice-log-water",
       "new_goals": [
@@ -207,7 +199,6 @@
   },
   "expect": {
     "status": "applied",
-    "lane": "robot_action",
     "planner_tier": "fast",
     "disposition": "execute",
     "coverage": "complete",

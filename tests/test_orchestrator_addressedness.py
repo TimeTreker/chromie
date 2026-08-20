@@ -76,14 +76,19 @@ class OrchestratorAddressednessTests(unittest.TestCase):
         self.assertTrue(context["active"])
         self.assertEqual(context["evidence"], "in_flight_turn")
 
-    def test_ignored_ambient_turn_does_not_open_engagement_window(self) -> None:
+    def test_gateway_suppressed_ambient_turn_does_not_open_engagement_window(self) -> None:
         context = self._assistant()._interaction_engagement_context(
             {
                 "history": [
                     {
                         "role": "user",
                         "text": "他们之后再把传感器结果合并。",
-                        "route": "ignore",
+                        "metadata": {
+                            "user_turn_envelope": {
+                                "admission": "suppress",
+                                "attention": {"speech_act": "ambient_report"},
+                            }
+                        },
                         "ts_ms": time.time() * 1000.0 - 1000.0,
                     }
                 ],
@@ -94,6 +99,28 @@ class OrchestratorAddressednessTests(unittest.TestCase):
 
         self.assertFalse(context["active"])
         self.assertEqual(context["evidence"], "none")
+
+    def test_admitted_user_turn_opens_engagement_window_from_explicit_evidence(self) -> None:
+        context = self._assistant()._interaction_engagement_context(
+            {
+                "history": [
+                    {
+                        "role": "user",
+                        "text": "你帮我看一下天气。",
+                        "metadata": {
+                            "accepted_dialogue_evidence": True,
+                            "user_turn_envelope": {"admission": "admit"},
+                        },
+                        "ts_ms": time.time() * 1000.0 - 1000.0,
+                    }
+                ],
+                "active_pending_tasks": [],
+                "active_task_contexts": [],
+            }
+        )
+
+        self.assertTrue(context["active"])
+        self.assertEqual(context["evidence"], "recent_exchange")
 
 
 if __name__ == "__main__":

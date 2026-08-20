@@ -266,7 +266,6 @@ class CognitionSettings:
     enable_agent: bool
     enable_interaction_response: bool
     enable_soridormi_capabilities: bool
-    fast_first_response_enabled: bool
     fast_planner_mode: str
     fast_planner_timeout_ms: int
     deep_planner_mode: str
@@ -274,7 +273,6 @@ class CognitionSettings:
     goal_association_mode: str
     goal_association_timeout_ms: int
     runtime_mode: str
-    apply_lanes: frozenset[str]
     runtime_timeout_ms: int
     social_attention_mode: str
     capability_manifest_paths: str
@@ -314,16 +312,6 @@ class PlaybackSettings:
     playback_chunk_ms: int
     concurrency: int
     playback_start_timeout_ms: int
-    fast_audio_enabled: bool
-    fast_audio_hedge_ms: int
-    fast_audio_prime_on_startup: bool
-    fast_audio_prime_timeout_ms: int
-    fast_audio_content_gate_enabled: bool
-    fast_audio_max_cue_seconds: float
-    fast_audio_transcript_min_similarity: float
-    fast_audio_generation_attempts: int
-    fast_audio_cache_dir: Path
-    fast_audio_cache_revision: str
     ready_greeting_enabled: bool
     ready_greeting_speech_enabled: bool
     ready_greeting_text: str
@@ -392,19 +380,6 @@ class HostSettingsSnapshot:
             or ollama_model
         )
         max_text_chars = _int(values, "TTS_MAX_TEXT_CHARS", 220, minimum=20)
-        runtime_lanes = frozenset(
-            item.strip()
-            for item in _raw(
-                values,
-                "ORCH_COGNITIVE_APPLY_LANES",
-                "chat,memory,robot_action,tool",
-            ).split(",")
-            if item.strip()
-        )
-        if not runtime_lanes:
-            raise HostConfigurationError(
-                "ORCH_COGNITIVE_APPLY_LANES must contain at least one lane"
-            )
         social_mode = _text(
             values, "AGENT_SOCIAL_ATTENTION_MODE", "on"
         ).casefold()
@@ -471,50 +446,6 @@ class HostSettingsSnapshot:
                 "ORCH_TTS_PLAYBACK_START_TIMEOUT_MS",
                 20000,
                 minimum=100,
-            ),
-            fast_audio_enabled=_bool(values, "ORCH_FAST_FIRST_AUDIO_ENABLED", True),
-            fast_audio_hedge_ms=_int(
-                values, "ORCH_FAST_FIRST_AUDIO_HEDGE_MS", 750, minimum=0
-            ),
-            fast_audio_prime_on_startup=_bool(
-                values, "ORCH_FAST_FIRST_AUDIO_PRIME_ON_STARTUP", True
-            ),
-            fast_audio_prime_timeout_ms=_int(
-                values,
-                "ORCH_FAST_FIRST_AUDIO_PRIME_TIMEOUT_MS",
-                120000,
-                minimum=1000,
-            ),
-            fast_audio_content_gate_enabled=_bool(
-                values, "ORCH_FAST_FIRST_AUDIO_CONTENT_GATE_ENABLED", True
-            ),
-            fast_audio_max_cue_seconds=_float(
-                values,
-                "ORCH_FAST_FIRST_AUDIO_MAX_CUE_SECONDS",
-                4.0,
-                minimum=0.25,
-            ),
-            fast_audio_transcript_min_similarity=_float(
-                values,
-                "ORCH_FAST_FIRST_AUDIO_TRANSCRIPT_MIN_SIMILARITY",
-                0.65,
-                minimum=0.0,
-                maximum=1.0,
-            ),
-            fast_audio_generation_attempts=_int(
-                values,
-                "ORCH_FAST_FIRST_AUDIO_GENERATION_ATTEMPTS",
-                2,
-                minimum=1,
-            ),
-            fast_audio_cache_dir=_path(
-                values,
-                "ORCH_FAST_FIRST_AUDIO_CACHE_DIR",
-                ".chromie/cache/fast-first-audio",
-                project_root=project_root,
-            ),
-            fast_audio_cache_revision=_text(
-                values, "ORCH_FAST_FIRST_AUDIO_CACHE_REVISION", ""
             ),
             ready_greeting_enabled=_bool(
                 values, "ORCH_RUNTIME_READY_GREETING_ENABLED", True
@@ -630,9 +561,6 @@ class HostSettingsSnapshot:
                 enable_soridormi_capabilities=_bool(
                     values, "ORCH_ENABLE_SORIDORMI_CAPABILITIES", False
                 ),
-                fast_first_response_enabled=_bool(
-                    values, "ORCH_FAST_FIRST_RESPONSE_ENABLED", True
-                ),
                 fast_planner_mode=_choice(
                     values,
                     "ORCH_FAST_PLANNER_MODE",
@@ -669,7 +597,6 @@ class HostSettingsSnapshot:
                     "apply",
                     {"off", "report_only", "apply"},
                 ),
-                apply_lanes=runtime_lanes,
                 runtime_timeout_ms=_int(
                     values,
                     "ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS",

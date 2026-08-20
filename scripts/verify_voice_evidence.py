@@ -318,11 +318,10 @@ def _validate_live_voice_turn(
         if item.get("event") == "cognitive_runtime_resolution"
         and item.get("mode") == "apply"
         and item.get("status") == "applied"
-        and item.get("lane") == "chat"
     ]
     if len(resolutions) != 1:
         errors.append(
-            "Speech-only evidence must contain exactly one applied chat Core resolution"
+            "Speech-only evidence must contain exactly one applied Core resolution"
         )
     for item in [*gateways, *resolutions]:
         reference = item.get("run_identity")
@@ -839,9 +838,6 @@ def verify_bundle(
     }
     required_semantic_overrides = {
         "ORCH_COGNITIVE_RUNTIME_MODE": "apply",
-        "ORCH_COGNITIVE_APPLY_LANES": (
-            "chat,memory,tool" if live_voice_profile else "chat,memory,robot_action,tool"
-        ),
         "ORCH_COGNITIVE_EVIDENCE_ENABLED": "1",
     }
     if mode == "synthetic":
@@ -954,15 +950,6 @@ def verify_bundle(
 
     from scripts.voice_acceptance import analyze_case
 
-    expected_lane_by_case = {
-        "speech-only": "chat",
-        "speech-capability": "robot_action",
-        "refusal": "robot_action",
-        "barge-in": "chat",
-        "body-cancel": "robot_action",
-        "stop": "chat",
-        "follow-up": "chat",
-    }
     for case_id in sorted(required_cases & set(by_id)):
         raw_case_session_ids = by_id[case_id].get("session_ids")
         case_session_ids = {
@@ -990,7 +977,6 @@ def verify_bundle(
                 + ", ".join(recomputed_failures)
             )
 
-        expected_lane = expected_lane_by_case[case_id]
         case_cognitive_events = [
             item
             for item in cognitive_events
@@ -1001,13 +987,12 @@ def verify_bundle(
             for item in case_cognitive_events
             if item.get("mode") == "apply"
             and item.get("status") == "applied"
-            and item.get("lane") == expected_lane
         ]
         minimum_applied = 2 if case_id == "follow-up" else 1
         if len(applied) < minimum_applied:
             provenance_error(
-                f"Case {case_id} has {len(applied)} correlated applied "
-                f"{expected_lane!r} cognitive events; expected at least {minimum_applied}"
+                f"Case {case_id} has {len(applied)} correlated applied cognitive events; "
+                f"expected at least {minimum_applied}"
             )
         if any(item.get("status") == "error" for item in case_cognitive_events):
             provenance_error(
@@ -1069,17 +1054,14 @@ def verify_bundle(
         for item in cognitive_events
         if str(item.get("sid") or "") in acceptance_session_ids
     ]
-    applied_lanes = {
-        str(item.get("lane") or "")
+    applied_events = [
+        item
         for item in correlated_cognitive_events
         if item.get("mode") == "apply" and item.get("status") == "applied"
-    }
-    required_applied_lanes = {"chat"} if live_voice_profile else {"chat", "robot_action"}
-    missing_applied_lanes = sorted(required_applied_lanes - applied_lanes)
-    if missing_applied_lanes:
+    ]
+    if not applied_events:
         provenance_error(
-            "Voice evidence is missing correlated applied cognitive runtime lanes: "
-            + ", ".join(missing_applied_lanes)
+            "Voice evidence is missing correlated applied cognitive runtime events"
         )
     cognitive_errors = [
         item
@@ -1185,7 +1167,7 @@ def verify_bundle(
         },
         "cognitive_runtime": {
             "event_count": len(correlated_cognitive_events),
-            "applied_lanes": sorted(applied_lanes),
+            "applied_event_count": len(applied_events),
             "error_count": len(cognitive_errors),
         },
         "soridormi_mode": "sim" if provider_modes == {"sim"} else None,

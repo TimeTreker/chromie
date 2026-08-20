@@ -18,7 +18,6 @@
           "text": "河南省内乡县现在下雨了吗？",
           "expect": {
             "admission": "admit",
-            "runtime_lane": "tool",
             "required_agent_skill_ids": [
               "chromie.grounded-external-information",
               "chromie.weather-information"

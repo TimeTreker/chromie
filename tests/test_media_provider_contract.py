@@ -453,7 +453,7 @@ class MediaTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(media_request.metadata["parallel_with_vocal"])
         self.assertEqual(media_request.metadata["source_goal_ids"], ["goal-media"])
 
-    async def test_body_and_exact_media_plan_keeps_robot_action_authority(self) -> None:
+    async def test_body_and_exact_media_plan_needs_no_semantic_lane(self) -> None:
         plan = CanonicalPlan(
             plan_id="walk-and-media",
             planner_tier="deep",
@@ -498,9 +498,10 @@ class MediaTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(
-            CanonicalPlanRuntimeAdapter.lane_for_plan(plan),
-            "robot_action",
+            [step.capability_id for step in plan.steps],
+            ["soridormi.walk_forward", MEDIA_CAPABILITY_IDS["play"]],
         )
+        self.assertTrue(all(step.source_goal_ids for step in plan.steps))
 
     async def test_persistent_lifecycle_and_progress_are_correlated(self) -> None:
         cases = [
@@ -682,15 +683,14 @@ class MediaTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
     async def test_reflex_has_distinct_talking_media_and_all_scopes(self) -> None:
         reflex = ReflexFilter()
         cases = [
-            ("Stop talking.", "output_only", "stop_current_output"),
-            ("Stop the music.", "media_output", "stop_media_output"),
-            ("停止播放。", "media_output", "stop_media_output"),
-            ("Stop everything.", "current_interaction", "cancel_current_interaction"),
+            ("Stop talking.", "output_only"),
+            ("Stop the music.", "media_output"),
+            ("停止播放。", "media_output"),
+            ("Stop everything.", "current_interaction"),
         ]
-        for text, scope, intent in cases:
+        for text, scope in cases:
             outcome = reflex.evaluate(text)
             self.assertEqual(outcome.cancellation_scope, scope)
-            self.assertEqual(outcome.intent, intent)
 
 
 if __name__ == "__main__":

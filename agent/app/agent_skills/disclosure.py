@@ -442,20 +442,13 @@ def build_agent_skill_selection_request(
         )
     current_goal_ids = _association_goal_ids(context)
     allowed_goal_ids = current_goal_ids if current_goal_ids else None
-    # Goal Association has not yet decided which canonical Goal(s) the current
-    # turn belongs to. Feeding historical active Goals into its method selector
-    # lets an unrelated unfinished Goal bias the current semantic decision. Goal
-    # Association therefore receives no pre-associated Goal identity; the
-    # selection service deterministically returns no_skill without a model call.
-    # Downstream roles receive only Goal IDs already established by Association.
-    selection_goals = (
-        ()
-        if agent_role == "goal_association"
-        else _goal_contexts(
-            context,
-            allowed_goal_ids=allowed_goal_ids,
-            include_recent=True,
-        )
+    # Agent Skills are Planner HOW methods. Planner roles receive only Goal IDs
+    # already established by Goal Association; historical unrelated Goals remain
+    # outside the selection request.
+    selection_goals = _goal_contexts(
+        context,
+        allowed_goal_ids=allowed_goal_ids,
+        include_recent=True,
     )
     return AgentSkillSelectionRequest(
         sid=sid,

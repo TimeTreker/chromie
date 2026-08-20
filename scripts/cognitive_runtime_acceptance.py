@@ -90,12 +90,11 @@ def _events_report(events: list[dict[str, Any]]) -> dict[str, Any]:
         item
         for item in events
         if item.get("event") in {None, "cognitive_runtime_resolution"}
-        and (item.get("status") is not None or item.get("lane") is not None)
+        and item.get("status") is not None
     ]
     status = Counter(
         str(item.get("status") or "unknown") for item in runtime_events
     )
-    lanes = Counter(str(item.get("lane") or "unknown") for item in runtime_events)
     modes = Counter(str(item.get("mode") or "unknown") for item in runtime_events)
     latencies = [
         float((item.get("timings_ms") or {}).get("total", 0.0))
@@ -115,7 +114,6 @@ def _events_report(events: list[dict[str, Any]]) -> dict[str, Any]:
         "event_count": len(runtime_events),
         "observed_event_count": len(events),
         "status_counts": dict(sorted(status.items())),
-        "lane_counts": dict(sorted(lanes.items())),
         "mode_counts": dict(sorted(modes.items())),
         "mean_total_latency_ms": round(sum(latencies) / len(latencies), 1) if latencies else 0.0,
         "applied_capability_ids": applied_capabilities,
@@ -184,8 +182,8 @@ def _run_provenance(summary: dict[str, Any]) -> dict[str, Any]:
             if isinstance(semantic_runtime, dict)
             else None
         ),
-        "cognitive_runtime_selected_for_route": (
-            semantic_runtime.get("cognitive_runtime_selected_for_route")
+        "cognitive_runtime_selected": (
+            semantic_runtime.get("cognitive_runtime_selected")
             if isinstance(semantic_runtime, dict)
             else None
         ),
@@ -263,9 +261,9 @@ def _simulator_report(
         provenance_errors.append(
             "simulator run was not recorded with cognitive runtime mode 'apply'"
         )
-    if run_provenance["cognitive_runtime_selected_for_route"] is not True:
+    if run_provenance["cognitive_runtime_selected"] is not True:
         provenance_errors.append(
-            "simulator run did not select the cognitive runtime for its route"
+            "simulator run did not select the maintained cognitive runtime"
         )
     sim_status = bool(
         isinstance(status_before, dict)
@@ -418,7 +416,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--expected-chromie-revision")
     parser.add_argument("--expected-soridormi-revision")
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--require-applied-lane", action="append", default=[])
     args = parser.parse_args(argv)
 
     try:
@@ -433,11 +430,8 @@ def main(argv: list[str] | None = None) -> int:
                 for item in events
                 if item.get("status") == "applied"
             ]
-            applied_lanes = {str(item.get("lane")) for item in applied_events}
-            missing = sorted(set(args.require_applied_lane) - applied_lanes)
-            payload["required_applied_lanes"] = list(args.require_applied_lane)
-            payload["missing_applied_lanes"] = missing
-            payload["ok"] = not missing and not payload["status_counts"].get("error", 0)
+            payload["applied_event_count"] = len(applied_events)
+            payload["ok"] = bool(applied_events) and not payload["status_counts"].get("error", 0)
         else:
             payload = build_bundle(
                 events_path=args.events if args.events else None,

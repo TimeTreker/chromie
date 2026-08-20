@@ -116,7 +116,7 @@ The repository now provides:
 - `benchmarks/manifests/social_attention_qualification_v1.json`, the versioned
   identity and hard-gate contract;
 - explicit run provenance for effective model topology, MindProfile, Social
-  Interaction Style, apply lanes, semantic authority, runtime topology, and
+  Interaction Style, semantic authority, runtime topology, provider/capability surface, and
   sample count;
 - first-party E2E adapter profiles that resolve one configured URL or Python
   callable without embedding deployment endpoints or behavior rules;
@@ -146,7 +146,7 @@ least:
 - code and Prompt revision;
 - summary model identity and per-component effective model topology;
 - MindProfile and Social Interaction Style;
-- semantic authority owner and effective apply lanes;
+- semantic authority owner and effective provider/capability surface;
 - runtime topology, provider revision, hardware profile, and sample count;
 - evidence profile and operator identity where supervision is required.
 
@@ -192,7 +192,7 @@ python -m benchmarks.e2e.run \
   --output benchmarks/reports/social-attention-live-model-on-courteous.json
 ```
 
-Example deployed-service run adds the effective lanes, provider, and hardware:
+Example deployed-service run adds provider and hardware identity:
 
 ```bash
 export CHROMIE_BENCHMARK_LIVE_SERVICE_CALLABLE=qualification_harness.live_service:invoke
@@ -202,8 +202,6 @@ python -m benchmarks.e2e.run \
   --profile live_service_text \
   --adapter live_service_text \
   --dataset social_attention \
-  --apply-lane chat \
-  --apply-lane robot_action \
   --provider-revision <provider-revision> \
   --hardware-profile rtx5090 \
   --semantic-authority-owner goal_driven_cognitive_core \

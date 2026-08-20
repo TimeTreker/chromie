@@ -40,7 +40,9 @@ def test_daily_conversation_live_adapter_reports_structural_not_semantic_proof()
         [summary],
     )
 
-    assert all(item["passed"] for item in results.values())
+    assert results["typed_output_and_schema_boundaries_remain_valid"]["passed"] is True
+    assert results["speech_claims_match_available_commitment_and_evidence"]["passed"] is None
+    assert results["chromie_identity_and_robotic_body_truth_remain_consistent"]["passed"] is None
     assert "semantic" in results["speech_claims_match_available_commitment_and_evidence"]["detail"]
     assert (
         "LLM review"
@@ -53,7 +55,6 @@ def test_daily_conversation_live_adapter_retains_goal_and_plan_semantics() -> No
         {
             "text": "Walk and tell a story",
             "ok": True,
-            "route": {"route": "robot_action"},
             "interaction_response": {
                 "speech": [{"text": "Once upon a time"}],
                 "capabilities": [

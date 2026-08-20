@@ -166,19 +166,10 @@ class SessionTracker:
         "cognitive_core_start",
         "cognitive_core_done",
         "cognitive_core_exception",
-        "goal_interpretation_start",
-        "goal_interpretation_done",
-        "fast_first_response_schedule",
-        "fast_first_response_scheduled",
-        "fast_first_response_skipped",
-        "fast_first_audio_hedge_started",
-        "fast_first_audio_schedule",
-        "fast_first_audio_suppressed",
         "playback_cancel_before_start",
         "playback_skip_cancelled",
         "routed_turn_cancellation_requested",
         "turn_cancelled",
-        "agent_start",
         "interaction_done",
         "cognitive_interaction_ready",
         "cognitive_capability_proposed",
@@ -848,12 +839,6 @@ class SessionTracker:
         if event_name == "tts_playback_start_waiter_resolved" and self._field_value(rendered, "started").casefold() == "false":
             return logging.WARNING
 
-        if event_name == "goal_interpretation_done":
-            route = self._field_value(rendered, "route").casefold()
-            intent = self._field_value(rendered, "intent").casefold()
-            if route == "robot_action" and intent == "capability:chromie.speak":
-                return logging.WARNING
-
         if any(token in lowered for token in ("status=blocked", "status=rejected", "status=timeout")):
             return logging.WARNING
         return logging.INFO
@@ -1164,14 +1149,12 @@ class SessionTracker:
             "execution_lane",
             "failure_stage",
             "interaction_id",
-            "intent",
             "operation",
             "output_mode",
             "provider_id",
             "reason_code",
             "request_id",
             "result_type",
-            "route",
             "session_id",
             "severity",
             "sid",

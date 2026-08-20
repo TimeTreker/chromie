@@ -9,6 +9,7 @@ from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.named_goal_cancellation import (
     NamedGoalCancellationClosureError,
     dispatch_goal_replacement,
+    dispatch_named_goal_cancellation,
 )
 from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
 from shared.chromie_contracts.goal import GoalAssociationResolution
@@ -96,7 +97,6 @@ def _cancel_resolution(goal_ids: list[str]) -> CognitiveRuntimeResolution:
     return CognitiveRuntimeResolution(
         mode="apply",
         status="applied",
-        lane="chat",
         goal_association=GoalAssociationResolution(
             resolution_status="resolved",
             turn_id="turn-cancel",
@@ -117,7 +117,6 @@ def _replacement_resolution() -> CognitiveRuntimeResolution:
     return CognitiveRuntimeResolution(
         mode="apply",
         status="applied",
-        lane="robot_action",
         goal_association=GoalAssociationResolution(
             resolution_status="resolved",
             turn_id="turn-replace",
@@ -135,6 +134,32 @@ def _replacement_resolution() -> CognitiveRuntimeResolution:
 
 
 class NamedGoalCancellationClosureTests(unittest.TestCase):
+
+    def test_dispatch_bridge_reconciles_idle_named_goal_without_legacy_route_kwargs(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="cancel-bridge-test")
+        _create_goals(manager)
+
+        class _NoRuntimeWork:
+            cancel_scope = None
+
+        results, metadata = asyncio.run(
+            dispatch_named_goal_cancellation(
+                conversation_state=manager,
+                interaction_runtime=_NoRuntimeWork(),
+                confirmation_dialogue=None,
+                resolution=_cancel_resolution(["goal-a"]),
+                session_id="sid-cancel",
+                user_text="Cancel the nod.",
+                language="en-US",
+            )
+        )
+
+        self.assertTrue(any(item.get("applied") for item in results))
+        cancelled = manager._task_context_by_goal_id("goal-a")
+        assert cancelled is not None
+        self.assertEqual(cancelled["status"], "cancelled")
+        self.assertEqual(metadata["target_goal_ids"], ["goal-a"])
+        self.assertEqual(metadata["cancellation_receipts"], [])
 
     def test_replacement_without_live_work_atomically_supersedes_old_and_creates_new(self) -> None:
         manager = ConversationStateManager(base_conversation_id="replace-test")

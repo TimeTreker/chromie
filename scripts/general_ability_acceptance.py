@@ -60,7 +60,6 @@ class TextScenarioCase:
     case_id: str
     text: str
     language: str = ""
-    expected_routes: tuple[str, ...] = field(default_factory=tuple)
     expected_capabilities: tuple[str, ...] = field(default_factory=tuple)
     expected_args: tuple[tuple[int, str, Any], ...] = field(default_factory=tuple)
     expect_no_capabilities: bool = False
@@ -601,16 +600,7 @@ def validate_live_text_result(
                     for item in violations
                 )
             )
-    route = summary.get("route")
-    actual_route = route.get("route") if isinstance(route, dict) else None
     internal_diagnostics: list[str] = []
-    if case.expected_routes and actual_route not in case.expected_routes:
-        message = f"route={actual_route!r}, expected one of {list(case.expected_routes)!r}"
-        if assertion_scope == "full":
-            errors.append(message)
-        else:
-            internal_diagnostics.append(message)
-
     fast_progress = _fast_progress_activities(summary)
     if case.forbid_fast_communicative_act and fast_progress:
         errors.append("Planner emitted forbidden pre-effect Communicative Activity")
@@ -954,9 +944,6 @@ def _text_scenario_case(
         case_id=case_id,
         text=text,
         language=str(raw.get("language") or "").strip(),
-        expected_routes=_tuple_of_strings(
-            raw.get("expected_routes", raw.get("expected_route"))
-        ),
         expected_capabilities=_tuple_of_strings(
             raw.get("expected_capabilities", raw.get("expect_capability"))
         ),
@@ -1332,7 +1319,6 @@ def _write_reviewer_packet(
         "speaker": bool(run_summary.get("speaker")),
         "assertion_scope": run_summary.get("assertion_scope"),
         "goal_driven_runtime": run_summary.get("goal_driven_runtime"),
-        "cognitive_apply_lanes": run_summary.get("cognitive_apply_lanes"),
         "source_identity": source_identity,
         "runtime_identity_sha256": runtime_identity.get("identity_sha256"),
         "runtime_profile": {
@@ -1586,7 +1572,6 @@ def _live_case_namespace(
     *,
     conversation_id: str | None = None,
 ) -> argparse.Namespace:
-    expected_route = case.expected_routes[0] if len(case.expected_routes) == 1 else None
     return argparse.Namespace(
         text=case.text,
         agent_url=args.agent_url,
@@ -1602,7 +1587,6 @@ def _live_case_namespace(
         allow_non_sim=args.allow_non_sim,
         grant_confirmation=args.grant_confirmation,
         require_speech=case.require_speech,
-        expect_route=expected_route if args.assertion_scope == "full" else None,
         expect_no_capabilities=case.expect_no_capabilities and not case.allow_expressive_cues,
         expect_capability=list(case.expected_capabilities) if args.assertion_scope == "full" else [],
         expect_arg=list(case.expected_args) if args.assertion_scope == "full" else [],
@@ -1616,7 +1600,6 @@ def _live_case_namespace(
         reject_internal_speech=True,
         reject_speech_pattern=[],
         cognitive_runtime=args.goal_driven_runtime == "apply",
-        cognitive_apply_lanes=args.cognitive_apply_lanes,
     )
 
 
@@ -1915,11 +1898,6 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
         "manifest": str(manifest.path),
         "goal_driven_runtime": args.goal_driven_runtime,
         "assertion_scope": args.assertion_scope,
-        "cognitive_apply_lanes": (
-            args.cognitive_apply_lanes
-            if args.goal_driven_runtime == "apply"
-            else ""
-        ),
         "execute": args.execute,
         "speaker": args.speaker,
         "errors": errors,
@@ -2064,13 +2042,8 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Use Goal Association, Fast/Deep Planner-owned communication, "
             "and trusted runtime adapter for live-text cases (default: apply). "
-            "Select off only for an explicit legacy Agent compatibility run."
+            "Select off only for an explicit diagnostic runtime-disabled run."
         ),
-    )
-    parser.add_argument(
-        "--cognitive-apply-lanes",
-        default="chat,memory,robot_action,tool",
-        help="Comma-separated goal-driven apply lanes for live-text cases.",
     )
     parser.add_argument(
         "--assertion-scope",

@@ -86,13 +86,10 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         assistant.cognitive_runtime_mode = "apply"
         assistant.enable_agent = True
         assistant.enable_interaction_response = True
-        assistant.cognitive_apply_lanes = frozenset({"chat", "memory", "robot_action", "tool"})
-        assistant.fast_first_response_enabled = False
         assistant.conversation_state = _State()
         assistant.interaction_runtime = _InteractionRuntime()
         assistant.cognitive_evidence = type("Evidence", (), {"record": lambda *args, **kwargs: None})()
         assistant.session_log = lambda *args, **kwargs: None
-        assistant._start_fast_first_audio_hedge = lambda *args, **kwargs: None
         assistant._experience_context = lambda **kwargs: {"source": "test"}
         assistant._apply_cognitive_goal_state = lambda *args, **kwargs: []
         assistant._record_cognitive_runtime_evidence = lambda *args, **kwargs: None
@@ -102,14 +99,10 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         async def run_pipeline(*args, **kwargs):
             return resolution
 
-        async def settle(*args, **kwargs):
-            return False
-
         async def confirm(*args, **kwargs):
             return False
 
         assistant._run_cognitive_runtime_pipeline = run_pipeline
-        assistant._settle_fast_first_audio_hedge = settle
         assistant._stage_interaction_confirmation = confirm
         return assistant
 
@@ -121,7 +114,6 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         resolution = CognitiveRuntimeResolution(
             mode="apply",
             status="applied",
-            lane="chat",
             interaction_response=response,
             timings_ms={"total": 12.0},
         )
@@ -171,12 +163,10 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         resolution = CognitiveRuntimeResolution(
             mode="apply",
             status="applied",
-            lane="tool",
             interaction_response=response,
             timings_ms={"total": 68000.0},
         )
         assistant = self._assistant(resolution)
-        assistant.cognitive_apply_lanes = frozenset({"tool"})
         events = []
 
         async def schedule_fast_first(*args, **kwargs):
@@ -255,7 +245,6 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         resolution = CognitiveRuntimeResolution(
             mode="apply",
             status="applied",
-            lane="chat",
             goal_association=GoalAssociationResolution(
                 resolution_status="resolved",
                 turn_id="turn-cancel-delivery",
@@ -289,7 +278,6 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         resolution = CognitiveRuntimeResolution(
             mode="apply",
             status="applied",
-            lane="chat",
             interaction_response=response,
             goal_association=GoalAssociationResolution(
                 resolution_status="resolved",
@@ -377,10 +365,9 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
             metadata={"source": "goal_driven_cognitive_runtime"},
         )
         resolution = CognitiveRuntimeResolution(
-            mode="apply", status="applied", lane="chat", interaction_response=response
+            mode="apply", status="applied", interaction_response=response
         )
         assistant = self._assistant(resolution)
-        assistant.cognitive_apply_lanes = frozenset({"chat"})
         core, envelope = _core_and_envelope(
             "Please help me work this out.", sid="sid-chat"
         )
@@ -446,7 +433,6 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         resolution = CognitiveRuntimeResolution(
             mode="apply",
             status="error",
-            lane="robot_action",
             fallback_reason="lane_not_enabled_for_apply",
             timings_ms={"total": 15.0},
         )
@@ -454,7 +440,6 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         async def settle(*args, **kwargs):
             return True
 
-        assistant._settle_fast_first_audio_hedge = settle
         core, envelope = _core_and_envelope("眨眼。", sid="sid", language="zh-CN")
 
         async def run():

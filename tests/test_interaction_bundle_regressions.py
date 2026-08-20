@@ -16,7 +16,6 @@ class PlannerCommunicationBoundaryTests(unittest.TestCase):
         resolution = CognitiveRuntimeResolution(
             mode="apply",
             status="error",
-            lane="robot_action",
             fallback_reason="planner communicative activity invalid",
             metadata={
                 "failure_stage": "planner_communicative_activity_validation"

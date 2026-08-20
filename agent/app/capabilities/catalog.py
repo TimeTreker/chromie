@@ -26,7 +26,6 @@ from .models import CapabilityRegistry, ToolCapability
 logger = logging.getLogger("chromie.agent.capability_catalog")
 
 CapabilityInvocationKind = Literal["mcp_tool", "named_skill"]
-CapabilityRoute = Literal["chat", "robot_action", "tool", "memory"]
 CapabilityPromptTier = Literal["common", "rare"]
 def _default_capability_asset(name: str) -> Path:
     module_path = Path(__file__).resolve()
@@ -78,7 +77,6 @@ class CatalogCapability(BaseModel):
     safety_class: str = "safe_read"
     requires_confirmation: bool = False
     available: bool = True
-    route: CapabilityRoute = "tool"
     source: str = "registry"
     invocation_kind: CapabilityInvocationKind = "mcp_tool"
     interaction_executable: bool = False
@@ -102,9 +100,6 @@ class CapabilityMatch(CatalogCapability):
 
 class CapabilitySearchResult(BaseModel):
     query: str
-    matched: bool = False
-    suggested_route: CapabilityRoute = "chat"
-    suggested_agents: list[str] = Field(default_factory=list)
     matches: list[CapabilityMatch] = Field(default_factory=list)
     catalog_version: int = 0
     live_refresh_error: str | None = None
@@ -197,7 +192,6 @@ class CapabilityCatalog:
                 item.prompt_tier != "common",
                 item.prompt_tier_locked,
                 not item.interaction_executable,
-                item.route,
                 item.capability_id,
             ),
         )
@@ -228,8 +222,8 @@ class CapabilityCatalog:
     ) -> CapabilitySearchResult:
         """Return a bounded, model-neutral view of the capability catalog.
 
-        This compatibility endpoint deliberately does not infer relevance,
-        routes, or agents from user text.  Language meaning belongs to Goal
+        This inspection endpoint deliberately does not infer relevance or
+        semantic routing from user text. Language meaning belongs to Goal
         Interpretation and the semantic planners, which receive the declared
         capability contracts directly.
         """
@@ -244,7 +238,6 @@ class CapabilityCatalog:
                 item.prompt_tier != "common",
                 not item.interaction_executable if prefer_interaction_executable else False,
                 item.prompt_tier_locked,
-                item.route,
                 item.capability_id,
             )
         )
@@ -254,9 +247,6 @@ class CapabilityCatalog:
         ]
         return CapabilitySearchResult(
             query=query,
-            matched=False,
-            suggested_route="chat",
-            suggested_agents=[],
             matches=matches,
             catalog_version=self._version,
             live_refresh_error=self._last_refresh_error,
@@ -420,7 +410,6 @@ class CapabilityCatalog:
                                 availability_contract.get("available", True),
                             )
                         ),
-                        route="robot_action",
                         source="soridormi.live_named_capabilities",
                         invocation_kind="named_skill",
                         interaction_executable=True,
@@ -505,7 +494,6 @@ class CapabilityCatalog:
                 safety_class=tool.safety_class,
                 requires_confirmation=tool.confirmation.required,
                 available=tool.availability.available and agent.status.available,
-                route=self._route_for_tool(tool),
                 source="registry",
                 invocation_kind="mcp_tool",
                 interaction_executable=self._interaction_executable_for_tool(tool),
@@ -806,19 +794,3 @@ class CapabilityCatalog:
         return tool.name == "chromie.speak" or cls._truthy(
             tool.llm_hints.get("interaction_executable")
         )
-
-    def _route_for_tool(self, tool: ToolCapability) -> CapabilityRoute:
-        effects = set(tool.effects)
-        if tool.agent_id.startswith("soridormi.") or effects & {
-            "physical_motion",
-            "safety_control",
-            "planning_only",
-            "creates_plan",
-            "commissioning_no_motion",
-        }:
-            return "robot_action"
-        if "memory_write" in effects:
-            return "memory"
-        if effects <= {"user_interaction", "audio_input", "audio_output", "read_only"} and tool.agent_id == "chromie.speech":
-            return "chat"
-        return "tool"

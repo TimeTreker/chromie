@@ -58,13 +58,14 @@ cannot be replaced from `.env.local`.
 
 | Mode | Default launcher | Scope |
 |---|---|---|
-| `services` | `scripts/start_services.sh` | Docker services and non-embodied chat/tool apply lanes; no Soridormi skills. |
+| `services` | `scripts/start_services.sh` | Docker services and non-embodied capabilities; no Soridormi skills. |
 | `speech` | `scripts/start_orchestrator.sh` | Microphone, conversation, and safe-read tools without embodied skills. |
-| `voice_mujoco` | `scripts/start_chromie.sh` and the voice-to-MuJoCo wrapper | Full maintained voice plus Soridormi/MuJoCo apply lanes. Named Soridormi skills execute in the simulator; the removed legacy action path remains disabled rather than being used as a dry-run substitute. |
+| `voice_mujoco` | `scripts/start_chromie.sh` and the voice-to-MuJoCo wrapper | Full maintained voice plus trusted Soridormi/MuJoCo capabilities. Named Soridormi skills execute in the simulator; the removed legacy action path remains disabled rather than being used as a dry-run substitute. |
 | `qualification` | `scripts/run_target_evidence_closure.py` | Source-bound acceptance with timing and cognitive evidence enabled. |
 
-Every maintained mode keeps Goal-driven `apply`, disables the legacy direct-LLM
-semantic fallback, and declares its complete chat/tool/robot-action lane set.
+Every maintained mode keeps Goal-driven `apply` and disables the legacy direct-LLM
+semantic fallback. Capability applicability and execution authority come from typed
+Capability/provider contracts rather than a deployment semantic-lane allowlist.
 Contradictory mode files fail during runtime-environment generation. The generated
 `.chromie/runtime_profile.json` records `active_operator_mode` and `mode_file`.
 The machine-readable public/configuration classification is owned by
@@ -103,19 +104,8 @@ All risky or incomplete execution paths are default-off.
 | `ORCH_ENABLE_AGENT` | `1` | Enable the Agent-owned Cognitive Core and downstream runtime. |
 | `ORCH_ENABLE_INTERACTION_RESPONSE` | `1` | Enable strict structured InteractionResponse handling required by unified cognitive `apply`; disabling it does not reactivate a retired Agent endpoint or semantic fallback. |
 | `ORCH_ENABLE_SORIDORMI_CAPABILITIES` | `0` | Allow named Soridormi skills in the structured path. |
-| `ORCH_FAST_FIRST_RESPONSE_ENABLED` | `1` | Legacy/compatibility low-latency response gate. Maintained cognitive `apply` does not use Goal Interpretation as a speech owner; Fast Planner authors exact Communicative Activities and Cognitive Runtime validates and schedules them. |
-| `ORCH_FAST_FIRST_AUDIO_ENABLED` | `1` | Enable startup-primed in-memory PCM acknowledgements as a last-resort latency presentation path when dynamic speech is not admissible, absent, invalid, or cannot be scheduled. Cache entries are generic and cannot claim a tool result, memory commit, physical effect, or completion. |
-| `ORCH_FAST_FIRST_AUDIO_HEDGE_MS` | `750` | After a dynamic Fast Planner Communicative Activity cannot be scheduled, wait this long before playing the cached fallback; suppress it when the final response becomes ready first. |
-| `ORCH_FAST_FIRST_AUDIO_CACHE_DIR` | `.chromie/cache/fast-first-audio` | Ignored local WAV cache for speaker-specific English and Chinese acknowledgement cues. |
-| `ORCH_FAST_FIRST_AUDIO_PRIME_ON_STARTUP` | `1` | Generate any missing cache entries through the configured TTS service before opening microphone input. |
-| `ORCH_FAST_FIRST_AUDIO_PRIME_TIMEOUT_MS` | `120000` | Total startup cache-prime budget. Expiry is non-fatal: startup continues with the cues already available. An individual synthesis timeout also aborts the remaining missing-cue work so cancellation cannot repeatedly cold-restart a provider. |
-| `ORCH_FAST_FIRST_AUDIO_CONTENT_GATE_ENABLED` | `1` | Before a startup cue can enter memory or disk, enforce its duration bound and transcribe it through the configured ASR service. A content mismatch fails closed for that cue. |
-| `ORCH_FAST_FIRST_AUDIO_MAX_CUE_SECONDS` | `4` | Maximum audio duration for one cached acknowledgement. This prevents enrollment-prompt leakage from being accepted as a short cue. |
-| `ORCH_FAST_FIRST_AUDIO_TRANSCRIPT_MIN_SIMILARITY` | `0.65` | Minimum normalized similarity between the intended cue and its ASR round trip. |
-| `ORCH_FAST_FIRST_AUDIO_GENERATION_ATTEMPTS` | `2` | Bounded attempts for a missing cue that completes synthesis but fails validation. A rejected sample is never cached; one regeneration handles stochastic content defects without weakening the gate. Synthesis timeouts are not retried during startup. |
-| `ORCH_FAST_FIRST_AUDIO_CACHE_REVISION` | empty | Optional operator invalidation salt. Cache keys already include the TTS endpoint, provider/model declaration, speaker ID, and reported speaker revision. |
-| `ORCH_ADDRESSEDNESS_GATE_ENABLED` | `1` | Supply bounded host engagement evidence to Cognitive Gateway and Goal Interpretation. Only high-confidence semantic `not_addressed`/`ambient_speech` decisions may use model route `ignore`; stop/cancel and unusable audio remain deterministic. |
-| `ORCH_ADDRESSEDNESS_ENGAGEMENT_TIMEOUT_SEC` | `45` | Keep natural follow-ups addressed after the last accepted exchange. Active tasks also keep engagement open; ignored ambient turns do not. |
+| `ORCH_ADDRESSEDNESS_GATE_ENABLED` | `1` | Supply bounded host engagement evidence to Cognitive Gateway. High-confidence unaddressed ambient speech may be suppressed by Gateway Attention Review; stop/cancel and unusable audio remain deterministic. |
+| `ORCH_ADDRESSEDNESS_ENGAGEMENT_TIMEOUT_SEC` | `45` | Keep natural follow-ups addressed after the last accepted exchange. Active tasks also keep engagement open; Gateway-suppressed ambient turns do not refresh the exchange window. |
 
 A successfully queued fast response is projected into downstream Planner
 Interaction Context as a current-turn communicative commitment, never as
@@ -945,11 +935,10 @@ the authoritative Goal/Evidence snapshots remain Host-owned.
 | Variable | Default or profile behavior |
 |---|---|
 | `ORCH_COGNITIVE_RUNTIME_MODE` | `apply` in `.env.common` and the maintained launcher. `off` disables the Goal-driven Runtime and therefore fails closed for admitted ordinary cognition; `report_only` is diagnostic evidence-only execution when invoked explicitly; `apply` is the maintained authoritative mode. No mode falls back to a retired semantic pipeline. |
-| `ORCH_COGNITIVE_APPLY_LANES` | `chat,memory,tool` in the common safe base. `tool` is limited to explicitly registered, schema-validated, safe read-only local providers. `scripts/start_chromie.sh` additionally enables `robot_action` after registering the trusted Soridormi provider, yielding `chat,memory,robot_action,tool`. Before Goal Association, the Host may use only its deployment lane allowlist to determine whether broad ingress is eligible for the Goal-driven Runtime; after Goal Association, the terminal Plan lane is independently rechecked against the same policy. This is Host deployment policy, not GI semantic/effect authority: no pre-association label can grant, suppress, filter, or narrow Planner Capability access. Every executable step still requires a trusted registered provider plus its authorization, confirmation, resource, and safety contracts. Disabled terminal lanes fail closed. |
 | `ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS` | `25000`; total host budget for Goal Association, Fast-to-Deep planning, Planner response realization, and runtime adaptation. Trusted Host rejection is terminal and does not reopen semantic planning. |
 | `ORCH_COGNITIVE_EVIDENCE_ENABLED` | `1`; writes append-only operational resolution evidence. It does not by itself prove simulator or physical execution. |
 | `ORCH_COGNITIVE_EVIDENCE_INCLUDE_TEXT` | `0`; stores only text length and a short SHA-256 digest by default, including in completed/abandoned Session workflow reports. Enable raw text only under an explicit privacy decision. |
-| `ORCH_COGNITIVE_EVIDENCE_PATH` | `.chromie/evidence/cognitive-runtime/events.jsonl`; append-only Gateway admission, Goal Association, terminal Plan, Planner response projection, lane, latency, fallback, and execution-outcome summaries. Its parent directory also owns `session-workflows/`, containing per-SID JSON/Markdown flows and a rolling conversation-correlated view; this does not add another runtime setting. |
+| `ORCH_COGNITIVE_EVIDENCE_PATH` | `.chromie/evidence/cognitive-runtime/events.jsonl`; append-only Gateway admission, Goal Association, terminal Plan, Planner response projection, latency, failure, and execution-outcome summaries. Its parent directory also owns `session-workflows/`, containing per-SID JSON/Markdown flows and a rolling conversation-correlated view; this does not add another runtime setting. |
 | `ORCH_COGNITIVE_RUN_IDENTITY_PATH` | `.chromie/evidence/runtime-identity.json`; optional digest-bound source/profile/model/image/manifest identity attached to cognitive evidence. Missing identity is allowed for ordinary development but fails source-bound qualification. |
 
 `scripts/start_chromie.sh` generates
@@ -987,10 +976,11 @@ may author one new prospective acknowledgement or correction. No pre-evidence
 speech may turn `claim_state=none`, a Plan, or a committed request into a result,
 completion, or provider-evidence claim.
 The common profile runs the unified Goal-driven Runtime in authoritative
-`apply` mode for `chat,memory,tool`. The standalone continuity resolver remains off
-because continuity is an integrated stage of the unified runtime. The maintained
-Soridormi launcher additionally enables `robot_action`, yielding
-`chat,memory,robot_action,tool`; neither profile enables the legacy semantic fallback.
+`apply` mode. The standalone continuity resolver remains off because continuity is
+an integrated stage of the unified runtime. The maintained Soridormi launcher adds
+a trusted body Provider; eligible Work is determined from the canonical Goal and
+declared Capability semantic/safety/resource contracts rather than a semantic lane.
+Neither profile enables the legacy semantic fallback.
 
 
 Every runtime inference attempt now emits one single-line `llm_call_evidence`
@@ -1011,8 +1001,8 @@ operator review and sanitization. A record's `root_cause_attribution` remains
 Goal Interpretation additionally keeps its compact human-oriented observability
 lines. Each call emits `goal_interpreter_prompt_profile`,
 `goal_interpreter_llm_raw_summary`, and `goal_interpreter_normalize_result` so an
-operator can quickly see prompt features, catalog visibility, raw route/intent,
-and normalization changes. The two Goal Interpreter debug flags above control
+operator can quickly see prompt features, catalog visibility, raw model output,
+and Responsibility normalization changes. The two Goal Interpreter debug flags above control
 only the older bounded human-readable prompt/raw duplicates; they do not weaken
 the complete correlated evidence record.
 

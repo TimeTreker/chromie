@@ -107,7 +107,6 @@ class UserTurnEnvelopeContractTests(unittest.TestCase):
                     matched=True,
                     action="interrupt",
                     trigger="stop_command",
-                    intent="stop_current_output",
                     confidence=1.0,
                     language="en-US",
                     priority="urgent",
@@ -155,7 +154,6 @@ class CognitiveGatewayTests(unittest.TestCase):
         resolution = CognitiveRuntimeResolution(
             mode="report_only",
             status="report_only",
-            lane="chat",
             turn_envelope=envelope,
         )
         with tempfile.TemporaryDirectory() as directory:

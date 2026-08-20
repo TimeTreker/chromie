@@ -47,7 +47,6 @@ def _runtime(
     sid: str,
     identity: str,
     *,
-    lane: str,
     capabilities: list[str],
     goal_ids: list[str],
     targets: list[str] | None = None,
@@ -77,7 +76,6 @@ def _runtime(
         "turn_id": sid,
         "run_identity": {"identity_sha256": identity, "complete": True},
         "status": "applied",
-        "lane": lane,
         "terminal_plan": {
             "plan_id": f"plan-{sid}",
             "goal_ids": goal_ids,
@@ -240,7 +238,6 @@ class AgentSkillWeatherQualificationTests(unittest.TestCase):
             _runtime(
                 "sid-weather-1",
                 "identity-digest",
-                lane="tool",
                 capabilities=["chromie.weather.lookup"],
                 goal_ids=["goal-weather"],
                 skills=skills,
@@ -258,7 +255,6 @@ class AgentSkillWeatherQualificationTests(unittest.TestCase):
             _runtime(
                 "sid-weather-2",
                 "identity-digest",
-                lane="chat",
                 capabilities=[],
                 goal_ids=["goal-weather"],
                 targets=["goal-weather"],
@@ -267,7 +263,6 @@ class AgentSkillWeatherQualificationTests(unittest.TestCase):
             _runtime(
                 "sid-correction-1",
                 "identity-digest",
-                lane="tool",
                 capabilities=["chromie.weather.lookup"],
                 goal_ids=["goal-chongqing"],
                 skills=skills,
@@ -276,7 +271,6 @@ class AgentSkillWeatherQualificationTests(unittest.TestCase):
             _runtime(
                 "sid-correction-2",
                 "identity-digest",
-                lane="tool" if evidence_on_correction else "chat",
                 capabilities=(
                     ["chromie.weather.lookup"] if evidence_on_correction else []
                 ),
@@ -300,7 +294,6 @@ class AgentSkillWeatherQualificationTests(unittest.TestCase):
             _runtime(
                 "sid-correction-3",
                 "identity-digest",
-                lane="chat" if evidence_on_correction else "tool",
                 capabilities=(
                     [] if evidence_on_correction else ["chromie.weather.lookup"]
                 ),

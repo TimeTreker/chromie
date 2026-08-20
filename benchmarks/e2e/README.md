@@ -84,8 +84,6 @@ python -m benchmarks.e2e.run \
   --social-attention-mode on \
   --style courteous \
   --mode on \
-  --apply-lane chat \
-  --apply-lane robot_action \
   --semantic-authority-owner goal_driven_cognitive_core \
   --runtime-topology cognitive-runtime-apply \
   --sample-count 1 \

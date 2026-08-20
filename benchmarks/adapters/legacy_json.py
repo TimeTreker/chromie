@@ -25,7 +25,7 @@ CONTEXT_KEYS = (
 )
 EXPECTATION_KEYS = (
     "expected", "expect", "expectations", "expected_output", "expected_result",
-    "expected_route", "expected_intent", "expected_plan", "assertions", "checks",
+    "expected_plan", "assertions", "checks",
 )
 PRIMARY_KEYS = ("primary_outcome", "primary_expectation", "acceptable_outcomes")
 AUXILIARY_KEYS = ("acceptable_auxiliary", "acceptable_auxiliary_behavior", "allowed_auxiliary")
@@ -35,6 +35,26 @@ DISTRIBUTION_KEYS = ("distribution_observations", "distribution_expectations")
 RUBRIC_KEYS = ("review_rubric", "rubric", "qualitative_review")
 ORACLE_KEYS = ("oracle_policy", "oracle")
 
+
+
+_RETIRED_SEMANTIC_EXPECTATION_KEYS = frozenset({"expected_route", "expected_intent"})
+_RETIRED_NESTED_EXPECTATION_KEYS = frozenset({"route", "intent", "route_decision"})
+
+
+def _reject_retired_semantic_expectations(item: Mapping[str, Any]) -> None:
+    retired = sorted(_RETIRED_SEMANTIC_EXPECTATION_KEYS.intersection(item))
+    expected = item.get("expected")
+    if isinstance(expected, Mapping):
+        retired.extend(
+            f"expected.{key}"
+            for key in sorted(_RETIRED_NESTED_EXPECTATION_KEYS.intersection(expected))
+        )
+    if retired:
+        raise ContractError(
+            "legacy scenario uses retired route/intent expectations: "
+            + ", ".join(retired)
+            + "; migrate the case to Responsibility/Goal/Plan/Capability/Evidence assertions"
+        )
 
 @dataclass(frozen=True)
 class AdapterContext:
@@ -176,6 +196,7 @@ class LegacyJsonAdapter:
                     f"{context.source_path}[{index}] must be an object, got {type(raw_item).__name__}"
                 )
             item = dict(raw_item)
+            _reject_retired_semantic_expectations(item)
             scenario_id, source_id = _stable_id(context, item, index)
             primary = _as_strings(_first(item, PRIMARY_KEYS))
             explicit_primary = bool(primary)

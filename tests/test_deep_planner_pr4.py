@@ -33,7 +33,7 @@ class DeepPlannerMixedAccountingNormalizationTests(unittest.TestCase):
         capabilities = [
             {
                 "capability_id": "soridormi.walk_forward",
-                "route": "robot_action",
+                "effects": ["physical_motion"],
             },
             {
                 "capability_id": "chromie.clock.local",
@@ -216,7 +216,7 @@ class FullCatalog:
         self.items = [
             CatalogCapability(
                 capability_id="soridormi.walk_forward", agent_id="capability_agent",
-                description="Walk forward", route="robot_action", available=True,
+                description="Walk forward", effects=["physical_motion"], available=True,
                 interaction_executable=True, prompt_tier="common",
                 input_schema={"type":"object","properties":{"duration_s":{"type":"number","minimum":0.1}},"required":["duration_s"]},
                 can_run_parallel=False, parallel_metadata_declared=True,
@@ -224,7 +224,7 @@ class FullCatalog:
             ),
             CatalogCapability(
                 capability_id="soridormi.blink_eyes", agent_id="capability_agent",
-                description="Blink eyes", route="robot_action", available=True,
+                description="Blink eyes", effects=["visual_expression"], available=True,
                 interaction_executable=True, prompt_tier="common",
                 input_schema={"type":"object","properties":{"count":{"type":"integer","minimum":1,"maximum":10}},"required":["count"]},
                 can_run_parallel=True, parallel_metadata_declared=True,
@@ -232,7 +232,7 @@ class FullCatalog:
             ),
             CatalogCapability(
                 capability_id="soridormi.look_at_person", agent_id="capability_agent",
-                description="Look at a person", route="robot_action", available=True,
+                description="Look at a person", effects=["physical_motion"], available=True,
                 interaction_executable=True, prompt_tier="common",
                 input_schema={
                     "type": "object",
@@ -245,13 +245,13 @@ class FullCatalog:
             ),
             CatalogCapability(
                 capability_id="rare.observe_doorway", agent_id="capability_agent",
-                description="Observe doorway", route="tool", available=True,
+                description="Observe doorway", effects=["read_only"], available=True,
                 interaction_executable=True, prompt_tier="rare",
                 input_schema={"type":"object","properties":{}},
             ),
             CatalogCapability(
                 capability_id="chromie.speak", agent_id="capability_agent",
-                description="Speak text", route="chat", available=True,
+                description="Speak text", effects=["user_interaction", "audio_output"], available=True,
                 interaction_executable=True, prompt_tier="common",
                 input_schema={
                     "type": "object",
@@ -276,7 +276,7 @@ class GranularResourceCatalog(FullCatalog):
                     capability_id="soridormi.acquire_resource",
                     agent_id="capability_agent",
                     description="Acquire a physical resource.",
-                    route="robot_action",
+                    effects=["physical_motion", "object_manipulation"],
                     available=True,
                     interaction_executable=True,
                     prompt_tier="common",
@@ -297,7 +297,7 @@ class GranularResourceCatalog(FullCatalog):
                     capability_id="soridormi.deliver_resource",
                     agent_id="capability_agent",
                     description="Deliver an acquired physical resource.",
-                    route="robot_action",
+                    effects=["physical_motion", "object_manipulation"],
                     available=True,
                     interaction_executable=True,
                     prompt_tier="common",

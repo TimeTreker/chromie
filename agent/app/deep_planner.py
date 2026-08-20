@@ -995,7 +995,6 @@ class DeepPlannerResolver:
             "capability_id": item.capability_id,
             "description": item.description,
             "input_schema": item.input_schema,
-            "route": item.route,
             "available": item.available,
             "interaction_executable": item.interaction_executable,
             "requires_confirmation": item.requires_confirmation,
@@ -1824,7 +1823,7 @@ class DeepPlannerResolver:
             "executable Goals without promising a substitute effect. "
             "When retained or provisional Runtime Activities are supplied for Work reconciliation, decide whether they still advance the canonical Goals. Reuse is an explicit semantic choice: set reuse_activity_id to the supplied stable activity_id only while preserving its Capability ID, exact arguments, Goal ownership, and timing; omit reuse_activity_id when authoring replacement Work. Runtime validates live identity and state and never infers reuse from similarity. "
             "A plan step may contain only step_id, capability_id, args, timing, source_goal_ids, reuse_activity_id, and reason_summary. "
-            "Use capability_id as the executable identity. Do not copy catalog-only fields such as input_schema, parameters, route, step_type, or effects into a plan step. "
+            "Use capability_id as the executable identity. Do not copy catalog-only fields such as input_schema, parameters, step_type, or effects into a plan step. "
             "Use exactly the supplied canonical goal IDs. Do not create goals for internal status checks, safety checks, capability lookups, or implementation preconditions; represent any justified internal operation only as a step owned by an existing user goal. "
             "Keep the plan minimal: every executable step must be necessary for one concrete observable outcome in the canonical Goal that owns it. A general body_action output mode does not authorize unrelated body effects. Do not add a blink, gaze, gesture, posture, attention expression, personality flourish, social enhancement, neutral-position, reset, transition, cleanup, or other presentation step merely to seem natural or improve the interaction. Optional coordinated expression belongs to the separate Social Attention owner; it enters the main Plan only when the user explicitly requested that exact observable effect or a supplied capability execution constraint explicitly requires it. "
             "goal_outcomes is a JSON object keyed by every supplied canonical goal ID exactly once, never a list; every Deep Planner result must include it. Every outcome must explicitly author disposition, coverage, response_text, unresolved, step_ids, satisfaction, and rationale. Each value describes only that key's goal and must not repeat goal_id inside the value. Per-goal outcome invariants are mandatory: execute requires coverage=complete and at least one real plan step_id copied exactly from steps; respond requires coverage=complete, the actual answer text now (not a promise that it will be supplied later), and zero step_ids; clarify requires coverage=partial or uncertain, exact natural response_text, and zero step_ids; unavailable and refused require exact natural response_text and zero step_ids. Top-level and per-goal satisfaction are always non-null model judgments with score, status, satisfied_goal_ids, unmet_goal_ids, unmet_requirements, and rationale. A satisfaction score from 0.95 through 1.0 requires status=exact; score=1.0 must never use substantial. Do not assign a physical skill to a conversational answer merely because it is the nearest remaining capability. "
@@ -1956,7 +1955,6 @@ class DeepPlannerResolver:
                 "capability_id",
                 "description",
                 "input_schema",
-                "route",
                 "requires_confirmation",
                 "effects",
                 "safety_class",

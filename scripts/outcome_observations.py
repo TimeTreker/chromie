@@ -217,7 +217,7 @@ def collect_llm_integrity_violations(summary: dict[str, Any]) -> list[dict[str, 
             for index, nested in enumerate(value):
                 scan_metadata(f"{source}[{index}]", nested)
 
-    for key in ("cognitive_runtime", "route", "interaction_response"):
+    for key in ("cognitive_runtime", "interaction_response"):
         scan_metadata(key, summary.get(key))
     return violations
 

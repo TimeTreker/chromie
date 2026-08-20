@@ -12,7 +12,6 @@ SPEAKER_FLAG=--speaker
 PREVIEW_ONLY=0
 GRANT_CONFIRMATION=1
 SKILL_TIMEOUT_S="${CHROMIE_VOICE_MUJOCO_SKILL_TIMEOUT_S:-120}"
-EXPECT_ROUTE=()
 EXPECT_NO_SKILLS=()
 EXPECT_SKILL=()
 EXPECT_ARGS=()
@@ -41,13 +40,10 @@ Options:
   --soridormi-repo DIR       Declared paired checkout for diagnostic provenance; default: ../soridormi
   --speaker                  Play Chromie TTS through configured speaker; default
   --no-speaker               Headless check without speaker playback
-  --preview-only             Route and validate without executing Soridormi skills
+  --preview-only             Plan and validate without executing Soridormi skills
   --no-grant-confirmation   Do not grant confirmation in this diagnostic harness
   --capability-timeout-s SECONDS  Per-Soridormi-skill timeout; default: 120
   --evidence-dir DIR         Write evidence to a specific directory
-  --expect-route ROUTE       Post-run assertion for Goal Interpretation route: chat, deep_thought,
-                             robot_action, tool, memory, clarify, interrupt,
-                             or ignore
   --expect-no-skills         Post-run assertion for no Soridormi skill emission
   --expect-capability CAPABILITY_ID    Post-run assertion for the exact planned skill sequence
   --expect-arg I:KEY=VALUE   Post-run assertion for an emitted skill argument
@@ -68,7 +64,6 @@ while [ "$#" -gt 0 ]; do
     --no-grant-confirmation) GRANT_CONFIRMATION=0; shift ;;
     --capability-timeout-s) SKILL_TIMEOUT_S="${2:?--capability-timeout-s requires seconds}"; shift 2 ;;
     --evidence-dir) EVIDENCE_DIR="${2:?--evidence-dir requires a directory}"; shift 2 ;;
-    --expect-route) EXPECT_ROUTE+=(--expect-route "${2:?--expect-route requires a route}"); shift 2 ;;
     --expect-no-skills) EXPECT_NO_SKILLS+=(--expect-no-skills); shift ;;
     --expect-capability) EXPECT_SKILL+=(--expect-capability "${2:?--expect-capability requires a skill id}"); shift 2 ;;
     --expect-arg) EXPECT_ARGS+=(--expect-arg "${2:?--expect-arg requires I:KEY=VALUE}"); shift 2 ;;
@@ -94,11 +89,10 @@ if [ -z "$TEXT" ]; then
   exit 2
 fi
 
-if [ "${#EXPECT_ROUTE[@]}" -eq 0 ] \
-  && [ "${#EXPECT_NO_SKILLS[@]}" -eq 0 ] \
+if [ "${#EXPECT_NO_SKILLS[@]}" -eq 0 ] \
   && [ "${#EXPECT_SKILL[@]}" -eq 0 ] \
   && [ "${#EXPECT_ARGS[@]}" -eq 0 ]; then
-  echo "[voice-mujoco-text] Natural input mode: no --expect-* assertions supplied; Chromie will infer route and skills from the text." >&2
+  echo "[voice-mujoco-text] Natural input mode: no --expect-* assertions supplied; Chromie will interpret the Goal and plan from the text." >&2
 else
   echo "[voice-mujoco-text] Assertion mode: --expect-* flags validate the output after Chromie has already planned from the text." >&2
 fi
@@ -140,7 +134,7 @@ else
 fi
 if [ -n "$EVIDENCE_DIR" ]; then args+=(--evidence-dir "$EVIDENCE_DIR"); fi
 args+=(
-  "${EXPECT_ROUTE[@]}"
+
   "${EXPECT_NO_SKILLS[@]}"
   "${EXPECT_SKILL[@]}"
   "${EXPECT_ARGS[@]}"

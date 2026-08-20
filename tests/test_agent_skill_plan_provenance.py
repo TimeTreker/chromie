@@ -301,10 +301,8 @@ class AgentSkillPlanProvenanceTests(unittest.TestCase):
                 skill_id="chromie.method-only",
             ),
         )
-        self.assertEqual(
-            CanonicalPlanRuntimeAdapter.lane_for_plan(base),
-            CanonicalPlanRuntimeAdapter.lane_for_plan(informed),
-        )
+        self.assertEqual(base.steps, informed.steps)
+        self.assertEqual(base.goal_ids, informed.goal_ids)
         self.assertEqual(
             [step.capability_id for step in base.steps],
             [step.capability_id for step in informed.steps],

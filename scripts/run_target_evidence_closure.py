@@ -616,8 +616,6 @@ def collect_social(args: argparse.Namespace) -> int:
             "--output",
             str(output),
         ]
-        for lane in args.apply_lane:
-            command.extend(["--apply-lane", lane])
         for model in args.effective_model:
             command.extend(["--effective-model", model])
         commands.append(command)
@@ -894,9 +892,6 @@ def build_parser() -> argparse.ArgumentParser:
     collect_social_parser.add_argument("--runtime-topology", required=True)
     collect_social_parser.add_argument(
         "--effective-model", action="append", default=[], metavar="COMPONENT=MODEL"
-    )
-    collect_social_parser.add_argument(
-        "--apply-lane", action="append", default=["chat", "robot_action"]
     )
     collect_social_parser.add_argument("--sample-count", type=int, default=1)
     collect_social_parser.add_argument("--timeout-s", type=float, default=180.0)

@@ -462,10 +462,6 @@ def validate_closure_summary(
     errors.extend(_safe_idle_errors(summary.get("status_before"), label="before"))
     errors.extend(_safe_idle_errors(summary.get("status_after"), label="after"))
 
-    route = summary.get("route")
-    route = route if isinstance(route, dict) else {}
-    if route.get("route") != "robot_action":
-        errors.append(f"route is not robot_action: {route.get('route')!r}")
 
     cognitive = summary.get("cognitive_runtime")
     cognitive = cognitive if isinstance(cognitive, dict) else {}
@@ -752,8 +748,6 @@ def _build_live_command(
         str(runtime_identity_path),
         "--conversation-id",
         conversation_id,
-        "--cognitive-apply-lanes",
-        "chat,memory,robot_action,tool",
         "--grant-confirmation",
         "--require-speech",
         "--reject-internal-speech",

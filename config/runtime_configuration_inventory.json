@@ -1123,7 +1123,6 @@
         "orchestrator/runtime/host_settings.py",
         "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
-        "scripts/deep_thought_response_check.py",
         "scripts/general_ability_acceptance.py",
         "scripts/interaction_text_mujoco_check.py",
         "scripts/preflight_cognitive_gateway_core_qualification.py",
@@ -2180,8 +2179,7 @@
         "env/modes/services.env",
         "env/modes/speech.env",
         "env/modes/voice_mujoco.env",
-        "orchestrator/runtime/host_settings.py",
-        "scripts/deep_thought_response_check.py"
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2256,7 +2254,6 @@
         "orchestrator/runtime/host_settings.py",
         "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
-        "scripts/deep_thought_response_check.py",
         "scripts/interaction_text_mujoco_check.py"
       ]
     },
@@ -2268,7 +2265,6 @@
         "orchestrator/runtime/host_settings.py",
         "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
-        "scripts/deep_thought_response_check.py",
         "scripts/interaction_text_mujoco_check.py"
       ]
     },
@@ -2305,23 +2301,6 @@
         ".env.common",
         "orchestrator/runtime/host_settings.py",
         "orchestrator/runtime/interaction_coordinator.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "profile_constant",
-      "key": "ORCH_COGNITIVE_APPLY_LANES",
-      "owners": [
-        ".env.common",
-        "env/modes/qualification.env",
-        "env/modes/services.env",
-        "env/modes/speech.env",
-        "env/modes/voice_mujoco.env",
-        "orchestrator/.env.local.example",
-        "orchestrator/runtime/host_settings.py",
-        "scripts/closed_loop_e2e.py",
-        "scripts/cognitive_gateway_core_live_text.py",
-        "scripts/interaction_text_mujoco_check.py"
       ]
     },
     {
@@ -2655,7 +2634,6 @@
         "orchestrator/runtime/host_settings.py",
         "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
-        "scripts/deep_thought_response_check.py",
         "scripts/interaction_text_mujoco_check.py"
       ]
     },
@@ -2709,7 +2687,6 @@
         "orchestrator/runtime/host_settings.py",
         "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
-        "scripts/deep_thought_response_check.py",
         "scripts/interaction_text_mujoco_check.py"
       ]
     },
@@ -2727,7 +2704,6 @@
         "orchestrator/runtime/host_settings.py",
         "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
-        "scripts/deep_thought_response_check.py",
         "scripts/interaction_text_mujoco_check.py"
       ]
     },
@@ -2771,7 +2747,6 @@
         "orchestrator/runtime/session.py",
         "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
-        "scripts/deep_thought_response_check.py",
         "scripts/interaction_text_mujoco_check.py"
       ]
     },
@@ -2780,104 +2755,6 @@
       "category": "service_internal",
       "key": "ORCH_EXPERIENCE_LOG_PATH",
       "owners": [
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "profile_constant",
-      "key": "ORCH_FAST_FIRST_AUDIO_CACHE_DIR",
-      "owners": [
-        ".env.common",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "ORCH_FAST_FIRST_AUDIO_CACHE_REVISION",
-      "owners": [
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": true,
-      "category": "profile_constant",
-      "key": "ORCH_FAST_FIRST_AUDIO_CONTENT_GATE_ENABLED",
-      "owners": [
-        ".env.common",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": true,
-      "category": "profile_constant",
-      "key": "ORCH_FAST_FIRST_AUDIO_ENABLED",
-      "owners": [
-        ".env.common",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "profile_constant",
-      "key": "ORCH_FAST_FIRST_AUDIO_GENERATION_ATTEMPTS",
-      "owners": [
-        ".env.common",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "profile_constant",
-      "key": "ORCH_FAST_FIRST_AUDIO_HEDGE_MS",
-      "owners": [
-        ".env.common",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "profile_constant",
-      "key": "ORCH_FAST_FIRST_AUDIO_MAX_CUE_SECONDS",
-      "owners": [
-        ".env.common",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": true,
-      "category": "profile_constant",
-      "key": "ORCH_FAST_FIRST_AUDIO_PRIME_ON_STARTUP",
-      "owners": [
-        ".env.common",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "profile_constant",
-      "key": "ORCH_FAST_FIRST_AUDIO_PRIME_TIMEOUT_MS",
-      "owners": [
-        ".env.common",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "profile_constant",
-      "key": "ORCH_FAST_FIRST_AUDIO_TRANSCRIPT_MIN_SIMILARITY",
-      "owners": [
-        ".env.common",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": true,
-      "category": "profile_constant",
-      "key": "ORCH_FAST_FIRST_RESPONSE_ENABLED",
-      "owners": [
-        ".env.common",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -3229,7 +3106,6 @@
         "env/modes/qualification.env",
         "orchestrator/.env.local.example",
         "orchestrator/runtime/host_settings.py",
-        "scripts/deep_thought_response_check.py",
         "scripts/interaction_text_mujoco_check.py"
       ]
     },
@@ -3259,7 +3135,6 @@
         ".env.common",
         "orchestrator/.env.local.example",
         "orchestrator/runtime/host_settings.py",
-        "scripts/deep_thought_response_check.py",
         "scripts/interaction_text_mujoco_check.py"
       ]
     },
@@ -3495,7 +3370,6 @@
         "orchestrator/runtime/host_settings.py",
         "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
-        "scripts/deep_thought_response_check.py",
         "scripts/interaction_text_mujoco_check.py"
       ]
     },
@@ -3582,7 +3456,6 @@
       "owners": [
         ".env.common",
         "docker-compose.yml",
-        "scripts/deep_thought_response_check.py",
         "scripts/general_ability_acceptance.py",
         "scripts/interaction_text_mujoco_check.py",
         "scripts/preflight_cognitive_gateway_core_qualification.py",

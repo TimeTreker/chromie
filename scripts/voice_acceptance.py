@@ -1173,15 +1173,11 @@ def friendly_event_line(event: dict[str, Any]) -> str | None:
     prefix = f"[{sid}]"
     if name == "asr_final":
         return f"{prefix} ASR heard: {extract_asr_text(event)!r}"
-    if name == "goal_interpretation_done":
-        return (
-            f"{prefix} Goal Interpretation: route={message_field(message, 'route') or '?'} "
-            f"intent={message_field(message, 'intent') or '?'}"
-        )
     if name == "cognitive_core_done":
         return (
-            f"{prefix} Cognitive Core: lane={message_field(message, 'lane') or '?'} "
-            f"intent={message_field(message, 'intent') or '?'}"
+            f"{prefix} Cognitive Core: responsibilities={message_field(message, 'responsibilities') or '?'} "
+            f"confidence={message_field(message, 'confidence') or '?'} "
+            f"unresolved={message_field(message, 'unresolved') or '?'}"
         )
     if name == "cognitive_gateway_reflex_applied":
         return (
@@ -1676,28 +1672,16 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
         )
 
     def semantic_decision_rows() -> list[tuple[int, dict[str, Any], str]]:
-        decision_rows = [
-            *rows("cognitive_core_done"),
-            *rows("goal_interpretation_done"),
-        ]
-        decision_rows.sort(key=lambda value: value[0])
-        return decision_rows
+        return rows("cognitive_core_done")
 
     def interrupt_decision_rows() -> list[tuple[int, dict[str, Any], str]]:
-        decision_rows = [
-            row
-            for row in rows("goal_interpretation_done")
-            if field(row[1], "route") == "interrupt"
-        ]
-        decision_rows.extend(
+        return [
             row
             for row in rows("cognitive_gateway_reflex_applied")
             if field(row[1], "action") == "interrupt"
             and str(field(row[1], "goal_interpretation_bypassed") or "").casefold()
             == "true"
-        )
-        decision_rows.sort(key=lambda value: value[0])
-        return decision_rows
+        ]
 
     def require_semantic_decision() -> None:
         checks.append(
@@ -1705,8 +1689,7 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
                 name="Cognitive Core semantic decision",
                 passed=bool(semantic_decision_rows()),
                 detail=(
-                    "required event: cognitive_core_done "
-                    "(goal_interpretation_done is accepted only for compatibility evidence)"
+                    "required event: cognitive_core_done"
                 ),
             )
         )
@@ -2640,7 +2623,7 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
         )
         checks.append(
             CheckResult(
-                "deterministic stop route",
+                "deterministic stop reflex",
                 deterministic,
                 "the Cognitive Gateway must retain its deterministic interrupt receipt",
             )
@@ -2945,11 +2928,6 @@ def build_metadata(args: argparse.Namespace, selected: list[str]) -> dict[str, A
             "mode": args.mode,
             "semantic_runtime": {
                 "mode": "apply",
-                "apply_lanes": (
-                    ["chat", "tool"]
-                    if not BODY_CASES.intersection(selected)
-                    else ["chat", "robot_action", "tool"]
-                ),
                 "failure_policy": "fail_closed_no_semantic_reentry",
             },
             "human_supervised_mode": args.mode == "supervised",
@@ -3008,9 +2986,6 @@ def write_override_file(
         "ORCH_ENABLE_INTERACTION_RESPONSE": "1",
         "ORCH_ENABLE_SORIDORMI_CAPABILITIES": "1" if enable_soridormi else "0",
         "ORCH_COGNITIVE_RUNTIME_MODE": "apply",
-        "ORCH_COGNITIVE_APPLY_LANES": (
-            "chat,memory,robot_action,tool" if enable_soridormi else "chat,memory,tool"
-        ),
         "ORCH_COGNITIVE_EVIDENCE_ENABLED": "1",
         "ORCH_COGNITIVE_EVIDENCE_INCLUDE_TEXT": "0",
         "ORCH_COGNITIVE_EVIDENCE_PATH": str(

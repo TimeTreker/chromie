@@ -43,7 +43,7 @@ def test_explicit_deterministic_oracle_keeps_fixture_truth_authoritative() -> No
         source=SourceReference(path="fixture.json", adapter="test"),
         inputs={"user_text": "weather"},
         primary_outcomes=["preserved human-readable description"],
-        legacy_expectations={"expected_route": "tool"},
+        legacy_expectations={"expected_status": "ok"},
         oracle_policy=OraclePolicy.create(
             mode="deterministic",
             deterministic_sources=["legacy_expectations"],
@@ -62,24 +62,27 @@ def test_oracle_contract_rejects_missing_semantic_dimensions() -> None:
         OraclePolicy.create(mode="hybrid", deterministic_sources=["fixture"])
 
 
-def test_legacy_list_preserves_declared_id_and_expectation() -> None:
-    cases = normalize_payload(
-        [{"scenario_id": "goal_interpretation.weather.zh", "user_text": "重庆天气如何？", "expected_route": "tool"}],
-        source_path="scenarios/goal_interpretation/weather.json",
-        layer="module",
-        datasets=["goal_interpretation", "tool_use"],
-        evidence_requirements=["replay"],
-    )
-    assert cases[0]["id"] == "goal_interpretation.weather.zh"
-    assert cases[0]["inputs"] == {"user_text": "重庆天气如何？"}
-    assert cases[0]["legacy_expectations"]["expected_route"] == "tool"
-    assert cases[0]["source"]["source_id"] == "goal_interpretation.weather.zh"
-    assert cases[0]["oracle_policy"]["mode"] == "deterministic"
+def test_legacy_adapter_rejects_retired_route_expectations() -> None:
+    with pytest.raises(ContractError, match="retired route/intent expectations"):
+        normalize_payload(
+            [{"scenario_id": "goal_interpretation.weather.zh", "user_text": "重庆天气如何？", "expected_route": "tool"}],
+            source_path="scenarios/goal_interpretation/weather.json",
+            layer="module",
+            datasets=["goal_interpretation", "tool_use"],
+            evidence_requirements=["replay"],
+        )
+    with pytest.raises(ContractError, match="retired route/intent expectations"):
+        normalize_payload(
+            {"cases": [{"name": "greeting", "input": "hello", "expected": {"route": "chat"}}]},
+            source_path="scenarios/interaction/greeting.json",
+            layer="integration",
+            datasets=["interaction"],
+        )
 
 
 def test_legacy_container_and_single_case_are_supported() -> None:
     container = normalize_payload(
-        {"cases": [{"name": "greeting", "input": "hello", "expected": {"route": "chat"}}]},
+        {"cases": [{"name": "greeting", "input": "hello", "expected": {"status": "ok"}}]},
         source_path="scenarios/interaction/greeting.json",
         layer="integration",
         datasets=["interaction"],

@@ -371,8 +371,6 @@ def _collect_stages(
         "--timeout-s",
         str(args.timeout_s),
         speaker_flag,
-        "--expect-route",
-        "robot_action",
         "--reject-internal-speech",
     ]
     for capability_id in required_capabilities:
@@ -397,8 +395,6 @@ def _collect_stages(
         "--interrupt-start-timeout-s",
         str(args.interrupt_start_timeout_s),
         speaker_flag,
-        "--expect-route",
-        "robot_action",
         "--interrupt-text",
         interrupt_text,
         "--interrupt-capability-prefix",

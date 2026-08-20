@@ -744,12 +744,7 @@ async def execute_local_tool(request: ToolExecutionRequest) -> ToolExecutionResp
 async def resolve_goal_association(request: CognitiveWorkRequest):
     if goal_association_resolver is None:
         raise HTTPException(status_code=503, detail="Goal association resolver is disabled")
-    prepared, disclosure = await agent_skill_progressive_disclosure.prepare_agent_request(
-        request,
-        "goal_association",
-    )
-    result = await goal_association_resolver.resolve(prepared)
-    return attach_disclosure_metadata(result, disclosure)
+    return await goal_association_resolver.resolve(request)
 
 
 @app.post(

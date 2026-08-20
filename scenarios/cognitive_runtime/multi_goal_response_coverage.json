@@ -15,14 +15,6 @@
   },
   "stub": {
     "mode": "apply",
-    "apply_lanes": [
-      "chat"
-    ],
-    "route_decision": {
-      "route": "chat",
-      "intent": "multi_goal_information",
-      "language": "zh-CN"
-    },
     "goal_association": {
       "turn_id": "turn-multi",
       "new_goals": [
@@ -96,7 +88,6 @@
   },
   "expect": {
     "status": "applied",
-    "lane": "chat",
     "planner_tier": "fast",
     "disposition": "respond",
     "coverage": "complete",

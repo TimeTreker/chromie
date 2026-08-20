@@ -107,13 +107,13 @@ only as evidence; they do not become production execution authority.
 
 ## Runtime modes and failure behavior
 
-`apply` is the maintained semantic mode. Planner output is mechanically projected
-to a runtime lane from the terminal `CanonicalPlan` (`chat`, `memory`, `tool`,
-`robot_action`, or `unsupported`); GI does not emit or own that lane. A lane not
-allowed by `ORCH_COGNITIVE_APPLY_LANES` fails closed. Once Goal-driven semantic
-ownership begins, technical failure, terminal-lane mismatch, Planner-response
-projection failure, trusted runtime rejection, or Goal-state commit failure cannot
-transfer the same turn to another semantic planner.
+`apply` is the maintained semantic mode. The terminal `CanonicalPlan` is validated
+directly against declared Capability schemas, semantic scope, safety, confirmation,
+resource, concurrency, availability, and provider contracts. There is no intermediate
+`chat`/`memory`/`tool`/`robot_action` semantic lane. Once Goal-driven semantic
+ownership begins, technical failure, Planner-response projection failure, trusted
+runtime rejection, or Goal-state commit failure cannot transfer the same turn to
+another semantic planner.
 
 `report_only` may run the same cognitive stages as an observer and retain
 diagnostics, but it has no authority to commit user-visible speech, Goal state,

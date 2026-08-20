@@ -81,7 +81,6 @@ def _parser() -> argparse.ArgumentParser:
         choices=("off", "report_only", "on"),
         help="Launcher-effective Social Attention mode for this homogeneous run.",
     )
-    parser.add_argument("--apply-lane", action="append", default=[])
     parser.add_argument("--semantic-authority-owner")
     parser.add_argument("--runtime-topology")
     parser.add_argument("--sample-count", type=int, default=1)
@@ -187,7 +186,6 @@ def main(argv: list[str] | None = None) -> int:
                 mind_profile=args.mind_profile,
                 social_interaction_style=args.social_style,
                 social_attention_mode=args.social_attention_mode,
-                apply_lanes=tuple(args.apply_lane),
                 semantic_authority_owner=args.semantic_authority_owner,
                 runtime_topology=args.runtime_topology,
                 sample_count=args.sample_count,

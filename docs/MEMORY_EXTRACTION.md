@@ -205,8 +205,8 @@ Memory is interpretive context, not authority.
 2. Implemented first slice: `MemoryExtractor` reads the latest user turn,
    structured task context metadata, explicit extracted-memory metadata, and
    Trusted Capability Runtime outcomes.
-3. Implemented first slice: deterministic extraction from route metadata, task
-   context patches, explicit memory entries, `memory_agent` updates, and
+3. Implemented first slice: deterministic extraction from typed task/context
+   metadata, explicit memory entries, model-authored memory updates, and trusted
    runtime task outcomes.
 4. Future: add an optional LLM-assisted extractor only after the deterministic
    path is covered, with strict JSON output and low temperature.
@@ -218,7 +218,7 @@ Memory is interpretive context, not authority.
    capability planning and review prompts rely on extracted memory/task context
    instead of raw history.
 7. Implemented first slice: focused tests cover extracted-memory storage,
-   reset and hard-idle expiry, keyed correction updates, explicit memory-route
+   reset and hard-idle expiry, keyed correction updates, explicit typed memory
    updates, trusted outcome memory, Goal Interpreter prompt sanitization,
    conversation/capability prompt migration, and deepthinking memory visibility.
 8. Implemented: terminal Goal history may feed evidence-grounded local

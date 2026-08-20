@@ -109,7 +109,6 @@ class _LoadedAgentSkillPackage:
             extends=self.metadata.extends,
             required_capabilities=self.metadata.required_capabilities,
             optional_capabilities=self.metadata.optional_capabilities,
-            applicable_routes=self.metadata.applicable_routes,
             applicable_output_modes=self.metadata.applicable_output_modes,
             applicable_information_domains=(
                 self.metadata.applicable_information_domains

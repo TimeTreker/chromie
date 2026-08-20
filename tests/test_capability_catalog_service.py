@@ -332,10 +332,6 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
             language="en",
             limit=32,
         )
-
-        self.assertFalse(result.matched)
-        self.assertEqual(result.suggested_route, "chat")
-        self.assertEqual(result.suggested_agents, [])
         self.assertTrue(
             any(
                 match.capability_id == "soridormi.walk_forward"
@@ -487,7 +483,6 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(speak.prompt_tier, "common")
         self.assertTrue(speak.interaction_executable)
-        self.assertEqual(speak.route, "chat")
 
     async def test_weather_lookup_tool_is_common_goal_interpreter_visible_tool(self) -> None:
         registry = CapabilityRegistry.from_bundles([chromie_capability_bundle()])
@@ -495,8 +490,6 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
 
         common = await catalog.prompt_entries(scope="common")
         weather = next(item for item in common if item.capability_id == "chromie.weather.lookup")
-
-        self.assertEqual(weather.route, "tool")
         self.assertEqual(weather.agent_id, "chromie.weather")
         self.assertEqual(weather.safety_class, "safe_read")
         self.assertFalse(weather.requires_confirmation)
@@ -514,8 +507,6 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
 
         common = await catalog.prompt_entries(scope="common")
         clock = next(item for item in common if item.capability_id == "chromie.clock.local")
-
-        self.assertEqual(clock.route, "tool")
         self.assertEqual(clock.agent_id, "chromie.clock")
         self.assertEqual(clock.safety_class, "safe_read")
         self.assertTrue(clock.interaction_executable)
@@ -542,14 +533,12 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
             for item in common
             if item.capability_id == "chromie.memory.retrieve_verified_tool_result"
         )
-
-        self.assertEqual(retrieval.route, "tool")
         self.assertEqual(retrieval.agent_id, "chromie.memory")
         self.assertEqual(retrieval.safety_class, "safe_read")
         self.assertIn("read_only", retrieval.effects)
         self.assertNotIn("memory_write", retrieval.effects)
 
-    async def test_declared_memory_write_keeps_the_memory_route(self) -> None:
+    async def test_declared_memory_write_remains_explicit_effect_metadata(self) -> None:
         registry = CapabilityRegistry.from_bundles(
             [
                 CapabilityBundle(
@@ -579,21 +568,18 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
             if item["capability_id"] == "chromie.preference-memory.remember"
         )
 
-        self.assertEqual(writer["route"], "memory")
+        self.assertIn("memory_write", writer["effects"])
+        self.assertNotIn("route", writer)
 
     async def test_chinese_weather_query_receives_catalog_without_host_match(self) -> None:
         registry = CapabilityRegistry.from_bundles([chromie_capability_bundle()])
         catalog = CapabilityCatalog(registry, live_invoker=None)
 
         result = await catalog.search("今天重庆天气怎么样？", language="zh-CN", limit=32)
-
-        self.assertFalse(result.matched)
-        self.assertEqual(result.suggested_route, "chat")
         weather = next(
             item for item in result.matches
             if item.capability_id == "chromie.weather.lookup"
         )
-        self.assertEqual(weather.route, "tool")
         self.assertEqual(weather.score, 0.0)
         self.assertTrue(weather.can_run_parallel)
         self.assertTrue(weather.parallel_metadata_declared)
@@ -607,8 +593,6 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
             limit=32,
             prefer_interaction_executable=True,
         )
-
-        self.assertFalse(result.matched)
         nod = next(
             item for item in result.matches
             if item.capability_id == "soridormi.nod_yes"
@@ -624,9 +608,6 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
             limit=32,
             prefer_interaction_executable=True,
         )
-
-        self.assertFalse(result.matched)
-        self.assertEqual(result.suggested_route, "chat")
         self.assertTrue(
             any(
                 match.capability_id == "soridormi.shake_no"
@@ -644,9 +625,6 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
             limit=32,
             prefer_interaction_executable=True,
         )
-
-        self.assertFalse(result.matched)
-        self.assertEqual(result.suggested_route, "chat")
         self.assertTrue(
             any(
                 match.capability_id == "soridormi.blink_eyes"
@@ -668,9 +646,6 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
             limit=32,
             prefer_interaction_executable=True,
         )
-
-        self.assertFalse(result.matched)
-        self.assertEqual(result.suggested_route, "chat")
         self.assertTrue(all(match.score == 0.0 for match in result.matches))
         self.assertTrue(
             any(
@@ -691,8 +666,6 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker())
 
         result = await catalog.search("What can you do?", language="en")
-
-        self.assertFalse(result.matched)
         self.assertTrue(result.matches)
         self.assertTrue(any(match.interaction_executable for match in result.matches))
 
@@ -700,9 +673,6 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker())
 
         result = await catalog.search("Who are you? What's your name?", language="en")
-
-        self.assertFalse(result.matched)
-        self.assertEqual(result.suggested_route, "chat")
         self.assertFalse(any(match.score >= 0.10 for match in result.matches))
 
     async def test_context_distinguishes_executable_from_planning_only(self) -> None:

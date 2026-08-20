@@ -6,8 +6,8 @@
   "authority": "benchmark_suite",
   "source_strategy": "referenced_in_place",
   "runtime_policy_authority": false,
-  "expected_inventory_total": 350,
-  "expected_normalized_total": 349,
+  "expected_inventory_total": 349,
+  "expected_normalized_total": 348,
   "allowed_datasets": [
     "asr_noise",
     "bilingual",
@@ -76,7 +76,7 @@
       ],
       "target_reference": "integration/goal_driven_runtime",
       "migration_state": "referenced_in_place",
-      "expected_inventory_count": 16
+      "expected_inventory_count": 15
     },
     {
       "name": "cognitive_core_dialogue",

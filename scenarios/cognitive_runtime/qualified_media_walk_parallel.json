@@ -17,15 +17,6 @@
   },
   "stub": {
     "mode": "apply",
-    "apply_lanes": [
-      "robot_action",
-      "tool"
-    ],
-    "route_decision": {
-      "route": "robot_action",
-      "intent": "parallel_body_and_media_activity",
-      "language": "en-US"
-    },
     "goal_association": {
       "turn_id": "turn-qualified-media-walk",
       "new_goals": [
@@ -241,7 +232,6 @@
   },
   "expect": {
     "status": "applied",
-    "lane": "robot_action",
     "planner_tier": "deep",
     "disposition": "execute",
     "coverage": "complete",

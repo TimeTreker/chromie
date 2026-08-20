@@ -214,8 +214,7 @@ def build_inventory(root: Path = ROOT) -> dict:
     required_mode_keys = {
         "CHROMIE_OPERATOR_MODE",
         "ORCH_ACTION_DRY_RUN",
-        "ORCH_COGNITIVE_APPLY_LANES",
-        "ORCH_COGNITIVE_RUNTIME_MODE",
+            "ORCH_COGNITIVE_RUNTIME_MODE",
         "ORCH_ENABLE_AGENT",
         "ORCH_ENABLE_INTERACTION_RESPONSE",
         "ORCH_ENABLE_SORIDORMI_CAPABILITIES",

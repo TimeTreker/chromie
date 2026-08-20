@@ -1205,14 +1205,10 @@ async def evaluate_cognitive_runtime_scenario(
     client = _CognitiveScenarioClient(stub)
     runtime = _CognitiveScenarioRuntime(list(stub.get("capabilities") or []))
     mode = str(stub.get("mode") or "report_only")
-    apply_lanes = frozenset(str(item) for item in (stub.get("apply_lanes") or ["chat", "robot_action"]))
     coordinator = GoalDrivenRuntimeCoordinator(
         agent_client=client,
         adapter=CanonicalPlanRuntimeAdapter(runtime),
-        policy=CognitiveRuntimePolicy(
-            mode=mode,
-            apply_lanes=apply_lanes,
-        ),
+        policy=CognitiveRuntimePolicy(mode=mode),
     )
     gateway = CognitiveGateway()
     capture = gateway.capture(
@@ -1294,7 +1290,6 @@ async def evaluate_cognitive_runtime_scenario(
                 speech_covers_goal_ids.append(goal_id)
     actual = {
         "status": resolution.status,
-        "lane": resolution.lane,
         "fallback_reason": resolution.fallback_reason,
         "planner_tier": terminal.planner_tier if terminal is not None else None,
         "disposition": terminal.disposition if terminal is not None else None,
@@ -1324,7 +1319,7 @@ async def evaluate_cognitive_runtime_scenario(
     }
     expect = scenario.expect
     errors: list[str] = []
-    for key in ("status", "lane", "planner_tier", "disposition", "coverage"):
+    for key in ("status", "planner_tier", "disposition", "coverage"):
         if key in expect and actual[key] != expect[key]:
             errors.append(f"{key}={actual[key]!r}, expected {expect[key]!r}")
     if "goal_outcomes" in expect and actual["goal_outcomes"] != list(expect["goal_outcomes"]):

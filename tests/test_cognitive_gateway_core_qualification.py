@@ -113,7 +113,6 @@ def runtime_event(
     conversation: str,
     identity: str,
     *,
-    lane: str,
     capabilities=None,
     goal_ids=None,
     targets=None,
@@ -135,7 +134,6 @@ def runtime_event(
         "conversation_id": conversation,
         "run_identity": {"identity_sha256": identity, "complete": True},
         "status": "applied",
-        "lane": lane,
         "core_interpretation": {"authority": "goal_driven_cognitive_core"},
         "terminal_plan": {
             "goal_ids": list(goal_ids or []),
@@ -200,18 +198,17 @@ class CognitiveGatewayCoreQualificationTests(unittest.TestCase):
             ),
             gateway_event("sid-direct", "conv-direct", "admit", digest),
             runtime_event(
-                "sid-direct", "conv-direct", digest, lane="chat", goal_ids=["goal-direct"]
+                "sid-direct", "conv-direct", digest, goal_ids=["goal-direct"]
             ),
             gateway_event("sid-self", "conv-self", "admit", digest),
             runtime_event(
-                "sid-self", "conv-self", digest, lane="chat", goal_ids=["goal-self"]
+                "sid-self", "conv-self", digest, goal_ids=["goal-self"]
             ),
             gateway_event("sid-weather-1", "conv-weather", "admit", digest),
             runtime_event(
                 "sid-weather-1",
                 "conv-weather",
                 digest,
-                lane="tool",
                 capabilities=["chromie.weather.lookup"],
                 goal_ids=["goal-weather"],
             ),
@@ -234,7 +231,6 @@ class CognitiveGatewayCoreQualificationTests(unittest.TestCase):
                 "sid-weather-2",
                 "conv-weather",
                 digest,
-                lane="chat",
                 capabilities=[],
                 targets=["goal-weather"],
             ),
@@ -559,7 +555,7 @@ class CognitiveGatewayCoreQualificationTests(unittest.TestCase):
                             "semantic_runtime": {
                                 "path": "goal_driven_cognitive_runtime",
                                 "configured_cognitive_runtime_mode": "apply",
-                                "cognitive_runtime_selected_for_route": True,
+                                "cognitive_runtime_selected": True,
                             },
                             "runtime_identity": {
                                 "identity_sha256": digest,

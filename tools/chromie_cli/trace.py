@@ -19,7 +19,6 @@ IDENTIFIER_KEYS = {
     "trace": {"trace_id"},
 }
 TRACE_JSON_FILENAMES = {
-    "route.json",
     "interaction_response.json",
     "execution.json",
     "trace.json",
@@ -36,8 +35,6 @@ TRACE_CONTENT_KEYS = {
     "node_results",
     "events",
     "traces",
-    "route",
-    "intent",
     "results",
     "capabilities",
     "debug_summary",
@@ -428,8 +425,6 @@ def _json_kind(path: Path, value: Any) -> str:
             return "capability_runtime_execution"
         if "interaction_id" in value and "capabilities" in value:
             return "interaction_response"
-        if "route" in value and "intent" in value:
-            return "route_decision"
         if path.name == "summary.json":
             return "acceptance_summary"
     return "json_trace_artifact"
@@ -444,7 +439,6 @@ def _summarize_json_payload(value: Any, *, limit: int) -> dict[str, Any]:
     for key in (
         "ok",
         "status",
-        "intent",
         "confidence",
         "sid",
         "session_id",
@@ -457,11 +451,6 @@ def _summarize_json_payload(value: Any, *, limit: int) -> dict[str, Any]:
     ):
         if key in value:
             summary[key] = _shorten(value[key])
-    route = value.get("route")
-    if isinstance(route, dict):
-        summary["route"] = _summarize_route_decision(route, limit=limit)
-    elif "route" in value:
-        summary["route"] = _shorten(value["route"])
     interaction_response = value.get("interaction_response")
     if isinstance(interaction_response, dict):
         summary["interaction_response"] = _summarize_interaction_response(
@@ -514,69 +503,6 @@ def _summarize_json_payload(value: Any, *, limit: int) -> dict[str, Any]:
     if isinstance(nested_execution, dict):
         summary["execution"] = _summarize_json_payload(nested_execution, limit=limit)
     return summary
-
-
-def _summarize_route_decision(route: dict[str, Any], *, limit: int) -> dict[str, Any]:
-    summary = {
-        key: _shorten(route[key])
-        for key in (
-            "route",
-            "intent",
-            "confidence",
-            "source",
-            "language",
-            "priority",
-            "reason",
-        )
-        if key in route
-    }
-    agents = route.get("agents")
-    if isinstance(agents, list):
-        summary["agents"] = [str(agent) for agent in agents[:limit]]
-        summary["agent_count"] = len(agents)
-    actions = route.get("actions")
-    if isinstance(actions, list):
-        summary["actions"] = [
-            _summarize_route_action(item)
-            for item in actions[:limit]
-            if isinstance(item, dict)
-        ]
-        summary["action_count"] = len(actions)
-    candidates = route.get("candidate_capabilities")
-    if isinstance(candidates, list):
-        summary["candidate_capability_ids"] = [
-            str(item.get("capability_id") or item.get("id") or "")
-            for item in candidates[:limit]
-            if isinstance(item, dict)
-        ]
-        summary["candidate_count"] = len(candidates)
-    metadata = route.get("metadata")
-    if isinstance(metadata, dict):
-        route_merge = metadata.get("route_merge")
-        if isinstance(route_merge, dict):
-            summary["route_merge"] = _summarize_scalar_mapping(route_merge, limit=limit)
-        task_list = metadata.get("task_list")
-        if isinstance(task_list, list):
-            summary["task_types"] = [
-                str(item.get("task_type") or "")
-                for item in task_list[:limit]
-                if isinstance(item, dict)
-            ]
-            summary["task_count"] = len(task_list)
-    return summary
-
-
-def _summarize_route_action(item: dict[str, Any]) -> dict[str, Any]:
-    return {
-        key: _shorten(item[key])
-        for key in (
-            "capability_id",
-            "sequence",
-            "timing",
-            "requires_confirmation",
-        )
-        if key in item
-    }
 
 
 def _summarize_interaction_response(
@@ -654,8 +580,6 @@ def _summarize_event_record(record: dict[str, Any]) -> dict[str, Any]:
         "graph_id",
         "trace_id",
         "status",
-        "route",
-        "intent",
     )
     summary = {
         key: _shorten(record[key])
@@ -745,7 +669,7 @@ def _record_has_marker(record: dict[str, Any], marker: str) -> bool:
         ) is not None
     if marker == "stop":
         return (
-            re.search(r"\bstop(?:_current_output|_now|_polling)?\b", text)
+            re.search(r"\bstop(?:_command|_current_output|_now|_polling)?\b", text)
             is not None
         )
     if marker == "emergency":

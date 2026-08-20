@@ -585,8 +585,6 @@ async def _dispatch_goal_work_stop(
             "confirmation_transition": confirmation_transition,
             "sid": session_id,
             "user_text": user_text,
-            "route": None,
-            "intent": None,
             "source": source,
         }
         goal_state_results = reconcile_fn(association, **reconcile_kwargs)

@@ -603,8 +603,7 @@ python -m unittest \
   tests.test_tts_provider_ab \
   tests.test_tts_candidate_providers \
   tests.test_tts_reference \
-  tests.test_tts_benchmark \
-  tests.test_fast_first_audio_cache
+  tests.test_tts_benchmark
 python scripts/tts_provider_ab.py --check
 ```
 
@@ -732,13 +731,12 @@ python scripts/interaction_text_mujoco_check.py \
 ```
 
 This runner defaults to the maintained goal-driven path; use
-`--no-cognitive-runtime` only for an explicitly labelled compatibility run. It
-writes `route.json`, `interaction_response.json`,
+`--no-cognitive-runtime` only for an explicitly labelled diagnostic fail-closed run. It
+writes `cognitive_runtime_resolution.json`, `interaction_response.json`,
 `execution.json`, status snapshots, session events, recordings when enabled,
 and `summary.json` under `.chromie/acceptance/text-mujoco/<id>/`. The summary
 records the Chromie checkout revision/version/clean state, Soridormi manifest,
-the user-supplied declared paired checkout and its clean state, selected
-semantic path, and apply lanes. `--soridormi-repo` alone does not prove which
+the user-supplied declared paired checkout and its clean state, selected semantic path and typed Runtime/provider provenance. `--soridormi-repo` alone does not prove which
 source the MCP endpoint executes. When the live Soridormi status reports
 `source_revision`, the runner records it; Level C target validation requires it
 to match the clean paired checkout. It fails if
@@ -748,7 +746,7 @@ expected arguments do not match. Use `--no-speaker` for headless automation;
 otherwise Chromie schedules TTS through the configured output device. The
 runner uses a 120s per-Soridormi-skill diagnostic timeout by default; pass
 `--capability-timeout-s 0` to use catalog/default timeouts unchanged. It prints
-compact debug lines for route, staged task list, skills, speech count, and
+compact debug lines for Goal/Plan state, staged task list, skills, speech count, and
 errors before the JSON summary. The runner refuses non-`sim` Soridormi modes
 unless `--allow-non-sim` is supplied under separate supervision.
 
@@ -887,8 +885,8 @@ python scripts/interaction_text_mujoco_check.py \
 
 That preview-only check fails if no walking skill is emitted or if spoken text
 contains internal labels such as `Task Split`, `Key Risk`, `Next Step`, or
-model-facing `soridormi.*` skill IDs. It still writes `route.json`,
-`interaction_response.json`, session events, and `summary.json` for diagnosis.
+model-facing `soridormi.*` skill IDs. It still writes `cognitive_runtime_resolution.json`, `interaction_response.json`,
+session events, and `summary.json` for diagnosis.
 
 The retained `20260617T081411Z` text bundle is historical text-to-MuJoCo `/interaction`
 closure evidence. It does not contain the provenance or cognitive status needed

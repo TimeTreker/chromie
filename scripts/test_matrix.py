@@ -64,7 +64,6 @@ GROUPS: dict[str, TestGroup] = {
             _unittest(
                 "tests.test_goal_interpreter_core",
                 "tests.test_goal_interpreter_capability_routing",
-                "tests.test_goal_interpreter_regression_evaluator",
                 "tests.test_llm_capability_routing",
                 "tests.test_capability_goal_interpretation_actions",
             ),

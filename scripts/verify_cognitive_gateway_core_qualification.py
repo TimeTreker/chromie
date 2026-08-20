@@ -325,12 +325,6 @@ def _validate_turn(
             errors.append(
                 f"runtime status {runtime.get('status')!r} != {expectations.get('runtime_status')!r}"
             )
-        if expectations.get("runtime_lane") and runtime.get("lane") != expectations.get(
-            "runtime_lane"
-        ):
-            errors.append(
-                f"runtime lane {runtime.get('lane')!r} != {expectations.get('runtime_lane')!r}"
-            )
         expected_authority = expectations.get("core_authority")
         core_interpretation = runtime.get("core_interpretation")
         actual_authority = (
@@ -525,7 +519,7 @@ def _validate_cancellation_summary(
         errors.append("cancellation run did not use the Goal-Driven Cognitive Runtime")
     if provenance.get("cognitive_runtime_mode") != "apply":
         errors.append("cancellation run did not use cognitive runtime apply mode")
-    if provenance.get("cognitive_runtime_selected_for_route") is not True:
+    if provenance.get("cognitive_runtime_selected") is not True:
         errors.append("cancellation run did not select the cognitive runtime")
     provenance_payload = summary.get("provenance")
     identity_ref = (

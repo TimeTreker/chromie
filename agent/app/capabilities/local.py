@@ -542,6 +542,10 @@ def chromie_manifests(
                         "the same tool_id and material arguments."
                     ),
                     "semantic_type": "verified_tool_memory_retrieval",
+                    "semantic_scope": {
+                        "responsibility_type": "acquire_and_deliver_resource",
+                        "resource_kinds": ["information"],
+                    },
                     "reference_resolution_authority": False,
                     "pre_execution_speech_guidance": (
                         "Say naturally that Chromie recently checked the exact subject "

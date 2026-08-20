@@ -6,7 +6,7 @@
   "description": "A social chat turn cannot acquire physical authority from motion goals that were erroneously retained as active after an earlier completed turn.",
   "tags": [
     "goal-lifecycle",
-    "lane-authority",
+    "goal-ownership",
     "regression",
     "voice-log-20260722"
   ],
@@ -16,15 +16,6 @@
   },
   "stub": {
     "mode": "apply",
-    "apply_lanes": [
-      "chat",
-      "robot_action"
-    ],
-    "route_decision": {
-      "route": "chat",
-      "intent": "social_exchange",
-      "language": "zh-CN"
-    },
     "context": {
       "active_goal_snapshots": [
         {
@@ -130,7 +121,6 @@
   },
   "expect": {
     "status": "error",
-    "lane": "robot_action",
     "planner_tier": "fast",
     "disposition": "execute",
     "coverage": "complete",

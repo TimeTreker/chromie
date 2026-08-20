@@ -99,15 +99,15 @@ Soridormi failure can
 propose only a fresh-confirmed child plan containing the failed recoverable
 subset; it cannot replay or mutate completed parent work.
 
-The common safe base enables this path for `chat,memory,tool`, with local tools limited
-to explicitly registered safe read-only providers. The Soridormi launcher adds
-the body provider and additionally enables `robot_action`:
+The common safe base enables this single path with local capabilities limited to
+explicitly registered safe providers. The Soridormi launcher adds the trusted body
+provider; the Host does not widen a semantic lane, it simply makes those declared
+body capabilities available to Planner/Runtime validation:
 
 ```env
 ORCH_ENABLE_INTERACTION_RESPONSE=1
 ORCH_ENABLE_SORIDORMI_CAPABILITIES=1
 ORCH_COGNITIVE_RUNTIME_MODE=apply
-ORCH_COGNITIVE_APPLY_LANES=chat,memory,robot_action,tool
 SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp
 ```
 

@@ -11,7 +11,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 AgentSkillAuthority = Literal["agent_method_only"]
 AgentSkillExecutionAuthority = Literal["none"]
 AgentSkillProjectionName = Literal[
-    "goal_association",
     "fast_planner",
     "deep_planner",
 ]
@@ -147,7 +146,6 @@ class AgentSkillMetadata(BaseModel):
     extends: tuple[str, ...] = Field(default_factory=tuple, max_length=16)
     required_capabilities: tuple[str, ...] = Field(default_factory=tuple, max_length=64)
     optional_capabilities: tuple[str, ...] = Field(default_factory=tuple, max_length=64)
-    applicable_routes: tuple[str, ...] = Field(default_factory=tuple, max_length=16)
     applicable_output_modes: tuple[AgentSkillApplicableOutputMode, ...] = Field(
         default_factory=tuple,
         max_length=10,
@@ -198,22 +196,6 @@ class AgentSkillMetadata(BaseModel):
     def normalize_optional_capabilities(cls, value: Any) -> tuple[str, ...]:
         return tuple(_normalize_identifier_list(value, field_name="optional_capabilities"))
 
-    @field_validator("applicable_routes", mode="before")
-    @classmethod
-    def normalize_applicable_routes(cls, value: Any) -> tuple[str, ...]:
-        if value is None:
-            return ()
-        if not isinstance(value, (list, tuple)):
-            raise ValueError("applicable_routes must be an array")
-        routes: list[str] = []
-        for item in value:
-            route = "_".join(
-                str(item or "").strip().casefold().replace("-", "_").split()
-            )
-            if route and route not in routes:
-                routes.append(route)
-        return tuple(routes)
-
     @field_validator("projections", mode="before")
     @classmethod
     def normalize_projections(cls, value: Any) -> tuple[dict[str, str], ...]:
@@ -259,7 +241,6 @@ class AgentSkillSummary(BaseModel):
     extends: tuple[str, ...] = Field(default_factory=tuple)
     required_capabilities: tuple[str, ...] = Field(default_factory=tuple)
     optional_capabilities: tuple[str, ...] = Field(default_factory=tuple)
-    applicable_routes: tuple[str, ...] = Field(default_factory=tuple)
     applicable_output_modes: tuple[AgentSkillApplicableOutputMode, ...] = Field(
         default_factory=tuple
     )

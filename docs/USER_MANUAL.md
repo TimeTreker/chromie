@@ -371,7 +371,7 @@ the run.
 Prefer the structured evidence files over visual memory when diagnosing a run:
 
 ```text
-route.json
+cognitive_runtime_resolution.json
 interaction_response.json
 execution.json
 status_before.json

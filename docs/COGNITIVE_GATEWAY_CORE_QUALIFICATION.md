@@ -287,9 +287,7 @@ python scripts/interaction_text_mujoco_check.py \
   --runtime-identity "${EVIDENCE_ROOT}/runtime-identity.json" \
   --soridormi-repo ../soridormi \
   --evidence-dir "${EVIDENCE_ROOT}/mujoco" \
-  --no-speaker \
-  --expect-route robot_action \
-  --expect-capability soridormi.walk_velocity \
+  --no-speaker \  --expect-capability soridormi.walk_velocity \
   --expect-capability soridormi.nod_yes \
   --expect-capability soridormi.turn_in_place \
   --reject-internal-speech
@@ -303,9 +301,7 @@ python scripts/interaction_text_mujoco_check.py \
   --runtime-identity "${EVIDENCE_ROOT}/runtime-identity.json" \
   --soridormi-repo ../soridormi \
   --evidence-dir "${EVIDENCE_ROOT}/active-cancel" \
-  --no-speaker \
-  --expect-route robot_action \
-  --interrupt-text "Stop." \
+  --no-speaker \  --interrupt-text "Stop." \
   --interrupt-capability-prefix soridormi.walk_velocity \
   --expect-cancelled \
   --reject-internal-speech

@@ -148,70 +148,37 @@ Use this mode only to disable the Goal-driven Runtime for diagnostics or fault i
 
 ### `report_only`
 
-The unified pipeline runs in the background and records:
-
-- Goal associations;
-- new Goal segmentation;
-- Fast coverage;
-- Deep escalation and revision;
-- terminal CanonicalPlan;
-- Planner response projection;
-- terminal Plan lane;
-- failure causes;
-- stage latency.
-
-It does not change user-visible speech, Goal state, confirmation, or execution.
-Observer routing is not filtered by the apply-lane allowlist, so tool and memory
-routes can be measured without granting them authority. This mode is available
-for diagnostics; it is not the maintained default.
+The unified pipeline runs as an observer and records Goal associations, Fast/Deep
+planning, the terminal `CanonicalPlan`, Planner response projection, failures, and stage
+latency. It has no authority to commit user-visible speech, Goal state, confirmation,
+or effects. This mode is diagnostic only.
 
 ### `apply`
 
-The unified pipeline is authoritative in `apply`. Runtime mechanically projects
-the terminal `CanonicalPlan` to a lane listed in `ORCH_COGNITIVE_APPLY_LANES`;
-GI does not emit that lane. A disallowed or unsupported terminal Plan lane fails
-closed and cannot enter another semantic planner. An allowed lane still executes
-only after Planner-response projection plus all trusted validation gates pass.
+The unified pipeline is authoritative in `apply`. Runtime validates the terminal
+`CanonicalPlan` directly against the selected Capability contracts: schema, declared
+semantic scope, effects, authorization, safety, confirmation, resources, concurrency,
+availability, and provider identity. There is no intermediate semantic lane or route
+taxonomy. Failure of any required contract fails closed and cannot enter another
+semantic planner.
 
-Initial recommended lanes:
+## 4. Capability-owned execution applicability
 
-```env
-ORCH_COGNITIVE_APPLY_LANES=chat,memory,tool
-```
-
-The common safe base applies `chat,memory,tool`. The maintained Soridormi
-launcher widens the set to `chat,memory,robot_action,tool` after enabling the
-trusted provider. The tool and memory lanes remain constrained to registered,
-schema-validated capabilities, explicit authorization, and evidence-bound
-outcome composition.
-
-## 4. Lane classification
-
-A terminal CanonicalPlan is projected to one runtime lane:
-
-| Plan shape | Lane |
-|---|---|
-| No effectful steps | `chat` |
-| All skills are Soridormi capabilities | `robot_action` |
-| All skills are trusted memory capabilities | `memory` |
-| All skills are other trusted Chromie capabilities | `tool` |
-| Mixed or unsupported provider surface | `unsupported` |
-
-This classification is a runtime dispatch property. It does not infer the
-meaning of user language.
+Execution applicability comes from the typed Plan and Capability/provider declarations.
+The Host does not derive `chat`, `memory`, `tool`, or `robot_action` categories and does
+not use such categories to widen or narrow Planner authority. Non-effectful response
+Plans remain conversational; executable steps must individually satisfy their declared
+Capability and Runtime contracts. Mixed-provider Plans are valid only when every step
+is independently authorized and the declared resource/dependency graph permits their
+coordination.
 
 ## 5. Semantic authority and failure policy
 
-The effective technical failure policy is `fail_closed`.
-input, but it cannot authorize same-turn fallback after the Goal-driven Runtime
-has acquired semantic authority.
-
-A lane excluded by `ORCH_COGNITIVE_APPLY_LANES` produces a typed fail-closed
-Host response and cannot enter another semantic planner. Once Goal Association
-begins in authoritative `apply`, any model, Planner projection, terminal-lane,
-trusted-runtime, or Goal-state commit failure produces truthful no-action speech
-and no effectful skill. Retired route/intent or Agent representations are never
-semantic fallback authority. See [Single Semantic Planning Authority](SEMANTIC_AUTHORITY.md).
+The effective technical failure policy is `fail_closed`. Once Goal-driven semantic
+authority has begun, model failure, Planner projection failure, Capability/Runtime
+rejection, provider failure, or Goal-state commit failure cannot authorize same-turn
+fallback into a retired route/intent or Agent semantic planner. See
+[Single Semantic Planning Authority](SEMANTIC_AUTHORITY.md).
 
 ## 6. Total and per-stage budgets
 
@@ -431,12 +398,11 @@ The Fast Planner escalates. The first Deep plan conflicts at the trusted runtime
 boundary. Structured feedback produces one revised Deep plan. The validated
 plan is adapted without partial execution.
 
-### Per-lane fail-closed boundary
+### Capability-contract fail-closed boundary
 
-A valid robot plan is not applied when its terminal `robot_action` lane is absent
-from the apply allowlist. If the mismatch is discovered after Goal-driven
-authority has started, the result is classified as `error` and cannot re-enter
-another semantic planner.
+A Plan step is not applied when its Capability is unavailable, unauthorized, schema
+invalid, confirmation-incomplete, resource-conflicting, or otherwise rejected by the
+trusted Runtime. The failure cannot re-enter another semantic planner.
 
 ### Multi-Goal response coverage
 
@@ -524,24 +490,19 @@ Review:
 - response Goal coverage;
 - latency and fallback causes.
 
-### Phase 2 — apply chat
+### Phase 2 — apply non-embodied capabilities
 
 ```env
 ORCH_COGNITIVE_RUNTIME_MODE=apply
-ORCH_COGNITIVE_APPLY_LANES=chat,memory,tool
 ```
 
-Retain successful and failure cases before widening lanes.
+Retain successful and failure cases while only the non-embodied provider set is enabled.
 
-### Phase 3 — apply robot action in simulator
+### Phase 3 — enable trusted Soridormi capabilities in simulator
 
-```env
-ORCH_COGNITIVE_RUNTIME_MODE=apply
-ORCH_COGNITIVE_APPLY_LANES=chat,memory,robot_action,tool
-```
-
-Do not enable this phase for physical hardware. Use the maintained simulator
-profile and retain exact Chromie/Soridormi revisions.
+Keep `ORCH_COGNITIVE_RUNTIME_MODE=apply` and enable the reviewed Soridormi provider
+through the maintained simulator operator mode. Do not use this phase as physical
+hardware qualification; retain exact Chromie/Soridormi revisions and provider contracts.
 
 ## 15. Cognitive text-to-MuJoCo procedure
 
@@ -551,7 +512,6 @@ The text-to-MuJoCo checker uses the unified PR8 authority path by default:
 python scripts/interaction_text_mujoco_check.py \
   "Walk forward for five seconds, then nod." \
   --cognitive-runtime \
-  --cognitive-apply-lanes chat,memory,robot_action,tool \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi \
   --no-speaker \
@@ -579,18 +539,6 @@ ORCH_COGNITIVE_RUNTIME_MODE=off
 Restart the host Orchestrator. No database migration or capability change is
 required.
 
-### Per-lane authority gate
-
-Remove the affected route before rollout:
-
-```env
-ORCH_COGNITIVE_APPLY_LANES=chat,memory,tool
-```
-
-A routed `robot_action` turn is then excluded before Goal-driven authority
-acquisition. If an already-started plan resolves to a disabled lane, it fails
-closed rather than entering compatibility planning.
-
 ### Fail-closed disablement
 
 `off` is a diagnostic/fault-isolation state, not an emergency semantic rollback.
@@ -600,7 +548,7 @@ explicitly invoked and likewise grants no execution authority.
 
 ## 17. Operational review questions
 
-Before widening an apply lane, review:
+Before widening the enabled provider/capability surface, review:
 
 1. Does Goal Association preserve existing Goals instead of creating duplicates?
 2. Do Fast plans apply only with complete high-confidence coverage?
