@@ -572,12 +572,11 @@ def chromie_manifests(
                 agent_id="chromie.weather",
                 display_name="Lookup weather",
                 description=(
-                    "Retrieve current weather or a short forecast for a named city "
-                    "or place. Use for user questions about current, tonight's, or "
-                    "another supported short-range forecast, including today's or "
-                    "tomorrow's weather, 天气/天气预报, temperature, rain, humidity, wind, or "
-                    "forecast conditions. This is read-only and returns information; "
-                    "it does not control the robot body."
+                    "Retrieve current weather observations or a supported short-range "
+                    "forecast for a named place. The declared information scope covers "
+                    "weather aspects such as temperature, precipitation, humidity, wind, "
+                    "and forecast conditions. This is read-only information work and does "
+                    "not control the robot body."
                 ),
                 input_schema={
                     "type": "object",
@@ -586,10 +585,9 @@ def chromie_manifests(
                             "type": "string",
                             "minLength": 1,
                             "description": (
-                                "Canonical city or place binding resolved from the "
-                                "user turn, such as 重庆, 河南省内乡县, Chongqing, "
-                                "or Neixiang County. Preserve this value exactly; "
-                                "provider retries must not replace the Goal target."
+                                "Canonical place binding resolved in the Goal. Preserve "
+                                "this value exactly; provider retries must not replace, "
+                                "translate, or reinterpret the Goal target."
                             ),
                         },
                         "location_context": {

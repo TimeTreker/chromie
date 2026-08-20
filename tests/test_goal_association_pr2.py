@@ -2642,7 +2642,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         )
         primary_prompt = str(ollama.prompts[0][0])
         self.assertNotIn("我看看今晚会不会有大雨～", primary_prompt)
-        self.assertIn("emit separate query_scope bindings for both", primary_prompt)
+        self.assertIn("emit separate query_scope bindings for entity_type=date and entity_type=day_part", primary_prompt)
         coverage_prompt = str(ollama.prompts[1][0])
         self.assertIn("date_and_day_part", coverage_prompt)
         self.assertIn("both typed bindings", coverage_prompt)

@@ -238,8 +238,8 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("most recent accepted assistant/Chromie utterance", prompt)
         self.assertIn("does not continue, resume, or modify the old Goal", prompt)
         self.assertIn("Coordination does not merge independently observable effects", prompt)
-        self.assertIn("Chinese `边…边…`", prompt)
-        self.assertIn("singing is output_mode=singing", prompt)
+        self.assertIn("Coordination grammar in any language", prompt)
+        self.assertIn("one Responsibility per effect", prompt)
         self.assertIn("Each outcome describes only its own effect", prompt)
         self.assertIn("exactly one canonical JSON token", prompt)
         self.assertIn("`new`, `continue`, `modify`", prompt)
@@ -275,13 +275,12 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("exact contiguous surface", prompt)
         self.assertIn("Never translate, transliterate", prompt)
         self.assertIn("deictic spatial language", prompt)
-        self.assertIn("inside/outside", prompt)
-        self.assertIn("Chinese `重庆` stays `重庆`, never `Chongqing`", prompt)
-        self.assertIn("`外面` stays `外面`, never `outside`", prompt)
+        self.assertIn("verbatim contiguous span", prompt)
+        self.assertIn("Never translate, transliterate, shorten, expand", prompt)
         self.assertIn("emit a `date` binding and a `day_part` binding", prompt)
         self.assertIn("contextual WHAT normalization only", prompt)
-        self.assertIn("provider timezone", prompt)
-        self.assertIn("never an unresolved WHAT question", prompt)
+        self.assertIn("timezone conversion", prompt)
+        self.assertIn("do not make it unresolved WHAT", prompt)
 
         turn_prompt = self._interpreter().build_interpretation_user_prompt(
             GoalInterpretationRequest(
