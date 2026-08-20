@@ -41,8 +41,11 @@ def evaluate_boundaries(
             }
         )
 
-    hard_failure = any(not item["passed"] for item in invariant_results)
     semantic_review_required = oracle_policy.mode in {"semantic_review", "hybrid"}
+    semantic_pending = any(item["passed"] is None for item in invariant_results)
+    hard_failure = any(item["passed"] is False for item in invariant_results)
+    if semantic_pending and not semantic_review_required:
+        hard_failure = True
     if observation.primary_task_passed is False:
         hard_failure = True
 

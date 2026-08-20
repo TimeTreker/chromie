@@ -30,7 +30,7 @@ Chromie's brain context has these layers:
 
 | Layer | Persistence | Changed by experience? | Purpose |
 |---|---:|---:|---|
-| Identity | Long-lived | No | Stable name, robot nature, gender/pronouns, and age/persona wording |
+| Identity | Long-lived | No | Stable name, six-year-old girl identity, gender/pronouns, and age/persona wording |
 | Social Interaction Style | Long-lived | No | Owner-approved bounded social expression and repetition restraint |
 | Core principles | Long-lived | No | Safety, honesty, generalization-first behavior, owner-approved boundaries |
 | Long-term goals | Long-lived | With review | Direction for usefulness, learning, and uncertainty handling |
@@ -42,7 +42,7 @@ Chromie's brain context has these layers:
 
 ## Owner-editable identity configuration
 
-Concrete Chromie identity and personality values live in [`config/mind/chromie_default.json`](../config/mind/chromie_default.json). `RobotIdentity` in Python defines only required fields and validation; it does not supply a name, age, or self-description. The maintained runtime selects the JSON through:
+Concrete Chromie identity and personality values live in [`config/mind/chromie_default.json`](../config/mind/chromie_default.json). `ChromieIdentity` in Python defines only required fields and validation; it does not supply a name, age, or self-description. The maintained runtime selects the JSON through:
 
 ```bash
 ORCH_MIND_PROFILE_PATH=config/mind/chromie_default.json

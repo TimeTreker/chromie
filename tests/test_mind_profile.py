@@ -30,9 +30,11 @@ class MindProfileTests(unittest.TestCase):
         self.assertEqual(profile.identity.kind, "human child")
         self.assertEqual(profile.identity.gender, "female")
         self.assertEqual(profile.identity.age_description, "6 years old")
-        self.assertEqual(profile.version, "0.6.1")
+        self.assertEqual(profile.version, "0.6.2")
+        self.assertEqual(type(profile.identity).__name__, "ChromieIdentity")
         self.assertIn("family's little secretary", profile.identity.short_self_description)
-        self.assertIn("six-year-old human child", profile.identity.model_identity_boundary)
+        self.assertIn("six-year-old girl", profile.identity.model_identity_boundary)
+        self.assertIn("robot", profile.identity.model_identity_boundary.casefold())
         self.assertIn("she", profile.identity.pronouns)
         self.assertIn(
             "generalization_first_ai",
@@ -62,7 +64,11 @@ class MindProfileTests(unittest.TestCase):
         )
         self.assertTrue(context["personality_expression"]["owner_approved"])
         self.assertIn("smart", context["personality_expression"]["core_traits"])
-        self.assertIn("six-year-old human girl", context["personality_expression"]["self_concept"])
+        self.assertIn("quick-witted", context["personality_expression"]["core_traits"])
+        self.assertIn("lively", context["personality_expression"]["core_traits"])
+        self.assertIn("cute", context["personality_expression"]["core_traits"])
+        self.assertIn("six-year-old girl", context["personality_expression"]["self_concept"])
+        self.assertIn("not a robot", context["personality_expression"]["self_concept"])
         self.assertIn("question first", context["personality_expression"]["answer_style"])
         self.assertIn("logs and memory", context["personality_expression"]["internal_language_boundary"])
         self.assertIn(
@@ -85,7 +91,7 @@ class MindProfileTests(unittest.TestCase):
         )
         self.assertNotIn("internal_components", context["self_model"])
         self.assertIn("model_identity_boundary", context["identity"])
-        self.assertNotIn("robot", context["identity"]["model_identity_boundary"].casefold())
+        self.assertIn("robot", context["identity"]["model_identity_boundary"].casefold())
         self.assertIn(
             "generalization_first_ai",
             {item["id"] for item in profile.prompt_context()["core_principles"]},

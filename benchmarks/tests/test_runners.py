@@ -135,6 +135,63 @@ def test_semantic_oracle_cannot_be_short_circuited_by_executor_pass_flag() -> No
     assert report["results"][0]["evaluation"]["semantic_review_status"] == "pending"
 
 
+def test_semantic_pending_invariant_enters_hybrid_review() -> None:
+    report = BenchmarkRunner(
+        ReplayExecutor(
+            {
+                "case.001": {
+                    "primary_task_passed": True,
+                    "invariant_results": {
+                        "explicit action has priority": {
+                            "passed": None,
+                            "detail": "semantic review required",
+                        }
+                    },
+                }
+            }
+        ),
+        RunProfile("replay", "replay"),
+    ).run(
+        [
+            _scenario(
+                oracle_policy={
+                    "mode": "hybrid",
+                    "deterministic_sources": ["typed_schema"],
+                    "semantic_dimensions": ["intent_understanding"],
+                    "semantic_blocking": True,
+                }
+            )
+        ]
+    )
+
+    result = report["results"][0]
+    assert result["status"] == "review"
+    assert result["evaluation"]["deterministic_status"] == "pass"
+    assert result["invariant_results"][0]["passed"] is None
+
+
+def test_semantic_pending_invariant_fails_without_semantic_oracle() -> None:
+    report = BenchmarkRunner(
+        ReplayExecutor(
+            {
+                "case.001": {
+                    "primary_task_passed": True,
+                    "invariant_results": {
+                        "explicit action has priority": {
+                            "passed": None,
+                            "detail": "semantic review required",
+                        }
+                    },
+                }
+            }
+        ),
+        RunProfile("replay", "replay"),
+    ).run([_scenario()])
+
+    assert report["results"][0]["status"] == "fail"
+    assert report["results"][0]["evaluation"]["deterministic_status"] == "fail"
+
+
 def test_command_executor_uses_json_boundary(tmp_path: Path) -> None:
     adapter = tmp_path / "adapter.py"
     adapter.write_text(

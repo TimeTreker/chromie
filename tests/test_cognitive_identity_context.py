@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import unittest
 
 from agent.app.clients.ollama_client import LayeredPrompt
@@ -36,7 +37,7 @@ class CognitiveIdentityContextTests(unittest.TestCase):
                 "new_goals": [
                     {
                         "goal_id": "goal-identity",
-                        "description": "Answer the user's question about the robot's identity.",
+                        "description": "Answer the user's question about Chromie's identity.",
                         "source_text": "你叫什么名字？",
                         "constraints": {},
                         "success_criteria": [],
@@ -71,7 +72,10 @@ class CognitiveIdentityContextTests(unittest.TestCase):
         projected = owner_approved_personality_context(self.context)
         self.assertTrue(projected["owner_approved"])
         self.assertIn("smart", projected["core_traits"])
-        self.assertIn("six-year-old human girl", projected["self_concept"])
+        self.assertIn("quick-witted", projected["core_traits"])
+        self.assertIn("lively", projected["core_traits"])
+        self.assertIn("six-year-old girl", projected["self_concept"])
+        self.assertIn("not a robot", projected["self_concept"])
         encoded = bounded_personality_json(self.context)
         self.assertIn('"answer_style"', encoded)
         self.assertIn('"internal_language_boundary"', encoded)
@@ -81,6 +85,21 @@ class CognitiveIdentityContextTests(unittest.TestCase):
         unapproved = {"mind": {**self.mind, "owner_approved": False}}
         self.assertEqual(owner_approved_identity_context(unapproved), {})
         self.assertEqual(bounded_identity_json(unapproved), "null")
+
+    def test_bounded_identity_and_personality_are_valid_json(self) -> None:
+        identity_text = bounded_identity_json(self.context, max_chars=200)
+        personality_text = bounded_personality_json(self.context, max_chars=200)
+
+        self.assertLessEqual(len(identity_text), 200)
+        self.assertLessEqual(len(personality_text), 200)
+        identity = json.loads(identity_text)
+        personality = json.loads(personality_text)
+        self.assertEqual(identity["identity"]["name"], "Chromie")
+        self.assertEqual(identity["identity"]["age_description"], "6 years old")
+        self.assertIn("smart", personality["core_traits"])
+        self.assertIn("quick-witted", personality["core_traits"])
+        self.assertFalse(identity_text.endswith("..."))
+        self.assertFalse(personality_text.endswith("..."))
 
     def test_goal_association_prompt_contains_authoritative_identity_section(self) -> None:
         resolver = GoalAssociationResolver(_Dummy())
@@ -125,7 +144,8 @@ class CognitiveIdentityContextTests(unittest.TestCase):
             self.assertIn("Owner-approved Chromie identity JSON", prompt)
             self.assertIn('"name":"Chromie"', prompt)
             self.assertIn('"age_description":"6 years old"', prompt)
-            self.assertIn("six-year-old human child", prompt)
+            self.assertIn("six-year-old girl", prompt)
+            self.assertIn("not a robot", prompt)
             self.assertIn("Owner-approved Personality Expression JSON", prompt)
             self.assertIn(PERSONALITY_SEMANTIC_CONTRACT, prompt)
 

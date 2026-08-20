@@ -53,27 +53,6 @@ class CognitiveGatewayAttentionReviewTests(unittest.IsolatedAsyncioTestCase):
             recent_dialogue=list(recent_dialogue or []),
         )
 
-    async def test_temporary_admit_all_policy_never_calls_model(self) -> None:
-        client = _Client(error=AssertionError("model must not be called"))
-        reviewer = AttentionReviewer(
-            client,
-            model_review_enabled=False,
-        )
-
-        result = await reviewer.review(
-            self.request("She said the model runs locally.")
-        )
-
-        self.assertEqual(result.disposition, "admit")
-        self.assertEqual(result.speech_act, "unclear")
-        self.assertEqual(result.confidence, 1.0)
-        self.assertEqual(
-            result.source,
-            "cognitive_gateway.attention_policy_admit_all",
-        )
-        self.assertIn("admit-all", result.reason)
-        self.assertEqual(client.calls, 0)
-
     async def test_inactive_ambient_narration_can_be_suppressed(self) -> None:
         client = _Client(
             {
@@ -110,6 +89,24 @@ class CognitiveGatewayAttentionReviewTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.disposition, "admit")
         self.assertEqual(result.speech_act, "question")
+        self.assertEqual(result.source, "cognitive_gateway.attention_review_model")
+        self.assertEqual(client.calls, 1)
+
+    async def test_direct_greeting_is_admitted_and_preserves_speech_act(self) -> None:
+        client = _Client(
+            {
+                "addressed": True,
+                "speech_act": "greeting",
+                "confidence": 0.99,
+            }
+        )
+        reviewer = AttentionReviewer(client)
+
+        result = await reviewer.review(self.request("Hi, Chromie!"))
+
+        self.assertEqual(result.disposition, "admit")
+        self.assertEqual(result.speech_act, "greeting")
+        self.assertEqual(result.confidence, 0.99)
         self.assertEqual(result.source, "cognitive_gateway.attention_review_model")
         self.assertEqual(client.calls, 1)
 

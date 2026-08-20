@@ -53,7 +53,6 @@ class AttentionReviewer:
         client: OllamaClient | None,
         *,
         min_suppression_confidence: float = 0.72,
-        model_review_enabled: bool = True,
         num_ctx: int = 2048,
         num_predict: int = 96,
     ) -> None:
@@ -62,7 +61,6 @@ class AttentionReviewer:
             0.0,
             min(1.0, float(min_suppression_confidence)),
         )
-        self.model_review_enabled = bool(model_review_enabled)
         self.num_ctx = max(512, int(num_ctx))
         self.num_predict = max(32, int(num_predict))
 
@@ -74,24 +72,6 @@ class AttentionReviewer:
                 confidence=1.0,
                 source="cognitive_gateway.attention_policy",
                 reason="attention gate is disabled",
-            )
-
-        if not self.model_review_enabled:
-            # Temporary architecture simplification: Cognitive Gateway remains
-            # responsible for normalization, protective reflexes, context assembly,
-            # and admission, but model-based addressedness review is not on the
-            # foreground interaction path.  The reviewer is deliberately fail-open,
-            # so making the current policy explicit avoids paying model load/inference
-            # latency merely to reach the same default admission result.
-            #
-            # Keep the model-backed implementation below intact for later work; the
-            # runtime composition point decides when that capability is qualified to
-            # return to the critical path.
-            return self._admit(
-                request=request,
-                confidence=1.0,
-                source="cognitive_gateway.attention_policy_admit_all",
-                reason="temporary admit-all policy; model attention review bypassed",
             )
 
         # Active work is context for addressedness, not proof that the latest

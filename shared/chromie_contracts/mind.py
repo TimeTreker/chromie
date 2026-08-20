@@ -81,12 +81,12 @@ class InternalComponent(BaseModel):
         ]
 
 
-class RobotIdentity(BaseModel):
+class ChromieIdentity(BaseModel):
     """Owner-configured identity facts for Chromie as the speaking person.
 
     Concrete values intentionally have no Python defaults. They belong to the
     active MindProfile JSON so an owner can change Chromie's identity without a
-    code change. The class name is retained for wire compatibility only.
+    code change.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -330,7 +330,7 @@ class MindProfile(BaseModel):
         "Identity, personality expression, core principles, and Social Interaction "
         "Style change only through human owner review and commit."
     )
-    identity: RobotIdentity
+    identity: ChromieIdentity
     personality_expression: PersonalityExpression
     social_interaction_style: SocialInteractionStyle = Field(
         default_factory=SocialInteractionStyle
@@ -375,7 +375,7 @@ class MindProfile(BaseModel):
             },
             "social_presentation": {
                 "self_reference": identity.name,
-                "presence": "natural, warm, human conversational presence",
+                "presence": "natural, quick-witted, lively, warm conversational presence",
                 "family_role": identity.family_role,
                 "purpose": identity.purpose,
                 "relationship_boundary": identity.family_context_boundary,

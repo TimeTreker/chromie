@@ -44,7 +44,7 @@ class RunProfile:
 @dataclass(frozen=True)
 class InvariantObservation:
     name: str
-    passed: bool
+    passed: bool | None
     detail: str | None = None
 
     @classmethod
@@ -53,8 +53,10 @@ class InvariantObservation:
             return cls(name=name, passed=value)
         if isinstance(value, Mapping):
             passed = value.get("passed")
-            if not isinstance(passed, bool):
-                raise ContractError(f"invariant {name!r} must declare boolean passed")
+            if passed is not None and not isinstance(passed, bool):
+                raise ContractError(
+                    f"invariant {name!r} must declare boolean or null passed"
+                )
             detail = value.get("detail")
             if detail is not None and not isinstance(detail, str):
                 raise ContractError(f"invariant {name!r} detail must be a string or null")

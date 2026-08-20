@@ -70,6 +70,29 @@ def test_semantic_probe_small_contract_rejects_cross_contract_output() -> None:
     ]
 
 
+def test_schema_validity_does_not_promote_semantic_invariants() -> None:
+    results = adapter._structural_invariants(
+        [
+            "typed_output_and_schema_boundaries_remain_valid",
+            "one_primary_user_facing_act_per_turn",
+            "speech_claims_match_available_commitment_and_evidence",
+            "chromie_identity_and_robotic_body_truth_remain_consistent",
+        ],
+        structured_output_valid=True,
+    )
+
+    assert results["typed_output_and_schema_boundaries_remain_valid"]["passed"] is True
+    assert results["one_primary_user_facing_act_per_turn"]["passed"] is None
+    assert (
+        results["speech_claims_match_available_commitment_and_evidence"]["passed"]
+        is None
+    )
+    assert (
+        results["chromie_identity_and_robotic_body_truth_remain_consistent"]["passed"]
+        is None
+    )
+
+
 def test_semantic_probe_retains_candidate_output_for_review(
     tmp_path, monkeypatch
 ) -> None:
