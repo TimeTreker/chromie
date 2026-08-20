@@ -101,9 +101,11 @@ Accepted dialogue also survives semantic-path failure. A user turn that fails be
 Goal commit remains bounded conversation evidence for a later follow-up, but it never becomes a
 provisional Goal. A newer turn is not itself a semantic cancellation of older committed work.
 
-Goal Progress Communication is event-identity based. Once a typed Communicative Act is
-scheduled or heard for the current turn, a later stage reuses that exact event or produces a
-genuinely different speech act; it does not paraphrase the same acknowledgement as new audio.
+Goal Progress Communication is Communicative-Activity-identity based. A Planner
+`CommunicativeAct.activity_id` remains one semantic speech event for the turn; playback
+generation/order identify delivery attempts only. Once that Activity is scheduled or heard, a
+later stage reuses its retained delivery evidence or produces a genuinely different Planner
+Activity; it does not paraphrase or requeue the same acknowledgement as a new semantic act.
 
 
 ## Mission

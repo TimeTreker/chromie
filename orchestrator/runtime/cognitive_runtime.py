@@ -126,7 +126,6 @@ class CognitiveRuntimeResolution(BaseModel):
 @dataclass(frozen=True)
 class CognitiveRuntimePolicy:
     mode: CognitiveRuntimeMode = "off"
-    max_total_ms: int = 25000
     goal_association_timeout_ms: int = 3500
     fast_planner_timeout_ms: int = 3000
     deep_planner_timeout_ms: int = 10000
@@ -1764,6 +1763,9 @@ class CanonicalPlanRuntimeAdapter:
                             "delivery_role": stage.delivery_role,
                             "reuse_current_turn_speech": (stage.reuse_current_turn_speech),
                             "reused_speech_event_id": stage.reused_speech_event_id,
+                            "communicative_activity_ids": list(
+                                (stage.metadata or {}).get("communicative_activity_ids") or []
+                            ),
                         }
                     ]
                 else:
@@ -1787,6 +1789,9 @@ class CanonicalPlanRuntimeAdapter:
                         "delivery_role": stage.delivery_role,
                         "reuse_current_turn_speech": (stage.reuse_current_turn_speech),
                         "reused_speech_event_id": stage.reused_speech_event_id,
+                        "communicative_activity_ids": list(
+                            (stage.metadata or {}).get("communicative_activity_ids") or []
+                        ),
                     }
                     for phase, stage in stage_items
                     if stage is not None
@@ -1806,6 +1811,9 @@ class CanonicalPlanRuntimeAdapter:
                     "delivery_role": stage.delivery_role,
                     "reuse_current_turn_speech": (stage.reuse_current_turn_speech),
                     "reused_speech_event_id": stage.reused_speech_event_id,
+                    "communicative_activity_ids": list(
+                        (stage.metadata or {}).get("communicative_activity_ids") or []
+                    ),
                 }
                 for phase, stage in stage_items
                 if stage is not None
@@ -1839,6 +1847,9 @@ class CanonicalPlanRuntimeAdapter:
                 "claims": projected["claims"],
                 "execution_lane": "vocal",
                 "delivery_role": projected.get("delivery_role", "response"),
+                "communicative_activity_ids": list(
+                    projected.get("communicative_activity_ids") or []
+                ),
                 "wait_for_playback_start": playback_barrier,
                 "playback_start_required_for_delivery": playback_barrier,
             }
@@ -5317,6 +5328,12 @@ class GoalDrivenRuntimeCoordinator:
                     **path_metadata(),
                 },
             )
+        except asyncio.CancelledError:
+            # The Host owns the outer foreground deadline. If it cancels this
+            # pipeline, stop only Fast work that never reached canonical Goal/Plan
+            # binding, then propagate cancellation so the Host records the timeout.
+            await cancel_uncommitted_fast_work("foreground_deadline")
+            raise
         except CognitiveStageFailure as exc:
             await cancel_uncommitted_fast_work(exc.stage)
             failure_metadata = {

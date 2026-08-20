@@ -1480,6 +1480,112 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             )
         )
 
+    def test_foreground_cancellation_cleans_unbound_provisional_fast_work(self):
+        async def run() -> None:
+            provisional_started = asyncio.Event()
+
+            class CancellationRuntime:
+                def __init__(self) -> None:
+                    self.cancelled: list[str] = []
+
+                async def cancel_interaction(self, interaction_id: str) -> None:
+                    self.cancelled.append(interaction_id)
+
+            class ReadyRuntime(FastAdvanceRuntime):
+                def __init__(self) -> None:
+                    super().__init__([weather_definition()])
+                    self.runtime = CancellationRuntime()
+
+                async def start_fast_planner_capability_activities(
+                    self, activities, *, session_id: str, turn_id: str
+                ):
+                    del session_id
+                    provisional_started.set()
+                    return type(
+                        "Ready",
+                        (),
+                        {
+                            "interaction_id": f"ready-{turn_id}",
+                            "activities": list(activities),
+                        },
+                    )()
+
+            class SlowAssociationClient(ScriptedClient):
+                async def resolve_goal_association(self, *args, **kwargs):
+                    del args, kwargs
+                    self.calls.append("association")
+                    await asyncio.Event().wait()
+                    raise AssertionError("unreachable")
+
+            advance = FastPlannerAdvance(
+                turn_id="turn-timeout-cleanup",
+                disposition="execute",
+                coverage="complete",
+                covered_responsibility_refs=["weather"],
+                activities=[
+                    FastPlannerCapabilityActivity(
+                        activity_id="provisional-weather-lookup",
+                        role="capability",
+                        capability_id="chromie.weather.lookup",
+                        args={"location": "重庆", "date": "today"},
+                        timing="parallel",
+                        source_responsibility_refs=["weather"],
+                    )
+                ],
+                confidence=0.97,
+                reason_summary="A safe provisional lookup can start.",
+            )
+            runtime = ReadyRuntime()
+            client = SlowAssociationClient(
+                association=new_goal_association("goal-weather"),
+                fast_plans=[],
+                fast_advances=[advance],
+            )
+            coordinator = GoalDrivenRuntimeCoordinator(
+                agent_client=client,
+                adapter=CanonicalPlanRuntimeAdapter(runtime),
+                policy=CognitiveRuntimePolicy(mode="apply"),
+            )
+            core, envelope = admitted_core(
+                "Check Chongqing weather today.",
+                sid="turn-timeout-cleanup",
+                language="en-US",
+                responsibilities=[
+                    {
+                        "local_ref": "weather",
+                        "outcome": "Check Chongqing weather today.",
+                        "bindings": {"location": "重庆", "date": "today"},
+                        "completion_requires_work": True,
+                        "completion_requires_fresh_evidence": True,
+                        "confidence": 0.97,
+                    }
+                ],
+            )
+
+            task = asyncio.create_task(
+                coordinator.resolve(
+                    object(),
+                    text="Check Chongqing weather today.",
+                    sid="turn-timeout-cleanup",
+                    core_interpretation=core,
+                    turn_envelope=envelope,
+                    context={"history": [], "active_goal_snapshots": []},
+                    history=[],
+                    language="en-US",
+                )
+            )
+            await asyncio.wait_for(provisional_started.wait(), timeout=1.0)
+            task.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await task
+
+            self.assertEqual(
+                runtime.runtime.cancelled,
+                [f"ready-{envelope.turn_id}"],
+            )
+
+        asyncio.run(run())
+
     def test_ga_reconsideration_cancels_changed_work_only_after_fast_planner_revision(self):
         events: list[str] = []
 

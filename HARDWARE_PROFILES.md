@@ -95,26 +95,26 @@ is missing. After containers start, `scripts/verify_runtime_profile.sh` checks
 that Goal Interpretation and the Cognitive Core received the same profile and fingerprint as
 `.env.runtime`.
 
-During the current architecture-qualification phase, the maintained RTX 5090
-and RTX 4090 Laptop profiles own correctness-first cognitive budgets as well as
-generous timeouts. Every active cognitive stage uses one 32768-token runner
-topology, reserves its complete declared output budget plus a 2048-token safety
-margin before inference, and rejects prompt or completion truncation as an
-LLM-budget failure. RTX 5090 retains the `qwen3:4b` fast model plus
-`gemma4:12b` quality model while CosyVoice is active. RTX 4090 Laptop uses
+The maintained RTX 5090 and RTX 4090 Laptop hardware profiles own model,
+context-window, output-budget, and residency topology; they do **not** own
+human-facing interaction deadlines. Both profiles keep a 32768-token cognitive
+runner topology, reserve each stage's complete declared output budget plus a
+2048-token safety margin before inference, and reject prompt or completion
+truncation as an LLM-budget failure. RTX 5090 retains the `qwen3:4b` fast model
+plus `gemma4:12b` quality model while CosyVoice is active. RTX 4090 Laptop uses
 `qwen3:8b` for Goal Interpretation and Deep Planning, `gemma4:e4b` for Goal
 Association and the general Agent, and `qwen3:4b` for latency-sensitive roles;
 only one 32K Ollama runner may remain resident at a time while CosyVoice shares
-the 16 GB GPU. The supervised launcher clears stale Ollama runners before the first TTS
-synthesis probe. The prior launcher-wide compact override is reserved only for
-profiles that explicitly choose it; it no longer replaces maintained quality
-stages on either GPU.
-Agent model stages receive up to 120 seconds, host stage calls receive up to 150
-seconds, and the complete staged cognitive runtime receives up to 900 seconds.
-This is intentional: live acceptance should measure model capability and
-workflow correctness before latency, KV-cache, and token-budget optimization.
-These budgets require no launcher option and are regenerated automatically with
-the detected profile.
+the 16 GB GPU. The supervised launcher clears stale Ollama runners before the
+first TTS synthesis probe.
+
+Foreground latency is owned by `env/modes/*.env`. The maintained `speech`,
+`services`, and `voice_mujoco` modes use interactive stage budgets, a 15-second
+foreground Cognitive Runtime deadline, and a 3.5-second playback-start hard
+barrier. The explicit `qualification` mode owns the long 120/150/900-second
+watchdogs used when collecting complete source-bound evidence. This separation
+prevents a powerful GPU profile from making an ordinary person wait through a
+qualification watchdog merely because that profile was auto-detected.
 
 ## Current profiles
 

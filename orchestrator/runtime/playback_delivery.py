@@ -107,6 +107,7 @@ class PlaybackDeliveryLifecycle:
         purpose: str,
         commitment: str = "",
         fast_activity_id: str = "",
+        communicative_activity_ids: list[str] | None = None,
         turn_id: str | None = None,
         source_goal_ids: list[str] | None = None,
         canonical_plan_id: str = "",
@@ -124,6 +125,15 @@ class PlaybackDeliveryLifecycle:
         normalized_fast_activity_id = " ".join(
             str(fast_activity_id or "").strip().split()
         )
+        normalized_activity_ids = self._normalized_text_values(
+            communicative_activity_ids
+        )
+        if (
+            normalized_fast_activity_id
+            and normalized_fast_activity_id not in normalized_activity_ids
+        ):
+            normalized_activity_ids.append(normalized_fast_activity_id)
+            normalized_activity_ids.sort()
         normalized_goal_ids = self._normalized_text_values(source_goal_ids)
         normalized_claims = self._normalized_text_values(claims)
         normalized_plan_id = " ".join(str(canonical_plan_id or "").strip().split())
@@ -136,28 +146,33 @@ class PlaybackDeliveryLifecycle:
         normalized_delivery_role = (
             " ".join(str(delivery_role or "response").strip().split()) or "response"
         )
-        # The event identity is a structured Communicative Act and transport
-        # correlation key. Wording is payload integrity, not de-duplication
-        # identity, so changing punctuation or whitespace cannot define a new
-        # delivered act.
-        event_seed = json.dumps(
-            {
+        # ``event_id`` is semantic identity: one Planner Communicative Activity
+        # remains one speech event even when transport is retried under a new
+        # generation/order.  Transport correlation belongs to ``delivery_attempt_id``.
+        # Wording is payload integrity rather than de-duplication identity.
+        if normalized_activity_ids:
+            event_identity = {
+                "communicative_activity_ids": normalized_activity_ids,
+                "session_id": sid,
+                "turn_id": normalized_turn_id,
+            }
+        else:
+            event_identity = {
                 "canonical_plan_fingerprint": normalized_plan_fingerprint,
                 "canonical_plan_id": normalized_plan_id,
                 "claims": normalized_claims,
                 "commitment": str(commitment or ""),
                 "delivery_role": normalized_delivery_role,
-                "fast_activity_id": normalized_fast_activity_id,
-                "generation": int(generation),
                 "goal_association_fingerprint": normalized_association_fingerprint,
                 "must_not_claim_completion": must_not_claim_completion,
-                "order": int(orders[0]),
                 "purpose": str(purpose or ""),
                 "session_id": sid,
                 "source_goal_ids": normalized_goal_ids,
                 "stage": str(stage or ""),
                 "turn_id": normalized_turn_id,
-            },
+            }
+        event_seed = json.dumps(
+            event_identity,
             ensure_ascii=False,
             separators=(",", ":"),
             sort_keys=True,
@@ -165,32 +180,79 @@ class PlaybackDeliveryLifecycle:
         event_id = "speech_event_" + hashlib.sha256(
             event_seed.encode("utf-8")
         ).hexdigest()[:20]
-        event = {
-            "event_id": event_id,
-            "session_id": sid,
-            "turn_id": normalized_turn_id,
-            "stage": str(stage or ""),
-            "purpose": str(purpose or ""),
-            "status": "scheduled",
-            "text": text,
-            "commitment": str(commitment or ""),
-            "source_goal_ids": normalized_goal_ids,
-            "canonical_plan_id": normalized_plan_id,
-            "canonical_plan_fingerprint": normalized_plan_fingerprint,
-            "goal_association_fingerprint": normalized_association_fingerprint,
-            "delivery_role": normalized_delivery_role,
-            "fast_activity_id": normalized_fast_activity_id,
-            "claims": normalized_claims,
-            "must_not_claim_completion": must_not_claim_completion,
+        normalized_orders = [int(order) for order in orders]
+        attempt_seed = json.dumps(
+            {
+                "event_id": event_id,
+                "generation": int(generation),
+                "orders": normalized_orders,
+            },
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        delivery_attempt_id = "speech_attempt_" + hashlib.sha256(
+            attempt_seed.encode("utf-8")
+        ).hexdigest()[:20]
+        attempt = {
+            "delivery_attempt_id": delivery_attempt_id,
             "generation": int(generation),
-            "orders": [int(order) for order in orders],
+            "orders": normalized_orders,
+            "status": "scheduled",
         }
         events = self.turn_speech_events.setdefault(sid, [])
-        events.append(event)
-        if len(events) > 12:
-            del events[:-12]
+        existing = next(
+            (item for item in reversed(events) if item.get("event_id") == event_id),
+            None,
+        )
+        if existing is None:
+            event = {
+                "event_id": event_id,
+                "delivery_attempt_id": delivery_attempt_id,
+                "delivery_attempts": [attempt],
+                "session_id": sid,
+                "turn_id": normalized_turn_id,
+                "stage": str(stage or ""),
+                "purpose": str(purpose or ""),
+                "status": "scheduled",
+                "text": text,
+                "commitment": str(commitment or ""),
+                "source_goal_ids": normalized_goal_ids,
+                "canonical_plan_id": normalized_plan_id,
+                "canonical_plan_fingerprint": normalized_plan_fingerprint,
+                "goal_association_fingerprint": normalized_association_fingerprint,
+                "delivery_role": normalized_delivery_role,
+                "fast_activity_id": normalized_fast_activity_id,
+                "communicative_activity_ids": normalized_activity_ids,
+                "claims": normalized_claims,
+                "must_not_claim_completion": must_not_claim_completion,
+                "generation": int(generation),
+                "orders": normalized_orders,
+            }
+            events.append(event)
+            if len(events) > 12:
+                del events[:-12]
+        else:
+            event = existing
+            attempts = event.setdefault("delivery_attempts", [])
+            if not any(
+                item.get("delivery_attempt_id") == delivery_attempt_id
+                for item in attempts
+                if isinstance(item, dict)
+            ):
+                attempts.append(attempt)
+                if len(attempts) > 8:
+                    del attempts[:-8]
+            event.update(
+                {
+                    "delivery_attempt_id": delivery_attempt_id,
+                    "status": "scheduled",
+                    "text": text,
+                    "generation": int(generation),
+                    "orders": normalized_orders,
+                }
+            )
         self.turn_speech_event_by_playback_key[
-            self.key(generation, orders[0], session_id)
+            self.key(generation, normalized_orders[0], session_id)
         ] = event_id
         self._publish_interaction_event(event)
         return event
@@ -209,6 +271,43 @@ class PlaybackDeliveryLifecycle:
             }
         )
 
+    def find_turn_speech_event_for_activities(
+        self,
+        *,
+        session_id: str | None,
+        turn_id: str | None,
+        communicative_activity_ids: list[str] | tuple[str, ...] | set[str],
+        reusable_statuses: set[str] | None = None,
+    ) -> dict[str, Any] | None:
+        """Return one already-scheduled semantic Communicative Activity event.
+
+        This is an idempotency lookup, not semantic matching: callers must supply
+        the exact Planner-owned Activity IDs.  Wording similarity never qualifies
+        reuse.
+        """
+
+        sid = " ".join(str(session_id or "").strip().split())
+        normalized_turn_id = " ".join(str(turn_id or sid).strip().split())
+        activity_ids = self._normalized_text_values(communicative_activity_ids)
+        if not sid or not activity_ids:
+            return None
+        statuses = reusable_statuses or {
+            "scheduled",
+            "playback_started",
+            "playback_completed",
+        }
+        for event in reversed(self.turn_speech_events.get(sid, [])):
+            if str(event.get("turn_id") or "") != normalized_turn_id:
+                continue
+            if self._normalized_text_values(
+                event.get("communicative_activity_ids")
+            ) != activity_ids:
+                continue
+            if str(event.get("status") or "") not in statuses:
+                continue
+            return dict(event)
+        return None
+
     def _publish_interaction_event(self, event: dict[str, Any]) -> None:
         if self.interaction_event_sink is None:
             return
@@ -220,6 +319,14 @@ class PlaybackDeliveryLifecycle:
                     event.get("source_goal_ids") or []
                 ),
                 "claims": list(event.get("claims") or []),
+                "communicative_activity_ids": list(
+                    event.get("communicative_activity_ids") or []
+                ),
+                "delivery_attempts": [
+                    dict(item)
+                    for item in event.get("delivery_attempts") or []
+                    if isinstance(item, dict)
+                ],
             }
         )
 
@@ -240,8 +347,20 @@ class PlaybackDeliveryLifecycle:
         for event in reversed(self.turn_speech_events.get(sid, [])):
             if event.get("event_id") != event_id:
                 continue
-            event["status"] = "playback_started" if started else "not_delivered"
+            status = "playback_started" if started else "not_delivered"
+            event["status"] = status
             event["playback_reason"] = str(reason or "")
+            for attempt in reversed(event.get("delivery_attempts") or []):
+                if not isinstance(attempt, dict):
+                    continue
+                if int(attempt.get("generation", -1)) != int(generation):
+                    continue
+                attempt_orders = attempt.get("orders")
+                if not isinstance(attempt_orders, list) or int(order) not in attempt_orders:
+                    continue
+                attempt["status"] = status
+                attempt["playback_reason"] = str(reason or "")
+                break
             self._publish_interaction_event(event)
             break
 

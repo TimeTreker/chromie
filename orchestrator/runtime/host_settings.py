@@ -444,7 +444,7 @@ class HostSettingsSnapshot:
             playback_start_timeout_ms=_int(
                 values,
                 "ORCH_TTS_PLAYBACK_START_TIMEOUT_MS",
-                20000,
+                3500,
                 minimum=100,
             ),
             ready_greeting_enabled=_bool(
@@ -600,7 +600,7 @@ class HostSettingsSnapshot:
                 runtime_timeout_ms=_int(
                     values,
                     "ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS",
-                    25000,
+                    15000,
                     minimum=1000,
                 ),
                 social_attention_mode=social_mode,

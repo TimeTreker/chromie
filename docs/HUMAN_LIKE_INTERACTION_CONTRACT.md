@@ -462,7 +462,7 @@ A barge-in or newer ordinary turn may invalidate speech that is already playing
 or queued for an obsolete Communicative Act. It does not by itself cancel an
 independent Goal, erase its evidence, or discard the truthful result response
 that becomes eligible later. Task cancellation still requires an explicit
-deterministic scope or a Core-authorized semantic interruption.
+deterministic scope or a Goal-Association-authorized semantic cancellation.
 
 Provider PCM chunks may be played incrementally only while preserving ordered
 delivery, cancellation generations, stale-output suppression, barge-in, output
@@ -616,7 +616,22 @@ the remaining Fast/GA work continue. Fast Advance cannot then salvage or author 
 progress Activity as a replacement for that completed first-response decision. No independent production LLM reviews, repairs,
 or re-decides ordinary progress wording, and no reviewer chain is permitted.
 Interaction Context remains the authority for whether any speech was actually heard or
-is still pending.
+is still pending. A Planner `CommunicativeAct.activity_id` is the semantic speech
+identity for that turn. Requeueing the same Activity under a new playback generation
+or order creates a new **delivery attempt**, not a new user-facing speech event. Runtime
+may suppress/resume transport only by exact Activity identity and retained delivery
+evidence; wording similarity is never a de-duplication authority. A delivered or
+already-scheduled Activity must not be spoken again merely because GA reconciliation,
+plan projection, retry, or transport ordering created another delivery attempt.
+
+Foreground interaction deadlines and qualification watchdogs are separate concerns.
+Maintained human-facing modes use bounded interactive stage deadlines, a 15-second
+foreground Cognitive Runtime deadline, and a 3.5-second playback-start hard barrier.
+If the foreground deadline cancels cognition, Runtime cancels only provisional Fast
+Capability work that never received canonical Goal/Plan binding, preserves already
+scheduled or heard Planner speech evidence, and returns a bounded repair rather than
+waiting through a qualification watchdog. Long 120/150/900-second watchdogs belong only
+to explicit qualification/validation modes used to collect complete evidence.
 
 In the qualified warm live profile, the Planner-local target is at most 2.0 seconds
 from validated GI handoff to the first valid Fast-Planner Communicative Activity

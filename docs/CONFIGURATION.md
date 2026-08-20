@@ -393,8 +393,8 @@ retained. See
 |---|---|
 | `AGENT_MODEL` | Ollama model selected by the hardware profile. |
 | `AGENT_OLLAMA_URL` | Container Ollama base URL. |
-| `AGENT_TIMEOUT_MS` | Agent-to-Ollama timeout; profile-specific. |
-| `ORCH_AGENT_TIMEOUT_MS` | Host-to-Agent timeout; common default `9000`; must exceed `AGENT_TIMEOUT_MS`. |
+| `AGENT_TIMEOUT_MS` | Generic Agent-to-Ollama fallback timeout. Normal cognitive stages use their stage-specific timeouts; explicit qualification mode raises the generic fallback to `240000`. |
+| `ORCH_AGENT_TIMEOUT_MS` | Generic Host-to-Agent fallback timeout; common default `9000`. Cognitive stage calls use their explicit Host stage deadlines; qualification mode raises the generic fallback to `300000`. |
 | `AGENT_USE_LLM` | Enable LLM-backed conversation/planning; default `1`. |
 | `AGENT_SOCIAL_ATTENTION_MODE` | Embodiment-independent policy with values `off`, `report_only`, or `on`; maintained default `on`. Legacy simulator-scoped values are no longer accepted; maintained modes compose this service-owned policy explicitly. Soridormi/provider owns simulator-versus-physical selection. See [Social Attention Behavior Domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md). |
 | `AGENT_SOCIAL_ATTENTION_MODEL` | Dedicated Ollama model for optional `SocialAttentionPlan` generation; default `qwen3:4b`. |
@@ -458,7 +458,7 @@ Do not commit a real execution token. Manifest strings may use required
 | Variable | Default or profile behavior |
 |---|---|
 | `ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | `9000` in common low-latency configuration. It must exceed `AGENT_GOAL_INTERPRETER_TIMEOUT_MS` so the service can return a WHAT-only result or typed unavailability before the Host timeout. |
-| `ORCH_AGENT_TIMEOUT_MS` | Host-to-Agent timeout; must exceed `AGENT_TIMEOUT_MS`. Hardware profiles set this value. |
+| `ORCH_AGENT_TIMEOUT_MS` | Generic Host-to-Agent fallback timeout. Hardware profiles do not own it; explicit operator/validation modes may override it when collecting qualification evidence. |
 | `ORCH_ASR_TIMEOUT_MS` | Host wait for one final ASR response; common default `30000`. |
 | `ORCH_ACTION_TIMEOUT_MS` | Host timeout for one legacy hardware-daemon action; common default `5000`. |
 | `ORCH_SORIDORMI_CATALOG_REFRESH_TTL_S` | Seconds to keep the Orchestrator-side Soridormi named-skill catalog before reloading; code default `30`. Unknown requested `soridormi.*` skills force an immediate refresh even before this TTL expires. Set `0` to reload before every body-skill execution. |
@@ -474,7 +474,7 @@ and there are no `ORCH_CONDITIONAL_DEEPTHINK_*` runtime controls.
 | `ORCH_TTS_FIRST_CHUNK_CHARS` | Preferred first complete-speech chunk size; common and code default `16` so short complete openers such as `I'm doing well.`, `Not tired.`, or `Too fast.` can be synthesized before longer follow-up sections. Set `0` to use `ORCH_TTS_CHUNK_CHARS` for every chunk. |
 | `ORCH_TTS_CHUNK_CHARS` | Preferred upper size for complete-speech chunks; common and code default `120`. Complete speech is split on sentence and substantial clause boundaries first; tiny fragments may be grouped, and length splitting is only a fallback for text longer than `TTS_MAX_TEXT_CHARS`. |
 | `ORCH_TTS_MIN_CHUNK_CHARS` | Small-fragment aggregation threshold for complete-speech chunks; common and code default `20`. |
-| `ORCH_TTS_PLAYBACK_START_TIMEOUT_MS` | Maximum host wait for response speech that carries a playback-start delivery/effect barrier; code default `20000`. Failure prevents dependent body effects, marks the speech request failed, and invalidates every queued chunk of that utterance so late synthesis cannot speak after the failed barrier. |
+| `ORCH_TTS_PLAYBACK_START_TIMEOUT_MS` | Hard Host wait for response speech that carries a playback-start delivery/effect barrier. Maintained interactive modes and the code/common fallback use `3500`; explicit qualification mode uses `20000`. Failure prevents dependent body effects, marks the speech request failed, and invalidates every queued chunk of that utterance so late synthesis cannot speak after the failed barrier. |
 | `ORCH_RUNTIME_READY_GREETING_ENABLED` | `1`; runtime-ready lifecycle switch. In a live device session, Chromie may attempt one quiet, untargeted, provider-declared startup-orientation Activity before opening the microphone. This is baseline liveliness, not Social Attention because there is no interaction anchor yet. Missing, unavailable, confirmation-bound, or invalid orientation fails open and never produces failure speech. Stdin/discard acceptance modes skip the orientation. |
 | `ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED` | `0`; startup speech is disabled by default. Set to `1` only when the owner deliberately wants a spoken startup line. The non-verbal orientation remains independent. |
 | `ORCH_RUNTIME_READY_GREETING_TEXT` | Empty by default. When startup speech is explicitly enabled, a valid configured sentence is preferred. Leaving it empty allows the existing bounded generation path, but maintained profiles do not require or schedule that speech. |
@@ -749,7 +749,8 @@ checks completion diagnostics, and only then schedules TTS. A truncated stream
 is never partially spoken.
 
 The generated `.chromie/runtime_profile.json` retains the exact global and
-per-stage context/output budgets, estimator, safety margin, and timeouts.
+per-stage context/output budgets, estimator, safety margin, cognitive deadlines,
+and playback-start barrier selected after hardware/profile/mode resolution.
 `scripts/verify_runtime_profile.sh` checks that the running Ollama and Agent
 containers received those values. Product optimization may reduce these budgets
 only after retained warm-run evidence establishes real prompt/output
@@ -935,7 +936,7 @@ the authoritative Goal/Evidence snapshots remain Host-owned.
 | Variable | Default or profile behavior |
 |---|---|
 | `ORCH_COGNITIVE_RUNTIME_MODE` | `apply` in `.env.common` and the maintained launcher. `off` disables the Goal-driven Runtime and therefore fails closed for admitted ordinary cognition; `report_only` is diagnostic evidence-only execution when invoked explicitly; `apply` is the maintained authoritative mode. No mode falls back to a retired semantic pipeline. |
-| `ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS` | `25000`; total host budget for Goal Association, Fast-to-Deep planning, Planner response realization, and runtime adaptation. Trusted Host rejection is terminal and does not reopen semantic planning. |
+| `ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS` | Foreground Host deadline for one admitted cognitive interaction. Maintained interactive modes and the code/common fallback use `15000`; explicit qualification mode uses `900000` as an evidence-collection watchdog. When the foreground deadline cancels the pipeline, Runtime cleans up unbound provisional Fast work before propagating cancellation. Trusted Host rejection is terminal and does not reopen semantic planning. |
 | `ORCH_COGNITIVE_EVIDENCE_ENABLED` | `1`; writes append-only operational resolution evidence. It does not by itself prove simulator or physical execution. |
 | `ORCH_COGNITIVE_EVIDENCE_INCLUDE_TEXT` | `0`; stores only text length and a short SHA-256 digest by default, including in completed/abandoned Session workflow reports. Enable raw text only under an explicit privacy decision. |
 | `ORCH_COGNITIVE_EVIDENCE_PATH` | `.chromie/evidence/cognitive-runtime/events.jsonl`; append-only Gateway admission, Goal Association, terminal Plan, Planner response projection, latency, failure, and execution-outcome summaries. Its parent directory also owns `session-workflows/`, containing per-SID JSON/Markdown flows and a rolling conversation-correlated view; this does not add another runtime setting. |
@@ -943,7 +944,7 @@ the authoritative Goal/Evidence snapshots remain Host-owned.
 
 `scripts/start_chromie.sh` generates
 `.chromie/voice-runtime/orchestrator.env` and synchronizes the complete
-profile-owned cognitive budget set from `.env.runtime`; the generated file must
+resolved cognitive budget set from `.env.runtime`; the generated file must
 not be edited by hand. Source-bound Gateway/Core qualification loads that exact
 file into every cognitive evidence subprocess. Runtime identity capture rejects
 a missing budget or any value that differs from
@@ -1155,8 +1156,8 @@ retained. See
 |---|---|
 | `AGENT_MODEL` | Ollama model selected by the hardware profile. |
 | `AGENT_OLLAMA_URL` | Container Ollama base URL. |
-| `AGENT_TIMEOUT_MS` | Agent-to-Ollama timeout; profile-specific. |
-| `ORCH_AGENT_TIMEOUT_MS` | Host-to-Agent timeout; common default `9000`; must exceed `AGENT_TIMEOUT_MS`. |
+| `AGENT_TIMEOUT_MS` | Generic Agent-to-Ollama fallback timeout. Normal cognitive stages use their stage-specific timeouts; explicit qualification mode raises the generic fallback to `240000`. |
+| `ORCH_AGENT_TIMEOUT_MS` | Generic Host-to-Agent fallback timeout; common default `9000`. Cognitive stage calls use their explicit Host stage deadlines; qualification mode raises the generic fallback to `300000`. |
 | `AGENT_USE_LLM` | Enable LLM-backed conversation/planning; default `1`. |
 | `AGENT_SOCIAL_ATTENTION_MODE` | Embodiment-independent policy with values `off`, `report_only`, or `on`; maintained default `on`. Legacy simulator-scoped values are no longer accepted; maintained modes compose this service-owned policy explicitly. Soridormi/provider owns simulator-versus-physical selection. See [Social Attention Behavior Domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md). |
 | `AGENT_SOCIAL_ATTENTION_MODEL` | Dedicated Ollama model for optional `SocialAttentionPlan` generation; default `qwen3:4b`. |
@@ -1220,7 +1221,7 @@ Do not commit a real execution token. Manifest strings may use required
 | Variable | Default or profile behavior |
 |---|---|
 | `ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | `9000` in common low-latency configuration. It must exceed the Goal Interpreter catalog lookup plus quick-LLM and review timeout budget so interpretation can finish or report its own timeout before the host falls back. |
-| `ORCH_AGENT_TIMEOUT_MS` | Host-to-Agent timeout; must exceed `AGENT_TIMEOUT_MS`. Hardware profiles set this value. |
+| `ORCH_AGENT_TIMEOUT_MS` | Generic Host-to-Agent fallback timeout. Hardware profiles do not own it; explicit operator/validation modes may override it when collecting qualification evidence. |
 | `ORCH_ASR_TIMEOUT_MS` | Host wait for one final ASR response; common default `30000`. |
 | `ORCH_ACTION_TIMEOUT_MS` | Host timeout for one legacy hardware-daemon action; common default `5000`. |
 | `ORCH_SORIDORMI_CATALOG_REFRESH_TTL_S` | Seconds to keep the Orchestrator-side Soridormi named-skill catalog before reloading; code default `30`. Unknown requested `soridormi.*` skills force an immediate refresh even before this TTL expires. Set `0` to reload before every body-skill execution. |
@@ -1236,7 +1237,7 @@ and there are no `ORCH_CONDITIONAL_DEEPTHINK_*` runtime controls.
 | `ORCH_TTS_FIRST_CHUNK_CHARS` | Preferred first complete-speech chunk size; common and code default `16` so short complete openers such as `I'm doing well.`, `Not tired.`, or `Too fast.` can be synthesized before longer follow-up sections. Set `0` to use `ORCH_TTS_CHUNK_CHARS` for every chunk. |
 | `ORCH_TTS_CHUNK_CHARS` | Preferred upper size for complete-speech chunks; common and code default `120`. Complete speech is split on sentence and substantial clause boundaries first; tiny fragments may be grouped, and length splitting is only a fallback for text longer than `TTS_MAX_TEXT_CHARS`. |
 | `ORCH_TTS_MIN_CHUNK_CHARS` | Small-fragment aggregation threshold for complete-speech chunks; common and code default `20`. |
-| `ORCH_TTS_PLAYBACK_START_TIMEOUT_MS` | Maximum host wait for response speech that carries a playback-start delivery/effect barrier; code default `20000`. Failure prevents dependent body effects, marks the speech request failed, and invalidates every queued chunk of that utterance so late synthesis cannot speak after the failed barrier. |
+| `ORCH_TTS_PLAYBACK_START_TIMEOUT_MS` | Hard Host wait for response speech that carries a playback-start delivery/effect barrier. Maintained interactive modes and the code/common fallback use `3500`; explicit qualification mode uses `20000`. Failure prevents dependent body effects, marks the speech request failed, and invalidates every queued chunk of that utterance so late synthesis cannot speak after the failed barrier. |
 | `ORCH_RUNTIME_READY_GREETING_ENABLED` | `1`; runtime-ready lifecycle switch. In a live device session, Chromie may attempt one quiet, untargeted, provider-declared startup-orientation Activity before opening the microphone. This is baseline liveliness, not Social Attention because there is no interaction anchor yet. Missing, unavailable, confirmation-bound, or invalid orientation fails open and never produces failure speech. Stdin/discard acceptance modes skip the orientation. |
 | `ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED` | `0`; startup speech is disabled by default. Set to `1` only when the owner deliberately wants a spoken startup line. The non-verbal orientation remains independent. |
 | `ORCH_RUNTIME_READY_GREETING_TEXT` | Empty by default. When startup speech is explicitly enabled, a valid configured sentence is preferred. Leaving it empty allows the existing bounded generation path, but maintained profiles do not require or schedule that speech. |
@@ -1511,7 +1512,8 @@ checks completion diagnostics, and only then schedules TTS. A truncated stream
 is never partially spoken.
 
 The generated `.chromie/runtime_profile.json` retains the exact global and
-per-stage context/output budgets, estimator, safety margin, and timeouts.
+per-stage context/output budgets, estimator, safety margin, cognitive deadlines,
+and playback-start barrier selected after hardware/profile/mode resolution.
 `scripts/verify_runtime_profile.sh` checks that the running Ollama and Agent
 containers received those values. Product optimization may reduce these budgets
 only after retained warm-run evidence establishes real prompt/output

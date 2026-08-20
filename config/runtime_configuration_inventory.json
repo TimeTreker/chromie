@@ -166,8 +166,10 @@
         ".env.common",
         "agent/app/settings.py",
         "docker-compose.yml",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
+        "env/modes/qualification.env",
+        "env/modes/services.env",
+        "env/modes/speech.env",
+        "env/modes/voice_mujoco.env",
         "env/validation/architecture.env"
       ]
     },
@@ -264,8 +266,10 @@
         ".env.common",
         "agent/app/settings.py",
         "docker-compose.yml",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
+        "env/modes/qualification.env",
+        "env/modes/services.env",
+        "env/modes/speech.env",
+        "env/modes/voice_mujoco.env",
         "env/validation/architecture.env"
       ]
     },
@@ -462,8 +466,10 @@
         ".env.common",
         "agent/app/settings.py",
         "docker-compose.yml",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
+        "env/modes/qualification.env",
+        "env/modes/services.env",
+        "env/modes/speech.env",
+        "env/modes/voice_mujoco.env",
         "env/validation/architecture.env"
       ]
     },
@@ -561,8 +567,10 @@
         ".env.common",
         "agent/app/settings.py",
         "docker-compose.yml",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
+        "env/modes/qualification.env",
+        "env/modes/services.env",
+        "env/modes/speech.env",
+        "env/modes/voice_mujoco.env",
         "env/validation/architecture.env"
       ]
     },
@@ -664,8 +672,10 @@
         ".env.common",
         "agent/app/settings.py",
         "docker-compose.yml",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
+        "env/modes/qualification.env",
+        "env/modes/services.env",
+        "env/modes/speech.env",
+        "env/modes/voice_mujoco.env",
         "env/validation/architecture.env"
       ]
     },
@@ -1028,8 +1038,7 @@
       "category": "acceptance_override",
       "key": "AGENT_TASK_CONTINUITY_TIMEOUT_MS",
       "owners": [
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
+        "env/modes/qualification.env",
         "env/validation/architecture.env"
       ]
     },
@@ -1102,6 +1111,7 @@
       "owners": [
         "agent/app/settings.py",
         "docker-compose.yml",
+        "env/modes/qualification.env",
         "env/profiles/default.env",
         "env/profiles/jetson_agx_orin.env",
         "env/profiles/jetson_orin_nano_super.env",
@@ -1109,8 +1119,6 @@
         "env/profiles/nvidia_ada.env",
         "env/profiles/nvidia_blackwell.env",
         "env/profiles/rtx4090.env",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
         "env/validation/architecture.env"
       ]
     },
@@ -1395,8 +1403,10 @@
       "category": "profile_constant",
       "key": "CHROMIE_COGNITIVE_BUDGET_PROFILE",
       "owners": [
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env"
+        "env/modes/qualification.env",
+        "env/modes/services.env",
+        "env/modes/speech.env",
+        "env/modes/voice_mujoco.env"
       ]
     },
     {
@@ -2156,9 +2166,7 @@
       "category": "profile_constant",
       "key": "OLLAMA_WARM_REQUEST_TIMEOUT_SECONDS",
       "owners": [
-        ".env.common",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env"
+        ".env.common"
       ]
     },
     {
@@ -2223,6 +2231,7 @@
       "key": "ORCH_AGENT_TIMEOUT_MS",
       "owners": [
         ".env.common",
+        "env/modes/qualification.env",
         "env/profiles/default.env",
         "env/profiles/jetson_agx_orin.env",
         "env/profiles/jetson_orin_nano_super.env",
@@ -2230,8 +2239,6 @@
         "env/profiles/nvidia_ada.env",
         "env/profiles/nvidia_blackwell.env",
         "env/profiles/rtx4090.env",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
         "env/validation/architecture.env",
         "orchestrator/runtime/host_settings.py"
       ]
@@ -2359,8 +2366,10 @@
       "key": "ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS",
       "owners": [
         ".env.common",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
+        "env/modes/qualification.env",
+        "env/modes/services.env",
+        "env/modes/speech.env",
+        "env/modes/voice_mujoco.env",
         "env/validation/architecture.env",
         "orchestrator/runtime/host_settings.py"
       ]
@@ -2571,8 +2580,10 @@
       "key": "ORCH_DEEP_PLANNER_TIMEOUT_MS",
       "owners": [
         ".env.common",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
+        "env/modes/qualification.env",
+        "env/modes/services.env",
+        "env/modes/speech.env",
+        "env/modes/voice_mujoco.env",
         "env/validation/architecture.env",
         "orchestrator/runtime/host_settings.py"
       ]
@@ -2773,8 +2784,10 @@
       "key": "ORCH_FAST_PLANNER_TIMEOUT_MS",
       "owners": [
         ".env.common",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
+        "env/modes/qualification.env",
+        "env/modes/services.env",
+        "env/modes/speech.env",
+        "env/modes/voice_mujoco.env",
         "env/validation/architecture.env",
         "orchestrator/runtime/host_settings.py"
       ]
@@ -2794,8 +2807,10 @@
       "key": "ORCH_GOAL_ASSOCIATION_TIMEOUT_MS",
       "owners": [
         ".env.common",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
+        "env/modes/qualification.env",
+        "env/modes/services.env",
+        "env/modes/speech.env",
+        "env/modes/voice_mujoco.env",
         "env/validation/architecture.env",
         "orchestrator/runtime/host_settings.py"
       ]
@@ -3152,8 +3167,7 @@
       "category": "acceptance_override",
       "key": "ORCH_TASK_CONTINUITY_TIMEOUT_MS",
       "owners": [
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
+        "env/modes/qualification.env",
         "env/validation/architecture.env"
       ]
     },
@@ -3218,6 +3232,10 @@
       "key": "ORCH_TTS_PLAYBACK_START_TIMEOUT_MS",
       "owners": [
         ".env.common",
+        "env/modes/qualification.env",
+        "env/modes/services.env",
+        "env/modes/speech.env",
+        "env/modes/voice_mujoco.env",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -4095,12 +4113,12 @@
     "category_counts": {
       "acceptance_override": 37,
       "bounded_compatibility_alias": 0,
-      "profile_constant": 141,
+      "profile_constant": 130,
       "public_choice": 9,
-      "service_internal": 218
+      "service_internal": 217
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 405
+    "total_keys": 393
   }
 }

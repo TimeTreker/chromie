@@ -465,7 +465,6 @@ class VoiceAssistant:
         self.interaction_runtime = build_interaction_runtime(self, self.host_settings, interaction_ledger=host_support.interaction_ledger)
         self.cognitive_runtime_policy = CognitiveRuntimePolicy(
             mode=self.cognitive_runtime_mode,
-            max_total_ms=self.cognitive_runtime_timeout_ms,
             goal_association_timeout_ms=self.goal_association_timeout_ms,
             fast_planner_timeout_ms=self.fast_planner_timeout_ms,
             deep_planner_timeout_ms=self.deep_planner_timeout_ms,
@@ -620,6 +619,7 @@ class VoiceAssistant:
         purpose: str,
         commitment: str = "",
         fast_activity_id: str = "",
+        communicative_activity_ids: list[str] | None = None,
         turn_id: str | None = None,
         source_goal_ids: list[str] | None = None,
         canonical_plan_id: str = "",
@@ -638,6 +638,7 @@ class VoiceAssistant:
             purpose=purpose,
             commitment=commitment,
             fast_activity_id=fast_activity_id,
+            communicative_activity_ids=communicative_activity_ids,
             turn_id=turn_id,
             source_goal_ids=source_goal_ids,
             canonical_plan_id=canonical_plan_id,
@@ -1833,6 +1834,53 @@ class VoiceAssistant:
                 "status": current_status() or status or "scheduled",
             }
 
+        # Semantic idempotency is keyed by exact Planner Communicative Activity
+        # identity, not by transport generation/order and not by wording similarity.
+        # If the same Activity is materialized twice during reconciliation or a
+        # retry, reuse the already-scheduled/delivered audio rather than creating
+        # a second user-facing act.
+        semantic_activity_ids: list[str] = []
+        if isinstance(metadata, dict):
+            raw_activity_ids = metadata.get("communicative_activity_ids")
+            if isinstance(raw_activity_ids, str):
+                raw_activity_ids = [raw_activity_ids]
+            if isinstance(raw_activity_ids, list):
+                semantic_activity_ids.extend(
+                    str(item).strip()
+                    for item in raw_activity_ids
+                    if str(item).strip()
+                )
+            fast_activity_id = str(metadata.get("fast_activity_id") or "").strip()
+            if fast_activity_id and fast_activity_id not in semantic_activity_ids:
+                semantic_activity_ids.append(fast_activity_id)
+        if semantic_activity_ids:
+            existing_event = self._playback_state().find_turn_speech_event_for_activities(
+                session_id=session_id,
+                turn_id=(
+                    str(metadata.get("turn_id") or session_id or "")
+                    if isinstance(metadata, dict)
+                    else str(session_id or "")
+                ),
+                communicative_activity_ids=semantic_activity_ids,
+            )
+            if existing_event is not None:
+                existing_orders = existing_event.get("orders")
+                if isinstance(existing_orders, list) and existing_orders:
+                    reuse_metadata = dict(metadata or {})
+                    reuse_metadata.update(
+                        {
+                            "reuse_current_turn_speech": True,
+                            "reused_speech_event_id": existing_event.get("event_id"),
+                            "reused_speech_generation": existing_event.get("generation"),
+                            "reused_speech_orders": list(existing_orders),
+                            "reused_speech_status": existing_event.get("status"),
+                            "semantic_idempotent_reuse": True,
+                        }
+                    )
+                    reuse_args = dict(args)
+                    reuse_args["metadata"] = reuse_metadata
+                    return await self._schedule_interaction_speech(reuse_args)
+
         text = str(args.get("text") or "")
         scheduled = await self.schedule_tts_text(text, session_id)
         if scheduled.get("scheduled") is True:
@@ -1873,6 +1921,12 @@ class VoiceAssistant:
                     str(metadata.get("fast_activity_id") or "")
                     if isinstance(metadata, dict)
                     else ""
+                ),
+                communicative_activity_ids=(
+                    list(metadata.get("communicative_activity_ids") or [])
+                    if isinstance(metadata, dict)
+                    and isinstance(metadata.get("communicative_activity_ids"), list)
+                    else []
                 ),
                 turn_id=(
                     str(metadata.get("turn_id") or session_id or "")
@@ -2694,11 +2748,15 @@ class VoiceAssistant:
                 timings_ms={"total": round(now_ms() - started_ms, 1)},
                 fallback_reason=f"{type(exc).__name__}: {str(exc)[:500]}",
                 metadata={
-                    "outer_timeout_ms": self.cognitive_runtime_timeout_ms,
-                    "failure_stage": "cognitive_runtime_outer",
-                    "failure_class": "outer_timeout" if is_timeout else type(exc).__name__,
+                    "foreground_deadline_ms": self.cognitive_runtime_timeout_ms,
+                    "failure_stage": "cognitive_runtime_foreground",
+                    "failure_class": (
+                        "foreground_deadline_exceeded"
+                        if is_timeout
+                        else type(exc).__name__
+                    ),
                     "failure_domain": (
-                        "orchestration_budget" if is_timeout else "cognitive_runtime"
+                        "interaction_deadline" if is_timeout else "cognitive_runtime"
                     ),
                     "architecture_attribution": "not_evaluated",
                     "retryable": is_timeout,
@@ -3026,9 +3084,25 @@ class VoiceAssistant:
             resolution = resolution.model_copy(
                 update={"turn_envelope": turn_envelope}
             )
+        planner_speech_events = [
+            event
+            for event in self._playback_state().turn_speech_events.get(
+                str(session_id or ""), []
+            )
+            if isinstance(event, dict)
+            and str(event.get("status") or "")
+            in {"scheduled", "playback_started", "playback_completed"}
+            and (
+                event.get("fast_activity_id")
+                or event.get("communicative_activity_ids")
+            )
+        ]
         fast_planner_vocal_scheduled = bool(
-            resolution.fast_advance is not None
-            and resolution.metadata.get("fast_vocal_activity_ids")
+            (
+                resolution.fast_advance is not None
+                and resolution.metadata.get("fast_vocal_activity_ids")
+            )
+            or planner_speech_events
         )
         summary = self._cognitive_resolution_summary(resolution)
         if resolution.status != "applied" or resolution.interaction_response is None:
@@ -4392,9 +4466,9 @@ class VoiceAssistant:
         del context
         zh = self._looks_zh(user_text)
         text = (
-            "咦？我刚刚没弄明白。你再跟我说一遍嘛。"
+            "咦，刚才没接上。你再跟我说一遍嘛。"
             if zh
-            else "Huh? I didn't quite get that. Can you tell me again?"
+            else "Huh, that didn't go through. Can you tell me again?"
         )
         response = self._host_speech_response(
             text,

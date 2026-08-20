@@ -915,6 +915,55 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["playback_started"])
         self.assertEqual(result["order"], 5)
 
+    async def test_same_communicative_activity_auto_reuses_audio_without_transport_identity(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.playback_start_waiters = {}
+        assistant._turn_speech_events = {}
+        assistant._turn_speech_event_by_playback_key = {}
+        assistant.session_log = MethodType(
+            lambda self, sid, message, *args: None,
+            assistant,
+        )
+        event = assistant._register_turn_speech_event(
+            session_id="sid-semantic-reuse",
+            turn_id="turn-semantic-reuse",
+            generation=4,
+            orders=[8],
+            text="好，我去看看。",
+            stage="fast_first",
+            purpose="acknowledge_and_check",
+            communicative_activity_ids=["activity-weather-check"],
+        )
+        self.assertIsNotNone(event)
+        assert event is not None
+        event["status"] = "playback_started"
+
+        async def fail_if_resynthesized(
+            self: VoiceAssistant, text: str, session_id: str | None
+        ) -> dict[str, Any]:
+            del self, text, session_id
+            raise AssertionError("same Communicative Activity must not synthesize twice")
+
+        assistant.schedule_tts_text = MethodType(fail_if_resynthesized, assistant)
+        result = await assistant._schedule_interaction_speech(
+            {
+                "text": "好，我去看看。",
+                "metadata": {
+                    "session_id": "sid-semantic-reuse",
+                    "turn_id": "turn-semantic-reuse",
+                    "communicative_activity_ids": ["activity-weather-check"],
+                    "wait_for_playback_start": True,
+                },
+            }
+        )
+
+        self.assertTrue(result["scheduled"])
+        self.assertTrue(result["reused"])
+        self.assertTrue(result["playback_started"])
+        self.assertEqual(result["speech_event_id"], event["event_id"])
+        self.assertEqual(result["generation"], 4)
+        self.assertEqual(result["orders"], [8])
+
     async def test_undelivered_fast_communicative_act_is_fulfilled_once_by_reused_stage(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.playback_start_waiters = {}
@@ -984,7 +1033,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assert response is not None
         self.assertEqual(
             response.speech[0].text,
-            "Huh? I didn't quite get that. Can you tell me again?",
+            "Huh, that didn't go through. Can you tell me again?",
         )
         self.assertEqual(
             response.metadata["source"],
@@ -1001,7 +1050,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             response.speech[0].text,
-            "Huh? I didn't quite get that. Can you tell me again?",
+            "Huh, that didn't go through. Can you tell me again?",
         )
         self.assertEqual(response.metadata["effect_execution"], "not_authorized")
         self.assertFalse(response.metadata["semantic_fallback"])
@@ -1058,7 +1107,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             response.speech[0].text,
-            "咦？我刚刚没弄明白。你再跟我说一遍嘛。",
+            "咦，刚才没接上。你再跟我说一遍嘛。",
         )
         self.assertNotIn("执行任何操作", response.speech[0].text)
         self.assertNotIn("处理好你的请求", response.speech[0].text)

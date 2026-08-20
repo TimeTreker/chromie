@@ -78,6 +78,7 @@ COGNITIVE_BUDGET_KEYS = (
     "ORCH_FAST_PLANNER_TIMEOUT_MS",
     "ORCH_DEEP_PLANNER_TIMEOUT_MS",
     "ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS",
+    "ORCH_TTS_PLAYBACK_START_TIMEOUT_MS",
 )
 
 REQUIRED_PROFILE_KEYS = (
@@ -361,9 +362,9 @@ def merge_runtime_environment(
     if ignored_local_overrides and strict_local_conflicts:
         keys = ", ".join(ignored_local_overrides)
         raise ConfigurationError(
-            ".env.local overrides hardware/validation-owned settings: "
+            ".env.local overrides profile/mode/validation-owned settings: "
             f"{keys}. Remove those values or unset CHROMIE_ENV_STRICT so the detected "
-            "profile can ignore them and remain authoritative."
+            "resolved runtime sources can ignore them and remain authoritative."
         )
 
     allowed_local = OrderedDict(

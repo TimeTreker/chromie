@@ -433,7 +433,7 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         resolution = CognitiveRuntimeResolution(
             mode="apply",
             status="error",
-            fallback_reason="lane_not_enabled_for_apply",
+            fallback_reason="foreground_deadline_exceeded",
             timings_ms={"total": 15.0},
         )
         assistant = self._assistant(resolution)
@@ -464,10 +464,58 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(
             safe_response.speech[0].text,
-            "咦？我刚刚没弄明白。你再跟我说一遍嘛。",
+            "咦，刚才没接上。你再跟我说一遍嘛。",
         )
         self.assertEqual(safe_response.metadata["effect_execution"], "not_authorized")
         self.assertEqual(len(assistant._launch_interaction_calls), 1)
+
+
+    def test_cognitive_failure_preserves_existing_planner_speech_playback(self):
+        resolution = CognitiveRuntimeResolution(
+            mode="apply",
+            status="error",
+            fallback_reason="foreground_deadline_exceeded",
+            timings_ms={"total": 15000.0},
+            metadata={
+                "failure_stage": "cognitive_runtime_foreground",
+                "failure_class": "foreground_deadline_exceeded",
+            },
+        )
+        assistant = self._assistant(resolution)
+        event = assistant._register_turn_speech_event(
+            session_id="sid-timeout",
+            turn_id="sid-timeout",
+            generation=2,
+            orders=[4],
+            text="好，我去看看。",
+            stage="fast_first",
+            purpose="acknowledge_and_check",
+            communicative_activity_ids=["progress_weather"],
+        )
+        assert event is not None
+        event["status"] = "playback_started"
+        core, envelope = _core_and_envelope(
+            "查一下天气。", sid="sid-timeout", language="zh-CN"
+        )
+
+        async def run():
+            handled = await assistant._try_apply_cognitive_runtime(
+                object(),
+                user_text="查一下天气。",
+                session_id="sid-timeout",
+                context={"history": []},
+                core_interpretation=core,
+                core_interpretation_latency_ms=10.0,
+                turn_envelope=envelope,
+            )
+            self.assertTrue(handled)
+
+        asyncio.run(run())
+        self.assertEqual(len(assistant._launch_interaction_calls), 1)
+        self.assertFalse(
+            assistant._launch_interaction_calls[0][1]["reset_playback"]
+        )
+
 
 
 

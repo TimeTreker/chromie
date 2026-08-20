@@ -48,6 +48,7 @@ class PlaybackDeliveryLifecycleTests(unittest.IsolatedAsyncioTestCase):
             purpose="acknowledge_and_check",
             commitment="checking_only",
         )
+        first_text = first["text"] if first is not None else ""
         second = lifecycle.register_turn_speech_event(
             session_id="sid",
             generation=2,
@@ -60,7 +61,8 @@ class PlaybackDeliveryLifecycleTests(unittest.IsolatedAsyncioTestCase):
 
         assert first is not None and second is not None
         self.assertEqual(first["event_id"], second["event_id"])
-        self.assertNotEqual(first["text"], second["text"])
+        self.assertNotEqual(first_text, second["text"])
+        self.assertEqual(len(lifecycle.turn_speech_events["sid"]), 1)
 
         other_goal = lifecycle.register_turn_speech_event(
             session_id="sid",
@@ -74,6 +76,43 @@ class PlaybackDeliveryLifecycleTests(unittest.IsolatedAsyncioTestCase):
         )
         assert other_goal is not None
         self.assertNotEqual(first["event_id"], other_goal["event_id"])
+
+
+    def test_activity_identity_is_stable_across_transport_attempts(self) -> None:
+        lifecycle = PlaybackDeliveryLifecycle()
+        first = lifecycle.register_turn_speech_event(
+            session_id="sid",
+            turn_id="turn-1",
+            generation=2,
+            orders=[4],
+            normalized_text="I will check that.",
+            stage="fast_first",
+            purpose="acknowledge_and_check",
+            communicative_activity_ids=["activity-check"],
+        )
+        assert first is not None
+        first_attempt_id = first["delivery_attempt_id"]
+        first["status"] = "not_delivered"
+
+        second = lifecycle.register_turn_speech_event(
+            session_id="sid",
+            turn_id="turn-1",
+            generation=3,
+            orders=[9],
+            normalized_text="I will check that.",
+            stage="pre_action",
+            purpose="acknowledge_and_check",
+            canonical_plan_id="plan-revised",
+            communicative_activity_ids=["activity-check"],
+        )
+
+        assert second is not None
+        self.assertEqual(first["event_id"], second["event_id"])
+        self.assertNotEqual(first_attempt_id, second["delivery_attempt_id"])
+        self.assertEqual(len(lifecycle.turn_speech_events["sid"]), 1)
+        self.assertEqual(len(second["delivery_attempts"]), 2)
+        self.assertEqual(second["generation"], 3)
+        self.assertEqual(second["orders"], [9])
 
     async def test_delivered_event_preserves_goal_plan_and_claim_provenance(
         self,

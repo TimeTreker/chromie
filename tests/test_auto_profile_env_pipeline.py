@@ -252,11 +252,15 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(manifest["fingerprint"], values["CHROMIE_RUNTIME_ENV_FINGERPRINT"])
         self.assertEqual(
             manifest["cognitive_budgets"]["CHROMIE_COGNITIVE_BUDGET_PROFILE"],
-            "qualification",
+            "interactive",
         )
         self.assertEqual(
             manifest["cognitive_budgets"]["ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS"],
-            "900000",
+            "15000",
+        )
+        self.assertEqual(
+            manifest["cognitive_budgets"]["ORCH_TTS_PLAYBACK_START_TIMEOUT_MS"],
+            "3500",
         )
         self.assertEqual(
             manifest["cognitive_budgets"]["OLLAMA_NUM_CTX"],
@@ -329,21 +333,26 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             self.assertEqual(values[key], "32768", key)
         self.assertEqual(values["AGENT_SOCIAL_ATTENTION_NUM_PREDICT"], "160")
         self.assertEqual(values["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"], "2048")
-        self.assertEqual(values["AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS"], "120000")
+        self.assertEqual(values["AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS"], "2500")
+        self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS"], "15000")
+        self.assertEqual(values["ORCH_TTS_PLAYBACK_START_TIMEOUT_MS"], "3500")
         self.assertEqual(values["AGENT_SOCIAL_ATTENTION_TIMEOUT_MS"], "2500")
 
-    def test_primary_gpu_profiles_use_long_qualification_budgets(self) -> None:
-        required = {
-            "CHROMIE_COGNITIVE_BUDGET_PROFILE": "qualification",
-            "AGENT_TIMEOUT_MS": "240000",
-            "ORCH_AGENT_TIMEOUT_MS": "300000",
-            "AGENT_GOAL_ASSOCIATION_TIMEOUT_MS": "120000",
-            "AGENT_FAST_PLANNER_TIMEOUT_MS": "120000",
-            "AGENT_DEEP_PLANNER_TIMEOUT_MS": "120000",
-            "ORCH_GOAL_ASSOCIATION_TIMEOUT_MS": "150000",
-            "ORCH_FAST_PLANNER_TIMEOUT_MS": "150000",
-            "ORCH_DEEP_PLANNER_TIMEOUT_MS": "150000",
-            "ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS": "900000",
+    def test_primary_gpu_profiles_do_not_own_foreground_latency(self) -> None:
+        retired_profile_owned_budgets = {
+            "CHROMIE_COGNITIVE_BUDGET_PROFILE",
+            "AGENT_TIMEOUT_MS",
+            "ORCH_AGENT_TIMEOUT_MS",
+            "AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS",
+            "AGENT_GOAL_INTERPRETER_TIMEOUT_MS",
+            "AGENT_GOAL_ASSOCIATION_TIMEOUT_MS",
+            "AGENT_FAST_PLANNER_TIMEOUT_MS",
+            "AGENT_DEEP_PLANNER_TIMEOUT_MS",
+            "ORCH_GOAL_ASSOCIATION_TIMEOUT_MS",
+            "ORCH_FAST_PLANNER_TIMEOUT_MS",
+            "ORCH_DEEP_PLANNER_TIMEOUT_MS",
+            "ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS",
+            "ORCH_TTS_PLAYBACK_START_TIMEOUT_MS",
         }
         for profile_name in ("rtx5090", "rtx4090_laptop"):
             values: dict[str, str] = {}
@@ -354,23 +363,67 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
                     key, value = line.split("=", 1)
                     values[key] = value
             with self.subTest(profile=profile_name):
-                for key, expected in required.items():
-                    self.assertEqual(values.get(key), expected, key)
-                self.assertGreater(
-                    int(values["ORCH_DEEP_PLANNER_TIMEOUT_MS"]),
-                    int(values["AGENT_DEEP_PLANNER_TIMEOUT_MS"]),
-                )
-                self.assertGreater(
-                    int(values["ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS"]),
-                    sum(
-                        int(values[key])
-                        for key in (
-                            "ORCH_GOAL_ASSOCIATION_TIMEOUT_MS",
-                            "ORCH_FAST_PLANNER_TIMEOUT_MS",
-                            "ORCH_DEEP_PLANNER_TIMEOUT_MS",
-                        )
-                    ),
-                )
+                self.assertEqual(retired_profile_owned_budgets & values.keys(), set())
+
+    def test_qualification_operator_mode_owns_long_watchdogs(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._minimal_root(directory)
+            system_info = root / "system.env"
+            self._system_info(
+                system_info,
+                gpu="NVIDIA GeForce RTX 5090",
+                compute="12.0",
+                memory="32607",
+                cuda_arch="120",
+            )
+            env = self._generator_env()
+            env["CHROMIE_OPERATOR_MODE"] = "qualification"
+            subprocess.run(
+                [
+                    "python3",
+                    str(GENERATOR),
+                    "--root",
+                    str(root),
+                    "--system-info-file",
+                    str(system_info),
+                ],
+                cwd=root,
+                env=env,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            values = parse_env(root / ".env.runtime")
+            manifest = json.loads(
+                (root / ".chromie" / "runtime_profile.json").read_text()
+            )
+
+        self.assertEqual(values["CHROMIE_OPERATOR_MODE"], "qualification")
+        self.assertEqual(values["CHROMIE_COGNITIVE_BUDGET_PROFILE"], "qualification")
+        self.assertEqual(values["AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS"], "120000")
+        self.assertEqual(values["AGENT_GOAL_INTERPRETER_TIMEOUT_MS"], "120000")
+        self.assertEqual(values["AGENT_GOAL_ASSOCIATION_TIMEOUT_MS"], "120000")
+        self.assertEqual(values["AGENT_FAST_PLANNER_TIMEOUT_MS"], "120000")
+        self.assertEqual(values["AGENT_DEEP_PLANNER_TIMEOUT_MS"], "120000")
+        self.assertEqual(values["ORCH_GOAL_ASSOCIATION_TIMEOUT_MS"], "150000")
+        self.assertEqual(values["ORCH_FAST_PLANNER_TIMEOUT_MS"], "150000")
+        self.assertEqual(values["ORCH_DEEP_PLANNER_TIMEOUT_MS"], "150000")
+        self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS"], "900000")
+        self.assertEqual(values["ORCH_TTS_PLAYBACK_START_TIMEOUT_MS"], "20000")
+        self.assertEqual(values["AGENT_TIMEOUT_MS"], "240000")
+        self.assertEqual(values["ORCH_AGENT_TIMEOUT_MS"], "300000")
+        self.assertEqual(
+            manifest["cognitive_budgets"]["CHROMIE_COGNITIVE_BUDGET_PROFILE"],
+            "qualification",
+        )
+        self.assertEqual(
+            manifest["cognitive_budgets"]["ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS"],
+            "900000",
+        )
+        self.assertEqual(
+            manifest["cognitive_budgets"]["ORCH_TTS_PLAYBACK_START_TIMEOUT_MS"],
+            "20000",
+        )
 
     def test_generated_runtime_env_has_one_assignment_per_key(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -446,7 +499,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             result = self._generate(root, system_info, check=False, strict=True)
 
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn(".env.local overrides hardware/validation-owned settings", result.stderr)
+            self.assertIn(".env.local overrides profile/mode/validation-owned settings", result.stderr)
             self.assertFalse((root / ".env.runtime").exists())
             self.assertFalse((root / ".env").exists())
 
