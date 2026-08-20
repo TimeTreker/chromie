@@ -269,11 +269,11 @@ Read the diagram with these boundaries:
   Rejection or verifier unavailability commits no first speech and does not block the
   remaining Planner/GA work. The remaining Advance cannot author or salvage a substitute
   progress Activity for that completed first-response decision. This is a narrow truth gate inside Fast Planner, not a
-  Response Composer, new response author, or semantic-review chain. As soon as that
+  new response-authoring or semantic-review stage. As soon as that
   bounded decision exists, the same Fast Planner continues the remaining
   Activity Plan while Goal Association independently begins from the unchanged GI
   result. The two continuations run concurrently. This is one Planner with phased
-  readiness, not a Response Composer followed by a Planner, and the progress sentence
+  readiness, not a response stage followed by a Planner, and the progress sentence
   does not stand in for the still-required Plan. Fast Planner is the first **HOW /
   Work-advancement authority**. Planner owns
   execution-input completeness and source strategy against the immutable
@@ -392,7 +392,7 @@ A successful Chromie release lets an operator:
   effects and direct or unclear turns fail open to cognition;
 - conversation state and user-facing interaction semantics;
 - the Goal-Driven Cognitive Core: goal meaning and continuity, semantic
-  decomposition and planning, outcome reconciliation, and response composition;
+  decomposition and planning, Planner-authored communication, and outcome reconciliation;
 - native structured Agent output and strict model-facing contracts;
 - owner-approved Agent Skill discovery, bounded Agent projections, and
   selection provenance without granting Skill content execution authority;
@@ -450,7 +450,7 @@ The Cognitive Gateway is the narrow ingress, protective-reflex, and attention
 boundary. It decides whether a turn must be acted on immediately for operational
 safety, admitted to cognition, or ignored as confidently ambient input. It does
 not own final user-goal meaning, task decomposition, planning, agent selection,
-or response composition.
+or user-facing response authorship.
 
 The Goal-Driven Cognitive Core owns those semantic decisions. Stop and emergency
 commands are still user inputs, but their immediate protective effect must not
@@ -879,7 +879,7 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    natural wording. Goal Interpretation owns neither. The Activity also carries
    timing, Goal/Responsibility provenance, a truth stage, and exact Evidence
    references for facts that depend on observed reality. There is no independent
-   Response Composer or result-wording semantic owner between Planner and Runtime.
+   response-authoring or result-wording semantic owner between Planner and Runtime.
    The Host validates these fields mechanically and rejects unsupported reality,
    stale Goal binding, duplicate delivery, or unsafe commitment; it cannot author
    replacement wording or reopen ordinary meaning. TTS realizes accepted text as

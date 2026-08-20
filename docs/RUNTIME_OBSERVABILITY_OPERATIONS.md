@@ -80,7 +80,7 @@ High-value boundaries include:
 
 - VAD utterance start/end and ASR send/final;
 - Gateway admission and Core interpretation;
-- Goal Association, Fast/Deep planning, and Response Composition;
+- Goal Association, Fast/Deep planning, and Planner response projection;
 - TTS request, first PCM, audible playback start/end;
 - capability/provider request start, Provider start, progress, terminal result,
   cancellation, and safe idle;

@@ -7,15 +7,14 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 SEMANTIC_AUTHORITY_CONTEXT_KEY = "semantic_authority"
 
 SemanticAuthorityOwner = Literal["goal_driven_runtime"]
-SemanticAuthorityRole = Literal["authoritative", "observer", "adapter"]
+SemanticAuthorityRole = Literal["authoritative", "observer"]
 
 
 class SemanticAuthorityClaim(BaseModel):
     """One explicit semantic-owner claim for a single routed turn.
 
-    A turn may have one authoritative owner. Observer and adapter roles are
-    deliberately non-authoritative: observers cannot commit or execute plans,
-    and adapters may only materialize an already-selected exact action.
+    A turn may have one authoritative owner. Observer mode is deliberately
+    non-authoritative and cannot commit or execute plans.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -25,7 +24,6 @@ class SemanticAuthorityClaim(BaseModel):
     role: SemanticAuthorityRole
     turn_id: str = Field(min_length=1)
     reason: str = ""
-    emergency_fallback: bool = False
 
     @field_validator("turn_id")
     @classmethod

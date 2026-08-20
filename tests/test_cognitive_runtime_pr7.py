@@ -43,10 +43,8 @@ from shared.chromie_contracts.plan import (
     FastPlannerFirstResponse,
     FastPlannerProgressAct,
 )
-from shared.chromie_contracts.response_composition import (
-    CoordinatedResponsePlan,
-    canonical_plan_fingerprint,
-)
+from shared.chromie_contracts.planner_response import PlannerResponseProjection
+from shared.chromie_contracts.plan import canonical_plan_fingerprint
 from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage, SemanticGoal
 
 
@@ -2410,8 +2408,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
     def test_respond_delivery_failure_cannot_complete_goal(self):
         plan = respond_plan()
-        composition = CoordinatedResponsePlan(
-            composition_id="composition-respond-delivery",
+        planner_response = PlannerResponseProjection(
+            projection_id="planner_response-respond-delivery",
             canonical_plan_id=plan.plan_id,
             canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
             canonical_plan=plan,
@@ -2429,7 +2427,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         response = asyncio.run(
             CanonicalPlanRuntimeAdapter(FakeRuntime()).build_response(
                 plan=plan,
-                composition=composition,
+                planner_response=planner_response,
                 session_id="sid-respond-delivery",
                 language="zh-CN",
             )
@@ -2565,8 +2563,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 }
             ],
         )
-        composition = CoordinatedResponsePlan(
-            composition_id="composition-weather",
+        planner_response = PlannerResponseProjection(
+            projection_id="planner_response-weather",
             canonical_plan_id=plan.plan_id,
             canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
             canonical_plan=plan,
@@ -2595,7 +2593,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 FakeRuntime([weather_definition()])
             ).build_response(
                 plan=plan,
-                composition=composition,
+                planner_response=planner_response,
                 session_id="sid-weather",
                 language="zh-CN",
                 context={
@@ -2633,7 +2631,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             response.metadata["personality_expression"]["core_traits"],
         )
 
-    def test_safe_read_reuses_scheduled_fast_speech_without_duplicate_audio(self):
+    def test_safe_read_reuses_scheduled_fast_communicative_act_without_duplicate_audio(self):
         plan = CanonicalPlan(
             plan_id="plan-weather-reuse",
             planner_tier="fast",
@@ -2660,8 +2658,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             ],
         )
         fast_text = "好嘛，我帮你看看重庆明天的天气。"
-        composition = CoordinatedResponsePlan(
-            composition_id="composition-weather-reuse",
+        planner_response = PlannerResponseProjection(
+            projection_id="planner_response-weather-reuse",
             canonical_plan_id=plan.plan_id,
             canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
             canonical_plan=plan,
@@ -2684,7 +2682,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 FakeRuntime([weather_definition()])
             ).build_response(
                 plan=plan,
-                composition=composition,
+                planner_response=planner_response,
                 session_id="sid-weather-reuse",
                 language="zh-CN",
                 context={
@@ -2731,7 +2729,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     FakeRuntime([weather_definition()])
                 ).build_response(
                     plan=plan,
-                    composition=composition,
+                    planner_response=planner_response,
                     session_id="sid-weather-reuse",
                     language="zh-CN",
                     context={
@@ -2752,7 +2750,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 )
             )
 
-    def test_physical_activity_reuses_scheduled_fast_speech_and_keeps_skill(self):
+    def test_physical_activity_reuses_scheduled_fast_communicative_act_and_keeps_skill(self):
         plan = CanonicalPlan(
             plan_id="plan-walk-reuse",
             planner_tier="fast",
@@ -2779,8 +2777,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             ],
         )
         fast_text = "好，我准备往前走十五秒。"
-        composition = CoordinatedResponsePlan(
-            composition_id="composition-walk-reuse",
+        planner_response = PlannerResponseProjection(
+            projection_id="planner_response-walk-reuse",
             canonical_plan_id=plan.plan_id,
             canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
             canonical_plan=plan,
@@ -2803,7 +2801,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 FakeRuntime([walk_definition()])
             ).build_response(
                 plan=plan,
-                composition=composition,
+                planner_response=planner_response,
                 session_id="sid-walk-reuse",
                 language="zh-CN",
                 context={
@@ -2940,8 +2938,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 }
             ],
         )
-        composition = CoordinatedResponsePlan(
-            composition_id="composition-weather-silent",
+        planner_response = PlannerResponseProjection(
+            projection_id="planner_response-weather-silent",
             canonical_plan_id=plan.plan_id,
             canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
             canonical_plan=plan,
@@ -2955,7 +2953,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 FakeRuntime([weather_definition()])
             ).build_response(
                 plan=plan,
-                composition=composition,
+                planner_response=planner_response,
                 session_id="sid-weather-silent",
                 language="zh-CN",
                 context={},
@@ -3015,8 +3013,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
     def test_effectful_pre_execution_preserves_model_speech_with_barrier(self):
         plan = execute_plan()
-        composition = CoordinatedResponsePlan(
-            composition_id="composition-pre-action-projection",
+        planner_response = PlannerResponseProjection(
+            projection_id="planner_response-pre-action-projection",
             canonical_plan_id=plan.plan_id,
             canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
             canonical_plan=plan,
@@ -3046,7 +3044,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 FakeRuntime([blink_definition()])
             ).build_response(
                 plan=plan,
-                composition=composition,
+                planner_response=planner_response,
                 session_id="sid-pre-action-projection",
                 language="en-US",
             )
@@ -3127,8 +3125,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             "Okay! I'll walk forward for a bit, give you two nods, and then "
             "turn left."
         )
-        composition = CoordinatedResponsePlan(
-            composition_id="composition-walk-nod-turn",
+        planner_response = PlannerResponseProjection(
+            projection_id="planner_response-walk-nod-turn",
             canonical_plan_id=plan.plan_id,
             canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
             canonical_plan=plan,
@@ -3162,7 +3160,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         response = asyncio.run(
             CanonicalPlanRuntimeAdapter(FakeRuntime(definitions)).build_response(
                 plan=plan,
-                composition=composition,
+                planner_response=planner_response,
                 session_id="sid-walk-nod-turn",
                 language="en-US",
             )
@@ -3179,8 +3177,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
     def test_exact_execute_rejects_structurally_unrequired_confirmation(self):
         plan = execute_plan()
-        composition = CoordinatedResponsePlan(
-            composition_id="composition-false-confirmation",
+        planner_response = PlannerResponseProjection(
+            projection_id="planner_response-false-confirmation",
             canonical_plan_id=plan.plan_id,
             canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
             canonical_plan=plan,
@@ -3205,7 +3203,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     FakeRuntime([blink_definition()])
                 ).build_response(
                     plan=plan,
-                    composition=composition,
+                    planner_response=planner_response,
                     session_id="sid-false-confirmation",
                     language="zh-CN",
                 )
@@ -3259,8 +3257,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 "unmet_goal_ids": ["goal-walk"],
             },
         )
-        composition = CoordinatedResponsePlan(
-            composition_id="composition-mixed-execute-clarify",
+        planner_response = PlannerResponseProjection(
+            projection_id="planner_response-mixed-execute-clarify",
             canonical_plan_id=plan.plan_id,
             canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
             canonical_plan=plan,
@@ -3291,7 +3289,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         response = asyncio.run(
             CanonicalPlanRuntimeAdapter(FakeRuntime([nod])).build_response(
                 plan=plan,
-                composition=composition,
+                planner_response=planner_response,
                 session_id="sid-mixed-execute-clarify",
                 language="zh-CN",
             )
@@ -4033,8 +4031,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 covers_goal_ids=["goal-blink"],
             ),
         )
-        composition = CoordinatedResponsePlan(
-            composition_id="composition-mixed-runtime",
+        planner_response = PlannerResponseProjection(
+            projection_id="planner_response-mixed-runtime",
             canonical_plan_id=plan.plan_id,
             canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
             canonical_plan=plan,
@@ -4047,7 +4045,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         response = asyncio.run(
             adapter.build_response(
                 plan=plan,
-                composition=composition,
+                planner_response=planner_response,
                 session_id="sid-mixed-runtime",
                 language="en-US",
             )
@@ -4073,9 +4071,9 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
 class DeterministicInterruptResponseTests(unittest.TestCase):
     @staticmethod
-    def _composition(plan: CanonicalPlan) -> CoordinatedResponsePlan:
-        return CoordinatedResponsePlan(
-            composition_id="composition-interrupt",
+    def _planner_response(plan: CanonicalPlan) -> PlannerResponseProjection:
+        return PlannerResponseProjection(
+            projection_id="planner_response-interrupt",
             canonical_plan_id=plan.plan_id,
             canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
             canonical_plan=plan,
@@ -4114,7 +4112,7 @@ class DeterministicInterruptResponseTests(unittest.TestCase):
         response = asyncio.run(
             CanonicalPlanRuntimeAdapter(FakeRuntime([blink_definition()])).build_response(
                 plan=plan,
-                composition=self._composition(plan),
+                planner_response=self._planner_response(plan),
                 session_id="sid-cancel",
                 language="zh-CN",
                 context={
@@ -4138,7 +4136,7 @@ class DeterministicInterruptResponseTests(unittest.TestCase):
         response = asyncio.run(
             CanonicalPlanRuntimeAdapter(FakeRuntime([blink_definition()])).build_response(
                 plan=plan,
-                composition=self._composition(plan),
+                planner_response=self._planner_response(plan),
                 session_id="sid-silent-body",
                 language="zh-CN",
                 context={

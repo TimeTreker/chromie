@@ -267,7 +267,6 @@ class CognitionSettings:
     enable_interaction_response: bool
     enable_soridormi_capabilities: bool
     fast_first_response_enabled: bool
-    core_generated_fast_speech_enabled: bool
     fast_planner_mode: str
     fast_planner_timeout_ms: int
     deep_planner_mode: str
@@ -633,11 +632,6 @@ class HostSettingsSnapshot:
                 ),
                 fast_first_response_enabled=_bool(
                     values, "ORCH_FAST_FIRST_RESPONSE_ENABLED", True
-                ),
-                core_generated_fast_speech_enabled=_bool(
-                    values,
-                    "ORCH_AGENT_GOAL_INTERPRETER_GENERATED_FAST_SPEECH_ENABLED",
-                    True,
                 ),
                 fast_planner_mode=_choice(
                     values,

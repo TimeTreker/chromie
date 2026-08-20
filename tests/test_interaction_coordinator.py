@@ -177,7 +177,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             turn_id="turn-late-bind",
             language="zh-CN",
         )
-        # Fast speech may finish before Goal Association has canonical Goal IDs.
+        # Fast Planner Communicative Activity may finish before Goal Association has canonical Goal IDs.
         await ready.task
         bound = coordinator.bind_fast_planner_communicative_execution(
             ready,

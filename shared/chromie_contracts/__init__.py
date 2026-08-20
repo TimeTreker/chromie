@@ -125,13 +125,7 @@ from .mind import (
     load_mind_profile,
 )
 from .session import SessionContext
-from .response_composition import (
-    CoordinatedResponsePlan,
-    ResponseCompositionPhase,
-    ResponseCompositionResolution,
-    ResponseCompositionStatus,
-    canonical_plan_fingerprint,
-)
+from .planner_response import PlannerResponseProjection
 from .reflex import (
     CancellationDirective,
     CancellationDispatchReceipt,
@@ -194,6 +188,7 @@ from .goal import (
     GoalRelationship,
     GoalSet,
     GoalVersionRef,
+    goal_association_fingerprint,
     stable_goal_operation_id,
 )
 from .resource import (
@@ -329,11 +324,7 @@ __all__ = [
     "default_mind_profile_path",
     "load_mind_profile",
     "SessionContext",
-    "ResponseCompositionStatus",
-    "ResponseCompositionPhase",
-    "ResponseCompositionResolution",
-    "CoordinatedResponsePlan",
-    "canonical_plan_fingerprint",
+    "PlannerResponseProjection",
     "CancellationDirective",
     "CancellationDispatchReceipt",
     "CancellationProviderFailure",
@@ -387,6 +378,7 @@ __all__ = [
     "GoalRelationship",
     "GoalSet",
     "GoalVersionRef",
+    "goal_association_fingerprint",
     "stable_goal_operation_id",
     "CommitmentState",
     "ResponsibilityStatus",
@@ -413,6 +405,7 @@ __all__ = [
     "PlanDisposition",
     "PlanParameterResolution",
     "PlannerTier",
+    "canonical_plan_fingerprint",
     "ToolResultEvidence",
     "ToolResultStatus",
     "canonical_value_sha256",
@@ -426,4 +419,5 @@ from .plan import (
     PlanDisposition,
     PlanParameterResolution,
     PlannerTier,
+    canonical_plan_fingerprint,
 )

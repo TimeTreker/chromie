@@ -84,8 +84,8 @@ streaming remains capability metadata until an incremental token-to-audio input
 transport is implemented and measured end to end.
 
 Raw model tokens, partial JSON, and incomplete response contracts are not valid
-TTS input. The Host may submit an independently schema-valid, semantically
-admissible `fast_speech` or `ResponseStage` earlier only after authorization
+TTS input. The Host may submit an independently schema-valid, semantically admissible
+Planner Communicative Activity transport projection earlier only after authorization
 against the applicable correlation, commitment/evidence, claim, and
 cancellation state. Dynamic pre-effect speech is admissible only when it is a
 still-needed prospective conversational delta and does not repeat an equivalent

@@ -32,10 +32,8 @@ from shared.chromie_contracts.interaction import (
 )
 from shared.chromie_contracts.execution_lanes import LaneCoordinationGroup
 from shared.chromie_contracts.plan import CanonicalPlan
-from shared.chromie_contracts.response_composition import (
-    CoordinatedResponsePlan,
-    canonical_plan_fingerprint,
-)
+from shared.chromie_contracts.planner_response import PlannerResponseProjection
+from shared.chromie_contracts.plan import canonical_plan_fingerprint
 from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage
 
 
@@ -139,9 +137,9 @@ class ExecutionLaneContractTests(unittest.TestCase):
             ],
         )
 
-    def _composition(self, plan: CanonicalPlan) -> CoordinatedResponsePlan:
-        return CoordinatedResponsePlan(
-            composition_id="lane-composition",
+    def _planner_response(self, plan: CanonicalPlan) -> PlannerResponseProjection:
+        return PlannerResponseProjection(
+            projection_id="lane-planner_response",
             canonical_plan_id=plan.plan_id,
             canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
             canonical_plan=plan,
@@ -176,16 +174,16 @@ class ExecutionLaneContractTests(unittest.TestCase):
             )
 
     def test_two_execution_lane_contract_accepts_explicit_parallel_members(self) -> None:
-        composition = self._composition(self._plan())
+        planner_response = self._planner_response(self._plan())
 
         self.assertEqual(
-            composition.lane_coordination[0].lanes,
+            planner_response.lane_coordination[0].lanes,
             ["vocal", "activity"],
         )
 
     def test_two_execution_lane_contract_rejects_serial_activity_step(self) -> None:
         with self.assertRaisesRegex(ValueError, "timing=parallel"):
-            self._composition(self._plan(timing="sequential"))
+            self._planner_response(self._plan(timing="sequential"))
 
     def test_social_attention_is_not_an_execution_lane(self) -> None:
         with self.assertRaises(ValueError):
@@ -197,8 +195,8 @@ class ExecutionLaneContractTests(unittest.TestCase):
     def test_confirmation_speech_cannot_overlap_activity(self) -> None:
         plan = self._plan()
         with self.assertRaisesRegex(ValueError, "cannot overlap"):
-            CoordinatedResponsePlan(
-                composition_id="confirmation-composition",
+            PlannerResponseProjection(
+                projection_id="confirmation-planner_response",
                 canonical_plan_id=plan.plan_id,
                 canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
                 canonical_plan=plan,
@@ -234,11 +232,11 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         adapter = CanonicalPlanRuntimeAdapter(view, social_attention_mode="on")
         contract = ExecutionLaneContractTests()
         plan = contract._plan()
-        composition = contract._composition(plan)
+        planner_response = contract._planner_response(plan)
         return (
             await adapter.build_response(
                 plan=plan,
-                composition=composition,
+                planner_response=planner_response,
                 session_id="lane-session",
                 language="zh-CN",
                 context={},
@@ -283,7 +281,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError, "lacks explicit parallel metadata"):
             await adapter.build_response(
                 plan=plan,
-                composition=contract._composition(plan),
+                planner_response=contract._planner_response(plan),
                 session_id="lane-session",
                 language="zh-CN",
                 context={},
@@ -369,8 +367,8 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         )
-        composition = CoordinatedResponsePlan(
-            composition_id="vocal-activity-lane-composition",
+        planner_response = PlannerResponseProjection(
+            projection_id="vocal-activity-lane-planner_response",
             canonical_plan_id=plan.plan_id,
             canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
             canonical_plan=plan,
@@ -398,7 +396,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
             _InteractionRuntimeView([vocal, walk])
         ).build_response(
             plan=plan,
-            composition=composition,
+            planner_response=planner_response,
             session_id="vocal-activity-lane-session",
             language="en-US",
             context={},

@@ -57,9 +57,8 @@ running.
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/health` | Return model/runtime state, loaded capability sources, feature gates, scheduler counters, and the legacy CapabilityAgent emergency gate. |
-| `GET` | `/semantic-authority` | Return the machine-readable single-authority route matrix and current Agent emergency-fallback gate. |
-| `GET` | `/agents` | List specialized agents and ownership notes. |
+| `GET` | `/health` | Return current model/runtime state, loaded capability sources, Planner availability, Social Attention mode, and TaskGraph diagnostic counters. |
+| `GET` | `/semantic-authority` | Return the machine-readable maintained single-authority matrix for Goal-driven `apply` and `report_only`. |
 | `POST` | `/cognitive-gateway/attention-review` | Focused pre-Core admission review; returns addressedness evidence only and fails open. |
 | `POST` | `/cognitive-core/interpret` | Envelope-first ordinary semantic Goal Interpretation inside the Core. |
 | `GET` | `/agent-skills` | Return bounded owner-approved Agent Skill metadata summaries and configured package provenance only; no Skill body or projection text. |
@@ -83,7 +82,7 @@ packages. Startup validates safe YAML, explicit
 `authority=agent_method_only`, explicit `execution_authority=none`, owner
 approval, semantic version, deterministic package digest, projection paths,
 duplicate IDs, parent references, inheritance cycles, and normalized
-`applicable_routes`. The endpoint exposes only immutable bounded summaries. The
+package applicability metadata. The endpoint exposes only immutable bounded summaries. The
 two packages expose projections for all three maintained Agent roles; the
 weather package declares the grounded method as its parent and remains passive
 despite referencing required/optional Capabilities.
@@ -99,12 +98,10 @@ and registry digest. One invalid result may receive one same-boundary repair;
 model or contract failure returns an optional no-Skill resolution rather than
 fabricating method provenance. No `SKILL.md` or projection text is loaded, no
 Canonical Plan is changed, and no Capability is registered, authorized, or
-executed. Before disclosure, a non-empty package-owned `applicable_routes`
-list removes that package from the candidate set when the current structured
-route does not match; an empty list remains unrestricted. This is a structural
-applicability boundary, not Host semantic selection. `/health` reports whether
-this independent selection boundary is enabled plus its model and candidate
-limits.
+executed. Candidate discovery is bounded by the declared Agent role and package metadata;
+semantic selection remains model-authored from the current Goal and Responsibility
+context rather than a retired GI route/intent classification. `/health` reports
+whether this independent selection boundary is enabled plus its model and candidate limits.
 
 Catalog entries include `prompt_tier=common|rare`, plus
 `prompt_tier_locked`, `prompt_tier_source`, and `prompt_tier_reason`. The
@@ -113,9 +110,8 @@ Goal Interpretation uses unlocked `common` entries for the fast compact Qwen pro
 entries remain visible in the full catalog but are excluded from the fast
 common prompt even when an experience overlay requests `common`. The initial
 preset is data in `capabilities/prompt_tiers.json`, not a Python skill list.
-`chromie.speak` remains common and interaction-executable for legacy/native
-`InteractionResponse` compatibility, but the Goal-driven Fast and Deep Planner
-schemas exclude it as a task-plan response-transport leaf. A mixed
+`chromie.speak` remains a trusted Vocal transport capability, but the Goal-driven
+Fast and Deep Planner schemas exclude it as a task-plan response-transport leaf. A mixed
 conversational/body turn may use a goal-scoped `respond` outcome plus executable
 body steps, and executable planner outcomes may carry prospective
 `response_text` for a new conversational delta. The Planner's Communicative
@@ -130,12 +126,18 @@ oversized content, and returns typed failures plus a disclosure digest. The thre
 maintained semantic model endpoints perform this selection/disclosure automatically;
 caller-supplied disclosure context is removed before trusted injection.
 
-### Conversation and interaction
+### Cognitive planning and interaction support
+
+The retired Agent `/run`, `/interaction`, and `/agents` endpoints are not part of
+the maintained service. User-turn orchestration is Host-owned; the Agent service
+exposes bounded cognitive module endpoints plus trusted tool/TaskGraph support.
+Important interaction-related endpoints are:
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/run` | Established `AgentRequest -> AgentResult` compatibility path. CapabilityAgent semantic planning is emergency-only; deprecated caller-supplied exact `actions[]` are adapter input and are not current Fast Goal Interpretation output. |
-| `POST` | `/interaction` | Return a natively accumulated and strictly revalidated shared `InteractionResponse`; deprecated caller-supplied exact `actions[]` are materialized without LLM reinterpretation, and the legacy CapabilityAgent planner requires explicit emergency authority. |
+| `POST` | `/fast-first-response` | Let Fast Planner author one bounded first Communicative Activity candidate from immutable Responsibility evidence. |
+| `POST` | `/fast-advance` | Continue the same Fast Planner into remaining Work/Activity planning. |
+| `POST` | `/goal-association` | Commit no Host state; return the model-authored canonical Goal association/segmentation proposal for Host application. |
 | `POST` | `/agent-skills/select` | Return a typed optional method selection authored for the declared Agent role from bounded approved summaries. |
 | `POST` | `/agent-skills/disclose` | Return exact bounded role projections from one validated selection without Plan mutation or execution. |
 | `POST` | `/social-attention/plan` | Return an event-scoped auxiliary Social-Attention proposal with behavior IDs decoder-constrained to the reviewed live candidate set. |
@@ -221,7 +223,7 @@ accept/reject Epistemic Qualification over immutable result wording. The certifi
 has no wording or planning fields. Rejection or checker unavailability returns a
 semantic escalation for the existing Deep Planner (or fails closed); the Host never
 rewrites the sentence. This prevents a forecast probability below 100% from being
-promoted to certainty without adding a Tool Result Interpreter or Response Composer.
+promoted to certainty without adding a second result-semantic or response-authoring stage.
 
 `POST /fast-plan` is the bounded re-entrant canonical Fast Planner endpoint, available only when `AGENT_FAST_PLANNER_ENABLED=1` and Agent LLM use is enabled. A valid `/fast-advance` may still finish a provider-free easy turn directly. Canonical Goal commit with provisional Work, association to retained Goal state, trusted Evidence/result re-entry, or another relevant open-Responsibility event calls `/fast-plan` with a bounded current Work snapshot. It decides whether existing Work remains in the complete desired Plan; GA and Orchestrator do not make that semantic choice. The endpoint never executes by itself, and trusted Runtime revalidates exact identity, version, authorization, resources, and safety before applying the Plan.
 
@@ -509,7 +511,7 @@ Planning execution can run `chromie.report` as a trace-only local report node;
 it does not play audio. `chromie.speak` remains rejected from planning
 execution and should be emitted through `InteractionResponse`/Trusted Capability Runtime when
 audible playback is required.
-When native `POST /interaction` emits `chromie.task_graph.execute`, the host
+When the current Planner emits a `chromie.task_graph.execute` Capability request, the Host
 Trusted Capability Runtime can route that request to `POST /task-graphs/execute-planning`.
 The Agent-side planning execution flag still controls whether the graph runs;
 disabled planning execution returns a safe failure instead of falling back to

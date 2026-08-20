@@ -233,9 +233,6 @@ class VoiceAssistant:
         self.fast_first_response_enabled = (
             cognition_settings.fast_first_response_enabled
         )
-        self.core_generated_fast_speech_enabled = (
-            cognition_settings.core_generated_fast_speech_enabled
-        )
         self.fast_first_audio_enabled = playback_settings.fast_audio_enabled
         self.fast_first_audio_hedge_ms = playback_settings.fast_audio_hedge_ms
         self.fast_first_audio_prime_on_startup = (
@@ -519,7 +516,6 @@ class VoiceAssistant:
         self.cognitive_runtime_policy = CognitiveRuntimePolicy(
             mode=self.cognitive_runtime_mode,
             apply_lanes=self.cognitive_apply_lanes,
-            fallback_policy="fail_closed",
             max_total_ms=self.cognitive_runtime_timeout_ms,
             goal_association_timeout_ms=self.goal_association_timeout_ms,
             fast_planner_timeout_ms=self.fast_planner_timeout_ms,
@@ -557,13 +553,12 @@ class VoiceAssistant:
         logger.info(
             "Interaction runtime: endpoint=%s soridormi_skills=%s "
             "confirmation_ttl_s=%.1f fast_first_response=%s "
-            "core_generated_fast_speech=%s fast_first_audio=%s hedge_ms=%s "
+            "fast_first_audio=%s hedge_ms=%s "
             "cache_dir=%s prime_on_startup=%s prime_timeout_ms=%s",
             self.enable_interaction_response,
             self.enable_soridormi_capabilities,
             self.confirmation_dialogue.ttl_s,
             self.fast_first_response_enabled,
-            self.core_generated_fast_speech_enabled,
             self.fast_first_audio_cache.enabled,
             self.fast_first_audio_hedge_ms,
             self.fast_first_audio_cache.cache_dir,
@@ -2512,16 +2507,6 @@ class VoiceAssistant:
             )
 
     @staticmethod
-    def _fast_speech_payload_text(payload: Any) -> str | None:
-        if not payload:
-            return None
-        if hasattr(payload, "model_dump"):
-            payload = payload.model_dump(mode="json", exclude_none=True)
-        if isinstance(payload, dict):
-            return str(payload.get("text") or "")
-        return None
-
-    @staticmethod
     def _safe_validated_response_plan_speech(text: str | None) -> str | None:
         cleaned = " ".join((text or "").strip().split())
         if not cleaned or len(cleaned) > 160:
@@ -2531,54 +2516,12 @@ class VoiceAssistant:
             return None
         return cleaned
 
-    @classmethod
-    def _validated_fast_speech_payload_text(
-        cls,
-        payload: Any,
-    ) -> str | None:
-        """Validate the whole dynamic FastSpeech contract before playback.
-
-        Bare strings and partially structured objects remain parseable at API
-        boundaries for compatibility, but they are not sufficient authority to
-        produce immediate audio. Dynamic playback requires an explicit process
-        speech act and a non-terminal commitment, while the completion marker
-        must retain its fail-closed true value.
-        """
-
-        if hasattr(payload, "model_dump"):
-            payload = payload.model_dump(mode="json", exclude_none=True)
-        if not isinstance(payload, dict):
-            return None
-        if payload.get("must_not_claim_completion") is not True:
-            return None
-        if str(payload.get("purpose") or "").strip().casefold() not in {
-            "acknowledge",
-            "acknowledge_and_check",
-            "clarify",
-            "thinking",
-            "safety_prelude",
-        }:
-            return None
-        if str(payload.get("commitment") or "").strip().casefold() not in {
-            "checking_only",
-            "needs_confirmation",
-            "prelude_only",
-        }:
-            return None
-        if str(payload.get("claim_state") or "").strip().casefold() != "none":
-            return None
-        claimed_capability_ids = payload.get("claimed_capability_ids")
-        claimed_goal_ids = payload.get("claimed_goal_ids")
-        if claimed_capability_ids != [] or claimed_goal_ids != []:
-            return None
-        return cls._safe_immediate_route_speech(str(payload.get("text") or ""))
-
     @staticmethod
     def _safe_immediate_route_speech(text: str | None) -> str | None:
         """Apply only transport-safe checks to source-authored immediate speech.
 
-        Semantic wording is owned by the cognitive speech author. Typed FastSpeech fields
-        carry the mechanical claim boundary; the Host deliberately does not add a
+        Semantic wording is owned by the Planner's Communicative Activity. Typed
+        Planner provenance carries the mechanical claim boundary; the Host does not add a
         second semantic LLM or infer meaning from phrases, keywords, or punctuation.
         """
 

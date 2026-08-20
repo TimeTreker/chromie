@@ -327,7 +327,7 @@ becomes complete or abandoned. These reports retain monotonic start/finish
 timing plus the already-owned input DTO, output DTO, status, diagnostics, and
 attempt number for ASR, Gateway attention, Goal Interpretation, Goal
 Association and state commit, Fast/Deep Planning, canonical-plan validation or
-rejection, Response Composition, runtime adaptation, fallback speech, and the
+rejection, Planner response projection, runtime adaptation, fallback speech, and the
 Trusted Capability Runtime. The existing runtime event timeline adds TTS,
 playback, and provider-result observations. A canonical-plan rejection records
 that dispatch was blocked. Provider start is derived only from Trusted Capability

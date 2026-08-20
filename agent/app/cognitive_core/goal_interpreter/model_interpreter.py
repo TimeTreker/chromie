@@ -120,7 +120,6 @@ _FORBIDDEN_MODEL_OUTPUT_FIELDS = frozenset(
         "execution_lane",
         "realization",
         "coordination",
-        "fast_speech",
         "speak_first",
         "progress",
         "response_text",

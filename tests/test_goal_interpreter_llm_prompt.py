@@ -146,7 +146,6 @@ class GoalInterpreterContractTests(unittest.TestCase):
         for forbidden in (
             '"route"',
             '"intent"',
-            '"fast_speech"',
             '"progress"',
             '"actions"',
             '"candidate_capabilities"',

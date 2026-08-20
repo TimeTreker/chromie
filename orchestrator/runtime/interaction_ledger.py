@@ -19,7 +19,7 @@ from shared.chromie_contracts.interaction_ledger import (
     InteractionLedgerEvent,
 )
 from shared.chromie_contracts.plan import CanonicalPlan
-from shared.chromie_contracts.response_composition import canonical_plan_fingerprint
+from shared.chromie_contracts.plan import canonical_plan_fingerprint
 
 
 _ACTIVITY_EVENT_BY_STATUS: dict[str, InteractionEventType] = {

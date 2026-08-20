@@ -112,7 +112,7 @@ job it is performing. Turn-specific targets belong inside `Current Job` and
 `Task Context Group`.
 
 `Global Context Group` tells the model who Chromie is and what upper principles
-she obeys. It includes Robot Identity, Worldview, Lifeview, Valueview, core
+she obeys. It includes Chromie Identity, Worldview, Lifeview, Valueview, core
 principles, Social Interaction Style, reflex policy, deliberation policy, and experience boundaries.
 Identity, age/persona wording, and core principles come from the owner-approved
 mind profile.
@@ -153,8 +153,8 @@ The Orchestrator builds a context object for every routed turn. It now includes:
 - `mind`: bounded profile summary and structured policy fields;
 - `mind.identity`: stable owner-approved descriptive fields;
 - `mind.social_interaction_style`: owner-approved courtesy, expression,
-  initiative, restraint, cooldown, and repetition guidance supplied to Response
-  Composer together with bounded recent auxiliary-request evidence;
+  initiative, restraint, cooldown, and repetition guidance supplied to Planner
+  communication and Social Attention together with bounded recent auxiliary-request evidence;
 - `mind.self_model`: structured speaker, perceiver, actor, body owner, internal
   components, and capability-evidence source used by Goal Interpreter, conversation,
   deepthinking, and direct-fallback prompts;

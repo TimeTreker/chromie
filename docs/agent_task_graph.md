@@ -30,7 +30,7 @@ model or caller proposes graph
   -> retain process-local trace
 ```
 
-A graph returned by `POST /run` is never automatically executed.
+A TaskGraph proposal is never automatically executed merely because it was produced or supplied.
 
 ## Global and Embodied Graphs
 
@@ -119,16 +119,14 @@ adapter, primarily as failure-policy fallback nodes. This records a report in
 the execution trace without invoking TTS or audio playback. `chromie.speak`
 remains outside planning execution; audible speech still belongs to the native
 InteractionResponse and host Trusted Capability Runtime path.
-Native `POST /interaction` emits planned graphs as
-`chromie.task_graph.execute` Trusted Capability Runtime requests. The host Orchestrator wires
-that skill to the Agent's planning executor, which still requires
+The current Planner may emit `chromie.task_graph.execute` as a Trusted
+Capability Runtime request. The Host Orchestrator wires that capability to the Agent's planning executor, which still requires
 `AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION=1`; if the planning executor is
 disabled or returns a failed trace, the skill result is failed and completion
 speech is suppressed.
-The LLM TaskGraph planner normalizes Soridormi `soridormi.task.submit` nodes
-that lack an explicit failure fallback by adding a `chromie.report` trace-only
-fallback that reports the submit node's `error` field. Existing explicit
-fallbacks are preserved.
+TaskGraph validation/execution does not own an LLM semantic planner. Any
+Planner-authored graph must already satisfy the current TaskGraph contract before
+these deterministic diagnostic/execution endpoints accept it.
 When Soridormi returns `task_graph`, treat it as Soridormi's body-runtime DAG:
 Chromie may display, monitor, or route from it, but must not translate it into
 raw motor, joint, torque, or policy outputs. Chromie's own TaskGraph remains the

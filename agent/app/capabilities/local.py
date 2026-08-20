@@ -772,11 +772,10 @@ def chromie_manifests(
                     ),
                     "tool_name": "weather",
                     "semantic_type": "weather_lookup",
-                    "fast_speech_guidance": (
-                        "Use one short, ordinary acknowledgement that says what Chromie is "
-                        "looking at, such as the weather forecast for the requested place/date. "
-                        "Do not use generic workflow language and do not state weather results "
-                        "before the tool returns."
+                    "pre_execution_speech_guidance": (
+                        "If a progress Communicative Activity is useful, keep it short and "
+                        "say only that Chromie is checking the requested weather scope. "
+                        "Do not state weather results before trusted Evidence exists."
                     ),
                     "semantic_scope": {
                         "responsibility_type": "acquire_and_deliver_resource",
@@ -808,7 +807,7 @@ def chromie_manifests(
                         "plan_requires": [],
                         "plan_provides": ["resource_acquired"],
                         "completion_evidence": "trusted_tool_result",
-                        "final_delivery_owner": "chromie_response_layer",
+                        "final_delivery_owner": "planner_communicative_activity",
                     },
                     "pre_execution_speech_guidance": (
                         "Generate natural model-owned wording for the specific lookup. "
@@ -921,12 +920,8 @@ def chromie_manifests(
                         "plan_requires": [],
                         "plan_provides": ["resource_acquired"],
                         "completion_evidence": "trusted_tool_result",
-                        "final_delivery_owner": "chromie_response_layer",
+                        "final_delivery_owner": "planner_communicative_activity",
                     },
-                    "fast_speech_guidance": (
-                        "Briefly acknowledge checking the local time without naming an "
-                        "instrument; do not state the time before the clock result returns."
-                    ),
                     "pre_execution_speech_guidance": (
                         "Use natural model-owned wording such as checking the current time. "
                         "Do not claim to look at a phone, screen, camera, or external source."
@@ -1102,7 +1097,7 @@ def chromie_manifests(
                         "plan_requires": [],
                         "plan_provides": ["resource_acquired"],
                         "completion_evidence": "grounded_retrieval_evidence",
-                        "final_delivery_owner": "chromie_response_layer",
+                        "final_delivery_owner": "planner_communicative_activity",
                     },
                     "pre_execution_speech_guidance": (
                         "Acknowledge the specific information being checked without "

@@ -23,14 +23,11 @@ A turn carries one `context.semantic_authority` claim. The claim records an
 owner and one of three roles:
 
 - `authoritative`: may resolve user goals and produce the semantic plan;
-- `observer`: may produce comparison evidence but cannot commit or execute;
-- `adapter`: may validate and materialize an already-selected exact action but
-  cannot reinterpret the utterance.
+- `observer`: may produce comparison evidence but cannot commit or execute.
 
 After the Goal-Driven Cognitive Core's current Goal-driven Runtime acquires
 authoritative ownership, any planning, composition, host-validation, or
-state-commit failure is fail-closed. The same turn cannot re-enter the legacy
-CapabilityAgent planner.
+state-commit failure is fail-closed. The same turn cannot transfer semantic authority to a retired planner or adapter.
 
 Speech composition and user-task execution may be prepared or scheduled
 independently from immutable projections of that authoritative turn. Parallel
@@ -74,20 +71,19 @@ legacy Agent semantic compatibility surface remains on the Core path.
 
 | Entrypoint | Semantic owner | Role | Planner path | Failure behavior |
 |---|---|---|---|---|
-| Orchestrator turn in `apply`; mapped route lane is allowlisted and apply preconditions pass | Goal-Driven Cognitive Core (current Goal-driven Runtime) | authoritative | Goal Interpretation → concurrent Fast Planner Activity Plan and Goal Association → deterministic Goal binding → optional Deep Planner for complex HOW → Goal-grouped Trusted Capability Runtime → Evidence/Response | Fail closed after ownership is acquired. |
-| Orchestrator turn in `apply`; mapped route lane is excluded | Goal-Driven Cognitive Core policy boundary | authoritative fail-closed | No semantic planner is entered; deprecated externally supplied `actions[]` remain unexecuted compatibility input only | Return a typed no-action/error outcome without legacy semantic re-entry. |
-| Orchestrator turn in `report_only` | Goal-Driven Cognitive Core (current Goal-driven Runtime) | observer | Same stages, evidence only | The existing routed Agent path remains the only authority. |
-| Agent `/interaction` or `/run` with deprecated exact `actions[]` compatibility input | No new semantic planner; legacy action materializer | adapter | Schema validation and `CapabilityRequest` materialization only | Invalid actions are blocked or clarified; no LLM reinterpretation and no claim that Fast Goal Interpretation authored them. |
-| Explicit compatibility emergency | Legacy CapabilityAgent | authoritative | Legacy capability semantic planner | Requires both service gates and a per-turn emergency claim. |
+| Orchestrator turn in `apply` | Goal-Driven Cognitive Core | authoritative | Goal Interpretation → concurrent Fast Planner / Goal Association → optional Deep Planner for complex HOW → Goal-grouped Trusted Capability Runtime → Evidence re-entry | Once ownership is acquired, any semantic, validation, execution-preparation, or Goal-state error fails closed. |
+| Orchestrator turn in `report_only` | Goal-Driven Cognitive Core | observer | Same bounded cognitive stages, evidence only | No semantic state, user-visible speech, or execution authority is committed by the observer result. |
+| Cognitive Gateway protective reflex | Host deterministic control | pre-semantic | Stop/cancel/emergency/silence policy only | Never enters ordinary Goal semantics merely to enact a reflex. |
+| Agent module endpoints | The named cognitive owner only | bounded module authority | `/cognitive-core/interpret`, Planner, Goal Association, Reflection, Social Attention, Agent Skill, tool, and TaskGraph contracts | Endpoint failure remains local to that bounded contract; it cannot reopen a second semantic planner. |
 
-The maintained direct speech-only path is Fast-Planner-owned. Goal Interpretation emits
-Responsibility evidence only. Fast Planner may determine that a simple non-effectful
-conversational Responsibility is completeable immediately, author the conversational
-Activity, and return no Goal/Deep continuation; Runtime then delivers it through the
-trusted Vocal path without creating a persistent Goal or invoking another wording
-model for the same act. This changes latency, not effect authority. Capability-dependent reads are
-not this terminal branch; Fast Planner requests Goal Association for their persistent
-fresh-evidence responsibility and factual speech follows trusted execution evidence.
+The maintained first user-facing speech path is Fast-Planner-owned. Goal
+Interpretation emits Responsibility evidence only. Fast Planner may author one
+immediately realizable Communicative Activity before Goal Association has
+finished committing canonical Goal identity. Once GA commits, Runtime binds that
+same delivered/scheduled Activity to the canonical Goal; Goal binding is not a
+reason to author or play a second equivalent utterance. This changes latency,
+not semantic or effect authority. Capability-dependent factual answers still
+require matching trusted Evidence.
 
 When Goal Association explicitly binds one Goal with `entity_type=action_list`,
 Fast and Deep Planning require a bounded model-authored semantic completeness
@@ -98,84 +94,41 @@ unavailability removes every executable step and returns clarification. This is
 a fail-closed validation of the current Planner's coverage claim, not another
 planning authority or a Host phrase-to-action rule.
 
-`GET /semantic-authority` exposes the same machine-readable route matrix from
-the Agent service.
+`GET /semantic-authority` exposes the maintained machine-readable authority
+matrix from the Agent service.
 
-## Legacy CapabilityAgent status
+## Retired semantic fallbacks
 
-The CapabilityAgent remains in the repository for compatibility evidence and
-emergency operation. In normal operation it is an adapter:
+The old CapabilityAgent semantic planner, direct-LLM Host path, route/intent
+projection, and emergency semantic fallback gates are not part of the maintained
+runtime. A disabled lane or failed authoritative turn cannot transfer semantic
+authority to another planner. Deprecated test/archive representations may be read
+only as evidence; they do not become production execution authority.
 
-1. Deprecated compatibility `actions[]` supplied directly to legacy Agent entrypoints
-   are validated and converted to `CapabilityRequest` objects without calling the
-   CapabilityAgent LLM. Current Fast Goal Interpretation does not author this field.
-2. A robot-action request without exact actions cannot invoke the old semantic
-   planner by default.
-3. The old planner runs only when all three conditions are true:
-   - the Agent has `AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED=1`;
-   - the Orchestrator attaches a valid per-turn
-     `legacy_capability_fallback` claim with `emergency_fallback=true` and a
-     non-empty `turn_id` exactly matching the Agent request `sid`.
+## Runtime modes and failure behavior
 
-The two environment variables alone are not enough. The claim's exact turn
-binding rejects an empty or cross-turn claim from silently widening authority.
-This internal routing claim is not caller authentication and is not stored as a
-single-use nonce: replaying the same valid claim with the same `sid` is not
-independently prevented here. Keep the endpoint on its trusted network boundary
-and keep both emergency gates off during normal operation.
+`apply` is the maintained semantic mode. Planner output is mechanically projected
+to a runtime lane from the terminal `CanonicalPlan` (`chat`, `memory`, `tool`,
+`robot_action`, or `unsupported`); GI does not emit or own that lane. A lane not
+allowed by `ORCH_COGNITIVE_APPLY_LANES` fails closed. Once Goal-driven semantic
+ownership begins, technical failure, terminal-lane mismatch, Planner-response
+projection failure, trusted runtime rejection, or Goal-state commit failure cannot
+transfer the same turn to another semantic planner.
 
-The maintained launcher and common profiles keep the Agent emergency gate off.
-The Host has no direct-LLM semantic rollback surface: once Goal-driven authority
-is acquired, failures remain fail-closed and may only use bounded Host-owned
-failure facts rather than transferring semantic authority to another planner.
+`report_only` may run the same cognitive stages as an observer and retain
+diagnostics, but it has no authority to commit user-visible speech, Goal state,
+or effects. `off` disables the Goal-driven semantic runtime for diagnostics and
+fails ordinary cognition closed; it is not a rollback into a legacy planner.
 
-## Disabled lanes versus failed authoritative turns
-
-In the current compatibility topology, the Orchestrator first maps Goal Interpreter
-routes to semantic lanes: `chat`, `clarify`, and `deep_thought` map to `chat`;
-`robot_action`, `tool`, and `memory` retain their lane names; everything else
-maps to `unsupported`. A mapped lane excluded by `ORCH_COGNITIVE_APPLY_LANES` fails closed before the
-Goal-driven Runtime starts. It does not enter the retained CapabilityAgent
-semantic planner, regardless of emergency-gate state. This lane mapping does
-not make the Cognitive Gateway the owner of goal meaning.
-
-Once Goal Association begins under authoritative `apply`, there is no
-same-turn compatibility fallback. Technical failure, terminal-lane mismatch,
-response-composition failure, trusted runtime rejection, or Goal-state commit
-failure produces truthful no-action output and an `error` resolution.
-
-## Offline equivalence and regression evidence
-
-The migration keeps old planner behavior covered as explicitly labelled
-emergency-fallback tests while adding boundary tests that establish:
-
-- exact Goal Interpretation actions produce the same validated skill requests with the LLM
-  available or unavailable;
-- the CapabilityAgent LLM call count remains zero on adapter-only requests;
-- neither a service gate nor a per-turn claim alone can enable the old planner;
-- empty and mismatched turn claims are rejected before any LLM call;
-- both gates plus the emergency claim enable the retained compatibility planner;
-- Goal-driven failures never emit a `legacy_fallback` status;
-- allowlisted mapped lanes at apply name Goal-driven Runtime as their only
-  authority after acquisition, while excluded mapped lanes fail closed without
-  legacy semantic re-entry;
-- maintained profiles use `apply`, `fail_closed`, and disabled legacy gates.
-
-Run the dependency-light audit with:
+The dependency-light authority audit is:
 
 ```bash
 python scripts/semantic_authority_audit.py
-```
-
-Run the relevant regression tests with:
-
-```bash
 PYTHONPATH=agent:. python -m unittest -v tests.test_semantic_authority
 ```
 
-These checks establish code-path ownership and deterministic adapter
-compatibility. They do not establish live-model semantic quality or robot
-execution correctness.
+These checks establish code-path ownership and fail-closed boundaries. They do
+not establish live-model semantic quality or robot execution correctness.
 
 ## Live validation still required
 
@@ -187,15 +140,15 @@ On the NVIDIA workstation, retain evidence for:
 - Soridormi/MuJoCo skill execution and safe-idle closure;
 - voice ASR/TTS behavior.
 
-A live failure does not reopen the old planner during the same turn. Recovery
-must start a new turn or use an explicitly initiated emergency compatibility
-operation.
+A live failure does not reopen another planner during the same turn. Recovery
+must use the current Goal/turn continuation mechanisms or begin a new user turn;
+there is no emergency semantic compatibility planner.
 
-## Exact skill identity in compatibility planning
+## Exact Capability identity
 
-Even under the explicitly enabled emergency compatibility planner, the selected
-named skill and its semantic arguments remain model-authored. The CapabilityAgent
-may validate the selected skill against the live catalog and validate or repair
-arguments against that same skill schema, but it must not substitute a nearby
-skill, translate one skill's arguments into another schema, or clamp values as a
-semantic rewrite. Invalid output fails closed or returns to model repair.
+Planner-selected Capability identity and semantic arguments remain Planner-authored.
+Trusted Host/runtime validation may check the exact Capability against the live
+catalog and validate arguments against that Capability's schema, but it must not
+substitute a nearby Capability, translate one Capability's arguments into another
+schema, or clamp values as a semantic rewrite. Invalid output fails closed or
+returns to the owning Planner's bounded repair/escalation path.

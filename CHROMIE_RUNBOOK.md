@@ -15,8 +15,9 @@ Supported launchers select complete source-controlled modes automatically:
 
 Do not recreate these combinations with ad-hoc booleans. The generated
 `.chromie/runtime_profile.json` must show the expected `active_operator_mode`.
-All maintained modes disable the legacy direct-LLM compatibility path; enabling
-that path is an explicit rollback state, not normal operation.
+No maintained operator mode exposes the retired direct-LLM or CapabilityAgent
+semantic paths. `ORCH_COGNITIVE_RUNTIME_MODE=off` is diagnostic fail-closed
+disablement, not a rollback to an older planner.
 
 Run commands from the repository root unless stated otherwise.
 

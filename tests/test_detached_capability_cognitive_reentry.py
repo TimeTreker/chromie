@@ -23,7 +23,7 @@ from shared.chromie_contracts.interaction import (
     output_schema_sha256,
 )
 from shared.chromie_contracts.plan import CanonicalPlan
-from shared.chromie_contracts.response_composition import canonical_plan_fingerprint
+from shared.chromie_contracts.plan import canonical_plan_fingerprint
 
 
 _SCHEMA = {
@@ -307,7 +307,17 @@ def _assistant(coordinator: InteractionRuntimeCoordinator) -> VoiceAssistant:
     async def close_execution(self, **_kwargs):
         return "final_closed"
 
+    def build_context(self, _session_id):
+        # This fixture intentionally bypasses full VoiceAssistant construction.
+        # Evidence re-entry needs only bounded dialogue/Goal context; do not make
+        # the unit test depend on unrelated Mind/audio/runtime collaborators.
+        return {
+            "history": [],
+            "active_goal_snapshots": self.conversation_state.active_goal_snapshots(),
+        }
+
     assistant.reset_playback_ordering = MethodType(reset_playback_ordering, assistant)
+    assistant.build_context = MethodType(build_context, assistant)
     assistant.get_http_session = MethodType(get_http_session, assistant)
     assistant._close_cognitive_execution = MethodType(close_execution, assistant)
     return assistant

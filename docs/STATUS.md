@@ -202,17 +202,14 @@ convert MuJoCo, generated TTS, or text input into physical microphone, speaker,
 robot, or release evidence; the comprehensive run's independent semantic-review
 skip also remains an explicit external evidence gap.
 
-## Compatibility state
+## Semantic compatibility state
 
-`POST /interaction` and `POST /run` remain compatibility interfaces. Their old
-CapabilityAgent semantic planner is emergency-only and requires explicit service
-and per-turn authority gates. Normal Goal-driven apply failures and excluded
-lanes do not enter it. Exact Core action proposals may cross a deterministic
-compatibility adapter, but the adapter cannot reinterpret meaning or authorize
-execution.
-
-The compatibility planner should be removed after current replay, live-service,
-and operator rollback evidence shows that no maintained profile depends on it.
+The legacy Agent `/run`, `/interaction`, `/agents`, CapabilityAgent planner,
+direct-LLM Host path, and emergency semantic fallback gates are removed from the
+maintained runtime. `apply` is the authoritative Goal-driven path; `report_only`
+is diagnostic observation and `off` disables ordinary Goal-driven cognition
+fail-closed rather than restoring an older planner. Historical evidence may still
+name retired endpoints, but it proves only the revision that produced it.
 
 ## Open source issues
 
@@ -221,8 +218,6 @@ and operator rollback evidence shows that no maintained profile depends on it.
   retained.
 - Reduce the Orchestrator composition root while preserving current structural
   ratchets and exception boundaries.
-- Remove remaining compatibility planner code after equivalent retained
-  evidence exists.
 - Keep dependency-complete Ruff and Mypy execution available in the maintained
   CI environment.
 - Continue replacing development-only mutable runtime aliases with resolved publishable digests.

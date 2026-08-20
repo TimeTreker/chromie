@@ -706,8 +706,8 @@
             "0:period=night"
           ],
           "require_speech": true,
-          "require_fast_speech": true,
-          "expected_fast_speech_purposes": [
+          "require_fast_communicative_act": true,
+          "expected_fast_communicative_speech_acts": [
             "acknowledge_and_check"
           ],
           "require_social_attention_opportunity": true,
@@ -732,8 +732,8 @@
             "0:date=today",
             "0:period=night"
           ],
-          "require_fast_speech": true,
-          "expected_fast_speech_purposes": [
+          "require_fast_communicative_act": true,
+          "expected_fast_communicative_speech_acts": [
             "acknowledge_and_check"
           ],
           "min_new_goal_count": 1,
@@ -809,8 +809,8 @@
             "0:period=morning"
           ],
           "require_speech": true,
-          "require_fast_speech": true,
-          "expected_fast_speech_purposes": [
+          "require_fast_communicative_act": true,
+          "expected_fast_communicative_speech_acts": [
             "acknowledge_and_check"
           ],
           "require_social_attention_opportunity": true,
@@ -833,8 +833,8 @@
           ],
           "expect_no_capabilities": true,
           "require_speech": true,
-          "require_fast_speech": true,
-          "expected_fast_speech_purposes": [
+          "require_fast_communicative_act": true,
+          "expected_fast_communicative_speech_acts": [
             "acknowledge_and_check"
           ],
           "description": "The Beijing rain question should acknowledge the check promptly without claiming a result before trusted lookup evidence."
@@ -902,7 +902,7 @@
           "expect_no_capabilities": true,
           "require_speech": false,
           "expect_no_speech": true,
-          "forbid_fast_speech": true,
+          "forbid_fast_communicative_act": true,
           "description": "The negative speech boundary is deterministic. With no trusted speaker target location, Chromie must neither talk nor invent a direction of travel."
         }
       ]
@@ -950,7 +950,7 @@
           "text": "帮我看看现在几点。",
           "language": "zh-CN",
           "require_speech": true,
-          "require_fast_speech": true,
+          "require_fast_communicative_act": true,
           "expected_capabilities": [
             "chromie.clock.local"
           ],

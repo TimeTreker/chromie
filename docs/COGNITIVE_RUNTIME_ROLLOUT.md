@@ -7,7 +7,7 @@
 **Automated verification:** dependency-light unit tests and retained cognitive
 runtime scenarios cover report-only operation, lane-gated apply, Fast-to-Deep
 escalation, trusted terminal host validation, atomic Goal-state application,
-response composition, legacy rollback, and evidence classification.
+Planner response projection, fail-closed disablement, and evidence classification.
 
 **Target validation:** open. No live model-stack or MuJoCo evidence created by
 this implementation patch is claimed here.
@@ -142,9 +142,9 @@ Context; wording never becomes execution evidence.
 ### `off`
 
 The PR7 unified pipeline is not called. Existing Goal Interpreter, Agent, and trusted
-runtime behavior remains the compatibility path.
+ordinary cognition fails closed rather than entering another semantic path.
 
-Use this mode for immediate rollback.
+Use this mode only to disable the Goal-driven Runtime for diagnostics or fault isolation.
 
 ### `report_only`
 
@@ -155,9 +155,9 @@ The unified pipeline runs in the background and records:
 - Fast coverage;
 - Deep escalation and revision;
 - terminal CanonicalPlan;
-- response composition;
-- candidate apply lane;
-- failure and fallback causes;
+- Planner response projection;
+- terminal Plan lane;
+- failure causes;
 - stage latency.
 
 It does not change user-visible speech, Goal state, confirmation, or execution.
@@ -167,15 +167,11 @@ for diagnostics; it is not the maintained default.
 
 ### `apply`
 
-The unified pipeline may become authoritative only for mapped semantic lanes
-listed in `ORCH_COGNITIVE_APPLY_LANES`. Goal Interpreter routes `chat`, `clarify`, and
-`deep_thought` map to the `chat` lane; `robot_action`, `tool`, and `memory`
-retain their lane names.
-
-A mapped lane that is not enabled fails closed before Goal Association. It does
-not enter the retained CapabilityAgent planner or any other semantic fallback.
-An enabled lane still applies only after all trusted validation and
-response-composition gates pass.
+The unified pipeline is authoritative in `apply`. Runtime mechanically projects
+the terminal `CanonicalPlan` to a lane listed in `ORCH_COGNITIVE_APPLY_LANES`;
+GI does not emit that lane. A disallowed or unsupported terminal Plan lane fails
+closed and cannot enter another semantic planner. An allowed lane still executes
+only after Planner-response projection plus all trusted validation gates pass.
 
 Initial recommended lanes:
 
@@ -210,23 +206,12 @@ The effective technical failure policy is `fail_closed`.
 input, but it cannot authorize same-turn fallback after the Goal-driven Runtime
 has acquired semantic authority.
 
-A route whose mapped semantic lane is excluded by
-`ORCH_COGNITIVE_APPLY_LANES` produces a typed fail-closed Host response before
-Goal Association and does not enter the legacy CapabilityAgent planner. Once
-Goal Association begins in authoritative `apply`, any model, composition,
-terminal-lane, trusted-runtime, or Goal-state commit failure produces truthful
-no-action speech and no effectful skill.
-
-The legacy CapabilityAgent semantic planner is retained only as an explicit
-emergency compatibility path. It requires disabled or non-authoritative
-Goal-driven processing, host and Agent opt-in gates, and a per-turn emergency
-authority claim. Deprecated exact `actions[]` supplied through legacy Agent
-compatibility entrypoints use a deterministic adapter and never call that planner;
-current Fast Goal Interpretation does not author them. The Agent rejects an empty claim or a claim whose `turn_id`
-does not exactly match the request `sid`, which blocks cross-turn reuse. The
-claim is not stored as a consumed nonce, so this boundary does not independently
-prevent replay with the same `sid`. See
-[Single Semantic Planning Authority](SEMANTIC_AUTHORITY.md).
+A lane excluded by `ORCH_COGNITIVE_APPLY_LANES` produces a typed fail-closed
+Host response and cannot enter another semantic planner. Once Goal Association
+begins in authoritative `apply`, any model, Planner projection, terminal-lane,
+trusted-runtime, or Goal-state commit failure produces truthful no-action speech
+and no effectful skill. Retired route/intent or Agent representations are never
+semantic fallback authority. See [Single Semantic Planning Authority](SEMANTIC_AUTHORITY.md).
 
 ## 6. Total and per-stage budgets
 
@@ -306,7 +291,7 @@ Goal Association remains advisory until the entire cognitive turn has passed:
 
 1. terminal planning;
 2. trusted CanonicalPlan validation;
-3. response composition;
+3. Planner response projection validation;
 4. trusted `InteractionResponse` preparation.
 
 Only then does the host apply Goal changes.
@@ -451,7 +436,7 @@ plan is adapted without partial execution.
 A valid robot plan is not applied when its terminal `robot_action` lane is absent
 from the apply allowlist. If the mismatch is discovered after Goal-driven
 authority has started, the result is classified as `error` and cannot re-enter
-the legacy planner.
+another semantic planner.
 
 ### Multi-Goal response coverage
 
@@ -606,20 +591,12 @@ A routed `robot_action` turn is then excluded before Goal-driven authority
 acquisition. If an already-started plan resolves to a disabled lane, it fails
 closed rather than entering compatibility planning.
 
-### Explicit emergency compatibility
+### Fail-closed disablement
 
-The maintained profiles keep both legacy gates disabled. Emergency operation
-requires all of the following:
-
-```env
-AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED=1
-```
-
-The Orchestrator must also attach an emergency authority claim whose non-empty
-`turn_id` exactly matches the Agent request `sid`. This internal claim is not a
-caller-authentication or single-use replay mechanism.
-These settings do not reopen a turn that already entered authoritative
-Goal-driven processing.
+`off` is a diagnostic/fault-isolation state, not an emergency semantic rollback.
+When the unified Runtime is disabled, admitted ordinary cognition cannot execute
+through a retired planner or direct-LLM path. `report_only` is evidence-only when
+explicitly invoked and likewise grants no execution authority.
 
 ## 17. Operational review questions
 
@@ -646,7 +623,7 @@ PR7 implementation is automatically verified when:
 - Deep performs no same-tier semantic replan; at most one mechanical DTO regeneration is allowed, and trusted runtime rejection fails closed;
 - invalid or partial plans commit no effectful skill;
 - Goal-state application is atomic;
-- response composition is fingerprint-bound to the terminal plan;
+- the Planner response projection is fingerprint-bound to the terminal Plan;
 - evidence distinguishes applied, report-only, skipped, and error outcomes;
 - dependency-light cognitive scenarios and the full test suite pass.
 

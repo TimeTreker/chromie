@@ -4,8 +4,8 @@
 This runner feeds user text into the deployed Cognitive Core and, by default, the
 maintained goal-driven cognitive runtime. It executes the resulting structured
 response through the host Trusted Capability Runtime and optionally plays Chromie
-speech through the configured speaker. An explicit legacy Agent ``/interaction``
-compatibility mode remains available. This is a simulator/live-integration
+speech through the configured speaker. Retired Agent ``/interaction``
+compatibility is not part of this runner. This is a simulator/live-integration
 check, not supervised microphone evidence.
 """
 

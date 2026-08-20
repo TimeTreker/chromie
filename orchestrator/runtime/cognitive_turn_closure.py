@@ -20,9 +20,7 @@ from shared.chromie_contracts.interaction import (
     validate_output_schema_declaration,
 )
 from shared.chromie_contracts.plan import CanonicalPlan
-from shared.chromie_contracts.response_composition import (
-    canonical_plan_fingerprint,
-)
+from shared.chromie_contracts.plan import canonical_plan_fingerprint
 
 from .outcome_reconciliation import ExecutionOutcomeReconciler
 from .capability_runtime import CapabilityRuntimeResult

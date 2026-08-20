@@ -519,7 +519,7 @@ channel.
 #### 7.3.2 Big-change capability-degradation protocol
 
 Before a change that can alter model prompts, reasoning, routing, memory,
-capability selection, response composition, audio flow, or lifecycle behavior:
+capability selection, Planner communication, audio flow, or lifecycle behavior:
 
 1. Commit a clean baseline and run
    `scripts/qualification/run_comprehensive_test.sh --strict-exit`.

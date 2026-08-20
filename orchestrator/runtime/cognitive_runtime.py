@@ -24,7 +24,10 @@ from shared.chromie_contracts.execution_outcome import (
     claim_qualification_policy_sha256,
     execution_outcome_fingerprint,
 )
-from shared.chromie_contracts.goal import GoalAssociationResolution
+from shared.chromie_contracts.goal import (
+    GoalAssociationResolution,
+    goal_association_fingerprint,
+)
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
@@ -51,14 +54,9 @@ from shared.chromie_contracts.plan import (
     PlannedCommunicativeAct,
     RespondGoalPlanOutcome,
     fast_planner_activity_request_id,
-)
-from shared.chromie_contracts.response_composition import (
-    CoordinatedResponsePlan,
-    DirectResponseComposition,
-    ResponseCompositionResolution,
     canonical_plan_fingerprint,
-    goal_association_fingerprint,
 )
+from shared.chromie_contracts.planner_response import PlannerResponseProjection
 from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage
 from shared.chromie_contracts.social_attention import (
     SocialAttentionActivityAnchor,
@@ -120,7 +118,6 @@ class CognitiveRuntimeResolution(BaseModel):
     fast_advance: FastPlannerAdvance | None = None
     fast_plan: CanonicalPlan | None = None
     terminal_plan: CanonicalPlan | None = None
-    response_composition: ResponseCompositionResolution | None = None
     interaction_response: InteractionResponse | None = None
     goal_state_results: list[dict[str, Any]] = Field(default_factory=list)
     timings_ms: dict[str, float] = Field(default_factory=dict)
@@ -132,7 +129,6 @@ class CognitiveRuntimeResolution(BaseModel):
 class CognitiveRuntimePolicy:
     mode: CognitiveRuntimeMode = "off"
     apply_lanes: frozenset[str] = frozenset({"chat", "memory", "robot_action", "tool"})
-    fallback_policy: str = "fail_closed"
     max_total_ms: int = 25000
     goal_association_timeout_ms: int = 3500
     fast_planner_timeout_ms: int = 3000
@@ -310,7 +306,6 @@ class CognitiveEvidenceRecorder:
             ),
             "fast_plan": self._plan_summary(resolution.fast_plan),
             "terminal_plan": self._plan_summary(resolution.terminal_plan),
-            "composition": self._composition_summary(resolution.response_composition),
             "interaction": self._interaction_summary(resolution.interaction_response),
             "goal_state_results": resolution.goal_state_results,
             "timings_ms": resolution.timings_ms,
@@ -383,49 +378,6 @@ class CognitiveEvidenceRecorder:
             "goal_satisfaction": (
                 plan.goal_satisfaction.model_dump(mode="json")
                 if plan.goal_satisfaction is not None
-                else None
-            ),
-        }
-
-    @staticmethod
-    def _composition_summary(
-        resolution: ResponseCompositionResolution | None,
-    ) -> dict[str, Any] | None:
-        if resolution is None:
-            return None
-        composition = resolution.composition
-        coordinated = composition if isinstance(composition, CoordinatedResponsePlan) else None
-        direct = composition if isinstance(composition, DirectResponseComposition) else None
-        return {
-            "status": resolution.status,
-            "composition_id": composition.composition_id if composition else None,
-            "phase": composition.phase if composition else None,
-            "canonical_plan_fingerprint": (
-                coordinated.canonical_plan_fingerprint if coordinated else None
-            ),
-            "goal_association_fingerprint": (
-                direct.goal_association_fingerprint if direct else None
-            ),
-            "lane_coordination": (
-                [
-                    {
-                        "coordination_id": item.coordination_id,
-                        "lanes": list(item.lanes),
-                        "activity_step_ids": list(item.activity_step_ids),
-                        "relation": item.relation,
-                        "start_policy": item.start_policy,
-                        "failure_policy": item.failure_policy,
-                    }
-                    for item in coordinated.lane_coordination
-                ]
-                if coordinated is not None
-                else []
-            ),
-            "response_truth_audit": (
-                dict(composition.metadata.get("response_truth_audit") or {})
-                if composition
-                and isinstance(composition.metadata, dict)
-                and isinstance(composition.metadata.get("response_truth_audit"), dict)
                 else None
             ),
         }
@@ -1159,107 +1111,6 @@ class CanonicalPlanRuntimeAdapter:
             metadata=metadata,
         )
 
-    async def build_direct_response(
-        self,
-        *,
-        composition: DirectResponseComposition,
-        session_id: str,
-        language: str,
-        context: dict[str, Any] | None = None,
-    ) -> InteractionResponse:
-        association = composition.goal_association
-        fingerprint = goal_association_fingerprint(association)
-        if composition.goal_association_fingerprint != fingerprint:
-            raise ValueError("direct response goal-association fingerprint mismatch")
-        final = composition.response_plan.final
-        if final is None:
-            raise ValueError("direct response requires a final speech stage")
-        goal_ids = [
-            str(goal.goal_id or "").strip()
-            for goal in association.new_goals
-            if str(goal.goal_id or "").strip()
-        ]
-        runtime_context = context if isinstance(context, dict) else {}
-        envelope = runtime_context.get("user_turn_envelope")
-        turn_id = (
-            str(envelope.get("turn_id") or session_id)
-            if isinstance(envelope, dict)
-            else session_id
-        )
-        reflex = envelope.get("reflex") if isinstance(envelope, dict) else None
-        deterministic_interrupt = bool(
-            isinstance(envelope, dict)
-            and envelope.get("admission") == "reflex_and_admit"
-            and isinstance(reflex, dict)
-            and reflex.get("action") == "interrupt"
-        )
-        speech_prohibited = bool(
-            deterministic_interrupt and reflex.get("should_speak") is not True
-        )
-        residual_effects_permitted = bool(
-            deterministic_interrupt
-            and reflex.get("intent") == "stop_current_output"
-            and reflex.get("cancellation_scope") == "output_only"
-            and isinstance(reflex.get("metadata"), dict)
-            and reflex["metadata"].get("residual_semantic_input") is True
-        )
-        speech = [] if speech_prohibited else [
-            InteractionSpeech(
-                text=final.text,
-                timing="immediate",
-                style="brief",
-                metadata={
-                    "source": "legacy_direct_response_transport",
-                    "turn_id": turn_id,
-                    "phase": "final",
-                    "speech_act": final.speech_act,
-                    "commitment_state": final.commitment_state,
-                    "must_not_claim_completion": (final.must_not_claim_completion),
-                    "covers_goal_ids": list(final.covers_goal_ids),
-                    "source_goal_ids": list(final.covers_goal_ids),
-                    "goal_association_fingerprint": fingerprint,
-                    "claims": list(final.claims),
-                    "wait_for_playback_start": True,
-                    "playback_start_required_for_delivery": True,
-                    "planless_direct_response": True,
-                    "execution_lane": "vocal",
-                    "delivery_role": "response",
-                },
-            )
-        ]
-
-        capabilities: list[CapabilityRequest] = []
-
-        metadata = {
-            "source": "goal_driven_cognitive_runtime",
-            "cognitive_runtime_apply": True,
-            "language": language,
-            "planless_direct_response": True,
-            "goal_association": association.model_dump(mode="json", exclude_none=True),
-            "goal_association_fingerprint": fingerprint,
-            "response_composition": composition.model_dump(mode="json", exclude_none=True),
-            "execution_lanes": {
-                "vocal": "response_delivery",
-                "activity": "idle",
-            },
-            "lane_coordination_groups": [],
-            "planning_result": "direct_response",
-            "capability_decision": "respond",
-            "goal_ids": goal_ids,
-            "planner_tier": "none",
-            "operational_speech_authority": "llm_direct_response",
-        }
-        if isinstance(runtime_context.get("user_turn_envelope"), dict):
-            metadata["user_turn_envelope"] = runtime_context["user_turn_envelope"]
-        response = InteractionResponse(
-            interaction_id=f"cognitive_{session_id}",
-            status="ok",
-            speech=speech,
-            capabilities=capabilities,
-            metadata=metadata,
-        )
-        return response
-
     async def build_execution_only_response(
         self,
         *,
@@ -1271,15 +1122,15 @@ class CanonicalPlanRuntimeAdapter:
         """Materialize a pure safe-read Plan without a presentation-model barrier."""
 
         fingerprint = canonical_plan_fingerprint(plan)
-        composition = CoordinatedResponsePlan(
-            composition_id=f"execution_only_{fingerprint[:20]}",
+        planner_response = PlannerResponseProjection(
+            projection_id=f"execution_only_{fingerprint[:20]}",
             canonical_plan_id=plan.plan_id,
             canonical_plan_fingerprint=fingerprint,
             canonical_plan=plan,
             response_plan=ResponsePlan(),
             lane_coordination=[],
             confidence=1.0,
-            rationale="Pure safe-read execution does not require pre-evidence response composition.",
+            rationale="Pure safe-read execution does not require pre-evidence planner response projection.",
             metadata={
                 "authority": "advisory",
                 "resolver": "readiness_execution",
@@ -1289,7 +1140,7 @@ class CanonicalPlanRuntimeAdapter:
         )
         return await self.build_response(
             plan=plan,
-            composition=composition,
+            planner_response=planner_response,
             session_id=session_id,
             language=language,
             context=context,
@@ -1442,8 +1293,8 @@ class CanonicalPlanRuntimeAdapter:
                 pre_action=pre_action,
             )
             fingerprint = canonical_plan_fingerprint(plan)
-            composition = CoordinatedResponsePlan(
-                composition_id=f"planner_owned_{fingerprint[:20]}",
+            planner_response = PlannerResponseProjection(
+                projection_id=f"planner_owned_{fingerprint[:20]}",
                 canonical_plan_id=plan.plan_id,
                 canonical_plan_fingerprint=fingerprint,
                 canonical_plan=plan,
@@ -1459,7 +1310,7 @@ class CanonicalPlanRuntimeAdapter:
             )
             return await self.build_response(
                 plan=plan,
-                composition=composition,
+                planner_response=planner_response,
                 session_id=session_id,
                 language=language,
                 context=context,
@@ -1488,8 +1339,8 @@ class CanonicalPlanRuntimeAdapter:
         )
         if pure_silent_execution:
             fingerprint = canonical_plan_fingerprint(plan)
-            composition = CoordinatedResponsePlan(
-                composition_id=f"planner_owned_{fingerprint[:20]}",
+            planner_response = PlannerResponseProjection(
+                projection_id=f"planner_owned_{fingerprint[:20]}",
                 canonical_plan_id=plan.plan_id,
                 canonical_plan_fingerprint=fingerprint,
                 canonical_plan=plan,
@@ -1507,7 +1358,7 @@ class CanonicalPlanRuntimeAdapter:
             )
             return await self.build_response(
                 plan=plan,
-                composition=composition,
+                planner_response=planner_response,
                 session_id=session_id,
                 language=language,
                 context=context,
@@ -1559,8 +1410,8 @@ class CanonicalPlanRuntimeAdapter:
             else ResponsePlan(final=stage)
         )
         fingerprint = canonical_plan_fingerprint(plan)
-        composition = CoordinatedResponsePlan(
-            composition_id=f"planner_owned_{fingerprint[:20]}",
+        planner_response = PlannerResponseProjection(
+            projection_id=f"planner_owned_{fingerprint[:20]}",
             canonical_plan_id=plan.plan_id,
             canonical_plan_fingerprint=fingerprint,
             canonical_plan=plan,
@@ -1576,7 +1427,7 @@ class CanonicalPlanRuntimeAdapter:
         )
         return await self.build_response(
             plan=plan,
-            composition=composition,
+            planner_response=planner_response,
             session_id=session_id,
             language=language,
             context=context,
@@ -1586,7 +1437,7 @@ class CanonicalPlanRuntimeAdapter:
         self,
         *,
         plan: CanonicalPlan,
-        composition: CoordinatedResponsePlan,
+        planner_response: PlannerResponseProjection,
         session_id: str,
         language: str,
         context: dict[str, Any] | None = None,
@@ -1600,18 +1451,18 @@ class CanonicalPlanRuntimeAdapter:
                 "speech_stage_count": sum(
                     1
                     for item in (
-                        composition.response_plan.immediate,
-                        composition.response_plan.pre_action,
-                        composition.response_plan.final,
+                        planner_response.response_plan.immediate,
+                        planner_response.response_plan.pre_action,
+                        planner_response.response_plan.final,
                     )
                     if item is not None
                 )
-                + len(composition.response_plan.progress),
+                + len(planner_response.response_plan.progress),
             },
         ) as span:
             response = await self._build_response(
                 plan=plan,
-                composition=composition,
+                planner_response=planner_response,
                 session_id=session_id,
                 language=language,
                 context=context,
@@ -1627,15 +1478,15 @@ class CanonicalPlanRuntimeAdapter:
         self,
         *,
         plan: CanonicalPlan,
-        composition: CoordinatedResponsePlan,
+        planner_response: PlannerResponseProjection,
         session_id: str,
         language: str,
         context: dict[str, Any] | None = None,
     ) -> InteractionResponse:
-        if composition.canonical_plan_id != plan.plan_id:
-            raise ValueError("response composition references a different canonical plan")
-        if composition.canonical_plan_fingerprint != canonical_plan_fingerprint(plan):
-            raise ValueError("response composition canonical-plan fingerprint mismatch")
+        if planner_response.canonical_plan_id != plan.plan_id:
+            raise ValueError("planner response projection references a different canonical plan")
+        if planner_response.canonical_plan_fingerprint != canonical_plan_fingerprint(plan):
+            raise ValueError("planner response projection canonical-plan fingerprint mismatch")
         errors = await self.validation_errors(plan)
         if errors:
             raise ValueError(
@@ -1680,23 +1531,23 @@ class CanonicalPlanRuntimeAdapter:
                 if definition.requires_confirmation:
                     confirmation_goal_ids.update(step.source_goal_ids)
 
-        response_plan = composition.response_plan
+        response_plan = planner_response.response_plan
         lane_coordination_by_id = {
-            item.coordination_id: item for item in composition.lane_coordination
+            item.coordination_id: item for item in planner_response.lane_coordination
         }
         activity_coordination_by_step_id = {
             step_id: item
-            for item in composition.lane_coordination
+            for item in planner_response.lane_coordination
             for step_id in item.activity_step_ids
         }
         vocal_coordination_by_step_id = {
             step_id: item
-            for item in composition.lane_coordination
+            for item in planner_response.lane_coordination
             for step_id in item.vocal_step_ids
         }
         plan_steps_by_id = {step.step_id: step for step in plan.steps}
         media_mixer_by_coordination_id: dict[str, dict[str, Any]] = {}
-        for coordination in composition.lane_coordination:
+        for coordination in planner_response.lane_coordination:
             if "vocal" not in coordination.lanes:
                 continue
             media_step_ids = [
@@ -2289,7 +2140,7 @@ class CanonicalPlanRuntimeAdapter:
             "canonical_plan": plan.model_dump(mode="json", exclude_none=True),
             "canonical_plan_id": plan.plan_id,
             "canonical_plan_fingerprint": fingerprint,
-            "response_composition": composition.model_dump(mode="json", exclude_none=True),
+            "planner_response_projection": planner_response.model_dump(mode="json", exclude_none=True),
             "execution_lanes": {
                 "vocal": (
                     "response_delivery_and_provider_work"
@@ -2309,7 +2160,7 @@ class CanonicalPlanRuntimeAdapter:
             },
             "lane_coordination_groups": [
                 item.model_dump(mode="json", exclude_none=True)
-                for item in composition.lane_coordination
+                for item in planner_response.lane_coordination
             ],
             "planning_result": (
                 "composed_plan" if plan.disposition in {"execute", "mixed"} else plan.disposition
@@ -4317,7 +4168,6 @@ class GoalDrivenRuntimeCoordinator:
         fast_first_response: FastPlannerFirstResponse | None = None
         fast_plan: CanonicalPlan | None = None
         terminal_plan: CanonicalPlan | None = None
-        composition_resolution: ResponseCompositionResolution | None = None
         interaction: InteractionResponse | None = None
         goal_state_results: list[dict[str, Any]] = []
         goal_state_commit_stage = ""
@@ -4735,7 +4585,7 @@ class GoalDrivenRuntimeCoordinator:
                 # Goal Association is the model-owned semantic interpretation of the
                 # user's responsibility.  Publish that validated semantic state as
                 # soon as the stage completes so a concurrent follow-up can reason
-                # over the in-flight Goal while planning/composition continue.  The
+                # over the in-flight Goal while planning/realization continue.  The
                 # host is only transporting and versioning the model result here; it
                 # does not infer continuity, entities, or bindings itself.
                 #
@@ -5332,7 +5182,6 @@ class GoalDrivenRuntimeCoordinator:
                             association=association,
                             fast_plan=fast_plan,
                             terminal_plan=terminal_plan,
-                            composition=None,
                             timings=timings,
                             started=started,
                             fallback_reason="fast_activity_chat_lane_not_enabled",
@@ -5364,7 +5213,6 @@ class GoalDrivenRuntimeCoordinator:
                         association=association,
                         fast_plan=fast_plan,
                         terminal_plan=terminal_plan,
-                        composition=None,
                         interaction=interaction,
                         goal_state_results=goal_state_results,
                         timings=timings,
@@ -5383,7 +5231,6 @@ class GoalDrivenRuntimeCoordinator:
                     association=association,
                     fast_plan=fast_plan,
                     terminal_plan=terminal_plan,
-                    composition=None,
                     timings=timings,
                     started=started,
                     metadata={
@@ -5404,7 +5251,6 @@ class GoalDrivenRuntimeCoordinator:
                             association=association,
                             fast_plan=fast_plan,
                             terminal_plan=terminal_plan,
-                            composition=None,
                             timings=timings,
                             started=started,
                             fallback_reason="safe_read_lane_not_enabled_for_apply",
@@ -5453,7 +5299,6 @@ class GoalDrivenRuntimeCoordinator:
                         association=association,
                         fast_plan=fast_plan,
                         terminal_plan=terminal_plan,
-                        composition=None,
                         interaction=interaction,
                         goal_state_results=goal_state_results,
                         timings=timings,
@@ -5472,7 +5317,6 @@ class GoalDrivenRuntimeCoordinator:
                     association=association,
                     fast_plan=fast_plan,
                     terminal_plan=terminal_plan,
-                    composition=None,
                     timings=timings,
                     started=started,
                     metadata={
@@ -5482,14 +5326,14 @@ class GoalDrivenRuntimeCoordinator:
                     },
                 )
 
-            composition_context = dict(planning_context)
-            composition_context["canonical_plan_resolution"] = terminal_plan.prompt_projection()
+            planner_response_context = dict(planning_context)
+            planner_response_context["canonical_plan_resolution"] = terminal_plan.prompt_projection()
             delivered_turn_speech = (
                 self.delivered_turn_speech_provider(sid)
                 if callable(self.delivered_turn_speech_provider)
                 else []
             )
-            composition_context["delivered_turn_speech"] = [
+            planner_response_context["delivered_turn_speech"] = [
                 dict(item) for item in delivered_turn_speech if isinstance(item, dict)
             ]
             timings["planner_communicative_activity_validation"] = 0.0
@@ -5503,7 +5347,6 @@ class GoalDrivenRuntimeCoordinator:
                         association=association,
                         fast_plan=fast_plan,
                         terminal_plan=terminal_plan,
-                        composition=None,
                         timings=timings,
                         started=started,
                         fallback_reason="terminal_plan_lane_not_enabled_for_apply",
@@ -5529,7 +5372,7 @@ class GoalDrivenRuntimeCoordinator:
                         plan=terminal_plan,
                         session_id=sid,
                         language=language,
-                        context=composition_context,
+                        context=planner_response_context,
                     ),
                 )
                 timings["runtime_adapter"] = (time.perf_counter() - stage) * 1000.0
@@ -5545,7 +5388,6 @@ class GoalDrivenRuntimeCoordinator:
                     association=association,
                     fast_plan=fast_plan,
                     terminal_plan=terminal_plan,
-                    composition=None,
                     interaction=interaction,
                     goal_state_results=goal_state_results,
                     timings=timings,
@@ -5566,7 +5408,6 @@ class GoalDrivenRuntimeCoordinator:
                 association=association,
                 fast_plan=fast_plan,
                 terminal_plan=terminal_plan,
-                composition=None,
                 timings=timings,
                 started=started,
                 metadata={
@@ -5592,7 +5433,6 @@ class GoalDrivenRuntimeCoordinator:
                 association=association,
                 fast_plan=fast_plan,
                 terminal_plan=terminal_plan,
-                composition=composition_resolution,
                 interaction=interaction,
                 goal_state_results=goal_state_results,
                 timings=timings,
@@ -5609,7 +5449,6 @@ class GoalDrivenRuntimeCoordinator:
                 association=association,
                 fast_plan=fast_plan,
                 terminal_plan=terminal_plan,
-                composition=composition_resolution,
                 interaction=interaction,
                 goal_state_results=goal_state_results,
                 timings=timings,
@@ -5687,7 +5526,6 @@ class GoalDrivenRuntimeCoordinator:
         association: GoalAssociationResolution | None,
         fast_plan: CanonicalPlan | None,
         terminal_plan: CanonicalPlan | None,
-        composition: ResponseCompositionResolution | None,
         timings: dict[str, float],
         started: float,
         interaction: InteractionResponse | None = None,
@@ -5713,7 +5551,6 @@ class GoalDrivenRuntimeCoordinator:
             fast_advance=fast_advance,
             fast_plan=fast_plan,
             terminal_plan=terminal_plan,
-            response_composition=composition,
             interaction_response=interaction,
             goal_state_results=list(goal_state_results or []),
             timings_ms={key: round(value, 1) for key, value in final_timings.items()},

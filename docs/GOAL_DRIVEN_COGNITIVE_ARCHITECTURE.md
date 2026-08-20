@@ -187,7 +187,7 @@ When that Activity communicates, it is a **Communicative Act**. Planner owns
 the act's exact wording, function (`acknowledge`, `ask`, `answer`, `explain`,
 `refuse`, or no speech), semantic provenance, timing, and truth constraints. The Host
 validates but does not rewrite it; TTS/playback owns acoustic production and delivery
-Evidence. This refines the Activity expansion without adding a Response Composer or
+Evidence. This refines the Activity expansion without adding a separate response-authoring stage or
 another semantic manager.
 
 ### Human-like does not mean perfectionist
@@ -604,22 +604,12 @@ preserves the user’s goal.
 
 ### 3.8.1 Single semantic authority
 
-For an enabled route, one turn has one authoritative semantic planner. In
-maintained `apply` mode that owner is the Goal-Driven Cognitive Core, currently
-implemented by the unified Goal-driven Runtime. Deprecated exact `actions[]` from
-legacy Agent compatibility callers may be consumed only as adapter input; current Fast
-Goal Interpretation never authors them. They do not form a second semantic plan, and a
-turn acquired by the Goal-driven Runtime cannot fall through to the
-old CapabilityAgent planner after a failure.
-
-The old CapabilityAgent semantic planner is retained only as an explicit
-emergency path. It requires the host gate, the Agent gate, and an authoritative
-emergency claim whose non-empty `turn_id` exactly matches the request turn.
-Missing, empty, or cross-turn claims fail closed before model planning. The
-claim is internal routing metadata, not caller authentication or a consumed
-single-use nonce. Emergency compatibility does not widen execution authority:
-its output still crosses the same host validation, confirmation, Trusted Capability Runtime,
-provider, and evidence boundaries.
+One admitted turn has one maintained semantic architecture. In `apply` mode the
+Goal-Driven Cognitive Core owns the semantic path: GI interprets WHAT, Goal
+Association owns canonical Goal continuity, and Fast/Deep Planner owns HOW and
+Communicative Activities. A failure after this path starts fails closed; there is
+no retained CapabilityAgent, direct-LLM, route/intent, or emergency semantic
+fallback that can reinterpret the same turn.
 
 ### 3.9 Semantic choice, deterministic enforcement
 
@@ -891,8 +881,7 @@ side-effect-free read with explicit parallel-safety metadata may begin without a
 GA and initially carries only Responsibility refs. Effects remain gated by canonical
 Goal binding, confirmation, authorization, resource, and provider-safety checks.
 
-The old Goal-Interpreter `CognitiveProgressCandidate` / `native_response` /
-`fast_speech` path has been removed rather than retained as compatibility. Goal
+Goal Interpretation has no progress-speech or response-authoring contract. Goal
 Association consumes the same authoritative GI result after the bounded first-response
 commitment and never waits for the remaining Fast Activity Plan. Fast Activities retain
 GI Responsibility refs until the
@@ -1854,11 +1843,10 @@ choose a genuine clarification when the user can resolve the gap. Invalid or
 repeatedly incomplete output fails closed with no Goal commit or effect.
 
 Fast Goal Interpreter Responsibility proposals are semantic evidence for Goal
-Association. Legacy route/intent fields may remain as advisory compatibility or
-diagnostic projections, but they are not Planner inputs: they cannot grant, deny,
-filter, or narrow executable Capability access. Exact Capability/retrieval selection
-and the execution shape belong to Fast/Deep Planner after canonical Goal Association.
-Its maintained transaction is deliberately smaller than Goal Association's:
+Association. Retired route/intent classifications are not part of the maintained
+GI contract and are not Planner inputs. Exact Capability/retrieval selection and
+the execution shape belong to Fast/Deep Planner. Its maintained transaction is
+deliberately smaller than Goal Association's:
 
 ```text
 primary fast interpretation
@@ -2233,15 +2221,16 @@ This is one goal with a conditional plan, not two user goals.
 }
 ```
 
-### 7.4 Response composition
+### 7.4 Planner communication across multiple Goals
 
-Multiple goals do not require multiple awkward acknowledgements. A response
-composer may naturally consolidate them while preserving independent lifecycle
-and evidence.
+Multiple Goals do not require multiple awkward acknowledgements. Fast or Deep
+Planner may author one Communicative Activity that naturally consolidates the
+still-needed user-facing delta while preserving each Goal's independent lifecycle
+and Evidence provenance.
 
-Semantic composition belongs to a model. The Orchestrator validates references,
-commitments, versions, and evidence; it does not concatenate strings to imitate
-understanding.
+Semantic communication belongs to Planner. The Orchestrator validates references,
+commitments, versions, and Evidence; it does not concatenate strings or author a
+second response to imitate understanding.
 
 ### 7.5 Independent goals may end the same turn differently
 
@@ -3016,8 +3005,7 @@ wording. Fast Planner owns the semantic role, exact wording, timing, truth stage
 and provenance of every Communicative Activity it authors. The Host derives transport/claim-envelope facts and
 may reject malformed or authority-violating output, but it does not become a second
 semantic writer. Progress speech carries no Capability/Goal completion claim.
-The old Goal-Interpreter `fast_speech`/`native_response` fields are removed rather than
-retained as compatibility. Tool speech uses the typed
+Goal Interpretation has no speech fields. Tool progress communication uses the typed
 `acknowledge_and_check`/
 `checking_only` contract before result evidence; a memory acknowledgement is
 likewise purely prospective and cannot claim that the commit already happened.
@@ -3030,7 +3018,7 @@ speech requires reconciled terminal evidence.
 Response stages reuse earlier current-turn speech by exact speech-event ID and
 structured act fields, not text comparison. The playback event preserves turn,
 source Goal IDs, canonical Plan identity/fingerprint, delivery role, claims,
-and the completion-claim restriction emitted by the Core. Fast speech scheduled
+and the completion-claim restriction emitted by the Core. A Fast Planner Communicative Activity scheduled
 before GA finishes retains GI Responsibility refs until canonical binding;
 Goal-bound speech cannot later be reassigned to an
 unrelated Goal or Plan. Only playback-started or completed events satisfy an
@@ -3074,7 +3062,7 @@ does not claim that Goal state was updated.
 
 `Interaction Context` is the deterministic, model-facing projection of that
 journal, not another store. Runtime selects a bounded chronology for the
-relevant Goal IDs and includes same-turn unbound Fast speech without inventing
+relevant Goal IDs and includes same-turn unbound Fast Planner Communicative Activities without inventing
 Goal ownership. It exposes already audible speech, pending speech, Activity and
 provider-backed Vocal work, Social Attention decorations, Goal/Plan history, and
 unresolved waits. Ledger `domain=social_attention` is an observation domain, not
@@ -3117,7 +3105,7 @@ schema contains no free-form result text, so an unverified result cannot become
 admissible merely by labelling it `role=progress`. A substantive immediate answer
 or clarification uses its own typed Activity and truth requirements instead.
 
-Later planning, trusted result interpretation, response composition, or runtime
+Later planning, trusted result interpretation, or Planner Evidence re-entry
 may communicate a genuinely new trustworthy user-relevant delta: a material
 limitation, meaningful wait state, achieved milestone, failure/retry, correction,
 or completion. Interaction Context and playback Evidence prevent duplicate
@@ -3135,9 +3123,8 @@ into a Social Attention anchor merely because it happened.
 
 Each Communicative Act has one Planner wording owner and one downstream delivery owner,
 with deterministic authority, evidence, cancellation, and delivery validation. The architecture does not add a
-second LLM to repair ordinary progress wording, and it does not retain a legacy
-Goal-Interpreter `fast_speech`/`native_response` compatibility path for maintained
-turns.
+second LLM to repair ordinary progress wording, and Goal Interpretation has no
+maintained response-authoring path.
 
 ### 15.2 Post-execution response
 
@@ -3415,7 +3402,7 @@ Exit criteria:
 
 Deliver:
 
-- multi-goal response composition;
+- multi-Goal Planner communication;
 - validated response commitments;
 - independent social attention plan;
 - target-evidence and resource-conflict validation;
@@ -3461,24 +3448,22 @@ Operational details are maintained in
 
 ### PR8 — Single semantic authority and model-facing contract hardening
 
-Implementation status: the unified runtime is authoritative for configured
-lanes, deprecated exact `actions[]` are legacy-adapter-only rather than Fast Goal
-Interpreter output, and the legacy CapabilityAgent planner is emergency-only behind
-matching per-turn authority. Goal Association
-uses the exact model-facing schema while the host constructs canonical
+Implementation status: the unified Goal-driven runtime is the only maintained
+semantic architecture. Retired Agent `/run`/`/interaction`, CapabilityAgent,
+route/intent, and emergency semantic fallback surfaces have been removed. Goal
+Association uses the exact model-facing schema while the Host constructs canonical
 persistence objects.
 
 Exit criteria:
 
 - authoritative turns do not fall through to a second semantic planner;
-- emergency fallback requires both service gates and a non-empty matching-turn
-  claim;
+- GI owns WHAT without route/intent/Capability/Activity leakage;
+- Planner owns HOW and exact Communicative Activities;
 - model-facing Goal Association values are schema constrained and receive at
   most one mechanical DTO repair before the bounded coverage transaction;
 - contract exhaustion fails closed;
 - automated authority and schema-boundary checks pass;
-- retained live-text and MuJoCo evidence is reviewed before target behavior is
-  claimed.
+- retained live-text and MuJoCo evidence is reviewed before target behavior is claimed.
 
 ### PR9 — Cognitive turn closure
 

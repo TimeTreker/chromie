@@ -14,9 +14,7 @@ from shared.chromie_contracts.interaction import (
     CapabilityResult,
 )
 from shared.chromie_contracts.plan import CanonicalPlan
-from shared.chromie_contracts.response_composition import (
-    canonical_plan_fingerprint,
-)
+from shared.chromie_contracts.plan import canonical_plan_fingerprint
 
 logger = logging.getLogger("chromie.orchestrator.body_recovery")
 

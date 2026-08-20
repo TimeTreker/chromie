@@ -24,7 +24,7 @@ from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.outcome_reconciliation import ExecutionOutcomeReconciler
 from shared.chromie_contracts.interaction import CapabilityRequest
 from shared.chromie_contracts.plan import CanonicalPlan
-from shared.chromie_contracts.response_composition import canonical_plan_fingerprint
+from shared.chromie_contracts.plan import canonical_plan_fingerprint
 
 
 class _SequenceOllama:

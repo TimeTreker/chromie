@@ -250,7 +250,7 @@ For fresh-machine bootstrap, use [Chromie Deployment](docs/DEPLOYMENT.md) and
 
 | Mode | Key setting | State |
 |---|---|---|
-| Compatibility voice | cognitive runtime off, explicit legacy path | Emergency rollback only |
+| Diagnostic cognition | cognitive runtime disabled or report-only | Fail-closed / evidence-only diagnostics; never a legacy semantic fallback |
 | Goal-driven speech | cognitive apply on, `chat,memory,tool` lanes, Soridormi skills off | Common safe base |
 | Goal-driven MuJoCo | cognitive apply on, `chat,memory,robot_action,tool`, Soridormi skills on | Maintained simulator launcher |
 | Physical robot | commissioned Soridormi plus physical gates | Optional provider integration; experimental and outside core acceptance |
@@ -320,11 +320,11 @@ documented in
 - normal robot thinking, including body-goal interpretation, capability choice,
   and planning, belongs to LLM reasoning over bounded contracts, not hardcoded
   phrase, regex, or regression-case matches;
-- normal natural-language routing goes through model-authored typed meaning;
-  complete non-effectful conversation uses the direct Core response path rather
-  than a planner used merely to transport speech, bounded work stays on Fast
-  Planner, and Deep records the wider semantic or safety/resource reason that
-  required escalation instead of relying on deterministic guessing;
+- normal natural-language cognition goes through model-authored typed meaning;
+  Goal Interpretation owns WHAT, Goal Association owns canonical Goal continuity,
+  and Fast/Deep Planner owns HOW plus every user-facing Communicative Activity;
+  the Host validates, schedules, and realizes those Activities without becoming
+  a second response author;
 - simulation exemptions never authorize hardware;
 - physical execution stays default-off and Soridormi-owned;
 - implementation, automated verification, target validation, and release
@@ -335,7 +335,7 @@ documented in
 | Path | Responsibility |
 |---|---|
 | `orchestrator/` | Host audio, interruption, conversation state, and Trusted Capability Runtime |
-| `agent/app/cognitive_core/goal_interpreter/` | Compatibility Cognitive Gateway backend for attention review and advisory routing |
+| `agent/app/cognitive_core/goal_interpreter/` | Goal Interpretation implementation: provider-neutral Responsibility meaning only |
 | `agent/` | Native interaction, capabilities, and TaskGraph APIs |
 | `asr/`, `tts/` | Speech services |
 | `shared/` | Shared contracts and scheduling primitives |

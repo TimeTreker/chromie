@@ -71,9 +71,11 @@ class TextScenarioCase:
     allow_expressive_cues: bool = True
     require_speech: bool = True
     expect_no_speech: bool = False
-    require_fast_speech: bool = False
-    forbid_fast_speech: bool = False
-    expected_fast_speech_purposes: tuple[str, ...] = field(default_factory=tuple)
+    require_fast_communicative_act: bool = False
+    forbid_fast_communicative_act: bool = False
+    expected_fast_communicative_speech_acts: tuple[str, ...] = field(
+        default_factory=tuple
+    )
     require_social_attention_opportunity: bool = False
     require_fast_planner_evidence_reentry: bool = False
     require_pre_ga_safe_capability_dispatch: bool = False
@@ -609,44 +611,25 @@ def validate_live_text_result(
         else:
             internal_diagnostics.append(message)
 
-    fast_speech = route.get("fast_speech") if isinstance(route, dict) else None
     fast_progress = _fast_progress_activities(summary)
-    legacy_fast_speech_present = (
-        isinstance(fast_speech, dict)
-        and bool(str(fast_speech.get("text") or "").strip())
-    )
-    if case.forbid_fast_speech and (
-        legacy_fast_speech_present or fast_progress
-    ):
-        errors.append("Core emitted forbidden pre-effect progress speech")
-    if case.require_fast_speech:
-        if legacy_fast_speech_present:
-            purpose = str(fast_speech.get("purpose") or "").strip()
-            if (
-                case.expected_fast_speech_purposes
-                and purpose not in case.expected_fast_speech_purposes
-            ):
-                errors.append(
-                    "fast_speech purpose mismatch: expected one of "
-                    f"{list(case.expected_fast_speech_purposes)!r}, got {purpose!r}"
-                )
-            if fast_speech.get("must_not_claim_completion") is not True:
-                errors.append(
-                    "fast_speech did not retain must_not_claim_completion=true"
-                )
-        elif fast_progress:
-            purposes = {
+    if case.forbid_fast_communicative_act and fast_progress:
+        errors.append("Planner emitted forbidden pre-effect Communicative Activity")
+    if case.require_fast_communicative_act:
+        if fast_progress:
+            speech_acts = {
                 str(item.get("speech_act") or "").strip()
                 for item in fast_progress
             }
             if (
-                case.expected_fast_speech_purposes
-                and not purposes.intersection(case.expected_fast_speech_purposes)
+                case.expected_fast_communicative_speech_acts
+                and not speech_acts.intersection(
+                    case.expected_fast_communicative_speech_acts
+                )
             ):
                 errors.append(
-                    "Fast progress Communicative Act purpose mismatch: expected one of "
-                    f"{list(case.expected_fast_speech_purposes)!r}, got "
-                    f"{sorted(purposes)!r}"
+                    "Fast Planner Communicative Act speech_act mismatch: expected one of "
+                    f"{list(case.expected_fast_communicative_speech_acts)!r}, got "
+                    f"{sorted(speech_acts)!r}"
                 )
             cognitive = summary.get("cognitive_runtime")
             metadata = (
@@ -663,12 +646,12 @@ def validate_live_text_result(
                 and realization_status != "planner_owned"
             ):
                 errors.append(
-                    "Fast progress Communicative Act was not retained as Planner-owned "
+                    "Fast Planner Communicative Act was not retained as Planner-owned "
                     "before execution"
                 )
         else:
             errors.append(
-                "Core omitted the required pending-work progress Communicative Act"
+                "Planner omitted the required pending-work Communicative Activity"
             )
 
     speech = _speech_text(summary)
@@ -986,10 +969,14 @@ def _text_scenario_case(
         allow_expressive_cues=bool(raw.get("allow_expressive_cues", True)),
         require_speech=bool(raw.get("require_speech", True)),
         expect_no_speech=bool(raw.get("expect_no_speech", False)),
-        require_fast_speech=bool(raw.get("require_fast_speech", False)),
-        forbid_fast_speech=bool(raw.get("forbid_fast_speech", False)),
-        expected_fast_speech_purposes=_tuple_of_strings(
-            raw.get("expected_fast_speech_purposes")
+        require_fast_communicative_act=bool(
+            raw.get("require_fast_communicative_act", False)
+        ),
+        forbid_fast_communicative_act=bool(
+            raw.get("forbid_fast_communicative_act", False)
+        ),
+        expected_fast_communicative_speech_acts=_tuple_of_strings(
+            raw.get("expected_fast_communicative_speech_acts")
         ),
         require_social_attention_opportunity=bool(
             raw.get("require_social_attention_opportunity", False)
@@ -1194,12 +1181,18 @@ def validate_manifest(
                         f"{ability.ability_id}/{case.case_id}: speech cannot be "
                         "both required and forbidden"
                     )
-                if case.require_fast_speech and case.forbid_fast_speech:
+                if (
+                    case.require_fast_communicative_act
+                    and case.forbid_fast_communicative_act
+                ):
                     errors.append(
-                        f"{ability.ability_id}/{case.case_id}: fast speech "
+                        f"{ability.ability_id}/{case.case_id}: Fast Planner Communicative Activity "
                         "cannot be both required and forbidden"
                     )
-                if case.forbid_fast_speech and case.expected_fast_speech_purposes:
+                if (
+                    case.forbid_fast_communicative_act
+                    and case.expected_fast_communicative_speech_acts
+                ):
                     errors.append(
                         f"{ability.ability_id}/{case.case_id}: forbidden fast "
                         "speech cannot declare expected purposes"

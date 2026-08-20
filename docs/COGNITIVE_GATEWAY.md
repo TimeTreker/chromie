@@ -67,7 +67,7 @@ voice / text / trusted interaction event
        deterministic validation and commitment
        agent, tool, memory, and embodied execution coordination
        outcome reconciliation against goal success criteria
-       final response composition
+       Planner-owned user-facing Communicative Activities
   -> trusted Trusted Capability Runtime / tools / memory / Soridormi
   -> execution evidence returned to the Core
   -> validated speech and optional social-attention delivery
@@ -222,7 +222,7 @@ The Cognitive Gateway does **not** own:
 - task decomposition, ordering, concurrency, or replanning;
 - tool, memory, or physical execution;
 - evaluation of whether execution satisfied a user goal;
-- final user-facing response composition, TTS wording, or social expression;
+- user-facing Communicative Activity authorship, TTS wording, or social expression;
 - authorization of ordinary side effects.
 
 Those responsibilities belong to the Goal-Driven Cognitive Core, deterministic
@@ -346,7 +346,7 @@ transport input
   -> host Cognitive Gateway
   -> immutable UserTurnEnvelope
   -> Agent-owned Goal Interpretation and Goal-Driven Cognitive Core
-  -> validated planning, execution, reconciliation, and response composition
+  -> validated planning, execution, reconciliation, and Planner communication
 ```
 
 The Gateway remains a narrow ingress boundary. Goal Interpretation emits a typed

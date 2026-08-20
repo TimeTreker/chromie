@@ -23,7 +23,7 @@ Planner Capability Activity
   -> ordered TTS realization
 ```
 
-There is no separate Tool Result Interpreter and no Response Composer. The
+There is no separate result-semantic or response-authoring stage between Planner and Runtime. The
 result cannot infer its Goal from provider fields, text similarity, location,
 or recency. Missing immutable Goal provenance fails closed.
 

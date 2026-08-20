@@ -377,3 +377,15 @@ class GoalAssociationResolution(BaseModel):
                 "Goal Association prompt projection exceeds 65536 UTF-8 bytes"
             )
         return projection
+
+
+def goal_association_fingerprint(resolution: GoalAssociationResolution) -> str:
+    """Stable fingerprint of one canonical Goal Association projection."""
+
+    payload = json.dumps(
+        resolution.prompt_projection(),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()

@@ -39,10 +39,8 @@ from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.execution_lanes import LaneCoordinationGroup
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.reflex import CancellationDirective, ReflexFilter
-from shared.chromie_contracts.response_composition import (
-    CoordinatedResponsePlan,
-    canonical_plan_fingerprint,
-)
+from shared.chromie_contracts.planner_response import PlannerResponseProjection
+from shared.chromie_contracts.plan import canonical_plan_fingerprint
 from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage
 
 
@@ -406,8 +404,8 @@ class MediaTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         )
-        composition = CoordinatedResponsePlan(
-            composition_id="speech-over-media-composition",
+        planner_response = PlannerResponseProjection(
+            projection_id="speech-over-media-planner_response",
             canonical_plan_id=plan.plan_id,
             canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
             canonical_plan=plan,
@@ -434,7 +432,7 @@ class MediaTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
         response = await adapter.build_response(
             plan=plan,
-            composition=composition,
+            planner_response=planner_response,
             session_id="media-session",
             language="en-US",
             context={},

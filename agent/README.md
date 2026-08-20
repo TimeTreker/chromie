@@ -8,7 +8,7 @@ microservice per cognitive role. The Cognitive Gateway itself remains Host-owned
 
 The service is **not** a second orchestration runtime. The retired `AgentRuntime`,
 `InteractionRuntime`, specialized semantic Agent pipeline, `/run`, `/interaction`,
-`/agents`, independent Response Composer, and Tool Result Interpreter compatibility
+`/agents`, independent response-authoring stage, and Tool Result Interpreter
 surfaces have been removed. Fast Planner owns Communicative Activities and receives
 trusted terminal Evidence re-entry. The Host Orchestrator owns turn coordination
 and the trusted asynchronous `CapabilityRuntime`; Soridormi remains an execution

@@ -92,9 +92,10 @@ def test_identity_oracle_and_pronoun_episode_follow_runtime_authorities() -> Non
     scenarios = {item["id"]: item for item in _load()["scenarios"]}
 
     identity = scenarios["daily.v1.identity_body.are_you_an_ai"]
-    assert "owner-approved first-person identity" in identity["primary_outcome"]
-    assert "Reject the AI-assistant label" in identity["primary_outcome"]
-    assert "preserve the exact configured name" in identity["primary_outcome"]
+    assert "six-year-old girl" in identity["primary_outcome"]
+    assert "not an AI assistant or robot" in identity["primary_outcome"]
+    assert "preserve her exact configured name" in identity["primary_outcome"]
+    assert "owner_approved_mind_profile" in identity["context"]["chromie_contract_basis"]
 
     pronoun = scenarios["daily.v1.multi_turn_continuity.pronoun_two_people"]
     assert pronoun["inputs"]["turns"][0].startswith("Chromie，")

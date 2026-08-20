@@ -358,7 +358,7 @@ The decomposition rule is:
 For physical handover, plan-level completion requires the resource state to establish
 both `resource_acquired` and `resource_delivered`. For information resources, the
 provider plan must establish acquisition of trusted information evidence; the
-resource contract may declare `final_delivery_owner=chromie_response_layer`, in
+resource contract may declare `final_delivery_owner=planner_communicative_activity`, in
 which case Host Evidence binding and Fast Planner own the final human delivery.
 
 This makes the boundary evolve naturally. If Soridormi currently advertises only

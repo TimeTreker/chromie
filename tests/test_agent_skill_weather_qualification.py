@@ -443,7 +443,7 @@ class AgentSkillWeatherQualificationTests(unittest.TestCase):
             report["qualification"]["provider_backed_weather_validated"]
         )
 
-    def test_stale_chongqing_fast_speech_fails_reference_qualification(self) -> None:
+    def test_stale_chongqing_progress_speech_fails_reference_qualification(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             identity, summary, events = self._fixture(root)

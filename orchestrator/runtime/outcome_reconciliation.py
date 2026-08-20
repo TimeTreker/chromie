@@ -30,9 +30,7 @@ from shared.chromie_contracts.interaction import (
     output_schema_declaration_error,
 )
 from shared.chromie_contracts.plan import CanonicalPlan
-from shared.chromie_contracts.response_composition import (
-    canonical_plan_fingerprint,
-)
+from shared.chromie_contracts.plan import canonical_plan_fingerprint
 
 
 _PRIMARY_PLAN_SOURCE = "goal_driven_canonical_plan"

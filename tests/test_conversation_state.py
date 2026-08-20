@@ -258,8 +258,8 @@ class ConversationStateTests(unittest.TestCase):
         self.assertEqual(recent[0]["responsibility_status"], "satisfied")
         self.assertEqual(recent[0]["work_status"], "done")
 
-    def test_fast_speech_completion_cannot_close_work_requiring_goal(self) -> None:
-        manager = ConversationStateManager(base_conversation_id="fast-speech-work")
+    def test_fast_communicative_delivery_cannot_close_work_requiring_goal(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="fast-communicative-work")
         manager.apply_semantic_task_operations_atomically(
             [
                 {
@@ -489,7 +489,7 @@ class ConversationStateTests(unittest.TestCase):
             "soridormi.nod_yes",
         )
 
-    def test_reused_fast_speech_is_not_recorded_as_a_second_assistant_turn(self) -> None:
+    def test_reused_fast_communicative_delivery_is_not_recorded_as_second_assistant_turn(self) -> None:
         manager = ConversationStateManager()
         manager.record_assistant_turn(
             "s1",

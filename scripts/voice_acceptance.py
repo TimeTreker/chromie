@@ -2950,8 +2950,7 @@ def build_metadata(args: argparse.Namespace, selected: list[str]) -> dict[str, A
                     if not BODY_CASES.intersection(selected)
                     else ["chat", "robot_action", "tool"]
                 ),
-                "fallback_policy": "fail_closed",
-                "legacy_semantic_fallback": False,
+                "failure_policy": "fail_closed_no_semantic_reentry",
             },
             "human_supervised_mode": args.mode == "supervised",
             "start_services": args.start_services,

@@ -1,47 +1,22 @@
 from __future__ import annotations
 
-import hashlib
-import json
-from typing import Annotated, Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .execution_lanes import LaneCoordinationGroup
 from .interaction import reject_forbidden_low_level_fields
-from .goal import GoalAssociationResolution
-from .plan import CanonicalPlan
+from .plan import CanonicalPlan, canonical_plan_fingerprint
 from .semantic_task import ResponsePlan, ResponseStage
 
-ResponseCompositionStatus = Literal["resolved", "model_unavailable", "invalid_input"]
-ResponseCompositionPhase = Literal["pre_execution"]
-def goal_association_fingerprint(resolution: GoalAssociationResolution) -> str:
-    payload = json.dumps(
-        resolution.prompt_projection(),
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    )
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
-
-def canonical_plan_fingerprint(plan: CanonicalPlan) -> str:
-    payload = json.dumps(
-        plan.prompt_projection(),
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    )
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
-
-class CoordinatedResponsePlan(BaseModel):
-    """Immutable task plan plus truthful user-facing response expression."""
+class PlannerResponseProjection(BaseModel):
+    """Mechanical projection of Planner-owned speech and lane coordination."""
 
     model_config = ConfigDict(extra="forbid")
 
     schema_version: int = Field(default=1, ge=1)
-    composition_id: str = Field(min_length=1)
-    phase: ResponseCompositionPhase = "pre_execution"
+    projection_id: str = Field(min_length=1)
     canonical_plan_id: str = Field(min_length=1)
     canonical_plan_fingerprint: str = Field(min_length=16)
     canonical_plan: CanonicalPlan
@@ -52,7 +27,7 @@ class CoordinatedResponsePlan(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator(
-        "composition_id",
+        "projection_id",
         "canonical_plan_id",
         "canonical_plan_fingerprint",
         "rationale",
@@ -81,10 +56,10 @@ class CoordinatedResponsePlan(BaseModel):
         ]
 
     @model_validator(mode="after")
-    def validate_coordination(self) -> "CoordinatedResponsePlan":
+    def validate_coordination(self) -> "PlannerResponseProjection":
         plan = self.canonical_plan
         if plan.disposition == "escalate":
-            raise ValueError("response composition requires a terminal canonical plan")
+            raise ValueError("planner response projection requires a terminal canonical plan")
         if self.canonical_plan_id != plan.plan_id:
             raise ValueError("canonical_plan_id must match the embedded immutable plan")
         expected_fingerprint = canonical_plan_fingerprint(plan)
@@ -119,7 +94,7 @@ class CoordinatedResponsePlan(BaseModel):
         ):
             missing = sorted(known_goals - covered_goals)
             raise ValueError(
-                "response composition does not cover all plan goals: " + ",".join(missing)
+                "planner response projection does not cover all plan goals: " + ",".join(missing)
             )
 
         coordination_by_id = {item.coordination_id: item for item in self.lane_coordination}
@@ -204,7 +179,7 @@ class CoordinatedResponsePlan(BaseModel):
         if plan.disposition == "execute":
             if self.response_plan.final is not None:
                 raise ValueError(
-                    "pre-execution response composition must not include a final stage"
+                    "pre-execution planner response projection must not include a final stage"
                 )
             allowed = {"none", "heard", "evaluating", "waiting_for_user"}
             for stage in stages:
@@ -219,7 +194,7 @@ class CoordinatedResponsePlan(BaseModel):
             execute_goals = set(plan.executable_goal_ids())
             clarify_goals = set(plan.waiting_goal_ids())
             if execute_goals and self.response_plan.final is not None:
-                raise ValueError("mixed pre-execution composition must not include a final stage")
+                raise ValueError("mixed pre-execution planner response must not include a final stage")
             allowed = {"none", "heard", "evaluating", "waiting_for_user"}
             for _, stage in phased_stages:
                 if set(stage.covers_goal_ids).intersection(execute_goals):
@@ -262,110 +237,4 @@ class CoordinatedResponsePlan(BaseModel):
                     "unavailable or refused plans cannot claim execution or completion"
                 )
 
-        return self
-
-
-class DirectResponseComposition(BaseModel):
-    """Planless composition for model-authored non-effectful speech Goals."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    schema_version: int = Field(default=1, ge=1)
-    composition_id: str = Field(min_length=1)
-    phase: Literal["direct"] = "direct"
-    goal_association_fingerprint: str = Field(min_length=16)
-    goal_association: GoalAssociationResolution
-    response_plan: ResponsePlan
-    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
-    rationale: str = ""
-    metadata: dict[str, Any] = Field(default_factory=dict)
-
-    @field_validator(
-        "composition_id",
-        "goal_association_fingerprint",
-        "rationale",
-        mode="before",
-    )
-    @classmethod
-    def normalize_text(cls, value: Any) -> Any:
-        return " ".join(value.strip().split()) if isinstance(value, str) else value
-
-    @field_validator("metadata")
-    @classmethod
-    def reject_low_level_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
-        return reject_forbidden_low_level_fields(value)
-
-    @model_validator(mode="after")
-    def validate_direct_composition(self) -> "DirectResponseComposition":
-        association = self.goal_association
-        if self.goal_association_fingerprint != goal_association_fingerprint(association):
-            raise ValueError("goal association fingerprint mismatch")
-        if association.associations:
-            raise ValueError("planless direct composition accepts only newly authored speech Goals")
-        goal_ids = [
-            str(goal.goal_id or "").strip()
-            for goal in association.new_goals
-            if str(goal.goal_id or "").strip()
-        ]
-        if not goal_ids:
-            raise ValueError("direct response composition requires canonical Goal IDs")
-        if any(
-            str((goal.metadata or {}).get("responsibility_kind") or "") != "vocal_output"
-            or str((goal.metadata or {}).get("output_mode") or "") != "speech"
-            or bool((goal.metadata or {}).get("provider_required"))
-            for goal in association.new_goals
-        ):
-            raise ValueError(
-                "planless direct composition is limited to ordinary speech Vocal Goals"
-            )
-        response = self.response_plan
-        if (
-            response.immediate is not None
-            or response.pre_action is not None
-            or response.progress
-            or response.final is None
-        ):
-            raise ValueError("direct response composition requires exactly one final speech stage")
-        final = response.final
-        if set(final.covers_goal_ids) != set(goal_ids):
-            raise ValueError("direct response must cover every spoken Goal exactly")
-        if final.commitment_state != "completed":
-            raise ValueError("direct response final stage must complete the spoken Goals")
-        if final.must_not_claim_completion:
-            raise ValueError(
-                "direct response final stage must permit completion of authored speech"
-            )
-        return self
-
-
-ResponseComposition = Annotated[
-    CoordinatedResponsePlan | DirectResponseComposition,
-    Field(discriminator="phase"),
-]
-
-
-class ResponseCompositionResolution(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    status: ResponseCompositionStatus
-    composition: ResponseComposition | None = None
-    reason_summary: str = ""
-    metadata: dict[str, Any] = Field(default_factory=dict)
-
-    @field_validator("reason_summary", mode="before")
-    @classmethod
-    def normalize_reason(cls, value: Any) -> Any:
-        return " ".join(value.strip().split()) if isinstance(value, str) else value
-
-    @field_validator("metadata")
-    @classmethod
-    def reject_low_level_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
-        return reject_forbidden_low_level_fields(value)
-
-    @model_validator(mode="after")
-    def validate_status(self) -> "ResponseCompositionResolution":
-        if self.status == "resolved" and self.composition is None:
-            raise ValueError("resolved response composition requires composition")
-        if self.status != "resolved" and self.composition is not None:
-            raise ValueError("non-resolved response composition must not carry composition")
         return self

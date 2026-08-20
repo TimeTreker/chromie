@@ -72,7 +72,7 @@ ORCH_OUTPUT_DEVICE=扬声器名称或编号
 4. 验证 Soridormi capability contract；
 5. 启动主机 Orchestrator，并打开麦克风和扬声器；
 6. 启用统一 Goal-driven Runtime，对 `chat,memory,robot_action,tool` 使用权威
-   `apply`，同时关闭旧 CapabilityAgent 语义回退。
+   `apply`；旧 CapabilityAgent 语义回退已经从维护架构中删除。
 
 看到下面的信息后即可说话：
 

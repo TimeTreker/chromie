@@ -39,8 +39,8 @@ The [Cognitive Gateway / 认知网关](../docs/COGNITIVE_GATEWAY.md) is the logi
 boundary between interaction transport and semantic cognition. It owns input
 normalization, deterministic protective reflexes, attention review, bounded
 context assembly, and turn admission. The Goal-Driven Cognitive Core owns
-ordinary intent and goal understanding, planning, execution coordination,
-outcome reconciliation, and final response composition.
+ordinary intent and goal understanding, Planner-owned communication/work,
+execution coordination, and outcome reconciliation.
 
 The frozen version 1 `UserTurnEnvelope`, shared deterministic reflex contract,
 host admission adapter, source/freshness context references, and local
@@ -111,10 +111,9 @@ ORCH_COGNITIVE_APPLY_LANES=chat,memory,robot_action,tool
 SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp
 ```
 
-`/interaction` remains a real strict compatibility API and uses native
-structured Agent output by default. It is not the maintained semantic planner
-when unified `apply` owns the turn. Legacy-adapter mode and validation fallback
-are explicit rollback controls.
+The maintained Host path uses the typed Goal Interpretation, Goal Association,
+Fast/Deep Planner, and Trusted Capability Runtime contracts directly. A retired
+Agent interaction endpoint is not a semantic rollback surface.
 
 Use `ORCH_ENABLE_SORIDORMI_CAPABILITIES=0` for speech-only rollout. Named body skills
 fail closed when their provider is disabled or unavailable.
@@ -125,32 +124,16 @@ to add or remove authorization. Interaction-level rules such as material
 alternatives and post-interrupt physical resume may still require fresh user
 confirmation regardless of the provider declaration.
 
-### Compatibility path
+### Maintained authority path
 
 ```text
-ASR -> Cognitive Gateway -> Goal-Driven Cognitive Core /run -> AgentResult
-  -> compatibility speech/actions -> TTS and optional mock hardware daemon
+ASR -> Cognitive Gateway -> Goal Interpretation -> Fast/Deep Planner
+    -> Trusted Capability Runtime / Vocal Runtime -> Evidence -> Planner re-entry
 ```
 
-This path remains for regression coverage and gradual migration. It must not be
-used to turn a failed named-capability request into an unvalidated low-level action.
-
-### Explicitly gated direct-conversation compatibility
-
-The emergency compatibility gates can authorize a speech-only Ollama streaming
-path for a legacy turn that has not entered a maintained Goal-driven apply lane:
-
-```text
-ASR -> Ollama -> TTS -> playback
-```
-
-This compatibility path produces speech only. It does not gain permission to
-invoke skills or hardware, and it is not ordinary degradation for maintained
-`apply` lanes. Once Goal-driven authority is selected, Goal Interpretation or
-later failure stays fail-closed and cannot enter this path. A legacy embodied or
-pending-task turn uses deterministic safe-fallback speech instead of generic
-conversation. Deterministic silence/unusable-input suppression runs before any
-compatibility decision, so suppressed input cannot fall through to the LLM.
+If the Goal-driven Runtime is disabled or fails after admission, ordinary cognition
+fails closed with bounded Host-owned failure speech. The Host never switches to a
+direct-LLM or retired Agent semantic path.
 
 ## Configuration precedence
 
@@ -242,7 +225,7 @@ but does not rewrite the sentence. Open answers and clarification acts follow
 the same ownership. Interaction Context,
 claim/evidence checks, cancellation, and playback lifecycle remain the
 deterministic delivery boundaries. Maintained turns do not fall back to the old
-Goal-Interpreter `fast_speech`, route, or intent compatibility contract.
+retired Goal-Interpreter response, route, or intent contract.
 
 Manual development start:
 

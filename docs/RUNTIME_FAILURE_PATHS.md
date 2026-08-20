@@ -39,7 +39,7 @@ claim successful silence or resumed delivery.
 
 Malformed optional or historical context may be omitted only when the caller
 still receives a complete typed result. Goal Association snapshots, discourse
-referents, compatibility route items, and legacy task-state fields now catch
+referents, stale advisory-route archive items, and historical task-state fields catch
 Pydantic validation failures narrowly and record debug or warning diagnostics.
 They do not catch arbitrary model, provider, cancellation, or execution errors.
 

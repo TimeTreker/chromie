@@ -1373,10 +1373,9 @@ def validate_resource_responsibility_capability_grounding(
     the already-authored Goal.
 
     ``resource_contract.plan_requires`` and ``plan_provides`` are public
-    composition facts. ``completion_requires`` remains provider-result evidence
-    for the exact capability. Legacy one-step full providers that predate
-    ``plan_provides`` remain accepted when their existing scope/contract already
-    declares the complete delivery responsibility.
+    planning facts. ``completion_requires`` remains provider-result evidence
+    for the exact Capability. Every maintained provider must declare its public
+    plan coverage explicitly; Planner does not infer missing provider contracts.
     """
 
     capability_by_id = {
@@ -1414,7 +1413,6 @@ def validate_resource_responsibility_capability_grounding(
         expected_kind: str,
         expected_delivery: str,
         expected_information_domain: str,
-        allow_legacy_full: bool,
     ) -> tuple[list[str], set[str], set[str], set[str], str]:
         scope, contract = capability_contract(candidate)
         errors: list[str] = []
@@ -1465,32 +1463,20 @@ def validate_resource_responsibility_capability_grounding(
         final_delivery_owner = " ".join(
             str(contract.get("final_delivery_owner") or "").strip().split()
         )
-        if (
-            not provides
-            and allow_legacy_full
-            and contract
-            and expected_delivery in delivery_modes
-        ):
-            # Backward compatibility for one-step providers from before the
-            # composition contract existed. Do not apply this inference to a
-            # multi-step plan because it would make every partial step look full.
-            provides = {"resource_acquired"}
-            if expected_kind == "physical_object":
-                provides.add("resource_delivered")
         if "resource_delivered" in provides and expected_delivery not in delivery_modes:
             errors.append(
                 "capability providing resource_delivered must declare "
                 f"delivery mode {expected_delivery!r}"
             )
         if (
-            final_delivery_owner == "chromie_response_layer"
+            final_delivery_owner == "planner_communicative_activity"
             and expected_delivery not in delivery_modes
         ):
             errors.append(
-                "response-layer delivery capability must declare "
+                "Planner-delivery Capability must declare "
                 f"delivery mode {expected_delivery!r}"
             )
-        if not provides and final_delivery_owner != "chromie_response_layer":
+        if not provides and final_delivery_owner != "planner_communicative_activity":
             errors.append("resource_contract.plan_provides is empty")
         return errors, requires, provides, delivery_modes, final_delivery_owner
 
@@ -1550,7 +1536,6 @@ def validate_resource_responsibility_capability_grounding(
                         expected_kind=expected_kind,
                         expected_delivery=expected_delivery,
                         expected_information_domain=expected_information_domain,
-                        allow_legacy_full=True,
                     )
                 )
                 if errors:
@@ -1564,7 +1549,7 @@ def validate_resource_responsibility_capability_grounding(
                     and (
                         expected_kind == "physical_object"
                         or "resource_delivered" in provides
-                        or final_delivery_owner == "chromie_response_layer"
+                        or final_delivery_owner == "planner_communicative_activity"
                     )
                 )
                 if individually_complete:
@@ -1583,7 +1568,7 @@ def validate_resource_responsibility_capability_grounding(
                         continue
                     reachable.update(provides)
                     response_delivery = response_delivery or (
-                        final_delivery_owner == "chromie_response_layer"
+                        final_delivery_owner == "planner_communicative_activity"
                     )
                     used.append(capability_id)
                     progressed = True
@@ -1623,7 +1608,6 @@ def validate_resource_responsibility_capability_grounding(
                     expected_kind=expected_kind,
                     expected_delivery=expected_delivery,
                     expected_information_domain=expected_information_domain,
-                    allow_legacy_full=len(owned_steps) == 1,
                 )
             )
             if errors:
@@ -1676,7 +1660,7 @@ def validate_resource_responsibility_capability_grounding(
                                 expected_kind == "physical_object"
                                 or "resource_delivered" in provides
                                 or final_delivery_owner
-                                == "chromie_response_layer"
+                                == "planner_communicative_activity"
                             )
                             else []
                         ),
@@ -1696,7 +1680,7 @@ def validate_resource_responsibility_capability_grounding(
                 )
             resource_state.update(provides)
             response_layer_delivery = response_layer_delivery or (
-                final_delivery_owner == "chromie_response_layer"
+                final_delivery_owner == "planner_communicative_activity"
             )
             selected_ids.append(step.capability_id)
 

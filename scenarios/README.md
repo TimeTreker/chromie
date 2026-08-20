@@ -22,14 +22,13 @@ python scripts/general_ability_acceptance.py --mode level-a
 criteria-based removal schedule in the Benchmark migration manifest. Neither it
 nor a Level A pass alone proves natural live robot behavior.
 
-Eligible planning/embodied pending-work regressions should assert the typed
-`fast_speech` object as well as the final route: purpose, non-terminal
-commitment, and `must_not_claim_completion=true`. Live-text cases can set
-`require_fast_speech=true` and `expected_fast_speech_purposes`. Tool routes may
-use the exact reviewed `acknowledge_and_check`/`checking_only` contract before a
-result; it carries no result or completion authority. Memory routes still set
-`forbid_fast_speech=true` until a commit exists. The Host's generic cache remains
-a separate fallback presentation path.
+Eligible planning/embodied pending-work regressions assert the typed Fast Planner
+progress Communicative Activity in `cognitive_runtime.fast_advance`. Live-text
+cases can set `require_fast_communicative_act=true` together with
+`expected_fast_communicative_speech_acts`, or set
+`forbid_fast_communicative_act=true` when pre-effect speech is not allowed.
+These assertions inspect Planner-owned semantic activity evidence rather than a
+separate Goal-Interpreter speech contract.
 
 Create and validate scenarios with:
 

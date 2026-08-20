@@ -361,7 +361,7 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                 )
                 self.assertEqual(
                     hints["resource_contract"]["final_delivery_owner"],
-                    "chromie_response_layer",
+                    "planner_communicative_activity",
                 )
 
     def test_information_domain_rejects_unrelated_current_read(self) -> None:
@@ -395,7 +395,7 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                 "resource_contract": {
                     "plan_requires": [],
                     "plan_provides": ["resource_acquired"],
-                    "final_delivery_owner": "chromie_response_layer",
+                    "final_delivery_owner": "planner_communicative_activity",
                 },
             },
         }
@@ -480,7 +480,12 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                                 "delivery_modes": ["physical_handover"],
                             },
                             "resource_contract": {
-                                "result_field": "resource_outcome"
+                                "result_field": "resource_outcome",
+                                "plan_requires": [],
+                                "plan_provides": [
+                                    "resource_acquired",
+                                    "resource_delivered",
+                                ],
                             },
                         },
                     },
@@ -628,31 +633,50 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
             {"const": "goal-resource"},
         )
 
-    def test_resource_capability_accepts_legacy_or_canonical_delivery_scope(self) -> None:
-        for scope in (
-            {
-                "responsibility_type": "acquire_and_deliver_resource",
-                "resource_kinds": ["physical_object"],
-                "delivery": "physical_handover",
+    def test_resource_capability_requires_explicit_plan_coverage(self) -> None:
+        canonical = {
+            "capability_id": "soridormi.acquire_and_deliver_resource",
+            "hints": {
+                "semantic_scope": {
+                    "responsibility_type": "acquire_and_deliver_resource",
+                    "resource_kinds": ["physical_object"],
+                    "delivery_modes": ["physical_handover"],
+                },
+                "resource_contract": {
+                    "result_field": "resource_outcome",
+                    "plan_requires": [],
+                    "plan_provides": [
+                        "resource_acquired",
+                        "resource_delivered",
+                    ],
+                },
             },
-            {
-                "responsibility_type": "acquire_and_deliver_resource",
-                "resource_kinds": ["physical_object"],
-                "delivery_modes": ["physical_handover"],
+        }
+        validate_resource_responsibility_capability_grounding(
+            self._planner_output("soridormi.acquire_and_deliver_resource"),
+            authoritative_goals=[self._resource_goal()],
+            capabilities=[canonical],
+        )
+
+        legacy_missing_coverage = {
+            "capability_id": "soridormi.acquire_and_deliver_resource",
+            "hints": {
+                "semantic_scope": {
+                    "responsibility_type": "acquire_and_deliver_resource",
+                    "resource_kinds": ["physical_object"],
+                    "delivery_modes": ["physical_handover"],
+                },
+                "resource_contract": {"result_field": "resource_outcome"},
             },
+        }
+        with self.assertRaisesRegex(
+            ResourceResponsibilityCapabilityUnavailableError,
+            "resource_contract.plan_provides is empty",
         ):
             validate_resource_responsibility_capability_grounding(
                 self._planner_output("soridormi.acquire_and_deliver_resource"),
                 authoritative_goals=[self._resource_goal()],
-                capabilities=[
-                    {
-                        "capability_id": "soridormi.acquire_and_deliver_resource",
-                        "hints": {
-                            "semantic_scope": scope,
-                            "resource_contract": {"result_field": "resource_outcome"},
-                        },
-                    }
-                ],
+                capabilities=[legacy_missing_coverage],
             )
 
 
@@ -909,6 +933,11 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                     "metadata": {
                         "resource_contract": {
                             "result_field": "resource_outcome",
+                            "plan_requires": [],
+                            "plan_provides": [
+                                "resource_acquired",
+                                "resource_delivered",
+                            ],
                         }
                     },
                 }

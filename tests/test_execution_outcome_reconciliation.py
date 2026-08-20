@@ -24,9 +24,7 @@ from shared.chromie_contracts.interaction import (
     CapabilityTrace,
 )
 from shared.chromie_contracts.plan import CanonicalPlan
-from shared.chromie_contracts.response_composition import (
-    canonical_plan_fingerprint,
-)
+from shared.chromie_contracts.plan import canonical_plan_fingerprint
 
 
 def output_schema(*properties: str) -> dict:

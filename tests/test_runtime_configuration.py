@@ -149,12 +149,6 @@ class RuntimeConfigurationTests(unittest.TestCase):
         )
         self.assertEqual(values["ORCH_ADDRESSEDNESS_GATE_ENABLED"], "1")
         self.assertEqual(values["ORCH_ADDRESSEDNESS_ENGAGEMENT_TIMEOUT_SEC"], "45")
-        self.assertEqual(
-            values[
-                "ORCH_AGENT_GOAL_INTERPRETER_GENERATED_FAST_SPEECH_ENABLED"
-            ],
-            "1",
-        )
         self.assertEqual(values["ORCH_ENABLE_INTERACTION_RESPONSE"], "1")
         self.assertEqual(values["ORCH_ENABLE_SORIDORMI_CAPABILITIES"], "0")
         self.assertEqual(values["TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC"], "3")

@@ -692,7 +692,7 @@ a `ModelObservation` through a deterministic projection that:
   truncation or redaction flags.
 
 Only that bounded observation may reach Core reconciliation, replanning, or
-response composition. The retained audit record preserves the validation and
+Planner-authored result communication. The retained audit record preserves the validation and
 projection decision plus a content digest under the evidence-retention policy;
 it does not make raw secrets model-visible. Schema failure, projection failure,
 or an empty required observation fails closed as `observation_unavailable`.
@@ -718,8 +718,8 @@ The first early speech contract is an independently worded, typed Fast-Planner
 Communicative Act.
 The Host may schedule that Activity as soon as its provider-free claim/effect boundaries,
 turn correlation, cancellation generation, and Vocal transport contract validate; it
-need not wait for Goal Association or unrelated later response fields. The old Goal-Interpreter `fast_speech`/`native_response` contracts are removed;
-there is no parallel legacy early-speech path beside Fast Planner Activity.
+need not wait for Goal Association or unrelated later response fields. Goal
+Interpretation has no parallel early-speech contract beside Fast Planner Activity.
 
 Current-turn Communicative-Act reuse is correlated by the exact speech-event
 ID together with its turn, structured stage, purpose, route, intent,
@@ -756,7 +756,7 @@ later association refreshes continuity after the association already occupying t
 boundary commits. Refreshed dialogue is causally cut at the current admitted turn,
 so later speech can inform a follow-up but can never flow backward into an earlier turn.
 After canonical Goal IDs exist, Runtime projects only Interaction Ledger events
-bound to those Goals plus explicitly unbound Fast speech from the same turn. Fast
+bound to those Goals plus explicitly unbound Fast Planner Communicative Activities from the same turn. Fast
 Planner, Deep Planner, and other later cognitive stages receive the bounded
 Goal-scoped projection to decide the
 still-needed delta. Scheduled speech remains distinct from audible speech,
@@ -1015,7 +1015,7 @@ Failures remain attributed to their earliest responsible boundary:
 - deterministic validation or authorization;
 - Agent/tool/provider execution;
 - outcome correlation and reconciliation;
-- final response composition or delivery.
+- final Planner communication or delivery.
 
 ## 11. Observability
 
@@ -1060,7 +1060,7 @@ The contract-first loop baseline is implemented:
 5. `ExecutionOutcomeBundle` joins results and traces to the immutable plan,
    retains exact per-goal states, and commits them to goal state;
 6. bounded schema-validated `ModelObservation` values are the only provider
-   payloads visible to outcome response composition;
+   payloads visible to Planner post-Evidence communication;
 7. ordinary overlapping turns retain independent lifecycle identity, while
    explicitly cancelled, superseded, stale-output, or recovery-waiting turns
    retain their evidence and suppress only invalid late final speech;
@@ -1096,7 +1096,7 @@ Required Level A cases include:
 - a timeout, refusal, cancellation, or stop never becomes completion;
 - an unknown goal, step, request, evidence ID, or stale fingerprint fails
   closed;
-- final response composition emits no skill or action;
+- final Communicative Activity emits no skill or action;
 - an independent ordinary newer turn does not cancel earlier work;
 - explicit deterministic or Core-authorized interruption suppresses stale final
   speech only within its effective scope;

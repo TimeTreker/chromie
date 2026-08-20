@@ -5432,7 +5432,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "resource_contract": {
                         "plan_requires": [],
                         "plan_provides": ["resource_acquired"],
-                        "final_delivery_owner": "chromie_response_layer",
+                        "final_delivery_owner": "planner_communicative_activity",
                     },
                 },
             )

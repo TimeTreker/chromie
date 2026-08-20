@@ -422,7 +422,7 @@ claims, and completion restriction. Generated or queued speech is not delivery
 evidence. Only playback-started or playback-completed state satisfies the
 audible act. A later response stage may reference a queued event without
 resynthesizing it; if that exact event becomes `not_delivered`, Runtime may
-fulfill the same act once. Fast speech scheduled before GA finishes retains only
+fulfill the same act once. A Fast Planner Communicative Activity scheduled before GA finishes retains only
 GI Responsibility refs until GA binds it; Goal-bound speech cannot be reassigned
 to unrelated work. Literal text
 equality is only a payload-integrity check and never decides whether two
@@ -505,8 +505,8 @@ control: the safe effect happens first, without waiting for model reasoning,
 and the control outcome remains available to later cognition and response.
 
 The Goal-Driven Cognitive Core owns goal association and meaning, independent
-goal segmentation, planning, semantic agent/tool coordination, outcome
-reconciliation, and response composition. It should use the live tool and skill
+goal segmentation, planning, semantic agent/tool coordination, Planner-authored
+communication, and outcome reconciliation. It should use the live tool and skill
 catalog as affordance grounding, not phrase tables. Catalog presence does not
 justify weak substitution: a capability may be selected only when user meaning
 and required arguments are sufficiently supported.
@@ -593,7 +593,7 @@ bounded, small-output phase to author the exact immediately realizable Communica
 Activity. As soon as the bounded accept/reject qualification finishes, the same Planner continues Capability,
 input-completeness, and clarification planning while GA begins concurrently from the
 same immutable GI result. This is one Fast Planner with phased readiness, not a
-Response Composer or a Host acknowledgement template. Once a nontrivial
+second response-authoring stage or a Host acknowledgement template. Once a nontrivial
 Goal is sufficiently understood and still requires downstream work before a substantive
 answer or effect, it should normally author one typed, non-terminal progress Activity so
 the person knows Chromie got the Goal and is taking it forward. This is a polite progress notification, not Social
@@ -604,8 +604,8 @@ already delivered or pending, the user asked for silence, or another utterance w
 only repeat or add empty chatter. Fast Planner owns this HOW decision and its exact
 prospective wording. A pre-evidence progress Activity carries
 `truth_stage=pre_evidence`, no Evidence references, and wording that can acknowledge
-or prospectively describe the check but cannot state its result. The removed
-Goal-Interpreter `fast_speech`/`native_response` path is not accepted as compatibility.
+or prospectively describe the check but cannot state its result. Goal Interpretation
+has no response-authoring contract.
 Before Runtime commits that immutable Activity, Fast Planner performs one bounded
 same-owner Epistemic Qualification over its wording, truth stage, Responsibility facts,
 and admitted Evidence. The check returns accept or reject only. It cannot rewrite,
@@ -1018,7 +1018,7 @@ capability recovery:
 | `你能查天信吗？` | Clarify what the user means; do not treat `天信` as `天气`; no weather lookup; no `checking_only` TTS. |
 | `重庆今天天气情况怎么样？` | Weather tool route when `chromie.weather.lookup` is available; short Chinese acknowledgement; weather result later. |
 | `往前走个15秒。` | Catalog-backed physical proposal path for the exact walk skill when available; no direct hardware command; no internal fallback sentence. |
-| `walk forward for 15 seconds quickly` | Preserve duration and speed semantics; CapabilityAgent/Soridormi may bound or request confirmation. |
+| `walk forward for 15 seconds quickly` | Preserve duration and speed semantics; Planner, trusted Runtime, and Soridormi may bound or request confirmation according to their owned contracts. |
 | `B.` | Clarify; do not blink or execute a weakly related skill. |
 | unsupported physical request | Short localized refusal or clarification; no fake execution claim. |
 

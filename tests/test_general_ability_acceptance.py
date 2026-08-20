@@ -80,11 +80,11 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             text="今天北京下雨了没有？",
             expected_routes=("tool",),
             require_speech=False,
-            require_fast_speech=True,
-            expected_fast_speech_purposes=("acknowledge_and_check",),
+            require_fast_communicative_act=True,
+            expected_fast_communicative_speech_acts=("acknowledge_and_check",),
         )
         summary = {
-            "route": {"route": "tool", "fast_speech": None},
+            "route": {"route": "tool"},
             "interaction_response": {"speech": [], "capabilities": []},
             "preview_only": True,
             "cognitive_runtime": {},
@@ -93,11 +93,16 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         missing = validate_live_text_result(case, summary)
         self.assertTrue(any("omitted" in item for item in missing))
 
-        summary["route"]["fast_speech"] = {
-            "text": "我看看北京今天会不会下雨。",
-            "purpose": "acknowledge_and_check",
-            "commitment": "checking_only",
-            "must_not_claim_completion": True,
+        summary["cognitive_runtime"]["fast_advance"] = {
+            "activities": [
+                {
+                    "activity_id": "a1",
+                    "role": "progress",
+                    "speech_act": "acknowledge_and_check",
+                    "progress_kind": "check_information",
+                    "source_responsibility_refs": ["r1"],
+                }
+            ]
         }
         self.assertEqual(validate_live_text_result(case, summary), [])
 
@@ -106,8 +111,8 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             case_id="weather",
             text="哎，今天上午重庆会不会下雨？",
             require_speech=False,
-            require_fast_speech=True,
-            expected_fast_speech_purposes=("acknowledge_and_check",),
+            require_fast_communicative_act=True,
+            expected_fast_communicative_speech_acts=("acknowledge_and_check",),
         )
         summary = {
             "interaction_response": {"speech": [], "capabilities": []},
@@ -374,45 +379,35 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             self.assertTrue((packet / "SHA256SUMS").is_file())
             self.assertEqual(metadata["file_count"], 6)
 
-    def test_live_validation_can_forbid_pre_effect_fast_speech(self) -> None:
+    def test_live_validation_can_forbid_pre_effect_communicative_act(self) -> None:
         case = TextScenarioCase(
             case_id="weather",
             text="今天北京下雨了没有？",
             expected_routes=("tool",),
             require_speech=False,
-            forbid_fast_speech=True,
+            forbid_fast_communicative_act=True,
         )
         summary = {
-            "route": {
-                "route": "tool",
-                "fast_speech": {
-                    "text": "北京今天已经下雨了。",
-                    "purpose": "acknowledge_and_check",
-                    "commitment": "checking_only",
-                    "must_not_claim_completion": True,
-                },
-            },
+            "route": {"route": "tool"},
             "interaction_response": {"speech": [], "capabilities": []},
             "preview_only": True,
-            "cognitive_runtime": {},
-        }
-
-        errors = validate_live_text_result(case, summary)
-        self.assertTrue(any("forbidden pre-effect" in item for item in errors))
-
-        summary["route"]["fast_speech"] = None
-        self.assertEqual(validate_live_text_result(case, summary), [])
-
-        summary["cognitive_runtime"]["fast_advance"] = {
-            "activities": [
-                {
-                    "role": "progress",
-                    "speech_act": "acknowledge_and_check",
+            "cognitive_runtime": {
+                "fast_advance": {
+                    "activities": [
+                        {
+                            "role": "progress",
+                            "speech_act": "acknowledge_and_check",
+                        }
+                    ]
                 }
-            ]
+            },
         }
+
         errors = validate_live_text_result(case, summary)
         self.assertTrue(any("forbidden pre-effect" in item for item in errors))
+
+        summary["cognitive_runtime"]["fast_advance"] = {"activities": []}
+        self.assertEqual(validate_live_text_result(case, summary), [])
 
     def test_live_validation_can_require_complete_silence(self) -> None:
         case = TextScenarioCase(
@@ -420,7 +415,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             text="别说话，过来。",
             require_speech=False,
             expect_no_speech=True,
-            forbid_fast_speech=True,
+            forbid_fast_communicative_act=True,
         )
         summary = {
             "interaction_response": {"speech": [], "capabilities": []},
@@ -443,14 +438,14 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         }
         self.assertEqual(validate_live_text_result(case, summary), [])
 
-    def test_manifest_rejects_contradictory_fast_speech_policy(self) -> None:
+    def test_manifest_rejects_contradictory_fast_communicative_act_policy(self) -> None:
         manifest = load_manifest(DEFAULT_MANIFEST)
         ability = manifest.ability_classes[0]
         contradictory = TextScenarioCase(
             case_id="contradictory",
             text="Check something.",
-            require_fast_speech=True,
-            forbid_fast_speech=True,
+            require_fast_communicative_act=True,
+            forbid_fast_communicative_act=True,
         )
         patched_ability = replace(
             ability,

@@ -2212,15 +2212,6 @@
       ]
     },
     {
-      "boolean": true,
-      "category": "profile_constant",
-      "key": "ORCH_AGENT_GOAL_INTERPRETER_GENERATED_FAST_SPEECH_ENABLED",
-      "owners": [
-        ".env.common",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
       "boolean": false,
       "category": "profile_constant",
       "key": "ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS",
@@ -4231,12 +4222,12 @@
     "category_counts": {
       "acceptance_override": 37,
       "bounded_compatibility_alias": 0,
-      "profile_constant": 142,
+      "profile_constant": 141,
       "public_choice": 9,
       "service_internal": 218
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 406
+    "total_keys": 405
   }
 }

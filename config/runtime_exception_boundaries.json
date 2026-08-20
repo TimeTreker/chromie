@@ -1040,7 +1040,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "b1cda33ae1bfd6c54b9d5801b3c49fe844a4ca49383af4c9070ce21a704f2b12",
+      "body_sha256": "8511ee3efd25be51e384a702666d17c717ce7bd6e81a61c10bedb7e7da49e228",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -1252,7 +1252,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "91c61be3ea85ab9b60e1d618cf7a2708d0e3769449332f5bc649d5e86fe82250",
+      "body_sha256": "a6e19c4042bd53ffdfc15a65f36e94a82578c98508669c15448970ff23709eaf",
       "failure_signals": [
         "return"
       ]
@@ -1470,6 +1470,19 @@
       "contract": "Log an optional delivered-speech recorder failure without changing the already-completed Vocal execution or crashing Runtime.",
       "review_status": "reviewed",
       "body_sha256": "256b8fd73cab768931861de8a9ad6077696170845b32b0f2eec36d8c1c39b001",
+      "failure_signals": [
+        "diagnostic"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/interaction_coordinator.py",
+      "symbol": "InteractionRuntimeCoordinator.bind_fast_planner_communicative_execution.reconcile_completion",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator.interaction_runtime",
+      "contract": "Log an optional canonical-Goal completion recorder failure without changing the already-completed Vocal execution or its delivery evidence.",
+      "review_status": "reviewed",
+      "body_sha256": "080156970b38fd0db18a99b6507fd8cc28dbe1d6847f9ee2e413d6253c604174",
       "failure_signals": [
         "diagnostic"
       ]

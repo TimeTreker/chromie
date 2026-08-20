@@ -20,16 +20,16 @@ User request
   -> Goal Association resolves the user's responsibility and continuity
   -> Fast or terminal Deep Planner selects an exact registered Capability
   -> Trusted Capability Runtime validates and invokes the owning Provider
-  -> exact result evidence is reconciled to the source Goal and Plan
-  -> model-owned response composition reports the grounded outcome
+  -> exact result Evidence is reconciled to the source Goal and Plan
+  -> Fast Planner re-enters with trusted Evidence and authors the grounded result Communicative Activity
 ```
 
-Before Goals and Plans exist, eligible slow work may use one reviewed natural
-fast acknowledgement with `claim_state=none` and no claimed Goal or Capability
-IDs. Tool Capabilities may use only `acknowledge_and_check` with
-`checking_only`; memory speech waits for commit. An optional generic Host cue
-may cover latency without claiming selection, execution, evidence, or a commit.
-Every cognitive stage follows the same still-needed-delta rule. For a safe-read
+Before canonical Goal identity exists, Fast Planner may author one prospective
+Communicative Activity grounded only in GI Responsibility evidence and its current
+truth stage. It must not claim Capability selection, execution, result Evidence, or
+Goal completion. The Host may transport only that exact validated Activity; it does
+not author a generic semantic acknowledgement. Every cognitive re-entry follows the
+same still-needed-delta rule. For a safe-read
 or other executable Plan, an equivalent audible or pending acknowledgement is
 referenced by exact speech-event identity rather than repeated. If no equivalent
 act exists, a Planner may author one new prospective
@@ -94,8 +94,8 @@ feature.
    - Add `llm_hints.tool_name`, `llm_hints.semantic_type`,
      `llm_hints.semantic_scope`, `llm_hints.when_to_use`, and any compact
      guidance that helps model-owned interpretation and planning understand the
-     Capability without phrase examples. Add `fast_speech_guidance` only when the capability needs
-     capability-specific pre-result acknowledgement constraints.
+     Capability without phrase examples. Add `pre_execution_speech_guidance` only when the Capability needs
+     compact pre-result truth constraints for a Planner Communicative Activity.
 
 4. **Bind execution to the owning Provider.**
    - The execution adapter must require an exact plan-selected `capability_id`

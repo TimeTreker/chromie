@@ -87,8 +87,6 @@ def audit() -> dict[str, Any]:
             errors.append(f"Orchestrator still contains removed semantic rollback surface: {forbidden}")
 
     cognitive_runtime = _read("orchestrator/runtime/cognitive_runtime.py")
-    if 'fallback_policy: Literal["fail_closed"] = "fail_closed"' not in cognitive_runtime and 'fallback_policy: str = "fail_closed"' not in cognitive_runtime:
-        errors.append("Goal-driven runtime code default is not fail-closed")
     if '"legacy_fallback"' in cognitive_runtime:
         errors.append("Goal-driven runtime still declares a legacy_fallback status")
 

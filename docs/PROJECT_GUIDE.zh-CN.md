@@ -56,8 +56,8 @@ Soridormi 负责：
 
 已完成的开发基础包括：
 
-- 原生严格 `/interaction`；
-- Goal Association、Fast/Deep Planner、Response Composition 与统一主机协调器；
+- Host 驱动的 Gateway/Core/Planner 原生交互闭环；
+- Goal Association、Fast/Deep Planner（含 Communicative Activity）与统一主机协调器；
 - 公共安全配置对 `chat,memory,tool` 使用权威 `apply`，维护的 Soridormi 启动器在启用可信
   Provider 后把权威范围扩大到 `chat,memory,robot_action,tool`；
 - 请求绑定的口头确认与拒绝；
@@ -68,10 +68,10 @@ Soridormi 负责：
 - 证据校验与 preview-only 开发制品打包工具。
 
 RTX 5090 参考主机上的 GPU smoke、synthetic 七场景和 PipeWire virtual-mic
-七场景均曾通过并保留历史证据。文本输入经旧 `/interaction` 路径、可信
-Skill Runtime、Soridormi MCP 到 MuJoCo 的 walk/nod/turn 链路也有历史证据。
-这些证据只对其记录的源码与旧语义路径有效，不能证明当前统一 Goal-driven
-Runtime。仍须在干净、匹配的 Chromie 与 Soridormi checkout 上重新运行，
+七场景均曾通过并保留历史证据。旧版本通过 Agent `/interaction`、可信
+Skill Runtime、Soridormi MCP 到 MuJoCo 的 walk/nod/turn 链路也保留了历史证据；
+该接口现已退休。那些证据只对其记录的源码与旧语义路径有效，不能证明当前统一
+Goal-driven Runtime。仍须在干净、匹配的 Chromie 与 Soridormi checkout 上重新运行，
 记录 `apply`、完成、`sim` 模式与 safe-idle 证据。
 
 acoustic 模式使用 TTS 生成语音，通过主机扬声器播放并由配置的输入设备采集，

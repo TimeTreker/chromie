@@ -20,9 +20,7 @@ from shared.chromie_contracts.reflex import (
     CancellationDirective,
     CancellationDispatchReceipt,
 )
-from shared.chromie_contracts.response_composition import (
-    canonical_plan_fingerprint,
-)
+from shared.chromie_contracts.plan import canonical_plan_fingerprint
 
 
 class ActiveGoalCancellationRequiresRuntimeDispatch(ValueError):
@@ -346,7 +344,7 @@ def _build_confirmation_remainder(
                     "confirmation_remainder": True,
                     "replaces_confirmation_id": pending.confirmation_id,
                     "cancelled_goal_ids": sorted(target_goal_ids),
-                    "response_composition_superseded": True,
+                    "planner_response_projection_superseded": True,
                 },
             },
         )

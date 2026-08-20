@@ -7,7 +7,7 @@ criteria; current implementation and evidence state live in
 The current focus is a **Goal-driven single semantic authority**. The Cognitive
 Gateway owns ingress, protective reflexes, and attention admission. The
 Goal-driven Cognitive Core owns ordinary semantic interpretation, goal
-association, planning, response composition, and outcome reconciliation.
+association, Planner-authored communication/work, and outcome reconciliation.
 Provider and Host boundaries remain the only authorities for effects.
 The core embodied target is a qualified simulator provider. Chromie's cognition
 must remain backend-neutral; physical-robot commissioning is optional
@@ -69,15 +69,14 @@ Next design/implementation order:
    one immediate safe Communicative Act and typed continuation dispositions for
    Goal Association and/or Deep Planner. Goal Association remains the only canonical
    Goal-continuity authority; commitment-bearing Capability work still requires
-   applicable canonical Goal grounding and trusted validation. Retired Goal-Interpreter
-   `native_response`/`fast_speech` compatibility vocabulary is not part of the
-   maintained path. A Communicative Activity contains function, exact wording,
-   timing, truth/evidence provenance, and constraints. The Host validates and
-   schedules it mechanically before Vocal/TTS delivery; there is no independent
-   Response Composer semantic owner.
+   applicable canonical Goal grounding and trusted validation. Goal Interpretation
+   has no speech or response contract. A Communicative Activity contains function,
+   exact wording, timing, truth/evidence provenance, and constraints. The Host validates
+   and schedules it mechanically before Vocal/TTS delivery; there is no second
+   response-authoring semantic owner.
 3. **Planner-owned communication and Evidence re-entry — implemented and source-guarded.**
-   The duplicate Response Composer and Tool Result Interpreter semantic stages are
-   removed. Trusted Runtime/Host binds terminal Evidence through immutable request
+   Planner is the only ordinary response semantic owner. Trusted Runtime/Host binds
+   terminal Evidence through immutable request
    provenance to exact Goal IDs, then reactivates Fast Planner with a bounded,
    version-consistent Goal/Evidence snapshot. Fast Planner chooses answer,
    follow-up Work, clarification, or silence. Social Attention remains optional
@@ -446,23 +445,23 @@ Exit criteria:
   remains part of the next model-profile qualification and must distinguish
   source completion from target evidence.
 
-### Semantic authority closure
+### Semantic authority closure — source complete
 
-- Keep `chat`, `memory`, `tool`, and trusted `robot_action` turns on the
-  Goal-driven apply path for profiles that enable those lanes.
-- Fail closed when a mapped lane is disabled or unsupported; do not resume the
-  legacy Agent planner for the same turn.
-- Keep emergency compatibility endpoints disabled by default and protected by
-  service and per-turn authority gates.
-- Remove the remaining compatibility planner only after retained replay and live
-  evidence show no required rollback dependency.
+- `apply` is the only maintained authoritative semantic path.
+- `report_only` is observer-only and `off` is diagnostic fail-closed disablement.
+- GI owns WHAT; Goal Association owns canonical Goal continuity; Fast/Deep Planner
+  own HOW and exact Communicative Activities.
+- Runtime derives the execution lane mechanically from the terminal Plan and fails
+  closed when that lane is unsupported or disabled.
+- Retired Agent `/run`, `/interaction`, `/agents`, CapabilityAgent, direct-LLM,
+  route/intent, and emergency semantic fallback surfaces are not rollback options.
 
 Exit criteria:
 
-- the semantic-authority matrix has exactly one owner per entry point;
-- excluded lanes produce typed no-action outcomes;
+- the semantic-authority matrix has exactly one owner per maintained entrypoint;
+- unsupported/disallowed terminal Plan lanes produce typed no-action outcomes;
 - no authoritative failure enters another semantic planner;
-- current docs and profiles describe the same lane policy.
+- current docs, profiles, and source describe the same authority and lane policy.
 
 ### Goal-scoped Interaction Ledger and current-turn continuity
 
@@ -482,9 +481,9 @@ Exit criteria:
 - replay cannot change an immutable event, and terminal Activity entries require
   trusted execution evidence references;
 - Goal Association receives bounded recent Interaction Context and later
-  planners/composition receive the Goal-scoped projection so they can produce
+  Planners receive the Goal-scoped projection so they can produce
   only the still-needed delta;
-- Fast speech scheduled before GA finishes retains GI Responsibility refs and is
+- A Fast Planner Communicative Activity scheduled before GA finishes retains GI Responsibility refs and is
   later bound only through GA-owned canonical Goal identity;
 - Goal-bound speech cannot be reused for unrelated Goals or a different Plan;
 - scheduled and delivered speech remain distinct, and neither proves Activity

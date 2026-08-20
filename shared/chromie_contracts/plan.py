@@ -1212,3 +1212,15 @@ class CanonicalPlan(BaseModel):
                         + ",".join(sorted(unsupported))
                     )
         return self
+
+
+def canonical_plan_fingerprint(plan: CanonicalPlan) -> str:
+    """Stable fingerprint of the immutable CanonicalPlan prompt projection."""
+
+    payload = json.dumps(
+        plan.prompt_projection(),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()

@@ -862,78 +862,14 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
 
 
-    def test_dynamic_fast_speech_uses_typed_claim_authority_not_wording_rules(self) -> None:
-        # The Host applies transport checks only; semantic wording is reviewed
-        # by the Cognitive Core and represented by typed claim provenance.
+    def test_immediate_planner_speech_host_check_is_transport_only(self) -> None:
         self.assertEqual(
             VoiceAssistant._safe_immediate_route_speech("I finished it."),
             "I finished it.",
         )
         self.assertIsNone(
-            VoiceAssistant._validated_fast_speech_payload_text(
-                {
-                    "text": "I finished it.",
-                    "purpose": "acknowledge",
-                    "commitment": "prelude_only",
-                    "claim_state": "completed",
-                    "claimed_capability_ids": [],
-                    "claimed_goal_ids": [],
-                    "must_not_claim_completion": True,
-                }
-            )
+            VoiceAssistant._safe_immediate_route_speech("soridormi.walk_forward")
         )
-        self.assertIsNone(
-            VoiceAssistant._validated_fast_speech_payload_text(
-                {
-                    "text": "I can do that.",
-                    "purpose": "acknowledge",
-                    "commitment": "prelude_only",
-                    "claim_state": "none",
-                    "claimed_capability_ids": ["soridormi.walk_forward"],
-                    "claimed_goal_ids": [],
-                    "must_not_claim_completion": True,
-                }
-            )
-        )
-
-    def test_memory_fast_speech_accepts_typed_precommit_acknowledgement(self) -> None:
-        self.assertEqual(
-            VoiceAssistant._validated_fast_speech_payload_text(
-                {
-                    "text": "Okay, I will remember it.",
-                    "purpose": "acknowledge",
-                    "commitment": "prelude_only",
-                    "claim_state": "none",
-                    "claimed_capability_ids": [],
-                    "claimed_goal_ids": [],
-                    "must_not_claim_completion": True,
-                }
-            ),
-            "Okay, I will remember it.",
-        )
-
-    def test_tool_fast_speech_accepts_typed_pre_result_acknowledgement(self) -> None:
-        self.assertEqual(
-            VoiceAssistant._validated_fast_speech_payload_text(
-                {
-                    "text": "Let me check the weather.",
-                    "purpose": "acknowledge_and_check",
-                    "commitment": "checking_only",
-                    "claim_state": "none",
-                    "claimed_capability_ids": [],
-                    "claimed_goal_ids": [],
-                    "must_not_claim_completion": True,
-                }
-            ),
-            "Let me check the weather.",
-        )
-
-
-
-
-
-
-
 
 
     async def test_interaction_speech_reuses_fast_first_audio_without_resynthesis(self) -> None:
@@ -979,7 +915,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["playback_started"])
         self.assertEqual(result["order"], 5)
 
-    async def test_undelivered_fast_speech_is_fulfilled_once_by_reused_stage(self) -> None:
+    async def test_undelivered_fast_communicative_act_is_fulfilled_once_by_reused_stage(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.playback_start_waiters = {}
         assistant._turn_speech_events = {}

@@ -86,7 +86,6 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         assistant.cognitive_runtime_mode = "apply"
         assistant.enable_agent = True
         assistant.enable_interaction_response = True
-        assistant.cognitive_fallback_policy = "fail_closed"
         assistant.cognitive_apply_lanes = frozenset({"chat", "memory", "robot_action", "tool"})
         assistant.fast_first_response_enabled = False
         assistant.conversation_state = _State()

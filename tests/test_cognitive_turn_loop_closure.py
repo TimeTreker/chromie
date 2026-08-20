@@ -25,9 +25,7 @@ from shared.chromie_contracts.interaction import (
     output_schema_sha256,
 )
 from shared.chromie_contracts.plan import CanonicalPlan
-from shared.chromie_contracts.response_composition import (
-    canonical_plan_fingerprint,
-)
+from shared.chromie_contracts.plan import canonical_plan_fingerprint
 
 _TEST_OUTPUT_SCHEMA = {
     "type": "object",

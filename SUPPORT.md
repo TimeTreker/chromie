@@ -28,7 +28,7 @@ GPU path works.
 - Chromie revision;
 - selected hardware profile and GPU model;
 - operating system, Docker, driver, and Python versions;
-- deployment mode: compatibility voice, structured speech-only, MuJoCo, or
+- active operator mode and whether the run is speech-only, MuJoCo, or a
   hardware experiment;
 - exact command and sanitized logs;
 - whether the problem reproduces with all experimental feature gates off.

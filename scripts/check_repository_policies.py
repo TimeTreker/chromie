@@ -773,51 +773,6 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
             ),
             "the static ability ontology may describe responsibility but may not author user-facing speech",
         ),
-        "agent/app/agents/speaker.py": (
-            RULE_HOST_SEMANTIC_AUTHORITY,
-            (
-                "def _default_speech",
-                "Please confirm that action first.",
-                "What should I remember?",
-                "What do you mean?",
-                "I understand.",
-            ),
-            "SpeakerAgent may normalize model-authored speech but may not invent route-specific wording",
-        ),
-        "agent/app/agents/memory.py": (
-            RULE_HOST_SEMANTIC_AUTHORITY,
-            (
-                "I will remember that.",
-                "What should I remember?",
-                "我记下了。",
-                "你想让我记住什么？",
-            ),
-            "MemoryAgent may apply typed model proposals but may not author acknowledgement or clarification speech",
-        ),
-        "agent/app/agents/conversation.py": (
-            RULE_HOST_SEMANTIC_AUTHORITY,
-            (
-                "def _fallback_reply",
-                "I am still working on the previous task.",
-                "That sounds tiring.",
-                "I remember the previous context",
-                "_ACTION_REQUEST_RE",
-                "_ACTION_CLAIM_RE",
-                "_guard_unrouted_physical_action_response",
-                "bad_prefixes =",
-            ),
-            "ConversationAgent may use model-authored meaning and operational fallback only, not phrase classification",
-        ),
-        "agent/app/agents/capability.py": (
-            RULE_HOST_SEMANTIC_AUTHORITY,
-            ('label in {"unsupported"',),
-            "CapabilityAgent may validate typed decisions but may not reclassify model speech from label words",
-        ),
-        "agent/app/agents/deepthinking.py": (
-            RULE_HOST_SEMANTIC_AUTHORITY,
-            ("bad_prefixes =",),
-            "DeepThinkingAgent may preserve model-authored speech but may not rewrite it from phrase prefixes",
-        ),
         "agent/app/cognitive_core/goal_interpreter/engine.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
             (

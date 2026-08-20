@@ -42,15 +42,15 @@ treating that evidence as a publication gate:
 - explicit E-stop and safe-idle postcondition evidence;
 - representative latency traces and environment-approved thresholds.
 
-## Rollback
+## Diagnostic disablement
 
-An intentional rollback from the unified Goal-driven path to the legacy Agent
-adapter requires both host and Agent switches; it does not change `/run`
-callers:
+There is no maintained semantic rollback to the retired Agent planner. For fault
+isolation an operator may disable the Goal-driven runtime:
 
 ```env
 ORCH_COGNITIVE_RUNTIME_MODE=off
 ```
 
-Do not enable validation fallback as a permanent compatibility mode; use the
-explicit adapter mode when rollback is intentional.
+`off` fails ordinary cognition closed; it does not reactivate `/run`,
+`/interaction`, CapabilityAgent, direct-LLM, or another semantic fallback.
+Restore `apply` after the fault is understood.

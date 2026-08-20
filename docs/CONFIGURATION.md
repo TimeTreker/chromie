@@ -101,12 +101,11 @@ All risky or incomplete execution paths are default-off.
 | Variable | Generated default | Meaning |
 |---|---:|---|
 | `ORCH_ENABLE_AGENT` | `1` | Enable the Agent-owned Cognitive Core and downstream runtime. |
-| `ORCH_ENABLE_INTERACTION_RESPONSE` | `1` | Enable strict structured responses. Unified cognitive `apply` requires this; the compatibility `/interaction` surface remains available for explicit diagnostics. |
+| `ORCH_ENABLE_INTERACTION_RESPONSE` | `1` | Enable strict structured InteractionResponse handling required by unified cognitive `apply`; disabling it does not reactivate a retired Agent endpoint or semantic fallback. |
 | `ORCH_ENABLE_SORIDORMI_CAPABILITIES` | `0` | Allow named Soridormi skills in the structured path. |
 | `ORCH_FAST_FIRST_RESPONSE_ENABLED` | `1` | Legacy/compatibility low-latency response gate. Maintained cognitive `apply` does not use Goal Interpretation as a speech owner; Fast Planner authors exact Communicative Activities and Cognitive Runtime validates and schedules them. |
-| `ORCH_AGENT_GOAL_INTERPRETER_GENERATED_FAST_SPEECH_ENABLED` | `1` | Legacy compatibility gate for Goal-Interpreter-generated `fast_speech`. In maintained cognitive `apply`, Goal Interpretation emits Responsibility evidence only and this field is structurally `null`; Fast Planner owns any immediate Communicative-Act selection. |
 | `ORCH_FAST_FIRST_AUDIO_ENABLED` | `1` | Enable startup-primed in-memory PCM acknowledgements as a last-resort latency presentation path when dynamic speech is not admissible, absent, invalid, or cannot be scheduled. Cache entries are generic and cannot claim a tool result, memory commit, physical effect, or completion. |
-| `ORCH_FAST_FIRST_AUDIO_HEDGE_MS` | `750` | After dynamic fast speech cannot be scheduled, wait this long before playing the cached fallback; suppress it when the final response becomes ready first. |
+| `ORCH_FAST_FIRST_AUDIO_HEDGE_MS` | `750` | After a dynamic Fast Planner Communicative Activity cannot be scheduled, wait this long before playing the cached fallback; suppress it when the final response becomes ready first. |
 | `ORCH_FAST_FIRST_AUDIO_CACHE_DIR` | `.chromie/cache/fast-first-audio` | Ignored local WAV cache for speaker-specific English and Chinese acknowledgement cues. |
 | `ORCH_FAST_FIRST_AUDIO_PRIME_ON_STARTUP` | `1` | Generate any missing cache entries through the configured TTS service before opening microphone input. |
 | `ORCH_FAST_FIRST_AUDIO_PRIME_TIMEOUT_MS` | `120000` | Total startup cache-prime budget. Expiry is non-fatal: startup continues with the cues already available. An individual synthesis timeout also aborts the remaining missing-cue work so cancellation cannot repeatedly cold-restart a provider. |
@@ -488,7 +487,7 @@ and there are no `ORCH_CONDITIONAL_DEEPTHINK_*` runtime controls.
 | `ORCH_TTS_PLAYBACK_START_TIMEOUT_MS` | Maximum host wait for response speech that carries a playback-start delivery/effect barrier; code default `20000`. Failure prevents dependent body effects, marks the speech request failed, and invalidates every queued chunk of that utterance so late synthesis cannot speak after the failed barrier. |
 | `ORCH_RUNTIME_READY_GREETING_ENABLED` | `1`; runtime-ready lifecycle switch. In a live device session, Chromie may attempt one quiet, untargeted, provider-declared startup-orientation Activity before opening the microphone. This is baseline liveliness, not Social Attention because there is no interaction anchor yet. Missing, unavailable, confirmation-bound, or invalid orientation fails open and never produces failure speech. Stdin/discard acceptance modes skip the orientation. |
 | `ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED` | `0`; startup speech is disabled by default. Set to `1` only when the owner deliberately wants a spoken startup line. The non-verbal orientation remains independent. |
-| `ORCH_RUNTIME_READY_GREETING_TEXT` | Empty by default. When startup speech is explicitly enabled, a valid configured sentence is preferred. Leaving it empty allows the existing bounded generation compatibility path, but maintained profiles do not require or schedule that speech. |
+| `ORCH_RUNTIME_READY_GREETING_TEXT` | Empty by default. When startup speech is explicitly enabled, a valid configured sentence is preferred. Leaving it empty allows the existing bounded generation path, but maintained profiles do not require or schedule that speech. |
 | `ORCH_RUNTIME_READY_GREETING_FALLBACK_TEXT` | Empty by default. A generation failure therefore remains silent rather than replacing it with a generic character slogan. |
 | `ORCH_RUNTIME_READY_GREETING_LANGUAGE` | `zh-CN`; authoritative language only when startup speech is explicitly enabled. |
 | `ORCH_RUNTIME_READY_GREETING_MODEL` | Empty by default; compatibility model selection used only by explicitly enabled generated startup speech. |
@@ -893,7 +892,7 @@ the fresh interpretation nor an invalid proof receives repair. The logical
 semantic DAG is capped at five calls. There is no local relationship synonym,
 phrase mapping, word-form normalization, resource-alignment workflow, or
 certificate-repair fallback.
-| `ORCH_GOAL_ASSOCIATION_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified `ORCH_COGNITIVE_RUNTIME_MODE=off`. Goal Association is an integrated stage in unified `apply`/`report_only`. |
+| `ORCH_GOAL_ASSOCIATION_MODE` | `off` in `.env.common`; retained standalone diagnostic observer only. Goal Association is an integrated stage in the maintained Goal-driven Runtime and is never a fallback semantic authority. |
 | `ORCH_GOAL_ASSOCIATION_TIMEOUT_MS` | `3500`; host timeout for the advisory endpoint. |
 | `AGENT_FAST_PLANNER_ENABLED` | `1`; exposes the advisory Fast Planner endpoint. |
 | `AGENT_FAST_PLANNER_MODEL` | `qwen3:4b`; compact model for complete common-goal coverage. |
@@ -945,12 +944,12 @@ the authoritative Goal/Evidence snapshots remain Host-owned.
 
 | Variable | Default or profile behavior |
 |---|---|
-| `ORCH_COGNITIVE_RUNTIME_MODE` | `apply` in `.env.common` and the maintained launcher. `off` bypasses the Goal-driven Runtime, `report_only` runs it as a non-authoritative observer, and `apply` makes eligible lanes authoritative through the Trusted Capability Runtime. Code fallback is `apply`. |
-| `ORCH_COGNITIVE_APPLY_LANES` | `chat,memory,tool` in the common safe base. `tool` is limited to explicitly registered, schema-validated, safe read-only local providers. `scripts/start_chromie.sh` additionally enables `robot_action` after registering the trusted Soridormi provider, yielding `chat,memory,robot_action,tool`. The pre-association compatibility route is used only to decide whether the Goal-driven runtime is configured for that broad ingress lane; after Goal Association, the terminal Plan lane is independently rechecked against this allowlist. This is Host deployment policy, not Fast Goal Interpreter semantic/effect authority: a compatibility route cannot grant, suppress, filter, or narrow Planner Capability access. Every executable step still requires a trusted registered provider plus its authorization, confirmation, resource, and safety contracts. Disabled terminal lanes fail closed without entering the legacy planner. |
-| `ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS` | `25000`; total host budget for Goal Association, Fast-to-Deep planning, response composition, and runtime adaptation. Trusted Host rejection is terminal and does not reopen semantic planning. |
+| `ORCH_COGNITIVE_RUNTIME_MODE` | `apply` in `.env.common` and the maintained launcher. `off` disables the Goal-driven Runtime and therefore fails closed for admitted ordinary cognition; `report_only` is diagnostic evidence-only execution when invoked explicitly; `apply` is the maintained authoritative mode. No mode falls back to a retired semantic pipeline. |
+| `ORCH_COGNITIVE_APPLY_LANES` | `chat,memory,tool` in the common safe base. `tool` is limited to explicitly registered, schema-validated, safe read-only local providers. `scripts/start_chromie.sh` additionally enables `robot_action` after registering the trusted Soridormi provider, yielding `chat,memory,robot_action,tool`. Before Goal Association, the Host may use only its deployment lane allowlist to determine whether broad ingress is eligible for the Goal-driven Runtime; after Goal Association, the terminal Plan lane is independently rechecked against the same policy. This is Host deployment policy, not GI semantic/effect authority: no pre-association label can grant, suppress, filter, or narrow Planner Capability access. Every executable step still requires a trusted registered provider plus its authorization, confirmation, resource, and safety contracts. Disabled terminal lanes fail closed. |
+| `ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS` | `25000`; total host budget for Goal Association, Fast-to-Deep planning, Planner response realization, and runtime adaptation. Trusted Host rejection is terminal and does not reopen semantic planning. |
 | `ORCH_COGNITIVE_EVIDENCE_ENABLED` | `1`; writes append-only operational resolution evidence. It does not by itself prove simulator or physical execution. |
 | `ORCH_COGNITIVE_EVIDENCE_INCLUDE_TEXT` | `0`; stores only text length and a short SHA-256 digest by default, including in completed/abandoned Session workflow reports. Enable raw text only under an explicit privacy decision. |
-| `ORCH_COGNITIVE_EVIDENCE_PATH` | `.chromie/evidence/cognitive-runtime/events.jsonl`; append-only Gateway admission, Goal Association, terminal plan, composition, lane, latency, fallback, and execution-outcome summaries. Its parent directory also owns `session-workflows/`, containing per-SID JSON/Markdown flows and a rolling conversation-correlated view; this does not add another runtime setting. |
+| `ORCH_COGNITIVE_EVIDENCE_PATH` | `.chromie/evidence/cognitive-runtime/events.jsonl`; append-only Gateway admission, Goal Association, terminal Plan, Planner response projection, lane, latency, fallback, and execution-outcome summaries. Its parent directory also owns `session-workflows/`, containing per-SID JSON/Markdown flows and a rolling conversation-correlated view; this does not add another runtime setting. |
 | `ORCH_COGNITIVE_RUN_IDENTITY_PATH` | `.chromie/evidence/runtime-identity.json`; optional digest-bound source/profile/model/image/manifest identity attached to cognitive evidence. Missing identity is allowed for ordinary development but fails source-bound qualification. |
 
 `scripts/start_chromie.sh` generates
@@ -968,7 +967,7 @@ until the maintained Soridormi launcher enables the body provider. Effectful
 steps still pass the existing trusted registry, schema, provider, confirmation,
 resource, cancellation, and execution-evidence gates. Goal state is committed
 atomically only after the terminal plan and composed response have passed host
-preparation. A technical failure after authority acquisition cannot execute a partial plan or widen authority through the legacy planner. See [Single Semantic Planning Authority](SEMANTIC_AUTHORITY.md).
+preparation. A technical failure after authority acquisition cannot execute a partial plan or widen authority through another semantic path. See [Single Semantic Planning Authority](SEMANTIC_AUTHORITY.md).
  Source-bound qualification and runtime-identity capture are defined in [Cognitive Gateway/Core Source-Bound Qualification](COGNITIVE_GATEWAY_CORE_QUALIFICATION.md).
 
 ## Semantic task continuity
@@ -976,7 +975,7 @@ preparation. A technical failure after authority acquisition cannot execute a pa
 | Variable | Default or profile behavior |
 |---|---|
 
-In `apply` mode, an authoritative empty result also suppresses legacy route-based
+In `apply` mode, an authoritative empty result also suppresses any non-authoritative route-based
 task creation. This prevents an ordinary side conversation routed through
 `deep_thought` from becoming a new task merely because no semantic operation was
 needed. ResponsePlan immediate speech is accepted only when its task scope,
@@ -1250,7 +1249,7 @@ and there are no `ORCH_CONDITIONAL_DEEPTHINK_*` runtime controls.
 | `ORCH_TTS_PLAYBACK_START_TIMEOUT_MS` | Maximum host wait for response speech that carries a playback-start delivery/effect barrier; code default `20000`. Failure prevents dependent body effects, marks the speech request failed, and invalidates every queued chunk of that utterance so late synthesis cannot speak after the failed barrier. |
 | `ORCH_RUNTIME_READY_GREETING_ENABLED` | `1`; runtime-ready lifecycle switch. In a live device session, Chromie may attempt one quiet, untargeted, provider-declared startup-orientation Activity before opening the microphone. This is baseline liveliness, not Social Attention because there is no interaction anchor yet. Missing, unavailable, confirmation-bound, or invalid orientation fails open and never produces failure speech. Stdin/discard acceptance modes skip the orientation. |
 | `ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED` | `0`; startup speech is disabled by default. Set to `1` only when the owner deliberately wants a spoken startup line. The non-verbal orientation remains independent. |
-| `ORCH_RUNTIME_READY_GREETING_TEXT` | Empty by default. When startup speech is explicitly enabled, a valid configured sentence is preferred. Leaving it empty allows the existing bounded generation compatibility path, but maintained profiles do not require or schedule that speech. |
+| `ORCH_RUNTIME_READY_GREETING_TEXT` | Empty by default. When startup speech is explicitly enabled, a valid configured sentence is preferred. Leaving it empty allows the existing bounded generation path, but maintained profiles do not require or schedule that speech. |
 | `ORCH_RUNTIME_READY_GREETING_FALLBACK_TEXT` | Empty by default. A generation failure therefore remains silent rather than replacing it with a generic character slogan. |
 | `ORCH_RUNTIME_READY_GREETING_LANGUAGE` | `zh-CN`; authoritative language only when startup speech is explicitly enabled. |
 | `ORCH_RUNTIME_READY_GREETING_MODEL` | Empty by default; compatibility model selection used only by explicitly enabled generated startup speech. |

@@ -67,10 +67,8 @@ from shared.chromie_contracts.plan import (
     FastPlannerFirstResponse,
 )
 from shared.chromie_contracts.reflex import CancellationDirective
-from shared.chromie_contracts.response_composition import (
-    CoordinatedResponsePlan,
-    canonical_plan_fingerprint,
-)
+from shared.chromie_contracts.planner_response import PlannerResponseProjection
+from shared.chromie_contracts.plan import canonical_plan_fingerprint
 from shared.chromie_contracts.semantic_task import ResponsePlan
 from agent.app.cognitive_core.goal_interpreter.errors import InterpretationUnavailableError
 from agent.app.cognitive_core.goal_interpreter.model_interpreter import OllamaGoalInterpreter
@@ -1214,7 +1212,6 @@ async def evaluate_cognitive_runtime_scenario(
         policy=CognitiveRuntimePolicy(
             mode=mode,
             apply_lanes=apply_lanes,
-            fallback_policy=str(stub.get("fallback_policy") or "legacy"),
         ),
     )
     gateway = CognitiveGateway()
@@ -1511,18 +1508,18 @@ async def evaluate_cognitive_turn_loop_scenario(
             "covers_goal_ids": plan.goal_ids,
         }
     }
-    composition = CoordinatedResponsePlan(
-        composition_id=f"composition-{scenario.scenario_id}",
+    planner_response = PlannerResponseProjection(
+        projection_id=f"planner_response-{scenario.scenario_id}",
         canonical_plan_id=plan.plan_id,
         canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
         canonical_plan=plan,
         response_plan=ResponsePlan.model_validate(response_plan_raw),
         confidence=0.99,
-        rationale="deterministic Level A turn-loop composition",
+        rationale="deterministic Level A turn-loop Planner response projection",
     )
     response = await CanonicalPlanRuntimeAdapter(runtime).build_response(
         plan=plan,
-        composition=composition,
+        planner_response=planner_response,
         session_id=session_id,
         language=scenario.language or "en-US",
         context={"history": []},

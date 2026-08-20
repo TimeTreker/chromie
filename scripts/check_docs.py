@@ -114,6 +114,10 @@ STALE_PHRASES = {
     "a simple greeting may finish there without goal association": "every admitted greeting retains canonical Goal continuity after early speech",
     "it must not claim to be human": "the owner-approved identity is a six-year-old girl, not a robot",
     "robotidentity": "the current identity contract is ChromieIdentity",
+    "retained capabilityagent planner": "CapabilityAgent is retired from the maintained semantic architecture",
+    "emergency compatibility planner is retained": "there is no maintained emergency semantic planner",
+    "post /run` |": "the retired Agent /run endpoint must not appear in current API tables",
+    "post /interaction` |": "the retired Agent /interaction endpoint must not appear in current API tables",
 }
 
 MILESTONE_TOKEN_RE = re.compile(
