@@ -375,7 +375,7 @@ class InputSessionRuntime:
                         if user_text:
                             if playback_candidate:
                                 confirmation_started_ms = now_ms()
-                                await host.abort_output_stream()
+                                await playback_transport_for(host).abort_output_stream()
                                 host._invalidate_output_state(
                                     cancel_cognitive_work=False,
                                 )

@@ -16,6 +16,7 @@ from orchestrator.runtime.confirmation import (
 from orchestrator.runtime.interaction_coordinator import (
     InteractionRuntimeCoordinator,
 )
+from orchestrator.runtime.playback_transport import transport_for as playback_transport_for
 from shared.chromie_contracts.interaction import InteractionResponse
 from shared.chromie_contracts.reflex import (
     CancellationDirective,
@@ -287,9 +288,9 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         assistant.next_playback_order = 0
         assistant.synthesis_order = 0
         assistant.output_abort_tasks = set()
-        assistant.abort_output_stream = MethodType(
+        playback_transport_for(assistant).abort_output_stream = MethodType(
             abort_output_stream,
-            assistant,
+            playback_transport_for(assistant),
         )
         assistant.handle_routed_text = MethodType(
             handle_routed_text,
@@ -783,9 +784,9 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         assistant.next_playback_order = 0
         assistant.synthesis_order = 0
         assistant.output_abort_tasks = set()
-        assistant.abort_output_stream = MethodType(
+        playback_transport_for(assistant).abort_output_stream = MethodType(
             abort_output_stream,
-            assistant,
+            playback_transport_for(assistant),
         )
         assistant.session_log = MethodType(
             lambda self, *args, **kwargs: None,
@@ -1447,7 +1448,9 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         assistant.resolve_all_playback_start_waiters = lambda **kwargs: None
         assistant.sessions = _Sessions()
         assistant.handle_routed_text = MethodType(handle, assistant)
-        assistant.abort_output_stream = MethodType(abort_output_stream, assistant)
+        playback_transport_for(assistant).abort_output_stream = MethodType(
+            abort_output_stream, playback_transport_for(assistant)
+        )
         assistant.session_log = MethodType(session_log, assistant)
         assistant.maybe_session_done = MethodType(maybe_session_done, assistant)
 

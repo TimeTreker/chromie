@@ -10,6 +10,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import inspect
+from functools import wraps
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
@@ -18,8 +20,44 @@ import websockets
 
 from .audio_device_lifecycle import apply_pending_output_device_change
 from .session import now_ms
+from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 
 logger = logging.getLogger(__name__)
+
+
+TTS_TRACE_MODULE = TraceModule(
+    name="orchestrator.tts",
+    component_type="audio",
+    implementation="PlaybackTransport",
+)
+PLAYBACK_TRACE_MODULE = TraceModule(
+    name="orchestrator.audio_playback",
+    component_type="audio",
+    implementation="PlaybackTransport",
+)
+
+
+def _trace_session_async(module: TraceModule, operation: str, session_arg: str):
+    """Instrument an async PlaybackTransport method on the Host session trace."""
+
+    def decorate(function):
+        @wraps(function)
+        async def wrapped(self, *args, **kwargs):
+            bound = inspect.signature(function).bind(self, *args, **kwargs)
+            bound.apply_defaults()
+            session_id = bound.arguments.get(session_arg)
+            host = self.host
+            with host.sessions.trace_context(session_id):
+                async with runtime_tracer.span(
+                    module=module,
+                    operation=operation,
+                    attributes={"session_id": session_id or ""},
+                ):
+                    return await function(self, *args, **kwargs)
+
+        return wrapped
+
+    return decorate
 
 
 @dataclass
@@ -288,7 +326,7 @@ class PlaybackTransport:
             generation=generation,
             session_id=session_id,
         )
-        await host.ensure_output_stream()
+        await self.ensure_output_stream()
         stream = host.output_stream
         if stream is None:
             raise RuntimeError("Output stream is not available")
@@ -299,7 +337,7 @@ class PlaybackTransport:
                 session_id=session_id,
             )
             if host.is_stale_playback(generation, session_id):
-                await host.abort_output_stream()
+                await self.abort_output_stream()
                 raise asyncio.CancelledError("Playback interrupted by newer session")
             chunk = output[offset : offset + frames_per_chunk]
             async with host.output_write_lock:
@@ -357,7 +395,7 @@ class PlaybackTransport:
                 host.pending_audio[order] = (generation, audio, source_rate, session_id, skip_reason)
                 continue
             try:
-                played = await host.play_one_order(
+                played = await self.play_one_order(
                     generation, order, audio, source_rate, session_id, skip_reason
                 )
             finally:
@@ -390,7 +428,7 @@ class PlaybackTransport:
                     continue
                 pending_order = host.next_playback_order
                 try:
-                    played = await host.play_one_order(
+                    played = await self.play_one_order(
                         ng, pending_order, na, nsr, nsid, nreason
                     )
                 finally:
@@ -405,6 +443,7 @@ class PlaybackTransport:
                 else:
                     break
 
+    @_trace_session_async(PLAYBACK_TRACE_MODULE, "play_one_order", "session_id")
     async def play_one_order(self, generation: int, order: int, audio: bytes | ProviderPcmStream, source_rate: int, session_id: Optional[str], skip_reason: Optional[str] = None) -> bool:
         host = self.host
         key = host.playback_start_key(generation, order, session_id)
@@ -525,17 +564,17 @@ class PlaybackTransport:
                 if isinstance(audio, ProviderPcmStream):
                     chunk = first_stream_chunk
                     while chunk is not None:
-                        await host.play_audio(chunk, source_rate, generation, session_id)
+                        await self.play_audio(chunk, source_rate, generation, session_id)
                         chunk = await audio.read()
                 else:
-                    await host.play_audio(audio, source_rate, generation, session_id)
+                    await self.play_audio(audio, source_rate, generation, session_id)
             finally:
                 host.is_playing_audio = False
         except asyncio.CancelledError:
             host.session_log(session_id, "playback_aborted_by_interrupt: order=%s playback_ms=%.1f generation=%s", order, now_ms() - playback_start_ms, generation)
             return False
         except Exception as exc:
-            await host.abort_output_stream()
+            await self.abort_output_stream()
             if state is not None:
                 state["failed_tts"] = int(state.get("failed_tts", 0)) + 1
             host.session_log(session_id, "playback_exception: order=%s playback_ms=%.1f error=%s", order, now_ms() - playback_start_ms, exc)
@@ -566,12 +605,13 @@ class PlaybackTransport:
         host.maybe_session_done(session_id)
         return True
 
+    @_trace_session_async(TTS_TRACE_MODULE, "synthesize_one", "session_id")
     async def synthesize_one(self, text: str, order: int, session_id: Optional[str], generation: int):
         host = self.host
         text = host.normalize_tts_candidate(text)
         if not host.is_valid_tts_text(text):
             host.session_log(session_id, "tts_skip_invalid_sentence: order=%s chars=%s text=%r", order, len(text), text)
-            await host.enqueue_playback_skip(generation, order, session_id, "invalid_tts_text")
+            await self.enqueue_playback_skip(generation, order, session_id, "invalid_tts_text")
             return
         if host.is_stale_playback(generation, session_id):
             return
@@ -648,7 +688,7 @@ class PlaybackTransport:
                                 if stream is not None:
                                     await stream.finish("tts_error")
                                 else:
-                                    await host.enqueue_playback_skip(generation, order, session_id, "tts_error")
+                                    await self.enqueue_playback_skip(generation, order, session_id, "tts_error")
                                 host.maybe_session_done(session_id)
                                 return
                             if msg_type == "end":
@@ -706,7 +746,7 @@ class PlaybackTransport:
                                 if stream is not None:
                                     await stream.finish()
                                 else:
-                                    await host.enqueue_playback_skip(generation, order, session_id, "tts_empty_audio")
+                                    await self.enqueue_playback_skip(generation, order, session_id, "tts_empty_audio")
                                 host.maybe_session_done(session_id)
                                 return
                         raise RuntimeError("TTS websocket closed before end message")
@@ -724,7 +764,7 @@ class PlaybackTransport:
                     if attempt < max_attempts:
                         await asyncio.sleep(retry_delay)
             logger.error("TTS error after retries: %s", last_error, exc_info=True)
-            await host.enqueue_playback_skip(generation, order, session_id, "tts_exception")
+            await self.enqueue_playback_skip(generation, order, session_id, "tts_exception")
             host.maybe_session_done(session_id)
 
 

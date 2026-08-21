@@ -167,14 +167,16 @@ class BargeInDuckingTests(unittest.IsolatedAsyncioTestCase):
             self._playback_state().cancel_output_duck()
 
         async def abort_output(self: VoiceAssistant) -> None:
-            if not self._playback_state().output_duck_matches(3, old_session_id):
+            if not self.host._playback_state().output_duck_matches(3, old_session_id):
                 raise AssertionError(
                     "output generation must remain ducked until the stream is silent"
                 )
             aborts.append(now_ms())
 
         assistant._invalidate_output_state = MethodType(invalidate, assistant)
-        assistant.abort_output_stream = MethodType(abort_output, assistant)
+        playback_transport_for(assistant).abort_output_stream = MethodType(
+            abort_output, playback_transport_for(assistant)
+        )
         assistant._launch_routed_turn = MethodType(
             lambda self, text, sid: routes.append((text, sid)),
             assistant,

@@ -134,7 +134,6 @@ from orchestrator.runtime.session import (
     record_session_workflow_stage,
     summarize_provider_start_evidence,
 )
-from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 from orchestrator.runtime.capability_runtime import CapabilityRuntimeResult
 from shared.chromie_contracts.core_interpretation import (
     CognitiveResponsibilityProposal,
@@ -185,49 +184,6 @@ logging.basicConfig(
     format="[%(levelname)s] %(asctime)s - %(threadName)s - %(funcName)s - %(message)s",
 )
 logger = logging.getLogger("chromie-orchestrator")
-
-TTS_TRACE_MODULE = TraceModule(
-    name="orchestrator.tts",
-    component_type="audio",
-    implementation="ChromieOrchestrator",
-)
-PLAYBACK_TRACE_MODULE = TraceModule(
-    name="orchestrator.audio_playback",
-    component_type="audio",
-    implementation="ChromieOrchestrator",
-)
-
-
-def trace_session_async(module: TraceModule, operation: str, session_arg: str):
-    """Instrument an async orchestrator method on its detached session trace."""
-
-    def decorate(function):
-        async def wrapped(self, *args, **kwargs):
-            import inspect
-
-            bound = inspect.signature(function).bind(self, *args, **kwargs)
-            bound.apply_defaults()
-            session_id = bound.arguments.get(session_arg)
-            with self.sessions.trace_context(session_id):
-                async with runtime_tracer.span(
-                    module=module,
-                    operation=operation,
-                    attributes={"session_id": session_id or ""},
-                ):
-                    return await function(self, *args, **kwargs)
-
-        wrapped.__name__ = function.__name__
-        wrapped.__doc__ = function.__doc__
-        return wrapped
-
-    return decorate
-
-
-
-
-
-
-
 
 class VoiceAssistant:
     def __init__(self):
@@ -1008,31 +964,8 @@ class VoiceAssistant:
             return np.column_stack([samples, samples])
         return np.tile(samples.reshape(-1, 1), (1, self.output_channels))
 
-    async def ensure_output_stream(self):
-        return await playback_transport_for(self).ensure_output_stream()
-
-    async def abort_output_stream(self):
-        return await playback_transport_for(self).abort_output_stream()
-
     def is_stale_playback(self, generation: int, session_id: Optional[str]) -> bool:
         return generation != self.playback_generation or session_id != self.session_id
-
-    async def play_audio(self, audio_bytes: bytes, source_rate: Optional[int], generation: int, session_id: Optional[str]):
-        return await playback_transport_for(self).play_audio(audio_bytes, source_rate, generation, session_id)
-
-    async def enqueue_playback_skip(self, generation: int, order: int, session_id: Optional[str], reason: str):
-        return await playback_transport_for(self).enqueue_playback_skip(generation, order, session_id, reason)
-
-    async def playback_worker(self):
-        return await playback_transport_for(self).playback_worker()
-
-    @trace_session_async(PLAYBACK_TRACE_MODULE, "play_one_order", "session_id")
-    async def play_one_order(self, generation: int, order: int, audio: bytes, source_rate: int, session_id: Optional[str], skip_reason: Optional[str] = None) -> bool:
-        return await playback_transport_for(self).play_one_order(generation, order, audio, source_rate, session_id, skip_reason)
-
-    @trace_session_async(TTS_TRACE_MODULE, "synthesize_one", "session_id")
-    async def synthesize_one(self, text: str, order: int, session_id: Optional[str], generation: int):
-        return await playback_transport_for(self).synthesize_one(text, order, session_id, generation)
 
     @staticmethod
     def _normalize_echo_text(text: str) -> str:
@@ -1160,7 +1093,7 @@ class VoiceAssistant:
         if state is not None:
             state["scheduled_tts"] = int(state.get("scheduled_tts", 0)) + 1
         self.session_log(session_id, "tts_schedule: order=%s chars=%s scheduled_tts=%s generation=%s text=%r", order, len(sentence), state.get("scheduled_tts", 0) if state else "unknown", generation, sentence)
-        task = asyncio.create_task(self.synthesize_one(sentence, order, session_id, generation))
+        task = asyncio.create_task(playback_transport_for(self).synthesize_one(sentence, order, session_id, generation))
         self.active_synthesis_tasks.add(task)
         task.add_done_callback(self.active_synthesis_tasks.discard)
         self.ensure_playback_worker()
@@ -1254,7 +1187,7 @@ class VoiceAssistant:
         )
         if needs_global_abort:
             self._invalidate_output_state(cancel_cognitive_work=False)
-            await self.abort_output_stream()
+            await playback_transport_for(self).abort_output_stream()
         self.session_log(
             session_id,
             "interaction_speech_cancelled: request_id=%s pending_orders=%s "
@@ -1645,7 +1578,7 @@ class VoiceAssistant:
             return
         playback_task = getattr(self, "playback_task", None)
         if playback_task is None or playback_task.done():
-            self.playback_task = asyncio.create_task(self.playback_worker())
+            self.playback_task = asyncio.create_task(playback_transport_for(self).playback_worker())
         self.session_idle_sweeper_task = asyncio.create_task(self._session_idle_sweeper())
 
     async def reset_playback_ordering(self):
@@ -5894,7 +5827,7 @@ class VoiceAssistant:
             return
 
         async def abort_and_log() -> None:
-            await self.abort_output_stream()
+            await playback_transport_for(self).abort_output_stream()
             if new_session_id and log_event:
                 self.session_log(
                     new_session_id,
@@ -5929,7 +5862,7 @@ class VoiceAssistant:
         self._invalidate_output_state(
             cancel_cognitive_work=cancel_cognitive_work,
         )
-        await self.abort_output_stream()
+        await playback_transport_for(self).abort_output_stream()
         if new_session_id and log_event:
             self.session_log(new_session_id, "interrupt_previous_audio_done: playback_generation=%s", self.playback_generation)
 
@@ -6776,7 +6709,7 @@ class VoiceAssistant:
             enable_agent=self.enable_agent,
         )
         self.asr_ws = await gate.wait_until_ready()
-        self.playback_task = asyncio.create_task(self.playback_worker())
+        self.playback_task = asyncio.create_task(playback_transport_for(self).playback_worker())
         if any(
             uses_followed_system_default(self, kind)
             for kind in ("input", "output")

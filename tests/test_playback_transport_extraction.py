@@ -36,7 +36,7 @@ class PlaybackTransportExtractionTests(unittest.TestCase):
         self.assertIn("websockets.connect(host.tts_url", transport_source)
         self.assertIn("sd.OutputStream(", transport_source)
 
-    def test_host_methods_delegate_only_when_runtime_still_calls_them(self) -> None:
+    def test_playback_transport_is_the_only_transport_owner(self) -> None:
         from orchestrator.orchestrator import VoiceAssistant
 
         for name in (
@@ -45,26 +45,44 @@ class PlaybackTransportExtractionTests(unittest.TestCase):
             "play_audio",
             "enqueue_playback_skip",
             "playback_worker",
+            "play_one_order",
+            "synthesize_one",
+            "close_output_stream",
         ):
             with self.subTest(name=name):
-                source = inspect.getsource(getattr(VoiceAssistant, name))
-                self.assertIn("playback_transport_for(self)", source)
-        self.assertFalse(
-            hasattr(VoiceAssistant, "close_output_stream"),
-            "shutdown must call the PlaybackTransport owner directly instead of "
-            "restoring a compatibility-only VoiceAssistant wrapper",
-        )
+                self.assertFalse(
+                    hasattr(VoiceAssistant, name),
+                    f"{name} must stay on PlaybackTransport instead of regrowing "
+                    "a compatibility-only VoiceAssistant facade",
+                )
+                self.assertTrue(hasattr(PlaybackTransport, name))
+
+        transport_source = (
+            ROOT / "orchestrator" / "runtime" / "playback_transport.py"
+        ).read_text(encoding="utf-8")
+        for forbidden in (
+            "host.ensure_output_stream(",
+            "host.abort_output_stream(",
+            "host.play_audio(",
+            "host.enqueue_playback_skip(",
+            "host.play_one_order(",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, transport_source)
+
         orchestrator_source = (ROOT / "orchestrator" / "orchestrator.py").read_text(
             encoding="utf-8"
         )
+        self.assertNotIn("def trace_session_async", orchestrator_source)
         self.assertIn(
-            "return await playback_transport_for(self).play_one_order",
+            "playback_transport_for(self).synthesize_one",
             orchestrator_source,
         )
         self.assertIn(
-            "return await playback_transport_for(self).synthesize_one",
+            "playback_transport_for(self).playback_worker",
             orchestrator_source,
         )
+
 
 
 if __name__ == "__main__":

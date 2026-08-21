@@ -12,6 +12,7 @@ from orchestrator.runtime.named_goal_cancellation import (
     dispatch_named_goal_cancellation,
 )
 from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
+from orchestrator.runtime.playback_transport import transport_for as playback_transport_for
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
@@ -243,7 +244,7 @@ class NamedGoalCancellationClosureTests(unittest.TestCase):
         async def abort_output_stream() -> None:
             aborts.append(True)
 
-        assistant.abort_output_stream = abort_output_stream
+        playback_transport_for(assistant).abort_output_stream = abort_output_stream
         assistant.session_log = lambda *args, **kwargs: None
 
         asyncio.run(

@@ -28,6 +28,8 @@ from orchestrator.runtime.mind import MindManager
 from orchestrator.runtime.session import SessionTracker
 from orchestrator.runtime.capability_runtime import CapabilityRuntimeResult
 from orchestrator.runtime.observability_recording import record_execution_experience_safely
+from orchestrator.runtime.playback_transport import transport_for as playback_transport_for
+import orchestrator.runtime.playback_transport as playback_transport_module
 from shared.chromie_contracts.mind import default_mind_profile
 from shared.chromie_contracts.interaction import InteractionResponse, CapabilityResult
 
@@ -829,7 +831,9 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             scheduled.append((order, session_id, text))
 
         assistant.session_log = MethodType(session_log, assistant)
-        assistant.synthesize_one = MethodType(synthesize_one, assistant)
+        playback_transport_for(assistant).synthesize_one = MethodType(
+            synthesize_one, playback_transport_for(assistant)
+        )
         assistant.ensure_playback_worker = MethodType(
             lambda self: None,
             assistant,
@@ -1150,7 +1154,9 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             logs.append(message % args)
 
         assistant.interaction_runtime = _Runtime()
-        assistant.abort_output_stream = MethodType(abort_output_stream, assistant)
+        playback_transport_for(assistant).abort_output_stream = MethodType(
+            abort_output_stream, playback_transport_for(assistant)
+        )
         assistant.session_log = MethodType(session_log, assistant)
         assistant.active_interaction_task = asyncio.create_task(asyncio.sleep(60))
         synthesis_task = asyncio.create_task(asyncio.sleep(60))
@@ -1463,7 +1469,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         ) -> None:
             del text
             await asyncio.sleep(0)
-            self.resolve_playback_start_waiter(
+            self.host.resolve_playback_start_waiter(
                 generation,
                 order,
                 session_id,
@@ -1472,7 +1478,9 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             )
 
         assistant.session_log = MethodType(session_log, assistant)
-        assistant.synthesize_one = MethodType(synthesize_one, assistant)
+        playback_transport_for(assistant).synthesize_one = MethodType(
+            synthesize_one, playback_transport_for(assistant)
+        )
 
         result = await assistant._schedule_interaction_speech(
             {
@@ -1529,8 +1537,12 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             played.append(1)
 
         assistant.session_log = MethodType(session_log, assistant)
-        assistant.synthesize_one = MethodType(synthesize_one, assistant)
-        assistant.play_audio = MethodType(play_audio, assistant)
+        playback_transport_for(assistant).synthesize_one = MethodType(
+            synthesize_one, playback_transport_for(assistant)
+        )
+        playback_transport_for(assistant).play_audio = MethodType(
+            play_audio, playback_transport_for(assistant)
+        )
 
         result = await assistant._schedule_interaction_speech(
             {
@@ -1554,7 +1566,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
         for order in result["orders"]:
-            consumed = await assistant.play_one_order(
+            consumed = await playback_transport_for(assistant).play_one_order(
                 result["generation"],
                 order,
                 b"\x00\x00" * 100,
@@ -1592,7 +1604,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         ) -> None:
             seen.append((order, text))
             if order == 0:
-                self.resolve_playback_start_waiter(
+                self.host.resolve_playback_start_waiter(
                     generation,
                     order,
                     session_id,
@@ -1602,7 +1614,9 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(0)
 
         assistant.session_log = MethodType(session_log, assistant)
-        assistant.synthesize_one = MethodType(synthesize_one, assistant)
+        playback_transport_for(assistant).synthesize_one = MethodType(
+            synthesize_one, playback_transport_for(assistant)
+        )
 
         result = await assistant._schedule_interaction_speech(
             {
@@ -1765,7 +1779,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             sid: str | None,
         ) -> None:
             del audio_bytes, source_rate, generation, sid
-            order = self.next_playback_order
+            order = self.host.next_playback_order
             events.append(("playback_start", order))
             if order == 0:
                 first_playback_started.set()
@@ -1814,12 +1828,14 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             ) -> None:
                 del exc_type, exc, tb
 
-        original_connect = getattr(orchestrator_module.websockets, "connect", None)
-        orchestrator_module.websockets.connect = _FakeConnect  # type: ignore[attr-defined]
+        original_connect = getattr(playback_transport_module.websockets, "connect", None)
+        playback_transport_module.websockets.connect = _FakeConnect  # type: ignore[attr-defined]
         assistant.session_log = MethodType(session_log, assistant)
         assistant.maybe_session_done = MethodType(maybe_session_done, assistant)
         assistant.save_audio = MethodType(save_audio, assistant)
-        assistant.play_audio = MethodType(play_audio, assistant)
+        playback_transport_for(assistant).play_audio = MethodType(
+            play_audio, playback_transport_for(assistant)
+        )
 
         try:
             scheduled = await assistant.schedule_tts_text(
@@ -1836,9 +1852,9 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 await asyncio.wait_for(assistant.playback_task, timeout=1.0)
         finally:
             if original_connect is None:
-                delattr(orchestrator_module.websockets, "connect")
+                delattr(playback_transport_module.websockets, "connect")
             else:
-                orchestrator_module.websockets.connect = original_connect
+                playback_transport_module.websockets.connect = original_connect
 
         self.assertTrue(scheduled["scheduled"])
         self.assertEqual(scheduled["chunks"], 2)
@@ -1942,16 +1958,20 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             ) -> None:
                 del exc_type, exc, tb
 
-        original_connect = getattr(orchestrator_module.websockets, "connect", None)
-        orchestrator_module.websockets.connect = _FakeConnect  # type: ignore[attr-defined]
+        original_connect = getattr(playback_transport_module.websockets, "connect", None)
+        playback_transport_module.websockets.connect = _FakeConnect  # type: ignore[attr-defined]
         assistant.session_log = MethodType(session_log, assistant)
         assistant.maybe_session_done = MethodType(maybe_session_done, assistant)
         assistant.save_audio = MethodType(save_audio, assistant)
-        assistant.play_audio = MethodType(play_audio, assistant)
+        playback_transport_for(assistant).play_audio = MethodType(
+            play_audio, playback_transport_for(assistant)
+        )
 
         assistant.ensure_playback_worker()
         synthesis = asyncio.create_task(
-            assistant.synthesize_one("Stream this sentence.", 0, session_id, 0)
+            playback_transport_for(assistant).synthesize_one(
+                "Stream this sentence.", 0, session_id, 0
+            )
         )
         try:
             await asyncio.wait_for(playback_started.wait(), timeout=1.0)
@@ -1962,9 +1982,9 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 await asyncio.wait_for(assistant.playback_task, timeout=1.0)
         finally:
             if original_connect is None:
-                delattr(orchestrator_module.websockets, "connect")
+                delattr(playback_transport_module.websockets, "connect")
             else:
-                orchestrator_module.websockets.connect = original_connect
+                playback_transport_module.websockets.connect = original_connect
 
         self.assertEqual(len(played_chunks), 2)
         self.assertEqual(
