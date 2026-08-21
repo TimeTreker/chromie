@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from agent.app import planner_prompt as planner_prompt
+
 from agent.app import goal_association_prompt as ga_prompt
 
 import json
@@ -131,13 +133,13 @@ class CognitiveIdentityContextTests(unittest.TestCase):
 
     def test_fast_and_deep_planner_prompts_share_same_identity(self) -> None:
         fast = FastPlannerResolver(_Dummy(), _Dummy())
-        fast_prompt = fast._prompt(
+        fast_prompt = planner_prompt.fast_plan_prompt(
             self.request,
             [],
             response_schema={},
         )
         deep = DeepPlannerResolver(_Dummy(), _Dummy())
-        deep_prompt = deep._prompt(
+        deep_prompt = planner_prompt.deep_plan_prompt(
             self.request,
             [],
             feedback=[],
@@ -176,26 +178,26 @@ class CognitiveIdentityContextTests(unittest.TestCase):
                 ga_prompt.system_prompt(GoalSegmentationModelOutput),
             ),
             (
-                fast._layered_prompt(self.request, [], response_schema={}),
-                fast._layered_prompt(changed, [], response_schema={}),
-                fast._system_prompt(),
+                planner_prompt.fast_layered_prompt(self.request, [], response_schema={}),
+                planner_prompt.fast_layered_prompt(changed, [], response_schema={}),
+                planner_prompt.fast_system_prompt(),
             ),
             (
-                deep._layered_prompt(
+                planner_prompt.deep_layered_prompt(
                     self.request,
                     [],
                     feedback=[],
                     response_schema={},
                     expected_goal_ids=["goal-identity"],
                 ),
-                deep._layered_prompt(
+                planner_prompt.deep_layered_prompt(
                     changed,
                     [],
                     feedback=[],
                     response_schema={},
                     expected_goal_ids=["goal-identity"],
                 ),
-                deep._system_prompt(),
+                planner_prompt.deep_system_prompt(),
             ),
         )
 

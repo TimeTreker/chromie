@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from agent.app import planner_prompt as planner_prompt
+
 import asyncio
 import copy
 import json
@@ -1617,7 +1619,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
 
         prompt = str(
-            FastPlannerResolver._first_response_prompt(
+            planner_prompt.fast_first_response_prompt(
                 request,
                 responsibilities=[responsibility],
                 needs_work=True,
@@ -1648,7 +1650,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn('"relationship":"continue"', text_contract)
         self.assertIn("continue the previous action", text_contract)
         truth_prompt = str(
-            FastPlannerResolver._first_response_truth_prompt(
+            planner_prompt.fast_first_response_truth_prompt(
                 request,
                 activity=FastPlannerProgressAct.model_validate(
                     {
@@ -2716,7 +2718,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
 
         prompt = str(
-            FastPlannerResolver._first_response_truth_prompt(
+            planner_prompt.fast_first_response_truth_prompt(
                 run_request,
                 activity=activity,
                 responsibilities=[responsibility],
@@ -2730,14 +2732,14 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("look outside or use direct perception", prompt)
         self.assertIn(
             "in a human command addressed to Chromie, Chromie is the commanded actor",
-            FastPlannerResolver._first_response_truth_system_prompt(),
+            planner_prompt.fast_first_response_truth_system_prompt(),
         )
         self.assertIn(
             "first-person subject is the correct actor",
-            FastPlannerResolver._first_response_truth_system_prompt(),
+            planner_prompt.fast_first_response_truth_system_prompt(),
         )
         author_prompt = str(
-            FastPlannerResolver._first_response_prompt(
+            planner_prompt.fast_first_response_prompt(
                 run_request,
                 responsibilities=[responsibility],
                 needs_work=True,
@@ -3127,7 +3129,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             },
             history=[],
         )
-        prompt = resolver._advance_layered_prompt(
+        prompt = planner_prompt.fast_advance_layered_prompt(
             run_request,
             responsibilities=[
                 CognitiveResponsibilityProposal.model_validate(responsibility)
@@ -3207,12 +3209,12 @@ class FastPlannerResolverTests(unittest.TestCase):
             history=[],
         )
         responsibilities = [CognitiveResponsibilityProposal.model_validate(responsibility)]
-        prompt = resolver._advance_layered_prompt(
+        prompt = planner_prompt.fast_advance_layered_prompt(
             run_request,
             responsibilities=responsibilities,
             capabilities=[],
         )
-        system = resolver._advance_system_prompt()
+        system = planner_prompt.fast_advance_system_prompt()
         diagnostics = ollama_prompt_preflight_diagnostics(
             prompt_chars=len(str(prompt)),
             system_chars=len(system),
@@ -3341,7 +3343,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
 
         prompt = str(
-            resolver._advance_layered_prompt(
+            planner_prompt.fast_advance_layered_prompt(
                 run_request,
                 responsibilities=[responsibility],
                 capabilities=capabilities,
@@ -4055,10 +4057,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         planner_request.context["interaction_context"] = {
             "events": [{"event_id": "ledger-fast-marker"}]
         }
-        prompt = FastPlannerResolver(
-            FakeOllama({}),
-            FakeCatalog(),
-        )._prompt(
+        prompt = planner_prompt.fast_plan_prompt(
             planner_request,
             [],
             response_schema={},
@@ -4085,10 +4084,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             }
         ]
 
-        prompt = FastPlannerResolver(
-            FakeOllama({}),
-            FakeCatalog(),
-        )._prompt(
+        prompt = planner_prompt.fast_plan_prompt(
             planner_request,
             [],
             response_schema={},

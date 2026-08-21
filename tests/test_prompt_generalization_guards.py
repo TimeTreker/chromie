@@ -60,7 +60,10 @@ def test_goal_association_prompt_does_not_embed_weather_or_tonight_templates() -
 
 
 def test_fast_planner_truth_prompt_preserves_epistemic_strength_without_phrase_table() -> None:
-    source = _text("agent/app/fast_planner.py")
+    source = (
+        _text("agent/app/fast_planner.py")
+        + _text("agent/app/planner_prompt.py")
+    )
     for literal in (
         "所以会下雨",
         "可能会下雨",

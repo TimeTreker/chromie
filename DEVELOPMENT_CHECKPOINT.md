@@ -150,9 +150,10 @@ claimed by this source patch.
 
 ## Resume order
 
-1. Apply patches 1, 2, 3, 4, and 5 in order to the uploaded archive, then run
-   `./scripts/run_tests.sh` with pinned test dependencies.
+1. Apply patches 1 through 14 in order to the uploaded archive, then run `./scripts/run_tests.sh` with pinned test dependencies.
 2. Run retained async/general-ability cases on the current model profile.
 3. Retain provider-backed information and embodied episodes that exercise follow-up Work,
    sibling concurrency, no fabricated user turn, and no duplicate speech/execution.
 4. Keep source/test/target/release evidence claims separate.
+
+Planner internal structure is also partially separated without changing authority: `agent/app/planner_prompt.py` now owns bounded Fast/Deep prompt and capability-projection mechanics only. Fast/Deep Resolver passes still own model invocation, Plan validation, escalation/repair, and HOW. No Planner reviewer, response composer, or reconciliation authority was added.

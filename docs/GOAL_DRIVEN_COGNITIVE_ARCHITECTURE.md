@@ -299,6 +299,8 @@ evidence is required. Local/private/device/sensor state without a supplied trust
 sensor or Provider remains epistemically unknown; a generic web or weather source is
 not silently promoted into authority for that state.
 
+Planner implementation may separate prompt/projection mechanics without creating another planning authority. `agent/app/planner_prompt.py` owns bounded Fast/Deep prompt construction, first-response truth/progress prompt text, system prompts, and capability prompt projection only. It cannot invoke a model, validate or materialize a Plan, mutate Goal/Work state, authorize effects, or own response delivery. Fast and Deep Resolver passes remain the same Planner authority at different cognition depths.
+
 ### Planner owns how Chromie says established meaning
 
 Planner owns every complete Communicative Activity: function, exact natural

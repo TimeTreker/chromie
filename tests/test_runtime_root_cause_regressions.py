@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from agent.app import planner_prompt as planner_prompt
+
 import inspect
 import unittest
 
@@ -919,8 +921,8 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         from agent.app.deep_planner import DeepPlannerResolver
         from agent.app.fast_planner import FastPlannerResolver
 
-        fast_source = inspect.getsource(FastPlannerResolver._prompt)
-        deep_source = inspect.getsource(DeepPlannerResolver._prompt)
+        fast_source = inspect.getsource(planner_prompt.fast_plan_prompt)
+        deep_source = inspect.getsource(planner_prompt.deep_plan_prompt)
         for source in (fast_source, deep_source):
             self.assertIn(
                 "Never silently rewrite simultaneous independent actions as before/after actions",

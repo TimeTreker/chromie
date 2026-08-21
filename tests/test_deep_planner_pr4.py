@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from agent.app import planner_prompt as planner_prompt
+
 import asyncio
 import unittest
 
@@ -698,7 +700,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             }
         )
 
-        prompt = DeepPlannerResolver(object(), object())._prompt(
+        prompt = planner_prompt.deep_plan_prompt(
             run_request.model_copy(update={"context": context}),
             capabilities,
             feedback=[],
@@ -779,7 +781,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             }
         )
 
-        prompt = DeepPlannerResolver(object(), object())._prompt(
+        prompt = planner_prompt.deep_plan_prompt(
             request("Walk at an explicit numeric velocity."),
             capabilities,
             feedback=[],
@@ -805,7 +807,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         planner_request.context["interaction_context"] = {
             "events": [{"event_id": "ledger-deep-marker"}]
         }
-        prompt = DeepPlannerResolver(object(), object())._prompt(
+        prompt = planner_prompt.deep_plan_prompt(
             planner_request,
             [],
             feedback=[],

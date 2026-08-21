@@ -6,6 +6,7 @@ from agent.app.fast_planner import FastPlannerResolver
 from agent.app.goal_association import GoalAssociationResolver
 from agent.app.goal_association_contract import GoalSegmentationModelOutput
 from agent.app import goal_association_prompt as ga_prompt
+from agent.app import planner_prompt
 from tests.cognitive_work_test_support import cognitive_work_request
 
 
@@ -82,12 +83,12 @@ def test_goal_and_planner_prompts_forbid_scope_narrowing() -> None:
         [],
         output_type=GoalSegmentationModelOutput,
     )
-    fast_prompt = FastPlannerResolver(object(), object())._prompt(
+    fast_prompt = planner_prompt.fast_plan_prompt(
         request,
         [],
         response_schema={},
     )
-    deep_prompt = DeepPlannerResolver(object(), object())._prompt(
+    deep_prompt = planner_prompt.deep_plan_prompt(
         request,
         [],
         feedback=[],
