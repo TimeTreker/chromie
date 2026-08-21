@@ -42,6 +42,8 @@ Gateway -> Goal Interpretation -> Goal Association when canonical continuity is
 needed. Runtime/Evidence transitions already carry exact request/Activity/Goal
 provenance and normally re-enter Planner directly.
 
+Goal Association implementation is now internally split without changing that authority: `agent/app/goal_association_contract.py` contains only model-facing DTO/schema/normalization rules, while `GoalAssociationResolver` in `agent/app/goal_association.py` retains inference, continuity decisions, and canonical Goal materialization. The stale `human-child kind` segmentation wording is removed; GA now preserves the owner-approved six-year-old-girl social identity without converting it into a biological-human claim.
+
 Planner fast/deep are cognition depths of the same HOW authority. Comparing a
 changed Goal with queued/running/completed Work is a Planner operation, not a
 mandatory `Work Reconciliation` stage. The model-facing bounded Work projection is

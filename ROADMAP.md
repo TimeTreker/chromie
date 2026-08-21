@@ -644,6 +644,8 @@ module boundaries, lowering the composition root from 150 to 142 methods. Statel
 slices adds a semantic owner, manager, state store, service, environment key, or public
 runtime path.
 
+**First cognition-owner internal slice implemented.** Goal Association now separates its model-facing Pydantic DTO/schema/normalization surface into `agent/app/goal_association_contract.py`. `GoalAssociationResolver` remains the only GA inference/continuity transaction and the only canonical Goal-continuity writer; the extracted contract module has no Ollama client, runtime state, Goal commit, tracing, or second semantic lifecycle. This reduces source density without turning validation/schema mechanics into another Goal authority. The same standard applies to future Planner/GA internal decomposition: extract representation, projection, decode, normalization, or mechanical validation only when the original semantic owner remains singular.
+
 - Decompose the Orchestrator composition root without raising existing method,
   property, initializer, exception-boundary, or direct-model-call ratchets.
 - Remove import-time global logging configuration from library modules.

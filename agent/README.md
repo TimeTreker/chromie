@@ -44,6 +44,8 @@ Planner                  0..N Activity changes or none
 
 Social Attention is an optional Activity-scoped auxiliary cognition path. It may select only eligible live social-expression capabilities supplied by the bounded catalog context; it cannot create Goals, replace primary work, alter completion, author response text, or select provider/backend mechanics.
 
+Goal Association keeps one semantic authority while separating implementation concerns: `app/goal_association_contract.py` owns only the model-facing typed DTO/schema and local normalization rules, while `app/goal_association.py` owns the resolver/inference transaction that decides canonical Goal continuity. The contract module has no model client, runtime state, Goal commit, or tracing authority.
+
 TaskGraph endpoints are deterministic validation/execution infrastructure. The retired LLM `TaskGraphPlanner` bridge has been removed; TaskGraph infrastructure does not own cognitive planning.
 
 ## Current HTTP surface

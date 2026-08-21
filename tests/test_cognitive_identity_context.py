@@ -113,6 +113,9 @@ class CognitiveIdentityContextTests(unittest.TestCase):
         self.assertIn('"name":"Chromie"', prompt)
         self.assertIn('"age_description":"6 years old"', prompt)
         self.assertIn("acting/perceiving/body ownership", prompt)
+        self.assertIn("social identity", prompt)
+        self.assertIn("biological-human claim", prompt)
+        self.assertNotIn("human-child kind", prompt)
         self.assertIn("personality expression never create an extra Goal", prompt)
         self.assertNotIn("Owner-approved Personality Expression JSON", prompt)
         layered = resolver._layered_prompt(

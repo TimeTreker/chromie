@@ -1735,6 +1735,8 @@ necessary.
 
 ### 5.1 Model-facing Goal Association boundary
 
+The source implementation may separate representation mechanics without creating another authority. `agent/app/goal_association_contract.py` contains the Pydantic model-facing DTO/schema and local normalization contract; `GoalAssociationResolver` remains the single inference/continuity transaction and canonical Goal writer. The contract module must not acquire a model client, runtime state, Goal commit, tracing, or an independent repair/decision lifecycle.
+
 Goal Association must not expose Chromie's persistence and lifecycle objects
 directly to the language model. Its model-facing output is intentionally small
 and explicitly discriminated:

@@ -40,7 +40,10 @@ def test_deep_goal_interpretation_atomicity_rule_is_language_independent() -> No
 
 
 def test_goal_association_prompt_does_not_embed_weather_or_tonight_templates() -> None:
-    source = _text("agent/app/goal_association.py")
+    source = (
+        _text("agent/app/goal_association.py")
+        + _text("agent/app/goal_association_contract.py")
+    )
     for literal in (
         "Chinese 边…边…",
         "checking weather and judging whether it is hot",
@@ -94,7 +97,10 @@ def test_temporal_realization_lives_in_capability_contract_not_gi_or_ga() -> Non
     gi_prompt = _text(
         "agent/app/cognitive_core/goal_interpreter/prompts/goal_interpreter_system.txt"
     )
-    ga_source = _text("agent/app/goal_association.py")
+    ga_source = (
+        _text("agent/app/goal_association.py")
+        + _text("agent/app/goal_association_contract.py")
+    )
     weather_source = _text("agent/app/capabilities/local.py")
     weather_start = weather_source.index('name="chromie.weather.lookup"')
     weather_end = weather_source.index(
