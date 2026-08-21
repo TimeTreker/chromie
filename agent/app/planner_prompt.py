@@ -15,8 +15,7 @@ from .cognitive_identity import (
 )
 from .goal_progress_communication import goal_progress_communication_prompt
 from .prompt_projection import bounded_json
-from .planner_contract import (
-    EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
+from .planner_context import (
     canonical_goal_grounding,
     evidence_bound_dialogue,
     expected_goal_ids,
@@ -38,6 +37,36 @@ except ImportError:  # pragma: no cover - repository development path
     )
     from shared.chromie_contracts.interaction import VOCAL_PERFORMANCE_CAPABILITY_ID
 
+
+EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT = (
+    "Treat an explicit numeric value in authoritative Goal text or a typed "
+    "Goal binding as a "
+    "user-supplied candidate for the matching catalog argument. When "
+    "the value and units are unambiguous and the value is within the "
+    "catalog schema, copy it exactly; never silently replace it with "
+    "a schema default or describe it only in prose. Select a capability "
+    "whose argument schema can represent the supplied value. Catalog "
+    "defaults are only for parameters the user did not supply. If the "
+    "units, argument mapping, or validity are uncertain, clarify or "
+    "escalate according to the planner tier instead of claiming exact "
+    "coverage. A material adjustment must use a non-exact plan_relation, "
+    "require confirmation, and explain the change. For each numeric "
+    "literal in an executable authoritative Goal's text or typed bindings, "
+    "include a user_supplied "
+    "parameter_resolution tied to the owned step and goal. The parameter "
+    "field must be the exact bare key in that step's args object, never a "
+    "step- or capability-qualified name. Its value must equal the step "
+    "argument and its source_goal_ids must identify the authoritative Goal "
+    "containing that same number. A typed binding is the model-owned canonical "
+    "provenance for a quantity stated in words by the user. Use those stable "
+    "Goal IDs as provenance. Never borrow a numeric literal or typed binding from "
+    "a sibling Goal to fill another step. When an optional catalog argument was not "
+    "supplied by the owning Goal, omit that argument and its resolution so the "
+    "provider applies its declared default, or copy the exact catalog default with "
+    "strategy=schema_default and no source_goal_ids. Never label a catalog default "
+    "as user_supplied. "
+    "do not copy, paraphrase, or annotate Goal text into another field. "
+)
 
 # Planner prompt/projection mechanics only. This module does not invoke a model,
 # validate or commit a Plan, mutate Goal/Work state, or authorize effects.

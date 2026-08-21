@@ -301,6 +301,8 @@ not silently promoted into authority for that state.
 
 Planner implementation may separate prompt/projection mechanics without creating another planning authority. `agent/app/planner_prompt.py` owns bounded Fast/Deep prompt construction, first-response truth/progress prompt text, system prompts, and capability prompt projection only. It cannot invoke a model, validate or materialize a Plan, mutate Goal/Work state, authorize effects, or own response delivery. Fast and Deep Resolver passes remain the same Planner authority at different cognition depths.
 
+The Planner model contract is likewise internally layered rather than centralized in one catch-all module. `planner_model_contract.py` owns model DTOs and typed model-envelope errors; `planner_context.py` owns read-only Goal/Evidence/Situation projection; `planner_grounding.py` owns canonical material and binding comparison; `planner_schema.py` owns constrained-decoder schema construction, including pass-specific Fast/Deep schemas; `planner_validation.py` owns deterministic provenance, qualification, normalization, and typed-integrity checks; and `planner_audit.py` contains the already-existing bounded model-assisted communication/coverage audits used inside Planner reasoning. The former `planner_contract.py` compatibility surface is removed. None of these layers is an independent planning authority: they do not write Goals, authorize effects, own Runtime state, or decide user-facing HOW outside the enclosing Planner lifecycle.
+
 ### Planner owns how Chromie says established meaning
 
 Planner owns every complete Communicative Activity: function, exact natural

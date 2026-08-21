@@ -150,10 +150,10 @@ claimed by this source patch.
 
 ## Resume order
 
-1. Apply patches 1 through 14 in order to the uploaded archive, then run `./scripts/run_tests.sh` with pinned test dependencies.
+1. Apply patches 1 through 15 in order to the uploaded archive, then run `./scripts/run_tests.sh` with pinned test dependencies.
 2. Run retained async/general-ability cases on the current model profile.
 3. Retain provider-backed information and embodied episodes that exercise follow-up Work,
    sibling concurrency, no fabricated user turn, and no duplicate speech/execution.
 4. Keep source/test/target/release evidence claims separate.
 
-Planner internal structure is also partially separated without changing authority: `agent/app/planner_prompt.py` now owns bounded Fast/Deep prompt and capability-projection mechanics only. Fast/Deep Resolver passes still own model invocation, Plan validation, escalation/repair, and HOW. No Planner reviewer, response composer, or reconciliation authority was added.
+Planner internal structure is now layered without changing authority: `planner_model_contract.py` owns model DTOs; `planner_context.py` read-only Goal/Evidence/Situation projection; `planner_grounding.py` canonical material comparison; `planner_schema.py` constrained decoder schemas (including Fast/Deep pass schemas); `planner_validation.py` deterministic integrity/normalization; `planner_audit.py` the existing bounded model-assisted Planner audits; and `planner_prompt.py` prompt/capability projection. Fast/Deep Resolver passes still own the Planner HOW lifecycle, model invocation, repair/escalation, and Plan return. The old catch-all `planner_contract.py` is removed rather than retained as a compatibility facade. No second Planner, reviewer authority, response composer, or reconciliation manager was added.

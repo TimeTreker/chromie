@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import unittest
 
-from agent.app.planner_contract import (
-    canonical_goal_grounding,
+from agent.app.planner_context import canonical_goal_grounding
+from agent.app.planner_validation import (
     validate_goal_binding_argument_grounding,
     validate_planner_model_output,
 )

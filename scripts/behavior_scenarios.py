@@ -25,6 +25,7 @@ if str(ROOT) not in sys.path:
 
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.cognitive_gateway import CognitiveGateway
+from orchestrator.runtime.input_session_runtime import input_session_runtime_for
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.interaction_coordinator import (
     CapabilityInteractionDispatch,
@@ -1434,7 +1435,8 @@ async def evaluate_cognitive_turn_loop_scenario(
         assistant.session_log = lambda *args, **kwargs: None
         assistant.maybe_session_done = lambda *args, **kwargs: None
 
-        assistant._launch_routed_turn(
+        input_runtime = input_session_runtime_for(assistant)
+        input_runtime._launch_routed_turn(
             "Check the first person's request.",
             "sid-first",
         )
@@ -1443,7 +1445,7 @@ async def evaluate_cognitive_turn_loop_scenario(
             raise AssertionError("first routed turn was not launched")
         await asyncio.wait_for(first_started.wait(), timeout=1.0)
 
-        assistant._launch_routed_turn(
+        input_runtime._launch_routed_turn(
             "Handle the second person's independent request.",
             "sid-second",
         )

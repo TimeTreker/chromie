@@ -10,11 +10,9 @@ from agent.app.capabilities.catalog import CapabilityCatalog
 from agent.app.capabilities.local import chromie_manifests
 from agent.app.capabilities.models import CapabilityBundle, CapabilityRegistry as AgentCapabilityRegistry
 from agent.app.goal_association_contract import GoalAssociationModelGoal
-from agent.app.planner_contract import (
-    PlannerModelOutput,
-    canonical_plan_response_schema,
-    validate_goal_responsibility_outcomes,
-)
+from agent.app.planner_model_contract import PlannerModelOutput
+from agent.app.planner_schema import canonical_plan_response_schema
+from agent.app.planner_validation import validate_goal_responsibility_outcomes
 from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
 from orchestrator.runtime.capability_runtime import (

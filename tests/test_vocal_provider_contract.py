@@ -10,11 +10,9 @@ from agent.app.capabilities.catalog import CapabilityCatalog
 from agent.app.capabilities.local import chromie_manifests
 from agent.app.capabilities.models import CapabilityBundle, CapabilityRegistry as AgentCapabilityRegistry
 from agent.app.deep_planner import DeepPlannerResolver
-from agent.app.planner_contract import (
-    PlannerModelOutput,
-    canonical_plan_response_schema,
-    validate_goal_responsibility_outcomes,
-)
+from agent.app.planner_model_contract import PlannerModelOutput
+from agent.app.planner_schema import canonical_plan_response_schema
+from agent.app.planner_validation import validate_goal_responsibility_outcomes
 from tests.cognitive_work_test_support import cognitive_work_request
 from orchestrator.runtime.cognitive_runtime import (
     CanonicalPlanRuntimeAdapter,

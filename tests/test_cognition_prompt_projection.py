@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from shared.chromie_contracts.goal import GoalAssociationResolution
-from agent.app.planner_contract import goal_association_prompt_projection
+from agent.app.planner_context import goal_association_prompt_projection
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.semantic_task import SemanticGoal
 from shared.chromie_runtime.llm_diagnostics import cognition_text_reference

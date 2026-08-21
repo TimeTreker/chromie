@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from agent.app import planner_validation
+from agent.app import planner_schema
 from agent.app import planner_prompt as planner_prompt
 
 import inspect
@@ -10,11 +12,13 @@ from typing import Any
 
 from agent.app.goal_association import GoalAssociationResolver
 from agent.app.deep_planner import DeepPlannerResolver
-from agent.app.planner_contract import (
-    PlannerModelOutput,
+from agent.app.planner_model_contract import PlannerModelOutput
+from agent.app.planner_schema import (
     canonical_plan_response_schema,
     fast_multi_goal_response_schema,
     planner_coverage_review_response_schema,
+)
+from agent.app.planner_validation import (
     coordinated_action_goal_ids,
     information_goal_ids_without_declared_provider,
     qualify_capability_catalog_for_information_domains,
@@ -209,7 +213,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             }
         ]
 
-        self.assertFalse(DeepPlannerResolver._requires_safety_revision(feedback))
+        self.assertFalse(planner_validation.requires_safety_revision(feedback))
         self.assertEqual(
             DeepPlannerResolver._safety_revision_contract_errors(
                 CanonicalPlan(
@@ -286,7 +290,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
         feedback = [{"type": "parallel_capability_not_declared_safe"}]
-        schema = DeepPlannerResolver._safety_revision_response_schema(
+        schema = planner_schema.deep_safety_revision_response_schema(
             base,
             feedback=feedback,
         )
@@ -309,7 +313,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             ["sequential"],
         )
         self.assertTrue(
-            DeepPlannerResolver._requires_safety_revision(feedback)
+            planner_validation.requires_safety_revision(feedback)
         )
 
     def test_deep_safety_revision_is_enforced_after_decoder_output(self) -> None:

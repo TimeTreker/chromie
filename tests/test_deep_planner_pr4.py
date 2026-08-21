@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from agent.app import planner_validation
+from agent.app import planner_schema
 from agent.app import planner_prompt as planner_prompt
 
 import asyncio
@@ -8,7 +10,7 @@ import unittest
 from agent.app.capabilities.catalog import CatalogCapability
 from agent.app.clients.ollama_client import OllamaGenerationError
 from agent.app.deep_planner import DeepPlannerResolver
-from agent.app.planner_contract import (
+from agent.app.planner_validation import (
     qualify_capability_catalog_for_output_modes,
     validate_planner_model_output,
 )
@@ -888,14 +890,14 @@ class DeepPlannerResolverTests(unittest.TestCase):
         )
         self.assertIn("strategy user_supplied", mismatch["corrective_contract"])
 
-        schema = DeepPlannerResolver._response_schema(
+        schema = planner_schema.deep_plan_response_schema(
             ["goal-action"],
             allowed_capability_ids=["soridormi.walk_velocity"],
             capability_input_schemas={
                 "soridormi.walk_velocity": mismatch["capability_input_schema"]
             },
         )
-        tightened = DeepPlannerResolver._contract_revision_response_schema(
+        tightened = planner_schema.deep_contract_revision_response_schema(
             schema,
             feedback=feedback,
         )
@@ -993,7 +995,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertIn("strategy schema_default", mismatch["corrective_contract"])
 
     def test_deep_decoder_requires_explicit_step_timing(self):
-        schema = DeepPlannerResolver._response_schema(
+        schema = planner_schema.deep_plan_response_schema(
             ["goal-walk", "goal-blink"],
             allowed_capability_ids=[
                 "soridormi.walk_forward",
@@ -1011,7 +1013,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         )
 
     def test_deep_decoder_enforces_exact_capability_argument_bounds(self):
-        schema = DeepPlannerResolver._response_schema(
+        schema = planner_schema.deep_plan_response_schema(
             ["goal-turn"],
             allowed_capability_ids=["soridormi.turn_in_place"],
             capability_input_schemas={
@@ -1128,10 +1130,10 @@ class DeepPlannerResolverTests(unittest.TestCase):
             }
         ]
         self.assertFalse(
-            DeepPlannerResolver._requires_safety_revision(singleton_feedback)
+            planner_validation.requires_safety_revision(singleton_feedback)
         )
         self.assertFalse(
-            DeepPlannerResolver._requires_sequential_safety_revision(
+            planner_validation.requires_sequential_safety_revision(
                 singleton_feedback
             )
         )
@@ -1220,7 +1222,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         )
 
     def test_coverage_review_receives_safe_adjustment_confirmation_contract(self):
-        from agent.app.planner_contract import review_coordinated_action_plan_coverage
+        from agent.app.planner_audit import review_coordinated_action_plan_coverage
 
         goal_ids = ["goal-walk", "goal-blink", "goal-song"]
         plan = CanonicalPlan(
@@ -2138,7 +2140,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
 
 
     def test_chat_route_schema_rejects_effectful_outcomes(self):
-        schema = DeepPlannerResolver._response_schema(
+        schema = planner_schema.deep_plan_response_schema(
             ["goal-greet"], response_only=True
         )
         self.assertEqual(schema["properties"]["steps"]["maxItems"], 0)
@@ -2250,7 +2252,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertEqual(output.goal_outcomes["goal-greet"].response_text, "Hello!")
 
     def test_goal_outcome_schema_uses_exact_unique_goal_key_map(self):
-        schema = DeepPlannerResolver._response_schema(["goal-look", "goal-blink"])
+        schema = planner_schema.deep_plan_response_schema(["goal-look", "goal-blink"])
 
         outcomes = schema["properties"]["goal_outcomes"]
         self.assertEqual(outcomes["type"], "object")

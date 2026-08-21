@@ -6,7 +6,7 @@ import unittest
 
 from agent.app.goal_association import GoalAssociationResolver
 from agent.app.goal_association_contract import GoalAssociationModelOutput
-from agent.app.planner_contract import coordinated_action_goal_ids
+from agent.app.planner_validation import coordinated_action_goal_ids
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
 

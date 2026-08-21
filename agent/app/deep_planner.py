@@ -25,32 +25,41 @@ except ImportError:  # pragma: no cover
     from shared.chromie_runtime.llm_diagnostics import cognition_text_reference
     from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 from .prompt_projection import bounded_json
-from .planner_contract import (
+from .planner_model_contract import (
     PlannerDTOContractError,
     ResourceResponsibilityCapabilityUnavailableError,
-    canonical_goal_binding_argument_response_schema,
-    canonical_resource_argument_response_schema,
-    canonical_goal_grounding,
-    canonical_plan_response_schema,
-    coordinated_action_goal_ids,
-    expected_goal_ids,
-    explicit_numeric_goal_values,
-    information_goal_ids_without_declared_provider,
     is_planner_step_capability,
     materialize_goal_outcomes,
     materialize_planner_metadata,
-    normalize_detached_parameter_resolutions,
-    normalize_missing_numeric_parameter_provenance,
-    normalize_schema_default_parameter_provenance,
-    parallel_plan_contract_errors,
+)
+from .planner_schema import (
+    canonical_goal_binding_argument_response_schema,
+    canonical_resource_argument_response_schema,
+    deep_plan_response_schema,
+    deep_safety_revision_response_schema,
+    deep_contract_revision_response_schema,
+)
+from .planner_context import (
+    canonical_goal_grounding,
+    expected_goal_ids,
     planner_goal_execution_requirements,
     planner_provider_media_goal_operations,
     planner_provider_vocal_goal_ids,
     planner_response_goal_ids,
+)
+from .planner_validation import (
+    requires_safety_revision,
+    requires_sequential_safety_revision,
+    coordinated_action_goal_ids,
+    explicit_numeric_goal_values,
+    information_goal_ids_without_declared_provider,
+    normalize_detached_parameter_resolutions,
+    normalize_missing_numeric_parameter_provenance,
+    normalize_schema_default_parameter_provenance,
+    parallel_plan_contract_errors,
     planner_contract_diagnostics,
     qualify_capability_catalog_for_information_domains,
     qualify_capability_catalog_for_output_modes,
-    review_coordinated_action_plan_coverage,
     validate_explicit_numeric_parameter_grounding,
     validate_external_response_evidence_boundary,
     validate_goal_binding_argument_grounding,
@@ -59,6 +68,7 @@ from .planner_contract import (
     validate_goal_responsibility_outcomes,
     validate_planner_model_output,
 )
+from .planner_audit import review_coordinated_action_plan_coverage
 
 try:
     from chromie_contracts.plan import CanonicalPlan
@@ -199,7 +209,7 @@ class DeepPlannerResolver:
             and str(goal["metadata"].get("responsibility_kind") or "").strip()
             in {"executable_action", "capability_dependent"}
         ]
-        response_schema = self._response_schema(
+        response_schema = deep_plan_response_schema(
             expected_goal_ids_for_turn,
             allowed_capability_ids=[item["capability_id"] for item in payload],
             capability_input_schemas={
@@ -250,13 +260,13 @@ class DeepPlannerResolver:
             mixed_accounting_repairs: list[dict[str, Any]] = []
             numeric_provenance_repairs: list[dict[str, Any]] = []
             try:
-                active_response_schema = self._contract_revision_response_schema(
+                active_response_schema = deep_contract_revision_response_schema(
                     response_schema,
                     feedback=feedback,
                     semantic_baseline=mechanical_numeric_baseline,
                 )
-                if self._requires_safety_revision(feedback):
-                    active_response_schema = self._safety_revision_response_schema(
+                if requires_safety_revision(feedback):
+                    active_response_schema = deep_safety_revision_response_schema(
                         active_response_schema,
                         feedback=feedback,
                     )
@@ -999,74 +1009,6 @@ class DeepPlannerResolver:
         return f"plan_{digest}"
 
     @classmethod
-    def _response_schema(
-        cls,
-        expected_goal_ids: list[str],
-        *,
-        allowed_capability_ids: list[str] | None = None,
-        capability_input_schemas: dict[str, dict[str, Any]] | None = None,
-        response_only: bool = False,
-        requires_execution: bool = False,
-        response_goal_ids: list[str] | None = None,
-        provider_required_vocal_goal_ids: list[str] | None = None,
-        provider_required_media_goal_operations: dict[str, str] | None = None,
-        unavailable_information_goal_ids: list[str] | None = None,
-        single_step_goal_ids: list[str] | None = None,
-        required_numeric_goal_values: dict[str, list[int | float]] | None = None,
-    ) -> dict[str, Any]:
-        return canonical_plan_response_schema(
-            planner_tier="deep",
-            expected_goal_ids=expected_goal_ids,
-            allowed_capability_ids=list(allowed_capability_ids or []),
-            capability_input_schemas=capability_input_schemas,
-            response_only=response_only,
-            requires_execution=requires_execution,
-            response_goal_ids=response_goal_ids,
-            provider_required_vocal_goal_ids=(provider_required_vocal_goal_ids),
-            provider_required_media_goal_operations=(provider_required_media_goal_operations),
-            unavailable_information_goal_ids=unavailable_information_goal_ids,
-            single_step_goal_ids=single_step_goal_ids,
-            required_numeric_goal_values=required_numeric_goal_values,
-        )
-
-    @staticmethod
-    def _requires_safety_revision(feedback: list[dict[str, Any]]) -> bool:
-        safety_types = {
-            "parallel_capability_not_declared_safe",
-            "parallel_exclusive_group_conflict",
-            "parallel_resource_claim_conflict",
-            "safety_revision_contract_not_satisfied",
-        }
-        return any(
-            isinstance(item, dict)
-            and item.get("type") in safety_types
-            and not (
-                item.get("type") == "parallel_capability_not_declared_safe"
-                and item.get("parallel_step_count") == 1
-            )
-            for item in feedback
-        )
-
-    @staticmethod
-    def _requires_sequential_safety_revision(
-        feedback: list[dict[str, Any]],
-    ) -> bool:
-        concurrency_types = {
-            "parallel_capability_not_declared_safe",
-            "parallel_exclusive_group_conflict",
-            "parallel_resource_claim_conflict",
-        }
-        return any(
-            isinstance(item, dict)
-            and item.get("type") in concurrency_types
-            and not (
-                item.get("type") == "parallel_capability_not_declared_safe"
-                and item.get("parallel_step_count") == 1
-            )
-            for item in feedback
-        )
-
-    @classmethod
     def _initial_safety_feedback(
         cls,
         context: dict[str, Any],
@@ -1094,7 +1036,7 @@ class DeepPlannerResolver:
         return [
             dict(item)
             for item in cls._merge_feedback(candidates)
-            if cls._requires_safety_revision([item])
+            if requires_safety_revision([item])
         ]
 
     @staticmethod
@@ -1348,201 +1290,6 @@ class DeepPlannerResolver:
         normalized["steps"] = retained
         return normalized, repairs
 
-    @classmethod
-    def _safety_revision_response_schema(
-        cls,
-        base_schema: dict[str, Any],
-        *,
-        feedback: list[dict[str, Any]] | None = None,
-    ) -> dict[str, Any]:
-        """Forbid exact execution after deterministic concurrency rejection."""
-
-        schema = copy.deepcopy(base_schema)
-        response_text = schema.get("properties", {}).get("response_text")
-        if isinstance(response_text, dict):
-            response_text.pop("maxLength", None)
-        if cls._requires_sequential_safety_revision(list(feedback or [])):
-            # The deployed structured decoder does not reliably enforce a
-            # nested step constraint added only through a top-level allOf.
-            # Specialize the referenced step DTO itself so a concurrency
-            # rejection cannot be relabeled as a safe adjustment while the
-            # rejected parallel timing remains unchanged.  This conservative
-            # revision may still clarify or propose a confirmation-bound
-            # sequential alternative; it cannot authorize overlap.
-            step_schema = schema.get("$defs", {}).get("PlannerModelStep")
-            if isinstance(step_schema, dict):
-                timing = step_schema.get("properties", {}).get("timing")
-                if isinstance(timing, dict):
-                    timing["enum"] = ["sequential"]
-                    timing["default"] = "sequential"
-                    timing["description"] = (
-                        "Concurrency was rejected by deterministic provider/resource "
-                        "validation; retained executable steps must be sequential."
-                    )
-        schema.setdefault("allOf", []).append(
-            {
-                "anyOf": [
-                    {
-                        "properties": {
-                            "disposition": {
-                                "type": "string",
-                                "enum": ["execute", "mixed"],
-                            },
-                            "plan_relation": {
-                                "type": "string",
-                                "enum": ["safe_adjustment", "alternative"],
-                            },
-                            "user_confirmation_required": {
-                                "type": "boolean",
-                                "enum": [True],
-                            },
-                            "response_text": {
-                                "type": "string",
-                                "minLength": 1,
-                            },
-                        }
-                    },
-                    {
-                        "properties": {
-                            "disposition": {
-                                "type": "string",
-                                "enum": ["clarify", "unavailable", "refused"],
-                            },
-                            "steps": {
-                                "type": "array",
-                                "maxItems": 0,
-                            },
-                            "plan_relation": {
-                                "type": "string",
-                                "enum": ["exact"],
-                            },
-                            "user_confirmation_required": {
-                                "type": "boolean",
-                                "enum": [False],
-                            },
-                        }
-                    },
-                ]
-            }
-        )
-        return schema
-
-    @staticmethod
-    def _contract_revision_response_schema(
-        base_schema: dict[str, Any],
-        *,
-        feedback: list[dict[str, Any]] | None = None,
-        semantic_baseline: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        """Tighten rejected pairs without allowing a mechanical repair to replan."""
-
-        mismatches = [
-            item
-            for item in list(feedback or [])
-            if isinstance(item, dict)
-            and item.get("type") == "parameter_resolution_argument_mismatch"
-            and str(item.get("capability_id") or "").strip()
-            and str(item.get("parameter") or "").strip()
-        ]
-        missing_numeric = [
-            item
-            for item in list(feedback or [])
-            if isinstance(item, dict)
-            and item.get("type")
-            == "missing_user_supplied_parameter_resolution"
-            and str(item.get("step_id") or "").strip()
-            and str(item.get("parameter") or "").strip()
-            and list(item.get("source_goal_ids") or [])
-        ]
-        if not mismatches and not missing_numeric:
-            return base_schema
-        schema = copy.deepcopy(base_schema)
-        branches = (
-            schema.get("$defs", {})
-            .get("PlannerModelStep", {})
-            .get("oneOf", [])
-        )
-        if not isinstance(branches, list):
-            return schema
-        for mismatch in mismatches:
-            capability_id = str(mismatch["capability_id"]).strip()
-            parameter = str(mismatch["parameter"]).strip()
-            for branch in branches:
-                if not isinstance(branch, dict):
-                    continue
-                properties = branch.get("properties")
-                if not isinstance(properties, dict):
-                    continue
-                capability_property = properties.get("capability_id")
-                if not isinstance(capability_property, dict) or capability_property.get(
-                    "enum"
-                ) != [capability_id]:
-                    continue
-                args = properties.get("args")
-                if not isinstance(args, dict) or parameter not in (
-                    args.get("properties") or {}
-                ):
-                    continue
-                required = args.setdefault("required", [])
-                if parameter not in required:
-                    required.append(parameter)
-        if missing_numeric:
-            if isinstance(semantic_baseline, dict):
-                properties = schema.get("properties")
-                if isinstance(properties, dict):
-                    for field_name, field_value in semantic_baseline.items():
-                        if field_name == "parameter_resolutions":
-                            continue
-                        properties[field_name] = {
-                            "const": copy.deepcopy(field_value)
-                        }
-            resolution_array = schema.get("properties", {}).get(
-                "parameter_resolutions"
-            )
-            resolution_model = schema.get("$defs", {}).get(
-                "PlanParameterResolution"
-            )
-            if isinstance(resolution_array, dict) and isinstance(
-                resolution_model, dict
-            ):
-                resolution_branches: list[dict[str, Any]] = []
-                for obligation in missing_numeric:
-                    branch = copy.deepcopy(resolution_model)
-                    branch_properties = branch.setdefault("properties", {})
-                    branch_properties["step_id"] = {
-                        "const": str(obligation["step_id"])
-                    }
-                    branch_properties["parameter"] = {
-                        "const": str(obligation["parameter"])
-                    }
-                    branch_properties["strategy"] = {"const": "user_supplied"}
-                    branch_properties["value"] = {"const": obligation["value"]}
-                    branch_properties["blocking"] = {"const": False}
-                    branch_properties["source_goal_ids"] = {
-                        "const": list(obligation["source_goal_ids"])
-                    }
-                    required = branch.setdefault("required", [])
-                    for field_name in (
-                        "step_id",
-                        "parameter",
-                        "strategy",
-                        "value",
-                        "confidence",
-                        "blocking",
-                        "rationale",
-                        "source_goal_ids",
-                    ):
-                        if field_name not in required:
-                            required.append(field_name)
-                    resolution_branches.append(branch)
-                resolution_array["items"] = (
-                    resolution_branches[0]
-                    if len(resolution_branches) == 1
-                    else {"oneOf": resolution_branches}
-                )
-                resolution_array["minItems"] = len(resolution_branches)
-        return schema
-
     @staticmethod
     def _validate_mechanical_numeric_revision_preserved(
         candidate: dict[str, Any],
@@ -1571,7 +1318,7 @@ class DeepPlannerResolver:
     ) -> list[dict[str, Any]]:
         """Enforce the decoder's safety-revision grammar at runtime too."""
 
-        if not cls._requires_safety_revision(feedback):
+        if not requires_safety_revision(feedback):
             return []
         if plan.disposition in {"clarify", "unavailable", "refused"}:
             return (
@@ -1587,7 +1334,7 @@ class DeepPlannerResolver:
         relation = str(plan.metadata.get("plan_relation") or "exact")
         confirmation = plan.metadata.get("user_confirmation_required") is True
         retained_parallel_steps = [step.step_id for step in plan.steps if step.timing == "parallel"]
-        if cls._requires_sequential_safety_revision(feedback) and retained_parallel_steps:
+        if requires_sequential_safety_revision(feedback) and retained_parallel_steps:
             return [
                 {
                     "type": "safety_revision_contract_not_satisfied",

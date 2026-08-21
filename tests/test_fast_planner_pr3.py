@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from agent.app import planner_schema
 from agent.app import planner_prompt as planner_prompt
 
 import asyncio
@@ -10,12 +11,14 @@ import unittest
 from pydantic import ValidationError
 
 from agent.app.fast_planner import FastPlannerResolver
-from agent.app.planner_contract import (
+from agent.app.planner_model_contract import (
     PlannerDTOContractError,
     PlannerModelOutput,
-    canonical_goal_binding_argument_response_schema,
-    goal_association_prompt_projection,
     is_planner_step_capability,
+)
+from agent.app.planner_schema import canonical_goal_binding_argument_response_schema
+from agent.app.planner_context import goal_association_prompt_projection
+from agent.app.planner_validation import (
     validate_external_response_evidence_boundary,
     validate_goal_binding_argument_grounding,
     validate_goal_responsibility_outcomes,
@@ -1636,7 +1639,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("generic stand-in", prompt)
         self.assertIn("use prospective grammar", prompt)
         self.assertIn("require Runtime commitment", prompt)
-        schema = FastPlannerResolver._first_response_schema(
+        schema = planner_schema.fast_first_response_response_schema(
             ["walk"],
             responsibilities=[responsibility],
             needs_work=True,
@@ -2788,7 +2791,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("has_semantic_perspective_contradiction", truth_schema["properties"])
 
     def test_first_response_schema_avoids_provider_think_control_token(self):
-        schema = FastPlannerResolver._first_response_schema(
+        schema = planner_schema.fast_first_response_response_schema(
             ["walk"],
             needs_work=True,
             needs_fresh_evidence=False,
@@ -3243,7 +3246,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("do not invent a semantic clarification", str(prompt))
 
     def test_first_activity_plan_schema_requires_explicit_decision_fields(self):
-        schema = FastPlannerResolver._advance_response_schema(["weather"])
+        schema = planner_schema.fast_advance_response_schema(["weather"])
 
         self.assertEqual(
             set(schema["required"]),
@@ -3388,7 +3391,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             }
         ]
 
-        schema = FastPlannerResolver._advance_response_schema(
+        schema = planner_schema.fast_advance_response_schema(
             ["weather"],
             responsibilities=[responsibility],
             capabilities=capability_payload,
@@ -3439,7 +3442,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             }
         )
 
-        schema = FastPlannerResolver._advance_response_schema(
+        schema = planner_schema.fast_advance_response_schema(
             ["weather"],
             responsibilities=[responsibility],
         )
@@ -3470,7 +3473,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             }
         )
 
-        schema = FastPlannerResolver._advance_response_schema(
+        schema = planner_schema.fast_advance_response_schema(
             ["walk"],
             responsibilities=[responsibility],
             capabilities=[
