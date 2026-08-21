@@ -980,12 +980,12 @@
       ]
     },
     {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant.cleanup",
+      "path": "orchestrator/runtime/shutdown_lifecycle.py",
+      "symbol": "shutdown_voice_assistant",
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "contract": "Final accelerator telemetry is diagnostic-only; teardown must continue to session finalization and resource release when that sample fails.",
       "review_status": "reviewed",
       "body_sha256": "fe216815b4bc0aa965c12c224e64486ae8ffe195f683d91da3fc6c849e040ae0",
       "failure_signals": [

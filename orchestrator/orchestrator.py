@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from collections import deque
 from difflib import SequenceMatcher
 import json
 import logging
@@ -128,6 +127,7 @@ from orchestrator.runtime.tts_text import (
     split_tts_clause_units,
     split_tts_sentence_units,
 )
+from orchestrator.runtime.shutdown_lifecycle import shutdown_voice_assistant
 from orchestrator.runtime.session import (
     now_ms,
     record_session_workflow_stage,
@@ -1072,9 +1072,6 @@ class VoiceAssistant:
 
     async def abort_output_stream(self):
         return await playback_transport_for(self).abort_output_stream()
-
-    async def close_output_stream(self):
-        return await playback_transport_for(self).close_output_stream()
 
     def is_stale_playback(self, generation: int, session_id: Optional[str]) -> bool:
         return generation != self.playback_generation or session_id != self.session_id
@@ -6852,75 +6849,6 @@ class VoiceAssistant:
         else:
             await self.mic_stream()
 
-    async def cleanup(self):
-        sessions = getattr(self, "sessions", None)
-        if sessions is not None:
-            try:
-                await self._sample_accelerator_resources(reason="session_finish")
-            except Exception as exc:
-                logger.debug(
-                    "Final accelerator telemetry sample failed: %s",
-                    type(exc).__name__,
-                )
-            sessions.finalize_active_sessions(reason="orchestrator_cleanup")
-        self.resolve_all_playback_start_waiters(
-            started=False,
-            reason="cleanup",
-        )
-        audio_device_monitor = getattr(self, "audio_device_monitor_task", None)
-        if audio_device_monitor is not None and not audio_device_monitor.done():
-            audio_device_monitor.cancel()
-            await asyncio.gather(
-                audio_device_monitor,
-                return_exceptions=True,
-            )
-        for task in list(self.active_synthesis_tasks):
-            task.cancel()
-        if self.active_asr_task and not self.active_asr_task.done():
-            self.active_asr_task.cancel()
-        active_turn_tasks = set(
-            getattr(self, "active_turn_tasks", {}).keys()
-        )
-        active_turn_task = getattr(self, "active_turn_task", None)
-        if active_turn_task is not None:
-            active_turn_tasks.add(active_turn_task)
-        for task in active_turn_tasks:
-            if not task.done():
-                task.cancel()
-        for task in list(
-            getattr(self, "concurrent_protective_reflex_tasks", set())
-        ):
-            if not task.done():
-                task.cancel()
-        output_abort_tasks = list(
-            getattr(self, "output_abort_tasks", set())
-        )
-        for task in output_abort_tasks:
-            if not task.done():
-                task.cancel()
-        if output_abort_tasks:
-            await asyncio.gather(
-                *output_abort_tasks,
-                return_exceptions=True,
-            )
-        self.active_reflex_task = None
-        self._pending_turn_after_reflex = deque()
-        self._pending_vad_audio = None
-        sweeper = getattr(self, "session_idle_sweeper_task", None)
-        if sweeper is not None and not sweeper.done():
-            sweeper.cancel()
-        for task in list(getattr(self, "observability_tasks", set())):
-            if not task.done():
-                task.cancel()
-        if self.playback_task and not self.playback_task.done():
-            await self.playback_queue.put((None, None, None, None, None, None))
-            self.playback_task.cancel()
-        await self.close_output_stream()
-        if self.asr_ws:
-            await self.asr_ws.close()
-        if self.http_session and not self.http_session.closed:
-            await self.http_session.close()
-        self.audio_mgr.close()
 
 
 async def main():
@@ -6928,7 +6856,10 @@ async def main():
     try:
         await assistant.run()
     finally:
-        await assistant.cleanup()
+        await shutdown_voice_assistant(
+            assistant,
+            close_output_stream=playback_transport_for(assistant).close_output_stream,
+        )
 
 
 if __name__ == "__main__":

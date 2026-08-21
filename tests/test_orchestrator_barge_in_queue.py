@@ -17,6 +17,7 @@ if "scipy" not in sys.modules:
     sys.modules["scipy.signal"] = scipy.signal  # type: ignore[attr-defined]
 
 from orchestrator.orchestrator import VoiceAssistant
+from orchestrator.runtime.shutdown_lifecycle import shutdown_voice_assistant
 
 
 class OrchestratorBargeInQueueTests(unittest.IsolatedAsyncioTestCase):
@@ -198,15 +199,17 @@ class OrchestratorBargeInQueueTests(unittest.IsolatedAsyncioTestCase):
         assistant.asr_ws = None
         assistant.http_session = None
 
-        async def close_output_stream(self: VoiceAssistant) -> None:
+        async def close_output_stream() -> None:
             return None
 
-        assistant.close_output_stream = MethodType(close_output_stream, assistant)
         assistant.audio_mgr = types.SimpleNamespace(close=lambda: None)
 
         asr_task = assistant.active_asr_task
         turn_task = assistant.active_turn_task
-        await assistant.cleanup()
+        await shutdown_voice_assistant(
+            assistant,
+            close_output_stream=close_output_stream,
+        )
         await asyncio.sleep(0)
 
         self.assertTrue(asr_task.cancelled())

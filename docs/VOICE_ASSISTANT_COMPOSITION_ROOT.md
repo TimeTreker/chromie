@@ -59,7 +59,7 @@ At this revision the checker reports:
 
 | Measure | Current ratchet |
 |---|---:|
-| `VoiceAssistant` methods | 129 |
+| `VoiceAssistant` methods | 127 |
 | properties | 1 |
 | `__init__` lines | 305 |
 | initialized `self` attributes | 110 |
@@ -69,7 +69,7 @@ These values are a **non-growth ceiling**, not proof that structural
 simplification is complete. The Planner-re-entry policy extraction removed nine
 private methods from the composition root (`159 -> 150`) and tightened the older
 permissive ceilings (`187/409/139`) to the actual maintained baseline
-(`150/305/110`). Subsequent owner-internal mechanical extractions move TTS text segmentation, Goal-list console projection, observability containment, reflex confirmation-token bookkeeping, and OS-default audio-device lifecycle out of the composition root, lowering the current method ceiling to `129` without moving semantic authority. A ratchet increase requires an explicit reviewed before/after
+(`150/305/110`). Subsequent owner-internal mechanical extractions move TTS text segmentation, Goal-list console projection, observability containment, reflex confirmation-token bookkeeping, and OS-default audio-device lifecycle out of the composition root. Top-level process teardown now lives in stateless `orchestrator/runtime/shutdown_lifecycle.py`: it reuses `InputTurnLifecycle.shutdown_tasks()`, asks the Playback lifecycle to release waiters/duck state, calls the real `PlaybackTransport` output-close owner directly, closes ASR/HTTP/audio resources, and finalizes session traces without interpreting Goal state. Removing `VoiceAssistant.cleanup()` and its cleanup-only `close_output_stream()` compatibility wrapper lowers the current method ceiling to `127` without moving semantic authority. A ratchet increase requires an explicit reviewed before/after
 rationale in the same change; ordinary work must hold or lower every ceiling.
 
 ## Remaining ownership seams
@@ -87,7 +87,7 @@ Further work is ordered by
 | Cognitive Gateway/Core dispatch | one Host turn-execution owner that delegates semantic work without gaining semantic authority |
 | observability recording | storage and lifecycle sampling remain delegated with exact turn/session correlation |
 | stop, interruption, approval revocation, and active-Goal cancellation | fixed-reflex token revocation/audit bookkeeping stays with the existing confirmation token owner; interruption dispatch and Goal cancellation remain atomic Host/runtime responsibilities |
-| cleanup | the root retains only top-level reverse-order collaborator shutdown |
+| shutdown lifecycle | top-level `shutdown_voice_assistant()` sequences mechanical teardown; task ownership remains in `InputTurnLifecycle`, playback teardown remains in Playback lifecycle/transport, session trace finalization remains in Session state, and process teardown never interprets or cancels Goals semantically |
 
 Each extraction must preserve ordering, cancellation, confirmation, and evidence
 semantics; add narrow regression tests; and lower or hold the mechanical

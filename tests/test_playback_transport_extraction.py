@@ -36,13 +36,12 @@ class PlaybackTransportExtractionTests(unittest.TestCase):
         self.assertIn("websockets.connect(host.tts_url", transport_source)
         self.assertIn("sd.OutputStream(", transport_source)
 
-    def test_host_methods_are_compatibility_delegates(self) -> None:
+    def test_host_methods_delegate_only_when_runtime_still_calls_them(self) -> None:
         from orchestrator.orchestrator import VoiceAssistant
 
         for name in (
             "ensure_output_stream",
             "abort_output_stream",
-            "close_output_stream",
             "play_audio",
             "enqueue_playback_skip",
             "playback_worker",
@@ -50,6 +49,11 @@ class PlaybackTransportExtractionTests(unittest.TestCase):
             with self.subTest(name=name):
                 source = inspect.getsource(getattr(VoiceAssistant, name))
                 self.assertIn("playback_transport_for(self)", source)
+        self.assertFalse(
+            hasattr(VoiceAssistant, "close_output_stream"),
+            "shutdown must call the PlaybackTransport owner directly instead of "
+            "restoring a compatibility-only VoiceAssistant wrapper",
+        )
         orchestrator_source = (ROOT / "orchestrator" / "orchestrator.py").read_text(
             encoding="utf-8"
         )
