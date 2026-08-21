@@ -16,6 +16,7 @@ from typing import Any, Optional
 import numpy as np
 import websockets
 
+from .audio_device_lifecycle import apply_pending_output_device_change
 from .session import now_ms
 
 logger = logging.getLogger(__name__)
@@ -257,7 +258,7 @@ class PlaybackTransport:
     async def play_audio(self, audio_bytes: bytes, source_rate: Optional[int], generation: int, session_id: Optional[str]):
         host = self.host
         if host.audio_output_mode == "device":
-            await host._apply_pending_output_device_change()
+            await apply_pending_output_device_change(host)
         pcm = host.resample_int16_bytes(audio_bytes, source_rate or host.default_tts_rate, host.output_rate)
         samples = np.frombuffer(pcm, dtype=np.int16)
         if samples.size == 0:
@@ -309,7 +310,7 @@ class PlaybackTransport:
                 await asyncio.to_thread(stream.write, chunk)
         # If the OS changed output while this ordered item was playing, close
         # the old stream now. The next item will open on the new default.
-        await host._apply_pending_output_device_change()
+        await apply_pending_output_device_change(host)
 
     async def enqueue_playback_skip(self, generation: int, order: int, session_id: Optional[str], reason: str):
         host = self.host

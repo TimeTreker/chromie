@@ -59,7 +59,7 @@ At this revision the checker reports:
 
 | Measure | Current ratchet |
 |---|---:|
-| `VoiceAssistant` methods | 136 |
+| `VoiceAssistant` methods | 129 |
 | properties | 1 |
 | `__init__` lines | 305 |
 | initialized `self` attributes | 110 |
@@ -69,7 +69,7 @@ These values are a **non-growth ceiling**, not proof that structural
 simplification is complete. The Planner-re-entry policy extraction removed nine
 private methods from the composition root (`159 -> 150`) and tightened the older
 permissive ceilings (`187/409/139`) to the actual maintained baseline
-(`150/305/110`). A ratchet increase requires an explicit reviewed before/after
+(`150/305/110`). Subsequent owner-internal mechanical extractions move TTS text segmentation, Goal-list console projection, observability containment, reflex confirmation-token bookkeeping, and OS-default audio-device lifecycle out of the composition root, lowering the current method ceiling to `129` without moving semantic authority. A ratchet increase requires an explicit reviewed before/after
 rationale in the same change; ordinary work must hold or lower every ceiling.
 
 ## Remaining ownership seams
@@ -81,6 +81,7 @@ Further work is ordered by
 |---|---|
 | Host configuration | immutable typed audio, cognition, playback, session, and evidence settings composed before `VoiceAssistant` |
 | playback delivery | keep synthesis, transport, playback barriers, echo handling, cancellation, and delivery evidence behind one collaborator |
+| audio-device lifecycle | keep OS-default detection, validated pending-device queueing, cross-device input reset, and output rollover as Host mechanics; device discovery stays in `AudioDeviceManager` and output I/O stays in `PlaybackTransport` |
 | input session lifecycle | keep microphone/VAD/ASR transport, injected audio, routed turns, idle sweeping, and deterministic task shutdown behind the session/lifecycle owners |
 | direct-LLM compatibility | prove maintained-profile unreachability, then remove it or retain only a separately tested emergency contract |
 | Cognitive Gateway/Core dispatch | one Host turn-execution owner that delegates semantic work without gaining semantic authority |

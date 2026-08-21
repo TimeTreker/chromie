@@ -3,7 +3,7 @@
   "voice_assistant": {
     "path": "orchestrator/orchestrator.py",
     "class_name": "VoiceAssistant",
-    "max_method_count": 136,
+    "max_method_count": 129,
     "max_property_count": 1,
     "max_init_lines": 305,
     "max_init_self_attributes": 110,

@@ -9,6 +9,11 @@ import unittest
 from unittest import mock
 
 from orchestrator.audio_device_manager import AudioDeviceManager
+from orchestrator.runtime.audio_device_lifecycle import (
+    apply_pending_input_device_change,
+    apply_pending_output_device_change,
+    refresh_system_default_audio_devices,
+)
 
 async def _to_thread_inline(function, /, *args, **kwargs):
     return function(*args, **kwargs)
@@ -468,10 +473,10 @@ class OrchestratorAudioDeviceFollowTests(unittest.IsolatedAsyncioTestCase):
         assistant._audio_device_errors = {}
 
         with mock.patch(
-            "orchestrator.orchestrator.asyncio.to_thread",
+            "orchestrator.runtime.audio_device_lifecycle.asyncio.to_thread",
             new=_to_thread_inline,
         ):
-            await assistant._refresh_system_default_audio_devices()
+            await refresh_system_default_audio_devices(assistant)
 
         self.assertTrue(assistant._input_device_change_event.is_set())
         self.assertEqual(assistant._pending_input_params, new_input)
@@ -535,7 +540,8 @@ class OrchestratorAudioDeviceFollowTests(unittest.IsolatedAsyncioTestCase):
         assistant._pending_output_params = None
         assistant._audio_device_errors = {}
 
-        queued = await assistant._refresh_system_default_audio_devices(
+        queued = await refresh_system_default_audio_devices(
+            assistant,
             force_kinds={"input", "output"},
         )
 
@@ -559,7 +565,7 @@ class OrchestratorAudioDeviceFollowTests(unittest.IsolatedAsyncioTestCase):
         assistant._vad_segment_started_during_playback = True
         assistant._vad_segment_playback_generation = 7
 
-        changed = await assistant._apply_pending_input_device_change()
+        changed = await apply_pending_input_device_change(assistant)
 
         self.assertTrue(changed)
         self.assertEqual(assistant.input_device, 8)
@@ -585,10 +591,10 @@ class OrchestratorAudioDeviceFollowTests(unittest.IsolatedAsyncioTestCase):
         assistant.output_stream = stream
 
         with mock.patch(
-            "orchestrator.orchestrator.asyncio.to_thread",
+            "orchestrator.runtime.audio_device_lifecycle.asyncio.to_thread",
             new=_to_thread_inline,
         ):
-            changed = await assistant._apply_pending_output_device_change()
+            changed = await apply_pending_output_device_change(assistant)
 
         self.assertTrue(changed)
         self.assertTrue(stream.stopped)

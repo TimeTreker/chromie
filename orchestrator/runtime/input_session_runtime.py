@@ -16,6 +16,10 @@ from typing import Any
 import numpy as np
 
 from orchestrator.audio_injection import read_audio_packet
+from orchestrator.runtime.audio_device_lifecycle import (
+    apply_pending_input_device_change,
+    refresh_system_default_audio_devices,
+)
 from orchestrator.runtime.playback_transport import transport_for as playback_transport_for
 from orchestrator.runtime.session import now_ms, record_session_workflow_stage
 from shared.chromie_contracts.reflex import DEFAULT_REFLEX_FILTER
@@ -813,7 +817,7 @@ class InputSessionRuntime:
         logger.info("Opening microphone with sounddevice")
         host.loop = asyncio.get_running_loop()
         while True:
-            await host._apply_pending_input_device_change()
+            await apply_pending_input_device_change(host)
             sd = _sounddevice()
             try:
                 with sd.InputStream(
@@ -853,7 +857,8 @@ class InputSessionRuntime:
                     "current valid system default: %s",
                     exc,
                 )
-                await host._refresh_system_default_audio_devices(
+                await refresh_system_default_audio_devices(
+                    host,
                     force_kinds={"input"},
                 )
                 await asyncio.sleep(1.0)

@@ -474,8 +474,8 @@
       ]
     },
     {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._apply_pending_output_device_change.stop_and_close",
+      "path": "orchestrator/runtime/audio_device_lifecycle.py",
+      "symbol": "apply_pending_output_device_change.stop_and_close",
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
@@ -487,8 +487,8 @@
       ]
     },
     {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._apply_pending_output_device_change.stop_and_close",
+      "path": "orchestrator/runtime/audio_device_lifecycle.py",
+      "symbol": "apply_pending_output_device_change.stop_and_close",
       "ordinal": 2,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
@@ -537,8 +537,8 @@
       ]
     },
     {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._audio_device_monitor.collect_pipewire_changes",
+      "path": "orchestrator/runtime/audio_device_lifecycle.py",
+      "symbol": "audio_device_monitor.collect_pipewire_changes",
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
@@ -923,14 +923,14 @@
       ]
     },
     {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._refresh_system_default_audio_devices",
+      "path": "orchestrator/runtime/audio_device_lifecycle.py",
+      "symbol": "refresh_system_default_audio_devices",
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "070c6debbbe0c6759f430467a871f616013aeb46af565edd8d3bf15a9086ddb7",
+      "body_sha256": "85aaea1da1a6d4d9cde2f1abb7acda54e081884b82804eee9ae94a0dff631769",
       "failure_signals": [
         "continue",
         "diagnostic",
@@ -1413,7 +1413,7 @@
       "owner": "orchestrator.input_session_runtime",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "33f08a44748e28a8ef2989a27aad7c092f3aea70962d5688208ed04c00c713c1",
+      "body_sha256": "cf5da6287442fd5430114d0dcae76b6f44ddc0e8d81399eaf0fa3bf92d0e24ee",
       "failure_signals": [
         "bare_reraise",
         "diagnostic"

@@ -640,7 +640,7 @@ delta suppression. Missing Responsibility provenance fails closed instead of fab
 a callback Responsibility. This extraction removes nine private methods from
 `VoiceAssistant`, lowering its method count from 159 to 150. A second mechanical slice
 moves TTS text segmentation and Goal-list console projection behind existing Host/runtime
-module boundaries, lowering the composition root from 150 to 142 methods. Stateless observability-recording containment then lowers it to 139 methods. Fixed-reflex confirmation-token revocation, widening evidence, and state bookkeeping now live with the existing ConfirmationDialogue owner, lowering it to 136 methods while confirmation meaning remains GA-owned and confirmation speech remains Planner-owned. None of these
+module boundaries, lowering the composition root from 150 to 142 methods. Stateless observability-recording containment then lowers it to 139 methods. Fixed-reflex confirmation-token revocation, widening evidence, and state bookkeeping now live with the existing ConfirmationDialogue owner, lowering it to 136 methods while confirmation meaning remains GA-owned and confirmation speech remains Planner-owned. OS-default audio-device detection, pending-switch queueing, cross-device input reset, and output rollover then move to stateless `audio_device_lifecycle.py`, lowering the root to 129 methods while device discovery remains `AudioDeviceManager`-owned and output I/O remains `PlaybackTransport`-owned. None of these
 slices adds a semantic owner, manager, state store, service, environment key, or public
 runtime path.
 
