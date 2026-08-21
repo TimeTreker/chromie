@@ -59,7 +59,7 @@ At this revision the checker reports:
 
 | Measure | Current ratchet |
 |---|---:|
-| `VoiceAssistant` methods | 150 |
+| `VoiceAssistant` methods | 142 |
 | properties | 1 |
 | `__init__` lines | 305 |
 | initialized `self` attributes | 110 |
@@ -93,10 +93,11 @@ semantics; add narrow regression tests; and lower or hold the mechanical
 ratchets. File size alone is not an acceptance criterion.
 
 Broader decomposition starts only after the active current-revision evidence closure.
-One narrow source slice is already implemented because it directly protects the current
-Evidence-provenance line: pure Planner-reentry validation moved out of the composition
-root and dead wrappers were deleted without changing public runtime behavior or adding a
-manager. Later candidates remain the existing ownership seams in the table, selected by
+Two narrow source slices are implemented. Pure Planner-reentry validation protects the
+current Evidence-provenance line. Pure TTS text segmentation and Goal-list console
+projection remove deterministic formatting algorithms from the composition root without
+changing public runtime behavior or adding a manager. Later candidates remain the existing
+ownership seams in the table, selected by
 independent testability, lifecycle, configuration authority, and failure semantics;
 method or file length alone does not justify a new manager. Durable memory, mood,
 ambient autonomy, or another cognitive service are not part of this structural work.

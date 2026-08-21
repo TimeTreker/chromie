@@ -3,6 +3,10 @@ from __future__ import annotations
 import unittest
 
 from orchestrator.orchestrator import VoiceAssistant
+from orchestrator.runtime.goal_list_console import (
+    goal_list_change_by_task,
+    goal_list_item_text,
+)
 
 
 class GoalListConsoleLoggingTests(unittest.TestCase):
@@ -23,7 +27,7 @@ class GoalListConsoleLoggingTests(unittest.TestCase):
             },
         }
 
-        line = VoiceAssistant._goal_list_item_text(
+        line = goal_list_item_text(
             snapshot,
             bucket="active",
             index=1,
@@ -42,7 +46,7 @@ class GoalListConsoleLoggingTests(unittest.TestCase):
         self.assertNotIn("should_not_print", line)
 
     def test_committed_operations_mark_only_changed_goal_tasks(self) -> None:
-        changes = VoiceAssistant._goal_list_change_by_task(
+        changes = goal_list_change_by_task(
             [
                 {
                     "applied": True,

@@ -123,9 +123,10 @@ Responsibility provenance retains Evidence but suppresses this opportunity befor
 invocation; the Host no longer fabricates callback meaning.
 
 The module owns no Goal meaning, speech, Planner call, Runtime mutation, or state. Nine
-private methods leave `VoiceAssistant` (`159 -> 150`), and ratchets tighten to
-`150 methods / 305 init lines / 110 attributes / 0 direct-LLM calls`. This is one narrow
-ownership-seam extraction, not a new manager or completed Host decomposition.
+private methods first leave `VoiceAssistant` (`159 -> 150`). The next mechanical slice
+moves TTS text segmentation and Goal-list console projection out of the composition root,
+lowering it again to `142 methods / 305 init lines / 110 attributes / 0 direct-LLM calls`.
+These are narrow ownership-seam extractions, not new managers or completed Host decomposition.
 
 ## Verification
 
@@ -147,7 +148,7 @@ claimed by this source patch.
 
 ## Resume order
 
-1. Apply patches 1, 2, and 3 in order to the uploaded archive, then run
+1. Apply patches 1, 2, 3, and 4 in order to the uploaded archive, then run
    `./scripts/run_tests.sh` with pinned test dependencies.
 2. Run retained async/general-ability cases on the current model profile.
 3. Retain provider-backed information and embodied episodes that exercise follow-up Work,

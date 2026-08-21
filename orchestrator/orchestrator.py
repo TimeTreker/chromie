@@ -83,6 +83,10 @@ from orchestrator.runtime.host_components import (
     build_interaction_runtime,
 )
 from orchestrator.runtime.host_settings import HostSettingsSnapshot
+from orchestrator.runtime.goal_list_console import (
+    goal_list_change_by_task,
+    goal_list_item_text,
+)
 from orchestrator.runtime.input_turn_lifecycle import InputTurnLifecycle
 from orchestrator.runtime.input_session_runtime import input_session_runtime_for
 from orchestrator.runtime.outcome_delivery import build_host_outcome_delivery
@@ -102,6 +106,13 @@ from orchestrator.runtime.planner_reentry import (
     planner_reentry_responsibilities,
     suppress_already_delivered_speech,
     terminal_evidence_relevance,
+)
+from orchestrator.runtime.tts_text import (
+    ends_with_tts_sentence_boundary,
+    should_merge_tts_chunks,
+    split_oversized_tts_unit,
+    split_tts_clause_units,
+    split_tts_sentence_units,
 )
 from orchestrator.runtime.session import (
     now_ms,
@@ -901,137 +912,6 @@ class VoiceAssistant:
             return candidate[:cut_at].strip(), candidate[cut_at:].strip()
         return None, candidate
 
-    @staticmethod
-    def _ends_with_tts_sentence_boundary(text: str) -> bool:
-        stripped = text.rstrip()
-        while stripped and stripped[-1] in "\"'”’)]}」』":
-            stripped = stripped[:-1].rstrip()
-        return bool(stripped and stripped[-1] in ".!?。！？")
-
-    @staticmethod
-    def _ends_with_tts_natural_boundary(text: str) -> bool:
-        stripped = text.rstrip()
-        while stripped and stripped[-1] in "\"'”’)]}」』":
-            stripped = stripped[:-1].rstrip()
-        return bool(stripped and stripped[-1] in ".!?。！？,，、;；:：")
-
-    @staticmethod
-    def _split_tts_sentence_units(text: str) -> list[str]:
-        end_chars = ".!?。！？"
-        closing_chars = "\"'”’)]}」』"
-        units: list[str] = []
-        start = 0
-        i = 0
-        while i < len(text):
-            if text[i] in end_chars:
-                sentence_mark = text[i]
-                end = i + 1
-                while end < len(text) and text[end] in closing_chars:
-                    end += 1
-                if end == len(text) or text[end].isspace() or sentence_mark in "。！？":
-                    unit = text[start:end].strip()
-                    if unit:
-                        units.append(unit)
-                    start = end
-                    while start < len(text) and text[start].isspace():
-                        start += 1
-                    i = start
-                    continue
-            i += 1
-        tail = text[start:].strip()
-        if tail:
-            units.append(tail)
-        return units or [text]
-
-    @staticmethod
-    def _split_tts_clause_units(
-        text: str,
-        *,
-        min_chars: int,
-        trigger_chars: int,
-    ) -> list[str]:
-        if len(text) <= trigger_chars:
-            return [text]
-
-        split_chars = ",，、;；:："
-        opening_quotes = {"“": "”", "「": "」", "『": "』"}
-        closing_quotes = {"”", "」", "』"}
-        quote_stack: list[str] = []
-        in_plain_quote = False
-        units: list[str] = []
-        start = 0
-        i = 0
-        while i < len(text):
-            char = text[i]
-            if char == '"':
-                in_plain_quote = not in_plain_quote
-            elif char in opening_quotes:
-                quote_stack.append(opening_quotes[char])
-            elif char in closing_quotes and quote_stack and char == quote_stack[-1]:
-                quote_stack.pop()
-            elif char in split_chars and not in_plain_quote and not quote_stack:
-                end = i + 1
-                unit = text[start:end].strip()
-                tail = text[end:].strip()
-                if len(unit) >= min_chars and len(tail) >= min_chars:
-                    units.append(unit)
-                    start = end
-                    while start < len(text) and text[start].isspace():
-                        start += 1
-                    i = start
-                    continue
-            i += 1
-
-        tail = text[start:].strip()
-        if tail:
-            units.append(tail)
-        return units or [text]
-
-    @staticmethod
-    def _split_oversized_tts_unit(text: str, hard_limit: int) -> list[str]:
-        if len(text) <= hard_limit:
-            return [text]
-        chunks: list[str] = []
-        remaining = text
-        while len(remaining) > hard_limit:
-            cut = remaining[:hard_limit]
-            cut_points = [
-                cut.rfind(sep)
-                for sep in (",", "，", "、", ";", "；", ":", "：", " ")
-            ]
-            cut_at = max(cut_points)
-            if cut_at < max(20, hard_limit // 2):
-                cut_at = hard_limit
-            else:
-                cut_at += 1
-            chunk = remaining[:cut_at].strip()
-            if chunk:
-                chunks.append(chunk)
-            remaining = remaining[cut_at:].strip()
-        if remaining:
-            chunks.append(remaining)
-        return chunks
-
-    def _should_merge_tts_chunks(
-        self,
-        current: str,
-        chunk: str,
-        *,
-        limit: int,
-        hard_limit: int,
-        min_chars: int,
-    ) -> bool:
-        merged_len = len(current) + 1 + len(chunk)
-        if merged_len > hard_limit:
-            return False
-        if len(current) < min_chars:
-            return True
-        if len(chunk) < min_chars and merged_len <= limit:
-            return True
-        if not self._ends_with_tts_natural_boundary(current) and merged_len <= limit:
-            return True
-        return False
-
     def split_tts_text(self, text: str) -> list[str]:
         candidate = self.normalize_tts_candidate(text)
         if not self.is_valid_tts_text(candidate):
@@ -1066,13 +946,13 @@ class VoiceAssistant:
             clause_trigger = max(limit, min_chars * 2)
         else:
             clause_trigger = max(80, min(limit, hard_limit) // 2, min_chars * 3)
-        for unit in self._split_tts_sentence_units(candidate):
-            for clause in self._split_tts_clause_units(
+        for unit in split_tts_sentence_units(candidate):
+            for clause in split_tts_clause_units(
                 unit,
                 min_chars=min_chars,
                 trigger_chars=clause_trigger,
             ):
-                raw_chunks.extend(self._split_oversized_tts_unit(clause, hard_limit))
+                raw_chunks.extend(split_oversized_tts_unit(clause, hard_limit))
         if not raw_chunks:
             return [candidate]
 
@@ -1083,7 +963,7 @@ class VoiceAssistant:
             first_limit < limit
             and len(raw_chunks) > 1
             and len(raw_chunks[0]) <= first_limit
-            and self._ends_with_tts_sentence_boundary(raw_chunks[0])
+            and ends_with_tts_sentence_boundary(raw_chunks[0])
         ):
             chunks.append(raw_chunks[0])
             grouped_chunks = raw_chunks[1:]
@@ -1091,7 +971,7 @@ class VoiceAssistant:
             merged = f"{current} {chunk}".strip() if current else chunk
             if not current:
                 current = chunk
-            elif self._should_merge_tts_chunks(
+            elif should_merge_tts_chunks(
                 current,
                 chunk,
                 limit=limit,
@@ -2076,109 +1956,6 @@ class VoiceAssistant:
         return summary
 
 
-    @staticmethod
-    def _goal_list_change_by_task(
-        applied_operations: list[dict[str, Any]] | None,
-    ) -> dict[str, str]:
-        """Map committed Goal-state operations to concise console change labels."""
-
-        labels: dict[str, str] = {}
-        priorities = {
-            "unchanged": 0,
-            "associated": 10,
-            "updated": 20,
-            "confirmed": 25,
-            "resumed": 25,
-            "paused": 30,
-            "added": 40,
-            "cancelled": 50,
-            "rejected": 50,
-        }
-        for item in list(applied_operations or []):
-            if not isinstance(item, dict) or item.get("applied") is not True:
-                continue
-            task_id = " ".join(str(item.get("task_id") or "").split())
-            if not task_id:
-                continue
-            operation = str(item.get("operation") or "").strip().casefold()
-            relationship = str(item.get("relationship") or "").strip().casefold()
-            if operation == "create":
-                label = "added"
-            elif relationship in {"continue", "reference"}:
-                label = "associated"
-            elif operation in {"modify", "clarification_answer", "correct"}:
-                label = "updated"
-            elif operation == "confirm":
-                label = "confirmed"
-            elif operation == "resume":
-                label = "resumed"
-            elif operation == "pause":
-                label = "paused"
-            elif operation == "cancel":
-                label = "cancelled"
-            elif operation == "reject":
-                label = "rejected"
-            elif relationship:
-                label = "associated"
-            elif operation:
-                label = "updated"
-            else:
-                continue
-            previous = labels.get(task_id, "unchanged")
-            if priorities.get(label, 1) >= priorities.get(previous, 0):
-                labels[task_id] = label
-        return labels
-
-    @staticmethod
-    def _goal_list_item_text(
-        snapshot: dict[str, Any],
-        *,
-        bucket: str,
-        index: int,
-        total: int,
-        change: str = "unchanged",
-    ) -> str:
-        goal = snapshot.get("goal") if isinstance(snapshot.get("goal"), dict) else {}
-        metadata = (
-            snapshot.get("metadata")
-            if isinstance(snapshot.get("metadata"), dict)
-            else {}
-        )
-        description = " ".join(
-            str(goal.get("description") or snapshot.get("last_user_update") or "").split()
-        )
-        if len(description) > 180:
-            description = description[:179].rstrip() + "…"
-        goal_id = " ".join(
-            str(snapshot.get("goal_id") or goal.get("goal_id") or "unknown").split()
-        )
-        responsibility = " ".join(
-            str(
-                snapshot.get("responsibility_status")
-                or goal.get("responsibility_status")
-                or "unknown"
-            ).split()
-        )
-        work = " ".join(str(snapshot.get("work_status") or "unknown").split())
-        relation = " ".join(str(metadata.get("task_relation") or "unknown").split())
-        version = snapshot.get("goal_version") or goal.get("version") or 0
-        marker = {
-            "added": "+",
-            "associated": "~",
-            "updated": "~",
-            "confirmed": "✓",
-            "resumed": ">",
-            "paused": "||",
-            "cancelled": "x",
-            "rejected": "x",
-        }.get(change, " ")
-        return (
-            "goal_list_item: "
-            f"change={change} marker={marker} bucket={bucket} index={index}/{total} "
-            f"goal_id={goal_id} responsibility={responsibility} work={work} "
-            f"relation={relation} version={version} description={description!r}"
-        )
-
     def _log_goal_list(
         self,
         session_id: str | None,
@@ -2194,7 +1971,7 @@ class VoiceAssistant:
             for item in list(recent_terminal_goals or [])
             if isinstance(item, dict)
         ]
-        change_by_task = self._goal_list_change_by_task(applied_operations)
+        change_by_task = goal_list_change_by_task(applied_operations)
         self.session_log(
             session_id,
             "goal_list: phase=%s active_count=%s recent_terminal_count=%s",
@@ -2209,7 +1986,7 @@ class VoiceAssistant:
                 self.session_log(
                     session_id,
                     "%s",
-                    self._goal_list_item_text(
+                    goal_list_item_text(
                         snapshot,
                         bucket=bucket,
                         index=index,

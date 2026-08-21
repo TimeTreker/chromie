@@ -638,8 +638,11 @@ pure Host policy module for current Goal/Plan/request validation, exact originat
 Responsibility selection, completed-Activity idempotence, and already-delivered speech
 delta suppression. Missing Responsibility provenance fails closed instead of fabricating
 a callback Responsibility. This extraction removes nine private methods from
-`VoiceAssistant`, lowers its actual method count from 159 to 150, and adds no semantic
-owner, manager, state store, service, environment key, or public runtime path.
+`VoiceAssistant`, lowering its method count from 159 to 150. A second mechanical slice
+moves TTS text segmentation and Goal-list console projection behind existing Host/runtime
+module boundaries, lowering the composition root again from 150 to 142 methods. Neither
+slice adds a semantic owner, manager, state store, service, environment key, or public
+runtime path.
 
 - Decompose the Orchestrator composition root without raising existing method,
   property, initializer, exception-boundary, or direct-model-call ratchets.
