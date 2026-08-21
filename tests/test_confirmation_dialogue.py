@@ -5,6 +5,9 @@ import unittest
 from orchestrator.runtime.confirmation import (
     ConfirmationDialogue,
     confirmation_meaning_from_goal_association,
+    reconcile_revoked_confirmation_for_reflex,
+    revoke_pending_confirmation_for_reflex,
+    revoked_confirmation_evidence_for_reflex,
 )
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.interaction import InteractionResponse
@@ -184,6 +187,108 @@ class ConfirmationDialogueTests(unittest.TestCase):
 
         self.assertEqual(resolution.decision, "not_confirmation")
         self.assertEqual(dialogue.pending, pending)
+
+
+    def test_fixed_reflex_confirmation_policy_is_scope_bound_and_conservative(self) -> None:
+        dialogue = ConfirmationDialogue(clock=lambda: 100.0)
+        pending = dialogue.begin(
+            InteractionResponse(
+                interaction_id="interaction-mixed",
+                capabilities=[
+                    {"request_id": "move", "capability_id": "soridormi.walk"},
+                    {"request_id": "read", "capability_id": "chromie.weather"},
+                ],
+            ),
+            confirmed_request_ids={"move", "read"},
+            origin_session_id="sid",
+            conversation_id="conversation",
+        )
+
+        class Definition:
+            def __init__(self, *domains: str) -> None:
+                self.cancellation_domains = domains
+
+        class Registry:
+            def get(self, capability_id: str) -> Definition:
+                if capability_id == "soridormi.walk":
+                    return Definition("embodied_motion")
+                return Definition()
+
+        self.assertIsNone(
+            revoke_pending_confirmation_for_reflex(
+                dialogue,
+                cancellation_scope="output_only",
+                interaction_registry=Registry(),
+            )
+        )
+        self.assertIs(dialogue.pending, pending)
+
+        revoked = revoke_pending_confirmation_for_reflex(
+            dialogue,
+            cancellation_scope="embodied_motion",
+            interaction_registry=Registry(),
+        )
+        self.assertIs(revoked, pending)
+        self.assertIsNone(dialogue.pending)
+
+        evidence = revoked_confirmation_evidence_for_reflex(
+            revoked,
+            cancellation_scope="embodied_motion",
+            interaction_registry=Registry(),
+        )
+        self.assertEqual(evidence["motion_request_ids"], ["move"])
+        self.assertTrue(evidence["confirmation_scope_widened"])
+        self.assertEqual(
+            evidence["widening_reason"],
+            "shared_confirmation_token_revoked_conservatively",
+        )
+
+    def test_reconcile_revoked_confirmation_is_bookkeeping_only(self) -> None:
+        dialogue = ConfirmationDialogue(clock=lambda: 100.0)
+        pending = dialogue.begin(
+            _response(),
+            confirmed_request_ids={"nod-1"},
+            origin_session_id="sid",
+            conversation_id="conversation",
+        )
+        revoked = dialogue.cancel()
+        assert revoked is pending
+
+        class Definition:
+            cancellation_domains = ("embodied_motion",)
+
+        class Registry:
+            def get(self, capability_id: str) -> Definition:
+                return Definition()
+
+        class ConversationState:
+            def __init__(self) -> None:
+                self.calls: list[tuple[str, str]] = []
+
+            def resolve_confirmation_scope(
+                self, *, confirmation_id: str, decision: str
+            ) -> bool:
+                self.calls.append((confirmation_id, decision))
+                return True
+
+        state = ConversationState()
+        logs: list[str] = []
+
+        evidence = reconcile_revoked_confirmation_for_reflex(
+            revoked,
+            conversation_state=state,
+            session_id="sid",
+            cancellation_scope="current_interaction",
+            interaction_registry=Registry(),
+            session_log=lambda sid, message, *args: logs.append(message % args),
+        )
+
+        self.assertEqual(
+            state.calls,
+            [(pending.confirmation_id, "operational_interrupt")],
+        )
+        self.assertEqual(evidence["confirmation_id"], pending.confirmation_id)
+        self.assertTrue(logs)
 
     def test_fallback_prompt_is_natural_and_omits_runtime_internals(self) -> None:
         response = _response()

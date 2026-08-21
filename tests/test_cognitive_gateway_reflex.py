@@ -9,7 +9,10 @@ from types import MethodType
 from typing import Any
 
 from orchestrator.orchestrator import VoiceAssistant
-from orchestrator.runtime.confirmation import ConfirmationDialogue
+from orchestrator.runtime.confirmation import (
+    ConfirmationDialogue,
+    revoke_pending_confirmation_for_reflex,
+)
 from orchestrator.runtime.interaction_coordinator import (
     InteractionRuntimeCoordinator,
 )
@@ -985,8 +988,11 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
             conversation_id="conversation-confirm",
         )
 
-        revoked = assistant._revoke_pending_confirmation_for_reflex(
-            ReflexFilter().evaluate("Stop talking.")
+        outcome = ReflexFilter().evaluate("Stop talking.")
+        revoked = revoke_pending_confirmation_for_reflex(
+            assistant.confirmation_dialogue,
+            cancellation_scope=outcome.cancellation_scope,
+            interaction_registry=getattr(getattr(assistant, "interaction_runtime", None), "registry", None),
         )
 
         self.assertIsNone(revoked)
@@ -1024,8 +1030,11 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
             {"registry": _Registry()},
         )()
 
-        revoked = assistant._revoke_pending_confirmation_for_reflex(
-            ReflexFilter().evaluate("Stop moving.")
+        outcome = ReflexFilter().evaluate("Stop moving.")
+        revoked = revoke_pending_confirmation_for_reflex(
+            assistant.confirmation_dialogue,
+            cancellation_scope=outcome.cancellation_scope,
+            interaction_registry=getattr(getattr(assistant, "interaction_runtime", None), "registry", None),
         )
 
         self.assertIsNotNone(revoked)
@@ -1080,8 +1089,11 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
             {"registry": _Registry()},
         )()
 
-        revoked = assistant._revoke_pending_confirmation_for_reflex(
-            ReflexFilter().evaluate("Stop moving.")
+        outcome = ReflexFilter().evaluate("Stop moving.")
+        revoked = revoke_pending_confirmation_for_reflex(
+            assistant.confirmation_dialogue,
+            cancellation_scope=outcome.cancellation_scope,
+            interaction_registry=getattr(getattr(assistant, "interaction_runtime", None), "registry", None),
         )
 
         self.assertIsNotNone(revoked)

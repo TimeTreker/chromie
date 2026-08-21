@@ -54,6 +54,9 @@ from orchestrator.runtime.confirmation import (
     PendingConfirmation,
     confirmation_meaning_from_goal_association,
     pending_confirmation_goal_ids,
+    reconcile_revoked_confirmation_for_reflex,
+    revoke_pending_confirmation_for_reflex,
+    revoked_confirmation_evidence_for_reflex,
 )
 from orchestrator.runtime.named_goal_cancellation import (
     ActiveGoalCancellationRequiresRuntimeDispatch,
@@ -3152,8 +3155,14 @@ class VoiceAssistant:
                 reflex_outcome.cancellation_scope,
                 reflex_outcome.confidence,
             )
-            revoked_confirmation = self._revoke_pending_confirmation_for_reflex(
-                reflex_outcome
+            revoked_confirmation = revoke_pending_confirmation_for_reflex(
+                getattr(self, "confirmation_dialogue", None),
+                cancellation_scope=reflex_outcome.cancellation_scope,
+                interaction_registry=getattr(
+                    getattr(self, "interaction_runtime", None),
+                    "registry",
+                    None,
+                ),
             )
             # The approval token is revoked synchronously before the first
             # await, so slow trusted-provider cancellation cannot leave an old
@@ -3169,10 +3178,17 @@ class VoiceAssistant:
                 # operational dispatch itself cannot return a receipt, retain
                 # that revocation through the compatibility state path before
                 # propagating the failure.
-                self._reconcile_revoked_confirmation_for_reflex(
+                reconcile_revoked_confirmation_for_reflex(
                     revoked_confirmation,
-                    session_id,
+                    conversation_state=getattr(self, "conversation_state", None),
+                    session_id=session_id,
                     cancellation_scope=reflex_outcome.cancellation_scope,
+                    interaction_registry=getattr(
+                        getattr(self, "interaction_runtime", None),
+                        "registry",
+                        None,
+                    ),
+                    session_log=self.session_log,
                 )
                 raise
             cancellation_reconciliation = (
@@ -3854,169 +3870,6 @@ class VoiceAssistant:
         )
         return meaning
 
-    def _revoke_pending_confirmation_for_reflex(
-        self,
-        outcome: ReflexOutcome,
-    ) -> Any | None:
-        """Revoke an approval token synchronously, before interruption awaits."""
-
-        dialogue = getattr(self, "confirmation_dialogue", None)
-        if outcome.cancellation_scope in {"output_only", "media_output"}:
-            return None
-        if outcome.cancellation_scope == "embodied_motion":
-            pending = getattr(dialogue, "pending", None)
-            if pending is None:
-                return None
-            confirmed = set(
-                getattr(pending, "confirmed_request_ids", ()) or ()
-            )
-            response = getattr(pending, "response", None)
-            requests = getattr(response, "capabilities", ()) or ()
-            registry = getattr(
-                getattr(self, "interaction_runtime", None),
-                "registry",
-                None,
-            )
-            has_motion = False
-            seen_confirmed_request_ids: set[str] = set()
-            unknown_confirmed_request = False
-            for request in requests:
-                if request.request_id not in confirmed:
-                    continue
-                seen_confirmed_request_ids.add(request.request_id)
-                try:
-                    definition = registry.get(request.capability_id)
-                except (AttributeError, ValueError):
-                    unknown_confirmed_request = True
-                    continue
-                if "embodied_motion" in definition.cancellation_domains:
-                    has_motion = True
-                    break
-            if confirmed - seen_confirmed_request_ids:
-                unknown_confirmed_request = True
-            if not has_motion and not unknown_confirmed_request:
-                return None
-        cancel = getattr(dialogue, "cancel", None)
-        return cancel() if callable(cancel) else None
-
-    def _revoked_confirmation_evidence_for_reflex(
-        self,
-        pending: Any | None,
-        *,
-        cancellation_scope: str,
-    ) -> dict[str, Any]:
-        """Describe a synchronously revoked token without mutating Goal state."""
-
-        if pending is None:
-            return {}
-        confirmation_id = str(getattr(pending, "confirmation_id", "") or "")
-        fingerprint = str(getattr(pending, "fingerprint", "") or "")
-        confirmed_request_ids = sorted(
-            str(item)
-            for item in (
-                getattr(pending, "confirmed_request_ids", ()) or ()
-            )
-        )
-        motion_request_ids: set[str] = set()
-        unknown_request_ids: set[str] = set()
-        response = getattr(pending, "response", None)
-        registry = getattr(
-            getattr(self, "interaction_runtime", None),
-            "registry",
-            None,
-        )
-        request_by_id = {
-            str(request.request_id): request
-            for request in (getattr(response, "capabilities", ()) or ())
-        }
-        for request_id in confirmed_request_ids:
-            request = request_by_id.get(request_id)
-            if request is None:
-                unknown_request_ids.add(request_id)
-                continue
-            try:
-                definition = registry.get(request.capability_id)
-            except (AttributeError, ValueError):
-                unknown_request_ids.add(request_id)
-                continue
-            if "embodied_motion" in definition.cancellation_domains:
-                motion_request_ids.add(request_id)
-        confirmation_scope_widened = bool(
-            cancellation_scope == "embodied_motion"
-            and (
-                set(confirmed_request_ids) - motion_request_ids
-                or unknown_request_ids
-            )
-        )
-        return {
-            "confirmation_id": confirmation_id,
-            "fingerprint": fingerprint,
-            "cancellation_scope": cancellation_scope,
-            "confirmed_request_ids": confirmed_request_ids,
-            "motion_request_ids": sorted(motion_request_ids),
-            "unknown_request_ids": sorted(unknown_request_ids),
-            "confirmation_scope_widened": confirmation_scope_widened,
-            "widening_reason": (
-                "shared_confirmation_token_revoked_conservatively"
-                if confirmation_scope_widened
-                else ""
-            ),
-        }
-
-    def _reconcile_revoked_confirmation_for_reflex(
-        self,
-        pending: Any | None,
-        session_id: str,
-        *,
-        cancellation_scope: str,
-    ) -> dict[str, Any]:
-        """Compatibility fallback when atomic receipt reconciliation is absent."""
-
-        evidence = self._revoked_confirmation_evidence_for_reflex(
-            pending,
-            cancellation_scope=cancellation_scope,
-        )
-        confirmation_id = str(evidence.get("confirmation_id") or "")
-        if not confirmation_id:
-            return evidence
-        conversation_state = getattr(self, "conversation_state", None)
-        resolved = False
-        resolve_confirmation_scope = getattr(
-            conversation_state,
-            "resolve_confirmation_scope",
-            None,
-        )
-        if callable(resolve_confirmation_scope):
-            resolved = bool(
-                resolve_confirmation_scope(
-                    confirmation_id=confirmation_id,
-                    decision="operational_interrupt",
-                )
-            )
-        if not resolved:
-            update_pending_task_status = getattr(
-                conversation_state,
-                "update_pending_task_status",
-                None,
-            )
-            if callable(update_pending_task_status):
-                update_pending_task_status(
-                    metadata_key="confirmation_id",
-                    metadata_value=confirmation_id,
-                    status="cancelled",
-                )
-
-        self.session_log(
-            session_id,
-            "cognitive_gateway_confirmation_cancelled: "
-            "confirmation_id=%s fingerprint=%s scope=%s widened=%s",
-            confirmation_id or "<unknown>",
-            str(evidence.get("fingerprint") or "<unknown>"),
-            cancellation_scope,
-            bool(evidence.get("confirmation_scope_widened")),
-        )
-        return evidence
-
     def _reconcile_reflex_cancellation_receipt(
         self,
         receipt: CancellationDispatchReceipt,
@@ -4028,9 +3881,14 @@ class VoiceAssistant:
     ) -> dict[str, Any]:
         """Commit a broad fixed-reflex receipt and confirmation as one state update."""
 
-        confirmation_evidence = self._revoked_confirmation_evidence_for_reflex(
+        confirmation_evidence = revoked_confirmation_evidence_for_reflex(
             pending,
             cancellation_scope=cancellation_scope,
+            interaction_registry=getattr(
+                getattr(self, "interaction_runtime", None),
+                "registry",
+                None,
+            ),
         )
         apply_receipt = getattr(
             getattr(self, "conversation_state", None),
@@ -4038,10 +3896,17 @@ class VoiceAssistant:
             None,
         )
         if not callable(apply_receipt):
-            cancelled_confirmation = self._reconcile_revoked_confirmation_for_reflex(
+            cancelled_confirmation = reconcile_revoked_confirmation_for_reflex(
                 pending,
-                session_id,
+                conversation_state=getattr(self, "conversation_state", None),
+                session_id=session_id,
                 cancellation_scope=cancellation_scope,
+                interaction_registry=getattr(
+                    getattr(self, "interaction_runtime", None),
+                    "registry",
+                    None,
+                ),
+                session_log=self.session_log,
             )
             return {
                 "status": "compatibility_fallback",
@@ -4057,10 +3922,17 @@ class VoiceAssistant:
                 source="cognitive_gateway_fixed_reflex",
             )
         except Exception as exc:
-            cancelled_confirmation = self._reconcile_revoked_confirmation_for_reflex(
+            cancelled_confirmation = reconcile_revoked_confirmation_for_reflex(
                 pending,
-                session_id,
+                conversation_state=getattr(self, "conversation_state", None),
+                session_id=session_id,
                 cancellation_scope=cancellation_scope,
+                interaction_registry=getattr(
+                    getattr(self, "interaction_runtime", None),
+                    "registry",
+                    None,
+                ),
+                session_log=self.session_log,
             )
             self.session_log(
                 session_id,
@@ -4083,10 +3955,17 @@ class VoiceAssistant:
             and item.get("reason") != "operation_already_applied"
         ]
         if rejected:
-            cancelled_confirmation = self._reconcile_revoked_confirmation_for_reflex(
+            cancelled_confirmation = reconcile_revoked_confirmation_for_reflex(
                 pending,
-                session_id,
+                conversation_state=getattr(self, "conversation_state", None),
+                session_id=session_id,
                 cancellation_scope=cancellation_scope,
+                interaction_registry=getattr(
+                    getattr(self, "interaction_runtime", None),
+                    "registry",
+                    None,
+                ),
+                session_log=self.session_log,
             )
             return {
                 "status": "uncertain",

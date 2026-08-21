@@ -5,7 +5,7 @@ import json
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 from uuid import uuid4
 
 from shared.chromie_contracts.goal import GoalAssociationResolution
@@ -286,6 +286,164 @@ def confirmation_meaning_from_goal_association(
     if relationships == {"reject"}:
         return "reject"
     return "ambiguous"
+
+
+def revoke_pending_confirmation_for_reflex(
+    dialogue: Any,
+    *,
+    cancellation_scope: str,
+    interaction_registry: Any,
+) -> PendingConfirmation | None:
+    """Revoke an exact pending confirmation token when a fixed reflex requires it.
+
+    This is mechanical token/scope policy only. It does not interpret the user,
+    decide whether confirmation is semantically required, or mutate Goal meaning.
+    """
+
+    if cancellation_scope in {"output_only", "media_output"}:
+        return None
+    if cancellation_scope == "embodied_motion":
+        pending = getattr(dialogue, "pending", None)
+        if pending is None:
+            return None
+        confirmed = set(getattr(pending, "confirmed_request_ids", ()) or ())
+        response = getattr(pending, "response", None)
+        requests = getattr(response, "capabilities", ()) or ()
+        has_motion = False
+        seen_confirmed_request_ids: set[str] = set()
+        unknown_confirmed_request = False
+        for request in requests:
+            if request.request_id not in confirmed:
+                continue
+            seen_confirmed_request_ids.add(request.request_id)
+            try:
+                definition = interaction_registry.get(request.capability_id)
+            except (AttributeError, ValueError):
+                unknown_confirmed_request = True
+                continue
+            if "embodied_motion" in definition.cancellation_domains:
+                has_motion = True
+                break
+        if confirmed - seen_confirmed_request_ids:
+            unknown_confirmed_request = True
+        if not has_motion and not unknown_confirmed_request:
+            return None
+    cancel = getattr(dialogue, "cancel", None)
+    return cancel() if callable(cancel) else None
+
+
+def revoked_confirmation_evidence_for_reflex(
+    pending: PendingConfirmation | None,
+    *,
+    cancellation_scope: str,
+    interaction_registry: Any,
+) -> dict[str, Any]:
+    """Describe a revoked token without inventing Goal or execution truth."""
+
+    if pending is None:
+        return {}
+    confirmation_id = str(getattr(pending, "confirmation_id", "") or "")
+    fingerprint = str(getattr(pending, "fingerprint", "") or "")
+    confirmed_request_ids = sorted(
+        str(item) for item in (getattr(pending, "confirmed_request_ids", ()) or ())
+    )
+    motion_request_ids: set[str] = set()
+    unknown_request_ids: set[str] = set()
+    response = getattr(pending, "response", None)
+    request_by_id = {
+        str(request.request_id): request
+        for request in (getattr(response, "capabilities", ()) or ())
+    }
+    for request_id in confirmed_request_ids:
+        request = request_by_id.get(request_id)
+        if request is None:
+            unknown_request_ids.add(request_id)
+            continue
+        try:
+            definition = interaction_registry.get(request.capability_id)
+        except (AttributeError, ValueError):
+            unknown_request_ids.add(request_id)
+            continue
+        if "embodied_motion" in definition.cancellation_domains:
+            motion_request_ids.add(request_id)
+    confirmation_scope_widened = bool(
+        cancellation_scope == "embodied_motion"
+        and (
+            set(confirmed_request_ids) - motion_request_ids
+            or unknown_request_ids
+        )
+    )
+    return {
+        "confirmation_id": confirmation_id,
+        "fingerprint": fingerprint,
+        "cancellation_scope": cancellation_scope,
+        "confirmed_request_ids": confirmed_request_ids,
+        "motion_request_ids": sorted(motion_request_ids),
+        "unknown_request_ids": sorted(unknown_request_ids),
+        "confirmation_scope_widened": confirmation_scope_widened,
+        "widening_reason": (
+            "shared_confirmation_token_revoked_conservatively"
+            if confirmation_scope_widened
+            else ""
+        ),
+    }
+
+
+def reconcile_revoked_confirmation_for_reflex(
+    pending: PendingConfirmation | None,
+    *,
+    conversation_state: Any,
+    session_id: str,
+    cancellation_scope: str,
+    interaction_registry: Any,
+    session_log: Callable[..., None],
+) -> dict[str, Any]:
+    """Synchronize a revoked token into Conversation State as fail-safe bookkeeping."""
+
+    evidence = revoked_confirmation_evidence_for_reflex(
+        pending,
+        cancellation_scope=cancellation_scope,
+        interaction_registry=interaction_registry,
+    )
+    confirmation_id = str(evidence.get("confirmation_id") or "")
+    if not confirmation_id:
+        return evidence
+    resolved = False
+    resolve_confirmation_scope = getattr(
+        conversation_state,
+        "resolve_confirmation_scope",
+        None,
+    )
+    if callable(resolve_confirmation_scope):
+        resolved = bool(
+            resolve_confirmation_scope(
+                confirmation_id=confirmation_id,
+                decision="operational_interrupt",
+            )
+        )
+    if not resolved:
+        update_pending_task_status = getattr(
+            conversation_state,
+            "update_pending_task_status",
+            None,
+        )
+        if callable(update_pending_task_status):
+            update_pending_task_status(
+                metadata_key="confirmation_id",
+                metadata_value=confirmation_id,
+                status="cancelled",
+            )
+
+    session_log(
+        session_id,
+        "cognitive_gateway_confirmation_cancelled: "
+        "confirmation_id=%s fingerprint=%s scope=%s widened=%s",
+        confirmation_id or "<unknown>",
+        str(evidence.get("fingerprint") or "<unknown>"),
+        cancellation_scope,
+        bool(evidence.get("confirmation_scope_widened")),
+    )
+    return evidence
 
 def _request_fingerprint(
     response: InteractionResponse,

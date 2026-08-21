@@ -59,7 +59,7 @@ At this revision the checker reports:
 
 | Measure | Current ratchet |
 |---|---:|
-| `VoiceAssistant` methods | 139 |
+| `VoiceAssistant` methods | 136 |
 | properties | 1 |
 | `__init__` lines | 305 |
 | initialized `self` attributes | 110 |
@@ -85,7 +85,7 @@ Further work is ordered by
 | direct-LLM compatibility | prove maintained-profile unreachability, then remove it or retain only a separately tested emergency contract |
 | Cognitive Gateway/Core dispatch | one Host turn-execution owner that delegates semantic work without gaining semantic authority |
 | observability recording | storage and lifecycle sampling remain delegated with exact turn/session correlation |
-| stop, interruption, approval revocation, and active-Goal cancellation | remain atomic and Host-owned unless a narrower owner preserves the deterministic contract |
+| stop, interruption, approval revocation, and active-Goal cancellation | fixed-reflex token revocation/audit bookkeeping stays with the existing confirmation token owner; interruption dispatch and Goal cancellation remain atomic Host/runtime responsibilities |
 | cleanup | the root retains only top-level reverse-order collaborator shutdown |
 
 Each extraction must preserve ordering, cancellation, confirmation, and evidence

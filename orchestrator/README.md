@@ -136,6 +136,7 @@ fails closed with bounded Host-owned failure speech. The Host never switches to 
 direct-LLM or retired Agent semantic path.
 
 `orchestrator/runtime/observability_recording.py` owns fail-soft recording containment for Experience/Episode and Cognitive Evidence writes; it is not a semantic owner and recording failure cannot alter Goal, Planner, speech, or execution truth.
+`orchestrator/runtime/confirmation.py` also owns the mechanical lifetime and fixed-reflex revocation/audit policy for request-bound confirmation tokens. Goal Association still interprets confirmation meaning, Planner still owns confirmation wording, and the Host/runtime still owns cancellation effects.
 
 `orchestrator/runtime/planner_reentry.py` owns the pure mechanical policy used when
 terminal Runtime Evidence may reactivate Planner. It checks the exact current

@@ -640,8 +640,8 @@ delta suppression. Missing Responsibility provenance fails closed instead of fab
 a callback Responsibility. This extraction removes nine private methods from
 `VoiceAssistant`, lowering its method count from 159 to 150. A second mechanical slice
 moves TTS text segmentation and Goal-list console projection behind existing Host/runtime
-module boundaries, lowering the composition root from 150 to 142 methods. Stateless observability-recording containment now also lives below the composition root, lowering it to 139 methods. None of these
-slice adds a semantic owner, manager, state store, service, environment key, or public
+module boundaries, lowering the composition root from 150 to 142 methods. Stateless observability-recording containment then lowers it to 139 methods. Fixed-reflex confirmation-token revocation, widening evidence, and state bookkeeping now live with the existing ConfirmationDialogue owner, lowering it to 136 methods while confirmation meaning remains GA-owned and confirmation speech remains Planner-owned. None of these
+slices adds a semantic owner, manager, state store, service, environment key, or public
 runtime path.
 
 - Decompose the Orchestrator composition root without raising existing method,

@@ -125,8 +125,7 @@ invocation; the Host no longer fabricates callback meaning.
 The module owns no Goal meaning, speech, Planner call, Runtime mutation, or state. Nine
 private methods first leave `VoiceAssistant` (`159 -> 150`). The next mechanical slice
 moves TTS text segmentation and Goal-list console projection out of the composition root,
-lowering it again to `139 methods / 305 init lines / 110 attributes / 0 direct-LLM calls`. Observability recording containment now lives in `orchestrator/runtime/observability_recording.py` as stateless Host policy; it records existing runtime facts and never changes Goal, Planner, speech, or execution semantics.
-These are narrow ownership-seam extractions, not new managers or completed Host decomposition.
+lowering it first to `139 methods / 305 init lines / 110 attributes / 0 direct-LLM calls`. Observability recording containment lives in `orchestrator/runtime/observability_recording.py` as stateless Host policy; it records existing runtime facts and never changes Goal, Planner, speech, or execution semantics. Fixed-reflex confirmation-token revoke/audit bookkeeping now lives in the existing `orchestrator/runtime/confirmation.py` owner, lowering `VoiceAssistant` again to 136 methods. Confirmation meaning remains GA-owned and confirmation wording remains Planner-owned. These are narrow ownership-seam extractions, not new managers or completed Host decomposition.
 
 ## Verification
 
