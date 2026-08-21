@@ -9,6 +9,7 @@ from types import MethodType
 from typing import Any
 
 from orchestrator.orchestrator import VoiceAssistant
+from orchestrator.runtime.input_session_runtime import input_session_runtime_for
 from orchestrator.runtime.confirmation import (
     ConfirmationDialogue,
     revoke_pending_confirmation_for_reflex,
@@ -1111,7 +1112,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
             self._blocked_reflex_assistant()
         )
 
-        assistant._launch_routed_turn("Stop talking.", "sid-output")
+        input_session_runtime_for(assistant)._launch_routed_turn("Stop talking.", "sid-output")
         output_reflex = assistant.active_reflex_task
         assert output_reflex is not None
         await asyncio.wait_for(
@@ -1119,7 +1120,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
             timeout=1.0,
         )
 
-        assistant._launch_routed_turn(
+        input_session_runtime_for(assistant)._launch_routed_turn(
             "Stop moving.",
             "sid-motion",
         )
@@ -1130,7 +1131,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("runtime_cancel:embodied_motion", events)
         self.assertFalse(output_reflex.done())
 
-        assistant._launch_routed_turn(
+        input_session_runtime_for(assistant)._launch_routed_turn(
             "Emergency stop!",
             "sid-emergency",
         )
@@ -1148,7 +1149,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(len(emergency_tasks), 1)
 
-        assistant._launch_routed_turn(
+        input_session_runtime_for(assistant)._launch_routed_turn(
             "What time is it?",
             "sid-ordinary",
         )
@@ -1218,7 +1219,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
             async def close(self) -> None:
                 return None
 
-        assistant._launch_routed_turn("Stop talking.", "sid-output")
+        input_session_runtime_for(assistant)._launch_routed_turn("Stop talking.", "sid-output")
         output_reflex = assistant.active_reflex_task
         assert output_reflex is not None
         await asyncio.wait_for(
@@ -1257,7 +1258,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
             signed=True,
         ) * 1600
         vad_task = asyncio.create_task(
-            assistant.handle_vad_audio(pcm16)
+            input_session_runtime_for(assistant).handle_vad_audio(pcm16)
         )
         await asyncio.wait_for(
             controls["emergency_dispatched"].wait(),
@@ -1454,7 +1455,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         assistant.session_log = MethodType(session_log, assistant)
         assistant.maybe_session_done = MethodType(maybe_session_done, assistant)
 
-        assistant._launch_routed_turn("Stop now.", "sid-stop")
+        input_session_runtime_for(assistant)._launch_routed_turn("Stop now.", "sid-stop")
         reflex_task = assistant.active_turn_task
         assert reflex_task is not None
         await reflex_started.wait()
@@ -1465,8 +1466,8 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         await assistant.interrupt_output(new_session_id="sid-next")
         self.assertFalse(reflex_task.cancelled())
 
-        assistant._launch_routed_turn("Hello after stop.", "sid-next")
-        assistant._launch_routed_turn("Keep the other request too.", "sid-another")
+        input_session_runtime_for(assistant)._launch_routed_turn("Hello after stop.", "sid-next")
+        input_session_runtime_for(assistant)._launch_routed_turn("Keep the other request too.", "sid-another")
         await asyncio.sleep(0)
 
         self.assertIs(assistant.active_turn_task, reflex_task)

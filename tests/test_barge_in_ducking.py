@@ -89,9 +89,9 @@ class BargeInDuckingTests(unittest.IsolatedAsyncioTestCase):
             del args, kwargs
             raise AssertionError("utterance must remain open")
 
-        assistant._queue_vad_utterance = MethodType(
+        input_session_runtime_for(assistant)._queue_vad_utterance = MethodType(
             reject_completed_utterance,
-            assistant,
+            input_session_runtime_for(assistant),
         )
         frame = b"\x00\x00" * 480
 
@@ -118,9 +118,9 @@ class BargeInDuckingTests(unittest.IsolatedAsyncioTestCase):
         spoken = "Chromie is reading the current response aloud."
         assistant, old_session_id, logs = self._assistant(asr_text=spoken)
         routes: list[tuple[str, str]] = []
-        assistant._launch_routed_turn = MethodType(
+        input_session_runtime_for(assistant)._launch_routed_turn = MethodType(
             lambda self, text, sid: routes.append((text, sid)),
-            assistant,
+            input_session_runtime_for(assistant),
         )
         invalidations: list[bool] = []
         assistant._invalidate_output_state = MethodType(
@@ -177,9 +177,9 @@ class BargeInDuckingTests(unittest.IsolatedAsyncioTestCase):
         playback_transport_for(assistant).abort_output_stream = MethodType(
             abort_output, playback_transport_for(assistant)
         )
-        assistant._launch_routed_turn = MethodType(
+        input_session_runtime_for(assistant)._launch_routed_turn = MethodType(
             lambda self, text, sid: routes.append((text, sid)),
-            assistant,
+            input_session_runtime_for(assistant),
         )
         runtime = input_session_runtime_for(assistant)
         await runtime._begin_playback_duck(

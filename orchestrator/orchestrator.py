@@ -1579,7 +1579,9 @@ class VoiceAssistant:
         playback_task = getattr(self, "playback_task", None)
         if playback_task is None or playback_task.done():
             self.playback_task = asyncio.create_task(playback_transport_for(self).playback_worker())
-        self.session_idle_sweeper_task = asyncio.create_task(self._session_idle_sweeper())
+        self.session_idle_sweeper_task = asyncio.create_task(
+            input_session_runtime_for(self)._session_idle_sweeper()
+        )
 
     async def reset_playback_ordering(self):
         async with self.order_lock:
@@ -5795,7 +5797,7 @@ class VoiceAssistant:
             reason="interrupt",
         )
         if cancel_cognitive_work:
-            self._cancel_active_routed_turns(
+            input_session_runtime_for(self)._cancel_active_routed_turns(
                 excluding=asyncio.current_task(),
                 cancel_all=False,
                 reason="foreground_interaction_interrupted",
@@ -5883,7 +5885,7 @@ class VoiceAssistant:
                 "committed plan binding and cannot originate from ReflexOutcome"
             )
         if scope in {"current_interaction", "global_emergency"}:
-            self._cancel_active_routed_turns(
+            input_session_runtime_for(self)._cancel_active_routed_turns(
                 excluding=asyncio.current_task(),
                 cancel_all=(scope == "global_emergency"),
                 reason=f"protective_reflex:{scope}",
@@ -6271,70 +6273,6 @@ class VoiceAssistant:
         if new_session_id:
             self.session_log(new_session_id, "interrupt_previous_audio_done: playback_generation=%s", self.playback_generation)
 
-    def mic_callback(self, indata, frames, time_info, status):
-        return input_session_runtime_for(self).mic_callback(indata, frames, time_info, status)
-
-    async def handle_vad_audio(
-        self,
-        audio: bytes,
-        *,
-        started_during_playback: bool = False,
-        playback_generation_at_start: int | None = None,
-    ):
-        return await input_session_runtime_for(self).handle_vad_audio(audio, started_during_playback=started_during_playback, playback_generation_at_start=playback_generation_at_start)
-
-    def _has_active_protective_reflex(
-        self,
-        *,
-        excluding: asyncio.Task | None = None,
-    ) -> bool:
-        return input_session_runtime_for(self)._has_active_protective_reflex(excluding=excluding)
-
-    def _cancel_active_routed_turns(
-        self,
-        *,
-        excluding: asyncio.Task | None,
-        cancel_all: bool,
-        reason: str,
-    ) -> tuple[str, ...]:
-        return input_session_runtime_for(self)._cancel_active_routed_turns(excluding=excluding, cancel_all=cancel_all, reason=reason)
-
-    def _launch_routed_turn(self, user_text: str, session_id: str) -> None:
-        return input_session_runtime_for(self)._launch_routed_turn(user_text, session_id)
-
-    def _on_routed_turn_done(
-        self,
-        task: asyncio.Task,
-        session_id: str,
-        *,
-        concurrent_reflex: bool = False,
-    ) -> None:
-        return input_session_runtime_for(self)._on_routed_turn_done(task, session_id, concurrent_reflex=concurrent_reflex)
-
-    def _queue_vad_utterance(
-        self,
-        audio: bytes,
-        *,
-        started_during_playback: bool = False,
-        playback_generation_at_start: int | None = None,
-    ) -> None:
-        return input_session_runtime_for(self)._queue_vad_utterance(audio, started_during_playback=started_during_playback, playback_generation_at_start=playback_generation_at_start)
-
-    def _on_asr_task_done(self, task: asyncio.Task) -> None:
-        return input_session_runtime_for(self)._on_asr_task_done(task)
-
-    async def _feed_vad_pcm16(self, pcm_16k: bytes) -> None:
-        return await input_session_runtime_for(self)._feed_vad_pcm16(pcm_16k)
-
-    async def mic_stream(self):
-        return await input_session_runtime_for(self).mic_stream()
-
-    async def injected_audio_stream(self):
-        return await input_session_runtime_for(self).injected_audio_stream()
-
-    async def _session_idle_sweeper(self) -> None:
-        return await input_session_runtime_for(self)._session_idle_sweeper()
-
     @staticmethod
     def _spoken_text_response_schema(
         *,
@@ -6718,10 +6656,11 @@ class VoiceAssistant:
                 audio_device_monitor(self)
             )
         await self._announce_runtime_ready()
+        input_runtime = input_session_runtime_for(self)
         if self.audio_input_mode == "stdin":
-            await self.injected_audio_stream()
+            await input_runtime.injected_audio_stream()
         else:
-            await self.mic_stream()
+            await input_runtime.mic_stream()
 
 
 

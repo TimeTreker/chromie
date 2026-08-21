@@ -17,6 +17,7 @@ if "scipy" not in sys.modules:
     sys.modules["scipy.signal"] = scipy.signal  # type: ignore[attr-defined]
 
 from orchestrator.orchestrator import VoiceAssistant
+from orchestrator.runtime.input_session_runtime import input_session_runtime_for
 from orchestrator.runtime.shutdown_lifecycle import shutdown_voice_assistant
 
 
@@ -28,8 +29,8 @@ class OrchestratorBargeInQueueTests(unittest.IsolatedAsyncioTestCase):
         assistant.active_asr_task = active
         assistant._pending_vad_audio = None
 
-        assistant._queue_vad_utterance(b"first")
-        assistant._queue_vad_utterance(b"latest")
+        input_session_runtime_for(assistant)._queue_vad_utterance(b"first")
+        input_session_runtime_for(assistant)._queue_vad_utterance(b"latest")
 
         self.assertEqual(assistant._pending_vad_audio, b"latest")
         self.assertIs(assistant.active_asr_task, active)
@@ -46,7 +47,9 @@ class OrchestratorBargeInQueueTests(unittest.IsolatedAsyncioTestCase):
         def queue(self: VoiceAssistant, audio: bytes) -> None:
             seen.append(audio)
 
-        assistant._queue_vad_utterance = MethodType(queue, assistant)
+        input_session_runtime_for(assistant)._queue_vad_utterance = MethodType(
+            queue, input_session_runtime_for(assistant)
+        )
 
         async def done() -> None:
             return None
@@ -55,7 +58,7 @@ class OrchestratorBargeInQueueTests(unittest.IsolatedAsyncioTestCase):
         await task
         assistant.active_asr_task = task
 
-        assistant._on_asr_task_done(task)
+        input_session_runtime_for(assistant)._on_asr_task_done(task)
 
         self.assertIsNone(assistant.active_asr_task)
         self.assertIsNone(assistant._pending_vad_audio)
@@ -94,11 +97,11 @@ class OrchestratorBargeInQueueTests(unittest.IsolatedAsyncioTestCase):
         )
         assistant.handle_routed_text = MethodType(handle, assistant)
 
-        assistant._launch_routed_turn("first request", "sid-first")
+        input_session_runtime_for(assistant)._launch_routed_turn("first request", "sid-first")
         first = assistant.active_turn_task
         assert first is not None
         await first_started.wait()
-        assistant._launch_routed_turn("latest request", "sid-latest")
+        input_session_runtime_for(assistant)._launch_routed_turn("latest request", "sid-latest")
         latest = assistant.active_turn_task
         assert latest is not None
         await latest
@@ -134,7 +137,7 @@ class OrchestratorBargeInQueueTests(unittest.IsolatedAsyncioTestCase):
             assistant,
         )
 
-        cancelled = assistant._cancel_active_routed_turns(
+        cancelled = input_session_runtime_for(assistant)._cancel_active_routed_turns(
             excluding=None,
             cancel_all=False,
             reason="core_authorized_test",

@@ -36,15 +36,16 @@ class InputSessionRuntimeExtractionTests(unittest.TestCase):
         self.assertIn("host.asr_ws.recv()", runtime_source)
         self.assertIn("read_audio_packet", runtime_source)
 
-    def test_public_host_input_methods_are_thin_delegates(self) -> None:
-        source = (ROOT / "orchestrator" / "orchestrator.py").read_text(encoding="utf-8")
-        tree = ast.parse(source)
+    def test_host_input_compatibility_facade_is_removed(self) -> None:
+        root_source = (ROOT / "orchestrator" / "orchestrator.py").read_text(encoding="utf-8")
+        runtime_source = (ROOT / "orchestrator" / "runtime" / "input_session_runtime.py").read_text(encoding="utf-8")
+        tree = ast.parse(root_source)
         class_node = next(
             node
             for node in tree.body
             if isinstance(node, ast.ClassDef) and node.name == "VoiceAssistant"
         )
-        names = {
+        removed_names = {
             "mic_callback",
             "handle_vad_audio",
             "_has_active_protective_reflex",
@@ -59,21 +60,17 @@ class InputSessionRuntimeExtractionTests(unittest.TestCase):
             "_session_idle_sweeper",
         }
         methods = {
-            node.name: node
+            node.name
             for node in class_node.body
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and node.name in names
         }
-        self.assertEqual(set(methods), names)
-        for name, method in methods.items():
-            self.assertEqual(
-                len(method.body),
-                1,
-                f"VoiceAssistant.{name} regained input/session mechanics",
-            )
-            self.assertIsInstance(method.body[0], ast.Return)
-            rendered = ast.unparse(method.body[0])
-            self.assertIn("input_session_runtime_for(self)", rendered)
+        self.assertTrue(removed_names.isdisjoint(methods))
+        self.assertNotIn("host._launch_routed_turn", runtime_source)
+        self.assertNotIn("host._queue_vad_utterance", runtime_source)
+        self.assertNotIn("host.handle_vad_audio", runtime_source)
+        self.assertNotIn("host._feed_vad_pcm16", runtime_source)
+        self.assertIn("input_runtime = input_session_runtime_for(self)", root_source)
+        self.assertIn("await input_runtime.mic_stream()", root_source)
 
     def test_lifecycle_owns_microphone_buffering_state(self) -> None:
         lifecycle = InputTurnLifecycle()

@@ -156,7 +156,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         )
         self.assertLess(
             source.index("await self._announce_runtime_ready()"),
-            source.index("await self.mic_stream()"),
+            source.index("await input_runtime.mic_stream()"),
         )
 
     def test_chinese_tts_uses_smaller_chunks_for_lower_first_audio_latency(self) -> None:

@@ -21,6 +21,7 @@ from agent.app.planner_contract import (
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 from tests.cognitive_work_test_support import cognitive_work_request
 from orchestrator.orchestrator import VoiceAssistant
+from orchestrator.runtime.input_session_runtime import input_session_runtime_for
 from orchestrator.runtime.outcome_reconciliation import ExecutionOutcomeReconciler
 from shared.chromie_contracts.interaction import CapabilityRequest
 from shared.chromie_contracts.plan import CanonicalPlan
@@ -856,7 +857,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         assistant.create_session = MethodType(create_session, assistant)
         audio = int(200).to_bytes(2, "little", signed=True) * 16000
 
-        await assistant.handle_vad_audio(
+        await input_session_runtime_for(assistant).handle_vad_audio(
             audio,
             started_during_playback=True,
             playback_generation_at_start=1,

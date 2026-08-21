@@ -440,7 +440,7 @@ class InputSessionRuntime:
                                         errors=[],
                                     )
                                 session_id = new_session_id
-                            host._launch_routed_turn(user_text, session_id)
+                            self._launch_routed_turn(user_text, session_id)
                         else:
                             host.session_log(session_id, "asr_empty_text")
                             if playback_candidate:
@@ -545,7 +545,7 @@ class InputSessionRuntime:
     def _launch_routed_turn(self, user_text: str, session_id: str) -> None:
         host = self.host
         reflex_candidate = DEFAULT_REFLEX_FILTER.evaluate(user_text)
-        if host._has_active_protective_reflex():
+        if self._has_active_protective_reflex():
             if reflex_candidate.action == "interrupt":
                 # A new deterministic protective input is independent of an
                 # older protective operation. It must not wait behind output
@@ -563,7 +563,7 @@ class InputSessionRuntime:
                 )
 
                 def protective_done(completed: asyncio.Task) -> None:
-                    host._on_routed_turn_done(
+                    self._on_routed_turn_done(
                         completed,
                         session_id,
                         concurrent_reflex=True,
@@ -599,7 +599,7 @@ class InputSessionRuntime:
             # before the coroutine reaches its first instruction.
             host._protective_reflex_failure = False
         task.add_done_callback(
-            lambda completed, sid=session_id: host._on_routed_turn_done(
+            lambda completed, sid=session_id: self._on_routed_turn_done(
                 completed,
                 sid,
             )
@@ -651,7 +651,7 @@ class InputSessionRuntime:
             return
         if not completed_ok:
             host._protective_reflex_failure = True
-        if host._has_active_protective_reflex():
+        if self._has_active_protective_reflex():
             return
         pending = host._input_turn_state().drain_turns_after_reflex()
         protective_failed = bool(
@@ -666,7 +666,7 @@ class InputSessionRuntime:
                     pending_session_id,
                     "turn_released_after_cognitive_gateway_reflex",
                 )
-                host._launch_routed_turn(pending_text, pending_session_id)
+                self._launch_routed_turn(pending_text, pending_session_id)
             return
         for _, pending_session_id in pending:
             host.session_log(
@@ -705,14 +705,14 @@ class InputSessionRuntime:
             )
             return
         task = asyncio.create_task(
-            host.handle_vad_audio(
+            self.handle_vad_audio(
                 audio,
                 started_during_playback=started_during_playback,
                 playback_generation_at_start=playback_generation_at_start,
             )
         )
         lifecycle.register_asr_task(task)
-        task.add_done_callback(host._on_asr_task_done)
+        task.add_done_callback(self._on_asr_task_done)
 
     def _on_asr_task_done(self, task: asyncio.Task) -> None:
         host = self.host
@@ -738,13 +738,13 @@ class InputSessionRuntime:
                 pending_started_playing = False
                 pending_generation = None
             if pending_started_playing or pending_generation is not None:
-                host._queue_vad_utterance(
+                self._queue_vad_utterance(
                     pending_audio,
                     started_during_playback=pending_started_playing,
                     playback_generation_at_start=pending_generation,
                 )
             else:
-                host._queue_vad_utterance(pending_audio)
+                self._queue_vad_utterance(pending_audio)
 
     async def _feed_vad_pcm16(self, pcm_16k: bytes) -> None:
         host = self.host
@@ -795,7 +795,7 @@ class InputSessionRuntime:
                         reason="hard_maximum",
                     )
                 else:
-                    host._queue_vad_utterance(
+                    self._queue_vad_utterance(
                         vad_audio,
                         started_during_playback=started_during_playback,
                         playback_generation_at_start=(
@@ -828,7 +828,7 @@ class InputSessionRuntime:
                     blocksize=host.input_block_size,
                     device=host.input_device,
                     latency=host.input_latency,
-                    callback=host.mic_callback,
+                    callback=self.mic_callback,
                 ):
                     logger.info(
                         "Microphone started: name=%s device=%r rate=%s channels=%s",
@@ -847,7 +847,7 @@ class InputSessionRuntime:
                         except asyncio.TimeoutError:
                             continue
                         pcm_16k = host.prepare_mic_chunk_for_asr(audio)
-                        await host._feed_vad_pcm16(pcm_16k)
+                        await self._feed_vad_pcm16(pcm_16k)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
@@ -900,7 +900,7 @@ class InputSessionRuntime:
                 len(packet.pcm16),
                 duration_ms,
             )
-            await host._feed_vad_pcm16(pcm_16k)
+            await self._feed_vad_pcm16(pcm_16k)
             # Ensure the VAD sees enough trailing silence to close the utterance.
             configured_vad_silence_ms = int(
                 getattr(
@@ -917,7 +917,7 @@ class InputSessionRuntime:
             silence = b"\x00\x00" * int(
                 host.target_asr_rate * silence_ms / 1000
             )
-            await host._feed_vad_pcm16(silence)
+            await self._feed_vad_pcm16(silence)
 
     async def _session_idle_sweeper(self) -> None:
         host = self.host
