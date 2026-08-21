@@ -16,6 +16,7 @@ from typing import Any
 import numpy as np
 
 from orchestrator.audio_injection import read_audio_packet
+from orchestrator.runtime.observability_recording import sample_accelerator_resources
 from orchestrator.runtime.audio_device_lifecycle import (
     apply_pending_input_device_change,
     refresh_system_default_audio_devices,
@@ -944,7 +945,7 @@ class InputSessionRuntime:
                     "active_synthesis_tasks": len(host.active_synthesis_tasks),
                 },
             )
-            await host._sample_accelerator_resources(reason="periodic")
+            await sample_accelerator_resources(host, reason="periodic")
             host.sessions.checkpoint_active_traces()
             host.sessions.finalize_idle_sessions(idle_timeout_ms=idle_timeout_ms)
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Callable
 
@@ -7,6 +8,7 @@ from shared.chromie_contracts.interaction import InteractionResponse
 from shared.chromie_contracts.user_turn import UserTurnEnvelope
 from orchestrator.runtime.capability_runtime import CapabilityRuntimeResult
 from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
+from shared.chromie_runtime.accelerator_telemetry import ACCELERATOR_SAMPLE_MODULE
 
 logger = logging.getLogger(__name__)
 
@@ -117,3 +119,71 @@ def record_cognitive_gateway_evidence(
             type(exc).__name__,
             exc,
         )
+
+def track_observability_task(host: Any, task: asyncio.Task[Any]) -> None:
+    """Retain one detached diagnostics task without giving it semantic authority."""
+
+    tasks = getattr(host, "observability_tasks", None)
+    if tasks is None:
+        tasks = set()
+        host.observability_tasks = tasks
+    tasks.add(task)
+    task.add_done_callback(tasks.discard)
+
+
+async def sample_accelerator_resources(
+    host: Any,
+    *,
+    reason: str,
+    session_ids: list[str] | None = None,
+) -> dict[str, Any]:
+    """Sample accelerator telemetry and attach it only to observability traces."""
+
+    sampler = getattr(host, "accelerator_sampler", None)
+    sessions = getattr(host, "sessions", None)
+    if sampler is None or sessions is None:
+        return {}
+    payload = await sampler.sample(reason=reason)
+    if not payload:
+        return {}
+    if session_ids is None:
+        sessions.record_active_resource_sample(
+            module=ACCELERATOR_SAMPLE_MODULE,
+            name="accelerator_resource_sample",
+            attributes=payload,
+        )
+    else:
+        for sid in session_ids:
+            sessions.record_resource_sample(
+                sid,
+                module=ACCELERATOR_SAMPLE_MODULE,
+                name="accelerator_resource_sample",
+                attributes=payload,
+            )
+    return payload
+
+
+def schedule_accelerator_sample(
+    host: Any,
+    *,
+    reason: str,
+    session_ids: list[str] | None = None,
+) -> None:
+    """Schedule optional accelerator sampling without blocking the interaction path."""
+
+    sampler = getattr(host, "accelerator_sampler", None)
+    if sampler is None or not sampler.should_sample(reason):
+        return
+    try:
+        task = asyncio.get_running_loop().create_task(
+            sample_accelerator_resources(
+                host,
+                reason=reason,
+                session_ids=session_ids,
+            )
+        )
+    except RuntimeError:
+        # Startup/unit-test callers may not yet have an event loop. Telemetry is
+        # optional and must never create a second lifecycle dependency.
+        return
+    track_observability_task(host, task)

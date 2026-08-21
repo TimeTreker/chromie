@@ -14,6 +14,8 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from orchestrator.runtime.observability_recording import sample_accelerator_resources
+
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +43,7 @@ async def shutdown_voice_assistant(
     sessions = getattr(host, "sessions", None)
     if sessions is not None:
         try:
-            await host._sample_accelerator_resources(reason="session_finish")
+            await sample_accelerator_resources(host, reason="session_finish")
         except Exception as exc:  # diagnostics must never block process teardown
             logger.debug(
                 "Final accelerator telemetry sample failed: %s",

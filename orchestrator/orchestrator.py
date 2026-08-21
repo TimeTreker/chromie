@@ -105,6 +105,7 @@ from orchestrator.runtime.observability_recording import (
     record_cognitive_gateway_evidence,
     record_cognitive_runtime_evidence,
     record_execution_experience_safely,
+    schedule_accelerator_sample,
 )
 from orchestrator.runtime.response_plan import validate_immediate_response_plan
 from orchestrator.runtime.runtime_ready_greeting import (
@@ -132,9 +133,6 @@ from orchestrator.runtime.session import (
     now_ms,
     record_session_workflow_stage,
     summarize_provider_start_evidence,
-)
-from shared.chromie_runtime.accelerator_telemetry import (
-    ACCELERATOR_SAMPLE_MODULE,
 )
 from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 from orchestrator.runtime.capability_runtime import CapabilityRuntimeResult
@@ -824,65 +822,8 @@ class VoiceAssistant:
 
     def create_session(self) -> str:
         sid = self.sessions.create()
-        self._schedule_accelerator_sample(reason="session_start", session_ids=[sid])
+        schedule_accelerator_sample(self, reason="session_start", session_ids=[sid])
         return sid
-
-    def _track_observability_task(self, task: asyncio.Task) -> None:
-        tasks = getattr(self, "observability_tasks", None)
-        if tasks is None:
-            tasks = set()
-            self.observability_tasks = tasks
-        tasks.add(task)
-        task.add_done_callback(tasks.discard)
-
-    def _schedule_accelerator_sample(
-        self,
-        *,
-        reason: str,
-        session_ids: list[str] | None = None,
-    ) -> None:
-        sampler = getattr(self, "accelerator_sampler", None)
-        if sampler is None or not sampler.should_sample(reason):
-            return
-        try:
-            task = asyncio.get_running_loop().create_task(
-                self._sample_accelerator_resources(
-                    reason=reason,
-                    session_ids=session_ids,
-                )
-            )
-        except RuntimeError:
-            return
-        self._track_observability_task(task)
-
-    async def _sample_accelerator_resources(
-        self,
-        *,
-        reason: str,
-        session_ids: list[str] | None = None,
-    ) -> dict[str, Any]:
-        sampler = getattr(self, "accelerator_sampler", None)
-        sessions = getattr(self, "sessions", None)
-        if sampler is None or sessions is None:
-            return {}
-        payload = await sampler.sample(reason=reason)
-        if not payload:
-            return {}
-        if session_ids is None:
-            sessions.record_active_resource_sample(
-                module=ACCELERATOR_SAMPLE_MODULE,
-                name="accelerator_resource_sample",
-                attributes=payload,
-            )
-        else:
-            for sid in session_ids:
-                sessions.record_resource_sample(
-                    sid,
-                    module=ACCELERATOR_SAMPLE_MODULE,
-                    name="accelerator_resource_sample",
-                    attributes=payload,
-                )
-        return payload
 
     def normalize_tts_candidate(self, text: str) -> str:
         text = (text or "").strip()

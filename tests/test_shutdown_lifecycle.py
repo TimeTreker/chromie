@@ -98,11 +98,15 @@ class ShutdownLifecycleTests(unittest.IsolatedAsyncioTestCase):
             finalize_active_sessions=lambda *, reason: assistant.sessions.finalized.append(reason),
         )
 
-        async def sample(*, reason: str) -> None:
-            self.assertEqual(reason, "session_finish")
-            raise RuntimeError("telemetry unavailable")
+        class FailingSampler:
+            async def sample(self, *, reason: str) -> None:
+                self.assertEqual(reason, "session_finish")
+                raise RuntimeError("telemetry unavailable")
 
-        assistant._sample_accelerator_resources = sample
+            def __init__(self, test_case: ShutdownLifecycleTests) -> None:
+                self.assertEqual = test_case.assertEqual
+
+        assistant.accelerator_sampler = FailingSampler(self)
         assistant.audio_device_monitor_task = None
         assistant.output_abort_tasks = set()
         assistant.observability_tasks = set()
