@@ -34,7 +34,10 @@ class RuntimeConfigurationInventoryTests(unittest.TestCase):
         entries = inventory["entries"]
         keys = [entry["key"] for entry in entries]
         self.assertEqual(keys, sorted(set(keys)))
-        self.assertGreaterEqual(len(entries), 400)
+        # Alias removal may legitimately shrink the surface; guard the maintained
+        # inventory from accidental collapse without rewarding compatibility growth.
+        self.assertGreaterEqual(len(entries), 380)
+        self.assertEqual(inventory["summary"]["compatibility_aliases"], 0)
         self.assertEqual(
             {entry["category"] for entry in entries},
             {

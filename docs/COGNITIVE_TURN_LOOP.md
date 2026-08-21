@@ -27,6 +27,8 @@ Chromie" can suppress ambient nearby speech while allowing a later explicitly ad
 turn. The Attention model makes one judgment only. Invalid/unavailable output fails open
 to ordinary Core cognition; there is no Attention repair or suppression-review chain.
 
+The executable loop applies `GREETING-GOAL-001`, `PLANNER-AUTHORITY-001`, and `ASYNC-COGNITION-001`; these names refer to Charter invariants, not additional stages.
+
 ## 1. Decision
 
 Chromie uses an **evidence-grounded, event-driven and readiness-driven cognitive

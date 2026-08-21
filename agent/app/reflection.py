@@ -5,6 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .prompt_projection import bounded_json
 from .clients.ollama_client import OllamaClient
 try:
     from chromie_contracts.core_interpretation import CognitiveWorkRequest
@@ -136,14 +137,7 @@ class ReflectionResolver:
 
     @staticmethod
     def _bounded(value: Any, limit: int) -> str:
-        text = json.dumps(
-            value,
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-            default=str,
-        )
-        return text if len(text) <= limit else text[:limit].rstrip() + "..."
+        return bounded_json(value, limit)
 
     def _prompt(
         self,

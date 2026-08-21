@@ -62,7 +62,6 @@ HARDCODED_GATE_COUNT_RE = re.compile(
 
 ROUTE_SOURCES = [
     ROOT / "agent" / "app" / "main.py",
-    ROOT / "agent" / "app" / "main.py",
     ROOT / "hardware" / "daemon.py",
 ]
 
@@ -72,7 +71,6 @@ RUNTIME_CONFIG_SOURCES = [
     ROOT / "asr" / "server.py",
     ROOT / "asr" / "settings.py",
     ROOT / "tts" / "server.py",
-    ROOT / "agent" / "app" / "main.py",
 ]
 
 # Generated dependency, cache, coverage, and build directories are not project
@@ -112,7 +110,7 @@ STALE_PHRASES = {
     "8c448e2de2cd8a602b0d48e31461f9be9f1b8d08": "stale repository snapshot revision",
     "current host has no microphone": "retained physical input now reaches VAD/ASR; the intelligible required utterance remains open",
     "a simple greeting may finish there without goal association": "every admitted greeting retains canonical Goal continuity after early speech",
-    "it must not claim to be human": "the owner-approved identity is a six-year-old girl, not a robot",
+    "the owner-approved identity is a six-year-old girl, not a robot": "social identity must not deny truthful robotic embodiment",
     "robotidentity": "the current identity contract is ChromieIdentity",
     "retained capabilityagent planner": "CapabilityAgent is retired from the maintained semantic architecture",
     "emergency compatibility planner is retained": "there is no maintained emergency semantic planner",
@@ -145,6 +143,33 @@ TEXT_SCAN_SUFFIXES = {
     ".yaml",
     ".yml",
 }
+
+ARCHITECTURE_REQUIREMENT_REFERENCES = {
+    "IDENTITY-TRUTH-001": [ROOT / "docs" / "HUMAN_LIKE_INTERACTION_CONTRACT.md"],
+    "ATTENTION-AUTHORITY-001": [
+        ROOT / "docs" / "HUMAN_LIKE_INTERACTION_CONTRACT.md",
+        ROOT / "docs" / "COGNITIVE_GATEWAY.md",
+    ],
+    "GREETING-GOAL-001": [
+        ROOT / "docs" / "HUMAN_LIKE_INTERACTION_CONTRACT.md",
+        ROOT / "docs" / "COGNITIVE_TURN_LOOP.md",
+    ],
+    "SPEECH-OWNER-001": [
+        ROOT / "docs" / "HUMAN_LIKE_INTERACTION_CONTRACT.md",
+        ROOT / "docs" / "SEMANTIC_AUTHORITY.md",
+    ],
+    "PLANNER-AUTHORITY-001": [
+        ROOT / "docs" / "GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md",
+        ROOT / "docs" / "COGNITIVE_TURN_LOOP.md",
+        ROOT / "docs" / "SEMANTIC_AUTHORITY.md",
+    ],
+    "ASYNC-COGNITION-001": [
+        ROOT / "docs" / "GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md",
+        ROOT / "docs" / "COGNITIVE_TURN_LOOP.md",
+    ],
+    "INTERACTION-LATENCY-001": [ROOT / "docs" / "HUMAN_LIKE_INTERACTION_CONTRACT.md"],
+}
+
 TEXT_SCAN_FILENAMES = {
     ".dockerignore",
     ".gitignore",
@@ -294,6 +319,25 @@ def check_current_focus(errors: list[str]) -> None:
                     f"{path.relative_to(ROOT)} contains stale phrase {phrase!r}: {reason}"
                 )
 
+
+
+def check_architecture_requirements(errors: list[str]) -> None:
+    """Keep high-value current authority contracts anchored to one Charter definition."""
+
+    charter = PROJECT_CHARTER.read_text(encoding="utf-8")
+    for requirement_id, references in ARCHITECTURE_REQUIREMENT_REFERENCES.items():
+        definition_count = charter.count(requirement_id)
+        if definition_count != 1:
+            errors.append(
+                f"docs/PROJECT_CHARTER.md must define {requirement_id} exactly once; "
+                f"found {definition_count}"
+            )
+        for path in references:
+            if requirement_id not in path.read_text(encoding="utf-8"):
+                errors.append(
+                    f"{path.relative_to(ROOT)} must reference Charter requirement "
+                    f"{requirement_id}"
+                )
 
 def check_current_gate_summaries(errors: list[str]) -> None:
     """Keep current-facing summaries from copying revision-specific test counts."""
@@ -847,6 +891,7 @@ def main() -> int:
     check_current_focus(errors)
     check_current_gate_summaries(errors)
     check_current_runtime_terminology(errors)
+    check_architecture_requirements(errors)
     check_project_direction(errors)
     check_api_reference(errors)
     check_configuration_reference(errors)

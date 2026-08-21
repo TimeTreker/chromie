@@ -28,6 +28,7 @@ from .cognitive_identity import (
     owner_approved_identity_context,
     owner_approved_personality_context,
 )
+from .prompt_projection import bounded_json
 from .planner_contract import (
     EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
     PlannerDTOContractError,
@@ -676,15 +677,10 @@ class FastPlannerResolver:
     ) -> LayeredPrompt:
         contract = (
             "Judge the exact immutable activity.text, not its label. At pre_evidence, "
-            "a present acknowledgement or prospective intention is valid; an intention "
-            "to check next is not an execution claim, and an intention to act next is "
-            "not a completion claim. Chinese '我先…', '我这就…', '我马上…', '我会…', "
-            "and '我将…', and English 'Let me…', 'I will…', and 'I'll do it now' are "
-            "prospective only when they modify a future intention. An onset or "
-            "progressive predicate equivalent to 'I am starting', 'I start executing', "
-            "or 'I am doing it' claims that work is underway and must be rejected even "
-            "after one of those immediacy markers. In contrast, wording equivalent to 'I checked', 'I did it', "
-            "'I finished', or a requested result says work already happened. "
+            "a present acknowledgement or prospective intention is valid; future-oriented "
+            "grammar may announce intended checking or action without claiming execution. "
+            "Onset, progressive, perfect, completion, and result predicates claim a later "
+            "truth stage and must be rejected when that stage is not established. "
             "Reject only when the sentence contains an unverified result, changed-world "
             "claim, already-started/completed claim, or when it invents a physical "
             "instrument, source, sensor, observation, action, personal fact, or world "
@@ -697,11 +693,9 @@ class FastPlannerResolver:
             "continuing or resuming the resolved work rather than starting it as a "
             "new action, and it must not fall back to a generic thing, matter, or "
             "action after the target meaning is supplied. "
-            "For a command addressed to Chromie, first-person 我/I is the correct actor; "
-            "a reply that tells the human to perform that action is not. In an "
-            "immediate command response, a bare Chinese first-person action such as "
-            "'我往前走十秒' still keeps Chromie as actor; only mark a perspective "
-            "contradiction if the sentence actually assigns the action to the human. "
+            "For a command addressed to Chromie, first-person self-reference may be the "
+            "correct actor; reject only when the wording actually assigns Chromie's owed "
+            "action to the human or otherwise reverses the grounded semantic roles. "
             "A human's feeling must remain the human's, and repeating Chromie's last utterance "
             "must use the supplied assistant utterance. A progress question that asks "
             "the human to supply or reconfirm information without an InformationGap "
@@ -721,29 +715,19 @@ class FastPlannerResolver:
                 separators=(",", ":"),
             )
             + "\n\nAuthoritative Responsibility evidence JSON:\n"
-            + json.dumps(
+            + bounded_json(
                 [
                     item.model_dump(mode="json", exclude_none=True)
                     for item in responsibilities
                 ],
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            )[:3000]
+                3000,
+            )
             + "\n\nAdmitted trusted Evidence JSON:\n"
-            + json.dumps(
-                trusted_evidence,
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            )[:2200]
+            + bounded_json(trusted_evidence, 2200)
             + "\n\nBounded Interaction Context JSON:\n"
-            + json.dumps(
-                (request.context or {}).get("interaction_context") or {},
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            )[:900]
+            + bounded_json(
+                (request.context or {}).get("interaction_context") or {}, 900
+            )
             + "\n\nCurrent user turn (context only, never external-result Evidence):\n"
             + str(request.original_user_text or "")[:700]
         )
@@ -839,12 +823,7 @@ class FastPlannerResolver:
                             "the check will reveal. Preserve the authoritative semantic "
                             "relationship and concrete resolved outcome in this decoder "
                             "contract: "
-                            + json.dumps(
-                                semantic_contract,
-                                ensure_ascii=False,
-                                sort_keys=True,
-                                separators=(",", ":"),
-                            )[:1200]
+                            + bounded_json(semantic_contract, 1200)
                             + ". For relationship=continue, explicitly word the sentence "
                             "as continuing or resuming that concrete outcome, not as a "
                             "new start and not with a generic stand-in."
@@ -973,20 +952,13 @@ class FastPlannerResolver:
             "modifies, or otherwise references a supplied Goal, use the resolved "
             "target Goal meaning below. The sentence must name that concrete resolved "
             "user-level action or work in natural language and preserve the supplied "
-            "relationship. For relationship=continue, the wording must explicitly say "
-            "continue/resume (继续/接着), rather than sounding like a new start. For "
-            "example, a retained "
-            "Goal meaning 'move forward' must be realized as continuing to move/walk "
-            "forward, not merely as continuing a thing or an action. Generic stand-ins "
-            "such as the thing, the matter, that request, that action, or the previous "
-            "action are invalid after the referent is available. It may omit repeated "
-            "parameter detail when brevity makes that natural. Before an embodied or "
-            "state-changing action, make the intention prospective with a natural "
-            "willingness/immediacy marker (for example Chinese 好/我这就/我马上 or "
-            "English okay/I'll), so a bare present-tense action is not mistaken for "
-            "execution already underway. That marker must modify a future intention, "
-            "not wording equivalent to 'I am starting' or 'I am doing it now'; those "
-            "claims require Runtime commitment. Do not invent current activity, household "
+            "relationship. For relationship=continue, the wording must semantically mark "
+            "continuation or resumption rather than sounding like a new start, while "
+            "preserving the resolved user-level action instead of replacing it with a "
+            "generic stand-in. It may omit repeated parameter detail when brevity makes "
+            "that natural. Before an embodied or state-changing action, use prospective "
+            "grammar so intention is not mistaken for execution already underway; onset "
+            "or progressive claims require Runtime commitment. Do not invent current activity, household "
             "work, personal state, or external facts."
         )
         responsibility_field_contract = (
@@ -1017,29 +989,19 @@ class FastPlannerResolver:
             + responsibility_field_contract
             + "\n\n"
             "Authoritative Responsibility evidence:\n"
-            + json.dumps(
+            + bounded_json(
                 [
                     item.model_dump(mode="json", exclude_none=True)
                     for item in responsibilities
                 ],
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            )[:2600]
+                2600,
+            )
             + "\n\nResolved target Goal semantics for referenced Responsibilities:\n"
-            + json.dumps(
-                _first_response_target_goal_grounding(context, responsibilities),
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            )[:1800]
+            + bounded_json(
+                _first_response_target_goal_grounding(context, responsibilities), 1800
+            )
             + "\n\nAlready delivered or pending interaction summary:\n"
-            + json.dumps(
-                context.get("interaction_context") or {},
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            )[:700]
+            + bounded_json(context.get("interaction_context") or {}, 700)
             + (
                 "\n\nFINAL COUNTERFACTUAL CHECK: the exact sentence must remain true if "
                 "no checking has started and no result exists."
@@ -2898,13 +2860,7 @@ class FastPlannerResolver:
                 continue
             seen.add(key)
             unique.append(item)
-        return json.dumps(
-            unique,
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-            default=str,
-        )[:10000]
+        return bounded_json(unique, 10000)
 
     @staticmethod
     def _capability_argument_errors(
@@ -2941,14 +2897,7 @@ class FastPlannerResolver:
 
     @staticmethod
     def _bounded(value: Any, limit: int) -> str:
-        text = json.dumps(
-            value,
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-            default=str,
-        )
-        return text if len(text) <= limit else text[:limit].rstrip() + "..."
+        return bounded_json(value, limit)
 
     @staticmethod
     def _validate_work_reuse_selection(
@@ -3044,10 +2993,10 @@ class FastPlannerResolver:
         response_only, requires_execution = planner_goal_execution_requirements(grounding)
         argument_grounding_contract = (
             EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT
-            + "For chromie.memory.retrieve_verified_tool_result, resolved Goal "
-            "bindings such as location and date belong inside the single "
-            "material_args object. They are not missing direct step arguments, "
-            "so do not emit separate location or date parameter_resolutions. "
+            + "For chromie.memory.retrieve_verified_tool_result, all resolved "
+            "material Goal bindings belong inside the single material_args object. "
+            "Nested material fields are not missing direct step arguments, so do "
+            "not emit separate parameter_resolutions for them. "
             "If a resolution for that nested object is useful, its parameter "
             "must be material_args and its value must equal the complete "
             "step.args.material_args object. "
@@ -3078,7 +3027,7 @@ class FastPlannerResolver:
                 else ""
             )
         )
-        semantic_scope_contract = "For a Goal with resource_responsibility, keep the entire acquire-and-deliver outcome as one semantic responsibility while treating the current capability catalog as the dynamic decomposition boundary. Fast Planner may terminally execute the Goal only when one exact registered Capability is a complete one-step cover. A provider's resource_contract.plan_requires/plan_provides declares public composition state; provider-internal stages remain private unless exposed as capabilities. If the catalog has only partial resource capabilities that could form a multi-step chain, escalate to Deep Planner rather than inventing hidden provider stages or claiming a partial primitive is complete. The Goal is provider-neutral: choose from the catalog by declared semantic scope and resource contract, never from capability-name conventions or a hardcoded provider rule. When resource_responsibility.source.status=unknown and the selected complete capability cannot resolve the source itself, return a specific context request and zero executable steps. Capability semantic_scope and resource_contract metadata are authoritative applicability evidence. Capability domains are not interchangeable merely because each reads current information: a local-clock capability covers only declared clock facts, a weather capability covers only declared weather facts, and neither covers environmental person-presence or direct perception. Never choose the nearest read-only capability from another domain. When the selected Capability accepts resource, source, or recipient objects, copy each accepted object exactly from the canonical resource_responsibility, including nested quantity, source bindings, and recipient fields. Those complete structured arguments are already grounded by the Goal contract; do not emit parameter_resolutions for their nested fields or invent a top-level quantity/distance argument that the Capability does not accept. Canonical Goal typed semantics are authoritative: non-resource Goals use object.bindings, while resource Goals use resource_responsibility directly with no persisted flat compatibility copy. Every material tool argument that directly represents one canonical binding must preserve that binding exactly; never reinterpret an original pronoun or replace a binding with older memory. When a Capability declares argument_realization, use the original user turn plus the canonical human-semantic binding to realize only the declared provider arguments, and record those transformed arguments as semantic_realization parameter provenance. This is Planner-owned HOW and must never rewrite the Goal. Preserve every canonical-goal qualifier, including temporal scope, comparison period, answer shape, ordering, and concurrency; never use a Capability default to silently narrow an explicit human scope. Never silently rewrite simultaneous independent actions as before/after actions. An explicit ordered relation must remain sequential. Capability parallel-safety is permission to honor user-requested concurrency, never evidence that concurrency was requested. Every executable step must explicitly include timing; omission is invalid because it would erase the model's ordering or concurrency decision. When the user requests compatible actions to happen together, assign timing=parallel only when each selected capability explicitly declares parallel_metadata_declared=true and can_run_parallel=true and their exclusive/resource claims are compatible. Never invent an unstated feature of a capability in a reason or outcome; in particular, a physical action cannot satisfy a conversational or spoken-performance Goal unless its supplied semantics explicitly say so. Use a respond outcome for speech whose exact wording you own. A user-requested spoken response or performance may still be simultaneous with an Activity-lane step. Preserve that relation without inventing a chromie.speak plan step: keep the spoken Goal as a respond outcome, set each participating Activity step to timing=parallel only when its provider declares safe parallel execution, and leave cross-lane scheduling to trusted Runtime. Never satisfy a prohibition, negation, or hold-state constraint by invoking the positive action it forbids; if the catalog has no capability whose semantic scope actually enforces that negative state, clarify or report it unavailable. If safe parallel execution is unavailable or uncertain, escalate or propose an explicit safe adjustment rather than silently serializing the request. Never silently narrow a goal to fit a capability or its enum defaults. If the goal falls outside a capability's supported scope, escalate for clarification, another capability, or an honest unavailable result with zero steps. "
+        semantic_scope_contract = "For a Goal with resource_responsibility, keep the entire acquire-and-deliver outcome as one semantic responsibility while treating the current capability catalog as the dynamic decomposition boundary. Fast Planner may terminally execute the Goal only when one exact registered Capability is a complete one-step cover. A provider's resource_contract.plan_requires/plan_provides declares public composition state; provider-internal stages remain private unless exposed as capabilities. If the catalog has only partial resource capabilities that could form a multi-step chain, escalate to Deep Planner rather than inventing hidden provider stages or claiming a partial primitive is complete. The Goal is provider-neutral: choose from the catalog by declared semantic scope and resource contract, never from capability-name conventions or a hardcoded provider rule. When resource_responsibility.source.status=unknown and the selected complete capability cannot resolve the source itself, return a specific context request and zero executable steps. Capability semantic_scope and resource_contract metadata are authoritative applicability evidence. Capability domains are not interchangeable merely because several capabilities share a read/effect class. Eligibility requires the selected Capability's declared information_domain and semantic scope to cover the exact Goal; never substitute the nearest read-only Capability from another domain. When the selected Capability accepts resource, source, or recipient objects, copy each accepted object exactly from the canonical resource_responsibility, including nested quantity, source bindings, and recipient fields. Those complete structured arguments are already grounded by the Goal contract; do not emit parameter_resolutions for their nested fields or invent a top-level quantity/distance argument that the Capability does not accept. Canonical Goal typed semantics are authoritative: non-resource Goals use object.bindings, while resource Goals use resource_responsibility directly with no persisted flat compatibility copy. Every material tool argument that directly represents one canonical binding must preserve that binding exactly; never reinterpret an original pronoun or replace a binding with older memory. When a Capability declares argument_realization, use the original user turn plus the canonical human-semantic binding to realize only the declared provider arguments, and record those transformed arguments as semantic_realization parameter provenance. This is Planner-owned HOW and must never rewrite the Goal. Preserve every canonical-goal qualifier, including temporal scope, comparison period, answer shape, ordering, and concurrency; never use a Capability default to silently narrow an explicit human scope. Never silently rewrite simultaneous independent actions as before/after actions. An explicit ordered relation must remain sequential. Capability parallel-safety is permission to honor user-requested concurrency, never evidence that concurrency was requested. Every executable step must explicitly include timing; omission is invalid because it would erase the model's ordering or concurrency decision. When the user requests compatible actions to happen together, assign timing=parallel only when each selected capability explicitly declares parallel_metadata_declared=true and can_run_parallel=true and their exclusive/resource claims are compatible. Never invent an unstated feature of a capability in a reason or outcome; in particular, a physical action cannot satisfy a conversational or spoken-performance Goal unless its supplied semantics explicitly say so. Use a respond outcome for speech whose exact wording you own. A user-requested spoken response or performance may still be simultaneous with an Activity-lane step. Preserve that relation without inventing a chromie.speak plan step: keep the spoken Goal as a respond outcome, set each participating Activity step to timing=parallel only when its provider declares safe parallel execution, and leave cross-lane scheduling to trusted Runtime. Never satisfy a prohibition, negation, or hold-state constraint by invoking the positive action it forbids; if the catalog has no capability whose semantic scope actually enforces that negative state, clarify or report it unavailable. If safe parallel execution is unavailable or uncertain, escalate or propose an explicit safe adjustment rather than silently serializing the request. Never silently narrow a goal to fit a capability or its enum defaults. If the goal falls outside a capability's supported scope, escalate for clarification, another capability, or an honest unavailable result with zero steps. "
         current_turn_communication_contract = (
             "The FINAL AUTHORITATIVE USER TURN owns the current communicative act. "
             "Retained Goals, delivered evidence-bound dialogue, and verified memory "
@@ -3182,7 +3131,7 @@ class FastPlannerResolver:
             "Use Interaction Context to plan only the still-needed conversational and effectful delta. Preserve each typed event's owner and state: generated or scheduled speech is not proof the user heard it, committed work is not completion, and only execution_closure terminal events reference trusted Activity completion evidence. Do not treat missing or undelivered speech as fulfilled communication. Decide whether any new planner response_text materially helps the current human interaction, and prefer no extra speech when it would be filler or repetition. Do not repeat an already delivered or pending semantic act, or re-plan an already completed effect, unless the current meaning requires an explicit repeat, retry after failure, correction, changed state, new evidence, or clarification. It cannot override the authoritative current Goals or Canonical Plan contract. "
             f"Previous Fast Planner output when doing a mechanical DTO regeneration:\n{self._bounded(previous_raw, 3500) if previous_raw is not None else 'null'}\n\n"
             "When validation errors are present and the previous output is null, regenerate one fresh complete object from the authoritative turn, goals, catalog, and every listed defect. Do not patch, quote, splice, annotate, or embed JSON fragments inside rationale or response strings. "
-            "Decide whether the executable common catalog completely covers every independent responsibility in the current user turn. A verified tool-memory index entry is only metadata that an exact prior result may be retrievable; it is never answer evidence. After Goal Association has fixed all material bindings, select chromie.memory.retrieve_verified_tool_result only when one index entry exactly matches the required tool_id and material arguments and is fresh enough for the user request. Otherwise select the fresh read capability. A status follow-up for a scheduled, running, or recoverable safe read must resume or retry the bound skill with its exact arguments when no matching completed memory entry exists. Never invent weather, temperature, status, price, schedule, or another external result from model memory or from index metadata. "
+            "Decide whether the executable common catalog completely covers every independent responsibility in the current user turn. A verified tool-memory index entry is only metadata that an exact prior result may be retrievable; it is never answer evidence. After Goal Association has fixed all material bindings, select chromie.memory.retrieve_verified_tool_result only when one index entry exactly matches the required tool_id and material arguments and is fresh enough for the user request. Otherwise select the fresh read capability. A status follow-up for a scheduled, running, or recoverable safe read must resume or retry the bound skill with its exact arguments when no matching completed memory entry exists. Never invent any external, private, or runtime result from model memory or index metadata. "
             "There are exactly two legal output shapes for one or many goals. A terminal plan uses coverage=complete, a goal_outcomes entry keyed exactly once by every canonical Goal ID, and non-null prospective satisfaction. A semantic escalation uses disposition=escalate, coverage=partial or uncertain, steps=[], one escalate outcome for every canonical Goal ID, non-exact prospective satisfaction, and a specific non-empty escalation_reason. "
             "Finding one matching capability is not complete coverage. If any responsibility, parameter, ordering, concurrency relation, safety judgment, or capability is unresolved, use the complete model-authored semantic-escalation shape; never return an empty outcome map or null satisfaction. "
             "Fast Planner may emit disposition=mixed only for a completely covered simple combination of common unlocked execute goals and direct conversational respond goals. A mixed plan requires at least one execute outcome, at least one respond outcome, complete per-goal satisfaction, and exact step ownership. "

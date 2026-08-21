@@ -17,6 +17,8 @@ verified without a GPU, Ollama, Soridormi, MuJoCo, a microphone, or physical
 hardware. Live services are still required to validate model quality and robot
 behavior.
 
+The maintained authority boundary applies Charter requirements `SPEECH-OWNER-001` and `PLANNER-AUTHORITY-001`.
+
 ## Maintained invariant
 
 A turn carries one `context.semantic_authority` claim. The claim records an

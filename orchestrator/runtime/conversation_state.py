@@ -94,13 +94,6 @@ _DEFAULT_REFLECTION_MEMORY_MAX_TTL_SEC = 900
 logger = logging.getLogger("chromie.orchestrator.conversation_state")
 
 
-def _env_bool(name: str, default: bool = False) -> bool:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    return value.strip().lower() in {"1", "true", "yes", "on"}
-
-
 def _now_ms() -> float:
     return time.time() * 1000.0
 
@@ -226,49 +219,6 @@ class ConversationStateManager:
             durable_memory_enabled=settings.durable_memory_enabled,
             durable_memory_path=settings.durable_memory_path,
             durable_memory_max_entries=settings.durable_memory_max_entries,
-        )
-
-    @classmethod
-    def from_env(cls) -> "ConversationStateManager":
-        return cls(
-            base_conversation_id=os.getenv("ORCH_CONVERSATION_ID", "local_default"),
-            enabled=_env_bool("ORCH_ENABLE_CONVERSATION_STATE", True),
-            max_turns=int(os.getenv("ORCH_CONVERSATION_MAX_TURNS", os.getenv("ORCH_CONTEXT_MAX_TURNS", "12"))),
-            soft_idle_timeout_sec=int(
-                os.getenv("ORCH_CONVERSATION_IDLE_TIMEOUT_SEC", os.getenv("ORCH_CONTEXT_IDLE_TIMEOUT_SEC", "180"))
-            ),
-            hard_idle_timeout_sec=int(
-                os.getenv("ORCH_CONVERSATION_HARD_IDLE_TIMEOUT_SEC", os.getenv("ORCH_CONTEXT_MAX_AGE_SECONDS", "900"))
-            ),
-            turn_max_text_chars=int(
-                os.getenv("ORCH_CONVERSATION_TURN_MAX_TEXT_CHARS", os.getenv("ORCH_CONTEXT_MAX_TEXT_CHARS", "260"))
-            ),
-            max_context_chars=int(os.getenv("ORCH_CONVERSATION_MAX_CONTEXT_CHARS", "2200")),
-            max_pending_tasks=int(
-                os.getenv("ORCH_CONVERSATION_MAX_PENDING_TASKS", os.getenv("ORCH_CONTEXT_MAX_PENDING_TASKS", "8"))
-            ),
-            max_tool_evidence=int(
-                os.getenv("ORCH_CONVERSATION_MAX_TOOL_EVIDENCE", "8")
-            ),
-            max_memory_entries=int(os.getenv("ORCH_CONVERSATION_MAX_MEMORY_ENTRIES", "24")),
-            max_discourse_referents=int(
-                os.getenv("ORCH_CONVERSATION_MAX_DISCOURSE_REFERENTS", "24")
-            ),
-            max_discourse_focus=int(
-                os.getenv("ORCH_CONVERSATION_MAX_DISCOURSE_FOCUS", "8")
-            ),
-            completed_task_retention_sec=int(os.getenv("ORCH_CONVERSATION_COMPLETED_TASK_RETENTION_SEC", "180")),
-            task_store_enabled=_env_bool("ORCH_ENABLE_TASK_CONTEXT_STORE", False),
-            task_store_path=os.getenv("ORCH_TASK_CONTEXT_STORE_PATH", _DEFAULT_TASK_STORE_PATH),
-            durable_memory_enabled=_env_bool(
-                "ORCH_ENABLE_DURABLE_PROFILE_MEMORY", False
-            ),
-            durable_memory_path=os.getenv(
-                "ORCH_DURABLE_PROFILE_MEMORY_PATH", _DEFAULT_DURABLE_MEMORY_PATH
-            ),
-            durable_memory_max_entries=int(
-                os.getenv("ORCH_DURABLE_PROFILE_MEMORY_MAX_ENTRIES", "64")
-            ),
         )
 
     @staticmethod

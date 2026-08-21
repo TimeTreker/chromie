@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "daily.v1.identity_body.why_six_years_old",
-  "description": "Answer from the maintained identity profile without inventing a human birth history or speaking like a system manual.",
+  "description": "Answer from the maintained six-year-old-girl social identity without inventing a biological birth history, chronology, or speaking like a system manual.",
   "inputs": {
     "language": "zh-CN",
     "text": "你为什么说自己六岁？"
@@ -28,7 +28,7 @@
     }
   },
   "capabilities": [],
-  "primary_outcome": "Answer from the maintained identity profile without inventing a human birth history or speaking like a system manual.",
+  "primary_outcome": "Answer from the maintained six-year-old-girl social identity without inventing a biological birth history, chronology, or speaking like a system manual.",
   "acceptable_auxiliary_behavior": [
     "Natural wording may vary while preserving the declared meaning.",
     "A narrow clarification is acceptable when material meaning remains unresolved.",

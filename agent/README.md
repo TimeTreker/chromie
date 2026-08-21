@@ -1,7 +1,7 @@
 # Chromie Agent Cognitive Service
 
 `chromie-agent` is Chromie's single model-facing cognitive service. It exposes
-separately testable Goal Interpretation, Goal Association, Fast and Deep Planner,
+separately testable Goal Interpretation, Goal Association, Planner fast/deep passes,
 Reflection, Social Attention, capability-catalog, and TaskGraph diagnostic
 surfaces. These are module/contract boundaries inside one FastAPI service, not a
 microservice per cognitive role. The Cognitive Gateway itself remains Host-owned.
@@ -9,8 +9,9 @@ microservice per cognitive role. The Cognitive Gateway itself remains Host-owned
 The service is **not** a second orchestration runtime. The retired `AgentRuntime`,
 `InteractionRuntime`, specialized semantic Agent pipeline, `/run`, `/interaction`,
 `/agents`, independent response-authoring stage, and Tool Result Interpreter
-surfaces have been removed. Fast Planner owns Communicative Activities and receives
-trusted terminal Evidence re-entry. The Host Orchestrator owns turn coordination
+surfaces have been removed. One Planner authority owns Communicative Activities; its
+fast/deep passes receive bounded Responsibility/Goal/Work/Evidence state on initial and
+event-driven re-entry. The Host Orchestrator owns turn coordination
 and the trusted asynchronous `CapabilityRuntime`; Soridormi remains an execution
 provider behind the Capability boundary.
 
@@ -22,14 +23,23 @@ Perception
 Cognitive Gateway
   ↓
 Goal Interpretation     WHAT only
-  ↓
-Goal Association        canonical Goal identity / continuity
-  ↓
-Fast / Deep Planner     HOW
-  ↓
+  ├───────────────┐
+  ↓               ↓
+Planner           Goal Association
+fast/deep passes  canonical Goal continuity
+  ↓               │
+Plan / Activities │
+  └───────┬───────┘
+          ↓
 CapabilityRuntime       trusted execution lifecycle
-  ↓
-Evidence                reality
+          ↓
+Provider events         what happened
+          ↓
+Evidence                what is true
+          ↓
+CognitiveOpportunity    ephemeral readiness trigger when useful
+          ↓
+Planner                  0..N Activity changes or none
 ```
 
 Social Attention is an optional Activity-scoped auxiliary cognition path. It may select only eligible live social-expression capabilities supplied by the bounded catalog context; it cannot create Goals, replace primary work, alter completion, author response text, or select provider/backend mechanics.

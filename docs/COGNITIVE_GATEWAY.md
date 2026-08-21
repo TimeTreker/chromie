@@ -11,6 +11,8 @@ projection. Dedicated
 Soridormi E-stop/safe-idle evidence and source-bound target qualification remain
 open. Current implementation and evidence are owned by [STATUS.md](STATUS.md).
 
+This boundary is governed by Charter requirement `ATTENTION-AUTHORITY-001`.
+
 ## 1. Name and purpose
 
 - **English:** Cognitive Gateway

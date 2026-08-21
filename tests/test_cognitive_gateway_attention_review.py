@@ -38,6 +38,7 @@ class CognitiveGatewayAttentionReviewTests(unittest.IsolatedAsyncioTestCase):
         active: bool = False,
         evidence: str | None = None,
         recent_dialogue: list[dict[str, str]] | None = None,
+        gate_enabled: bool = True,
     ) -> AttentionReviewRequest:
         return AttentionReviewRequest(
             turn_id="turn-1",
@@ -46,12 +47,26 @@ class CognitiveGatewayAttentionReviewTests(unittest.IsolatedAsyncioTestCase):
             text=text,
             language="en-US",
             engagement={
-                "gate_enabled": True,
+                "gate_enabled": gate_enabled,
                 "active": active,
                 "evidence": evidence or ("active_task" if active else "none"),
             },
             recent_dialogue=list(recent_dialogue or []),
         )
+
+
+    async def test_disabled_gate_admits_without_fabricating_review_confidence(self) -> None:
+        client = _Client({"addressed": True, "speech_act": "greeting", "confidence": 1.0})
+        reviewer = AttentionReviewer(client)
+
+        result = await reviewer.review(self.request("Hi.", gate_enabled=False))
+
+        self.assertEqual(result.disposition, "admit")
+        self.assertEqual(result.speech_act, "unclear")
+        self.assertEqual(result.confidence, 0.0)
+        self.assertEqual(result.source, "cognitive_gateway.attention_policy_disabled")
+        self.assertIn("not reviewed", result.reason)
+        self.assertEqual(client.calls, 0)
 
     async def test_inactive_ambient_narration_can_be_suppressed(self) -> None:
         client = _Client(

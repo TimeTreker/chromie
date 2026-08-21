@@ -43,31 +43,34 @@ layer or cognitive term.
 ## Immediate architecture line — consolidate the reviewed authority baseline
 
 The broad architecture-discovery phase is closed. New work starts from the canonical
-`Goal Interpretation → Responsibility evidence → Fast Planner advancement → immediate
-safe Activity and/or Goal Association/Deep continuation → Canonical Goal when persistent
-continuity is required → canonical planning → Work/Primary Activities → realization →
-Provider → Evidence` authority seam
-and must pass the Charter's architecture-irreducibility review before adding a new
-principle, owner, persistent state concept, manager, workflow, contract field, or
-mechanism.
+event/readiness authority seam: Goal Interpretation establishes Responsibility / WHAT;
+Planner (fast or deep pass) owns HOW; Goal Association independently owns canonical Goal
+continuity; Trusted Capability Runtime and Providers realize Work; asynchronous Runtime
+events report what happened; Host-bound Evidence records what is true; and a meaningful
+state transition may create a bounded `CognitiveOpportunity` that re-enters the same
+Planner with Responsibility + Goal + Situation + actual Work + Evidence. Planner may
+produce zero, one, or many Activity changes. Existing-Work comparison is a Planner
+operation, not a mandatory reconciliation stage. This baseline must pass the Charter's
+architecture-irreducibility review before adding a new principle, owner, persistent state
+concept, manager, workflow, contract field, or mechanism.
 
 Next design/implementation order:
 
-1. **GI/Fast-Planner input-ownership boundary — implemented and source-guarded.** GI is
+1. **GI/Planner input-ownership boundary — implemented and source-guarded.** GI is
    WHAT-only: Responsibility meaning, explicit/contextual semantic bindings, Goal
    relation, fresh-evidence need, and bounded unresolved meaning. GI has no authority or
    DTO fields to create/resolve planning InformationGaps, declare Capability inputs
    missing/blocking, or choose `ask_user`, context, observation/query, or default. Fast
-   Planner owns execution-input completeness, source/default policy, gap provenance, and
+   Planner fast pass owns execution-input completeness, source/default policy, gap provenance, and
    clarification selection without reinterpreting Responsibility. The temporary Deep-GI
    external-evidence/`ask_user` defense is removed; Deep GI is one source-based pass only
    for genuine consequential semantic ambiguity. Runtime commits a Planner gap to its
    exact GA-owned Goal before the question can be delivered.
-2. **Fast Planner first-advancement seam — implemented in the maintained path.** Keep
+2. **Planner fast-pass first advancement — implemented in the maintained path.** Keep
    Responsibility evidence as Goal Interpretation's provider-neutral WHAT handoff. The
-   same Fast Planner is the first HOW owner: before canonical Goal binding it may author
+   Planner fast pass is the first HOW path: before canonical Goal binding it may author
    one immediate safe Communicative Act and typed continuation dispositions for
-   Goal Association and/or Deep Planner. Goal Association remains the only canonical
+   Goal Association and/or Planner deep pass. Goal Association remains the only canonical
    Goal-continuity authority; commitment-bearing Capability work still requires
    applicable canonical Goal grounding and trusted validation. Goal Interpretation
    has no speech or response contract. A Communicative Activity contains function,
@@ -77,9 +80,9 @@ Next design/implementation order:
 3. **Planner-owned communication and Evidence re-entry — implemented and source-guarded.**
    Planner is the only ordinary response semantic owner. Trusted Runtime/Host binds
    terminal Evidence through immutable request
-   provenance to exact Goal IDs, then reactivates Fast Planner with a bounded,
-   version-consistent Goal/Evidence snapshot. Fast Planner chooses answer,
-   follow-up Work, clarification, or silence. Social Attention remains optional
+   provenance to exact Goal IDs, then creates a bounded readiness opportunity for Planner
+   with a version-consistent Goal/Evidence/Work snapshot. Planner chooses answer,
+   follow-up Work, revision, clarification, waiting, silence, or no new Activity. Social Attention remains optional
    decoration attached to the same observable Main Activity and never delays it.
    Retain separate first-commit, TTS-first-PCM, playback-start, result-reentry,
    and Social-Attention-opportunity timing evidence.
@@ -161,11 +164,14 @@ baseline**, not another broad concept-expansion phase:
    and evidence refs. It is rebuilt in-process, revisioned
    between Goal Association and planning, prompt-validated, and never owns or
    copies the referenced Goal/Evidence/provider truth.
-3. **Goal materialization, refinement, and replacement are implemented.** Fully
-   discharged provider-free native conversation stays transient; same-Responsibility
-   refinement changes Canonical Goal meaning only. Existing Fast Planner Work
-   Reconciliation compares that meaning with retained/provisional Work and explicitly
-   selects reuse or correction; GA and Host never decide compatibility. Genuine
+3. **Goal materialization, refinement, and replacement are implemented.** A fully
+   discharged provider-free interaction still receives canonical conversational Goal
+   continuity for the admitted turn, but a closed Goal need not be durably retained merely
+   because the response was immediate. Same-Responsibility refinement changes Canonical
+   Goal meaning only. Planner may compare that meaning with retained/provisional Work and
+   explicitly select reuse, correction, replacement, or no change; this is a Planner
+   operation rather than a Work-Reconciliation stage. GA and Host never decide
+   compatibility. Genuine
    replacement creates new Goal lineage, stops Planner-rejected old Work through
    trusted receipts, and supersedes the old Responsibility without rewriting history.
 4. **Evidence-driven reactivation and selective Reflection are implemented.**
@@ -199,8 +205,9 @@ safe evidence profile available.
 
 1. **Make simple interaction promptly useful.** Meet the approved Fast-Planner and
    audible-start budgets by removing avoidable model reloads, duplicate generations,
-   and serial waits inside existing owners. A provider-free answer should close without
-   durable Goal state; a pending-work acknowledgement must add truthful common ground
+   and serial waits inside existing owners. A provider-free answer may close its canonical
+   conversational Goal immediately without making that closed Goal durable; a pending-work
+   acknowledgement must add truthful common ground
    and must not claim execution. Preserve Epistemic Qualification and every existing
    truth/safety validator.
 2. **Keep conversation available while Work continues.** Exercise a follow-up or

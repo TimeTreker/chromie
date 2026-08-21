@@ -183,12 +183,9 @@ ORCH_TASK_CONTEXT_STORE_PATH=.chromie/conversation/task_contexts.json
 Conversation boundaries are deliberately non-semantic in the Host. It applies
 the hard-idle timeout and typed control state; it does not use reset or follow-up
 phrases, pronoun lists, or new-topic starters. Goal Association owns those
-meanings. `ORCH_CONVERSATION_IDLE_TIMEOUT_SEC` remains a compatibility value but
-does not authorize phrase-based soft-idle splitting.
+meanings. `ORCH_CONVERSATION_IDLE_TIMEOUT_SEC` remains a bounded conversation-state value but does not authorize phrase-based soft-idle splitting.
 
-Legacy `ORCH_CONTEXT_*` aliases remain accepted for compatibility. Use the
-current names in new deployments. Exact defaults and precedence are documented
-in [`CONFIGURATION.md`](CONFIGURATION.md).
+The former `ORCH_CONTEXT_*` aliases are removed. Exact maintained settings and defaults are documented in [`CONFIGURATION.md`](CONFIGURATION.md).
 
 ## Privacy and durability
 

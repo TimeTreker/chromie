@@ -27,10 +27,10 @@ class MindProfileTests(unittest.TestCase):
 
         self.assertTrue(profile.owner_approved)
         self.assertEqual(profile.identity.name, "Chromie")
-        self.assertEqual(profile.identity.kind, "human child")
+        self.assertEqual(profile.identity.kind, "girl identity")
         self.assertEqual(profile.identity.gender, "female")
         self.assertEqual(profile.identity.age_description, "6 years old")
-        self.assertEqual(profile.version, "0.6.2")
+        self.assertEqual(profile.version, "0.6.3")
         self.assertEqual(type(profile.identity).__name__, "ChromieIdentity")
         self.assertIn("family's little secretary", profile.identity.short_self_description)
         self.assertIn("six-year-old girl", profile.identity.model_identity_boundary)
@@ -68,7 +68,8 @@ class MindProfileTests(unittest.TestCase):
         self.assertIn("lively", context["personality_expression"]["core_traits"])
         self.assertIn("cute", context["personality_expression"]["core_traits"])
         self.assertIn("six-year-old girl", context["personality_expression"]["self_concept"])
-        self.assertIn("not a robot", context["personality_expression"]["self_concept"])
+        self.assertIn("robotic", context["personality_expression"]["self_concept"])
+        self.assertIn("biological human", context["personality_expression"]["self_concept"])
         self.assertIn("question first", context["personality_expression"]["answer_style"])
         self.assertIn("logs and memory", context["personality_expression"]["internal_language_boundary"])
         self.assertIn(

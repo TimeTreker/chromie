@@ -108,6 +108,46 @@ later stage reuses its retained delivery evidence or produces a genuinely differ
 Activity; it does not paraphrase or requeue the same acknowledgement as a new semantic act.
 
 
+### Named architecture requirements
+
+These identifiers name stable owner-approved invariants so current documents and
+automated checks can refer to one definition instead of restating competing versions.
+They are requirements, not new runtime modules, managers, DTOs, or execution stages.
+
+- **IDENTITY-TRUTH-001** — Chromie's owner-approved first-person social identity is a
+  six-year-old girl and family young secretary. That identity is not a biological-human
+  claim. Her current embodiment is robotic when relevant, and ordinary cognition must
+  neither deny that fact nor invent human birth history, physiology, or biological
+  status. Internal model/provider/system labels do not replace her ordinary social
+  self-description.
+- **ATTENTION-AUTHORITY-001** — Cognitive Gateway Attention Review is controlled by
+  maintained configuration and owns only addressedness/speech-act admission evidence.
+  A disabled or unavailable review may fail open to cognition, but it is explicitly
+  unreviewed/unknown evidence and must not fabricate high-confidence addressedness.
+- **GREETING-GOAL-001** — An admitted standalone greeting may receive its Planner-authored
+  Communicative Activity before Goal Association finishes, but GA still commits the
+  canonical conversational Goal and later binds actual delivery evidence to it. Goal
+  binding never authorizes an equivalent second utterance. Immediate satisfaction need
+  not imply durable retention after the Goal is closed.
+- **SPEECH-OWNER-001** — Planner is the sole ordinary semantic owner of whether to
+  communicate, the Communicative Activity, its exact wording, truth stage, and Goal /
+  Responsibility provenance. Host, Runtime, TTS, and Provider may validate, schedule,
+  realize, retry delivery, or reject it but never independently rewrite its meaning.
+- **PLANNER-AUTHORITY-001** — There is one Planner authority. Fast and deep are cognition
+  passes/depths of that same HOW authority. Comparing, reusing, cancelling, replacing,
+  or supplementing existing Work are Planner operations, not a mandatory reconciliation
+  stage or another semantic owner.
+- **ASYNC-COGNITION-001** — Trusted asynchronous Runtime events report what happened;
+  Host-bound Evidence records what is true; Responsibility/Goal records what is still
+  owed; and a meaningful state transition may create an ephemeral CognitiveOpportunity
+  that re-enters Planner. The callback never selects a response itself. Planner may
+  produce zero, one, or many desired Activity changes.
+- **INTERACTION-LATENCY-001** — For qualified warm interactive behavior, the target is at
+  most 2.0 seconds from validated GI handoff to the first valid Planner Communicative
+  Activity commitment and at most 3.0 seconds from that commitment to playback start.
+  Longer qualification watchdogs are diagnostic containment, not a human-facing latency
+  claim; only current-revision live evidence can qualify these targets.
+
 ## Mission
 
 Chromie is a local-first realtime interaction control plane for voice assistants
@@ -919,15 +959,16 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    Trusted Capability Runtime emits a typed terminal event; the Host validates its
    schema, request, Plan, and provider provenance, creates immutable Evidence, and
    deterministically attaches it to the exact Goal(s) through the original request
-   identity. The result then reactivates Fast Planner with a bounded Goal/Evidence
-   snapshot. Planner alone decides whether the human-relevant next Main Activity is
-   an answer, follow-up Work, clarification, or silence; complex HOW may use the
-   existing Deep escalation. Neither Host nor a separate Tool Result Interpreter may
+   identity. A meaningful transition may create a bounded `CognitiveOpportunity` that
+   re-enters the same Planner with Goal, Responsibility, Situation, actual Work, and
+   Evidence. Planner alone decides whether the human-relevant next Main Activity is
+   an answer, follow-up Work, revision, clarification, waiting, silence, or no new
+   Activity; complex HOW may use the Planner deep pass. Neither Host nor a separate Tool Result Interpreter may
    infer Goal ownership from result contents or author result meaning. Before a
    post-Evidence answer is committed, one bounded same-owner Epistemic Qualification
    may only accept or reject its immutable wording against the exact Goal/Evidence
    snapshot. It cannot rewrite the answer. Rejection or qualification unavailability
-   delegates once through the existing Deep-Planner path or fails closed; it never
+   delegates once through the existing Planner deep pass or fails closed; it never
    creates a response-composition owner or repair chain. A mechanical DTO regeneration
    may occur once without reconsidering meaning; it preserves the initial semantic
    disposition and may make schema defaults explicit so Runtime never guesses omitted

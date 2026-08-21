@@ -623,37 +623,22 @@ class HostSettingsSnapshot:
                 ) or "local_default",
                 enabled=_bool(values, "ORCH_ENABLE_CONVERSATION_STATE", True),
                 max_turns=_int(
-                    values,
-                    "ORCH_CONVERSATION_MAX_TURNS",
-                    _int(values, "ORCH_CONTEXT_MAX_TURNS", 12, minimum=0),
-                    minimum=0,
+                    values, "ORCH_CONVERSATION_MAX_TURNS", 12, minimum=0
                 ),
                 soft_idle_timeout_sec=_int(
-                    values,
-                    "ORCH_CONVERSATION_IDLE_TIMEOUT_SEC",
-                    _int(values, "ORCH_CONTEXT_IDLE_TIMEOUT_SEC", 180, minimum=1),
-                    minimum=1,
+                    values, "ORCH_CONVERSATION_IDLE_TIMEOUT_SEC", 180, minimum=1
                 ),
                 hard_idle_timeout_sec=_int(
-                    values,
-                    "ORCH_CONVERSATION_HARD_IDLE_TIMEOUT_SEC",
-                    _int(values, "ORCH_CONTEXT_MAX_AGE_SECONDS", 900, minimum=1),
-                    minimum=1,
+                    values, "ORCH_CONVERSATION_HARD_IDLE_TIMEOUT_SEC", 900, minimum=1
                 ),
                 turn_max_text_chars=_int(
-                    values,
-                    "ORCH_CONVERSATION_TURN_MAX_TEXT_CHARS",
-                    _int(values, "ORCH_CONTEXT_MAX_TEXT_CHARS", 260, minimum=20),
-                    minimum=20,
+                    values, "ORCH_CONVERSATION_TURN_MAX_TEXT_CHARS", 260, minimum=20
                 ),
                 max_context_chars=_int(
                     values, "ORCH_CONVERSATION_MAX_CONTEXT_CHARS", 2200, minimum=200
                 ),
                 max_pending_tasks=_int(
-                    values,
-                    "ORCH_CONVERSATION_MAX_PENDING_TASKS",
-                    _int(values, "ORCH_CONTEXT_MAX_PENDING_TASKS", 8, minimum=0),
-                    minimum=0,
+                    values, "ORCH_CONVERSATION_MAX_PENDING_TASKS", 8, minimum=0
                 ),
                 max_tool_evidence=_int(
                     values, "ORCH_CONVERSATION_MAX_TOOL_EVIDENCE", 8, minimum=1

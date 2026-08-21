@@ -89,6 +89,37 @@ The runtime model lock is also resynchronized with the maintained hardware profi
 the uploaded archive had a stale `agent_models` list that made the documentation gate
 fail before this patch.
 
+## Audit convergence after the async backbone
+
+The 2026-08-20 full audit remains useful as an issue inventory, but several findings
+were already closed by later source before this checkpoint. This convergence slice keeps
+the event/readiness architecture above and removes only still-current contradictions:
+
+- identity truth now distinguishes Chromie's owner-approved six-year-old-girl / family-
+  secretary social identity from biological-human claims while preserving truthful robotic
+  embodiment when relevant;
+- a disabled Attention Review fails open as explicitly unreviewed evidence with zero
+  confidence rather than fabricating certainty;
+- standalone admitted greeting continuity is one rule: Planner speech may start before GA,
+  GA still commits the canonical conversational Goal, and binding does not create a second
+  utterance;
+- production prompt JSON uses structure-preserving bounded serialization instead of slicing
+  serialized JSON mid-object/string;
+- remaining phrase/case examples in the Planner first-response truth contract were reduced
+  to general grammatical truth-stage, actor, continuation, and provenance rules;
+- Conversation State uses only typed `ORCH_CONVERSATION_*` Host settings; retired
+  `ORCH_CONTEXT_*` aliases and the second production `from_env()` authority are removed;
+- `docs/STATUS.md` is current facts rather than an append-only architecture history; and
+- named Charter requirements give the documentation gate mechanical anchors for identity,
+  Attention, greeting continuity, speech ownership, one Planner authority, asynchronous
+  cognition, and latency.
+
+The audit's proposed Response-Composer/`fast_speech`, structural-benchmark-false-pass,
+and speech semantic-ID fixes are not reimplemented here because the uploaded archive had
+already removed or corrected those current-path defects. Large god-object decomposition is
+kept as separate structural work, and the 2s/3s latency target remains a live qualification
+question rather than a static-source checkbox.
+
 ## Verification
 
 Focused source verification passes:

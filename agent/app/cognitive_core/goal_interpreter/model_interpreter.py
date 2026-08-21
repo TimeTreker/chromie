@@ -41,6 +41,7 @@ except ImportError:  # pragma: no cover - repository development path
     )
     from shared.chromie_runtime.log_colors import colorize_for_cli
 
+from ...prompt_projection import bounded_json
 from .errors import InterpretationUnavailableError
 from .schema import GoalInterpretationDecision, GoalInterpretationRequest
 
@@ -930,36 +931,11 @@ def _reject_untyped_coordination_bindings(parsed: dict[str, Any]) -> None:
 
 
 def _bounded_json(value: Any, *, max_chars: int = 4000) -> str:
-    try:
-        text = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    except TypeError:
-        text = json.dumps(str(value), ensure_ascii=False)
-    if len(text) > max_chars:
-        return text[:max_chars].rstrip() + "..."
-    return text
+    return bounded_json(value, max_chars)
 
 
 def _bounded_json_array(value: list[Any], *, max_chars: int = 4000) -> str:
-    items: list[Any] = []
-    for item in value:
-        candidate = [*items, item]
-        text = json.dumps(
-            candidate,
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-            default=str,
-        )
-        if len(text) > max_chars:
-            break
-        items.append(item)
-    return json.dumps(
-        items,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-        default=str,
-    )
+    return bounded_json(value, max_chars)
 
 
 def _short_hash(value: Any) -> str:

@@ -1630,10 +1630,10 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertNotIn("goal-unrelated", prompt)
         self.assertIn("must name that concrete resolved", prompt)
         self.assertIn("preserve the supplied relationship", prompt)
-        self.assertIn("continue/resume", prompt)
-        self.assertIn("Generic stand-ins", prompt)
-        self.assertIn("make the intention prospective", prompt)
-        self.assertIn("those claims require Runtime commitment", prompt)
+        self.assertIn("continuation or resumption", prompt)
+        self.assertIn("generic stand-in", prompt)
+        self.assertIn("use prospective grammar", prompt)
+        self.assertIn("require Runtime commitment", prompt)
         schema = FastPlannerResolver._first_response_schema(
             ["walk"],
             responsibilities=[responsibility],
@@ -1665,7 +1665,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         self.assertIn("semantic relationship reversal", truth_prompt)
         self.assertIn("relationship=continue", truth_prompt)
-        self.assertIn("claims that work is underway", truth_prompt)
+        self.assertIn("claim a later truth stage", truth_prompt)
 
     def test_first_response_model_specialization_does_not_change_fast_planner_authority(self):
         first_response_ollama = ScriptedOllama(
@@ -1919,7 +1919,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         truth_prompt = str(ollama.prompts[1][0])
         self.assertIn("immutable activity.text", truth_prompt)
         self.assertIn(
-            "an intention to check next is not an execution claim",
+            "future-oriented grammar may announce intended checking or action",
             truth_prompt,
         )
         self.assertIn(
@@ -2726,7 +2726,7 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         self.assertIn("invents a physical instrument", prompt)
         self.assertIn("never say Chromie will look at a phone", prompt)
-        self.assertIn("tells the human to perform that action", prompt)
+        self.assertIn("assigns Chromie's owed action to the human", prompt)
         self.assertIn("look outside or use direct perception", prompt)
         self.assertIn(
             "in a human command addressed to Chromie, Chromie is the commanded actor",
@@ -2745,7 +2745,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         self.assertIn("An imperative addressed to Chromie makes Chromie the actor", author_prompt)
         self.assertIn("Chromie's first-person intention", author_prompt)
-        self.assertIn("'我这就…'", prompt)
+        self.assertIn("prospective intention", prompt)
 
         ollama = ScriptedOllama(
             [
@@ -5968,7 +5968,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.steps[0].args["material_args"]["location"], "河南省内乡县")
         self.assertEqual(plan.parameter_resolutions, [])
         self.assertIn(
-            "do not emit separate location or date parameter_resolutions",
+            "do not emit separate parameter_resolutions for them",
             ollama.prompts[1][0],
         )
 

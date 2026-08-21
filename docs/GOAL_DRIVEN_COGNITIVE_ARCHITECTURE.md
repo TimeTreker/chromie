@@ -83,6 +83,8 @@ is defined in [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md). This constitution
 defines what cognition must preserve; the loop document defines when each
 contract is produced and consumed.
 
+The cognitive constitution applies Charter requirements `PLANNER-AUTHORITY-001` and `ASYNC-COGNITION-001`.
+
 ## Canonical human-like cognitive flow
 
 The [Project Charter](PROJECT_CHARTER.md#mission) owns the canonical diagram. The

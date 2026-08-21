@@ -93,16 +93,12 @@ def test_goal_and_planner_prompts_forbid_scope_narrowing() -> None:
         expected_goal_ids=["goal-weather"],
     )
 
-    assert "Never silently rewrite annual" in goal_prompt
+    assert "Never narrow broader temporal scope" in goal_prompt
     assert "Never silently narrow a goal" in fast_prompt
     assert "Never silently narrow a canonical goal" in deep_prompt
     assert "Capability domains are not interchangeable" in fast_prompt
     assert "Capability domains are not interchangeable" in deep_prompt
-    assert "calendar-date argument does not cover a finer day-part" in fast_prompt
-    assert "calendar-date argument does not cover a finer day-part" in deep_prompt
-    assert (
-        "canonical value from day, morning, afternoon, evening, or night"
-        in goal_prompt
-    )
-    assert "do not emit separate location or date parameter_resolutions" in fast_prompt
-    assert "do not emit separate location or date parameter_resolutions" in deep_prompt
+    assert "must never rewrite the Goal" in fast_prompt
+    assert "never rewrites the canonical Goal or silently narrows its scope" in deep_prompt
+    assert "do not emit separate parameter_resolutions for them" in fast_prompt
+    assert "do not emit separate parameter_resolutions for them" in deep_prompt

@@ -253,7 +253,7 @@ class RepositoryEngineeringPolicyTests(unittest.TestCase):
         self.assertIn("_STOP_WORDS", symbols)
         self.assertIn("normalize_enum_string", symbols)
         self.assertIn("reject_contract_marker_as_spoken_text", symbols)
-        self.assertIn("bad_prefixes =", symbols)
+        self.assertIn("ACTION_PHRASES", symbols)
 
     def test_model_facing_skill_id_field_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

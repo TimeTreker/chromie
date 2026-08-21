@@ -186,14 +186,13 @@ The unified path has a total host deadline plus stage-specific Agent deadlines.
 The defaults are:
 
 ```env
-ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS=25000
+ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS=15000
 ORCH_GOAL_ASSOCIATION_TIMEOUT_MS=3500
 ORCH_FAST_PLANNER_TIMEOUT_MS=3000
 ORCH_DEEP_PLANNER_TIMEOUT_MS=10000
 ```
 
-The total budget prevents a sequence of individually legal calls from creating
-unbounded turn latency. Fast Planner may escalate once to Deep Planner. Either planner tier may
+The total foreground budget bounds one admitted interactive turn; it does not replace the stricter Charter latency targets for first useful speech. Planner fast pass may escalate once to the deep pass when HOW warrants it. Either planner pass may
 regenerate once only for a mechanically malformed DTO. Deep semantic rejection is
 terminal, and Host validation cannot spend the remaining runtime budget on another
 semantic planning pass.

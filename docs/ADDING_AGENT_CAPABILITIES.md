@@ -181,6 +181,7 @@ cannot access realtime data” when the catalog advertises a working tool. If th
 Capability is disabled or fails, return a structured grounded failure so the
 model-owned response boundary can report it honestly.
 
-Do not let fast Goal Interpretation speech claim a Goal, selected Capability,
-final result, permanent memory write, or physical completion. Before Goal
-Association it is optional, claim-free process speech only.
+Goal Interpretation has no speech contract. Any pre-Goal-binding progress speech is a
+Planner-owned Communicative Activity and must not claim a selected Capability, final
+result, permanent memory write, physical completion, or any truth stage that Runtime /
+Evidence has not established.

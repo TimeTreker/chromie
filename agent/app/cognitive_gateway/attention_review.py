@@ -69,9 +69,9 @@ class AttentionReviewer:
         if engagement.get("gate_enabled") is not True:
             return self._admit(
                 request=request,
-                confidence=1.0,
-                source="cognitive_gateway.attention_policy",
-                reason="attention gate is disabled",
+                confidence=0.0,
+                source="cognitive_gateway.attention_policy_disabled",
+                reason="attention gate is disabled; addressedness was not reviewed",
             )
 
         # Active work is context for addressedness, not proof that the latest

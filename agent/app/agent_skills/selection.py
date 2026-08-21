@@ -9,6 +9,7 @@ from uuid import uuid4
 from pydantic import ValidationError
 
 from ..clients.ollama_client import llm_failure_metadata
+from ..prompt_projection import bounded_json
 from .loader import AgentSkillRegistry
 
 try:
@@ -616,13 +617,7 @@ class AgentSkillSelectionService:
             value: Any = exc.errors(include_url=False)
         else:
             value = [{"type": type(exc).__name__, "message": str(exc)[:1000]}]
-        return json.dumps(
-            value,
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-            default=str,
-        )[:6000]
+        return bounded_json(value, 6000)
 
     @staticmethod
     def _failure_resolution(

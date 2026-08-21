@@ -171,9 +171,7 @@ names or indices remain pinned and fail clearly when unavailable rather than
 silently falling back. Chromie never changes the OS route, default, mute, or
 volume. Relative `RECORDINGS_DIR` paths are resolved from the repository root.
 
-Conversation settings have both current `ORCH_CONVERSATION_*` names and legacy
-`ORCH_CONTEXT_*` aliases. New deployments should use the conversation-prefixed
-names documented in [`../docs/CONFIGURATION.md`](../docs/CONFIGURATION.md).
+Conversation state uses the typed `ORCH_CONVERSATION_*` settings documented in [`../docs/CONFIGURATION.md`](../docs/CONFIGURATION.md). The former `ORCH_CONTEXT_*` aliases are not part of the maintained runtime.
 
 ## Acceptance audio modes
 

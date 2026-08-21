@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field
+from ..prompt_projection import bounded_json
 
 try:
     from chromie_contracts.soridormi_body_contract import (
@@ -62,10 +63,7 @@ SAFETY_LOCKED_PROMPT_TIER_TAGS = {
 }
 
 def json_compact(value: Any, *, max_chars: int = 420) -> str:
-    text = json.dumps(value or {}, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    if len(text) > max_chars:
-        return text[:max_chars].rstrip() + "..."
-    return text
+    return bounded_json(value or {}, max_chars)
 
 
 class CatalogCapability(BaseModel):

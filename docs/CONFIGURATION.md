@@ -568,10 +568,7 @@ cancellation scope.
 | `ORCH_DURABLE_PROFILE_MEMORY_PATH` | `.chromie/memory/profile.json`; owner-local JSON written atomically with mode `0600`. The store is not encrypted and must not hold secrets. |
 | `ORCH_DURABLE_PROFILE_MEMORY_MAX_ENTRIES` | `64`; bounded retained profile entries. Each durable remember requires model-authored explicit current-turn consent, a stable key, and `retention_days`; forget and clear also require retained current-turn consent evidence. |
 
-`ORCH_CONTEXT_MAX_TURNS`, `ORCH_CONTEXT_IDLE_TIMEOUT_SEC`,
-`ORCH_CONTEXT_MAX_AGE_SECONDS`, `ORCH_CONTEXT_MAX_TEXT_CHARS`, and
-`ORCH_CONTEXT_MAX_PENDING_TASKS` are compatibility aliases. New configuration
-should use the `ORCH_CONVERSATION_*` names.
+The maintained Host reads conversation state only through the typed `ORCH_CONVERSATION_*` settings above. The former `ORCH_CONTEXT_*` aliases are removed rather than retained as a second configuration authority.
 The Host starts an automatic conversation boundary only after hard-idle expiry
 with no active Goal or pending work. Natural-language reset, follow-up,
 correction, reference, and new-topic meaning remains Cognitive Core
@@ -1032,16 +1029,15 @@ model handoff; deterministic fallback may only fail closed or return safe
 conversation. Validators only enforce capability, schema, availability, and
 safety contracts.
 
-The capability catalog is an ability source, not the normal intent brain. In
-`hybrid` and `llm_only`, the fast Goal Interpreter receives the catalog snapshot's
-unlocked `common` prompt-tier entries as `common_ability_catalog`. Catalog
-search still ranks and exposes current ability descriptions, schemas, and
-executable IDs for inspection and Agent-side retrieval, but it is not the fast
-Goal Interpreter result surface. The catalog must not contain hardcoded per-skill
-synonym tables that decide body actions in place of model understanding.
-Catalog-only route selection is disabled even in explicit `rules_only`
-compatibility mode; without model routing, normal intent fails closed to safe
-conversation.
+The capability catalog is an ability source, not the normal semantic brain. Goal
+Interpretation may receive its bounded `common_ability_catalog` projection only to
+preserve current ability boundaries while interpreting provider-neutral Responsibility.
+Catalog search exposes current ability descriptions, schemas, and executable IDs for
+inspection and downstream planning, but it is never a route/intent result surface. The
+catalog must not contain hardcoded per-capability synonym tables that decide body actions
+in place of model understanding. No maintained `rules_only`, `hybrid`, or `llm_only`
+route mode exists; ordinary semantic cognition uses the single Goal-driven authority and
+fails closed rather than re-entering a retired route planner.
 
 ## Mind, Principles, and Experience
 
@@ -1331,10 +1327,7 @@ cancellation scope.
 | `ORCH_DURABLE_PROFILE_MEMORY_PATH` | `.chromie/memory/profile.json`; owner-local JSON written atomically with mode `0600`. The store is not encrypted and must not hold secrets. |
 | `ORCH_DURABLE_PROFILE_MEMORY_MAX_ENTRIES` | `64`; bounded retained profile entries. Each durable remember requires model-authored explicit current-turn consent, a stable key, and `retention_days`; forget and clear also require retained current-turn consent evidence. |
 
-`ORCH_CONTEXT_MAX_TURNS`, `ORCH_CONTEXT_IDLE_TIMEOUT_SEC`,
-`ORCH_CONTEXT_MAX_AGE_SECONDS`, `ORCH_CONTEXT_MAX_TEXT_CHARS`, and
-`ORCH_CONTEXT_MAX_PENDING_TASKS` are compatibility aliases. New configuration
-should use the `ORCH_CONVERSATION_*` names.
+The maintained Host reads conversation state only through the typed `ORCH_CONVERSATION_*` settings above. The former `ORCH_CONTEXT_*` aliases are removed rather than retained as a second configuration authority.
 The Host starts an automatic conversation boundary only after hard-idle expiry
 with no active Goal or pending work. Natural-language reset, follow-up,
 correction, reference, and new-topic meaning remains Cognitive Core

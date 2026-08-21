@@ -457,21 +457,6 @@ class ConversationStateTests(unittest.TestCase):
         self.assertEqual(len(history), 3)
         self.assertEqual([turn["text"] for turn in history], ["turn 2", "turn 3", "turn 4"])
 
-    def test_from_env_reads_overrides(self) -> None:
-        with patch.dict(
-            "os.environ",
-            {
-                "ORCH_ENABLE_CONVERSATION_STATE": "0",
-                "ORCH_ENABLE_TASK_CONTEXT_STORE": "0",
-                "ORCH_CONVERSATION_MAX_TURNS": "4",
-            },
-            clear=False,
-        ):
-            manager = ConversationStateManager.from_env()
-
-        self.assertFalse(manager.enabled)
-        self.assertEqual(manager.max_turns, 4)
-
     def test_interaction_response_records_speech_and_named_skill(self) -> None:
         manager = ConversationStateManager()
 

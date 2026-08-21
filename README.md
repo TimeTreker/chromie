@@ -162,8 +162,8 @@ Retained target evidence additionally proves:
   execution and follow-up conversation;
 - the reviewed Social Attention live baseline;
 - second-machine LAN exposure validation;
-- broader/bilingual audio quality, physical acoustic barge-in, hot-plug, and a
-  declared latency budget; and
+- broader/bilingual audio quality, physical acoustic barge-in, hot-plug, and
+  current-revision qualification against the declared warm interaction latency targets; and
 - exact-revision rebinding when a release or publication claim requires it.
 
 Physical robot/Jetson deployment is deliberately absent from this list. Chromie
