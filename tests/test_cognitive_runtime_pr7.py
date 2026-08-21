@@ -356,6 +356,7 @@ def execute_plan(
                 "step_id": "blink",
                 "capability_id": "soridormi.blink_eyes",
                 "args": {"count": 4},
+                "timing": "sequential",
                 "source_goal_ids": [goal_id],
             }
         ],
@@ -1685,6 +1686,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "step_id": "corrected-weather-lookup",
                     "capability_id": "chromie.weather.lookup",
                     "args": {"location": "内乡", "date": "today"},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-weather"],
                 }
             ],
@@ -2641,6 +2643,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "step_id": "weather",
                     "capability_id": "chromie.weather.lookup",
                     "args": {"location": "重庆", "date": "today"},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-weather"],
                 }
             ],
@@ -2735,6 +2738,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "step_id": "weather",
                     "capability_id": "chromie.weather.lookup",
                     "args": {"location": "重庆", "date": "tomorrow"},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-weather"],
                 }
             ],
@@ -2854,6 +2858,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "step_id": "walk",
                     "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 15},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-walk"],
                 }
             ],
@@ -2951,6 +2956,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "step_id": "walk",
                     "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 10},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-walk"],
                 }
             ],
@@ -3016,6 +3022,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "step_id": "weather",
                     "capability_id": "chromie.weather.lookup",
                     "args": {"location": "上海", "date": "today"},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-weather"],
                 }
             ],
@@ -3177,18 +3184,21 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "step_id": "walk",
                     "capability_id": "soridormi.walk_velocity",
                     "args": {"duration_s": 10.0, "speed": "0.2"},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-walk"],
                 },
                 {
                     "step_id": "nod",
                     "capability_id": "soridormi.nod_yes",
                     "args": {"count": 2},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-nod"],
                 },
                 {
                     "step_id": "turn",
                     "capability_id": "soridormi.turn_in_place",
                     "args": {"yaw_radps": -0.12},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-turn"],
                 },
             ],
@@ -3313,6 +3323,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "step_id": "nod",
                     "capability_id": "soridormi.nod_yes",
                     "args": {"count": 2},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-nod"],
                 }
             ],
@@ -3413,6 +3424,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 "step_id": "blink",
                 "capability_id": "soridormi.blink_eyes",
                 "args": {"count": 2},
+                "timing": "sequential",
                 "source_goal_ids": ["goal-blink"],
             }],
             goal_outcomes=[
@@ -4080,6 +4092,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "step_id": "blink",
                     "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-blink"],
                 }
             ],

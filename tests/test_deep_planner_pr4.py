@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from agent.app import planner_validation
 from agent.app import planner_schema
+from agent.app.planner_model_contract import materialize_planner_output
 from agent.app import planner_prompt as planner_prompt
 
 import asyncio
@@ -84,7 +85,7 @@ class DeepPlannerMixedAccountingNormalizationTests(unittest.TestCase):
         }
 
         normalized, repairs = (
-            DeepPlannerResolver._normalize_mixed_goal_outcome_accounting(
+            planner_validation.normalize_mixed_goal_outcome_accounting(
                 raw,
                 expected_goal_ids=["goal-walk", "goal-sing"],
             )
@@ -115,7 +116,7 @@ class DeepPlannerMixedAccountingNormalizationTests(unittest.TestCase):
         }
 
         normalized, repairs = (
-            DeepPlannerResolver._normalize_mixed_goal_outcome_accounting(
+            planner_validation.normalize_mixed_goal_outcome_accounting(
                 raw,
                 expected_goal_ids=["goal-walk", "goal-sing"],
             )
@@ -156,11 +157,13 @@ class DeepPlannerMixedAccountingNormalizationTests(unittest.TestCase):
                 {
                     "step_id": "walk",
                     "capability_id": "soridormi.walk_forward",
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-walk", "goal-sing"],
                 },
                 {
                     "step_id": "decorative",
                     "capability_id": "soridormi.look_direction",
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-walk", "goal-sing"],
                 },
             ],
@@ -174,7 +177,7 @@ class DeepPlannerMixedAccountingNormalizationTests(unittest.TestCase):
         }
 
         normalized, repairs = (
-            DeepPlannerResolver._normalize_mixed_goal_outcome_accounting(
+            planner_validation.normalize_mixed_goal_outcome_accounting(
                 raw,
                 expected_goal_ids=["goal-walk", "goal-sing"],
             )
@@ -200,6 +203,7 @@ class DeepPlannerMixedAccountingNormalizationTests(unittest.TestCase):
                 {
                     "step_id": "walk",
                     "capability_id": "soridormi.walk_forward",
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-walk"],
                 }
             ],
@@ -833,7 +837,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertIn("ledger-deep-marker", prompt)
 
     def test_resolution_mismatch_feedback_carries_selected_capability_schema(self):
-        feedback = DeepPlannerResolver._validation_error_items(
+        feedback = planner_validation.deep_validation_error_items(
             ValueError(
                 "parameter resolution references an argument absent from its step"
             ),
@@ -909,7 +913,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         )
 
     def test_numeric_repair_feedback_rejects_default_strategy_for_goal_value(self):
-        feedback = DeepPlannerResolver._validation_error_items(
+        feedback = planner_validation.deep_validation_error_items(
             ValueError(
                 "explicit numeric goal value has no matching user_supplied "
                 "parameter resolution"
@@ -944,7 +948,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertIn("strategy user_supplied", mismatch["corrective_contract"])
 
     def test_numeric_repair_feedback_forbids_borrowing_sibling_goal_value(self):
-        feedback = DeepPlannerResolver._validation_error_items(
+        feedback = planner_validation.deep_validation_error_items(
             ValueError(
                 "numeric user_supplied parameter resolution is not present in "
                 "its authoritative source Goal"
@@ -1104,7 +1108,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         )
 
     def test_single_parallel_labeled_step_does_not_force_adjustment(self):
-        feedback = DeepPlannerResolver._initial_safety_feedback(
+        feedback = planner_validation.initial_safety_feedback(
             {
                 "fast_plan_resolution": {
                     "metadata": {
@@ -1544,10 +1548,10 @@ class DeepPlannerResolverTests(unittest.TestCase):
 
     def test_invalid_first_plan_is_revised_once_in_same_tier(self):
         invalid = {"disposition":"execute","coverage":"complete","confidence":0.92,"goal_ids":["goal-action"],"steps":[
-            {"step_id":"blink","capability_id":"soridormi.blink_eyes","args":{"count":99},"source_goal_ids":["goal-action"]}
+            {"step_id":"blink","capability_id":"soridormi.blink_eyes","args":{"count":99},"timing":"sequential","source_goal_ids":["goal-action"]}
         ],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         revised = {"disposition":"execute","coverage":"complete","confidence":0.93,"goal_ids":["goal-action"],"steps":[
-            {"step_id":"blink","capability_id":"soridormi.blink_eyes","args":{"count":4},"source_goal_ids":["goal-action"]}
+            {"step_id":"blink","capability_id":"soridormi.blink_eyes","args":{"count":4},"timing":"sequential","source_goal_ids":["goal-action"]}
         ],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         ollama = SequencedOllama([invalid, revised])
         plan = asyncio.run(DeepPlannerResolver(ollama, FullCatalog(), max_contract_repairs=1).resolve(request("眨眼。")))
@@ -1755,6 +1759,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "step_id": "blink",
                     "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-blink"],
                 }
             ],
@@ -2090,6 +2095,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "step_id": "blink",
                     "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-blink"],
                     "reason_summary": "Execute the requested physical blink action.",
                 }
@@ -2152,8 +2158,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertNotIn("execute", outcome["properties"]["disposition"]["enum"])
 
     def test_deep_adapter_preserves_execute_response_text_for_later_delta_review(self):
-        resolver = DeepPlannerResolver(SequencedOllama([]), FullCatalog())
-        normalized = resolver._normalize(
+        model_output = validate_planner_model_output(
             {
                 "disposition": "execute",
                 "coverage": "complete",
@@ -2165,6 +2170,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                         "step_id": "walk",
                         "capability_id": "soridormi.walk_forward",
                         "args": {"duration_s": 15},
+                        "timing": "sequential",
                         "source_goal_ids": ["goal-action"],
                     }
                 ],
@@ -2186,9 +2192,15 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "plan_relation": "exact",
                 "user_confirmation_required": False,
             },
-            request=request(goal_ids=["goal-action"]),
+            planner_tier="deep",
+            expected_goal_ids_for_turn=["goal-action"],
+        )
+        normalized = materialize_planner_output(
+            model_output,
+            planner_tier="deep",
             plan_id="plan-transport-normalization",
             expected_goal_ids_for_turn=["goal-action"],
+            goal_summary_fallback=request(goal_ids=["goal-action"]).text,
         )
 
         self.assertEqual(normalized["response_text"], "好，我可以先做这个动作。")
@@ -2213,6 +2225,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                         "step_id": "blink",
                         "capability_id": "soridormi.blink_eyes",
                         "args": {"count": 1},
+                        "timing": "sequential",
                         "source_goal_ids": ["goal-greet"],
                     }
                 ],
@@ -2462,6 +2475,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "step_id": "step_joke",
                     "capability_id": "chromie.speak",
                     "args": {"text": "Why don't robots panic? They keep their cache."},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-joke"],
                 },
             ],
@@ -2634,6 +2648,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "step_id": "step_blink",
                     "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-blink"],
                 }
             ],
@@ -2687,6 +2702,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "step_id": "step_blink",
                     "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-blink"],
                 }
             ],
@@ -2806,6 +2822,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "step_id": "blink",
                     "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-action"],
                 }
             ],
@@ -2838,6 +2855,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "step_id": "blink",
                     "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-action"],
                 }
             ],
@@ -2863,6 +2881,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "step_id": "blink",
                     "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-action"],
                 }
             ],
@@ -2898,6 +2917,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "step_id": "blink",
                     "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-blink"],
                 }
             ],
@@ -2985,6 +3005,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "step_id": "look",
                     "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 1},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-look"],
                 }
             ],
@@ -3075,6 +3096,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "step_id": "blink",
                     "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-action"],
                 }
             ],
@@ -3165,6 +3187,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "step_id": "nod",
                     "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-nod"],
                 }
             ],

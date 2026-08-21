@@ -294,12 +294,14 @@ def test_social_attention_primary_progress_is_scoped_to_semantic_activity_goal()
                     {
                         "step_id": "step-walk",
                         "capability_id": "soridormi.walk_forward",
+                        "timing": "sequential",
                         "source_goal_ids": ["goal-walk"],
                         "args": {"duration_s": 2},
                     },
                     {
                         "step_id": "step-blink",
                         "capability_id": "soridormi.blink_eyes",
+                        "timing": "sequential",
                         "source_goal_ids": ["goal-blink"],
                         "args": {"count": 2},
                     },

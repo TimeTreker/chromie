@@ -51,6 +51,7 @@ def single_plan() -> CanonicalPlan:
                 "step_id": "lookup",
                 "capability_id": "chromie.weather.lookup",
                 "args": {"city": "Beijing"},
+                "timing": "sequential",
                 "source_goal_ids": ["goal-weather"],
             }
         ],
@@ -71,12 +72,14 @@ def two_goal_plan() -> CanonicalPlan:
                 "step_id": "lookup-weather",
                 "capability_id": "chromie.weather.lookup",
                 "args": {"city": "Beijing"},
+                "timing": "sequential",
                 "source_goal_ids": ["goal-weather"],
             },
             {
                 "step_id": "lookup-calendar",
                 "capability_id": "chromie.calendar.lookup",
                 "args": {},
+                "timing": "sequential",
                 "source_goal_ids": ["goal-calendar"],
             },
         ],
@@ -111,6 +114,7 @@ def shared_step_plan() -> CanonicalPlan:
                 "step_id": "shared-observation",
                 "capability_id": "chromie.scene.observe",
                 "args": {},
+                "timing": "sequential",
                 "source_goal_ids": ["goal-a", "goal-b"],
             }
         ],
@@ -145,6 +149,7 @@ def mixed_plan() -> CanonicalPlan:
                 "step_id": "blink",
                 "capability_id": "soridormi.blink_eyes",
                 "args": {"count": 2},
+                "timing": "sequential",
                 "source_goal_ids": ["goal-action"],
             }
         ],

@@ -404,6 +404,7 @@ class ChromieCliTests(unittest.TestCase):
                                         "step_id": "step-walk",
                                         "capability_id": "soridormi.walk_velocity",
                                         "args": {"duration_s": 15, "vx_mps": 0.2},
+                                        "timing": "sequential",
                                         "source_goal_ids": ["goal-walk"],
                                     }
                                 ],

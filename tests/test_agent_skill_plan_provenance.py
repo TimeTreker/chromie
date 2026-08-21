@@ -290,6 +290,7 @@ class AgentSkillPlanProvenanceTests(unittest.TestCase):
                     "step_id": "step-weather",
                     "capability_id": "chromie.weather.lookup",
                     "args": {"location": "Neixiang"},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-1"],
                 }
             ],

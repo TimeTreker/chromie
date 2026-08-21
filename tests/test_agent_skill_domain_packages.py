@@ -379,6 +379,7 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
                         "date": "today",
                         "units": "metric",
                     },
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-weather"],
                 }
             ],

@@ -11,21 +11,22 @@ try:
     from chromie_contracts.interaction import MEDIA_CAPABILITY_IDS
     from chromie_contracts.situation import SituationProjection
     from chromie_contracts.tool_result import ToolResultEvidence
+    from chromie_contracts.plan import FastPlannerFirstResponse
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.goal import GoalAssociationResolution
     from shared.chromie_contracts.interaction import MEDIA_CAPABILITY_IDS
     from shared.chromie_contracts.situation import SituationProjection
     from shared.chromie_contracts.tool_result import ToolResultEvidence
+    from shared.chromie_contracts.plan import FastPlannerFirstResponse
 
 def goal_association_prompt_projection(
     context: dict[str, Any] | None,
 ) -> dict[str, Any]:
     """Return the closed Goal Association projection permitted in prompts.
 
-    The maintained runtime supplies a validated ``GoalAssociationResolution``.
-    Tests and compatibility callers may provide an older partial dictionary, so
-    the dictionary path uses the same explicit allowlist without inventing
-    missing fields or accepting diagnostic metadata.
+    The maintained runtime may supply either a validated ``GoalAssociationResolution``
+    or its serialized context dictionary.  The dictionary path uses the same explicit
+    allowlist without inventing missing fields or accepting diagnostic metadata.
     """
 
     raw = (context or {}).get("goal_association_resolution")
@@ -496,3 +497,71 @@ def evidence_bound_dialogue(
             }
         )
     return out[-max(1, int(limit)) :]
+
+def gateway_speech_act(request: Any) -> str:
+    """Return immutable Gateway speech-act evidence from the admitted turn envelope."""
+
+    context = request.context if isinstance(request.context, dict) else {}
+    envelope = context.get("user_turn_envelope")
+    if not isinstance(envelope, dict):
+        return ""
+    attention = envelope.get("attention")
+    if not isinstance(attention, dict):
+        return ""
+    return " ".join(str(attention.get("speech_act") or "").strip().split()).casefold()
+
+
+def first_response_phase_decided(request: Any) -> bool:
+    """Return whether Fast Planner already made its bounded first-response decision."""
+
+    context = request.context if isinstance(request.context, dict) else {}
+    raw = context.get("fast_planner_first_response")
+    if not isinstance(raw, dict):
+        return False
+    try:
+        FastPlannerFirstResponse.model_validate(raw)
+    except ValidationError:
+        return False
+    return True
+
+
+def fast_capability_payload(item: Any, *, include_side_effect_free: bool = False) -> dict[str, Any]:
+    """Project one catalog entry onto Fast Planner's read-only capability surface."""
+
+    payload = {
+        "capability_id": item.capability_id,
+        "description": item.description,
+        "input_schema": item.input_schema,
+        "requires_confirmation": item.requires_confirmation,
+        "can_run_parallel": item.can_run_parallel,
+        "parallel_metadata_declared": item.parallel_metadata_declared,
+        "exclusive_group": item.exclusive_group,
+        "resource_claims": list(item.resource_claims),
+        "effects": list(item.effects),
+        "safety_class": item.safety_class,
+        "hints": dict(item.hints),
+    }
+    if include_side_effect_free:
+        payload["side_effect_free"] = (item.hints or {}).get("side_effect_free") is True
+    return payload
+
+
+def deep_capability_payload(item: Any) -> dict[str, Any]:
+    """Project one catalog entry onto Deep Planner's read-only capability surface."""
+
+    return {
+        "capability_id": item.capability_id,
+        "description": item.description,
+        "input_schema": item.input_schema,
+        "available": item.available,
+        "interaction_executable": item.interaction_executable,
+        "requires_confirmation": item.requires_confirmation,
+        "effects": item.effects,
+        "safety_class": item.safety_class,
+        "can_run_parallel": item.can_run_parallel,
+        "parallel_metadata_declared": item.parallel_metadata_declared,
+        "exclusive_group": item.exclusive_group,
+        "resource_claims": item.resource_claims,
+        "execution_constraints": item.execution_constraints,
+        "hints": dict(item.hints),
+    }

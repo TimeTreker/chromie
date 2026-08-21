@@ -36,6 +36,7 @@ def _plan(
                 {
                     "step_id": step_id,
                     "capability_id": f"test.skill.{goal_index}.{step_index}",
+                    "timing": "sequential",
                     "source_goal_ids": [goal_id],
                     "reason_summary": "Execute one bounded test step.",
                 }
@@ -455,6 +456,7 @@ class OutcomeResponseTests(unittest.TestCase):
                 {
                     "step_id": "step-walk",
                     "capability_id": "soridormi.walk_forward",
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-walk"],
                 }
             ],

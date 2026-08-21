@@ -138,6 +138,7 @@ class CognitionPromptProjectionTests(unittest.TestCase):
                     "step_id": "step-blink",
                     "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 1},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-1"],
                     "metadata": {"raw_output": "step transcript"},
                 }

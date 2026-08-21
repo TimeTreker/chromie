@@ -312,11 +312,13 @@ class BodyRecoveryTests(unittest.TestCase):
                 {
                     "step_id": "step-move",
                     "capability_id": "soridormi.walk_forward",
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-combined"],
                 },
                 {
                     "step_id": "step-weather",
                     "capability_id": "chromie.weather.lookup",
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-combined"],
                 },
             ],

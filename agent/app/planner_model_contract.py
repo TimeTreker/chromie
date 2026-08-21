@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -440,3 +441,84 @@ def materialize_goal_outcomes(
         }
         for goal_id in ordered_ids
     ]
+
+def stable_plan_id(request: Any, planner_tier: PlannerTier) -> str:
+    """Return the stable host-owned Plan ID for one Planner pass."""
+
+    digest = hashlib.sha256(
+        f"{request.sid or 'turn'}|{planner_tier}|{request.text}".encode()
+    ).hexdigest()[:20]
+    return f"plan_{digest}"
+
+
+def materialize_planner_output(
+    model_output: PlannerModelOutput,
+    *,
+    planner_tier: PlannerTier,
+    plan_id: str,
+    expected_goal_ids_for_turn: list[str],
+    goal_summary_fallback: str,
+    fast_multi_goal_contract: bool = False,
+) -> dict[str, Any]:
+    """Materialize only host-owned CanonicalPlan envelope and redundant mechanics."""
+
+    out = model_output.model_dump(mode="python")
+    out.pop("plan_relation", None)
+    out.pop("user_confirmation_required", None)
+    out["goal_outcomes"] = materialize_goal_outcomes(
+        model_output,
+        expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+    )
+    out["plan_id"] = plan_id
+    out["planner_tier"] = planner_tier
+    out["goal_ids"] = list(expected_goal_ids_for_turn)
+
+    if planner_tier == "fast" and fast_multi_goal_contract:
+        metadata = materialize_planner_metadata(model_output)
+        metadata.update(
+            {
+                "model_contract": "FastPlannerMultiGoalPlanOutput",
+                "semantic_authority": "fast_planner_model",
+                "model_authored_steps": True,
+                "model_authored_step_ids": True,
+                "model_authored_step_ownership": True,
+                "model_authored_goal_outcomes": True,
+                "model_authored_goal_satisfaction": True,
+                "host_semantic_compilation": False,
+            }
+        )
+        out["metadata"] = metadata
+        return out
+
+    steps = out.get("steps")
+    if isinstance(steps, dict):
+        steps = [steps]
+    if not isinstance(steps, list):
+        steps = []
+    normalized_steps: list[dict[str, Any]] = []
+    for index, item in enumerate(steps):
+        if not isinstance(item, dict):
+            continue
+        step = dict(item)
+        if not step.get("step_id"):
+            step["step_id"] = f"{plan_id}:step:{index}"
+        normalized_steps.append(step)
+    if (
+        planner_tier == "deep"
+        and len(normalized_steps) == 1
+        and normalized_steps[0].get("timing") == "parallel"
+    ):
+        normalized_steps[0]["timing"] = "sequential"
+    out["steps"] = normalized_steps
+    out.setdefault("coverage", "uncertain")
+    out.setdefault("disposition", "escalate" if planner_tier == "fast" else "clarify")
+    out.setdefault("confidence", 0.0)
+    out.setdefault("goal_summary", goal_summary_fallback)
+    out.setdefault("response_text", "")
+    out.setdefault("escalation_reason", "")
+    out.setdefault("unresolved", [])
+    out.setdefault("parameter_resolutions", [])
+    out.setdefault("goal_outcomes", [])
+    out.setdefault("goal_satisfaction", None)
+    out["metadata"] = materialize_planner_metadata(model_output)
+    return out

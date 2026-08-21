@@ -1801,6 +1801,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
                             "step_id": "step-weather",
                             "capability_id": "chromie.weather.lookup",
                             "args": {"location": "上海", "date": "today"},
+                            "timing": "sequential",
                             "source_goal_ids": ["goal-weather"],
                         }
                     ],

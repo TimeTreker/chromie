@@ -175,7 +175,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "bdff84714e5f3b10c0bf042ec33a13eb1f46e502338cfdd72ee0cfca373468e7",
+      "body_sha256": "e33ad13522aa37c1e548a32bb40c2a53d82437b176cdb2bddf4eb21d62a7f1ee",
       "failure_signals": [
         "continue",
         "diagnostic",
@@ -191,7 +191,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "750001d182b642e799dd9797f00cb62f2e2d25669556a7ed84e177ab2dd69b71",
+      "body_sha256": "e50a0174e0bb51697e19b27408e499c4c218b0e318f646e2e2f72de0dd4469ec",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -218,7 +218,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "90a340fa11cae2be9e8e7c3a93225b55c8d30bf2915b46269587792e8a72f34f",
+      "body_sha256": "1d7c1cba8474a5d51b7b50e03adddc5f55001d09bd75bd05ec931c17276c85ae",
       "failure_signals": [
         "continue",
         "diagnostic",
@@ -234,7 +234,7 @@
       "owner": "agent.fast_planner",
       "contract": "Reject unqualified post-Evidence wording and return one observable semantic escalation without emitting or repairing the candidate answer.",
       "review_status": "reviewed",
-      "body_sha256": "7a4468297d4bd5a185b2cb76daf533f82c4fc36f8ecb5d24c29533edc230822a",
+      "body_sha256": "8703e4c715d505dad5ac740f6d350a30b2f66f83a77264387099295c7dfb4128",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -248,7 +248,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "527edf05070aa63ad983fcbe760d93779ce64e464abf0734473c1a3c1b6f1641",
+      "body_sha256": "5741c3548d7b86425682d26f0636ac4a062bb642547c2e5e3565249ea4ffb747",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -290,7 +290,7 @@
       "owner": "agent.fast_planner",
       "contract": "Map Fast Activity-Plan inference and contract failures into a typed unavailable FastPlannerAdvance without authorizing Work.",
       "review_status": "reviewed",
-      "body_sha256": "d1be8186855334247c6239b1076065e91170a1fde5e819dbac07f4f56a0ac502",
+      "body_sha256": "d4e42855b699f20a478747054d497588595a2a542676c9187383c2c32755d2bb",
       "failure_signals": [
         "continue",
         "return",

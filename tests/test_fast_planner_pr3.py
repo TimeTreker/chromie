@@ -11,6 +11,7 @@ import unittest
 from pydantic import ValidationError
 
 from agent.app.fast_planner import FastPlannerResolver
+from agent.app import planner_validation
 from agent.app.planner_model_contract import (
     PlannerDTOContractError,
     PlannerModelOutput,
@@ -1105,6 +1106,7 @@ class CanonicalPlanContractTests(unittest.TestCase):
                     "step_id": "wrong",
                     "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 1},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-joke"],
                 }],
             )
@@ -1125,6 +1127,7 @@ class CanonicalPlanContractTests(unittest.TestCase):
                 "step_id": "blink",
                 "capability_id": "soridormi.blink_eyes",
                 "args": {"count": 2},
+                "timing": "sequential",
                 "source_goal_ids": ["goal-blink"],
             }],
             goal_outcomes=[
@@ -4139,7 +4142,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             ]
         }
 
-        FastPlannerResolver._validate_work_reuse_selection(
+        planner_validation.validate_work_reuse_selection(
             output,
             context=context,
         )
@@ -4150,7 +4153,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             PlannerDTOContractError,
             "changes immutable args",
         ):
-            FastPlannerResolver._validate_work_reuse_selection(
+            planner_validation.validate_work_reuse_selection(
                 changed,
                 context=context,
             )
@@ -4837,12 +4840,14 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "step_id": "walk",
                     "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 1.0},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-walk"],
                 },
                 {
                     "step_id": "blink",
                     "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-blink"],
                 },
             ],
@@ -6197,7 +6202,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.steps, [])
 
     def test_non_common_or_non_executable_skill_escalates(self):
-        raw = {"disposition":"execute","coverage":"complete","confidence":0.95,"goal_ids":["goal-action"],"steps":[{"step_id":"invented","capability_id":"invented.skill","args":{},"source_goal_ids":["goal-action"]}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
+        raw = {"disposition":"execute","coverage":"complete","confidence":0.95,"goal_ids":["goal-action"],"steps":[{"step_id":"invented","capability_id":"invented.skill","args":{},"timing":"sequential","source_goal_ids":["goal-action"]}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("做点什么。", goal_ids=["goal-action"])))
         self.assertEqual(plan.disposition, "escalate")
         self.assertEqual(plan.escalation_reason, "step_not_in_executable_common_catalog")
@@ -6422,6 +6427,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "step_id": "blink",
                 "capability_id": "soridormi.blink_eyes",
                 "args": {"count": 2},
+                "timing": "sequential",
                 "source_goal_ids": ["goal-blink"],
             }],
             "goal_satisfaction": {
@@ -6472,6 +6478,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "step_id": "say",
                 "capability_id": "chromie.speak",
                 "args": {"text": "A short joke."},
+                "timing": "sequential",
                 "source_goal_ids": ["goal-joke"],
             }],
             "goal_satisfaction": {"score": 1.0, "status": "exact"},
@@ -6700,6 +6707,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "step_id": "blink",
                 "capability_id": "soridormi.blink_eyes",
                 "args": {"count": 2},
+                "timing": "sequential",
                 "source_goal_ids": ["goal-blink"],
             }],
             "goal_satisfaction": {

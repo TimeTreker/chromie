@@ -215,7 +215,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(planner_validation.requires_safety_revision(feedback))
         self.assertEqual(
-            DeepPlannerResolver._safety_revision_contract_errors(
+            planner_validation.safety_revision_contract_errors(
                 CanonicalPlan(
                     plan_id="semantic-repair",
                     planner_tier="deep",
@@ -229,6 +229,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                             "step_id": "walk",
                             "capability_id": "soridormi.walk_forward",
                             "args": {"duration_s": 15},
+                            "timing": "sequential",
                             "source_goal_ids": ["goal-walk"],
                         }
                     ],
@@ -330,6 +331,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                     "step_id": "walk",
                     "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 15},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-walk"],
                 }
             ],
@@ -356,7 +358,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             }
         )
 
-        errors = DeepPlannerResolver._safety_revision_contract_errors(
+        errors = planner_validation.safety_revision_contract_errors(
             exact,
             feedback,
         )
@@ -366,14 +368,14 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             "safety_revision_contract_not_satisfied",
         )
         self.assertEqual(
-            DeepPlannerResolver._safety_revision_contract_errors(
+            planner_validation.safety_revision_contract_errors(
                 adjusted,
                 feedback,
             ),
             [],
         )
         self.assertEqual(
-            DeepPlannerResolver._safety_revision_contract_errors(
+            planner_validation.safety_revision_contract_errors(
                 relabeled_parallel,
                 feedback,
             )[0]["parallel_step_ids"],
@@ -392,6 +394,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                         "step_id": "walk",
                         "capability_id": "soridormi.walk_forward",
                         "args": {"duration_s": 15},
+                        "timing": "sequential",
                         "source_goal_ids": ["goal-walk"],
                     }
                 ],
@@ -673,80 +676,49 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
 
-    def test_deep_planner_cannot_silently_drop_parallel_timing(self) -> None:
-        from agent.app.deep_planner import DeepPlannerResolver
-
-        context = {
-            "fast_plan_resolution": {
-                "steps": [
-                    {
-                        "step_id": "walk",
-                        "capability_id": "soridormi.walk_forward",
-                        "timing": "parallel",
-                    },
-                    {
-                        "step_id": "blink",
-                        "capability_id": "soridormi.blink_eyes",
-                        "timing": "parallel",
-                    },
-                ]
+    def test_planner_model_output_requires_explicit_timing_for_every_step(self) -> None:
+        for step_count in (1, 2):
+            steps = [
+                {
+                    "step_id": f"step-{index}",
+                    "capability_id": "soridormi.blink_eyes",
+                    "args": {"count": 1},
+                    "source_goal_ids": ["goal-blink"],
+                }
+                for index in range(step_count)
+            ]
+            raw = {
+                "disposition": "execute",
+                "coverage": "complete",
+                "confidence": 1.0,
+                "steps": steps,
+                "goal_satisfaction": {
+                    "score": 1.0,
+                    "status": "exact",
+                    "satisfied_goal_ids": ["goal-blink"],
+                },
             }
-        }
-        raw = {
-            "steps": [
-                {
-                    "step_id": "walk",
-                    "capability_id": "soridormi.walk_forward",
-                    "args": {"duration_s": 15},
-                },
-                {
-                    "step_id": "blink",
-                    "capability_id": "soridormi.blink_eyes",
-                    "args": {"count": 2},
-                },
-            ]
-        }
-        with self.assertRaisesRegex(ValueError, "omitted timing"):
-            DeepPlannerResolver._validate_parallel_timing_preservation(
-                raw,
-                context=context,
-            )
+            for planner_tier in ("fast", "deep"):
+                with self.subTest(
+                    planner_tier=planner_tier, step_count=step_count
+                ), self.assertRaisesRegex(ValueError, "timing"):
+                    planner_validation.validate_planner_model_output(
+                        raw,
+                        planner_tier=planner_tier,
+                        expected_goal_ids_for_turn=["goal-blink"],
+                    )
 
-        for step in raw["steps"]:
-            step["timing"] = "parallel"
-        DeepPlannerResolver._validate_parallel_timing_preservation(
-            raw,
-            context=context,
-        )
-
-    def test_deep_planner_requires_timing_when_fast_has_no_usable_plan(self) -> None:
-        from agent.app.deep_planner import DeepPlannerResolver
-
-        raw = {
-            "steps": [
-                {
-                    "step_id": "walk",
-                    "capability_id": "soridormi.walk_forward",
-                    "args": {"duration_s": 15},
-                },
-                {
-                    "step_id": "blink",
-                    "capability_id": "soridormi.blink_eyes",
-                    "args": {"count": 2},
-                },
-            ]
-        }
-
-        with self.assertRaisesRegex(ValueError, "omitted timing"):
-            DeepPlannerResolver._validate_parallel_timing_preservation(
-                raw,
-                context={
-                    "fast_plan_resolution": {
-                        "disposition": "escalate",
-                        "steps": [],
-                    }
-                },
-            )
+            for step in steps:
+                step["timing"] = "sequential"
+            for planner_tier in ("fast", "deep"):
+                validated = planner_validation.validate_planner_model_output(
+                    raw,
+                    planner_tier=planner_tier,
+                    expected_goal_ids_for_turn=["goal-blink"],
+                )
+                self.assertTrue(
+                    all(step.timing == "sequential" for step in validated.steps)
+                )
 
     def test_safe_read_parallel_timing_is_exactly_provenanced(self) -> None:
         plan = CanonicalPlan(

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import copy
-from decimal import Decimal
 import hashlib
 import json
 import logging
@@ -10,8 +8,6 @@ from typing import Any
 from pydantic import ValidationError
 
 from .capabilities.catalog import CapabilityCatalog
-from .planner_grounding import semantic_numeric_values
-from .capabilities.validator import validate_args_for_schema
 from .clients.ollama_client import (
     LayeredPrompt,
     OllamaClient,
@@ -24,8 +20,8 @@ from .planner_model_contract import (
     ResourceResponsibilityCapabilityUnavailableError,
     ResourceResponsibilityRequiresCompositionError,
     is_planner_step_capability,
-    materialize_goal_outcomes,
-    materialize_planner_metadata,
+    materialize_planner_output,
+    stable_plan_id,
 )
 from .planner_schema import (
     canonical_goal_binding_argument_response_schema,
@@ -41,24 +37,36 @@ from .planner_schema import (
 from .planner_context import (
     canonical_goal_grounding,
     expected_goal_ids,
+    fast_capability_payload,
+    gateway_speech_act,
     planner_goal_execution_requirements,
     planner_response_goal_ids,
     result_evidence_reentry_goal_ids,
 )
 from .planner_validation import (
+    AuthoritativeGroundingValidationError,
+    CapabilityArgumentValidationError,
+    capability_argument_errors,
     coordinated_action_goal_ids,
     normalize_detached_parameter_resolutions,
     normalize_missing_numeric_parameter_provenance,
     normalize_schema_default_parameter_provenance,
-    parallel_plan_contract_errors,
-    planner_contract_diagnostics,
+    planner_validation_error_json,
+    qualify_fast_canonical_plan,
+    restore_required_capability_args_from_responsibilities,
     validate_explicit_numeric_parameter_grounding,
     validate_external_response_evidence_boundary,
+    validate_fast_advance_output,
     validate_goal_binding_argument_grounding,
     validate_user_supplied_parameter_provenance,
     validate_resource_responsibility_capability_grounding,
     validate_goal_responsibility_outcomes,
     validate_planner_model_output,
+    validate_work_reuse_selection,
+)
+from .planner_fallback import (
+    materialize_fast_advance_fail_safe,
+    materialize_fast_escalation,
 )
 from .planner_audit import review_coordinated_action_plan_coverage
 try:
@@ -88,7 +96,6 @@ try:
         FastPlannerFirstResponse,
         FastPlannerFirstResponseModelOutput,
         FastPlannerFirstResponseTruthCertificate,
-        FastPlannerProgressAct,
     )
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
@@ -103,7 +110,6 @@ except ImportError:  # pragma: no cover
         FastPlannerFirstResponse,
         FastPlannerFirstResponseModelOutput,
         FastPlannerFirstResponseTruthCertificate,
-        FastPlannerProgressAct,
     )
 
 from .planner_prompt import (
@@ -126,26 +132,8 @@ logger = logging.getLogger("chromie.agent.fast_planner")
 
 
 
-class _CapabilityArgumentValidationError(PlannerDTOContractError):
-    def __init__(self, feedback: list[dict[str, Any]]) -> None:
-        self.feedback = [dict(item) for item in feedback]
-        super().__init__(
-            json.dumps(
-                self.feedback,
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            )
-        )
 
 
-class _AuthoritativeGroundingValidationError(ValueError):
-    """Fast output contradicts or bypasses immutable Goal grounding.
-
-    This is not evidence that the user problem is semantically difficult. Deep
-    Planner must not be used as a repair service for a plan that tried to source
-    executable arguments outside the authoritative Goal representation.
-    """
 
 
 class FastPlannerResolver:
@@ -330,10 +318,10 @@ class FastPlannerResolver:
                 raise PlannerDTOContractError(
                     "immediate conversational work requires a complete response"
                 )
-            gateway_speech_act = self._gateway_speech_act(request)
+            speech_act = gateway_speech_act(request)
             deterministic_greeting = bool(
                 not needs_work
-                and gateway_speech_act == "greeting"
+                and speech_act == "greeting"
                 and activity.role == "complete_response"
                 and activity.truth_stage == "context_grounded"
                 and not activity.evidence_refs
@@ -430,20 +418,6 @@ class FastPlannerResolver:
                 },
             )
 
-    @staticmethod
-    def _gateway_speech_act(request: CognitiveWorkRequest) -> str:
-        """Return immutable Gateway speech-act evidence when the envelope carries it."""
-
-        context = request.context if isinstance(request.context, dict) else {}
-        envelope = context.get("user_turn_envelope")
-        if not isinstance(envelope, dict):
-            return ""
-        attention = envelope.get("attention")
-        if not isinstance(attention, dict):
-            return ""
-        return " ".join(
-            str(attention.get("speech_act") or "").strip().split()
-        ).casefold()
 
     async def _qualify_first_response_truth(
         self,
@@ -531,9 +505,9 @@ class FastPlannerResolver:
                 separators=(",", ":"),
             )
             + "\n\nAdmitted trusted terminal Evidence JSON:\n"
-            + self._bounded(context.get("trusted_terminal_evidence") or [], 6000)
+            + bounded_json(context.get("trusted_terminal_evidence") or [], 6000)
             + "\n\nAuthoritative canonical Goal JSON:\n"
-            + self._bounded(canonical_goal_grounding(context), 3000)
+            + bounded_json(canonical_goal_grounding(context), 3000)
             + "\n\nCurrent user turn (scope only):\n"
             + str(request.original_user_text or "")[:700]
         )
@@ -558,96 +532,6 @@ class FastPlannerResolver:
         return FastPlannerFirstResponseTruthCertificate.model_validate(raw)
 
 
-    @staticmethod
-    def _restore_required_capability_args_from_responsibilities(
-        raw: dict[str, Any],
-        *,
-        responsibilities: list[CognitiveResponsibilityProposal],
-        capabilities: list[dict[str, Any]],
-    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-        """Restore omitted required args when GI already owns the exact value.
-
-        The model still owns Capability selection. Once it selects a Capability,
-        copying an identically named required input from every cited Responsibility
-        is mechanical provenance preservation, not a new HOW decision. Conflicting,
-        partial, transformed, optional, or defaulted inputs remain model-owned and
-        fail through the normal contract boundary.
-        """
-
-        activities = raw.get("activities")
-        if not isinstance(activities, list):
-            return raw, []
-        by_ref = {item.local_ref: item for item in responsibilities}
-        by_capability = {
-            str(item.get("capability_id") or ""): item
-            for item in capabilities
-            if isinstance(item, dict) and str(item.get("capability_id") or "")
-        }
-        normalized = copy.deepcopy(raw)
-        normalized_activities = normalized.get("activities")
-        if not isinstance(normalized_activities, list):
-            return raw, []
-        repairs: list[dict[str, Any]] = []
-        for activity_index, activity in enumerate(normalized_activities):
-            if not isinstance(activity, dict) or activity.get("role") != "capability":
-                continue
-            capability_id = str(activity.get("capability_id") or "")
-            definition = by_capability.get(capability_id)
-            if not isinstance(definition, dict):
-                continue
-            input_schema = definition.get("input_schema")
-            if not isinstance(input_schema, dict):
-                continue
-            properties = input_schema.get("properties")
-            if not isinstance(properties, dict):
-                properties = {}
-            required = [str(item) for item in input_schema.get("required") or []]
-            source_refs = [
-                str(item)
-                for item in activity.get("source_responsibility_refs") or []
-                if str(item) in by_ref
-            ]
-            if not source_refs:
-                continue
-            args = activity.get("args")
-            if not isinstance(args, dict):
-                args = {}
-            else:
-                args = dict(args)
-            changed = False
-            for parameter in required:
-                if parameter in args:
-                    continue
-                parameter_schema = properties.get(parameter)
-                if isinstance(parameter_schema, dict) and "default" in parameter_schema:
-                    continue
-                if not all(
-                    parameter in by_ref[source_ref].bindings
-                    for source_ref in source_refs
-                ):
-                    continue
-                values = [
-                    by_ref[source_ref].bindings[parameter]
-                    for source_ref in source_refs
-                ]
-                first = values[0]
-                if any(value != first for value in values[1:]):
-                    continue
-                args[parameter] = copy.deepcopy(first)
-                changed = True
-                repairs.append(
-                    {
-                        "activity_index": activity_index,
-                        "activity_id": str(activity.get("activity_id") or ""),
-                        "capability_id": capability_id,
-                        "parameter": parameter,
-                        "source_responsibility_refs": source_refs,
-                        "recovery": "restored_required_arg_from_authoritative_responsibility",
-                    }
-                )
-            if changed:
-                activity["args"] = args
-        return (normalized if repairs else raw), repairs
 
     async def resolve_advance(self, request: CognitiveWorkRequest) -> FastPlannerAdvance:
         """Produce Fast Planner's first Activity Plan from GI Responsibilities."""
@@ -717,20 +601,7 @@ class FastPlannerResolver:
             and is_planner_step_capability(item.capability_id)
         ]
         capability_payload = [
-            {
-                "capability_id": item.capability_id,
-                "description": item.description,
-                "input_schema": item.input_schema,
-                "requires_confirmation": item.requires_confirmation,
-                "can_run_parallel": item.can_run_parallel,
-                "parallel_metadata_declared": item.parallel_metadata_declared,
-                "exclusive_group": item.exclusive_group,
-                "resource_claims": list(item.resource_claims),
-                "effects": list(item.effects),
-                "safety_class": item.safety_class,
-                "side_effect_free": (item.hints or {}).get("side_effect_free") is True,
-                "hints": dict(item.hints),
-            }
+            fast_capability_payload(item, include_side_effect_free=True)
             for item in executable[: self.max_capabilities]
         ]
         response_schema = fast_advance_response_schema(
@@ -796,7 +667,7 @@ class FastPlannerResolver:
                         "Fast Planner advance response is not a JSON object"
                     )
                 last_raw, authoritative_arg_repairs = (
-                    self._restore_required_capability_args_from_responsibilities(
+                    restore_required_capability_args_from_responsibilities(
                         last_raw,
                         responsibilities=responsibilities,
                         capabilities=capability_payload,
@@ -806,7 +677,7 @@ class FastPlannerResolver:
                     logger.info(
                         "fast_planner_advance_authoritative_args_restored sid=%s repairs=%s",
                         request.sid,
-                        self._bounded(authoritative_arg_repairs, 2000),
+                        bounded_json(authoritative_arg_repairs, 2000),
                     )
                 output = FastPlannerAdvanceModelOutput.model_validate(last_raw)
                 if first_response_decided and any(
@@ -824,7 +695,7 @@ class FastPlannerResolver:
                         ]
                     }
                 )
-                self._validate_advance_output(
+                validate_fast_advance_output(
                     combined_output,
                     request=request,
                     responsibilities=responsibilities,
@@ -860,13 +731,14 @@ class FastPlannerResolver:
                     (ValidationError, json.JSONDecodeError),
                 ):
                     revision_source = last_raw
-                    previous_errors = self._validation_error_json(
+                    previous_errors = planner_validation_error_json(
                         exc,
                         raw=last_raw,
+                        planner_tier="fast",
                         expected_goal_ids_for_turn=responsibility_refs,
                     )
                     continue
-                return self._advance_fail_safe(
+                return materialize_fast_advance_fail_safe(
                     request,
                     responsibility_refs=responsibility_refs,
                     error=exc,
@@ -878,368 +750,9 @@ class FastPlannerResolver:
                 )
         raise AssertionError("unreachable")
 
-    @staticmethod
-    def _first_response_phase_decided(request: CognitiveWorkRequest) -> bool:
-        context = request.context if isinstance(request.context, dict) else {}
-        raw = context.get("fast_planner_first_response")
-        if not isinstance(raw, dict):
-            return False
-        try:
-            FastPlannerFirstResponse.model_validate(raw)
-        except ValidationError:
-            return False
-        return True
 
-    def _validate_advance_output(
-        self,
-        output: FastPlannerAdvanceModelOutput,
-        *,
-        request: CognitiveWorkRequest,
-        responsibilities: list[CognitiveResponsibilityProposal],
-        capabilities: list[dict[str, Any]],
-    ) -> None:
-        responsibility_refs = [item.local_ref for item in responsibilities]
-        if set(output.covered_responsibility_refs) != set(responsibility_refs):
-            raise PlannerDTOContractError(
-                "Fast Planner must cover exactly the authoritative Responsibility refs"
-            )
-        by_ref = {item.local_ref: item for item in responsibilities}
-        allowed = {item["capability_id"]: item for item in capabilities}
-        unresolved_meaning = {
-            " ".join(str(item or "").strip().split())
-            for item in request.interpretation_unresolved
-            if " ".join(str(item or "").strip().split())
-        }
-        clarification_activities = [
-            item for item in output.activities if item.role == "clarification"
-        ]
-        capability_activities = [
-            item for item in output.activities if item.role == "capability"
-        ]
-        complete_response_activities = [
-            item for item in output.activities if item.role == "complete_response"
-        ]
-        numeric_args_by_ref: dict[str, set[Decimal]] = {
-            ref: set() for ref in responsibility_refs
-        }
-        for activity in capability_activities:
-            activity_numbers = semantic_numeric_values(activity.args)
-            for source_ref in activity.source_responsibility_refs:
-                if source_ref in numeric_args_by_ref:
-                    numeric_args_by_ref[source_ref].update(activity_numbers)
-        for source_ref, source in by_ref.items():
-            required_numbers = semantic_numeric_values(source.bindings)
-            missing_numbers = sorted(
-                required_numbers - numeric_args_by_ref.get(source_ref, set())
-            )
-            if missing_numbers and any(
-                source_ref in activity.source_responsibility_refs
-                for activity in capability_activities
-            ):
-                raise PlannerDTOContractError(
-                    "Fast Planner Capability args omitted explicit numeric "
-                    f"Responsibility bindings for {source_ref}: "
-                    + ",".join(str(value) for value in missing_numbers)
-                )
-        if output.disposition in {"execute", "respond", "clarify", "mixed"}:
-            terminal_roles = {"capability", "complete_response", "clarification"}
-            terminal_refs = {
-                source_ref
-                for activity in output.activities
-                if activity.role in terminal_roles
-                for source_ref in activity.source_responsibility_refs
-            }
-            missing_terminal_refs = set(responsibility_refs) - terminal_refs
-            if missing_terminal_refs:
-                raise PlannerDTOContractError(
-                    "Fast Planner must supply one terminal Activity for every "
-                    "authoritative Responsibility before claiming a terminal "
-                    "disposition; missing="
-                    + ",".join(sorted(missing_terminal_refs))
-                )
-        if all(item.completion_requires_fresh_evidence for item in responsibilities) and not (
-            clarification_activities
-            or complete_response_activities
-            or any(item.role == "progress" for item in output.activities)
-            or self._first_response_phase_decided(request)
-        ):
-            raise PlannerDTOContractError(
-                "fresh-evidence Fast work requires a Communicative Main Activity"
-            )
-        if clarification_activities:
-            expected_disposition = "mixed" if capability_activities else "clarify"
-            if output.disposition != expected_disposition:
-                raise PlannerDTOContractError(
-                    "clarification disposition must be clarify when it is the only "
-                    "terminal work, or mixed when independent Capability work proceeds"
-                )
-            if complete_response_activities and not capability_activities:
-                raise PlannerDTOContractError(
-                    "the current Fast contract cannot combine only response and "
-                    "clarification outcomes without executable Work"
-                )
-        all_gap_ids = [
-            gap.gap_id
-            for activity in clarification_activities
-            for gap in activity.information_gaps
-        ]
-        if len(all_gap_ids) != len(set(all_gap_ids)):
-            raise PlannerDTOContractError(
-                "Planner InformationGap IDs must be unique across the Activity Plan"
-            )
-        for activity in output.activities:
-            unknown_refs = set(activity.source_responsibility_refs) - set(by_ref)
-            if unknown_refs:
-                raise PlannerDTOContractError(
-                    "Fast Planner Activity references unknown Responsibilities: "
-                    + ",".join(sorted(unknown_refs))
-                )
-            if activity.role == "complete_response" and any(
-                by_ref[ref].completion_requires_fresh_evidence
-                for ref in activity.source_responsibility_refs
-            ):
-                raise PlannerDTOContractError(
-                    "Fast Planner cannot complete a fresh-evidence Responsibility "
-                    "before trusted evidence"
-                )
-            if activity.role == "clarification":
-                if output.disposition not in {"clarify", "mixed"}:
-                    raise PlannerDTOContractError(
-                        "a clarification Activity requires disposition=clarify or mixed"
-                    )
-                for gap in activity.information_gaps:
-                    if gap.source_kind == "unresolved_meaning":
-                        if gap.source_reference not in unresolved_meaning:
-                            raise PlannerDTOContractError(
-                                "semantic clarification must cite exact GI unresolved "
-                                f"meaning: {gap.source_reference!r}"
-                            )
-                        continue
-                    definition = allowed.get(gap.source_reference)
-                    if definition is None:
-                        raise PlannerDTOContractError(
-                            "execution-input clarification must cite an available "
-                            f"Capability ID: {gap.source_reference!r}"
-                        )
-                    input_schema = definition.get("input_schema") or {}
-                    properties = input_schema.get("properties") or {}
-                    required = set(input_schema.get("required") or [])
-                    bound_names = {
-                        str(name)
-                        for ref in activity.source_responsibility_refs
-                        for name in by_ref[ref].bindings
-                    }
-                    for parameter in gap.required_for:
-                        parameter_schema = properties.get(parameter)
-                        if parameter not in required or not isinstance(
-                            parameter_schema, dict
-                        ):
-                            raise PlannerDTOContractError(
-                                "execution-input clarification may name only required "
-                                f"Capability inputs: {gap.source_reference}.{parameter}"
-                            )
-                        if "default" in parameter_schema:
-                            raise PlannerDTOContractError(
-                                "Planner cannot ask for an input with a Capability "
-                                f"schema default: {gap.source_reference}.{parameter}"
-                            )
-                        if parameter in bound_names:
-                            raise PlannerDTOContractError(
-                                "Planner cannot ask for an already-bound input: "
-                                f"{parameter}"
-                            )
-            if activity.role != "capability":
-                continue
-            definition = allowed.get(activity.capability_id)
-            if definition is None:
-                raise PlannerDTOContractError(
-                    f"unknown or unavailable Capability {activity.capability_id!r}"
-                )
-            for source_ref in activity.source_responsibility_refs:
-                source = by_ref[source_ref]
-                if source.output_mode not in set(VOCAL_MODES) - {"speech"}:
-                    continue
-                if (
-                    activity.capability_id != VOCAL_PERFORMANCE_CAPABILITY_ID
-                    or activity.args.get("mode") != source.output_mode
-                ):
-                    raise PlannerDTOContractError(
-                        "Fast Planner must preserve a mode-specific vocal "
-                        "Responsibility through the exact qualified vocal provider; "
-                        f"source_ref={source_ref} expected_capability="
-                        f"{VOCAL_PERFORMANCE_CAPABILITY_ID} expected_mode="
-                        f"{source.output_mode} actual_capability="
-                        f"{activity.capability_id} actual_mode="
-                        f"{activity.args.get('mode')!r}. Ordinary speech, media, and "
-                        "body Activities are not completion evidence for that mode."
-                    )
-            schema_errors = validate_args_for_schema(
-                activity.args,
-                definition.get("input_schema") or {},
-            )
-            if schema_errors:
-                raise PlannerDTOContractError(
-                    json.dumps(
-                        {
-                            "activity_id": activity.activity_id,
-                            "capability_id": activity.capability_id,
-                            "invalid_args": schema_errors[:8],
-                        },
-                        ensure_ascii=False,
-                        sort_keys=True,
-                    )
-                )
-            input_schema = definition.get("input_schema") or {}
-            properties = input_schema.get("properties") or {}
-            required_inputs = set(input_schema.get("required") or [])
-            authoritative_bindings = {
-                str(name): value
-                for ref in activity.source_responsibility_refs
-                for name, value in by_ref[ref].bindings.items()
-            }
-            for parameter in sorted(required_inputs):
-                parameter_schema = properties.get(parameter)
-                if not isinstance(parameter_schema, dict):
-                    continue
-                if "default" in parameter_schema:
-                    continue
-                if parameter not in authoritative_bindings:
-                    raise _AuthoritativeGroundingValidationError(
-                        "Fast Planner cannot invent an unbound required Capability "
-                        f"input before canonical Goal grounding: "
-                        f"{activity.capability_id}.{parameter}"
-                    )
-                actual = activity.args.get(parameter)
-                expected = authoritative_bindings[parameter]
-                if actual != expected and str(actual).strip() != str(expected).strip():
-                    raise _AuthoritativeGroundingValidationError(
-                        "Fast Planner required Capability input contradicts GI "
-                        f"binding: {activity.capability_id}.{parameter}"
-                    )
 
-    @staticmethod
-    def _advance_fail_safe(
-        request: CognitiveWorkRequest,
-        *,
-        responsibility_refs: list[str],
-        error: Exception,
-        raw_output: Any,
-        committed_communicative_activities: list[Any] | None = None,
-        allow_progress_salvage: bool = True,
-    ) -> FastPlannerAdvance:
-        inference_failure = isinstance(error, OllamaGenerationError)
-        failure = (
-            llm_failure_metadata(error)
-            if inference_failure
-            else {
-                "failure_class": "fast_advance_contract_invalid",
-                "failure_domain": "model_contract",
-                "architecture_attribution": "not_evaluated",
-                "retryable": True,
-            }
-        )
-        logger.warning(
-            "fast_planner_advance_fail_safe sid=%s error_type=%s error=%s "
-            "failure_class=%s raw_output_ref=%s",
-            request.sid,
-            type(error).__name__,
-            error,
-            failure["failure_class"],
-            cognition_text_reference(raw_output),
-        )
-        progress_activities = (
-            FastPlannerResolver._validated_fail_safe_progress(
-                raw_output,
-                responsibility_refs=responsibility_refs,
-            )
-            if allow_progress_salvage
-            else []
-        )
-        retained_communicative_activities = list(
-            committed_communicative_activities or []
-        )
-        retained_ids = {
-            item.activity_id for item in retained_communicative_activities
-        }
-        for item in progress_activities:
-            if item.activity_id in retained_ids:
-                continue
-            retained_communicative_activities.append(item)
-            retained_ids.add(item.activity_id)
-        return FastPlannerAdvance(
-            turn_id=str(request.sid or "turn-fast-advance"),
-            disposition="unavailable",
-            coverage="uncertain",
-            covered_responsibility_refs=responsibility_refs,
-            activities=retained_communicative_activities,
-            continuations=[],
-            confidence=0.0,
-            unresolved=[
-                "Fast Planner Activity Plan unavailable; Responsibility preserved "
-                "for one canonical Fast Planner revision after Goal Association."
-            ],
-            reason_summary=(
-                "Discard the invalid Fast Planner output without executing it."
-            ),
-            metadata={
-                "semantic_authority": "deterministic_fail_safe",
-                "phase": "responsibility_activity_planning",
-                "execution_authority": "none",
-                "advance_status": "canonical_fast_revision_required",
-                "raw_output_ref": cognition_text_reference(raw_output),
-                "error_type": type(error).__name__,
-                "error": str(error)[:300],
-                "salvaged_progress_activity_ids": [
-                    item.activity_id for item in retained_communicative_activities
-                ],
-                "progress_salvage_suppressed_by_first_response_decision": (
-                    not allow_progress_salvage
-                ),
-                **failure,
-            },
-        )
 
-    @staticmethod
-    def _validated_fail_safe_progress(
-        raw_output: Any,
-        *,
-        responsibility_refs: list[str],
-    ) -> list[FastPlannerProgressAct]:
-        """Retain independently valid, non-terminal progress from an invalid Plan.
-
-        Progress carries no result, completion, Capability, or execution claim.  The
-        invalid Plan wrapper and every terminal Activity remain discarded.  Exact
-        duplicates are collapsed so one malformed model response cannot schedule
-        repeated audible acknowledgements.
-        """
-
-        if not isinstance(raw_output, dict):
-            return []
-        allowed_refs = set(responsibility_refs)
-        retained: list[FastPlannerProgressAct] = []
-        seen: set[tuple[Any, ...]] = set()
-        for candidate in raw_output.get("activities") or []:
-            if not isinstance(candidate, dict) or candidate.get("role") != "progress":
-                continue
-            try:
-                activity = FastPlannerProgressAct.model_validate(candidate)
-            except ValidationError:
-                continue
-            refs = set(activity.source_responsibility_refs)
-            if not refs or not refs.issubset(allowed_refs):
-                continue
-            key = (
-                activity.progress_kind,
-                activity.speech_act,
-                activity.text,
-                activity.timing,
-                tuple(sorted(refs)),
-            )
-            if key in seen:
-                continue
-            seen.add(key)
-            retained.append(activity)
-        return retained
 
     async def resolve(self, request: CognitiveWorkRequest) -> CanonicalPlan:
         trace_scope = runtime_tracer.continue_from_context(request.context)
@@ -1274,7 +787,7 @@ class FastPlannerResolver:
         return result
 
     async def _resolve(self, request: CognitiveWorkRequest) -> CanonicalPlan:
-        plan_id = self._plan_id(request)
+        plan_id = stable_plan_id(request, "fast")
         context = request.context if isinstance(request.context, dict) else {}
         expected_goal_ids_for_turn = expected_goal_ids(context)
         authoritative_goals = canonical_goal_grounding(context)
@@ -1304,19 +817,7 @@ class FastPlannerResolver:
         if response_only:
             executable = []
         capability_payload = [
-            {
-                "capability_id": item.capability_id,
-                "description": item.description,
-                "input_schema": item.input_schema,
-                "requires_confirmation": item.requires_confirmation,
-                "can_run_parallel": item.can_run_parallel,
-                "parallel_metadata_declared": item.parallel_metadata_declared,
-                "exclusive_group": item.exclusive_group,
-                "resource_claims": list(item.resource_claims),
-                "effects": list(item.effects),
-                "safety_class": item.safety_class,
-                "hints": dict(item.hints),
-            }
+            fast_capability_payload(item)
             for item in executable[: self.max_capabilities]
         ]
         multi_goal_contract = len(expected_goal_ids_for_turn) > 1
@@ -1436,7 +937,7 @@ class FastPlannerResolver:
                         "fast_planner_detached_parameter_resolutions_removed "
                         "sid=%s repairs=%s",
                         request.sid,
-                        self._bounded(detached_resolution_repairs, 2000),
+                        bounded_json(detached_resolution_repairs, 2000),
                     )
                 raw, provenance_repairs = (
                     normalize_schema_default_parameter_provenance(
@@ -1452,7 +953,7 @@ class FastPlannerResolver:
                         "fast_planner_schema_default_provenance_normalized "
                         "sid=%s repairs=%s",
                         request.sid,
-                        self._bounded(provenance_repairs, 2000),
+                        bounded_json(provenance_repairs, 2000),
                     )
                 raw, numeric_provenance_repairs = (
                     normalize_missing_numeric_parameter_provenance(
@@ -1466,31 +967,24 @@ class FastPlannerResolver:
                     logger.info(
                         "fast_planner_numeric_provenance_normalized sid=%s repairs=%s",
                         request.sid,
-                        self._bounded(numeric_provenance_repairs, 2000),
+                        bounded_json(numeric_provenance_repairs, 2000),
                     )
                 try:
-                    normalized = (
-                        self._normalize_multi_goal(
-                            raw,
-                            request=request,
-                            plan_id=plan_id,
-                            expected_goal_ids_for_turn=expected_goal_ids_for_turn,
-                        )
-                        if multi_goal_contract
-                        else self._normalize(
-                            raw,
-                            request=request,
-                            plan_id=plan_id,
-                            expected_goal_ids_for_turn=expected_goal_ids_for_turn,
-                        )
-                    )
-                    plan = CanonicalPlan.model_validate(normalized)
                     validated_model_output = validate_planner_model_output(
                         raw,
                         planner_tier="fast",
                         expected_goal_ids_for_turn=expected_goal_ids_for_turn,
                     )
-                    self._validate_work_reuse_selection(
+                    normalized = materialize_planner_output(
+                        validated_model_output,
+                        planner_tier="fast",
+                        plan_id=plan_id,
+                        expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+                        goal_summary_fallback=request.text,
+                        fast_multi_goal_contract=multi_goal_contract,
+                    )
+                    plan = CanonicalPlan.model_validate(normalized)
+                    validate_work_reuse_selection(
                         validated_model_output,
                         context=request.context,
                     )
@@ -1532,24 +1026,24 @@ class FastPlannerResolver:
                 except PlannerDTOContractError:
                     raise
                 except ValueError as exc:
-                    raise _AuthoritativeGroundingValidationError(str(exc)) from exc
+                    raise AuthoritativeGroundingValidationError(str(exc)) from exc
                 validate_external_response_evidence_boundary(
                     validated_model_output,
                     context=request.context,
                 )
-                capability_errors = self._capability_argument_errors(
+                capability_errors = capability_argument_errors(
                     plan,
                     capability_payload,
                 )
                 if capability_errors:
-                    raise _CapabilityArgumentValidationError(capability_errors)
+                    raise CapabilityArgumentValidationError(capability_errors)
             except ResourceResponsibilityRequiresCompositionError as exc:
                 logger.info(
                     "fast_planner_resource_composition_required sid=%s error=%s",
                     request.sid,
                     exc,
                 )
-                return self._escalation(
+                return materialize_fast_escalation(
                     plan_id,
                     request,
                     "resource_responsibility_composition_required",
@@ -1577,7 +1071,7 @@ class FastPlannerResolver:
                 if isinstance(
                     exc, ResourceResponsibilityCapabilityUnavailableError
                 ):
-                    return self._escalation(
+                    return materialize_fast_escalation(
                         plan_id,
                         request,
                         "resource_responsibility_capability_unavailable",
@@ -1598,9 +1092,10 @@ class FastPlannerResolver:
                     # copy-editing caused validator text to be embedded inside
                     # rationale strings while required fields stayed missing.
                     previous_raw = None
-                    initial_validation_errors = self._validation_error_json(
+                    initial_validation_errors = planner_validation_error_json(
                         exc,
                         raw=raw,
+                        planner_tier="fast",
                         expected_goal_ids_for_turn=expected_goal_ids_for_turn,
                     )
                     logger.warning(
@@ -1609,7 +1104,7 @@ class FastPlannerResolver:
                         request.sid,
                         initial_validation_errors,
                         cognition_text_reference(initial_raw_output),
-                        self._bounded(initial_raw_output, 4000),
+                        bounded_json(initial_raw_output, 4000),
                     )
                     continue
                 logger.warning(
@@ -1619,10 +1114,10 @@ class FastPlannerResolver:
                     request.sid,
                     cognition_text_reference(initial_raw_output),
                     cognition_text_reference(raw if contract_repair_attempted else None),
-                    self._bounded(initial_raw_output, 4000)
+                    bounded_json(initial_raw_output, 4000)
                     if initial_raw_output is not None
                     else "",
-                    self._bounded(raw, 4000)
+                    bounded_json(raw, 4000)
                     if contract_repair_attempted and raw is not None
                     else "",
                 )
@@ -1633,14 +1128,14 @@ class FastPlannerResolver:
                     exc, (PlannerDTOContractError, json.JSONDecodeError)
                 )
                 authoritative_grounding_failure = isinstance(
-                    exc, _AuthoritativeGroundingValidationError
+                    exc, AuthoritativeGroundingValidationError
                 )
                 semantic_validation_failure = (
                     isinstance(exc, ValueError)
                     and not mechanical_contract_error
                     and not authoritative_grounding_failure
                 )
-                return self._escalation(
+                return materialize_fast_escalation(
                     plan_id,
                     request,
                     (
@@ -1670,19 +1165,32 @@ class FastPlannerResolver:
                         ),
                         "validation_feedback": (
                             exc.feedback
-                            if isinstance(exc, _CapabilityArgumentValidationError)
+                            if isinstance(exc, CapabilityArgumentValidationError)
                             else []
                         ),
                         **integrity_metadata,
                     },
                 )
 
-            validated = self._validate(
+            qualification = qualify_fast_canonical_plan(
                 plan,
                 capability_payload=capability_payload,
-                request=request,
                 expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+                authoritative_goals=canonical_goal_grounding(request.context),
+                evidence_reentry_goal_ids=result_evidence_reentry_goal_ids(request.context),
+                min_confidence=self.min_confidence,
             )
+            if not qualification.accepted:
+                return materialize_fast_escalation(
+                    plan.plan_id,
+                    request,
+                    qualification.reason,
+                    response_text=plan.response_text,
+                    unresolved=list(qualification.unresolved),
+                    metadata=qualification.metadata,
+                    path_classification=qualification.path_classification,
+                )
+            validated = qualification.plan
             if (
                 reentry_goal_ids
                 and validated.disposition == "respond"
@@ -1701,7 +1209,7 @@ class FastPlannerResolver:
                         type(exc).__name__,
                         exc,
                     )
-                    return self._escalation(
+                    return materialize_fast_escalation(
                         plan_id,
                         request,
                         "fast_planner_evidence_response_truth_unavailable",
@@ -1719,7 +1227,7 @@ class FastPlannerResolver:
                         "fast_planner_evidence_response_truth_rejected sid=%s",
                         request.sid,
                     )
-                    return self._escalation(
+                    return materialize_fast_escalation(
                         plan_id,
                         request,
                         "fast_planner_evidence_response_truth_rejected",
@@ -1761,7 +1269,7 @@ class FastPlannerResolver:
                         type(exc).__name__,
                         exc,
                     )
-                    return self._escalation(
+                    return materialize_fast_escalation(
                         plan_id,
                         request,
                         "coordinated_action_coverage_review_unavailable",
@@ -1779,7 +1287,7 @@ class FastPlannerResolver:
                         coverage_review.uncovered_requirements,
                         coverage_review.reason,
                     )
-                    return self._escalation(
+                    return materialize_fast_escalation(
                         plan_id,
                         request,
                         "coordinated_action_coverage_incomplete",
@@ -1827,446 +1335,3 @@ class FastPlannerResolver:
                 validated = validated.model_copy(update={"metadata": metadata})
             return validated
         raise AssertionError("unreachable")
-
-    @staticmethod
-    def _validation_error_json(
-        exc: Exception,
-        *,
-        raw: Any,
-        expected_goal_ids_for_turn: list[str],
-    ) -> str:
-        if isinstance(exc, _CapabilityArgumentValidationError):
-            feedback = [dict(item) for item in exc.feedback]
-        elif isinstance(exc, ValidationError):
-            feedback = list(exc.errors(include_url=False))
-        else:
-            feedback = [{"type": type(exc).__name__, "message": str(exc)[:1000]}]
-        feedback.extend(
-            planner_contract_diagnostics(
-                raw,
-                planner_tier="fast",
-                expected_goal_ids_for_turn=expected_goal_ids_for_turn,
-            )
-        )
-        unique: list[dict[str, Any]] = []
-        seen: set[tuple[str, tuple[Any, ...]]] = set()
-        for item in feedback:
-            key = (
-                str(item.get("msg") or item.get("message") or ""),
-                tuple(item.get("loc") or []),
-            )
-            if key in seen:
-                continue
-            seen.add(key)
-            unique.append(item)
-        return bounded_json(unique, 10000)
-
-    @staticmethod
-    def _capability_argument_errors(
-        plan: CanonicalPlan,
-        capability_payload: list[dict[str, Any]],
-    ) -> list[dict[str, Any]]:
-        allowed = {item["capability_id"]: item for item in capability_payload}
-        errors: list[dict[str, Any]] = []
-        for step in plan.steps:
-            capability = allowed.get(step.capability_id)
-            if capability is None:
-                continue
-            schema_errors = validate_args_for_schema(
-                step.args,
-                capability.get("input_schema") or {},
-            )
-            if schema_errors:
-                errors.append(
-                    {
-                        "type": "invalid_args",
-                        "step_id": step.step_id,
-                        "capability_id": step.capability_id,
-                        "errors": schema_errors[:8],
-                    }
-                )
-        return errors
-
-    @staticmethod
-    def _plan_id(request: CognitiveWorkRequest) -> str:
-        digest = hashlib.sha256(
-            f"{request.sid or 'turn'}|fast|{request.text}".encode()
-        ).hexdigest()[:20]
-        return f"plan_{digest}"
-
-    @staticmethod
-    def _bounded(value: Any, limit: int) -> str:
-        return bounded_json(value, limit)
-
-    @staticmethod
-    def _validate_work_reuse_selection(
-        output: Any,
-        *,
-        context: dict[str, Any] | None,
-    ) -> None:
-        """Validate explicit Planner reuse references without choosing reuse.
-
-        Fast Planner owns the semantic decision by either citing a supplied
-        provisional Activity ID or omitting it. This check is deliberately
-        mechanical: cited IDs must exist and the selected step must preserve
-        the Activity's immutable Capability, arguments, and timing. The Host
-        later validates canonical Goal ownership and live runtime state.
-        """
-
-        raw_activities = (context or {}).get(
-            "existing_work_activities"
-        )
-        activities = (
-            [item for item in raw_activities if isinstance(item, dict)]
-            if isinstance(raw_activities, list)
-            else []
-        )
-        by_id = {
-            str(item.get("activity_id") or "").strip(): item
-            for item in activities
-            if str(item.get("activity_id") or "").strip()
-        }
-        cited: set[str] = set()
-        for step in output.steps:
-            activity_id = str(step.reuse_activity_id or "").strip()
-            if not activity_id:
-                continue
-            if activity_id in cited:
-                raise PlannerDTOContractError(
-                    f"reuse_activity_id is duplicated: {activity_id}"
-                )
-            cited.add(activity_id)
-            activity = by_id.get(activity_id)
-            if activity is None:
-                raise PlannerDTOContractError(
-                    f"reuse_activity_id was not supplied by Runtime: {activity_id}"
-                )
-            if step.capability_id != str(activity.get("capability_id") or ""):
-                raise PlannerDTOContractError(
-                    f"reuse_activity_id {activity_id} changes capability_id"
-                )
-            if step.args != dict(activity.get("args") or {}):
-                raise PlannerDTOContractError(
-                    f"reuse_activity_id {activity_id} changes immutable args"
-                )
-            if step.timing != str(activity.get("timing") or "sequential"):
-                raise PlannerDTOContractError(
-                    f"reuse_activity_id {activity_id} changes timing"
-                )
-
-        # The supplied reconciliation projection is one bounded snapshot.
-        # Reusing any member currently requires selecting every member; extra
-        # newly planned steps remain legal and execute beside the reused set.
-        if cited and cited != set(by_id):
-            raise PlannerDTOContractError(
-                "Work reuse must select the complete supplied "
-                "Activity set"
-            )
-        if cited and any(
-            by_id[activity_id].get("origin") == "retained_runtime"
-            for activity_id in cited
-        ) and len(output.steps) != len(cited):
-            raise PlannerDTOContractError(
-                "retained Runtime Work reuse cannot add steps to the "
-                "reconciliation-only Plan"
-            )
-
-
-    def _normalize_multi_goal(
-        self,
-        raw: dict[str, Any],
-        *,
-        request: CognitiveWorkRequest,
-        plan_id: str,
-        expected_goal_ids_for_turn: list[str],
-    ) -> dict[str, Any]:
-        """Add only host-owned envelope fields to a model-authored plan."""
-
-        model_output = validate_planner_model_output(
-            raw,
-            planner_tier="fast",
-            expected_goal_ids_for_turn=expected_goal_ids_for_turn,
-        )
-        out = model_output.model_dump(mode="python")
-        out.pop("plan_relation", None)
-        out.pop("user_confirmation_required", None)
-        out["goal_outcomes"] = materialize_goal_outcomes(
-            model_output,
-            expected_goal_ids_for_turn=expected_goal_ids_for_turn,
-        )
-        out["plan_id"] = plan_id
-        out["planner_tier"] = "fast"
-        out["goal_ids"] = list(expected_goal_ids_for_turn)
-        metadata = materialize_planner_metadata(model_output)
-        metadata.update(
-            {
-                "model_contract": "FastPlannerMultiGoalPlanOutput",
-                "semantic_authority": "fast_planner_model",
-                "model_authored_steps": True,
-                "model_authored_step_ids": True,
-                "model_authored_step_ownership": True,
-                "model_authored_goal_outcomes": True,
-                "model_authored_goal_satisfaction": True,
-                "host_semantic_compilation": False,
-            }
-        )
-        out["metadata"] = metadata
-        return out
-
-    def _normalize(
-        self,
-        raw: dict[str, Any],
-        *,
-        request: CognitiveWorkRequest,
-        plan_id: str,
-        expected_goal_ids_for_turn: list[str],
-    ) -> dict[str, Any]:
-        model_output = validate_planner_model_output(
-            raw,
-            planner_tier="fast",
-            expected_goal_ids_for_turn=expected_goal_ids_for_turn,
-        )
-        out = model_output.model_dump(mode="python")
-        out.pop("plan_relation", None)
-        out.pop("user_confirmation_required", None)
-        out["goal_outcomes"] = materialize_goal_outcomes(
-            model_output,
-            expected_goal_ids_for_turn=expected_goal_ids_for_turn,
-        )
-        out["plan_id"] = plan_id
-        out["planner_tier"] = "fast"
-        out["goal_ids"] = list(expected_goal_ids_for_turn)
-        steps = out.get("steps")
-        if isinstance(steps, dict):
-            steps = [steps]
-        if not isinstance(steps, list):
-            steps = []
-        normalized_steps = []
-        for index, item in enumerate(steps):
-            if not isinstance(item, dict):
-                continue
-            step = dict(item)
-            if not step.get("step_id"):
-                step["step_id"] = f"{plan_id}:step:{index}"
-            step.setdefault("timing", "sequential")
-            normalized_steps.append(step)
-        out["steps"] = normalized_steps
-        out.setdefault("coverage", "uncertain")
-        out.setdefault("disposition", "escalate")
-        out.setdefault("confidence", 0.0)
-        out.setdefault("goal_summary", request.text)
-        out.setdefault("response_text", "")
-        out.setdefault("escalation_reason", "")
-        out.setdefault("unresolved", [])
-        out.setdefault("parameter_resolutions", [])
-        out.setdefault("goal_outcomes", [])
-        out.setdefault("goal_satisfaction", None)
-        out["metadata"] = materialize_planner_metadata(model_output)
-        return out
-
-    def _validate(
-        self,
-        plan: CanonicalPlan,
-        *,
-        capability_payload: list[dict[str, Any]],
-        request: CognitiveWorkRequest,
-        expected_goal_ids_for_turn: list[str],
-    ) -> CanonicalPlan:
-        allowed = {item["capability_id"]: item for item in capability_payload}
-        contract_schema = (
-            "FastPlannerMultiGoalPlanOutput"
-            if len(expected_goal_ids_for_turn) > 1
-            else "FastPlannerModelOutput"
-        )
-        counts = {
-            "authoritative_goal_count": len(expected_goal_ids_for_turn),
-            "goal_outcome_count": len(plan.goal_outcomes),
-            "executable_step_count": len(plan.steps),
-        }
-        if expected_goal_ids_for_turn and set(plan.goal_ids) != set(expected_goal_ids_for_turn):
-            return self._escalation(
-                plan.plan_id,
-                request,
-                "goal_ids_do_not_match_goal_association",
-                response_text=plan.response_text,
-                metadata={
-                    "expected_goal_ids": expected_goal_ids_for_turn,
-                    "actual_goal_ids": list(plan.goal_ids),
-                    **counts,
-                },
-            )
-        _, requires_execution = planner_goal_execution_requirements(
-            canonical_goal_grounding(request.context)
-        )
-        if result_evidence_reentry_goal_ids(request.context) == set(
-            expected_goal_ids_for_turn
-        ):
-            requires_execution = False
-        if (
-            requires_execution
-            and plan.disposition not in {"escalate", "clarify", "unavailable", "refused"}
-            and not plan.steps
-        ):
-            return self._escalation(
-                plan.plan_id,
-                request,
-                "canonical_goal_requires_executable_step",
-                response_text=plan.response_text,
-                metadata={
-                    "proposed_disposition": plan.disposition,
-                    **counts,
-                },
-            )
-        if plan.disposition == "escalate":
-            metadata = dict(plan.metadata)
-            metadata.update(
-                {
-                    "resolver": "fast_planner",
-                    "status": "escalate",
-                    "authority": "advisory",
-                    "path_classification": "semantic_escalation",
-                    "common_capability_count": len(capability_payload),
-                    "min_confidence": self.min_confidence,
-                    "contract_schema": contract_schema,
-                    "canonical_contract": "CanonicalPlan",
-                    **counts,
-                }
-            )
-            return plan.model_copy(update={"metadata": metadata})
-        if plan.coverage != "complete" or plan.confidence < self.min_confidence:
-            return self._escalation(
-                plan.plan_id,
-                request,
-                "coverage_not_complete",
-                response_text=plan.response_text,
-                unresolved=plan.unresolved,
-                metadata={
-                    "proposed_coverage": plan.coverage,
-                    "proposed_confidence": plan.confidence,
-                    **counts,
-                },
-            )
-        if plan.goal_satisfaction is None or plan.goal_satisfaction.score < 0.95:
-            return self._escalation(
-                plan.plan_id,
-                request,
-                "goal_satisfaction_not_exact",
-                response_text=plan.response_text,
-                unresolved=plan.unresolved,
-                metadata={
-                    "proposed_goal_satisfaction": (
-                        plan.goal_satisfaction.model_dump(mode="json")
-                        if plan.goal_satisfaction
-                        else None
-                    ),
-                    **counts,
-                },
-            )
-        incomplete_outcomes = [
-            outcome.goal_id
-            for outcome in plan.goal_outcomes
-            if outcome.satisfaction is None or outcome.satisfaction.score < 0.95
-        ]
-        if incomplete_outcomes:
-            return self._escalation(
-                plan.plan_id,
-                request,
-                "per_goal_satisfaction_not_exact",
-                response_text=plan.response_text,
-                unresolved=incomplete_outcomes,
-                metadata={**counts},
-            )
-        for step in plan.steps:
-            capability = allowed.get(step.capability_id)
-            if capability is None:
-                return self._escalation(
-                    plan.plan_id,
-                    request,
-                    "step_not_in_executable_common_catalog",
-                    response_text=plan.response_text,
-                    unresolved=[step.capability_id],
-                    metadata={**counts},
-                )
-        parallel_errors = parallel_plan_contract_errors(
-            plan,
-            capability_payload,
-        )
-        if parallel_errors:
-            return self._escalation(
-                plan.plan_id,
-                request,
-                "parallel_execution_contract_unavailable",
-                response_text=plan.response_text,
-                unresolved=[str(item["type"]) for item in parallel_errors],
-                metadata={
-                    "parallel_contract_errors": parallel_errors,
-                    "execution_allowed": False,
-                    **counts,
-                },
-            )
-        metadata = dict(plan.metadata)
-        metadata.update(
-            {
-                "resolver": "fast_planner",
-                "status": "complete",
-                "authority": "advisory",
-                "common_capability_count": len(capability_payload),
-                "min_confidence": self.min_confidence,
-                "contract_schema": contract_schema,
-                "canonical_contract": "CanonicalPlan",
-                "path_classification": "terminal",
-                **counts,
-            }
-        )
-        return plan.model_copy(update={"metadata": metadata})
-
-    def _escalation(
-        self,
-        plan_id: str,
-        request: CognitiveWorkRequest,
-        reason: str,
-        *,
-        response_text: str = "",
-        unresolved: list[str] | None = None,
-        metadata: dict[str, Any] | None = None,
-        error: Exception | None = None,
-        path_classification: str = "semantic_escalation",
-    ) -> CanonicalPlan:
-        detail = dict(metadata or {})
-        detail.update(
-            {
-                "resolver": "fast_planner",
-                "status": "escalate",
-                "authority": "advisory",
-                "path_classification": path_classification,
-            }
-        )
-        if error is not None:
-            detail.update(
-                {
-                    "error_type": type(error).__name__,
-                    "error": str(error)[:300],
-                    **llm_failure_metadata(error),
-                }
-            )
-        context = request.context if isinstance(request.context, dict) else {}
-        retained_progress = " ".join(str(response_text or "").strip().split())
-        if retained_progress:
-            detail["retained_progress_response_text"] = {
-                "status": "undelivered_advisory",
-                "reason": reason,
-            }
-        return CanonicalPlan(
-            plan_id=plan_id,
-            planner_tier="fast",
-            disposition="escalate",
-            coverage="uncertain",
-            confidence=0.0,
-            goal_ids=expected_goal_ids(context),
-            goal_summary=request.text,
-            response_text=retained_progress,
-            steps=[],
-            escalation_reason=reason,
-            unresolved=list(unresolved or []),
-            metadata=detail,
-        )
