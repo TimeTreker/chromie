@@ -135,6 +135,8 @@ If the Goal-driven Runtime is disabled or fails after admission, ordinary cognit
 fails closed with bounded Host-owned failure speech. The Host never switches to a
 direct-LLM or retired Agent semantic path.
 
+`orchestrator/runtime/observability_recording.py` owns fail-soft recording containment for Experience/Episode and Cognitive Evidence writes; it is not a semantic owner and recording failure cannot alter Goal, Planner, speech, or execution truth.
+
 `orchestrator/runtime/planner_reentry.py` owns the pure mechanical policy used when
 terminal Runtime Evidence may reactivate Planner. It checks the exact current
 Goal/Plan/request binding, reuses only the originating GI Responsibility provenance,

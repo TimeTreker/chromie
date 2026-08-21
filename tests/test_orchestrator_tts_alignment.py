@@ -27,6 +27,7 @@ from orchestrator.runtime.host_settings import HostSettingsSnapshot
 from orchestrator.runtime.mind import MindManager
 from orchestrator.runtime.session import SessionTracker
 from orchestrator.runtime.capability_runtime import CapabilityRuntimeResult
+from orchestrator.runtime.observability_recording import record_execution_experience_safely
 from shared.chromie_contracts.mind import default_mind_profile
 from shared.chromie_contracts.interaction import InteractionResponse, CapabilityResult
 
@@ -1078,7 +1079,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             assistant,
         )
 
-        assistant._record_execution_experience_safely(
+        record_execution_experience_safely(
             response=response,
             execution=CapabilityRuntimeResult(
                 interaction_id=response.interaction_id,
@@ -1086,6 +1087,9 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             ),
             session_id="sid-greeting",
             confirmed_request_ids=None,
+            prepare_response=assistant._prepared_interaction_response_for_record,
+            record_experience=assistant._record_experience,
+            session_log=assistant.session_log,
         )
 
         self.assertEqual(response.metadata["semantic_status"], "failed")

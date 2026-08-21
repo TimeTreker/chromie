@@ -125,7 +125,7 @@ invocation; the Host no longer fabricates callback meaning.
 The module owns no Goal meaning, speech, Planner call, Runtime mutation, or state. Nine
 private methods first leave `VoiceAssistant` (`159 -> 150`). The next mechanical slice
 moves TTS text segmentation and Goal-list console projection out of the composition root,
-lowering it again to `142 methods / 305 init lines / 110 attributes / 0 direct-LLM calls`.
+lowering it again to `139 methods / 305 init lines / 110 attributes / 0 direct-LLM calls`. Observability recording containment now lives in `orchestrator/runtime/observability_recording.py` as stateless Host policy; it records existing runtime facts and never changes Goal, Planner, speech, or execution semantics.
 These are narrow ownership-seam extractions, not new managers or completed Host decomposition.
 
 ## Verification
@@ -135,6 +135,7 @@ Focused source verification passes before final patch packaging:
 - 261 Planner re-entry / detached Evidence / Cognitive Runtime / Situation / interaction
   tests after the structural extraction;
 - pure-policy and Host integration coverage for missing Responsibility provenance;
+- 205 focused async/runtime/reflex/TTS/observability tests plus 36 subtests after the observability extraction;
 - runtime-structure ratchet, repository engineering policy, and test ownership checks.
 
 The final delivery reruns documentation, semantic-authority, configuration, and broader
@@ -148,7 +149,7 @@ claimed by this source patch.
 
 ## Resume order
 
-1. Apply patches 1, 2, 3, and 4 in order to the uploaded archive, then run
+1. Apply patches 1, 2, 3, 4, and 5 in order to the uploaded archive, then run
    `./scripts/run_tests.sh` with pinned test dependencies.
 2. Run retained async/general-ability cases on the current model profile.
 3. Retain provider-backed information and embodied episodes that exercise follow-up Work,

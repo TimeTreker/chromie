@@ -788,14 +788,40 @@
       ]
     },
     {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._record_cognitive_gateway_evidence",
+      "path": "orchestrator/runtime/observability_recording.py",
+      "symbol": "record_execution_experience_safely",
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not alter Goal, Planner, speech, or execution truth.",
       "review_status": "reviewed",
-      "body_sha256": "3134c98b2236f4bcc74916f66135cf5b277b5ad2e35c904496f2a7e6ed943a0e",
+      "body_sha256": "b907b80767f62bc176e43ca23ce665531659e4d5f5311c029208d6ad682091f0",
+      "failure_signals": [
+        "diagnostic"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/observability_recording.py",
+      "symbol": "record_cognitive_runtime_evidence",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not alter Goal, Planner, speech, or execution truth.",
+      "review_status": "reviewed",
+      "body_sha256": "a57d6fcab595a7832364c138180ea17170180111f6791488b1621c4d2dfd0f0a",
+      "failure_signals": [
+        "diagnostic"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/observability_recording.py",
+      "symbol": "record_cognitive_gateway_evidence",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not alter Goal, Planner, speech, or execution truth.",
+      "review_status": "reviewed",
+      "body_sha256": "bef62d2b48dd953de95a5d2512ee1eb0b9c1df9e56db0097a903af0eecd226ad",
       "failure_signals": [
         "diagnostic"
       ]
@@ -809,32 +835,6 @@
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
       "body_sha256": "0adacc10be5f64af34a00dc01d8895f43a4dad2b33487b213bba856ef53f3dbb",
-      "failure_signals": [
-        "diagnostic"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._record_cognitive_runtime_evidence",
-      "ordinal": 1,
-      "classification": "diagnostic_cleanup",
-      "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
-      "review_status": "reviewed",
-      "body_sha256": "5da2c74c6b7259894a6a0a23671acebbb8706b90e1fdb320a9af58f9c48fa8f2",
-      "failure_signals": [
-        "diagnostic"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._record_execution_experience_safely",
-      "ordinal": 1,
-      "classification": "diagnostic_cleanup",
-      "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
-      "review_status": "reviewed",
-      "body_sha256": "7951807a475189af727f8f2fab2fe9b95765aab334da4c60df09c6992332093b",
       "failure_signals": [
         "diagnostic"
       ]
@@ -972,7 +972,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "29339b93123f38741e8de44c3011ab629661ab97c743cc6adc15f44686d7f31f",
+      "body_sha256": "d3d4ed773828d8af69fdc3eb7a3bb7af809b46cd72a83cc31d1e1b25f1b600c6",
       "failure_signals": [
         "diagnostic",
         "return",

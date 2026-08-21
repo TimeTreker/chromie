@@ -59,7 +59,7 @@ At this revision the checker reports:
 
 | Measure | Current ratchet |
 |---|---:|
-| `VoiceAssistant` methods | 142 |
+| `VoiceAssistant` methods | 139 |
 | properties | 1 |
 | `__init__` lines | 305 |
 | initialized `self` attributes | 110 |

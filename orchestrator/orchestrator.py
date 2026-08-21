@@ -93,6 +93,11 @@ from orchestrator.runtime.outcome_delivery import build_host_outcome_delivery
 from orchestrator.runtime.playback_delivery import PlaybackDeliveryLifecycle
 from orchestrator.runtime.playback_transport import transport_for as playback_transport_for
 from orchestrator.runtime.outcome_response import compose_outcome_response
+from orchestrator.runtime.observability_recording import (
+    record_cognitive_gateway_evidence,
+    record_cognitive_runtime_evidence,
+    record_execution_experience_safely,
+)
 from orchestrator.runtime.response_plan import validate_immediate_response_plan
 from orchestrator.runtime.runtime_ready_greeting import (
     RuntimeReadyGreetingCoordinator,
@@ -2208,63 +2213,6 @@ class VoiceAssistant:
                 len(episode.turns),
             )
 
-    def _record_execution_experience_safely(
-        self,
-        *,
-        response: InteractionResponse,
-        execution: CapabilityRuntimeResult | None,
-        session_id: str | None,
-        confirmed_request_ids: set[str] | None,
-        errors: list[str] | None = None,
-    ) -> None:
-        """Keep observability failures outside execution/response semantics."""
-
-        try:
-            prepared = self._prepared_interaction_response_for_record(
-                response,
-                session_id=session_id,
-                confirmed_request_ids=confirmed_request_ids,
-            )
-            record_kwargs: dict[str, Any] = {
-                "response": prepared,
-                "execution": execution,
-                "session_id": session_id,
-            }
-            effective_errors = list(errors or ())
-            metadata = (
-                prepared.metadata
-                if isinstance(prepared.metadata, dict)
-                else {}
-            )
-            if metadata.get("semantic_status") == "failed":
-                stage = str(metadata.get("semantic_failure_stage") or "cognition")
-                failure_class = str(
-                    metadata.get("semantic_failure_class") or "semantic_failure"
-                )
-                failure_error = str(metadata.get("semantic_failure_error") or "").strip()
-                semantic_error = f"{stage}:{failure_class}"
-                if failure_error:
-                    semantic_error += f": {failure_error}"
-                if semantic_error not in effective_errors:
-                    effective_errors.append(semantic_error)
-            if effective_errors:
-                record_kwargs["errors"] = effective_errors
-            self._record_experience(
-                **record_kwargs,
-            )
-        except Exception as exc:  # pragma: no cover - defensive containment
-            logger.warning(
-                "Execution experience preparation failed: %s",
-                exc,
-                exc_info=True,
-            )
-            self.session_log(
-                session_id,
-                "experience_prepare_failed: error_type=%s error=%s",
-                type(exc).__name__,
-                exc,
-            )
-
     @staticmethod
     def _safe_immediate_route_speech(text: str | None) -> str | None:
         """Apply only transport-safe checks to source-authored immediate speech.
@@ -2344,50 +2292,6 @@ class VoiceAssistant:
             "metadata": resolution.metadata,
         }
 
-    def _record_cognitive_runtime_evidence(
-        self,
-        resolution: CognitiveRuntimeResolution,
-        *,
-        session_id: str,
-        user_text: str,
-    ) -> None:
-        try:
-            self.cognitive_evidence.record(
-                resolution,
-                sid=session_id,
-                text=user_text,
-            )
-        except Exception as exc:
-            self.session_log(
-                session_id,
-                "cognitive_runtime_evidence_failed: error_type=%s error=%s",
-                type(exc).__name__,
-                exc,
-            )
-
-    def _record_cognitive_gateway_evidence(
-        self,
-        turn_envelope: UserTurnEnvelope,
-        *,
-        user_text: str,
-        context_snapshot: Any | None = None,
-        attention_review: Any | None = None,
-    ) -> None:
-        try:
-            self.cognitive_evidence.record_gateway(
-                turn_envelope,
-                text=user_text,
-                context_snapshot=context_snapshot,
-                attention_review=attention_review,
-            )
-        except Exception as exc:
-            self.session_log(
-                turn_envelope.session_id,
-                "cognitive_gateway_evidence_failed: error_type=%s error=%s",
-                type(exc).__name__,
-                exc,
-            )
-
     def _goal_driven_authority_context(
         self,
         context: dict[str, Any],
@@ -2437,10 +2341,12 @@ class VoiceAssistant:
                 },
             )
             if record_evidence:
-                self._record_cognitive_runtime_evidence(
+                record_cognitive_runtime_evidence(
+                    getattr(self, "cognitive_evidence", None),
                     resolution,
                     session_id=session_id,
                     user_text=user_text,
+                    session_log=self.session_log,
                 )
             self.session_log(
                 session_id,
@@ -2521,8 +2427,10 @@ class VoiceAssistant:
             )
 
         if record_evidence:
-            self._record_cognitive_runtime_evidence(
-                resolution, session_id=session_id, user_text=user_text
+            record_cognitive_runtime_evidence(
+                getattr(self, "cognitive_evidence", None),
+                resolution, session_id=session_id, user_text=user_text,
+                session_log=self.session_log,
             )
 
         terminal = resolution.terminal_plan
@@ -2914,8 +2822,10 @@ class VoiceAssistant:
                 safe_response,
                 session_id=session_id,
             )
-            self._record_cognitive_runtime_evidence(
-                resolution, session_id=session_id, user_text=user_text
+            record_cognitive_runtime_evidence(
+                getattr(self, "cognitive_evidence", None),
+                resolution, session_id=session_id, user_text=user_text,
+                session_log=self.session_log,
             )
             self._launch_interaction(
                 safe_response,
@@ -3145,8 +3055,10 @@ class VoiceAssistant:
                 ),
             )
             self.conversation_state.record_interaction_response(session_id, safe_response)
-            self._record_cognitive_runtime_evidence(
-                resolution, session_id=session_id, user_text=user_text
+            record_cognitive_runtime_evidence(
+                getattr(self, "cognitive_evidence", None),
+                resolution, session_id=session_id, user_text=user_text,
+                session_log=self.session_log,
             )
             self._launch_interaction(
                 safe_response, session_id, reset_playback=not fast_first_scheduled
@@ -3174,8 +3086,10 @@ class VoiceAssistant:
                 turn_envelope,
             ),
         )
-        self._record_cognitive_runtime_evidence(
-            resolution, session_id=session_id, user_text=user_text
+        record_cognitive_runtime_evidence(
+            getattr(self, "cognitive_evidence", None),
+            resolution, session_id=session_id, user_text=user_text,
+            session_log=self.session_log,
         )
         self.session_log(
             session_id,
@@ -3292,9 +3206,11 @@ class VoiceAssistant:
                 reflex_outcome,
             )
             turn_envelope = gateway.for_reflex(turn_capture)
-            self._record_cognitive_gateway_evidence(
+            record_cognitive_gateway_evidence(
+                getattr(self, "cognitive_evidence", None),
                 turn_envelope,
                 user_text=user_text,
+                session_log=self.session_log,
             )
             self.conversation_state.record_user_turn(
                 session_id,
@@ -3336,9 +3252,11 @@ class VoiceAssistant:
 
         if reflex_outcome.action == "ignore":
             turn_envelope = gateway.for_suppression(turn_capture)
-            self._record_cognitive_gateway_evidence(
+            record_cognitive_gateway_evidence(
+                getattr(self, "cognitive_evidence", None),
                 turn_envelope,
                 user_text=user_text,
+                session_log=self.session_log,
             )
             self.conversation_state.record_user_turn(
                 session_id,
@@ -3460,11 +3378,13 @@ class VoiceAssistant:
             context_snapshot,
             attention_review,
         )
-        self._record_cognitive_gateway_evidence(
+        record_cognitive_gateway_evidence(
+            getattr(self, "cognitive_evidence", None),
             turn_envelope,
             user_text=user_text,
             context_snapshot=context_snapshot,
             attention_review=attention_review,
+            session_log=self.session_log,
         )
         self.session_log(
             session_id,
@@ -5944,7 +5864,10 @@ class VoiceAssistant:
                 response, execution, session_id=session_id,
                 log_event="interaction_history_after_delivery",
             )
-        self._record_execution_experience_safely(
+        record_execution_experience_safely(
+            prepare_response=self._prepared_interaction_response_for_record,
+            record_experience=self._record_experience,
+            session_log=self.session_log,
             response=response, execution=execution, session_id=session_id,
             confirmed_request_ids=confirmed_request_ids,
         )
@@ -6124,7 +6047,10 @@ class VoiceAssistant:
             recovery_confirmation_staged=recovery_confirmation_staged,
         )
         response.metadata["cognitive_turn_closure_status"] = closure_status
-        self._record_execution_experience_safely(
+        record_execution_experience_safely(
+            prepare_response=self._prepared_interaction_response_for_record,
+            record_experience=self._record_experience,
+            session_log=self.session_log,
             response=response,
             execution=execution,
             session_id=session_id,

@@ -640,7 +640,7 @@ delta suppression. Missing Responsibility provenance fails closed instead of fab
 a callback Responsibility. This extraction removes nine private methods from
 `VoiceAssistant`, lowering its method count from 159 to 150. A second mechanical slice
 moves TTS text segmentation and Goal-list console projection behind existing Host/runtime
-module boundaries, lowering the composition root again from 150 to 142 methods. Neither
+module boundaries, lowering the composition root from 150 to 142 methods. Stateless observability-recording containment now also lives below the composition root, lowering it to 139 methods. None of these
 slice adds a semantic owner, manager, state store, service, environment key, or public
 runtime path.
 
