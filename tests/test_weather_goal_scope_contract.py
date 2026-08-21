@@ -3,7 +3,9 @@ from __future__ import annotations
 from agent.app.capabilities.local import chromie_capability_bundle
 from agent.app.deep_planner import DeepPlannerResolver
 from agent.app.fast_planner import FastPlannerResolver
-from agent.app.goal_association import GoalAssociationResolver, GoalSegmentationModelOutput
+from agent.app.goal_association import GoalAssociationResolver
+from agent.app.goal_association_contract import GoalSegmentationModelOutput
+from agent.app import goal_association_prompt as ga_prompt
 from tests.cognitive_work_test_support import cognitive_work_request
 
 
@@ -75,7 +77,7 @@ def test_goal_and_planner_prompts_forbid_scope_narrowing() -> None:
             },
         },
     )
-    goal_prompt = GoalAssociationResolver(object())._build_prompt(
+    goal_prompt = ga_prompt.build_prompt(
         request,
         [],
         output_type=GoalSegmentationModelOutput,

@@ -9,7 +9,7 @@ import unittest
 from agent.app.capabilities.catalog import CapabilityCatalog
 from agent.app.capabilities.local import chromie_manifests
 from agent.app.capabilities.models import CapabilityBundle, CapabilityRegistry as AgentCapabilityRegistry
-from agent.app.goal_association import GoalAssociationModelGoal
+from agent.app.goal_association_contract import GoalAssociationModelGoal
 from agent.app.planner_contract import (
     PlannerModelOutput,
     canonical_plan_response_schema,

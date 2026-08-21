@@ -5,7 +5,8 @@ import unittest
 from pydantic import ValidationError
 
 from agent.app.capabilities.local import chromie_manifests
-from agent.app.goal_association import GoalAssociationResolver, GoalSegmentationModelOutput
+from agent.app.goal_association import GoalAssociationResolver
+from agent.app.goal_association_contract import GoalSegmentationModelOutput
 from agent.app.planner_contract import (
     PlannerModelOutput,
     ResourceResponsibilityCapabilityGroundingError,

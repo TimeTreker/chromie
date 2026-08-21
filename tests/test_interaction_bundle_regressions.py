@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+from agent.app import goal_association_contract as ga_contract
+
 import unittest
 
-from agent.app.goal_association import (
-    GoalAssociationModelOutput,
-    GoalAssociationResolver,
-)
+from agent.app.goal_association import GoalAssociationResolver
+from agent.app.goal_association_contract import GoalAssociationModelOutput
 from agent.app.planner_contract import coordinated_action_goal_ids
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
@@ -45,7 +45,7 @@ class GoalAndCoverageRegressionTests(unittest.TestCase):
             }
         )
 
-        required = GoalAssociationResolver._responsibility_coverage_required(
+        required = ga_contract.responsibility_coverage_required(
             output,
             request=object(),
         )

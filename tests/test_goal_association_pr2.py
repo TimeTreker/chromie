@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from agent.app import goal_association_contract as ga_contract
+from agent.app import goal_association_prompt as ga_prompt
+
 import asyncio
 import copy
 import unittest
@@ -8,14 +11,14 @@ from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
 from agent.app.clients.ollama_client import OllamaGenerationError
-from agent.app.goal_association import (
+from agent.app.goal_association import GoalAssociationResolver
+from agent.app.goal_association_contract import (
     GoalAssociationModelAssociation,
     GoalAssociationModelBinding,
     GoalAssociationModelGoal,
     GoalAssociationModelInformationResourceResponsibility,
     GoalAssociationModelOutput,
     GoalAssociationModelPhysicalResourceResponsibility,
-    GoalAssociationResolver,
     GoalResponsibilityCoverageCertificate,
     GoalSegmentationModelOutput,
 )
@@ -498,7 +501,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
     def test_resource_and_coverage_invariants_are_in_decoder_schemas(self):
-        goal_schema = GoalAssociationResolver._response_schema(
+        goal_schema = ga_contract.goal_association_response_schema(
             GoalSegmentationModelOutput,
             [],
             [],
@@ -541,7 +544,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
         self.assertEqual(list(goal_validator.iter_errors(weather)), [])
 
-        bounded_goal_schema = GoalAssociationResolver._response_schema(
+        bounded_goal_schema = ga_contract.goal_association_response_schema(
             GoalSegmentationModelOutput,
             [],
             [],
@@ -593,7 +596,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             vocal_branches[0]["properties"]["resource_responsibility"],
             {"type": "null"},
         )
-        fresh_evidence_schema = GoalAssociationResolver._response_schema(
+        fresh_evidence_schema = ga_contract.goal_association_response_schema(
             GoalSegmentationModelOutput,
             [],
             [],
@@ -680,7 +683,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
         self.assertTrue(list(goal_validator.iter_errors(typed_physical_attribute)))
 
-        coverage_schema = GoalAssociationResolver._coverage_certificate_response_schema(
+        coverage_schema = ga_contract.coverage_certificate_response_schema(
             [
                 GoalAssociationModelGoal.model_validate(
                     goal("Walk forward.", "body_action")
@@ -776,7 +779,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertFalse(recovered_context.supporting_items[0].independently_satisfiable)
 
         source_bound_coverage_schema = (
-            GoalAssociationResolver._coverage_certificate_response_schema(
+            ga_contract.coverage_certificate_response_schema(
                 [
                     GoalAssociationModelGoal.model_validate(
                         goal("Walk forward.", "body_action")
@@ -799,7 +802,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             language="en-US",
         )
 
-        interpretation_prompt = resolver._build_prompt(
+        interpretation_prompt = ga_prompt.build_prompt(
             req,
             [],
             output_type=GoalSegmentationModelOutput,
@@ -817,7 +820,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             interpretation_prompt,
         )
 
-        coverage_prompt = resolver._build_responsibility_coverage_prompt(
+        coverage_prompt = ga_prompt.build_responsibility_coverage_prompt(
             request=req,
             raw=create_goals(
                 goal(
@@ -847,7 +850,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             "resource_responsibility.query_scope",
             coverage_prompt,
         )
-        coverage_system = resolver._responsibility_coverage_system_prompt()
+        coverage_system = ga_prompt.responsibility_coverage_system_prompt()
         self.assertIn("source-grounded human scope", coverage_system)
         self.assertIn("do not require date/period fields", coverage_prompt)
         self.assertNotIn("temporal_dimensions", coverage_system)
@@ -861,7 +864,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertIn("silently invents a generic object", coverage_prompt)
         self.assertIn("multiple scene candidates remain plausible", coverage_prompt)
 
-        execution_contract = resolver._build_prompt(
+        execution_contract = ga_prompt.build_prompt(
             request(
                 "Set a reminder for later.",
                 language="en-US",
@@ -879,7 +882,7 @@ class GoalExecutionContractTests(unittest.TestCase):
 
     def test_unscoped_optional_referent_correction_is_dropped(self):
         normalized, dropped = (
-            GoalAssociationResolver._drop_invalid_optional_referent_introductions(
+            ga_contract.normalize_optional_referent_updates(
                 {
                     "decision": "create_goals",
                     "referent_updates": [
@@ -946,7 +949,7 @@ class GoalExecutionContractTests(unittest.TestCase):
                 ),
             )
         )
-        verdict, problems = GoalAssociationResolver._coverage_verdict(
+        verdict, problems = ga_contract.coverage_verdict(
             parsed, goal_count=1
         )
         self.assertEqual(verdict, "accept")
@@ -964,7 +967,7 @@ class GoalExecutionContractTests(unittest.TestCase):
                 )
             )
         )
-        verdict, problems = GoalAssociationResolver._coverage_verdict(
+        verdict, problems = ga_contract.coverage_verdict(
             parsed, goal_count=1
         )
         self.assertEqual(verdict, "reject")
@@ -1003,7 +1006,7 @@ class GoalExecutionContractTests(unittest.TestCase):
 
         self.assertEqual(parsed.items[0].coverage, "representation_mismatch")
         self.assertEqual(parsed.items[0].candidate_goal_indices, [0])
-        verdict, problems = GoalAssociationResolver._coverage_verdict(
+        verdict, problems = ga_contract.coverage_verdict(
             parsed, goal_count=1
         )
         self.assertEqual(verdict, "reject")
@@ -1028,7 +1031,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
         self.assertEqual(len(parsed.responsibility_items), 1)
-        verdict, problems = GoalAssociationResolver._coverage_verdict(
+        verdict, problems = ga_contract.coverage_verdict(
             parsed,
             goal_count=1,
         )
@@ -1115,7 +1118,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
         self.assertEqual(parsed.items[0].coverage, "representation_mismatch")
-        verdict, problems = GoalAssociationResolver._coverage_verdict(
+        verdict, problems = ga_contract.coverage_verdict(
             parsed,
             goal_count=1,
         )
@@ -1145,7 +1148,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             create_goals(goal("Sing a song.", "body_action"))
         )
 
-        conflicts = GoalAssociationResolver._responsibility_output_mode_conflicts(
+        conflicts = ga_contract.responsibility_output_mode_conflicts(
             wrong,
             request=req,
         )
@@ -1191,7 +1194,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             )
         )
 
-        conflicts = GoalAssociationResolver._source_grounded_binding_coverage_conflicts(
+        conflicts = ga_contract.source_grounded_binding_coverage_conflicts(
             missing_source,
             request=req,
         )
@@ -1217,7 +1220,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             )
         )
         self.assertEqual(
-            GoalAssociationResolver._source_grounded_binding_coverage_conflicts(
+            ga_contract.source_grounded_binding_coverage_conflicts(
                 grounded_source,
                 request=req,
             ),
@@ -1272,7 +1275,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            GoalAssociationResolver._source_grounded_binding_coverage_conflicts(
+            ga_contract.source_grounded_binding_coverage_conflicts(
                 output,
                 request=req,
             ),
@@ -1319,7 +1322,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            GoalAssociationResolver._source_grounded_binding_coverage_conflicts(
+            ga_contract.source_grounded_binding_coverage_conflicts(
                 output,
                 request=req,
             ),
@@ -1367,7 +1370,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            GoalAssociationResolver._source_grounded_binding_coverage_conflicts(
+            ga_contract.source_grounded_binding_coverage_conflicts(
                 output,
                 request=req,
             ),
@@ -1392,7 +1395,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            GoalAssociationResolver._binding_semantic_contract_conflicts(output),
+            ga_contract.binding_semantic_contract_conflicts(output),
             ["new_goals[0].bindings[0]=distance/measurement"],
         )
 
@@ -1416,7 +1419,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
         conflicts = (
-            GoalAssociationResolver._resource_source_binding_contract_conflicts(
+            ga_contract.resource_source_binding_contract_conflicts(
                 output
             )
         )
@@ -1450,7 +1453,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            GoalAssociationResolver._non_verbatim_explicit_location_bindings(
+            ga_contract.non_verbatim_explicit_location_bindings(
                 output,
                 request=request("bring the milk from ahead of you", language="en-US"),
             ),
@@ -1478,7 +1481,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         payload.update(referent_updates=[], resolved_references=[])
         model_output = GoalSegmentationModelOutput.model_validate(payload)
 
-        rejected = GoalAssociationResolver._non_verbatim_explicit_location_bindings(
+        rejected = ga_contract.non_verbatim_explicit_location_bindings(
             model_output,
             request=request("帮我看看现在几点。"),
         )
@@ -1501,7 +1504,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
         normalized, repairs = (
-            GoalAssociationResolver._normalize_grounded_generic_location_types(
+            ga_contract.normalize_grounded_generic_location_types(
                 payload,
                 request=request("你觉得外面有人吗？"),
             )
@@ -1548,7 +1551,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
         self.assertEqual(parsed.items[0].coverage, "representation_mismatch")
-        verdict, problems = GoalAssociationResolver._coverage_verdict(
+        verdict, problems = ga_contract.coverage_verdict(
             parsed,
             goal_count=1,
         )
@@ -1687,7 +1690,7 @@ class GoalExecutionContractTests(unittest.TestCase):
 
         self.assertEqual(parsed.items[0].coverage, "clarification_required")
         self.assertEqual(parsed.items[0].candidate_goal_indices, [0])
-        verdict, problems = GoalAssociationResolver._coverage_verdict(
+        verdict, problems = ga_contract.coverage_verdict(
             parsed,
             goal_count=1,
         )
@@ -1725,7 +1728,7 @@ class GoalExecutionContractTests(unittest.TestCase):
                 }
             }
         )
-        prompt = GoalAssociationResolver(FakeOllama({}))._build_prompt(
+        prompt = ga_prompt.build_prompt(
             req, [], output_type=GoalSegmentationModelOutput
         )
 
@@ -1757,7 +1760,7 @@ class GoalExecutionContractTests(unittest.TestCase):
                 "context": dict(req.context),
             }
         )
-        prompt = GoalAssociationResolver(FakeOllama({}))._build_fresh_interpretation_prompt(
+        prompt = ga_prompt.build_fresh_interpretation_prompt(
             request=req,
             candidate_goals=[],
             output_type=GoalSegmentationModelOutput,
@@ -1769,7 +1772,7 @@ class GoalExecutionContractTests(unittest.TestCase):
 
     def test_coverage_prompt_distinguishes_preferences_state_changes_and_information(self):
         resolver = GoalAssociationResolver(FakeOllama({}))
-        prompt = resolver._build_responsibility_coverage_prompt(
+        prompt = ga_prompt.build_responsibility_coverage_prompt(
             request=request("I want noodles, my sister wants rice; help us choose one.", language="en-US"),
             raw=create_goals(goal("Choose lunch fairly.", "speech")),
         )
@@ -1798,7 +1801,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
         normalized, dropped = (
-            GoalAssociationResolver._drop_inactive_resource_bindings(raw)
+            ga_contract.normalize_resource_binding_branches(raw)
         )
 
         self.assertEqual(normalized["new_goals"][0]["bindings"], [])
@@ -1822,7 +1825,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
         normalized, dropped = (
-            GoalAssociationResolver._drop_inactive_resource_bindings(raw)
+            ga_contract.normalize_resource_binding_branches(raw)
         )
 
         self.assertEqual(normalized["new_goals"][0]["bindings"], [])
@@ -1854,7 +1857,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
         normalized, dropped = (
-            GoalAssociationResolver._drop_inactive_resource_bindings(raw)
+            ga_contract.normalize_resource_binding_branches(raw)
         )
 
         candidate = normalized["new_goals"][0]
@@ -1882,7 +1885,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
         normalized, dropped = (
-            GoalAssociationResolver._drop_invalid_optional_resource_quantities(raw)
+            ga_contract.normalize_optional_resource_quantity(raw)
         )
 
         resource = normalized["new_goals"][0]["resource_responsibility"]
@@ -1909,7 +1912,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         raw["new_goals"][0].pop("description")
 
         normalized, recovered = (
-            GoalAssociationResolver._restore_missing_goal_descriptions(
+            ga_contract.restore_missing_goal_descriptions(
                 raw,
                 request=req,
             )
@@ -1925,7 +1928,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         ambiguous = copy.deepcopy(raw)
         ambiguous["new_goals"][0]["source_responsibility_refs"] = ["sing", "other"]
         unchanged, recovered = (
-            GoalAssociationResolver._restore_missing_goal_descriptions(
+            ga_contract.restore_missing_goal_descriptions(
                 ambiguous,
                 request=req,
             )
@@ -1934,7 +1937,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertEqual(recovered, [])
 
     def test_fresh_interpretation_explains_ordinary_effect_shape(self):
-        prompt = GoalAssociationResolver(FakeOllama({}))._build_fresh_interpretation_prompt(
+        prompt = ga_prompt.build_fresh_interpretation_prompt(
             request=request("你往前走 10 秒。"),
             candidate_goals=[],
             output_type=GoalSegmentationModelOutput,
@@ -1947,7 +1950,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertIn("top-level semantic bindings", prompt)
 
     def test_fresh_interpretation_requires_known_physical_source_grounding(self):
-        prompt = GoalAssociationResolver(FakeOllama({}))._build_fresh_interpretation_prompt(
+        prompt = ga_prompt.build_fresh_interpretation_prompt(
             request=request(
                 "bring the bottle from 50 meters ahead",
                 language="en-US",
@@ -2000,7 +2003,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
         normalized, dropped = (
-            GoalAssociationResolver._drop_ungrounded_resource_query_locations(
+            ga_contract.drop_ungrounded_resource_query_locations(
                 raw,
                 request=req,
             )
@@ -2023,7 +2026,7 @@ class GoalExecutionContractTests(unittest.TestCase):
 
         self.assertEqual(req.text, "今晚，重庆热不热？")
         self.assertEqual(req.original_user_text, "  今晚，重庆热不热？  ")
-        prompt = resolver._build_prompt(
+        prompt = ga_prompt.build_prompt(
             req, [], output_type=GoalSegmentationModelOutput
         )
         self.assertIn(
@@ -2041,12 +2044,12 @@ class GoalExecutionContractTests(unittest.TestCase):
                 "sing while running",
             ],
         )
-        primary_prompt = resolver._build_prompt(
+        primary_prompt = ga_prompt.build_prompt(
             req,
             [],
             output_type=GoalSegmentationModelOutput,
         )
-        coverage_system = resolver._responsibility_coverage_system_prompt()
+        coverage_system = ga_prompt.responsibility_coverage_system_prompt()
 
         self.assertIn("distinct concrete object", primary_prompt)
         self.assertIn("non-resource body_action Goals", primary_prompt)
@@ -2062,7 +2065,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             coverage_system,
         )
 
-        coverage_prompt = resolver._build_responsibility_coverage_prompt(
+        coverage_prompt = ga_prompt.build_responsibility_coverage_prompt(
             request=req,
             raw=create_goals(
                 goal("run forward for 15 seconds", "body_action"),
@@ -2094,13 +2097,13 @@ class GoalExecutionContractTests(unittest.TestCase):
         resolver = GoalAssociationResolver(FakeOllama({}))
         req = request("你往前走 10 秒。")
 
-        layered = resolver._layered_prompt(
+        layered = ga_prompt.layered_prompt(
             req,
             [],
             output_type=GoalSegmentationModelOutput,
         )
         input_chars = len(layered.render()) + len(
-            resolver._system_prompt(GoalSegmentationModelOutput)
+            ga_prompt.system_prompt(GoalSegmentationModelOutput)
         )
 
         # The deployed fail-closed estimate is two characters per token.  An
@@ -2113,7 +2116,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertIn("non-resource body_action Goals", prompt)
         self.assertIn("FINAL AUTHORITATIVE USER TURN", prompt)
 
-        coverage_prompt = resolver._build_responsibility_coverage_prompt(
+        coverage_prompt = ga_prompt.build_responsibility_coverage_prompt(
             request=req,
             raw=create_goals(
                 goal(
@@ -2126,7 +2129,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             ),
         )
         coverage_input_chars = len(coverage_prompt) + len(
-            resolver._responsibility_coverage_system_prompt()
+            ga_prompt.responsibility_coverage_system_prompt()
         )
         self.assertLessEqual(coverage_input_chars, 11_264)
         self.assertIn("Duration is never a second outcome", coverage_prompt)
@@ -2140,7 +2143,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
         self.assertIn(
             "do not call it a representation mismatch merely because the modifier",
-            resolver._responsibility_coverage_system_prompt(),
+            ga_prompt.responsibility_coverage_system_prompt(),
         )
 
     def test_existing_goal_association_prompt_fits_qualified_8k_preflight(self):
@@ -2186,13 +2189,13 @@ class GoalExecutionContractTests(unittest.TestCase):
             }
         )
         candidates = resolver._candidate_goals(req)
-        layered = resolver._layered_prompt(
+        layered = ga_prompt.layered_prompt(
             req,
             candidates,
             output_type=GoalAssociationModelOutput,
         )
         input_chars = len(layered.render()) + len(
-            resolver._system_prompt(GoalAssociationModelOutput)
+            ga_prompt.system_prompt(GoalAssociationModelOutput)
         )
 
         self.assertLessEqual(input_chars, 11_264)
@@ -2204,7 +2207,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertNotIn("runtime transport must not leak", prompt)
         self.assertNotIn("Owner-approved Personality Expression JSON", prompt)
 
-        schema = resolver._response_schema(
+        schema = ga_contract.goal_association_response_schema(
             GoalAssociationModelOutput,
             candidates,
             [],
@@ -2231,7 +2234,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertEqual(value.value, "今晚")
 
     def test_coverage_contract_has_no_provider_temporal_realization_fields(self):
-        schema = GoalAssociationResolver._coverage_certificate_response_schema(
+        schema = ga_contract.coverage_certificate_response_schema(
             [GoalAssociationModelGoal.model_validate(goal("Check weather.", "capability_work", resource=resource_responsibility(kind="information", description="weather", attributes=[binding("temporal_scope", "temporal_scope", "今晚")], source_status="provider_resolved")))]
         )
         properties = schema["$defs"]["GoalResponsibilityCoverageItem"]["properties"]
@@ -2764,7 +2767,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         )
 
     def test_response_schema_requires_source_grounded_ordinary_bindings(self):
-        schema = GoalAssociationResolver._response_schema(
+        schema = ga_contract.goal_association_response_schema(
             GoalSegmentationModelOutput,
             [],
             [],

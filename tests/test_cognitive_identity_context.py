@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from agent.app import goal_association_prompt as ga_prompt
+
 import json
 import unittest
 
@@ -14,10 +16,8 @@ from agent.app.cognitive_identity import (
 )
 from agent.app.deep_planner import DeepPlannerResolver
 from agent.app.fast_planner import FastPlannerResolver
-from agent.app.goal_association import (
-    GoalAssociationResolver,
-    GoalSegmentationModelOutput,
-)
+from agent.app.goal_association import GoalAssociationResolver
+from agent.app.goal_association_contract import GoalSegmentationModelOutput
 from tests.cognitive_work_test_support import cognitive_work_request
 from shared.chromie_contracts.mind import default_mind_profile
 
@@ -104,7 +104,7 @@ class CognitiveIdentityContextTests(unittest.TestCase):
 
     def test_goal_association_prompt_contains_authoritative_identity_section(self) -> None:
         resolver = GoalAssociationResolver(_Dummy())
-        prompt = resolver._build_prompt(
+        prompt = ga_prompt.build_prompt(
             self.request,
             [],
             output_type=GoalSegmentationModelOutput,
@@ -118,14 +118,14 @@ class CognitiveIdentityContextTests(unittest.TestCase):
         self.assertNotIn("human-child kind", prompt)
         self.assertIn("personality expression never create an extra Goal", prompt)
         self.assertNotIn("Owner-approved Personality Expression JSON", prompt)
-        layered = resolver._layered_prompt(
+        layered = ga_prompt.layered_prompt(
             self.request,
             [],
             output_type=GoalSegmentationModelOutput,
         )
         self.assertLessEqual(
             len(layered.render())
-            + len(resolver._system_prompt(GoalSegmentationModelOutput)),
+            + len(ga_prompt.system_prompt(GoalSegmentationModelOutput)),
             11_264,
         )
 
@@ -163,17 +163,17 @@ class CognitiveIdentityContextTests(unittest.TestCase):
         deep = DeepPlannerResolver(_Dummy(), _Dummy())
         pairs = (
             (
-                goal._layered_prompt(
+                ga_prompt.layered_prompt(
                     self.request,
                     [],
                     output_type=GoalSegmentationModelOutput,
                 ),
-                goal._layered_prompt(
+                ga_prompt.layered_prompt(
                     changed,
                     [],
                     output_type=GoalSegmentationModelOutput,
                 ),
-                goal._system_prompt(GoalSegmentationModelOutput),
+                ga_prompt.system_prompt(GoalSegmentationModelOutput),
             ),
             (
                 fast._layered_prompt(self.request, [], response_schema={}),
