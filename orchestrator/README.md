@@ -135,6 +135,14 @@ If the Goal-driven Runtime is disabled or fails after admission, ordinary cognit
 fails closed with bounded Host-owned failure speech. The Host never switches to a
 direct-LLM or retired Agent semantic path.
 
+`orchestrator/runtime/planner_reentry.py` owns the pure mechanical policy used when
+terminal Runtime Evidence may reactivate Planner. It checks the exact current
+Goal/Plan/request binding, reuses only the originating GI Responsibility provenance,
+rejects repetition of the completed Activity, and removes exact already-delivered speech
+deltas. It does not decide whether Evidence is interesting, reinterpret a Goal, author a
+response, or execute Work. Missing Responsibility provenance retains the Evidence but
+suppresses that cognitive re-entry rather than inventing a synthetic callback request.
+
 ## Configuration precedence
 
 At startup, the recommended scripts generate root `.env.runtime`. The

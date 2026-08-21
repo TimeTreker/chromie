@@ -14,7 +14,7 @@ The public runtime remains intentionally stable while internal responsibilities
 move behind narrow collaborators with explicit contracts and focused tests.
 
 There is one maintained Host-to-Agent service boundary. `chromie-agent` is one
-FastAPI service containing separately testable GI, GA, Fast Planner, Deep Planner,
+FastAPI service containing separately testable GI, GA, Planner fast/deep passes,
 Reflection, and Social Attention modules/endpoints; those cognitive roles are not
 independent deployment services. `VoiceAssistant` coordinates their lifecycle and
 dataflow but cannot reinterpret one module's semantics or become a response author.
@@ -35,6 +35,9 @@ The root currently composes, among other collaborators:
 - `InputTurnLifecycle` for mutable input-turn and cancellation state;
 - `PlaybackDelivery` for synthesis ordering, playback barriers, transport,
   cancellation, and audible-delivery evidence;
+- `orchestrator.runtime.planner_reentry` for pure current-binding, Responsibility-
+  provenance, completed-Activity, and delivered-speech validation before/after Planner
+  re-entry; it has no semantic or execution authority;
 - Cognitive Gateway/Core clients for admitted-turn cognition;
 - trusted execution providers and evidence stores.
 
@@ -56,17 +59,18 @@ At this revision the checker reports:
 
 | Measure | Current ratchet |
 |---|---:|
-| `VoiceAssistant` methods | 187 |
+| `VoiceAssistant` methods | 150 |
 | properties | 1 |
-| `__init__` lines | 409 |
-| initialized `self` attributes | 139 |
-| direct-LLM compatibility call sites | 1 |
+| `__init__` lines | 305 |
+| initialized `self` attributes | 110 |
+| direct-LLM compatibility call sites | 0 |
 
 These values are a **non-growth ceiling**, not proof that structural
-simplification is complete. Constructor and state ownership have improved, but
-the method-count reduction criterion remains open. A ratchet increase requires
-an explicit reviewed before/after rationale in the same change; ordinary work
-must hold or lower every ceiling.
+simplification is complete. The Planner-re-entry policy extraction removed nine
+private methods from the composition root (`159 -> 150`) and tightened the older
+permissive ceilings (`187/409/139`) to the actual maintained baseline
+(`150/305/110`). A ratchet increase requires an explicit reviewed before/after
+rationale in the same change; ordinary work must hold or lower every ceiling.
 
 ## Remaining ownership seams
 
@@ -88,9 +92,11 @@ Each extraction must preserve ordering, cancellation, confirmation, and evidence
 semantics; add narrow regression tests; and lower or hold the mechanical
 ratchets. File size alone is not an acceptance criterion.
 
-This decomposition starts only after the active current-revision evidence closure.
-The first candidates are the existing ownership seams in the table, selected by
+Broader decomposition starts only after the active current-revision evidence closure.
+One narrow source slice is already implemented because it directly protects the current
+Evidence-provenance line: pure Planner-reentry validation moved out of the composition
+root and dead wrappers were deleted without changing public runtime behavior or adding a
+manager. Later candidates remain the existing ownership seams in the table, selected by
 independent testability, lifecycle, configuration authority, and failure semantics;
 method or file length alone does not justify a new manager. Durable memory, mood,
-ambient autonomy, or another cognitive service are not part of this structural
-work.
+ambient autonomy, or another cognitive service are not part of this structural work.

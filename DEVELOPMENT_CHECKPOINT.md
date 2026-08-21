@@ -26,27 +26,14 @@ Four existing truth owners cooperate without adding another manager or store:
 4. Planner decides **what to do now**, including no new Activity.
 
 ```text
-person input -> Gateway -> Goal Interpretation -> Responsibility / WHAT
-                                      |                   |
-                                      |                   +-> Goal Association -> Goal continuity
-                                      +-> Planner fast/deep passes -> Plan / Activities
-                                                                  |
-                                                                  v
-                                                     Trusted Capability Runtime
-                                                                  |
-                                                               Provider
-                                                                  |
-                                                     async Runtime event
-                                                                  |
-                                       Host correlation -> trusted Evidence
-                                                                  |
-                    Responsibility + Goal + Situation + Work + Evidence
-                                                                  |
-                                                     CognitiveOpportunity
-                                                                  |
-                                                       Planner re-entry
-                                                                  |
-                                                 0..N Activity changes or none
+person -> Gateway -> GI -> Responsibility / WHAT
+                           |-> GA -> canonical Goal continuity
+                           `-> Planner fast/deep -> Plan / Activities
+                                                 -> Runtime -> Provider
+                                                 -> async event -> Evidence
+Responsibility + Goal + Situation + Work + Evidence
+                           -> CognitiveOpportunity -> Planner
+                           -> 0..N Activity changes or none
 ```
 
 `CognitiveOpportunity` is an ephemeral readiness signal, not a semantic owner.
@@ -116,19 +103,41 @@ the event/readiness architecture above and removes only still-current contradict
 
 The audit's proposed Response-Composer/`fast_speech`, structural-benchmark-false-pass,
 and speech semantic-ID fixes are not reimplemented here because the uploaded archive had
-already removed or corrected those current-path defects. Large god-object decomposition is
+already removed or corrected those current-path defects. Broad god-object decomposition is
 kept as separate structural work, and the 2s/3s latency target remains a live qualification
 question rather than a static-source checkbox.
 
+## First Host structural slice
+
+Terminal Evidence re-entry previously kept several distinct mechanical concerns inside the
+`VoiceAssistant` composition root and contained one semantic escape hatch: when the original
+GI `responsibilities[]` could not be recovered, the callback fabricated a generic
+"continue the existing canonical Responsibility" object so Planner would still run. That
+made Host callback code an accidental Responsibility author.
+
+Current source extracts pure policy to `orchestrator/runtime/planner_reentry.py`.
+It validates current Goal/Plan/request bindings, selects only originating GI
+Responsibilities through GA `source_responsibility_refs`, rejects completed-Activity
+repetition, and removes exact already-delivered speech deltas. Missing or ambiguous
+Responsibility provenance retains Evidence but suppresses this opportunity before model
+invocation; the Host no longer fabricates callback meaning.
+
+The module owns no Goal meaning, speech, Planner call, Runtime mutation, or state. Nine
+private methods leave `VoiceAssistant` (`159 -> 150`), and ratchets tighten to
+`150 methods / 305 init lines / 110 attributes / 0 direct-LLM calls`. This is one narrow
+ownership-seam extraction, not a new manager or completed Host decomposition.
+
 ## Verification
 
-Focused source verification passes:
+Focused source verification passes before final patch packaging:
 
-- 189 Planner / async re-entry / Cognitive Runtime tests;
-- 191 broader Runtime / outcome / cancellation / Conversation / Reflection tests,
-  plus 20 subtests;
-- repository engineering policy;
-- semantic-authority audit.
+- 261 Planner re-entry / detached Evidence / Cognitive Runtime / Situation / interaction
+  tests after the structural extraction;
+- pure-policy and Host integration coverage for missing Responsibility provenance;
+- runtime-structure ratchet, repository engineering policy, and test ownership checks.
+
+The final delivery reruns documentation, semantic-authority, configuration, and broader
+focused tests on a fresh patch chain; quote those exact results from the patch handoff.
 
 `./scripts/run_tests.sh` starts successfully through repository policy and test
 ownership but this sandbox does not contain the pinned Ruff executable, so the
@@ -138,14 +147,9 @@ claimed by this source patch.
 
 ## Resume order
 
-1. Apply this patch to the exact uploaded archive baseline and run
-   `./scripts/run_tests.sh` in the normal development environment with pinned test
-   dependencies installed.
-2. Run the retained async/general-ability cases with the current model profile.
-3. Verify a real information lookup whose first terminal Evidence can either answer
-   or schedule a second justified lookup without waiting for unrelated sibling Work.
-4. Verify an embodied sequence where terminal body/provider Evidence can make the
-   next Activity ready without fabricating a user turn.
-5. Inspect delivered speech to ensure one Evidence transition creates at most one
-   semantic response decision and never repeats the completed Activity.
-6. Keep source/test/target/release evidence claims separate.
+1. Apply patches 1, 2, and 3 in order to the uploaded archive, then run
+   `./scripts/run_tests.sh` with pinned test dependencies.
+2. Run retained async/general-ability cases on the current model profile.
+3. Retain provider-backed information and embodied episodes that exercise follow-up Work,
+   sibling concurrency, no fabricated user turn, and no duplicate speech/execution.
+4. Keep source/test/target/release evidence claims separate.

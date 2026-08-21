@@ -31,11 +31,13 @@ layer or cognitive term.
    injected-text run, then perform supervised physical microphone/audible-speaker
    proof and close the remaining default target-evidence profile. Headless/discarded
    playback must never be promoted to audible evidence.
-3. **Resume structural simplification after evidence closure.** Decompose the Host
-   composition root along existing configuration, input-lifecycle, playback,
-   cognitive-dispatch, observability, cancellation, and cleanup ownership seams.
-   Do not create one service/manager per cognitive role, and do not use file or
-   method count as the architectural reason.
+3. **Resume broad structural simplification after evidence closure.** One narrow
+   provenance-protecting source slice is already implemented: pure Planner-reentry
+   validation is extracted from the Host composition root and dead wrappers are removed.
+   Later decomposition follows existing configuration, input-lifecycle, playback,
+   cognitive-dispatch, observability, cancellation, and cleanup ownership seams. Do not
+   create one service/manager per cognitive role, and do not use file or method count as
+   the architectural reason.
 4. **Then resume later semantic Issues in their existing order.** Richer durable
    memory, affect/mood, and ambient autonomy remain separately governed work; they
    are not bundled into the evidence or Host-decomposition patch.
@@ -630,6 +632,14 @@ plan in one coherent change. Co-location or a cockpit/ADAS analogy is not by
 The maintained component and failure contracts are
 [VoiceAssistant Composition Root](docs/VOICE_ASSISTANT_COMPOSITION_ROOT.md) and
 [Runtime Failure Paths](docs/RUNTIME_FAILURE_PATHS.md).
+
+**First source slice implemented.** Planner re-entry from terminal Evidence now uses a
+pure Host policy module for current Goal/Plan/request validation, exact originating
+Responsibility selection, completed-Activity idempotence, and already-delivered speech
+delta suppression. Missing Responsibility provenance fails closed instead of fabricating
+a callback Responsibility. This extraction removes nine private methods from
+`VoiceAssistant`, lowers its actual method count from 159 to 150, and adds no semantic
+owner, manager, state store, service, environment key, or public runtime path.
 
 - Decompose the Orchestrator composition root without raising existing method,
   property, initializer, exception-boundary, or direct-model-call ratchets.

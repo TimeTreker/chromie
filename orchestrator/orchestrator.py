@@ -96,6 +96,13 @@ from orchestrator.runtime.runtime_ready_greeting import (
     execute_default_runtime_ready_orientation,
 )
 from orchestrator.runtime.situation import build_situation_projection
+from orchestrator.runtime.planner_reentry import (
+    execution_outcome_user_text,
+    planner_reentry_repeats_completed_activity,
+    planner_reentry_responsibilities,
+    suppress_already_delivered_speech,
+    terminal_evidence_relevance,
+)
 from orchestrator.runtime.session import (
     now_ms,
     record_session_workflow_stage,
@@ -650,22 +657,6 @@ class VoiceAssistant:
             must_not_claim_completion=must_not_claim_completion,
         )
 
-    def _update_turn_speech_event_for_playback(
-        self,
-        *,
-        generation: int,
-        order: int,
-        session_id: str | None,
-        started: bool,
-        reason: str,
-    ) -> None:
-        self._playback_state().update_turn_speech_event_for_playback(
-            generation=generation,
-            order=order,
-            session_id=session_id,
-            started=started,
-            reason=reason,
-        )
 
     def _delivered_turn_speech_events(
         self,
@@ -2086,17 +2077,6 @@ class VoiceAssistant:
 
 
     @staticmethod
-    def _compact_json_for_prompt(value: Any, *, max_chars: int) -> str:
-        try:
-            text = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-        except TypeError:
-            text = str(value)
-        text = " ".join(text.split())
-        if len(text) > max_chars:
-            return text[:max_chars].rstrip() + "..."
-        return text
-
-    @staticmethod
     def _goal_list_change_by_task(
         applied_operations: list[dict[str, Any]] | None,
     ) -> dict[str, str]:
@@ -2509,16 +2489,6 @@ class VoiceAssistant:
             )
 
     @staticmethod
-    def _safe_validated_response_plan_speech(text: str | None) -> str | None:
-        cleaned = " ".join((text or "").strip().split())
-        if not cleaned or len(cleaned) > 160:
-            return None
-        lowered = cleaned.casefold()
-        if any(marker in lowered for marker in ("soridormi.", "chromie.")):
-            return None
-        return cleaned
-
-    @staticmethod
     def _safe_immediate_route_speech(text: str | None) -> str | None:
         """Apply only transport-safe checks to source-authored immediate speech.
 
@@ -2572,8 +2542,6 @@ class VoiceAssistant:
             **metadata,
             **self._cognitive_gateway_adapter().metadata(turn_envelope),
         }
-
-    @staticmethod
 
     @staticmethod
     def _cognitive_resolution_summary(
@@ -5036,7 +5004,7 @@ class VoiceAssistant:
                         reflection_session,
                         request=CognitiveWorkRequest(
                             sid=session_id,
-                            text=self._execution_outcome_user_text(response, plan),
+                            text=execution_outcome_user_text(response, plan),
                             language=str(response.metadata.get("language") or "en-US"),
                             responsibilities=[
                                 CognitiveResponsibilityProposal(
@@ -5332,48 +5300,6 @@ class VoiceAssistant:
         )
         return delivery_status
 
-    @staticmethod
-    def _execution_outcome_user_text(
-        source_response: InteractionResponse,
-        plan: Any,
-    ) -> str:
-        metadata = (
-            source_response.metadata
-            if isinstance(source_response.metadata, dict)
-            else {}
-        )
-        envelope = metadata.get("user_turn_envelope")
-        normalized_input = (
-            envelope.get("normalized_input")
-            if isinstance(envelope, dict)
-            else None
-        )
-        if isinstance(normalized_input, dict):
-            text = str(normalized_input.get("text") or "").strip()
-            if text:
-                return text
-        return str(getattr(plan, "goal_summary", "") or "").strip()
-
-    @staticmethod
-    def _trusted_tool_result_fallback(
-        evidence: list[ToolResultEvidence],
-        *,
-        max_chars: int,
-    ) -> str:
-        """Return one provider-authored user summary for exceptional fallback only."""
-
-        explicit_fields = ("user_summary",)
-        for item in evidence:
-            for field in explicit_fields:
-                value = item.data.get(field)
-                if not isinstance(value, str):
-                    continue
-                text = " ".join(value.strip().split())
-                if not text:
-                    continue
-                return text[:max_chars].rstrip()
-        return ""
-
     async def _reenter_cognition_for_terminal_capability(
         self,
         *,
@@ -5442,9 +5368,12 @@ class VoiceAssistant:
             evidence.status,
         )
 
-        relevant, relevance_reason = self._terminal_evidence_is_currently_relevant(
+        relevant, relevance_reason = terminal_evidence_relevance(
             source_response=response,
             evidence=evidence,
+            goal_bindings=self.conversation_state.goal_cancellation_bindings(
+                evidence.source_goal_ids
+            ),
         )
         if not relevant:
             self.session_log(
@@ -5539,63 +5468,6 @@ class VoiceAssistant:
             apply_status,
         )
 
-    def _terminal_evidence_is_currently_relevant(
-        self,
-        *,
-        source_response: InteractionResponse,
-        evidence: ExecutionEvidence,
-    ) -> tuple[bool, str]:
-        """Fail closed when terminal Evidence belongs to obsolete responsibility.
-
-        Evidence remains valid history even after a Goal is cancelled, superseded,
-        or replanned.  What becomes invalid is using that old result to authorize
-        new user-facing speech/action.  Re-entry therefore requires the exact
-        Host-owned Goal/plan/request binding that originally dispatched the work
-        to still be current.
-        """
-
-        metadata = (
-            source_response.metadata
-            if isinstance(source_response.metadata, dict)
-            else {}
-        )
-        expected_plan_id = str(metadata.get("canonical_plan_id") or "").strip()
-        expected_fingerprint = str(
-            metadata.get("canonical_plan_fingerprint") or ""
-        ).strip()
-        if not expected_plan_id or not expected_fingerprint:
-            return False, "source_plan_binding_missing"
-
-        bindings = {
-            str(item.get("goal_id") or "").strip(): item
-            for item in self.conversation_state.goal_cancellation_bindings(
-                evidence.source_goal_ids
-            )
-            if str(item.get("goal_id") or "").strip()
-        }
-        if not evidence.source_goal_ids:
-            return False, "source_goal_binding_missing"
-        for goal_id in evidence.source_goal_ids:
-            binding = bindings.get(goal_id)
-            if not binding or binding.get("found") is not True:
-                return False, "goal_binding_missing"
-            if str(binding.get("responsibility_status") or "") != "open":
-                return False, "goal_responsibility_terminal"
-            if str(binding.get("canonical_plan_id") or "") != expected_plan_id:
-                return False, "canonical_plan_superseded"
-            if (
-                str(binding.get("canonical_plan_fingerprint") or "")
-                != expected_fingerprint
-            ):
-                return False, "canonical_plan_superseded"
-            request_ids = {
-                str(item).strip()
-                for item in binding.get("request_ids") or ()
-                if str(item).strip()
-            }
-            if evidence.request_id not in request_ids:
-                return False, "request_binding_superseded"
-        return True, "current"
 
     async def _plan_incremental_terminal_result_response(
         self,
@@ -5685,104 +5557,6 @@ class VoiceAssistant:
             },
         )
 
-    def _planner_reentry_responsibilities(
-        self,
-        *,
-        source_response: InteractionResponse,
-        goal_ids: list[str],
-    ) -> list[CognitiveResponsibilityProposal]:
-        """Reuse originating GI WHAT; never fabricate a callback user turn."""
-
-        metadata = source_response.metadata if isinstance(source_response.metadata, dict) else {}
-        raw_interpretation = metadata.get("goal_interpretation")
-        responsibilities = (
-            raw_interpretation.get("responsibilities")
-            if isinstance(raw_interpretation, dict)
-            else []
-        )
-        parsed: dict[str, CognitiveResponsibilityProposal] = {}
-        for item in responsibilities if isinstance(responsibilities, list) else []:
-            if not isinstance(item, dict):
-                continue
-            try:
-                responsibility = CognitiveResponsibilityProposal.model_validate(item)
-            except (TypeError, ValueError):
-                continue
-            parsed[responsibility.local_ref] = responsibility
-
-        wanted_refs: set[str] = set()
-        association = metadata.get("goal_association")
-        if isinstance(association, dict):
-            for item in association.get("associations") or []:
-                if not isinstance(item, dict):
-                    continue
-                if set(map(str, item.get("target_goal_ids") or [])).intersection(goal_ids):
-                    wanted_refs.update(map(str, item.get("source_responsibility_refs") or []))
-            for item in association.get("new_goals") or []:
-                if not isinstance(item, dict) or str(item.get("goal_id") or "") not in goal_ids:
-                    continue
-                wanted_refs.update(map(str, item.get("source_responsibility_refs") or []))
-        selected = [value for key, value in parsed.items() if not wanted_refs or key in wanted_refs]
-        if selected:
-            return selected
-
-        return [
-            CognitiveResponsibilityProposal(
-                local_ref=f"reentry:{goal_id}"[:80],
-                outcome="Continue the existing canonical Responsibility after trusted state changed.",
-                relationship="reference",
-                target_goal_ids=[goal_id],
-                completion_requires_work=True,
-                confidence=1.0,
-            )
-            for goal_id in goal_ids
-        ]
-
-    @staticmethod
-    def _planner_reentry_repeats_completed_activity(
-        *,
-        source_response: InteractionResponse,
-        plan: CanonicalPlan,
-        extra_context: dict[str, Any] | None,
-        evidence: list[ToolResultEvidence],
-    ) -> bool:
-        """Reject re-execution of the exact Activity that just completed."""
-
-        completed_request_ids: set[str] = set()
-        context = extra_context if isinstance(extra_context, dict) else {}
-        terminal_request_id = str(context.get("terminal_request_id") or "").strip()
-        if terminal_request_id and evidence and evidence[0].status == "completed":
-            completed_request_ids.add(terminal_request_id)
-        bundle = context.get("execution_outcome_bundle")
-        if isinstance(bundle, dict):
-            for item in bundle.get("evidence") or []:
-                if not isinstance(item, dict) or item.get("status") != "completed":
-                    continue
-                request_id = str(item.get("request_id") or "").strip()
-                if request_id:
-                    completed_request_ids.add(request_id)
-        if not completed_request_ids:
-            return False
-
-        completed = [
-            request
-            for request in source_response.capabilities
-            if request.request_id in completed_request_ids
-        ]
-        for step in plan.steps:
-            for request in completed:
-                source_goal_ids = {
-                    str(value).strip()
-                    for value in request.metadata.get("source_goal_ids") or []
-                    if str(value).strip()
-                }
-                if (
-                    step.capability_id == request.capability_id
-                    and step.args == request.args
-                    and set(step.source_goal_ids) == source_goal_ids
-                ):
-                    return True
-        return False
 
     async def _apply_planner_reentry_response(
         self,
@@ -5869,6 +5643,17 @@ class VoiceAssistant:
             raise ValueError(
                 "terminal Evidence Goal binding is not present in Goal Association"
             )
+        responsibilities = planner_reentry_responsibilities(
+            source_response=source_response,
+            goal_ids=normalized_goal_ids,
+        )
+        if not responsibilities:
+            self.session_log(
+                session_id,
+                "planner_evidence_reentry_rejected: "
+                "reason=missing_responsibility_provenance",
+            )
+            return None
 
         sid = str(session_id or canonical_plan.plan_id)
         context = self._goal_driven_authority_context(
@@ -5917,10 +5702,6 @@ class VoiceAssistant:
                 turn_id=str(metadata.get("turn_id") or ""),
             ).model_dump(mode="json")
 
-        responsibilities = self._planner_reentry_responsibilities(
-            source_response=source_response,
-            goal_ids=normalized_goal_ids,
-        )
         request = CognitiveWorkRequest(
             sid=f"{sid}:evidence:{evidence[0].evidence_id}"[:160],
             text=user_request,
@@ -6006,7 +5787,7 @@ class VoiceAssistant:
             )
             if set(replanned.goal_ids) != set(normalized_goal_ids):
                 raise ValueError("Deep Evidence re-entry Plan changed the bound Goal set")
-        if self._planner_reentry_repeats_completed_activity(
+        if planner_reentry_repeats_completed_activity(
             source_response=source_response,
             plan=replanned,
             extra_context=extra_context,
@@ -6036,27 +5817,19 @@ class VoiceAssistant:
             response.metadata["goal_interpretation"] = dict(
                 metadata["goal_interpretation"]
             )
-        delivered_texts = {
-            normalized
-            for item in self._delivered_turn_speech_events(sid)
-            if (normalized := " ".join(str(item.get("text") or "").strip().split()))
-        }
-        if delivered_texts and response.speech:
-            retained_speech = [
-                speech
-                for speech in response.speech
-                if " ".join(str(speech.text or "").strip().split())
-                not in delivered_texts
-            ]
-            if len(retained_speech) != len(response.speech):
-                self.session_log(
-                    session_id,
-                    "planner_evidence_reentry_duplicate_speech_suppressed: count=%s",
-                    len(response.speech) - len(retained_speech),
-                )
-                if not retained_speech:
-                    return response.model_copy(update={"speech": []})
-                response = response.model_copy(update={"speech": retained_speech})
+        response, suppressed_speech_count = suppress_already_delivered_speech(
+            response,
+            (
+                item.get("text") or ""
+                for item in self._delivered_turn_speech_events(sid)
+            ),
+        )
+        if suppressed_speech_count:
+            self.session_log(
+                session_id,
+                "planner_evidence_reentry_duplicate_speech_suppressed: count=%s",
+                suppressed_speech_count,
+            )
         evidence_refs = [item.evidence_id for item in evidence]
         for speech in response.speech:
             speech.metadata.update(
@@ -6204,25 +5977,6 @@ class VoiceAssistant:
                 exc,
             )
             return None
-
-    @staticmethod
-    def _resolve_tool_result_pointer(document: Any, pointer: str) -> Any:
-        current = document
-        for raw_part in pointer.split("/")[1:]:
-            part = raw_part.replace("~1", "/").replace("~0", "~")
-            if isinstance(current, dict):
-                if part not in current:
-                    raise ValueError("tool result fact pointer does not exist")
-                current = current[part]
-            elif isinstance(current, list):
-                if not part.isdigit() or int(part) >= len(current):
-                    raise ValueError("tool result fact pointer index does not exist")
-                current = current[int(part)]
-            else:
-                raise ValueError("tool result fact pointer traverses a scalar")
-        if isinstance(current, (dict, list)):
-            raise ValueError("tool result fact pointer must resolve to a scalar")
-        return current
 
     def _launch_interaction(
         self,

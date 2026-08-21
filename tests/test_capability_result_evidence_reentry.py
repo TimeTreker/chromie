@@ -113,10 +113,29 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
             interaction_id="weather",
             status="ok",
             metadata={
+                "goal_interpretation": {
+                    "responsibilities": [
+                        {
+                            "local_ref": "weather-result",
+                            "outcome": "Determine whether rain is expected this morning.",
+                            "bindings": {},
+                            "output_mode": "capability_work",
+                            "relationship": "new",
+                            "completion_requires_work": True,
+                            "completion_requires_fresh_evidence": True,
+                            "confidence": 1.0,
+                        }
+                    ]
+                },
                 "goal_association": {
                     "associations": [],
-                    "new_goals": [{"goal_id": goal_id}],
-                }
+                    "new_goals": [
+                        {
+                            "goal_id": goal_id,
+                            "source_responsibility_refs": ["weather-result"],
+                        }
+                    ],
+                },
             },
         )
 
@@ -166,6 +185,80 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         self.assertIsNotNone(duplicate)
         assert duplicate is not None
         self.assertEqual(duplicate.speech, [])
+
+    def test_host_reentry_fails_closed_without_originating_responsibility(self) -> None:
+        goal_id = "goal-weather"
+        original = CanonicalPlan(
+            plan_id="weather-read",
+            planner_tier="fast",
+            disposition="execute",
+            coverage="complete",
+            confidence=0.98,
+            goal_ids=[goal_id],
+            steps=[
+                CanonicalPlanStep(
+                    step_id="lookup",
+                    capability_id="chromie.weather.lookup",
+                    args={"location": "重庆"},
+                    source_goal_ids=[goal_id],
+                )
+            ],
+        )
+
+        class Client:
+            called = False
+
+            async def resolve_fast_plan(self, _session, *, request, timeout_ms):
+                self.called = True
+                raise AssertionError("Planner must not run without Responsibility provenance")
+
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.agent_client = Client()
+        assistant.session_log = lambda *_args, **_kwargs: None
+
+        def unexpected_context(_sid):
+            raise AssertionError("Host must reject before rebuilding Planner context")
+
+        assistant.build_context = unexpected_context
+        data = {"location": "重庆", "rain_probability": 10}
+        evidence = ToolResultEvidence(
+            evidence_id="weather-result",
+            tool_id="chromie.weather.lookup",
+            status="completed",
+            data=data,
+            output_sha256=canonical_value_sha256(data),
+        )
+        source = InteractionResponse(
+            interaction_id="weather",
+            status="ok",
+            metadata={
+                "goal_association": {
+                    "associations": [],
+                    "new_goals": [
+                        {
+                            "goal_id": goal_id,
+                            "source_responsibility_refs": ["weather-result"],
+                        }
+                    ],
+                }
+            },
+        )
+
+        response = asyncio.run(
+            assistant._planner_evidence_reentry_response(
+                source_response=source,
+                canonical_plan=original,
+                user_request="今天上午会下雨吗？",
+                language="zh-CN",
+                goal_ids=[goal_id],
+                evidence=[evidence],
+                session_id="session",
+                phase="post_execution",
+            )
+        )
+
+        self.assertIsNone(response)
+        self.assertFalse(assistant.agent_client.called)
 
 
 if __name__ == "__main__":

@@ -69,16 +69,18 @@ The authoritative definitions live in `docs/PROJECT_CHARTER.md`. In particular:
 | Cognitive Gateway / Attention | Maintained configuration controls Attention Review; deterministic protective reflex remains separate. Disabled or unavailable semantic review fails open without fabricating high-confidence addressedness. | Source and focused contract regressions cover admission, fail-open behavior, temporary addressedness rules, and schema boundaries. | Current-revision open-room microphone behavior still requires live evidence. | Development only. |
 | Goal Interpretation / Goal Association | GI is WHAT-only. GA is the canonical Goal-continuity writer. Standalone admitted greetings may speak before GA but still receive canonical conversational Goal continuity. | Contract and focused Goal/continuity tests are maintained. | Live-model semantic quality remains revision-bound and must be requalified after material model/prompt changes. | Development only. |
 | Planner / communication | One Planner authority owns HOW and exact Communicative Activities. Fast/deep are passes, not separate owners. Legacy Response Composer and GI fast-speech semantic ownership are not maintained paths. | Planner, speech-provenance, playback-identity, and duplicate-delivery regressions protect the current owner boundary. | The declared warm latency targets still require current-revision live qualification. | Development only. |
-| Async Runtime / Evidence re-entry | Terminal Runtime events are correlated into Evidence and may create bounded `CognitiveOpportunity` re-entry. Planner may answer, create follow-up Work, revise existing Work, wait, or do nothing. Re-entry is not response-only and does not fabricate a UserTurn or confirmation. | Focused async regressions cover incremental terminal Evidence, follow-up Work while siblings continue, cancellation/supersession containment, and duplicate-execution prevention. | Provider-backed weather/body episodes should be retained on the exact current revision. | Development only. |
+| Async Runtime / Evidence re-entry | Terminal Runtime events are correlated into Evidence and may create bounded `CognitiveOpportunity` re-entry. Planner may answer, create follow-up Work, revise existing Work, wait, or do nothing. Re-entry is not response-only and does not fabricate a UserTurn, Responsibility, or confirmation. Missing originating Responsibility provenance retains Evidence but fails that opportunity closed. | Focused async regressions cover incremental terminal Evidence, follow-up Work while siblings continue, cancellation/supersession containment, duplicate-execution prevention, and missing-provenance rejection before Planner invocation. | Provider-backed weather/body episodes should be retained on the exact current revision. | Development only. |
 | Identity / personality truth | Chromie's owner-approved social identity is a six-year-old girl and family young secretary. That is not a biological-human claim; truthful robotic embodiment remains available when relevant. | Mind-profile, prompt-context, and identity/body benchmark contracts guard the two-layer truth boundary. | Bilingual live identity conversation remains to be requalified on the current model/profile. | Development only. |
 | Social Attention | Optional embodied decoration remains subordinate to a concrete primary Activity, has no speech or Goal-completion authority, and may validly return none. | Source-level behavior and capability-grounding checks exist. | Reviewed live baseline remains open for the current revision. | Development only. |
+| Host structural boundary | Pure Planner-reentry currentness/provenance/idempotence checks now live in `orchestrator/runtime/planner_reentry.py`; nine dead/extracted private methods were removed from `VoiceAssistant` without adding a manager or semantic owner. | Focused pure-policy and Host integration tests pass; the method ratchet moves `159 -> 150`, and historical permissive ceilings are tightened to the current `150 methods / 305 init lines / 110 initialized attributes / 0 direct-LLM calls`. | Not a runtime target; full Host decomposition remains separate from behavior qualification. | Development only. |
 | Static quality gates | Repository policy, documentation, configuration ownership/inventory, structure ratchets, and selected static-analysis scopes are maintained. | Dependency-free gates can run without GPU. Ruff/Mypy scopes are still deliberately narrow and must be widened only after the pinned analyzers pass on each added slice. | Not a runtime target. | Development only. |
 
 ## Current open work
 
-1. **Apply and verify the audit-convergence source patch.** Keep identity truth,
-   Attention evidence, greeting continuity, speech ownership, prompt projection, and
-   current documentation aligned with the Charter requirements.
+1. **Close the canonical local gate in a dependency-complete environment.** Keep
+   identity truth, Attention evidence, greeting continuity, speech ownership, prompt
+   projection, asynchronous Responsibility provenance, and current documentation aligned
+   with the Charter requirements.
 2. **Requalify human-facing latency on the current revision.** The owner-approved warm
    targets remain `<=2.0 s` from validated GI handoff to first valid Planner
    Communicative-Activity commitment and `<=3.0 s` from that commitment to playback
@@ -92,11 +94,13 @@ The authoritative definitions live in `docs/PROJECT_CHARTER.md`. In particular:
    meaningful quality claim for the whole cognitive/runtime core. Expand along existing
    ownership seams only after the pinned toolchain passes; do not weaken the gate or add
    compatibility exclusions merely to increase coverage.
-5. **Perform structural simplification separately.** Large Host/Planner/GA files remain a
-   maintainability risk, but decomposition must follow existing configuration,
-   input-lifecycle, prompt-projection, validation, runtime, evidence, cancellation, and
-   observability seams. Do not create one manager/service per cognitive concept and do
-   not mix that refactor into semantic behavior fixes.
+5. **Continue structural simplification separately.** The first pure
+   Planner-reentry policy seam is extracted and the Host ratchet is lower. Large
+   Host/Planner/GA files remain a maintainability risk, but later decomposition must
+   follow existing configuration, input-lifecycle, prompt-projection, validation,
+   runtime, evidence, cancellation, and observability seams. Do not create one
+   manager/service per cognitive concept and do not mix broad refactors into semantic
+   behavior fixes.
 6. **Complete revision-bound human-like interaction evidence.** Open-room addressedness,
    greeting uniqueness, identity questions, fresh information, barge-in, late Goal
    results, multi-Goal cancellation, timeout behavior, Social Attention, and startup

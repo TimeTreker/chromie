@@ -79,7 +79,20 @@ Host validates the immutable execution join.
 
 The Planner endpoint receives Host-bound terminal Evidence together with the existing
 canonical Goal set and current bounded state. Re-entry may not widen the supplied Goal
-set. A Planner step that exactly repeats the Capability/arguments/Goal ownership of the
+set. It must reuse the originating Goal-Interpretation `responsibilities[]` and the
+Goal-Association `source_responsibility_refs` that bind those Responsibilities to the
+affected Goals. If that immutable Responsibility provenance is missing, malformed, or
+ambiguous, the Host retains the terminal Evidence but does not fabricate a callback
+Responsibility and does not invoke Planner for that transition.
+
+The mechanical policy for this boundary lives in
+`orchestrator/runtime/planner_reentry.py`. It validates current Goal/Plan/request
+correlation, selects only supplied Responsibility provenance, rejects exact repetition
+of the terminal Activity, and suppresses already-delivered exact speech deltas. These are
+pure Host checks over supplied truth; the module does not interpret Goal meaning, author
+speech, invoke Planner, or mutate Runtime.
+
+A Planner step that exactly repeats the Capability/arguments/Goal ownership of the
 terminal request that just completed is rejected; reactivation is not permission to
 repeat history.
 
@@ -95,6 +108,9 @@ apply. An internal opportunity is never user confirmation.
   not promoted to successful factual Evidence.
 - Unknown Goal IDs or a Goal-set mismatch fail closed; result contents never guess
   ownership.
+- Missing or ambiguous originating GI Responsibility provenance fails closed for this
+  cognitive opportunity. The terminal Evidence remains historical truth, but the Host
+  does not synthesize a replacement Responsibility merely to obtain a Planner response.
 - Planner output that widens Goals or repeats the just-completed Activity is rejected.
 - Confirmation-requiring new Work is not auto-confirmed by an asynchronous internal
   event.

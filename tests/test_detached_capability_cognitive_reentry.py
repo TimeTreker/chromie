@@ -248,6 +248,28 @@ def _response() -> InteractionResponse:
             "canonical_plan": plan.model_dump(mode="json"),
             "canonical_plan_id": plan.plan_id,
             "canonical_plan_fingerprint": fingerprint,
+            "goal_interpretation": {
+                "responsibilities": [
+                    {
+                        "local_ref": "read-first",
+                        "outcome": "Obtain the first requested result.",
+                        "output_mode": "capability_work",
+                        "relationship": "new",
+                        "completion_requires_work": True,
+                        "completion_requires_fresh_evidence": True,
+                        "confidence": 1.0,
+                    },
+                    {
+                        "local_ref": "read-second",
+                        "outcome": "Obtain the second requested result.",
+                        "output_mode": "capability_work",
+                        "relationship": "new",
+                        "completion_requires_work": True,
+                        "completion_requires_fresh_evidence": True,
+                        "confidence": 1.0,
+                    },
+                ]
+            },
             "goal_association": {
                 "resolution_status": "resolved",
                 "turn_id": "turn-detached-reentry",
@@ -257,11 +279,13 @@ def _response() -> InteractionResponse:
                         "goal_id": "goal-first",
                         "description": "Run the first read.",
                         "source_text": "Run both reads.",
+                        "source_responsibility_refs": ["read-first"],
                     },
                     {
                         "goal_id": "goal-second",
                         "description": "Run the second read.",
                         "source_text": "Run both reads.",
+                        "source_responsibility_refs": ["read-second"],
                     },
                 ],
                 "confidence": 1.0,
