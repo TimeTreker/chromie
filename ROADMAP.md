@@ -18,29 +18,27 @@ organized by capability, risk, and retained evidence.
 
 ## Current execution order
 
-The following order is binding until the current-revision target-evidence line is
-closed. It applies the already-approved architecture; it does not introduce another
-layer or cognitive term.
+The current-revision implementation/qualification axes remain separate. Phase 1 live
+semantic-authority source closure and Phase 2 documentation convergence are complete in
+the maintained tree; they are not requests to re-implement those migrations. Continue in
+this order:
 
-1. **Make the evidence contract internally reproducible.** Correct the general-
-   ability latency assertions so the Planner-local and playback intervals use their
-   declared raw anchors. Retain a revision/runtime-bound reviewer packet containing
-   explicit profile, input, speaker, assertion-scope, evidence-level, and raw timing
-   data. Use the existing evidence sanitizer for external sharing.
-2. **Run the highest safe current-revision profile.** First retain the repaired
-   injected-text run, then perform supervised physical microphone/audible-speaker
-   proof and close the remaining default target-evidence profile. Headless/discarded
-   playback must never be promoted to audible evidence.
-3. **Resume broad structural simplification after evidence closure.** One narrow
-   provenance-protecting source slice is already implemented: pure Planner-reentry
-   validation is extracted from the Host composition root and dead wrappers are removed.
-   Later decomposition follows existing configuration, input-lifecycle, playback,
-   cognitive-dispatch, observability, cancellation, and cleanup ownership seams. Do not
-   create one service/manager per cognitive role, and do not use file or method count as
-   the architectural reason.
-4. **Then resume later semantic Issues in their existing order.** Richer durable
-   memory, affect/mood, and ambient autonomy remain separately governed work; they
-   are not bundled into the evidence or Host-decomposition patch.
+1. **Decide dormant Chromie-global TaskGraph debt.** Keep provider/body-local DAGs, but
+   determine whether the default-off global TaskGraph and `residual_replan` surface owns a
+   distinct execution-only responsibility beneath Planner/Work. Delete it if that boundary
+   cannot be demonstrated; do not rename the overlap.
+2. **Perform repository hygiene and mechanical deduplication.** Remove verified orphan
+   assets/dead placeholders, restore the pinned async test dependency, consolidate repeated
+   normalization/schema mechanisms through small shared helpers, and remove compatibility
+   residue only after current consumers are checked.
+3. **Continue structural simplification only across existing ownership seams.** File or
+   method count is evidence of reconstructability cost, not permission to create another
+   semantic manager.
+4. **Then run current-revision qualification and retain target evidence.** Re-run canonical
+   gates and retain bilingual/provider/simulator/live evidence for Planner-owned speech,
+   Evidence-bound result claims, retry/alternative/silence behavior, duplicate-effect
+   prevention, Social Attention, and latency. Source implementation, automated verification,
+   target validation, and release readiness remain separate axes.
 
 ## Immediate architecture line — consolidate the reviewed authority baseline
 
@@ -56,7 +54,7 @@ operation, not a mandatory reconciliation stage. This baseline must pass the Cha
 architecture-irreducibility review before adding a new principle, owner, persistent state
 concept, manager, workflow, contract field, or mechanism.
 
-Next design/implementation order:
+Reviewed architecture status (each item states its implementation state explicitly):
 
 1. **GI/Planner input-ownership boundary — implemented and source-guarded.** GI is
    WHAT-only: Responsibility meaning, explicit/contextual semantic bindings, Goal
@@ -358,10 +356,10 @@ callbacks into a second planner.
 
 ### 2026-08-22 audit-remediation line
 
-Do not add another cognitive layer while the maintained Host still authors ordinary
-meaning that the Charter assigns to Planner.  The audit-remediation line is deliberately
-subtractive and precedes broad structural cleanup.  Each slice must remove an authority
-leak or historical surface rather than relocate it behind a new manager.
+The audit-remediation line is deliberately subtractive. Phase 1 has closed the verified
+live Host semantic-authority leaks in source. Current work therefore removes stale or
+overlapping surfaces without reopening the cognitive backbone or relocating deleted
+authority behind a new manager.
 
 1. **Phase 1 — close live semantic-authority violations.**
    - **1A Confirmation authority:** authorization state owns only exact request identity,
@@ -396,10 +394,13 @@ leak or historical surface rather than relocate it behind a new manager.
    and the documented cognition-unavailable emergency utterance are the only explicit
    exceptions.
 
-2. **Phase 2 — documentation convergence.** Rewrite/retire stale `chromie_mind.md`
-   architecture, remove duplicate authoritative configuration sections, reconcile
-   implementation-vs-qualification wording, and remove stale semantic vocabulary from
-   current-authority docs. Do not create another standalone architecture document.
+2. **Phase 2 — documentation convergence.** Current documentation now describes the same
+   Goal-driven authority implemented by source: `chromie_mind.md` is rewritten around
+   MindProfile-as-context rather than deleted agents/routes; duplicated configuration tails
+   are removed; current architecture docs no longer describe Host result fallbacks or
+   route/intent GI branches; ROADMAP/STATUS/checkpoint separate source closure from target
+   qualification; and the docs gate rejects duplicate Configuration H2 sections plus the
+   reviewed stale semantic phrases. **Implemented in Phase 2.**
 
 3. **Phase 3 — dormant TaskGraph decision.** Keep provider-local/physical DAGs. Audit the
    default-off Chromie-global TaskGraph and `residual_replan` surface against Goal + Work +

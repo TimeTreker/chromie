@@ -80,6 +80,16 @@ class DocumentationAuthorityTests(unittest.TestCase):
         )
 
 
+    def test_configuration_authority_has_unique_h2_sections(self) -> None:
+        headings = [
+            line.strip()
+            for line in (ROOT / "docs" / "CONFIGURATION.md")
+            .read_text(encoding="utf-8")
+            .splitlines()
+            if line.startswith("## ")
+        ]
+        self.assertEqual(len(headings), len(set(headings)))
+
     def test_specialized_documents_have_owned_entrypoints_or_contracts(self) -> None:
         completed = subprocess.run(
             [sys.executable, "scripts/check_docs.py"],

@@ -61,16 +61,14 @@ The authoritative definitions live in `docs/PROJECT_CHARTER.md`. In particular:
 - Existing-Work comparison, reuse, cancellation, replacement, or supplementation are
   Planner operations, not a mandatory Work-Reconciliation stage.
 
-The 2026-08-22 source audit found that this target authority line was **not yet fully
-closed in maintained source**. Phase 1A removed Confirmation Dialogue wording ownership,
-and Phase 1B removed named-cancellation replacement narration while preserving the narrow
-stop/cancel safety warning. Phase 1C now removes deterministic post-execution
-`status -> sentence` composition: terminal status, observation availability, and mechanical
-completion qualification are projected as trusted truth to the same Planner; failed or
-unavailable Planner re-entry retains Evidence and emits no Host-authored result meaning.
-The remaining verified live authority leak is Host-owned body-recovery retry/prompt
-construction. Passing structural gates must not be interpreted as release qualification
-for `SPEECH-OWNER-001` until that slice and live behavior evidence are closed.
+The 2026-08-22 source audit found live Host semantic-authority leaks; Phase 1A-1D now
+close the verified confirmation, cancellation, ordinary result-meaning, and body-recovery
+source paths. Confirmation owns authorization facts only; named cancellation returns typed
+Evidence to Planner; deterministic `status -> sentence` outcome composition is removed; and
+recoverable body failure exposes bounded provider retryability facts without Host retry
+planning. This is **source closure**, not target qualification: current-revision
+bilingual/provider/simulator/live evidence is still required before `SPEECH-OWNER-001` or
+human-facing behavior is considered qualified.
 
 ## Current implementation and verification state
 
@@ -82,40 +80,34 @@ for `SPEECH-OWNER-001` until that slice and live behavior evidence are closed.
 | Async Runtime / Evidence re-entry | Terminal Runtime events are correlated into Evidence and may create bounded `CognitiveOpportunity` re-entry. Planner may answer, create follow-up Work, revise existing Work, wait, or do nothing. Re-entry is not response-only and does not fabricate a UserTurn, Responsibility, or confirmation. Missing originating Responsibility provenance retains Evidence but fails that opportunity closed. | Focused async regressions cover incremental terminal Evidence, follow-up Work while siblings continue, cancellation/supersession containment, duplicate-execution prevention, and missing-provenance rejection before Planner invocation. | Provider-backed weather/body episodes should be retained on the exact current revision. | Development only. |
 | Identity / personality truth | Chromie's owner-approved social identity is a six-year-old girl and family young secretary. That is not a biological-human claim; truthful robotic embodiment remains available when relevant. | Mind-profile, prompt-context, and identity/body benchmark contracts guard the two-layer truth boundary. | Bilingual live identity conversation remains to be requalified on the current model/profile. | Development only. |
 | Social Attention | Optional embodied decoration remains subordinate to a concrete primary Activity, has no speech or Goal-completion authority, and may validly return none. | Source-level behavior and capability-grounding checks exist. | Reviewed live baseline remains open for the current revision. | Development only. |
-| Host structural boundary | Pure Planner-reentry policy lives in `orchestrator/runtime/planner_reentry.py`; TTS text segmentation lives in `orchestrator/runtime/tts_text.py`; Goal-list console projection lives in `orchestrator/runtime/goal_list_console.py`; fail-soft observability recording policy lives in `orchestrator/runtime/observability_recording.py`; fixed-reflex confirmation-token revocation/audit bookkeeping lives with the existing `ConfirmationDialogue` owner in `orchestrator/runtime/confirmation.py`; OS-default audio-device detection/queue/apply lifecycle lives in `orchestrator/runtime/audio_device_lifecycle.py`; top-level process teardown now lives in stateless `orchestrator/runtime/shutdown_lifecycle.py`, reusing the existing InputTurn/Playback/Session owners rather than reimplementing their task or transport truth in `VoiceAssistant`; accelerator sample scheduling, detached task tracking, and trace attachment now live with the existing fail-soft observability policy in `orchestrator/runtime/observability_recording.py`; PlaybackTransport now owns its provider/output methods directly, so the seven `VoiceAssistant` playback/TTS compatibility delegates have been removed while the same session trace spans live on the transport owner; `InputSessionRuntime` now likewise calls its own microphone/VAD/ASR/routed-turn/session-idle operations directly, removing twelve input/session compatibility delegates from `VoiceAssistant` while `InputTurnLifecycle` remains the task-state owner. These are existing Host concerns extracted without adding semantic owners, managers, or state stores. | Focused regressions pass; the method ratchet moves `159 -> 150 -> 142 -> 139 -> 136 -> 129 -> 127 -> 124 -> 117 -> 105`, with the current ceiling at `105 methods / 305 init lines / 110 initialized attributes / 0 direct-LLM calls`. | Not a runtime target; full Host decomposition remains separate from behavior qualification. | Development only. |
-| Static quality gates | Repository policy, documentation, configuration ownership/inventory, structure ratchets, and selected static-analysis scopes are maintained. | Dependency-free gates can run without GPU. Ruff/Mypy scopes are still deliberately narrow and must be widened only after the pinned analyzers pass on each added slice. | Not a runtime target. | Development only. |
+| Host structural boundary | Pure Planner-reentry policy lives in `orchestrator/runtime/planner_reentry.py`; TTS text segmentation lives in `orchestrator/runtime/tts_text.py`; Goal-list console projection lives in `orchestrator/runtime/goal_list_console.py`; fail-soft observability recording policy lives in `orchestrator/runtime/observability_recording.py`; fixed-reflex confirmation-token revocation/audit bookkeeping lives with the existing `ConfirmationDialogue` owner in `orchestrator/runtime/confirmation.py`; OS-default audio-device detection/queue/apply lifecycle lives in `orchestrator/runtime/audio_device_lifecycle.py`; top-level process teardown now lives in stateless `orchestrator/runtime/shutdown_lifecycle.py`, reusing the existing InputTurn/Playback/Session owners rather than reimplementing their task or transport truth in `VoiceAssistant`; accelerator sample scheduling, detached task tracking, and trace attachment now live with the existing fail-soft observability policy in `orchestrator/runtime/observability_recording.py`; PlaybackTransport now owns its provider/output methods directly, so the seven `VoiceAssistant` playback/TTS compatibility delegates have been removed while the same session trace spans live on the transport owner; `InputSessionRuntime` now likewise calls its own microphone/VAD/ASR/routed-turn/session-idle operations directly, removing twelve input/session compatibility delegates from `VoiceAssistant` while `InputTurnLifecycle` remains the task-state owner. These are existing Host concerns extracted without adding semantic owners, managers, or state stores. | Focused regressions pass; the method ratchet moves `159 -> 150 -> 142 -> 139 -> 136 -> 129 -> 127 -> 124 -> 117 -> 105 -> 103`, with the current ceiling at `103 methods / 301 init lines / 108 initialized attributes / 0 direct-LLM calls`. | Not a runtime target; full Host decomposition remains separate from behavior qualification. | Development only. |
+| Static quality gates | Repository policy, documentation, configuration ownership/inventory, structure ratchets, and selected static-analysis scopes are maintained. Phase 2 adds duplicate-H2 detection for the Configuration authority and stale-current-semantic phrase checks so deleted architecture cannot survive only in prose. | Dependency-free gates can run without GPU. Ruff/Mypy scopes are still deliberately narrow and must be widened only after the pinned analyzers pass on each added slice. | Not a runtime target. | Development only. |
 
 ## Current open work
 
-1. **Qualify the now source-closed semantic-authority path before adding cognition.**
-   Phases 1A-1D are source-closed: confirmation, cancellation, result meaning, and
-   recoverable body failure all preserve mechanism-as-fact and Planner-as-meaning. Run
-   current-revision bilingual/provider/simulator qualification and retain evidence of
-   retry/alternative/silence behavior without Host-authored semantic fallback.
-2. **Make the authority rule executable.** Extend repository/behavior tests so a
-   passing gate cannot coexist with ordinary Host-authored semantic response strings.
-   Test observable authority and truth-stage provenance rather than exact incidental
-   wording.
-3. **Converge current documentation.** Rewrite or retire stale `docs/chromie_mind.md`
-   semantics, remove exact duplicated `docs/CONFIGURATION.md` sections, and make ROADMAP
-   distinguish implemented source from qualification/readiness without asking a future
-   session to re-implement closed migrations.
-4. **Decide dormant global TaskGraph debt deliberately.** Provider/body-local DAGs are
+1. **Decide dormant global TaskGraph debt deliberately.** Provider/body-local DAGs are
    valid. The default-off Chromie-global TaskGraph and `residual_replan` planning guidance
    must either demonstrate a non-overlapping execution-only responsibility beneath
    Planner/Work or be removed; do not rename the same overlap.
-5. **Perform repository hygiene after correctness.** Delete verified orphan legacy-agent
-   prompt assets and dead `ToolClient`, add the missing async test dependency, consolidate
-   repeated whitespace and JSON-schema validation mechanisms, remove stale naming/aliases
-   when no current consumer requires them, and add non-Python obsolete-artifact checks.
-6. **Continue structural simplification separately.** Large Host/Planner/GA files remain
-   maintainability risks, but extract only existing mechanical ownership seams. Do not add
-   a Speech Manager, Reconciliation Manager, Meta Planner, or one manager per cognitive
-   term.
-7. **Requalify behavior only after source closure.** Re-run canonical gates, bilingual
+2. **Perform repository hygiene after correctness.** Delete verified orphan legacy-agent
+   prompt assets and dead `ToolClient`; restore the pinned async test dependency; consolidate
+   repeated whitespace normalization and JSON-schema/type validation mechanisms; remove stale
+   naming/aliases when current consumers are absent; and extend non-Python obsolete-artifact
+   checks.
+3. **Continue structural simplification separately.** Large Host/Planner/GA files remain
+   maintainability risks, but extract only existing mechanical ownership seams. Do not add a
+   Speech Manager, Reconciliation Manager, Meta Planner, or one manager per cognitive term.
+4. **Requalify behavior on the exact current revision.** Re-run canonical gates, bilingual
    confirmation/cancellation cases, provider-backed result Evidence, embodied failures,
-   multi-Goal cancellation, latency, Social Attention, and live/simulator evidence on the
-   exact revision. Source/test/target/release claims remain separate.
+   multi-Goal cancellation, latency, Social Attention, and live/simulator evidence. Source
+   implementation, automated verification, target validation, and release readiness remain
+   separate axes.
+
+Phase 2 documentation convergence is source-closed: `docs/chromie_mind.md` now describes
+MindProfile as bounded context rather than deleted agents/routes; the duplicated
+`docs/CONFIGURATION.md` tail is removed; current architecture docs no longer retain the
+reviewed Host-result-fallback or route/intent-GI contradictions; and the docs gate protects
+those boundaries mechanically.
 
 ## Evidence interpretation
 

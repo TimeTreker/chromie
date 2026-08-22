@@ -114,6 +114,13 @@ STALE_PHRASES = {
     "robotidentity": "the current identity contract is ChromieIdentity",
     "retained capabilityagent planner": "CapabilityAgent is retired from the maintained semantic architecture",
     "emergency compatibility planner is retained": "there is no maintained emergency semantic planner",
+    "capability planner, conversation agent, or deepthinking agent": "Mind context must use the current GI/GA/Planner/Social Attention owners",
+    "selected route/capability hints": "current cognition has no route/intent handoff",
+    "may propose routes, speech, task metadata, or skill plans": "current model owners have separate typed authority boundaries",
+    "direct no-planner `spoken_response` branch": "ordinary response meaning is Planner-owned",
+    "contract-defined conservative fallback": "Host may fail closed but may not author an ordinary semantic fallback",
+    "schema-valid benign `chat`": "Goal Interpretation no longer has chat/tool/memory/robot route branches",
+    "deterministic post-execution composer produces": "terminal Evidence must re-enter Planner rather than a status-to-sentence composer",
     "post /run` |": "the retired Agent /run endpoint must not appear in current API tables",
     "post /interaction` |": "the retired Agent /interaction endpoint must not appear in current API tables",
 }
@@ -488,6 +495,22 @@ def common_env_values() -> dict[str, str]:
 
 def check_configuration_reference(errors: list[str]) -> None:
     text = CONFIGURATION_REFERENCE.read_text(encoding="utf-8")
+
+    # Configuration is an operational authority. Duplicate H2 sections create two
+    # writable truths even when their bodies happen to be identical today.
+    seen_h2: dict[str, int] = {}
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        if not line.startswith("## "):
+            continue
+        heading = line.strip()
+        previous = seen_h2.get(heading)
+        if previous is not None:
+            errors.append(
+                f"docs/CONFIGURATION.md:{line_number}: duplicate H2 section {heading!r}; "
+                f"first declared at line {previous}"
+            )
+        else:
+            seen_h2[heading] = line_number
     active_names: set[str] = set()
     for source in RUNTIME_CONFIG_SOURCES:
         active_names.update(os_getenv_names(source))

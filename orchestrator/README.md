@@ -82,16 +82,17 @@ microphone -> host VAD -> ASR -> Cognitive Gateway
   -> Planner-owned exact communication is mechanically materialized when needed
   -> InteractionCoordinator -> Trusted Capability Runtime
       -> Soridormi or peer provider
-  -> exact plan/request/result/trace join -> per-goal outcome commit
-  -> validated speech-only final response -> TTS -> playback
+  -> exact plan/request/result/trace join -> per-Goal outcome/Evidence update
+  -> CognitiveOpportunity -> same Planner -> speech / follow-up Work / wait / silence
+  -> validated Planner-authored speech -> TTS -> playback
 ```
 
 For an effectful cognitive response, the Orchestrator commits requests only
 when plan ID/fingerprint, step, capability, arguments, timing, goal ownership, and
 output-schema identity match. Terminal `CapabilityResult` and `CapabilityTrace` records
 then produce an immutable `ExecutionOutcomeBundle`; missing results become
-`not_run`, and only bounded schema-validated observations may appear in the
-final result speech. Barge-in may invalidate stale audible output, but an
+`not_run`, and trusted terminal truth is projected as Evidence for the same Planner.
+Any result speech must therefore be Planner-authored and Evidence-bound. Barge-in may invalidate stale audible output, but an
 ordinary newer turn does not cancel the earlier routed turn or discard its Goal
 and outcome evidence. Explicit deterministic control or a Core-authorized
 foreground interruption may cancel only its bound scope. A recoverable
@@ -135,8 +136,10 @@ ASR -> Cognitive Gateway -> Goal Interpretation -> Fast/Deep Planner
 ```
 
 If the Goal-driven Runtime is disabled or fails after admission, ordinary cognition
-fails closed with bounded Host-owned failure speech. The Host never switches to a
-direct-LLM or retired Agent semantic path.
+fails closed and retains typed operational failure evidence. Host does not manufacture an
+ordinary semantic explanation; only the separately documented tiny protective/operational
+fail-safe exceptions may speak. The Host never switches to a direct-LLM or retired Agent
+semantic path.
 
 `orchestrator/runtime/observability_recording.py` owns fail-soft recording containment for Experience/Episode and Cognitive Evidence writes plus optional accelerator sample scheduling/task tracking/trace attachment; it is not a semantic owner and observability failure cannot alter Goal, Planner, speech, or execution truth.
 `orchestrator/runtime/shutdown_lifecycle.py` owns only final process teardown sequencing. It reuses the existing InputTurn/Playback/Session owners, closes concrete transports/resources, and may abandon unfinished session traces during process exit; it cannot interpret user intent, cancel Goals semantically, author speech, or fabricate completion Evidence.

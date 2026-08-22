@@ -7,16 +7,12 @@ reflexes. The
 [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
 remains the cognitive constitution. This document owns the executable
 turn-loop, delegation, observation, outcome-reconciliation, and final-response
-boundary between them. The host now closes effectful cognitive turns through
-the immutable plan/request/result join, per-goal reconciliation, goal-state
-commit, and a validated speech-only outcome response. Automated contract
-evidence exists; retained provider-backed and live robot evidence remains open
-and is owned by [STATUS.md](STATUS.md).
-
-The direct no-planner `spoken_response` transition and independently scheduled
-validated response stages described below are accepted post-evidence contract
-work, not implementation claims created by this documentation update. Current
-behavior and evidence remain authoritative in [STATUS.md](STATUS.md).
+boundary between them. The host closes effectful cognitive turns through immutable plan/request/result
+correlation, per-Goal reconciliation, Goal-state updates, typed Evidence, and bounded
+Planner re-entry. Result meaning is not composed by Host: trusted terminal truth returns
+to the same Planner, which may answer, create or revise Work, clarify, wait, or emit no
+new Activity. Automated contract evidence exists; retained provider-backed and live robot
+evidence remains open and is owned by [STATUS.md](STATUS.md).
 
 ## Bounded addressedness before Core semantics
 
@@ -109,14 +105,13 @@ Specialist Agents, tools, memory providers, and Soridormi:
 - never become the final conversation authority.
 
 The host Orchestrator is the trusted runtime controller, not a second cognitive
-manager. It enforces timeouts, cancellation, confirmation, resource policy,
-schema validation, result correlation, playback ordering, and legal transitions
-between loop states. It may reject invalid Core output and render a
-contract-defined conservative fallback, but it cannot reinterpret the user
-goal, invent a replacement plan or outcome, or transfer final conversation
-authority to a specialist. Soridormi remains the authority for embodied
-planning, execution, resource safety, stop/emergency behavior, and hardware
-commissioning.
+manager. It enforces timeouts, cancellation, confirmation, resource policy, schema
+validation, result correlation, playback ordering, and legal transitions between loop
+states. It may reject invalid Core output, retain typed failure/Evidence facts, and fail
+closed, but it cannot author an ordinary semantic fallback, reinterpret the user Goal,
+invent a replacement Plan/outcome, or transfer final conversation authority to a
+specialist. Soridormi remains the authority for embodied planning, execution, resource
+safety, stop/emergency behavior, and hardware commissioning.
 
 Speech composition and user-task execution may be prepared or scheduled
 independently, including with bounded parallel model calls, but they consume

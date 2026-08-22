@@ -386,9 +386,9 @@ proposals and Goal completion. Runtime validation checks exact catalog
 membership, schemas, target evidence, resource conflicts, confirmation policy,
 and a bounded latency budget. Target evidence is semantic only; installation calibration and body-specific
 coordinates are never part of the Chromie planning contract. Concrete user-requested actions remain primary
-CanonicalPlan goals and cannot be replaced by auxiliary expression. Body and tool requests are routed through the model-assisted
-Goal Interpretation, capability catalog, Agent capability planner, schemas, and Trusted Capability
-Runtime validation rather than hidden phrase parsers. Plain walking requests
+CanonicalPlan goals and cannot be replaced by auxiliary expression. Body and tool requests flow through model-assisted Goal Interpretation, the live
+capability catalog, the single Fast/Deep Planner authority, schemas, and Trusted Capability
+Runtime validation rather than hidden phrase parsers or a retired routing layer. Plain walking requests
 use a normal safe forward speed of `0.18 m/s`;
 requested forward speeds above Soridormi's current runtime limit of `0.20 m/s`
 are normalized back to the normal speed and surfaced through `speak_first`.

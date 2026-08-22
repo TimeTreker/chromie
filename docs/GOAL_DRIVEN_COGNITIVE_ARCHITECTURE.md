@@ -7,22 +7,16 @@ Physical fetching and external-information retrieval share one semantic responsi
 
 Status: Maintained architecture constitution
 Scope: Chromie cognition, planning, interaction, validation, and execution
-Implementation state: the maintained goal-association, planning, validation,
-pre-execution composition, trusted-execution, and post-execution closure path is
-implemented. Exact immutable plan/request/result reconciliation, per-goal
-`ExecutionOutcomeBundle`, and speech-only final outcome response are integrated
-as defined by the [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md). The upstream
-boundary migration is also implemented: five explicit Cognitive Gateway modules
-complete admission before ordinary Goal Interpretation, the frozen version 1
-`UserTurnEnvelope` is required at Core entry, and a Core-owned interpretation result now carries only provider-neutral
-Responsibility evidence plus bounded confidence/unresolved meaning. No route/intent
-compatibility projection exists on the maintained Core handoff. Retained source-bound
-live-text and MuJoCo evidence remains open.
-
-The direct no-planner `spoken_response` branch and independently scheduled
-validated response stages described below are accepted post-evidence contract
-work, not implementation claims created by this documentation update. Current
-behavior and evidence remain authoritative in [STATUS.md](STATUS.md).
+Implementation state: the maintained Goal Association, planning, validation, trusted
+execution, terminal-Evidence correlation, and Planner re-entry path is implemented. Exact
+immutable plan/request/result correlation and per-Goal `ExecutionOutcomeBundle` truth feed
+typed Evidence; ordinary result meaning returns to the same Planner rather than a Host
+status-to-sentence composer. The upstream boundary migration is also implemented: five
+explicit Cognitive Gateway modules complete admission before ordinary Goal Interpretation,
+the frozen version 1 `UserTurnEnvelope` is required at Core entry, and a Core-owned
+interpretation result carries only provider-neutral Responsibility evidence plus bounded
+confidence/unresolved meaning. No route/intent compatibility projection exists on the
+maintained Core handoff. Retained source-bound live-text and MuJoCo evidence remains open.
 
 
 ## One Core, two execution lanes, and background Social Attention
@@ -1516,12 +1510,11 @@ object.
 Cognitive roles are distinguished not only by model/prompt but by which semantic
 owner they may establish or revise:
 
-- Fast Understanding and perception/result interpretation may propose/update
-  revisable Situation meaning but do not rewrite Evidence;
-- Goal Association owns canonical responsibility continuity and Goal refinement,
-  replacement, cancellation, reopening, and binding decisions;
-- Planner roles own chosen Work/Plan semantics but do not casually rewrite Goal
-  meaning or execution history;
+- qualified cognition may revise soft/reconstructable Situation interpretation but does
+  not rewrite trusted Evidence;
+- Goal Association owns canonical Goal identity, association, versioning, and continuity;
+- Planner owns chosen Work/Plan semantics, communication, and current-state Work changes
+  without rewriting user Responsibility meaning or execution history;
 - trusted validation/runtime owns authorization, request correlation, execution,
   and outcome records but does not reinterpret user meaning;
 - Reflection may challenge current Situation/Goal/Plan/Memory within those
@@ -1827,53 +1820,34 @@ coverage proof may permit one fresh source-based interpretation, whose model may
 choose a genuine clarification when the user can resolve the gap. Invalid or
 repeatedly incomplete output fails closed with no Goal commit or effect.
 
-Fast Goal Interpreter Responsibility proposals are semantic evidence for Goal
-Association. Retired route/intent classifications are not part of the maintained
-GI contract and are not Planner inputs. Exact Capability/retrieval selection and
-the execution shape belong to Fast/Deep Planner. Its maintained transaction is
-deliberately smaller than Goal Association's:
+Fast/Deep Goal Interpretation are depths of the same WHAT authority. Their maintained
+model-facing contract is provider-neutral Responsibility evidence only: intended outcome,
+material semantic bindings, Goal relation, bounded unresolved meaning, and confidence.
+There are no `chat`, `tool`, `memory`, `robot_action`, `deep_thought`, route, intent,
+Capability, Activity, or provider-selection branches in the current GI contract.
+
+The maintained GI transaction is deliberately bounded:
 
 ```text
-primary fast interpretation
-  -> optional one mechanical DTO repair
-  -> accept, delegate uncertain tool/memory/robot work to Deep Thinking, or fail closed
+primary Fast Goal Interpretation from the authoritative admitted turn
+  -> optional one same-stage mechanical DTO repair when schema shape is malformed
+  -> accept when WHAT is sufficiently resolved
+  -> otherwise at most one source-based Deep Goal Interpretation when consequential
+     ambiguity remains in intended outcome, scope, Goal relation, or referent
+  -> accept or fail closed
 ```
 
-It does not run an intent reviewer, semantic-route repair, generic-chat critic,
-capability-grounding reviewer, or repair-of-review chain. Deterministic code may
-validate schema, reject Planner-owned fields or exact Capability selection, and
-check impossible route/intent combinations, but it may not manufacture ordinary
-user meaning or turn a Capability choice into a Fast interpretation. A valid low-confidence interpretation is delegated once to Deep
-Thinking when its route could change responsibility, external work, memory, or
-effects. A
-schema-valid benign `chat` decision stays on the fast conversational path; low
-confidence in its fine-grained conversational label does not justify another
-semantic model call. Deep Thinking receives the original admitted turn and
-bounded evidence; it is deeper cognition before commitment, not a patch of the
-Fast DTO. A semantic contradiction or a second malformed DTO is retained as
-technical evidence and fails closed.
+Deep Goal Interpretation receives authoritative source context rather than the Fast DTO and
+uses the same WHAT-only authority. It is not a repair reviewer and receives no additional
+Capability/planning authority. Fast Planner—not GI—owns execution-input completeness,
+input-source/default policy, clarification selection for HOW, exact Capability identity,
+arguments, Work, timing, and communication. Deterministic validation may reject malformed
+or authority-violating GI output, but it must not manufacture user meaning.
 
-The confidence threshold is risk-tiered rather than universal:
-
-| Fast result | Control action |
-|---|---|
-| schema-valid `chat`, at any confidence | Keep the fast conversational lane; normalize only structural defaults such as `intent=general_conversation`. |
-| schema-valid non-chat result at or above threshold | Continue through the normal typed validators. |
-| schema-valid low-confidence `tool`, `memory`, or `robot_action` | Delegate once to Deep Thinking from the authoritative admitted turn; commit no work first. |
-| explicit `deep_thought` | Enter Deep Thinking once without another Fast semantic reviewer. |
-| malformed DTO | Permit one same-stage mechanical DTO repair. |
-| semantic contradiction or second malformed DTO | Fail closed, retain evidence for evaluation/Reflection, and authorize no effect. |
-
-Removed online reviewers therefore have explicit replacement owners: DTO shape is
-owned by the one mechanical repair; uncertain consequential meaning by Deep
-Thinking; capability identity and arguments by typed catalog/schema validators;
-plan complexity by Deep Planner; and trusted plan rejection by terminal Host
-validation. None of those owners may rewrite committed Goal meaning.
-
-Transport retry of the exact same immutable request may be handled by the client
-as provider reliability evidence, but it is not a new semantic invocation and may
-not change prompt, schema, decoder options, or meaning. The Goal Interpreter does
-not switch transports to obtain a more agreeable semantic answer.
+A semantic interpretation failure is retained as `interpretation_unavailable`; it must not
+be rounded into capability inability, execution failure, an empty result, or a user-facing
+pipeline diagnosis. Transport retry of the exact same immutable model request remains
+provider reliability rather than another semantic invocation.
 
 ### 5.2 Stable-to-volatile model prompt ordering
 
@@ -2616,14 +2590,12 @@ and terminal provider evidence are then recorded against every source goal they
 serve; optional social-attention requests never enter the primary user-goal
 lifecycle.
 
-Effect authority is also monotonic within one turn. The configured cognitive
-lane allowlist says which kinds of plans the deployment can support. The
-Core-owned interpretation result supplies the turn's maximum source-effect
-envelope; that safety constraint is not semantic goal ownership or a Plan. A
-speech-only `chat` turn cannot become `robot_action` after Goal
-Association or planning merely because both lanes are enabled. Such escalation
-stops at the authority boundary before Communicative Activity validation, capability
-validation, or any CapabilityRequest is emitted.
+Effect authority is also monotonic within one turn. Goal Interpretation cannot authorize
+an effect: it supplies Responsibility meaning only. Planner may propose Capability Work
+only from the current catalog and only in service of that Responsibility/Goal; Runtime then
+enforces schema, confirmation, authorization, resource, availability, and provider-safety
+boundaries. No later stage may invent a broader user Responsibility merely because an
+effectful Capability happens to be available.
 
 For an accepted effectful plan, executable wording from the Planner
 is not treated as execution evidence. The trusted adapter preserves that
@@ -2876,7 +2848,7 @@ CapabilityRuntimeEvent
         ↓
 trusted Evidence / execution closure when terminal
         ↓
-Cognitive opportunity / result interpretation / replanning / response as needed
+CognitiveOpportunity / Planner re-entry / replanning / response or silence as needed
 ```
 
 One committed request has one canonical `request_id`. Canonical Goal identity, Plan
@@ -2889,9 +2861,10 @@ implementation references only.
 `CapabilityRuntimeEvent` is a mechanical lifecycle envelope around existing trusted
 request/result/trace truth. It may represent accepted, running/progress, completed,
 failed, cancelled, refused, or timed-out state. It does not decide whether the user
-should be interrupted, whether a Goal is satisfied, or how to phrase a result. The
-Cognitive Core and the existing evidence-bound result/response owners retain those
-semantic authorities. Late results from cancelled or superseded work remain historical
+should be interrupted, whether a Goal is satisfied, whether retry is appropriate, or how
+to phrase a result. Host correlation records qualified terminal truth as Evidence and a
+meaningful state transition may create `CognitiveOpportunity`; the same Planner owns the
+next semantic decision. Late results from cancelled or superseded Work remain historical
 execution observations but cannot resurrect obsolete Goal authority or force speech.
 
 Plan ordering still matters in an asynchronous runtime. `parallel` work may start
@@ -2940,13 +2913,13 @@ become terminal Capability results. Runtime cancellation continues to invoke pro
 using the provider activity ID, while canonical request/capability/Goal identity remains Host-owned. The
 current named-skill wire protocol has no status/event surface, so Chromie does not invent one.
 
-Planner-authored speech timed `after_capabilities` is not dispatched before terminal Evidence on detached execution paths.
-Before terminal Evidence exists it is only prospective wording and therefore cannot own a
-completion claim. Result wording is generated from terminal Evidence instead. When an early
-sibling result is already delivered, final aggregate closure filters that evidence from later
-result interpretation; when every completed fact has already been delivered, final speech is
-suppressed while the aggregate `ExecutionOutcomeBundle` is still recorded as whole-scope
-terminal truth. A newer overlapping turn suppresses early result speech rather than allowing
+Planner-authored speech timed `after_capabilities` is not dispatched before terminal
+Evidence on detached execution paths. Before terminal Evidence exists it is only prospective
+wording and therefore cannot own a completion claim. Terminal Evidence re-enters the same
+Planner, which may author a new trustworthy communicative delta, new Work, or silence. When
+an early sibling result is already delivered, later Planner context carries that delivered
+Evidence so equivalent speech is not repeated; when every completed fact has already been
+delivered, aggregate closure still records whole-scope terminal truth without forcing speech. A newer overlapping turn suppresses early result speech rather than allowing
 an old result to interrupt it. Runtime open-interaction ownership remains visible to scoped
 cancellation even after the foreground interaction task has been cleaned up. Late-result re-entry
 then applies a stricter Host-owned relevance gate: every source Goal must still have open
@@ -3084,15 +3057,15 @@ Evidence remains. It has no speech/progress Activity contract.
 
 After Responsibility meaning is sufficient, Fast Planner may select one tiny
 immediately-ready Communicative Act while downstream work continues. A
-pre-evidence progress act is structurally bounded: the model chooses only a
-`progress_kind` such as `check_information`, `perform_action`, `think`, or
-`acknowledge_work`; the bounded language realizer renders the actual prospective wording. The progress
-schema contains no free-form result text, so an unverified result cannot become
-admissible merely by labelling it `role=progress`. A substantive immediate answer
+pre-evidence progress act is structurally bounded: Planner chooses a `progress_kind` such
+as `check_information`, `perform_action`, `think`, or `acknowledge_work` **and authors the
+exact bounded prospective wording**. The Host validates truth stage and provenance but does
+not rewrite that sentence. The progress contract cannot make an unverified result admissible
+merely by labelling it `role=progress`. A substantive immediate answer
 or clarification uses its own typed Activity and truth requirements instead.
 
-Later planning, trusted result interpretation, or Planner Evidence re-entry
-may communicate a genuinely new trustworthy user-relevant delta: a material
+Later planning or Planner Evidence re-entry may communicate a genuinely new trustworthy
+user-relevant delta: a material
 limitation, meaningful wait state, achieved milestone, failure/retry, correction,
 or completion. Interaction Context and playback Evidence prevent duplicate
 communication. Generated, scheduled, or planned speech is not delivery Evidence;
@@ -3114,12 +3087,13 @@ maintained response-authoring path.
 
 ### 15.2 Post-execution response
 
-After execution, the Host's deterministic closure reconciles every executable
-canonical Goal against the `ExecutionOutcomeBundle`, commits the resulting Goal
-state, and reactivates Fast Planner with an immutable Goal/Evidence snapshot. Fast
-Planner owns the new human-relevant answer/follow-up/silence decision and exact
-wording. It cannot add a skill, action, retry, authorization, Goal change, or result
-ownership inferred from content.
+After execution, deterministic closure correlates every executable canonical Goal with
+the `ExecutionOutcomeBundle`, updates trusted Goal/Work state, and reactivates the same
+Planner with immutable Goal/Evidence/Situation/current-Work context. Planner owns the new
+human-relevant answer/follow-up/silence decision and exact wording and may author genuinely
+new follow-up, retry, alternative, cancellation, replacement, or clarification Work when
+the still-open Responsibility and trusted Evidence justify it. Any new effect still crosses
+ordinary Runtime validation, confirmation, authorization, and provider-safety boundaries.
 
 Before Runtime commits a post-Evidence answer, one bounded same-owner Epistemic
 Qualification accepts or rejects its immutable wording. It cannot rewrite or replace
@@ -3470,12 +3444,12 @@ semantic planners:
   runtime results/traces to exact goal IDs;
 - outcome reconciliation updates goal state from evidence rather than
   prospective planner output;
-- a deterministic post-execution composer produces one evidence-bound,
-  speech-only final response with no executable work;
-- cancellation and newer-turn preemption suppress stale final speech while
-  preserving outcome evidence;
-- recoverable retries create independently fingerprinted,
-  confirmation-bound child plans over only the failed recoverable subset.
+- terminal execution truth is correlated into Evidence and re-enters the same Planner,
+  which owns response, follow-up Work, revision, clarification, wait, or silence;
+- cancellation and newer-turn preemption preserve trusted outcome evidence while stale
+  Planner communication/effects remain suppressed; and
+- recoverable body failures expose only bounded provider-declared retryability facts; Host
+  does not synthesize retry child Plans or recovery prompts.
 
 Exit criteria:
 
