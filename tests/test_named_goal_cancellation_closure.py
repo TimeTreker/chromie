@@ -162,6 +162,76 @@ class NamedGoalCancellationClosureTests(unittest.TestCase):
         self.assertEqual(metadata["target_goal_ids"], ["goal-a"])
         self.assertEqual(metadata["cancellation_receipts"], [])
 
+
+    def test_revoked_multi_goal_confirmation_releases_sibling_for_replanning(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="cancel-confirm-test")
+        _create_goals(manager)
+        dialogue = ConfirmationDialogue(clock=lambda: 100.0)
+        response = InteractionResponse(
+            interaction_id="interaction-confirm",
+            capabilities=[
+                {
+                    "request_id": "request-a",
+                    "capability_id": "soridormi.nod_yes",
+                    "args": {"count": 1},
+                    "requires_confirmation": True,
+                    "metadata": {"source_goal_ids": ["goal-a"]},
+                },
+                {
+                    "request_id": "request-b",
+                    "capability_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "requires_confirmation": True,
+                    "metadata": {"source_goal_ids": ["goal-b"]},
+                },
+            ],
+            metadata={
+                "confirmation_prompt": "Can I do those now?",
+                "confirmation_prompt_source": "planner_wording_runtime_validated",
+            },
+        )
+        pending = dialogue.begin(
+            response,
+            confirmed_request_ids={"request-a", "request-b"},
+            origin_session_id="sid-confirm",
+            conversation_id=manager.conversation_id,
+        )
+        manager.record_confirmation_scope(
+            sid="sid-confirm",
+            confirmation_id=pending.confirmation_id,
+            interaction_id=response.interaction_id,
+            fingerprint=pending.fingerprint,
+            expires_at=pending.expires_at,
+            response=response,
+            confirmed_request_ids={"request-a", "request-b"},
+        )
+        _, transition = __import__(
+            "orchestrator.runtime.named_goal_cancellation",
+            fromlist=["_build_confirmation_remainder"],
+        )._build_confirmation_remainder(
+            confirmation_dialogue=dialogue, target_goal_ids={"goal-a"}
+        )
+        association = _cancel_resolution(["goal-a"]).goal_association
+        assert association is not None and transition is not None
+
+        manager.apply_goal_cancellation_resolution(
+            association,
+            receipts=[],
+            confirmation_transition=transition,
+            sid="sid-cancel",
+            user_text="Cancel the nod.",
+        )
+
+        target = manager._task_context_by_goal_id("goal-a")
+        sibling = manager._task_context_by_goal_id("goal-b")
+        assert target is not None and sibling is not None
+        self.assertEqual(target["status"], "cancelled")
+        self.assertEqual(sibling["status"], "planning")
+        self.assertEqual(sibling["commitment_state"], "evaluating")
+        self.assertEqual(sibling["plan_status"], "confirmation_revoked_requires_replan")
+        self.assertEqual(sibling["confirmation"]["status"], "revoked")
+        self.assertEqual(sibling["metadata"]["remaining_request_ids"], [])
+
     def test_replacement_without_live_work_atomically_supersedes_old_and_creates_new(self) -> None:
         manager = ConversationStateManager(base_conversation_id="replace-test")
         _create_goals(manager)

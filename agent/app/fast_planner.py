@@ -39,6 +39,7 @@ from .planner_context import (
     expected_goal_ids,
     fast_capability_payload,
     gateway_speech_act,
+    goal_cancellation_evidence_reentry_goal_ids,
     planner_goal_execution_requirements,
     planner_response_goal_ids,
     result_evidence_reentry_goal_ids,
@@ -791,11 +792,31 @@ class FastPlannerResolver:
         context = request.context if isinstance(request.context, dict) else {}
         expected_goal_ids_for_turn = expected_goal_ids(context)
         authoritative_goals = canonical_goal_grounding(context)
-        response_goal_ids = sorted(planner_response_goal_ids(authoritative_goals))
+        cancellation_reentry_goal_ids = (
+            goal_cancellation_evidence_reentry_goal_ids(context)
+        )
+        response_goal_ids = sorted(
+            planner_response_goal_ids(authoritative_goals)
+            | cancellation_reentry_goal_ids
+        )
         response_only, requires_execution = planner_goal_execution_requirements(
             authoritative_goals
         )
         reentry_goal_ids = result_evidence_reentry_goal_ids(context)
+        if cancellation_reentry_goal_ids:
+            capability_goal_ids = {
+                str(goal.get("goal_id") or "").strip()
+                for goal in authoritative_goals
+                if isinstance(goal, dict)
+                and isinstance(goal.get("metadata"), dict)
+                and str(goal["metadata"].get("responsibility_kind") or "").strip()
+                == "capability_dependent"
+            }
+            requires_execution = bool(
+                capability_goal_ids - cancellation_reentry_goal_ids
+            )
+            if cancellation_reentry_goal_ids == set(expected_goal_ids_for_turn):
+                response_only = True
         if reentry_goal_ids == set(expected_goal_ids_for_turn):
             # Terminal Evidence satisfies the just-completed provider prerequisite,
             # but it does not force a response-only callback.  Planner must see the
@@ -1177,7 +1198,10 @@ class FastPlannerResolver:
                 capability_payload=capability_payload,
                 expected_goal_ids_for_turn=expected_goal_ids_for_turn,
                 authoritative_goals=canonical_goal_grounding(request.context),
-                evidence_reentry_goal_ids=result_evidence_reentry_goal_ids(request.context),
+                evidence_reentry_goal_ids=(
+                    result_evidence_reentry_goal_ids(request.context)
+                    | goal_cancellation_evidence_reentry_goal_ids(request.context)
+                ),
                 min_confidence=self.min_confidence,
             )
             if not qualification.accepted:

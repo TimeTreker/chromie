@@ -23,6 +23,7 @@ from .planner_context import (
     _goal_execution_metadata,
     evidence_bound_dialogue,
     goal_association_prompt_projection,
+    goal_cancellation_evidence_reentry_goal_ids,
     planner_effectful_goal_ids,
     planner_goal_execution_requirements,
     planner_provider_media_goal_operations,
@@ -89,6 +90,7 @@ def validate_goal_responsibility_outcomes(
         for source_goal_id in item.get("source_goal_ids") or []
     }
     evidence_goal_ids.update(result_evidence_reentry_goal_ids(context))
+    evidence_goal_ids.update(goal_cancellation_evidence_reentry_goal_ids(context))
     valid_vocal_step_ids: set[str] = set()
     valid_media_step_ids: set[str] = set()
     for goal_id in sorted(response_goal_ids):
@@ -1449,6 +1451,7 @@ def validate_external_response_evidence_boundary(
 
     unsupported = responding_goal_ids & unresolved_external_goal_ids
     unsupported -= result_evidence_reentry_goal_ids(context)
+    unsupported -= goal_cancellation_evidence_reentry_goal_ids(context)
     if unsupported:
         raise ValueError(
             "external_read_response_requires_completed_or_verified_evidence: "
@@ -1473,6 +1476,7 @@ def validate_external_response_evidence_boundary(
     }
     index_only_goal_ids = responding_goal_ids & verified_goal_ids - dialogue_goal_ids
     index_only_goal_ids -= result_evidence_reentry_goal_ids(context)
+    index_only_goal_ids -= goal_cancellation_evidence_reentry_goal_ids(context)
     if index_only_goal_ids:
         raise ValueError(
             "external_read_response_requires_evidence_bound_dialogue_or_retrieval: "

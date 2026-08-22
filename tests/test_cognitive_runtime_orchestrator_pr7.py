@@ -346,9 +346,13 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         safe_response = state.agent_results[0][0][1]
         self.assertEqual(
             safe_response.metadata["source"],
-            "host_specific_goal_cancel_not_dispatched",
+            "host_goal_cancellation_operational_fail_safe",
         )
-        self.assertIn("did not mark it cancelled", safe_response.speech[0].text)
+        self.assertIn("don't assume it stopped", safe_response.speech[0].text)
+        self.assertEqual(
+            safe_response.metadata["goal_cancellation_evidence"]["status"],
+            "not_cancelled",
+        )
         self.assertEqual(len(assistant._launch_interaction_calls), 1)
         recorded_resolution = state.user_turns[0][1]["metadata"][
             "cognitive_runtime_resolution"

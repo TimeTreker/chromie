@@ -20,6 +20,7 @@ from .planner_context import (
     evidence_bound_dialogue,
     expected_goal_ids,
     goal_association_prompt_projection,
+    goal_cancellation_evidence_reentry_goal_ids,
     planner_goal_execution_requirements,
     planner_provider_vocal_goal_ids,
     situation_prompt_projection,
@@ -371,6 +372,19 @@ def fast_plan_prompt(
         if isinstance(context.get("result_evidence_reentry"), dict)
         else ""
     )
+    control_evidence_contract = (
+        "Host-bound Goal cancellation Evidence records the factual result of "
+        "deterministic cancellation control. Treat status, target_goal_ids, "
+        "coaffected_goal_ids, released_confirmation_goal_ids, and reconciliation "
+        "flags as trusted facts. A released confirmation sibling is still an open "
+        "Responsibility that needs fresh planning, not a cancelled Goal. Do not "
+        "re-execute a Goal whose cancellation status is cancelled, do not claim "
+        "a failed or uncertain cancellation succeeded, and do not invent control "
+        "effects. Decide only the still-needed conversational or independent Work "
+        "delta from the current Goal/Work/Situation state. "
+        if isinstance(context.get("goal_cancellation_reentry"), dict)
+        else ""
+    )
     goal_execution_contract = (
         "The canonical Goals are provider-free direct speech responsibilities. "
         "This plan is response-only: do not select executable capabilities or plan steps. "
@@ -438,6 +452,7 @@ def fast_plan_prompt(
             f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{bounded_json(context.get('verified_tool_memory_index') or [], 5000)}\n\n"
             f"Delivered evidence-bound dialogue JSON (trusted spoken projection, not the full provider result):\n{bounded_json(evidence_bound_dialogue(context, fallback_history=request.history), 3600)}\n\n"
             f"Host-bound terminal Evidence JSON:\n{bounded_json(context.get('trusted_terminal_evidence') or [], 6000)}\n\n"
+            f"Host-bound Goal cancellation Evidence JSON:\n{bounded_json(context.get('trusted_goal_cancellation_evidence') or [], 3200)}\n\n"
             f"Active and recoverable task bindings JSON:\n{bounded_json(context.get('active_task_snapshots') or [], 5000)}\n\n"
             f"Existing retained or provisional Runtime Activities JSON:\n{bounded_json(provisional_fast_activities or [], 3500)}\n\n"
             f"Bounded live Situation projection JSON (soft/revisable relevance only; referenced owners remain authoritative):\n{bounded_json(situation_prompt_projection(context), 3600)}\n\n"
@@ -452,7 +467,7 @@ def fast_plan_prompt(
             f"{current_turn_communication_contract}"
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
-            f"{result_evidence_contract}{goal_execution_contract}"
+            f"{result_evidence_contract}{control_evidence_contract}{goal_execution_contract}"
             f"{concise_output_contract}"
             f"{provisional_work_contract}"
             "Author stable non-empty step_id values, exact source_goal_ids, and matching outcome step_ids yourself. "
@@ -480,6 +495,7 @@ def fast_plan_prompt(
         f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{bounded_json(context.get('verified_tool_memory_index') or [], 5000)}\n\n"
         f"Delivered evidence-bound dialogue JSON (trusted spoken projection, not the full provider result):\n{bounded_json(evidence_bound_dialogue(context, fallback_history=request.history), 3600)}\n\n"
         f"Host-bound terminal Evidence JSON:\n{bounded_json(context.get('trusted_terminal_evidence') or [], 6000)}\n\n"
+        f"Host-bound Goal cancellation Evidence JSON:\n{bounded_json(context.get('trusted_goal_cancellation_evidence') or [], 3200)}\n\n"
         f"Active and recoverable task bindings JSON:\n{bounded_json(context.get('active_task_snapshots') or [], 5000)}\n\n"
         f"Existing retained or provisional Runtime Activities JSON:\n{bounded_json(provisional_fast_activities or [], 3500)}\n\n"
         f"Bounded live Situation projection JSON (soft/revisable relevance only; referenced owners remain authoritative):\n{bounded_json(situation_prompt_projection(context), 3600)}\n\n"
@@ -498,7 +514,7 @@ def fast_plan_prompt(
         f"{current_turn_communication_contract}"
         f"{IDENTITY_SEMANTIC_CONTRACT}"
         f"{PERSONALITY_SEMANTIC_CONTRACT}"
-        f"{result_evidence_contract}{goal_execution_contract}"
+        f"{result_evidence_contract}{control_evidence_contract}{goal_execution_contract}"
         f"{concise_output_contract}"
         f"{provisional_work_contract}"
         "Generic speech transport is not a plan step. A canonical Goal with responsibility_kind=vocal_output, output_mode=speech, and provider_required=false is a direct conversational responsibility: use disposition=respond with the actual response_text now. Executable outcomes may also carry response_text when it is a still-needed prospective conversational delta; use Interaction Context to omit equivalent delivered or pending speech, and never treat that text as execution evidence. A vocal_output Goal with provider_required=true is a mode-specific vocal performance and cannot be completed by response_text, chromie.speak, ordinary TTS, media playback, or a body gesture. Execute that Goal only when the supplied catalog contains exact capability_id chromie.vocal.perform and its mode enum contains the authoritative Goal output_mode; copy that exact mode and authored content into one owned step. Otherwise escalate for an exact unavailable, refused, or clarification outcome; never invent a vocal capability ID or silently choose another mode. A canonical executable_action/activity/media_playback Goal uses exactly one `chromie.media.<media_operation>` capability copied from the qualified catalog. Playback of existing music, recordings, streams, or sound effects is never a Vocal Goal and never evidence for singing. Preserve persistent playback_id controls and do not replace play, pause, resume, seek, stop, volume, or status with another operation. Greeting wording and length are ordinary model-authored conversational choices governed by the supplied scene, relationship context, and owner-approved personality. "
@@ -516,7 +532,8 @@ def fast_plan_prompt(
         "FINAL AUTHORITATIVE CONTRACT REPAIR ERRORS JSON:\n"
         f"{validation_errors or '[]'}\n"
         "When this list is non-empty, correct every listed defect in the fresh object. If an error reports an expected aggregate disposition, author exactly that disposition unless you also revise the underlying per-goal outcomes consistently.\n"
-        f"FINAL RESULT-EVIDENCE WORDING CONTRACT:\n{result_evidence_contract or 'not_applicable'}"
+        f"FINAL RESULT-EVIDENCE WORDING CONTRACT:\n{result_evidence_contract or 'not_applicable'}\n"
+        f"FINAL CONTROL-EVIDENCE WORDING CONTRACT:\n{control_evidence_contract or 'not_applicable'}"
     )
 
 
@@ -901,6 +918,19 @@ def deep_plan_prompt(
     feedback_section = bounded_json(combined_feedback, 5000) if combined_feedback else "[]"
     previous_section = bounded_json(previous_raw, 5000) if previous_raw is not None else "null"
     response_only, requires_execution = planner_goal_execution_requirements(grounding)
+    cancellation_reentry_goal_ids = goal_cancellation_evidence_reentry_goal_ids(context)
+    if cancellation_reentry_goal_ids:
+        capability_goal_ids = {
+            str(goal.get("goal_id") or "").strip()
+            for goal in grounding
+            if isinstance(goal, dict)
+            and isinstance(goal.get("metadata"), dict)
+            and str(goal["metadata"].get("responsibility_kind") or "").strip()
+            == "capability_dependent"
+        }
+        requires_execution = bool(capability_goal_ids - cancellation_reentry_goal_ids)
+        if cancellation_reentry_goal_ids == set(expected_goal_ids):
+            response_only = True
     provider_vocal_goal_ids = sorted(
         planner_provider_vocal_goal_ids(grounding)
     )
@@ -937,6 +967,7 @@ def deep_plan_prompt(
         f"{skill_section}"
         f"Executable capability catalog JSON:\n{bounded_json(prompt_capabilities, 12000)}\n\n"
         f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{bounded_json(context.get('verified_tool_memory_index') or [], 6000)}\n\n"
+        f"Host-bound Goal cancellation Evidence JSON:\n{bounded_json(context.get('trusted_goal_cancellation_evidence') or [], 3200)}\n\n"
         f"Active and recoverable task bindings JSON:\n{bounded_json(context.get('active_task_snapshots') or [], 6000)}\n\n"
         f"Existing retained or provisional Runtime Activities JSON:\n{bounded_json(context.get('existing_work_activities') or [], 4000)}\n\n"
         f"{goal_progress_communication_prompt('Planner deep pass')}\n\n"
@@ -952,6 +983,13 @@ def deep_plan_prompt(
         "When validation feedback is present but the previous output is null, regenerate one fresh complete object from the authoritative turn, goals, catalog, and all listed defects. Do not patch, quote, splice, annotate, or embed JSON fragments inside rationale or response strings. "
         "When validation feedback reports parallel_step_count=1, the parallel label has no peer and is a malformed scheduling annotation rather than a user-visible concurrency plan; regenerate that exact one-step plan with timing=sequential. When validation feedback says multi-step parallel execution is not affirmatively safe, never silently change those parallel steps to an exact sequential plan. Either author plan_relation=safe_adjustment or alternative with user_confirmation_required=true and response_text explaining the timing change, or return a zero-step clarification/unavailable result. "
         "Produce the final DeepPlannerModelOutput for the complete user goal. Deep planning is terminal: never return to the Fast Planner. The FINAL AUTHORITATIVE USER TURN owns the current communicative act. Retained Goals and delivered evidence may support a response, but must not replace the latest reaction, feeling, acknowledgement, evaluation, or practical decision. Answer that current act directly; replay or re-explain a prior task only when the latest turn asks for it. The verified tool-memory index contains no answer facts. If one exact fresh index entry matches the authoritative Goal bindings, execute chromie.memory.retrieve_verified_tool_result with its evidence_id, original tool_id, and the exact material arguments. If no such entry exists, execute the fresh read capability. Never answer directly from index metadata, never reinterpret an unresolved reference from old memory, and never use another task's result. When a scheduled, running, or recoverable safe read has no matching completed memory entry, resume or retry its bound capability with the exact arguments. "
+        "When Host-bound Goal cancellation Evidence is present, it is the trusted "
+        "control result for the named cancellation: cancelled means the target Goal "
+        "is terminal and must not be re-executed; not_cancelled means do not claim it "
+        "stopped; uncertain means preserve that uncertainty. Coaffected Goals remain "
+        "separate open/recoverable responsibilities unless their own state says otherwise. "
+        "Goals listed in released_confirmation_goal_ids lost only a stale authorization "
+        "token and remain open for fresh planning; never treat them as cancelled. "
         f"Required response language: {str(request.language or 'auto')[:32]}. "
         "Write every user-facing top-level and per-goal response_text naturally "
         "in that language. Do not switch languages merely because internal Goals, "

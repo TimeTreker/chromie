@@ -7,12 +7,14 @@ from typing import Any
 from pydantic import ValidationError
 
 try:
+    from chromie_contracts.control import GoalCancellationEvidence
     from chromie_contracts.goal import GoalAssociationResolution
     from chromie_contracts.interaction import MEDIA_CAPABILITY_IDS
     from chromie_contracts.situation import SituationProjection
     from chromie_contracts.tool_result import ToolResultEvidence
     from chromie_contracts.plan import FastPlannerFirstResponse
 except ImportError:  # pragma: no cover
+    from shared.chromie_contracts.control import GoalCancellationEvidence
     from shared.chromie_contracts.goal import GoalAssociationResolution
     from shared.chromie_contracts.interaction import MEDIA_CAPABILITY_IDS
     from shared.chromie_contracts.situation import SituationProjection
@@ -443,6 +445,54 @@ def result_evidence_reentry_goal_ids(
         for value in reentry.get("source_goal_ids") or []
         if (normalized := " ".join(str(value or "").strip().split()))
     }
+
+def goal_cancellation_evidence_reentry_goal_ids(
+    context: dict[str, Any] | None,
+) -> set[str]:
+    """Return Goals bound to Host-admitted cancellation control Evidence.
+
+    The cancellation mechanism owns only the factual transition. This helper
+    validates the bounded Evidence and grants the existing Planner permission to
+    communicate from that state; it does not interpret the result itself.
+    """
+
+    if not isinstance(context, dict):
+        return set()
+    reentry = context.get("goal_cancellation_reentry")
+    raw_evidence = context.get("trusted_goal_cancellation_evidence")
+    if not isinstance(reentry, dict) or not isinstance(raw_evidence, list):
+        return set()
+    try:
+        evidence = [
+            GoalCancellationEvidence.model_validate(item)
+            for item in raw_evidence
+        ]
+    except (ValidationError, ValueError, TypeError):
+        return set()
+    if not evidence:
+        return set()
+    evidence_ids = {item.evidence_id for item in evidence}
+    referenced_ids = {
+        normalized
+        for value in reentry.get("evidence_refs") or []
+        if (normalized := " ".join(str(value or "").strip().split()))
+    }
+    if referenced_ids and not referenced_ids.issubset(evidence_ids):
+        return set()
+    evidence_goal_ids = {
+        goal_id
+        for item in evidence
+        for goal_id in item.target_goal_ids
+    }
+    requested_goal_ids = {
+        normalized
+        for value in reentry.get("source_goal_ids") or []
+        if (normalized := " ".join(str(value or "").strip().split()))
+    }
+    if requested_goal_ids and not requested_goal_ids.issubset(evidence_goal_ids):
+        return set()
+    return requested_goal_ids or evidence_goal_ids
+
 
 def situation_prompt_projection(context: dict[str, Any] | None) -> dict[str, Any]:
     """Return only a validated bounded Situation projection for model prompts."""

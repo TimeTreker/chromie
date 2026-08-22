@@ -41,6 +41,7 @@ from .planner_context import (
     canonical_goal_grounding,
     expected_goal_ids,
     deep_capability_payload,
+    goal_cancellation_evidence_reentry_goal_ids,
     planner_goal_execution_requirements,
     planner_provider_media_goal_operations,
     planner_provider_vocal_goal_ids,
@@ -159,9 +160,26 @@ class DeepPlannerResolver:
         context = request.context if isinstance(request.context, dict) else {}
         expected_goal_ids_for_turn = expected_goal_ids(context)
         authoritative_goals = canonical_goal_grounding(context)
+        cancellation_reentry_goal_ids = (
+            goal_cancellation_evidence_reentry_goal_ids(context)
+        )
         response_only, requires_execution = planner_goal_execution_requirements(
             authoritative_goals
         )
+        if cancellation_reentry_goal_ids:
+            capability_goal_ids = {
+                str(goal.get("goal_id") or "").strip()
+                for goal in authoritative_goals
+                if isinstance(goal, dict)
+                and isinstance(goal.get("metadata"), dict)
+                and str(goal["metadata"].get("responsibility_kind") or "").strip()
+                == "capability_dependent"
+            }
+            requires_execution = bool(
+                capability_goal_ids - cancellation_reentry_goal_ids
+            )
+            if cancellation_reentry_goal_ids == set(expected_goal_ids_for_turn):
+                response_only = True
         capabilities = await self.catalog.prompt_entries(scope="all", refresh=False)
         executable = [
             item
@@ -225,7 +243,10 @@ class DeepPlannerResolver:
             },
             response_only=response_only,
             requires_execution=requires_execution,
-            response_goal_ids=sorted(planner_response_goal_ids(authoritative_goals)),
+            response_goal_ids=sorted(
+                planner_response_goal_ids(authoritative_goals)
+                | cancellation_reentry_goal_ids
+            ),
             provider_required_vocal_goal_ids=sorted(
                 planner_provider_vocal_goal_ids(authoritative_goals)
             ),

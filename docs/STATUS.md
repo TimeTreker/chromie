@@ -62,13 +62,16 @@ The authoritative definitions live in `docs/PROJECT_CHARTER.md`. In particular:
   Planner operations, not a mandatory Work-Reconciliation stage.
 
 The 2026-08-22 source audit found that this target authority line is **not yet fully
-closed in maintained source**.  The current patch removes the generic Confirmation
-Dialogue wording fallback and its approve/deny/expire/ambiguous message payload, so
-confirmation state now carries authorization facts only and requires already-authored
-Planner confirmation wording.  Remaining verified leaks are named-cancellation
-self-narration, deterministic execution-outcome/result wording, and Host-owned body
-recovery retry/prompt construction.  These are remediation work, not alternate
-architecture.  Passing structural gates must not be interpreted as proof that
+closed in maintained source**. Phase 1A removed generic Confirmation Dialogue wording
+and resolution messages. Phase 1B now removes named-cancellation self-narration and
+Host-authored confirmation remainders: deterministic cancellation emits bounded
+`GoalCancellationEvidence`, reconciles Goal/control state, and re-enters the existing
+Planner state path for any still-needed response or Work delta. A failed/uncertain
+cancellation may fall back only to a bounded operational safety warning when Planner
+re-entry itself is unavailable; that warning never claims cancellation succeeded.
+Remaining verified leaks are deterministic execution-outcome/result wording and
+Host-owned body-recovery retry/prompt construction. These are remediation work, not
+alternate architecture. Passing structural gates must not be interpreted as proof that
 `SPEECH-OWNER-001` is already closed.
 
 ## Current implementation and verification state
@@ -77,7 +80,7 @@ architecture.  Passing structural gates must not be interpreted as proof that
 |---|---|---|---|---|
 | Cognitive Gateway / Attention | Maintained configuration controls Attention Review; deterministic protective reflex remains separate. Disabled or unavailable semantic review fails open without fabricating high-confidence addressedness. | Source and focused contract regressions cover admission, fail-open behavior, temporary addressedness rules, and schema boundaries. | Current-revision open-room microphone behavior still requires live evidence. | Development only. |
 | Goal Interpretation / Goal Association | GI is WHAT-only. GA is the canonical Goal-continuity writer. Standalone admitted greetings may speak before GA but still receive canonical conversational Goal continuity. GA representation mechanics are now split internally: `agent/app/goal_association_contract.py` owns model DTO/schema/normalization/typed integrity checks and `agent/app/goal_association_prompt.py` owns bounded prompt projection/system prompts. Resolver/inference and canonical continuity remain in the single `GoalAssociationResolver` authority. | Contract and focused Goal/continuity tests are maintained, including guards that neither extracted module owns a model client/runtime/Goal-commit authority and that the Resolver does not re-own their mechanics. | Live-model semantic quality remains revision-bound and must be requalified after material model/prompt changes. | Development only. |
-| Planner / communication | One Planner authority is the target HOW and ordinary Communicative-Activity owner; Fast/Deep remain passes of that owner. Planner contract decomposition is maintained. The 2026-08-22 audit verified residual Host/runtime semantic wording outside that owner. This patch closes the generic Confirmation Dialogue wording fallback and typed-resolution messages, but named-cancellation narration, mechanical outcome wording, and Host body-recovery proposal/prompt ownership remain open until the remediation line below closes them. | Planner/GA/runtime tests and policy guards protect many boundaries, but existing gates did not catch all user-visible Host wording. The confirmation policy guard is strengthened in this patch; broader speech-owner guards remain required. | Warm latency and complete user-facing authority still require current-revision qualification after source closure. | Development only. |
+| Planner / communication | One Planner authority is the target HOW and ordinary Communicative-Activity owner; Fast/Deep remain passes of that owner. Planner contract decomposition is maintained. Phase 1A closes generic Confirmation Dialogue wording; Phase 1B closes named-cancellation narration and Host confirmation-remainder synthesis by returning typed cancellation Evidence to Planner. Mechanical outcome wording and Host body-recovery proposal/prompt ownership remain open. | Planner/GA/runtime tests and repository policy now guard confirmation and named-cancellation Host phrase ownership plus cancellation Evidence binding/re-entry. Broader result/body guards remain required. | Warm latency and complete user-facing authority still require current-revision qualification after source closure. | Development only. |
 | Async Runtime / Evidence re-entry | Terminal Runtime events are correlated into Evidence and may create bounded `CognitiveOpportunity` re-entry. Planner may answer, create follow-up Work, revise existing Work, wait, or do nothing. Re-entry is not response-only and does not fabricate a UserTurn, Responsibility, or confirmation. Missing originating Responsibility provenance retains Evidence but fails that opportunity closed. | Focused async regressions cover incremental terminal Evidence, follow-up Work while siblings continue, cancellation/supersession containment, duplicate-execution prevention, and missing-provenance rejection before Planner invocation. | Provider-backed weather/body episodes should be retained on the exact current revision. | Development only. |
 | Identity / personality truth | Chromie's owner-approved social identity is a six-year-old girl and family young secretary. That is not a biological-human claim; truthful robotic embodiment remains available when relevant. | Mind-profile, prompt-context, and identity/body benchmark contracts guard the two-layer truth boundary. | Bilingual live identity conversation remains to be requalified on the current model/profile. | Development only. |
 | Social Attention | Optional embodied decoration remains subordinate to a concrete primary Activity, has no speech or Goal-completion authority, and may validly return none. | Source-level behavior and capability-grounding checks exist. | Reviewed live baseline remains open for the current revision. | Development only. |
@@ -88,12 +91,12 @@ architecture.  Passing structural gates must not be interpreted as proof that
 
 1. **Close live semantic-authority leaks before adding cognition.** Finish the
    2026-08-22 audit remediation in narrow slices: (a) confirmation state carries no
-   Host-authored dialogue and requires exact Planner wording; (b) named cancellation
-   returns trusted state/effect facts to Planner instead of replacing Planner output
-   with Host prose; (c) remove deterministic status-to-speech outcome composition and
-   Host body-recovery planning/prompt ownership, using ordinary Evidence -> Situation ->
-   Planner continuation instead. Keep only the already-approved tiny cognition-unavailable
-   operational fallback where no safe semantic owner can run.
+   Host-authored dialogue and requires exact Planner wording — closed in Phase 1A;
+   (b) named cancellation returns typed control Evidence to Planner and never synthesizes
+   a Host confirmation remainder — closed in Phase 1B; (c) remove deterministic
+   status-to-speech outcome composition and Host body-recovery planning/prompt ownership,
+   using ordinary Evidence -> Situation -> Planner continuation instead. Keep only bounded
+   operational safety fallbacks where no safe semantic owner can run.
 2. **Make the authority rule executable.** Extend repository/behavior tests so a
    passing gate cannot coexist with ordinary Host-authored semantic response strings.
    Test observable authority and truth-stage provenance rather than exact incidental

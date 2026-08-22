@@ -1749,6 +1749,11 @@ class ConversationStateManager:
             old_confirmation_id = str(
                 transition.get("old_confirmation_id") or ""
             ).strip()
+            released_confirmation_goal_ids = {
+                str(item).strip()
+                for item in transition.get("released_confirmation_goal_ids") or []
+                if str(item).strip()
+            }
             if old_confirmation_id:
                 new_confirmation_id = str(
                     (replacement or {}).get("confirmation_id") or ""
@@ -1805,6 +1810,31 @@ class ConversationStateManager:
                     else:
                         task["status"] = "cancelled"
                         task["updated_ms"] = timestamp_ms
+                        if goal_id in released_confirmation_goal_ids:
+                            context = self._task_context_by_goal_id(goal_id)
+                            if context is not None and self._goal_responsibility_status(context) == "open":
+                                context["status"] = "planning"
+                                context["commitment_state"] = "evaluating"
+                                context["plan_status"] = "confirmation_revoked_requires_replan"
+                                confirmation = context.get("confirmation")
+                                if not isinstance(confirmation, dict):
+                                    confirmation = {}
+                                context["confirmation"] = {
+                                    **confirmation,
+                                    "status": "revoked",
+                                    "resolved_ms": timestamp_ms,
+                                }
+                                context_metadata = context.get("metadata")
+                                if not isinstance(context_metadata, dict):
+                                    context_metadata = {}
+                                context["metadata"] = {
+                                    **context_metadata,
+                                    "confirmation_id": "",
+                                    "confirmation_request_ids": [],
+                                    "remaining_request_ids": [],
+                                    "confirmation_revoked_by_goal_cancellation": True,
+                                }
+                                context["updated_ms"] = timestamp_ms
 
                 for task in self._pending_tasks:
                     if task.get("type") != "goal_execution":
@@ -1825,7 +1855,15 @@ class ConversationStateManager:
                         }
                         continue
                     request_ids = preserved_by_goal.get(goal_id)
-                    if new_confirmation_id and isinstance(request_ids, list):
+                    if goal_id in released_confirmation_goal_ids and not new_confirmation_id:
+                        task["status"] = "cancelled"
+                        task["updated_ms"] = timestamp_ms
+                        task["metadata"] = {
+                            **metadata,
+                            "remaining_request_ids": [],
+                            "confirmation_revoked_by_goal_cancellation": True,
+                        }
+                    elif new_confirmation_id and isinstance(request_ids, list):
                         task["status"] = "awaiting_confirmation"
                         task["updated_ms"] = timestamp_ms
                         task["metadata"] = {

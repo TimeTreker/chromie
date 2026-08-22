@@ -18,6 +18,48 @@ from shared.chromie_contracts.tool_result import (
 )
 
 
+async def _planner_evidence_reentry(
+    assistant: VoiceAssistant,
+    *,
+    source_response: InteractionResponse,
+    canonical_plan: CanonicalPlan,
+    user_request: str,
+    language: str,
+    goal_ids: list[str],
+    evidence: list[ToolResultEvidence],
+    session_id: str | None,
+    phase: str,
+):
+    evidence_refs = [item.evidence_id for item in evidence]
+    return await assistant._planner_state_reentry_response(
+        source_response=source_response,
+        canonical_plan=canonical_plan,
+        user_request=user_request,
+        language=language,
+        goal_ids=goal_ids,
+        evidence_goal_ids=goal_ids,
+        evidence_refs=evidence_refs,
+        session_id=session_id,
+        phase=phase,
+        context_updates={
+            "trusted_terminal_evidence": [
+                item.model_dump(mode="json") for item in evidence
+            ],
+            "result_evidence_refs": evidence_refs,
+            "result_evidence_reentry": {
+                "phase": phase,
+                "source_goal_ids": goal_ids,
+                "evidence_refs": evidence_refs,
+                "planner_authority": "planner",
+            },
+        },
+        fast_workflow_stage="fast_planner_evidence_reentry",
+        deep_workflow_stage="planner_deep_pass_evidence_reentry",
+        response_source="fast_planner_evidence_reentry",
+        repeat_check_evidence=evidence,
+    )
+
+
 class PlannerEvidenceReentryContractTests(unittest.TestCase):
     def test_terminal_evidence_is_digest_bound(self) -> None:
         data = {"location": "重庆", "rain_probability": 10}
@@ -140,7 +182,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         )
 
         response = asyncio.run(
-            assistant._planner_evidence_reentry_response(
+            _planner_evidence_reentry(assistant,
                 source_response=source,
                 canonical_plan=original,
                 user_request="今天上午会下雨吗？",
@@ -171,7 +213,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
             ]
         }
         duplicate = asyncio.run(
-            assistant._planner_evidence_reentry_response(
+            _planner_evidence_reentry(assistant,
                 source_response=source,
                 canonical_plan=original,
                 user_request="今天上午会下雨吗？",
@@ -245,7 +287,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         )
 
         response = asyncio.run(
-            assistant._planner_evidence_reentry_response(
+            _planner_evidence_reentry(assistant,
                 source_response=source,
                 canonical_plan=original,
                 user_request="今天上午会下雨吗？",

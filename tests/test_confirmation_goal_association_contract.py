@@ -48,6 +48,10 @@ class ConfirmationGoalAssociationContractTests(unittest.IsolatedAsyncioTestCase)
         assistant.get_http_session = MethodType(get_http_session, assistant)
         response = InteractionResponse(
             interaction_id="interaction-confirm",
+            metadata={
+                "confirmation_prompt": "Can I do that now?",
+                "confirmation_prompt_source": "planner_wording_runtime_validated",
+            },
             capabilities=[
                 {
                     "request_id": "request-1",

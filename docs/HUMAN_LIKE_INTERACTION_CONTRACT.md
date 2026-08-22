@@ -859,7 +859,14 @@ state-machine instructions, and Host phrase templates must never replace it.
 The confirmation state object therefore carries authorization facts (bound request IDs,
 fingerprint/expiry, and typed decision), not user-visible approve/deny/expire/ambiguous
 messages. If Planner did not author valid confirmation wording, confirmation staging fails
-closed rather than synthesizing a Host prompt.
+closed rather than synthesizing a Host prompt. If a later named-Goal cancellation makes a
+pending multi-Goal confirmation stale, the Host revokes that confirmation token as a
+whole. It must not synthesize a narrowed child Plan, replacement confirmation wording, or
+"continue the rest" sentence. Deterministic cancellation instead records exact bounded
+control Evidence and reactivates Planner; Planner decides whether the person needs a
+response and what still-open sibling Work should happen next. If that Planner re-entry is
+unavailable after a failed or uncertain stop attempt, a bounded operational safety warning
+may say only that the stop was not verified and must never imply it succeeded.
 For example:
 
 ```text

@@ -39,10 +39,14 @@ and constraints; Goal Interpretation owns none of those fields. Trusted Runtime
 and Host bind terminal results to exact request/Goal provenance as Evidence, then
 reactivate Planner with a bounded current-state view. Result contents cannot bypass
 Planner or infer their own Goal. Confirmation/cancellation mechanisms likewise own
-only authorization/control facts and may not turn those facts into ordinary dialogue. A
-later Planner pass may answer, author genuinely new Work, reuse/cancel/replace current
-Work, wait, or emit no Activity; it must not repeat the terminal Activity merely because
-Evidence arrived.
+only authorization/control facts and may not turn those facts into ordinary dialogue.
+Named-Goal cancellation records bounded `GoalCancellationEvidence` after deterministic
+dispatch/reconciliation and re-enters the same Planner state path used for trusted runtime
+Evidence. If cancellation invalidates a pending confirmation, Host revokes the stale token
+as a whole; it never invents a narrowed child Plan, replacement prompt, or sibling
+remainder speech. A later Planner pass may answer, author genuinely new Work,
+reuse/cancel/replace current Work, wait, or emit no Activity; it must not repeat the
+terminal or cancelled Activity merely because Evidence arrived.
 
 Cross-cutting evidence qualification, retention/privacy policy, and bounded
 adaptation are not additional semantic owners. They refine factual/context input to

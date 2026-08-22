@@ -69,6 +69,8 @@ from orchestrator.runtime.named_goal_cancellation import (
     cancellation_target_goal_ids,
     replacement_target_goal_ids,
     dispatch_named_goal_cancellation,
+    goal_cancellation_failure_evidence,
+    goal_cancellation_success_evidence,
     dispatch_goal_replacement,
 )
 from orchestrator.runtime.cognitive_runtime import (
@@ -153,6 +155,7 @@ from shared.chromie_contracts.execution_outcome import (
     goal_completion_qualification_summary,
 )
 from shared.chromie_contracts.situation import CognitiveOpportunity
+from shared.chromie_contracts.control import GoalCancellationEvidence
 from shared.chromie_contracts.tool_result import (
     ToolExecutionRequest,
     ToolExecutionResponse,
@@ -2129,69 +2132,40 @@ class VoiceAssistant:
 
 
 
-    def _named_goal_cancellation_failure_response(
+    def _goal_cancellation_operational_fail_safe(
         self,
-        exc: Exception,
-        *,
         user_text: str,
-    ) -> InteractionResponse | None:
-        """Render only evidence-qualified named-cancellation failures."""
+        *,
+        evidence: GoalCancellationEvidence,
+    ) -> InteractionResponse:
+        """Return one conservative warning only when Planner re-entry is unavailable.
 
-        zh = self._looks_zh(user_text)
-        if isinstance(exc, ActiveGoalCancellationRequiresRuntimeDispatch):
-            return self._host_speech_response(
-                (
-                    "我还不能可靠地把这个目标和正在执行的任务一起停下，"
-                    "所以没有把它标记为已取消。"
-                )
-                if zh
-                else (
-                    "I could not reliably stop the selected goal together "
-                    "with its active execution, so I did not mark it cancelled."
-                ),
-                style="warning",
-                source="host_specific_goal_cancel_not_dispatched",
-            )
-        if not isinstance(exc, NamedGoalCancellationClosureError):
-            return None
-        if exc.stage == "confirmation_scope_conflict":
-            text = (
-                "这个待确认动作同时属于多个目标，无法只取消其中一个；"
-                "我保留了原确认和目标状态。"
-                if zh
-                else (
-                    "That pending action is shared by multiple goals, so I "
-                    "could not cancel only one of them. I kept the original "
-                    "confirmation and goal state unchanged."
-                )
-            )
-            source = "host_specific_goal_cancel_scope_conflict"
-        elif exc.runtime_dispatch_attempted:
-            text = (
-                "我已尝试发送取消请求，但无法可靠地核对并写回这个目标的最终状态；"
-                "当前结果是不确定的。"
-                if zh
-                else (
-                    "I attempted to cancel the selected goal, but I could not "
-                    "reliably verify and reconcile its final state. The result "
-                    "is uncertain."
-                )
-            )
-            source = "host_specific_goal_cancel_result_uncertain"
-        else:
-            text = (
-                "我无法安全地更新这个目标及其确认状态，因此保留了原状态。"
-                if zh
-                else (
-                    "I could not safely update the selected goal and its "
-                    "confirmation state, so I left the original state unchanged."
-                )
-            )
-            source = "host_specific_goal_cancel_state_unchanged"
-        return self._host_speech_response(
+        This is an operational safety fallback, not ordinary cancellation dialogue:
+        it makes no claim that cancellation succeeded or failed and exposes no
+        internal closure stage. The normal path is Planner-authored from Evidence.
+        """
+
+        text = (
+            "刚才那个停止我没确认好，先别当作已经停了。"
+            if self._looks_zh(user_text)
+            else "I couldn't verify that stop, so don't assume it stopped."
+        )
+        response = self._host_speech_response(
             text,
             style="warning",
-            source=source,
+            source="host_goal_cancellation_operational_fail_safe",
+        )
+        return response.model_copy(
+            deep=True,
+            update={
+                "metadata": {
+                    **response.metadata,
+                    "operational_fail_safe": True,
+                    "goal_cancellation_evidence": evidence.model_dump(
+                        mode="json"
+                    ),
+                }
+            },
         )
 
     async def _dispatch_named_goal_cancellation(
@@ -2505,6 +2479,34 @@ class VoiceAssistant:
             return True
 
         response = resolution.interaction_response.model_copy(deep=True)
+        planner_source_plan = resolution.terminal_plan
+        cancellation_goal_ids = cancellation_target_goal_ids(resolution)
+        replacement_goal_ids = replacement_target_goal_ids(resolution)
+        cancellation_reentry_source_response = response
+        cancellation_reentry_source_plan: CanonicalPlan | None = None
+        pending_confirmation = getattr(
+            getattr(self, "confirmation_dialogue", None), "pending", None
+        )
+        if (
+            cancellation_goal_ids
+            and pending_confirmation is not None
+            and cancellation_goal_ids.intersection(
+                pending_confirmation_goal_ids(pending_confirmation)
+            )
+        ):
+            cancellation_reentry_source_response = (
+                pending_confirmation.response.model_copy(deep=True)
+            )
+            raw_pending_plan = cancellation_reentry_source_response.metadata.get(
+                "canonical_plan"
+            )
+            if isinstance(raw_pending_plan, dict):
+                try:
+                    cancellation_reentry_source_plan = CanonicalPlan.model_validate(
+                        raw_pending_plan
+                    )
+                except (TypeError, ValueError):
+                    cancellation_reentry_source_plan = None
         try:
             response_metadata = self._metadata_with_turn_envelope(
                 {
@@ -2530,8 +2532,10 @@ class VoiceAssistant:
                     "metadata": response_metadata,
                 },
             )
-            replacement_goal_ids = replacement_target_goal_ids(resolution)
-            cancellation_goal_ids = cancellation_target_goal_ids(resolution)
+            if planner_source_plan is None:
+                raw_plan = response.metadata.get("canonical_plan")
+                if isinstance(raw_plan, dict):
+                    planner_source_plan = CanonicalPlan.model_validate(raw_plan)
             if replacement_goal_ids:
                 goal_state_results, replacement_metadata = (
                     await dispatch_goal_replacement(
@@ -2567,38 +2571,86 @@ class VoiceAssistant:
                         language=core_interpretation.language,
                     )
                 )
-                zh = self._looks_zh(user_text)
-                coaffected = cancellation_metadata.get("coaffected_goal_ids") or []
-                replacement_prompt = str(
-                    cancellation_metadata.get(
-                        "replacement_confirmation_prompt"
+                association = resolution.goal_association
+                if association is None:
+                    raise ValueError(
+                        "named cancellation requires Goal Association provenance"
                     )
-                    or ""
-                ).strip()
-                if coaffected:
-                    text = (
-                        "已取消你指定的目标。由于执行器只支持更宽的停止范围，"
-                        "相关的正在执行工作也已停止。"
-                        if zh
-                        else (
-                            "I cancelled the selected goal. Because the provider "
-                            "supports only a wider stop scope, related active work "
-                            "was stopped as well."
+                cancellation_evidence = goal_cancellation_success_evidence(
+                    source_turn_id=association.turn_id,
+                    metadata=cancellation_metadata,
+                )
+                cancellation_metadata = {
+                    **cancellation_metadata,
+                    "evidence": cancellation_evidence.model_dump(mode="json"),
+                }
+                planner_response: InteractionResponse | None = None
+                released_goal_ids = list(
+                    cancellation_evidence.released_confirmation_goal_ids
+                )
+                reentry_source_response = response
+                reentry_source_plan = planner_source_plan
+                reentry_goal_ids = list(cancellation_evidence.target_goal_ids)
+                if released_goal_ids and cancellation_reentry_source_plan is not None:
+                    reentry_source_response = cancellation_reentry_source_response
+                    reentry_source_plan = cancellation_reentry_source_plan
+                    reentry_goal_ids = list(
+                        dict.fromkeys(
+                            [
+                                *cancellation_evidence.target_goal_ids,
+                                *released_goal_ids,
+                            ]
                         )
                     )
-                else:
-                    text = (
-                        "已取消你指定的目标。"
-                        if zh
-                        else "I cancelled the selected goal."
+                if reentry_source_plan is not None:
+                    planner_response = (
+                        await self._planner_state_reentry_response(
+                            source_response=reentry_source_response,
+                            canonical_plan=reentry_source_plan,
+                            user_request=user_text,
+                            language=core_interpretation.language,
+                            goal_ids=reentry_goal_ids,
+                            evidence_goal_ids=list(cancellation_evidence.target_goal_ids),
+                            evidence_refs=[cancellation_evidence.evidence_id],
+                            session_id=session_id,
+                            phase="goal_cancellation_reentry",
+                            context_updates={
+                                "trusted_goal_cancellation_evidence": [
+                                    cancellation_evidence.model_dump(mode="json")
+                                ],
+                                "goal_cancellation_reentry": {
+                                    "phase": "goal_cancellation_reentry",
+                                    "source_goal_ids": list(
+                                        cancellation_evidence.target_goal_ids
+                                    ),
+                                    "evidence_refs": [cancellation_evidence.evidence_id],
+                                    "planner_authority": "planner",
+                                },
+                            },
+                            fast_workflow_stage=(
+                                "fast_planner_goal_cancellation_reentry"
+                            ),
+                            deep_workflow_stage=(
+                                "planner_deep_pass_goal_cancellation_reentry"
+                            ),
+                            response_source=(
+                                "fast_planner_goal_cancellation_reentry"
+                            ),
+                        )
                     )
-                if replacement_prompt:
-                    text = f"{text} {replacement_prompt}"
-                response = self._host_speech_response(
-                    text,
-                    style="brief",
-                    source="host_named_goal_cancellation_reconciled",
-                )
+                if planner_response is None:
+                    # Control state is already reconciled. Never resurrect the old
+                    # prospective Planner wording or invent Host completion speech.
+                    response = response.model_copy(
+                        deep=True,
+                        update={
+                            "speech": [],
+                            "capabilities": [],
+                            "requires_confirmation": False,
+                        },
+                    )
+                else:
+                    response = planner_response
                 response = response.model_copy(
                     deep=True,
                     update={
@@ -2625,6 +2677,7 @@ class VoiceAssistant:
                         "named_goal_cancellation_dispatched_and_reconciled"
                     ),
                     "named_goal_cancellation": cancellation_metadata,
+                    "goal_cancellation_evidence_id": cancellation_evidence.evidence_id,
                 }
             else:
                 response = self.interaction_runtime.prepare_response(
@@ -2654,14 +2707,19 @@ class VoiceAssistant:
                     "host_commit_status": "prepared_and_goal_state_committed",
                 }
         except Exception as exc:
-            cancellation_failure_response = (
-                self._named_goal_cancellation_failure_response(
-                    exc,
-                    user_text=user_text,
+            cancellation_failure_evidence: GoalCancellationEvidence | None = None
+            if cancellation_goal_ids:
+                association = resolution.goal_association
+                source_turn_id = (
+                    association.turn_id
+                    if association is not None
+                    else str(session_id or "named_goal_cancellation")
                 )
-                if cancellation_goal_ids
-                else None
-            )
+                cancellation_failure_evidence = goal_cancellation_failure_evidence(
+                    source_turn_id=source_turn_id,
+                    target_goal_ids=cancellation_goal_ids,
+                    exc=exc,
+                )
             self.session_log(
                 session_id,
                 "cognitive_runtime_commit_failed: error_type=%s error=%s",
@@ -2682,15 +2740,94 @@ class VoiceAssistant:
                 },
             )
             summary = self._cognitive_resolution_summary(resolution)
-            safe_response = (
-                cancellation_failure_response
-                or self._cognitive_core_exception_safe_response(
+            safe_response: InteractionResponse
+            if cancellation_failure_evidence is not None:
+                planner_failure_response: InteractionResponse | None = None
+                try:
+                    if planner_source_plan is not None:
+                        planner_failure_response = (
+                            await self._planner_state_reentry_response(
+                                source_response=response,
+                                canonical_plan=planner_source_plan,
+                                user_request=user_text,
+                                language=core_interpretation.language,
+                                goal_ids=list(
+                                    cancellation_failure_evidence.target_goal_ids
+                                ),
+                                evidence_goal_ids=list(
+                                    cancellation_failure_evidence.target_goal_ids
+                                ),
+                                evidence_refs=[
+                                    cancellation_failure_evidence.evidence_id
+                                ],
+                                session_id=session_id,
+                                phase="goal_cancellation_reentry",
+                                context_updates={
+                                    "trusted_goal_cancellation_evidence": [
+                                        cancellation_failure_evidence.model_dump(
+                                            mode="json"
+                                        )
+                                    ],
+                                    "goal_cancellation_reentry": {
+                                        "phase": "goal_cancellation_reentry",
+                                        "source_goal_ids": list(
+                                            cancellation_failure_evidence.target_goal_ids
+                                        ),
+                                        "evidence_refs": [
+                                            cancellation_failure_evidence.evidence_id
+                                        ],
+                                        "planner_authority": "planner",
+                                    },
+                                },
+                                fast_workflow_stage=(
+                                    "fast_planner_goal_cancellation_reentry"
+                                ),
+                                deep_workflow_stage=(
+                                    "planner_deep_pass_goal_cancellation_reentry"
+                                ),
+                                response_source=(
+                                    "fast_planner_goal_cancellation_reentry"
+                                ),
+                            )
+                        )
+                except Exception as reentry_exc:
+                    self.session_log(
+                        session_id,
+                        "goal_cancellation_planner_reentry_failed: "
+                        "error_type=%s error=%s",
+                        type(reentry_exc).__name__,
+                        reentry_exc,
+                    )
+                safe_response = (
+                    planner_failure_response
+                    or self._goal_cancellation_operational_fail_safe(
+                        user_text,
+                        evidence=cancellation_failure_evidence,
+                    )
+                )
+                safe_response = safe_response.model_copy(
+                    deep=True,
+                    update={
+                        "metadata": self._metadata_with_turn_envelope(
+                            {
+                                **safe_response.metadata,
+                                "goal_cancellation_evidence": (
+                                    cancellation_failure_evidence.model_dump(
+                                        mode="json"
+                                    )
+                                ),
+                            },
+                            turn_envelope,
+                        )
+                    },
+                )
+            else:
+                safe_response = self._cognitive_core_exception_safe_response(
                     user_text,
                     failure_stage="host_commit",
                     failure_class=type(exc).__name__,
                     failure_error=str(exc),
                 )
-            )
             record_session_workflow_stage(
                 self,
                 session_id,
@@ -4782,22 +4919,41 @@ class VoiceAssistant:
                 exc,
             )
             return None
-        return await self._planner_evidence_reentry_response(
+        goal_ids = list(evidence.source_goal_ids)
+        evidence_refs = [bounded_evidence.evidence_id]
+        extra_context = {
+            "incremental_terminal_evidence": True,
+            "terminal_request_id": evidence.request_id,
+            "terminal_capability_id": evidence.capability_id,
+            "terminal_status": evidence.status,
+            "cognitive_opportunity": opportunity.prompt_projection(),
+        }
+        return await self._planner_state_reentry_response(
             source_response=source_response,
             canonical_plan=canonical_plan,
             user_request=user_request,
             language=language,
-            goal_ids=list(evidence.source_goal_ids),
-            evidence=[bounded_evidence],
+            goal_ids=goal_ids,
+            evidence_goal_ids=goal_ids,
+            evidence_refs=evidence_refs,
             session_id=session_id,
             phase="capability_result_reentry",
-            extra_context={
-                "incremental_terminal_evidence": True,
-                "terminal_request_id": evidence.request_id,
-                "terminal_capability_id": evidence.capability_id,
-                "terminal_status": evidence.status,
-                "cognitive_opportunity": opportunity.prompt_projection(),
+            context_updates={
+                "trusted_terminal_evidence": [bounded_evidence.model_dump(mode="json")],
+                "result_evidence_refs": evidence_refs,
+                "result_evidence_reentry": {
+                    "phase": "capability_result_reentry",
+                    "source_goal_ids": goal_ids,
+                    "evidence_refs": evidence_refs,
+                    "planner_authority": "planner",
+                },
+                **extra_context,
             },
+            fast_workflow_stage="fast_planner_evidence_reentry",
+            deep_workflow_stage="planner_deep_pass_evidence_reentry",
+            response_source="fast_planner_evidence_reentry",
+            repeat_check_evidence=[bounded_evidence],
+            repeat_check_context=extra_context,
         )
 
 
@@ -4838,7 +4994,7 @@ class VoiceAssistant:
         )
         return "planner_reentry_dispatched"
 
-    async def _planner_evidence_reentry_response(
+    async def _planner_state_reentry_response(
         self,
         *,
         source_response: InteractionResponse,
@@ -4846,19 +5002,41 @@ class VoiceAssistant:
         user_request: str,
         language: str,
         goal_ids: list[str],
-        evidence: list[ToolResultEvidence],
+        evidence_goal_ids: list[str],
+        evidence_refs: list[str],
         session_id: str | None,
         phase: str,
-        extra_context: dict[str, Any] | None = None,
+        context_updates: dict[str, Any],
+        fast_workflow_stage: str,
+        deep_workflow_stage: str,
+        response_source: str,
+        repeat_check_evidence: list[ToolResultEvidence] | None = None,
+        repeat_check_context: dict[str, Any] | None = None,
     ) -> InteractionResponse | None:
-        """Reactivate Fast Planner from Host-bound terminal Evidence."""
+        """Reactivate the same Planner from one trusted state transition.
+
+        The Host supplies bounded facts and provenance only. It does not convert
+        those facts into dialogue or a replacement Goal/Plan.
+        """
 
         normalized_goal_ids = list(
             dict.fromkeys(
                 str(item).strip() for item in goal_ids if str(item).strip()
             )
         )
-        if not normalized_goal_ids or not evidence:
+        normalized_evidence_goal_ids = list(
+            dict.fromkeys(
+                str(item).strip()
+                for item in evidence_goal_ids
+                if str(item).strip()
+            )
+        )
+        normalized_evidence_refs = list(
+            dict.fromkeys(
+                str(item).strip() for item in evidence_refs if str(item).strip()
+            )
+        )
+        if not normalized_goal_ids or not normalized_evidence_refs:
             return None
         metadata = (
             source_response.metadata
@@ -4869,7 +5047,7 @@ class VoiceAssistant:
         if not isinstance(association, dict):
             self.session_log(
                 session_id,
-                "planner_evidence_reentry_rejected: reason=missing_goal_association",
+                "planner_state_reentry_rejected: reason=missing_goal_association",
             )
             return None
         association_goal_ids = {
@@ -4884,7 +5062,7 @@ class VoiceAssistant:
         }
         if not set(normalized_goal_ids).issubset(association_goal_ids):
             raise ValueError(
-                "terminal Evidence Goal binding is not present in Goal Association"
+                "Planner state re-entry Goal binding is not present in Goal Association"
             )
         responsibilities = planner_reentry_responsibilities(
             source_response=source_response,
@@ -4893,7 +5071,7 @@ class VoiceAssistant:
         if not responsibilities:
             self.session_log(
                 session_id,
-                "planner_evidence_reentry_rejected: "
+                "planner_state_reentry_rejected: "
                 "reason=missing_responsibility_provenance",
             )
             return None
@@ -4908,27 +5086,19 @@ class VoiceAssistant:
             {
                 "goal_association_resolution": association,
                 "canonical_plan_resolution": canonical_plan.prompt_projection(),
-                "trusted_terminal_evidence": [
-                    item.model_dump(mode="json") for item in evidence
-                ],
-                "result_evidence_refs": [item.evidence_id for item in evidence],
-                "result_evidence_reentry": {
-                    "phase": phase,
-                    "source_goal_ids": normalized_goal_ids,
-                    "evidence_refs": [item.evidence_id for item in evidence],
-                    "planner_authority": "planner",
-                },
+                **context_updates,
             }
         )
         if isinstance(metadata.get("user_turn_envelope"), dict):
             context["user_turn_envelope"] = dict(metadata["user_turn_envelope"])
         if isinstance(metadata.get("goal_interpretation"), dict):
             context["core_interpretation"] = dict(metadata["goal_interpretation"])
-        if isinstance(extra_context, dict):
-            context.update(extra_context)
         situation = build_situation_projection(
             context=context,
-            turn_id=str(metadata.get("turn_id") or f"evidence:{evidence[0].evidence_id}"),
+            turn_id=str(
+                metadata.get("turn_id")
+                or f"state:{normalized_evidence_refs[0]}"
+            ),
             focus_goal_ids=normalized_goal_ids,
             revision=1,
         )
@@ -4946,7 +5116,7 @@ class VoiceAssistant:
             ).model_dump(mode="json")
 
         request = CognitiveWorkRequest(
-            sid=f"{sid}:evidence:{evidence[0].evidence_id}"[:160],
+            sid=f"{sid}:state:{normalized_evidence_refs[0]}"[:160],
             text=user_request,
             language=language,
             responsibilities=responsibilities,
@@ -4956,6 +5126,12 @@ class VoiceAssistant:
         )
         session = await self.get_http_session()
         planner_started_ms = now_ms()
+        workflow_input = {
+            "source_goal_ids": normalized_goal_ids,
+            "evidence_goal_ids": normalized_evidence_goal_ids,
+            "evidence_refs": normalized_evidence_refs,
+            "phase": phase,
+        }
         try:
             replanned = await self.agent_client.resolve_fast_plan(
                 session,
@@ -4966,15 +5142,11 @@ class VoiceAssistant:
             record_session_workflow_stage(
                 self,
                 session_id,
-                stage="fast_planner_evidence_reentry",
+                stage=fast_workflow_stage,
                 started_monotonic_ms=planner_started_ms,
                 finished_monotonic_ms=now_ms(),
                 status="failed",
-                input_payload={
-                    "source_goal_ids": normalized_goal_ids,
-                    "evidence_refs": [item.evidence_id for item in evidence],
-                    "phase": phase,
-                },
+                input_payload=workflow_input,
                 output_payload=None,
                 errors=[{"error_type": type(exc).__name__, "error": str(exc)}],
                 metadata={"wording_owner": "fast_planner"},
@@ -4983,27 +5155,24 @@ class VoiceAssistant:
         record_session_workflow_stage(
             self,
             session_id,
-            stage="fast_planner_evidence_reentry",
+            stage=fast_workflow_stage,
             started_monotonic_ms=planner_started_ms,
             finished_monotonic_ms=now_ms(),
             status="resolved",
-            input_payload={
-                "source_goal_ids": normalized_goal_ids,
-                "evidence_refs": [item.evidence_id for item in evidence],
-                "phase": phase,
-            },
+            input_payload=workflow_input,
             output_payload=replanned,
             errors=[],
             metadata={"wording_owner": "fast_planner"},
         )
         if set(replanned.goal_ids) != set(normalized_goal_ids):
-            raise ValueError("Evidence re-entry Plan changed the bound Goal set")
+            raise ValueError("Planner state re-entry changed the bound Goal set")
         if replanned.disposition == "escalate":
             deep_call = getattr(self.agent_client, "resolve_deep_plan", None)
             if not callable(deep_call):
                 self.session_log(
                     session_id,
-                    "planner_evidence_reentry_deep_unavailable",
+                    "planner_state_reentry_deep_unavailable: phase=%s",
+                    phase,
                 )
                 return None
             deep_started_ms = now_ms()
@@ -5015,29 +5184,27 @@ class VoiceAssistant:
             record_session_workflow_stage(
                 self,
                 session_id,
-                stage="planner_deep_pass_evidence_reentry",
+                stage=deep_workflow_stage,
                 started_monotonic_ms=deep_started_ms,
                 finished_monotonic_ms=now_ms(),
                 status="resolved",
-                input_payload={
-                    "source_goal_ids": normalized_goal_ids,
-                    "evidence_refs": [item.evidence_id for item in evidence],
-                    "phase": phase,
-                },
+                input_payload=workflow_input,
                 output_payload=replanned,
                 errors=[],
                 metadata={"planner_pass": "deep"},
             )
             if set(replanned.goal_ids) != set(normalized_goal_ids):
-                raise ValueError("Deep Evidence re-entry Plan changed the bound Goal set")
-        if planner_reentry_repeats_completed_activity(
+                raise ValueError(
+                    "Deep Planner state re-entry changed the bound Goal set"
+                )
+        if repeat_check_evidence and planner_reentry_repeats_completed_activity(
             source_response=source_response,
             plan=replanned,
-            extra_context=extra_context,
-            evidence=evidence,
+            extra_context=repeat_check_context,
+            evidence=repeat_check_evidence,
         ):
             raise ValueError(
-                "Evidence re-entry Planner attempted to repeat the completed terminal Activity"
+                "Planner state re-entry attempted to repeat the completed terminal Activity"
             )
         response = await self.cognitive_runtime.adapter.build_planner_owned_response(
             plan=replanned,
@@ -5050,9 +5217,7 @@ class VoiceAssistant:
                 "goal_association": association,
                 "planner_state_reentry": True,
                 "planner_state_reentry_phase": phase,
-                "planner_state_reentry_evidence_refs": [
-                    item.evidence_id for item in evidence
-                ],
+                "planner_state_reentry_evidence_refs": normalized_evidence_refs,
                 "parent_interaction_id": source_response.interaction_id,
             }
         )
@@ -5070,28 +5235,50 @@ class VoiceAssistant:
         if suppressed_speech_count:
             self.session_log(
                 session_id,
-                "planner_evidence_reentry_duplicate_speech_suppressed: count=%s",
+                "planner_state_reentry_duplicate_speech_suppressed: "
+                "phase=%s count=%s",
+                phase,
                 suppressed_speech_count,
             )
-        evidence_refs = [item.evidence_id for item in evidence]
+        evidence_goal_set = set(normalized_evidence_goal_ids)
         for speech in response.speech:
+            existing_source_goal_ids = {
+                str(item).strip()
+                for item in (
+                    speech.metadata.get("source_goal_ids")
+                    or speech.metadata.get("covers_goal_ids")
+                    or []
+                )
+                if str(item).strip()
+            }
             speech.metadata.update(
                 {
                     "source": "planner_state_reentry",
                     "phase": phase,
-                    "source_goal_ids": normalized_goal_ids,
+                    **(
+                        {"source_goal_ids": normalized_goal_ids}
+                        if not existing_source_goal_ids
+                        else {}
+                    ),
                 }
             )
-            if not speech.metadata.get("truth_stage"):
+            speech_goal_ids = existing_source_goal_ids or set(normalized_goal_ids)
+            if (
+                not speech.metadata.get("truth_stage")
+                and (not evidence_goal_set or speech_goal_ids & evidence_goal_set)
+            ):
                 speech.metadata["truth_stage"] = "post_evidence"
-            if not speech.metadata.get("evidence_refs"):
-                speech.metadata["evidence_refs"] = evidence_refs
+            if (
+                not speech.metadata.get("evidence_refs")
+                and (not evidence_goal_set or speech_goal_ids & evidence_goal_set)
+            ):
+                speech.metadata["evidence_refs"] = normalized_evidence_refs
         response.metadata.update(
             {
-                "source": "fast_planner_evidence_reentry",
+                "source": response_source,
                 "phase": phase,
                 "source_goal_ids": normalized_goal_ids,
-                "evidence_refs": evidence_refs,
+                "evidence_refs": normalized_evidence_refs,
                 "planner_reentry_plan": replanned.model_dump(
                     mode="json", exclude_none=True
                 ),
@@ -5186,31 +5373,51 @@ class VoiceAssistant:
             return None
         goal_ids = list(plan.executable_goal_ids())
         try:
-            return await self._planner_evidence_reentry_response(
+            evidence_refs = [item.evidence_id for item in evidence]
+            extra_context = {
+                "execution_outcome_bundle": bundle.model_dump(
+                    mode="json", exclude_none=True
+                ),
+                "aggregate_status": bundle.aggregate_status,
+                "goal_statuses": [
+                    {
+                        "goal_id": item.goal_id,
+                        "status": item.status,
+                        "completion_qualification": (
+                            goal_completion_qualification_summary(bundle, item)
+                        ),
+                    }
+                    for item in bundle.goal_outcomes
+                ],
+            }
+            return await self._planner_state_reentry_response(
                 source_response=source_response,
                 canonical_plan=plan,
                 user_request=user_request,
                 language=language,
                 goal_ids=goal_ids,
-                evidence=evidence,
+                evidence_goal_ids=goal_ids,
+                evidence_refs=evidence_refs,
                 session_id=session_id,
                 phase="post_execution",
-                extra_context={
-                    "execution_outcome_bundle": bundle.model_dump(
-                        mode="json", exclude_none=True
-                    ),
-                "aggregate_status": bundle.aggregate_status,
-                    "goal_statuses": [
-                        {
-                            "goal_id": item.goal_id,
-                            "status": item.status,
-                            "completion_qualification": (
-                                goal_completion_qualification_summary(bundle, item)
-                            ),
-                        }
-                        for item in bundle.goal_outcomes
+                context_updates={
+                    "trusted_terminal_evidence": [
+                        item.model_dump(mode="json") for item in evidence
                     ],
+                    "result_evidence_refs": evidence_refs,
+                    "result_evidence_reentry": {
+                        "phase": "post_execution",
+                        "source_goal_ids": goal_ids,
+                        "evidence_refs": evidence_refs,
+                        "planner_authority": "planner",
+                    },
+                    **extra_context,
                 },
+                fast_workflow_stage="fast_planner_evidence_reentry",
+                deep_workflow_stage="planner_deep_pass_evidence_reentry",
+                response_source="fast_planner_evidence_reentry",
+                repeat_check_evidence=evidence,
+                repeat_check_context=extra_context,
             )
         except Exception as exc:
             self.session_log(

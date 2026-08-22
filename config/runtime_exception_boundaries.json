@@ -678,19 +678,6 @@
     },
     {
       "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._planner_evidence_reentry_response",
-      "ordinal": 1,
-      "classification": "narrow_reraise",
-      "owner": "orchestrator",
-      "contract": "Retain Fast Planner Evidence re-entry failure evidence, then re-raise so the caller fails closed without ungrounded speech.",
-      "review_status": "reviewed",
-      "body_sha256": "6366a7a0df40ca3ce33a3124c0b59af5d165fb54928640590482c0bc2501cd24",
-      "failure_signals": [
-        "bare_reraise"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant._consume_detached_cognitive_dispatch",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
@@ -972,7 +959,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "27afd8e2fefb1c0a2d09cded2f57e913a2b0208624c619828b06f85831bfa5a5",
+      "body_sha256": "ad0c323a15da6833e96bf2a2bf0a0698b5072990be6a9c342411641ad0a93b85",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -1874,6 +1861,32 @@
       "body_sha256": "1da14c5fde2aabf84c559f6b9bb11adef0de4c1f243cfff302d95cbc89de1cfd",
       "failure_signals": [
         "state_update"
+      ]
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._planner_state_reentry_response",
+      "ordinal": 1,
+      "classification": "narrow_reraise",
+      "owner": "orchestrator",
+      "contract": "Retain Planner state re-entry failure evidence, then re-raise so the caller fails closed without Host-authored semantic wording.",
+      "review_status": "reviewed",
+      "body_sha256": "1f743fa38cf04e565fb92542dd6b6aa97ca64e193a0cbaacfa3e815f38c73e3d",
+      "failure_signals": [
+        "bare_reraise"
+      ]
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._try_apply_cognitive_runtime",
+      "ordinal": 2,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "If post-cancellation Planner state re-entry itself fails, retain diagnostics and fall back only to the bounded operational safety utterance rather than inventing cancellation meaning.",
+      "review_status": "reviewed",
+      "body_sha256": "99c4b17ec02d5b5f369bd0cba70b848d4a954c2dc3f13751ac208f656a9765af",
+      "failure_signals": [
+        "diagnostic"
       ]
     }
   ],

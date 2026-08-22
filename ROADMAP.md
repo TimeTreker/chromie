@@ -371,9 +371,13 @@ leak or historical surface rather than relocate it behind a new manager.
      recovery re-entry remains below.**
    - **1B Cancellation and technical failure truth:** preserve deterministic stop/cancel
      safety, but return receipts/state facts to cognition rather than replacing the
-     Planner response with Host self-narration. Processing/commit failures must never be
-     rounded into capability inability or pipeline jargon. The tiny cognition-unavailable
-     operational fallback is the only ordinary Host speech exception.
+     Planner response with Host self-narration. Named-Goal cancellation now materializes
+     bounded `GoalCancellationEvidence` and re-enters the existing Planner state path; an
+     affected pending confirmation is revoked as a whole rather than narrowed by Host
+     child-plan/prompt synthesis. Failed or uncertain cancellation may use only a tiny
+     operational safety utterance if Planner re-entry is unavailable, and that utterance
+     must not claim success. Processing/commit failures must never be rounded into
+     capability inability or pipeline jargon. **Implemented in Phase 1B.**
    - **1C Result meaning:** remove `status -> sentence` outcome composition and other
      post-execution Host result interpretation. Trusted Evidence updates Goal/Work/Situation
      and reactivates Planner; unavailable Planner cognition records failure and remains

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import json
 from typing import Any
 
@@ -10,17 +9,12 @@ from orchestrator.runtime.confirmation import (
     PendingConfirmation,
 )
 from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
-from shared.chromie_contracts.interaction import (
-    InteractionResponse,
-    InteractionSpeech,
-    CapabilityRequest,
-)
-from shared.chromie_contracts.plan import CanonicalPlan
+from shared.chromie_contracts.control import GoalCancellationEvidence
+from shared.chromie_contracts.interaction import CapabilityRequest
 from shared.chromie_contracts.reflex import (
     CancellationDirective,
     CancellationDispatchReceipt,
 )
-from shared.chromie_contracts.plan import canonical_plan_fingerprint
 
 
 class ActiveGoalCancellationRequiresRuntimeDispatch(ValueError):
@@ -101,21 +95,21 @@ def _build_confirmation_remainder(
     *,
     confirmation_dialogue: ConfirmationDialogue | None,
     target_goal_ids: set[str],
-    language: str,
 ) -> tuple[PendingConfirmation | None, dict[str, Any] | None]:
-    """Prepare, but do not install, a narrowed confirmation token.
+    """Revoke one affected confirmation without inventing replacement wording.
 
-    The original canonical plan remains immutable.  Preserved work receives
-    a deterministic child plan, fresh interaction/request identities, and a
-    fresh confirmation token.  A step jointly owned by cancelled and
-    preserved Goals is not separable and therefore fails closed.
+    A pending confirmation is an authorization token over one immutable Planner
+    response. Once a named Goal is removed, the Host may mechanically revoke that
+    token, but it may not synthesize a child plan, a narrowed confirmation prompt,
+    or replacement speech for preserved Goals. Those still-open Goals are left for
+    Planner state re-entry after cancellation reconciliation.
     """
 
     dialogue = confirmation_dialogue
     pending = getattr(dialogue, "pending", None)
     if pending is None:
         return None, None
-    response = pending.response.model_copy(deep=True)
+    response = pending.response
     all_goal_ids = {
         goal_id
         for request in response.capabilities
@@ -125,7 +119,6 @@ def _build_confirmation_remainder(
         return None, None
 
     cancelled_request_ids: set[str] = set()
-    preserved_requests: list[CapabilityRequest] = []
     for request in response.capabilities:
         owners = _request_source_goal_ids(request)
         overlap = owners.intersection(target_goal_ids)
@@ -136,261 +129,110 @@ def _build_confirmation_remainder(
             )
         if overlap:
             cancelled_request_ids.add(request.request_id)
-        else:
-            preserved_requests.append(request)
     if not cancelled_request_ids:
         return None, None
 
-    old_plan_raw = response.metadata.get("canonical_plan")
-    child_plan: CanonicalPlan | None = None
-    child_fingerprint = ""
-    request_id_map: dict[str, str] = {}
-    preserved_goal_ids: set[str] = all_goal_ids - target_goal_ids
-    if isinstance(old_plan_raw, dict):
-        old_plan = CanonicalPlan.model_validate(old_plan_raw)
-        parent_fingerprint = canonical_plan_fingerprint(old_plan)
-        for step in old_plan.steps:
-            owners = set(step.source_goal_ids)
-            if owners.intersection(target_goal_ids) and owners - target_goal_ids:
-                raise ValueError(
-                    "confirmation_rebuild_shared_plan_step:" + step.step_id
-                )
-        kept_goal_ids = [
-            goal_id
-            for goal_id in old_plan.goal_ids
-            if goal_id not in target_goal_ids
-        ]
-        kept_steps = [
-            step.model_copy(deep=True)
-            for step in old_plan.steps
-            if not set(step.source_goal_ids).intersection(target_goal_ids)
-        ]
-        kept_step_ids = {step.step_id for step in kept_steps}
-        kept_outcomes = [
-            item.model_copy(deep=True)
-            for item in old_plan.goal_outcomes
-            if item.goal_id in kept_goal_ids
-        ]
-        if kept_outcomes:
-            dispositions = {item.disposition for item in kept_outcomes}
-            disposition = (
-                "mixed" if len(dispositions) > 1 else next(iter(dispositions))
-            )
-        else:
-            disposition = "execute" if kept_steps else "respond"
-        child_seed = hashlib.sha256(
-            (
-                parent_fingerprint
-                + "|confirmation_remainder|"
-                + ",".join(sorted(target_goal_ids))
-            ).encode("utf-8")
-        ).hexdigest()[:20]
-        child_plan = old_plan.model_copy(
-            deep=True,
-            update={
-                "plan_id": f"plan_confirmation_remainder_{child_seed}",
-                "disposition": disposition,
-                "goal_ids": kept_goal_ids,
-                "steps": kept_steps,
-                "goal_outcomes": kept_outcomes,
-                "parameter_resolutions": [
-                    item.model_copy(deep=True)
-                    for item in old_plan.parameter_resolutions
-                    if item.step_id in kept_step_ids
-                    and not set(item.source_goal_ids).intersection(
-                        target_goal_ids
-                    )
-                ],
-                "goal_satisfaction": None,
-                "selected_agent_skills": old_plan.agent_skill_provenance_for_goals(
-                    kept_goal_ids
-                ),
-                "response_text": (
-                    old_plan.response_text if disposition == "respond" else ""
-                ),
-                "metadata": {
-                    **old_plan.metadata,
-                    "plan_relation": "confirmation_remainder",
-                    "parent_plan_id": old_plan.plan_id,
-                    "parent_plan_fingerprint": parent_fingerprint,
-                    "cancelled_goal_ids": sorted(target_goal_ids),
-                },
-            },
-        )
-        child_plan = CanonicalPlan.model_validate(
-            child_plan.model_dump(mode="python")
-        )
-        child_fingerprint = canonical_plan_fingerprint(child_plan)
-        remapped: list[CapabilityRequest] = []
-        for request in preserved_requests:
-            step_id = str(request.metadata.get("step_id") or "").strip()
-            digest = hashlib.sha256(
-                f"{child_fingerprint}|{step_id}|{request.request_id}".encode(
-                    "utf-8"
-                )
-            ).hexdigest()[:20]
-            new_request_id = f"cogreq_{digest}"
-            request_id_map[request.request_id] = new_request_id
-            remapped.append(
-                request.model_copy(
-                    deep=True,
-                    update={
-                        "request_id": new_request_id,
-                        "idempotency_key": (
-                            f"{child_plan.plan_id}:{step_id}:"
-                            f"{child_fingerprint[:16]}"
-                        ),
-                        "metadata": {
-                            **request.metadata,
-                            "canonical_plan_id": child_plan.plan_id,
-                            "canonical_plan_fingerprint": child_fingerprint,
-                            "confirmation_remainder_from_request_id": (
-                                request.request_id
-                            ),
-                        },
-                    },
-                )
-            )
-        preserved_requests = remapped
-
-    preserved_confirmed_ids = {
-        request_id_map.get(request_id, request_id)
-        for request_id in pending.confirmed_request_ids
-        if request_id not in cancelled_request_ids
-    }
-    replacement_pending: PendingConfirmation | None = None
-    replacement_response: InteractionResponse | None = None
-    request_ids_by_goal: dict[str, list[str]] = {}
-    confirmation_request_ids_by_goal: dict[str, list[str]] = {}
-    if preserved_requests and preserved_confirmed_ids:
-        if child_plan is None:
-            raise ValueError(
-                "confirmation_rebuild_requires_canonical_plan"
-            )
-        preserved_speech: list[InteractionSpeech] = []
-        for speech in response.speech:
-            metadata = speech.metadata if isinstance(speech.metadata, dict) else {}
-            covered = metadata.get("covers_goal_ids")
-            if isinstance(covered, str):
-                covered = [covered]
-            covered_ids = {
-                str(item).strip()
-                for item in (covered or [])
-                if str(item).strip()
-            }
-            if not covered_ids or covered_ids.intersection(target_goal_ids):
-                continue
-            digest = hashlib.sha256(
-                f"{child_fingerprint}|speech|{speech.id}".encode("utf-8")
-            ).hexdigest()[:16]
-            preserved_speech.append(
-                speech.model_copy(
-                    deep=True,
-                    update={
-                        "id": f"speech_{digest}",
-                        "metadata": {
-                            **metadata,
-                            "canonical_plan_id": child_plan.plan_id,
-                            "canonical_plan_fingerprint": child_fingerprint,
-                            "source_goal_ids": sorted(covered_ids),
-                        },
-                    },
-                )
-            )
-        if not preserved_speech:
-            zh = str(language or "").lower().startswith("zh")
-            preserved_speech = [
-                InteractionSpeech(
-                    id=f"speech_confirmation_remainder_{child_fingerprint[:12]}",
-                    text=(
-                        "我会继续执行其余已确认的动作。"
-                        if zh
-                        else "I will continue with the remaining confirmed actions."
-                    ),
-                    timing="sequential",
-                    style="brief",
-                    metadata={
-                        "source": "host_confirmation_remainder",
-                        "phase": "pre_action",
-                        "covers_goal_ids": sorted(preserved_goal_ids),
-                        "source_goal_ids": sorted(preserved_goal_ids),
-                        "canonical_plan_id": child_plan.plan_id,
-                        "canonical_plan_fingerprint": child_fingerprint,
-                        "must_not_claim_completion": True,
-                        "wait_for_playback_start": True,
-                        "playback_start_required_for_delivery": True,
-                        "playback_start_required_for_effects": True,
-                    },
-                )
-            ]
-        interaction_seed = hashlib.sha256(
-            f"{child_fingerprint}|{pending.confirmation_id}".encode("utf-8")
-        ).hexdigest()[:16]
-        replacement_response = response.model_copy(
-            deep=True,
-            update={
-                "interaction_id": f"interaction_confirmation_remainder_{interaction_seed}",
-                "speech": preserved_speech,
-                "capabilities": preserved_requests,
-                "requires_confirmation": True,
-                "metadata": {
-                    **response.metadata,
-                    "canonical_plan": child_plan.model_dump(
-                        mode="json", exclude_none=True
-                    ),
-                    "canonical_plan_id": child_plan.plan_id,
-                    "canonical_plan_fingerprint": child_fingerprint,
-                    "goal_ids": child_plan.goal_ids,
-                    "confirmation_remainder": True,
-                    "replaces_confirmation_id": pending.confirmation_id,
-                    "cancelled_goal_ids": sorted(target_goal_ids),
-                    "planner_response_projection_superseded": True,
-                },
-            },
-        )
-        replacement_pending = dialogue.prepare(
-            replacement_response,
-            confirmed_request_ids=preserved_confirmed_ids,
-            origin_session_id=pending.origin_session_id,
-            conversation_id=pending.conversation_id,
-            language=language,
-            ttl_s=max(
-                1.0,
-                dialogue.remaining_ttl_s(pending),
-            ),
-        )
-        for request in replacement_response.capabilities:
-            for goal_id in _request_source_goal_ids(request):
-                request_ids_by_goal.setdefault(goal_id, []).append(
-                    request.request_id
-                )
-                if request.request_id in preserved_confirmed_ids:
-                    confirmation_request_ids_by_goal.setdefault(
-                        goal_id, []
-                    ).append(request.request_id)
-
-    transition = {
+    return None, {
         "old_confirmation_id": pending.confirmation_id,
         "cancelled_request_ids": sorted(cancelled_request_ids),
         "cancelled_goal_ids": sorted(target_goal_ids),
-        "replacement": (
-            {
-                "confirmation_id": replacement_pending.confirmation_id,
-                "fingerprint": replacement_pending.fingerprint,
-                "expires_at": replacement_pending.expires_at,
-                "interaction_id": replacement_response.interaction_id,
-                "canonical_plan_id": child_plan.plan_id,
-                "canonical_plan_fingerprint": child_fingerprint,
-                "request_ids_by_goal": request_ids_by_goal,
-                "confirmation_request_ids_by_goal": (
-                    confirmation_request_ids_by_goal
-                ),
-            }
-            if replacement_pending is not None
-            else None
-        ),
+        "released_confirmation_goal_ids": sorted(all_goal_ids - target_goal_ids),
+        "replacement": None,
+        "revoked_entire_confirmation": True,
     }
-    return replacement_pending, transition
+
+
+def goal_cancellation_success_evidence(
+    *,
+    source_turn_id: str,
+    metadata: dict[str, Any],
+) -> GoalCancellationEvidence:
+    """Project reconciled cancellation facts into bounded Planner Evidence."""
+
+    target_goal_ids = [
+        str(item).strip()
+        for item in metadata.get("target_goal_ids") or []
+        if str(item).strip()
+    ]
+    coaffected_goal_ids = [
+        str(item).strip()
+        for item in metadata.get("coaffected_goal_ids") or []
+        if str(item).strip()
+    ]
+    receipts = metadata.get("cancellation_receipts")
+    transition = metadata.get("confirmation_transition")
+    released_confirmation_goal_ids = (
+        [
+            str(item).strip()
+            for item in transition.get("released_confirmation_goal_ids") or []
+            if str(item).strip()
+        ]
+        if isinstance(transition, dict)
+        else []
+    )
+    return GoalCancellationEvidence.create(
+        source_turn_id=source_turn_id,
+        target_goal_ids=target_goal_ids,
+        coaffected_goal_ids=coaffected_goal_ids,
+        released_confirmation_goal_ids=released_confirmation_goal_ids,
+        status="cancelled",
+        runtime_dispatch_attempted=bool(receipts),
+        goal_state_reconciled=True,
+        confirmation_state_reconciled=True,
+        reason_code=(
+            "wider_scope_cancelled"
+            if coaffected_goal_ids
+            else (
+                "confirmation_revoked_and_cancelled"
+                if isinstance(transition, dict)
+                else "cancelled"
+            )
+        ),
+    )
+
+
+def goal_cancellation_failure_evidence(
+    *,
+    source_turn_id: str,
+    target_goal_ids: set[str] | list[str] | tuple[str, ...],
+    exc: Exception,
+) -> GoalCancellationEvidence:
+    """Project a failed/uncertain cancellation closure without user wording."""
+
+    normalized_goal_ids = sorted(
+        {str(item).strip() for item in target_goal_ids if str(item).strip()}
+    )
+    if isinstance(exc, ActiveGoalCancellationRequiresRuntimeDispatch):
+        normalized_goal_ids = list(exc.goal_ids) or normalized_goal_ids
+        return GoalCancellationEvidence.create(
+            source_turn_id=source_turn_id,
+            target_goal_ids=normalized_goal_ids,
+            status="not_cancelled",
+            runtime_dispatch_attempted=False,
+            goal_state_reconciled=False,
+            confirmation_state_reconciled=False,
+            reason_code="runtime_dispatch_required",
+        )
+    if isinstance(exc, NamedGoalCancellationClosureError):
+        normalized_goal_ids = list(exc.goal_ids) or normalized_goal_ids
+        return GoalCancellationEvidence.create(
+            source_turn_id=source_turn_id,
+            target_goal_ids=normalized_goal_ids,
+            status=("uncertain" if exc.runtime_dispatch_attempted else "not_cancelled"),
+            runtime_dispatch_attempted=exc.runtime_dispatch_attempted,
+            goal_state_reconciled=False,
+            confirmation_state_reconciled=False,
+            reason_code=f"closure_{exc.stage}",
+        )
+    return GoalCancellationEvidence.create(
+        source_turn_id=source_turn_id,
+        target_goal_ids=normalized_goal_ids,
+        status="uncertain",
+        runtime_dispatch_attempted=False,
+        goal_state_reconciled=False,
+        confirmation_state_reconciled=False,
+        reason_code="control_commit_failed",
+    )
 
 
 async def _dispatch_goal_work_stop(
@@ -407,6 +249,7 @@ async def _dispatch_goal_work_stop(
     dispatch_reason: str,
     source: str,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    del language
     association = resolution.goal_association
     if association is None:
         raise ValueError("Goal Work stop requires Goal Association")
@@ -461,7 +304,6 @@ async def _dispatch_goal_work_stop(
             _build_confirmation_remainder(
                 confirmation_dialogue=confirmation_dialogue,
                 target_goal_ids=target_goal_ids,
-                language=language,
             )
         )
     except ValueError as exc:
@@ -651,11 +493,6 @@ async def _dispatch_goal_work_stop(
             for item in receipts
         ],
         "confirmation_transition": confirmation_transition,
-        "replacement_confirmation_prompt": (
-            replacement_pending.prompt
-            if replacement_pending is not None
-            else ""
-        ),
     }
     return goal_state_results, metadata
 
@@ -715,6 +552,8 @@ __all__ = [
     "NamedGoalCancellationClosureError",
     "cancellation_target_goal_ids",
     "replacement_target_goal_ids",
+    "goal_cancellation_success_evidence",
+    "goal_cancellation_failure_evidence",
     "dispatch_named_goal_cancellation",
     "dispatch_goal_replacement",
 ]
