@@ -2684,15 +2684,11 @@ class VoiceAssistant:
             summary = self._cognitive_resolution_summary(resolution)
             safe_response = (
                 cancellation_failure_response
-                or self._host_speech_response(
-                    "这次计划没有通过执行验证，所以我没有继续。"
-                    if self._looks_zh(user_text)
-                    else (
-                        "That plan did not pass execution validation, "
-                        "so I stopped before acting."
-                    ),
-                    style="warning",
-                    source="host_cognitive_runtime_commit_failure",
+                or self._cognitive_core_exception_safe_response(
+                    user_text,
+                    failure_stage="host_commit",
+                    failure_class=type(exc).__name__,
+                    failure_error=str(exc),
                 )
             )
             record_session_workflow_stage(
@@ -3236,12 +3232,10 @@ class VoiceAssistant:
         # continue through the goal-driven Cognitive Runtime. A disabled or
         # unavailable runtime therefore fails closed instead of reconstructing a
         # retired route/intent projection or entering a second semantic pipeline.
-        safe_response = self._host_speech_response(
-            "咦，我现在还做不了这个。"
-            if self._looks_zh(user_text)
-            else "Oh, I can't do that right now.",
-            style="warning",
-            source="host_cognitive_runtime_unavailable",
+        safe_response = self._cognitive_core_exception_safe_response(
+            user_text,
+            failure_stage="cognitive_runtime_entry",
+            failure_class="runtime_unavailable",
         )
         self.conversation_state.record_user_turn(
             session_id,
@@ -3289,7 +3283,6 @@ class VoiceAssistant:
             confirmed_request_ids=confirmation_request_ids,
             origin_session_id=session_id,
             conversation_id=self.conversation_state.conversation_id,
-            language=language,
             prompt_override=confirmation_prompt or None,
         )
         self.session_log(
@@ -3452,12 +3445,19 @@ class VoiceAssistant:
             resolution.decision,
             resolution.fingerprint,
         )
-        response = self._host_speech_response(
-            resolution.message,
-            style="warning" if resolution.decision in {"ambiguous", "expired"} else "brief",
-        )
-        self.conversation_state.record_interaction_response(session_id, response)
-        self._launch_interaction(response, session_id)
+        # Confirmation state is deterministic authorization truth, not a speech
+        # author.  A rejected/expired/ambiguous token therefore closes fail-safe
+        # without inventing Host dialogue.  A later Planner opportunity may choose
+        # a communicative Activity from the updated Goal/Situation state.
+        sessions = getattr(self, "sessions", None)
+        state_map = getattr(sessions, "state", None)
+        if isinstance(state_map, dict):
+            state = state_map.get(session_id)
+            if isinstance(state, dict):
+                state["llm_done"] = True
+        maybe_session_done = getattr(self, "maybe_session_done", None)
+        if sessions is not None and callable(maybe_session_done):
+            maybe_session_done(session_id)
         return True
 
     async def _resolve_pending_confirmation_meaning(
@@ -5714,7 +5714,6 @@ class VoiceAssistant:
             confirmed_request_ids=set(recovery.confirmed_request_ids),
             origin_session_id=session_id,
             conversation_id=self.conversation_state.conversation_id,
-            language=language,
             prompt_override=recovery.prompt,
             ttl_s=getattr(self, "body_recovery_confirmation_ttl_s", 10.0),
         )

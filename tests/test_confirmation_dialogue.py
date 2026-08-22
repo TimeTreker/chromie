@@ -24,6 +24,10 @@ def _response() -> InteractionResponse:
                 "requires_confirmation": True,
             }
         ],
+        metadata={
+            "confirmation_prompt": "Can I do that now?",
+            "confirmation_prompt_source": "planner_wording_runtime_validated",
+        },
     )
 
 
@@ -198,6 +202,10 @@ class ConfirmationDialogueTests(unittest.TestCase):
                     {"request_id": "move", "capability_id": "soridormi.walk"},
                     {"request_id": "read", "capability_id": "chromie.weather"},
                 ],
+                metadata={
+                    "confirmation_prompt": "Should I do those actions?",
+                    "confirmation_prompt_source": "planner_wording_runtime_validated",
+                },
             ),
             confirmed_request_ids={"move", "read"},
             origin_session_id="sid",
@@ -290,12 +298,8 @@ class ConfirmationDialogueTests(unittest.TestCase):
         self.assertEqual(evidence["confirmation_id"], pending.confirmation_id)
         self.assertTrue(logs)
 
-    def test_fallback_prompt_is_natural_and_omits_runtime_internals(self) -> None:
+    def test_planner_confirmation_prompt_is_reused_exactly(self) -> None:
         response = _response()
-        response.capabilities[0].args["access_token"] = "do-not-speak"
-        response.capabilities[0].args["nested"] = {
-            "password": "also-do-not-speak",
-        }
         dialogue = ConfirmationDialogue(clock=lambda: 100.0)
 
         pending = dialogue.begin(
@@ -305,15 +309,37 @@ class ConfirmationDialogueTests(unittest.TestCase):
             conversation_id="conversation-1",
         )
 
-        self.assertEqual(
-            pending.prompt,
-            "Would you like me to do that? Say “yes” and I’ll get started!",
-        )
-        self.assertNotIn("nod_yes", pending.prompt)
-        self.assertNotIn("count", pending.prompt)
-        self.assertNotIn("do-not-speak", pending.prompt)
-        self.assertNotIn("also-do-not-speak", pending.prompt)
+        self.assertEqual(pending.prompt, "Can I do that now?")
         self.assertEqual(ConfirmationDialogue(ttl_s=999).ttl_s, 300.0)
+
+    def test_missing_planner_confirmation_prompt_fails_closed(self) -> None:
+        response = _response().model_copy(update={"metadata": {}})
+        dialogue = ConfirmationDialogue(clock=lambda: 100.0)
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "Planner-authored confirmation_prompt",
+        ):
+            dialogue.begin(
+                response,
+                confirmed_request_ids={"nod-1"},
+                origin_session_id="sid-1",
+                conversation_id="conversation-1",
+            )
+
+    def test_resolution_carries_authorization_truth_not_dialogue(self) -> None:
+        dialogue = ConfirmationDialogue(clock=lambda: 100.0)
+        dialogue.begin(
+            _response(),
+            confirmed_request_ids={"nod-1"},
+            origin_session_id="sid-1",
+            conversation_id="conversation-1",
+        )
+
+        resolution = dialogue.resolve("reject")
+
+        self.assertEqual(resolution.decision, "denied")
+        self.assertNotIn("message", resolution.__dataclass_fields__)
 
 
 if __name__ == "__main__":

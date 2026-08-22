@@ -716,7 +716,11 @@ Communicative Activity but may not collapse one into another. A no-results claim
 requires provider execution plus trusted empty-result evidence. When no provider request
 was dispatched, the response may state only understanding and the supported limitation or
 processing failure. Host/runtime code enforces the typed state and speech envelope without
-using a phrase blacklist.
+using a phrase blacklist. A failed or unavailable post-Evidence Planner response must not
+fall through to a deterministic `status -> sentence` result composer; Runtime retains the
+factual outcome and either re-enters the owning Planner later or remains conservatively
+non-semantic. The tiny documented cognition-unavailable operational utterance is an
+exception for loss of cognition itself, not a second result interpreter.
 
 Capability limitation is represented through typed Goal outcomes and Plan structure,
 not a repair route. An unavailable or unsupported Capability outcome has no executable
@@ -852,6 +856,10 @@ user-facing actions, explains a material safe adjustment before asking, and says
 naturally how to approve it. The Host validates the structured confirmation
 act and must reuse that exact wording; capability IDs, argument keys, JSON,
 state-machine instructions, and Host phrase templates must never replace it.
+The confirmation state object therefore carries authorization facts (bound request IDs,
+fingerprint/expiry, and typed decision), not user-visible approve/deny/expire/ambiguous
+messages. If Planner did not author valid confirmation wording, confirmation staging fails
+closed rather than synthesizing a Host prompt.
 For example:
 
 ```text

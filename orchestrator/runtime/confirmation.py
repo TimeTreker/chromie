@@ -43,7 +43,6 @@ class ConfirmationResolution:
     response: InteractionResponse | None = None
     confirmed_request_ids: frozenset[str] = frozenset()
     fingerprint: str | None = None
-    message: str = ""
 
 
 class ConfirmationDialogue:
@@ -81,7 +80,6 @@ class ConfirmationDialogue:
         confirmed_request_ids: set[str],
         origin_session_id: str | None,
         conversation_id: str | None,
-        language: str | None = None,
         prompt_override: str | None = None,
         ttl_s: float | None = None,
     ) -> PendingConfirmation:
@@ -96,11 +94,15 @@ class ConfirmationDialogue:
         stored = response.model_copy(deep=True)
         now = self._clock()
         effective_ttl_s = self.ttl_s if ttl_s is None else min(300.0, max(1.0, float(ttl_s)))
-        prompt = (prompt_override or "").strip() or _confirmation_prompt(
-            stored,
-            request_ids,
-            language=language,
+        metadata = stored.metadata if isinstance(stored.metadata, dict) else {}
+        prompt = (
+            (prompt_override or "").strip()
+            or str(metadata.get("confirmation_prompt") or "").strip()
         )
+        if not prompt:
+            raise ValueError(
+                "confirmation requires Planner-authored confirmation_prompt wording"
+            )
         pending = PendingConfirmation(
             confirmation_id=f"confirm_{uuid4().hex[:12]}",
             response=stored,
@@ -121,7 +123,6 @@ class ConfirmationDialogue:
         confirmed_request_ids: set[str],
         origin_session_id: str | None,
         conversation_id: str | None,
-        language: str | None = None,
         prompt_override: str | None = None,
         ttl_s: float | None = None,
     ) -> PendingConfirmation:
@@ -130,7 +131,6 @@ class ConfirmationDialogue:
             confirmed_request_ids=confirmed_request_ids,
             origin_session_id=origin_session_id,
             conversation_id=conversation_id,
-            language=language,
             prompt_override=prompt_override,
             ttl_s=ttl_s,
         )
@@ -180,44 +180,26 @@ class ConfirmationDialogue:
 
         self._pending = None
         if pending.expires_at <= self._clock():
-            return self._resolution(
-                pending,
-                "expired",
-                "That confirmation expired, so I will not perform the action.",
-            )
+            return self._resolution(pending, "expired")
         if _request_fingerprint(
             pending.response,
             pending.confirmed_request_ids,
         ) != pending.fingerprint:
-            return self._resolution(
-                pending,
-                "ambiguous",
-                "The requested action changed, so I will not perform it.",
-            )
+            return self._resolution(pending, "ambiguous")
         if meaning == "confirm":
             return self._resolution(
                 pending,
                 "approved",
-                "Confirmed.",
                 include_request=True,
             )
         if meaning == "reject":
-            return self._resolution(
-                pending,
-                "denied",
-                "Okay, I will not perform that action.",
-            )
-        return self._resolution(
-            pending,
-            "ambiguous",
-            "I did not get a clear yes or no, so I will not perform the action.",
-        )
+            return self._resolution(pending, "denied")
+        return self._resolution(pending, "ambiguous")
 
     @staticmethod
     def _resolution(
         pending: PendingConfirmation,
         decision: ConfirmationDecision,
-        message: str,
         *,
         include_request: bool = False,
     ) -> ConfirmationResolution:
@@ -233,7 +215,6 @@ class ConfirmationDialogue:
                 pending.confirmed_request_ids if include_request else frozenset()
             ),
             fingerprint=pending.fingerprint,
-            message=message,
         )
 
 
@@ -464,15 +445,3 @@ def _request_fingerprint(
         separators=(",", ":"),
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
-
-
-def _confirmation_prompt(
-    response: InteractionResponse,
-    request_ids: frozenset[str],
-    *,
-    language: str | None,
-) -> str:
-    del response, request_ids
-    if (language or "").lower().startswith("zh"):
-        return "要我做刚才说的动作吗？你说“好”，我就开始啦！"
-    return "Would you like me to do that? Say “yes” and I’ll get started!"

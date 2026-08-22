@@ -323,6 +323,10 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
                     self.dialogue.begin(
                         InteractionResponse(
                             interaction_id="interaction-stop",
+                            metadata={
+                                "confirmation_prompt": "Planner-authored confirmation prompt.",
+                                "confirmation_prompt_source": "planner_wording_runtime_validated",
+                            },
                             capabilities=[
                                 {
                                     "request_id": "move-stop",
@@ -978,6 +982,10 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         pending = assistant.confirmation_dialogue.begin(
             InteractionResponse(
                 interaction_id="confirm-output",
+                metadata={
+                    "confirmation_prompt": "Planner-authored confirmation prompt.",
+                    "confirmation_prompt_source": "planner_wording_runtime_validated",
+                },
                 capabilities=[
                     {
                         "request_id": "weather-request",
@@ -1010,6 +1018,10 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         assistant.confirmation_dialogue.begin(
             InteractionResponse(
                 interaction_id="confirm-unknown-motion",
+                metadata={
+                    "confirmation_prompt": "Planner-authored confirmation prompt.",
+                    "confirmation_prompt_source": "planner_wording_runtime_validated",
+                },
                 capabilities=[
                     {
                         "request_id": "unknown-request",
@@ -1056,6 +1068,10 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         assistant.confirmation_dialogue.begin(
             InteractionResponse(
                 interaction_id="confirm-mixed-motion",
+                metadata={
+                    "confirmation_prompt": "Planner-authored confirmation prompt.",
+                    "confirmation_prompt_source": "planner_wording_runtime_validated",
+                },
                 capabilities=[
                     {
                         "request_id": "motion-request",

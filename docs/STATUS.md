@@ -1,8 +1,7 @@
 # Chromie Current Status
 
-**Updated:** 2026-08-21
-**Current focus:** Goal-driven single semantic authority with event-driven,
-readiness-driven cognition.
+**Updated:** 2026-08-22
+**Current focus:** Close the verified live semantic-authority leaks before further cognitive expansion; preserve the Goal-driven, event/readiness architecture while removing Host-authored ordinary meaning.
 
 This file contains current facts only. Historical implementation narratives,
 superseded architecture, old test totals, and revision-specific diagnostics belong in
@@ -62,13 +61,23 @@ The authoritative definitions live in `docs/PROJECT_CHARTER.md`. In particular:
 - Existing-Work comparison, reuse, cancellation, replacement, or supplementation are
   Planner operations, not a mandatory Work-Reconciliation stage.
 
+The 2026-08-22 source audit found that this target authority line is **not yet fully
+closed in maintained source**.  The current patch removes the generic Confirmation
+Dialogue wording fallback and its approve/deny/expire/ambiguous message payload, so
+confirmation state now carries authorization facts only and requires already-authored
+Planner confirmation wording.  Remaining verified leaks are named-cancellation
+self-narration, deterministic execution-outcome/result wording, and Host-owned body
+recovery retry/prompt construction.  These are remediation work, not alternate
+architecture.  Passing structural gates must not be interpreted as proof that
+`SPEECH-OWNER-001` is already closed.
+
 ## Current implementation and verification state
 
 | Area | Implementation | Automated verification | Target validation | Release readiness |
 |---|---|---|---|---|
 | Cognitive Gateway / Attention | Maintained configuration controls Attention Review; deterministic protective reflex remains separate. Disabled or unavailable semantic review fails open without fabricating high-confidence addressedness. | Source and focused contract regressions cover admission, fail-open behavior, temporary addressedness rules, and schema boundaries. | Current-revision open-room microphone behavior still requires live evidence. | Development only. |
 | Goal Interpretation / Goal Association | GI is WHAT-only. GA is the canonical Goal-continuity writer. Standalone admitted greetings may speak before GA but still receive canonical conversational Goal continuity. GA representation mechanics are now split internally: `agent/app/goal_association_contract.py` owns model DTO/schema/normalization/typed integrity checks and `agent/app/goal_association_prompt.py` owns bounded prompt projection/system prompts. Resolver/inference and canonical continuity remain in the single `GoalAssociationResolver` authority. | Contract and focused Goal/continuity tests are maintained, including guards that neither extracted module owns a model client/runtime/Goal-commit authority and that the Resolver does not re-own their mechanics. | Live-model semantic quality remains revision-bound and must be requalified after material model/prompt changes. | Development only. |
-| Planner / communication | One Planner authority owns HOW and exact Communicative Activities. Fast/deep are passes, not separate owners. Prompt construction, model DTO/materialization, read-only context and catalog projection, canonical grounding, constrained decoder schemas, deterministic validation/normalization/repair feedback, narrow fallback materialization, and bounded model-assisted audits are separate implementation layers; the old catch-all `planner_contract.py` is removed. Resolver passes retain model invocation and repair/escalation lifecycle decisions but no longer re-own deterministic helper mechanics (`FastPlannerResolver`: 7 lifecycle methods; `DeepPlannerResolver`: 3). Executable steps require explicit Planner-authored timing; Host materialization does not infer omitted timing. Legacy Response Composer and GI fast-speech semantic ownership are not maintained paths. | Planner layer guards plus speech-provenance, playback-identity, duplicate-delivery, Fast/Deep, GA, and async-runtime regressions protect the single-owner boundary. | The declared warm latency targets still require current-revision live qualification. | Development only. |
+| Planner / communication | One Planner authority is the target HOW and ordinary Communicative-Activity owner; Fast/Deep remain passes of that owner. Planner contract decomposition is maintained. The 2026-08-22 audit verified residual Host/runtime semantic wording outside that owner. This patch closes the generic Confirmation Dialogue wording fallback and typed-resolution messages, but named-cancellation narration, mechanical outcome wording, and Host body-recovery proposal/prompt ownership remain open until the remediation line below closes them. | Planner/GA/runtime tests and policy guards protect many boundaries, but existing gates did not catch all user-visible Host wording. The confirmation policy guard is strengthened in this patch; broader speech-owner guards remain required. | Warm latency and complete user-facing authority still require current-revision qualification after source closure. | Development only. |
 | Async Runtime / Evidence re-entry | Terminal Runtime events are correlated into Evidence and may create bounded `CognitiveOpportunity` re-entry. Planner may answer, create follow-up Work, revise existing Work, wait, or do nothing. Re-entry is not response-only and does not fabricate a UserTurn, Responsibility, or confirmation. Missing originating Responsibility provenance retains Evidence but fails that opportunity closed. | Focused async regressions cover incremental terminal Evidence, follow-up Work while siblings continue, cancellation/supersession containment, duplicate-execution prevention, and missing-provenance rejection before Planner invocation. | Provider-backed weather/body episodes should be retained on the exact current revision. | Development only. |
 | Identity / personality truth | Chromie's owner-approved social identity is a six-year-old girl and family young secretary. That is not a biological-human claim; truthful robotic embodiment remains available when relevant. | Mind-profile, prompt-context, and identity/body benchmark contracts guard the two-layer truth boundary. | Bilingual live identity conversation remains to be requalified on the current model/profile. | Development only. |
 | Social Attention | Optional embodied decoration remains subordinate to a concrete primary Activity, has no speech or Goal-completion authority, and may validly return none. | Source-level behavior and capability-grounding checks exist. | Reviewed live baseline remains open for the current revision. | Development only. |
@@ -77,35 +86,38 @@ The authoritative definitions live in `docs/PROJECT_CHARTER.md`. In particular:
 
 ## Current open work
 
-1. **Close the canonical local gate in a dependency-complete environment.** Keep
-   identity truth, Attention evidence, greeting continuity, speech ownership, prompt
-   projection, asynchronous Responsibility provenance, and current documentation aligned
-   with the Charter requirements.
-2. **Requalify human-facing latency on the current revision.** The owner-approved warm
-   targets remain `<=2.0 s` from validated GI handoff to first valid Planner
-   Communicative-Activity commitment and `<=3.0 s` from that commitment to playback
-   start. Long qualification watchdogs are not evidence that these interaction targets
-   pass.
-3. **Retain current-revision asynchronous episodes.** At minimum, prove provider-backed
-   information Evidence can trigger useful follow-up planning without waiting for
-   unrelated sibling Work, and prove embodied terminal Evidence can likewise advance an
-   open Responsibility without callback-owned speech.
-4. **Widen Ruff/Mypy ratchets incrementally.** The existing four-file scopes are not a
-   meaningful quality claim for the whole cognitive/runtime core. Expand along existing
-   ownership seams only after the pinned toolchain passes; do not weaken the gate or add
-   compatibility exclusions merely to increase coverage.
-5. **Continue structural simplification separately.** Planner-reentry policy plus the
-   purely mechanical TTS-text and Goal-list projection seams are extracted and the Host
-   ratchet is lower. Large Host/Planner/GA files remain a maintainability risk, but later decomposition must
-   follow existing configuration, input-lifecycle, prompt-projection, validation,
-   runtime, evidence, cancellation, and observability seams. Do not create one
-   manager/service per cognitive concept and do not mix broad refactors into semantic
-   behavior fixes.
-6. **Complete revision-bound human-like interaction evidence.** Open-room addressedness,
-   greeting uniqueness, identity questions, fresh information, barge-in, late Goal
-   results, multi-Goal cancellation, timeout behavior, Social Attention, and startup
-   orientation should be judged as complete episodes with actual delivery/effect
-   evidence.
+1. **Close live semantic-authority leaks before adding cognition.** Finish the
+   2026-08-22 audit remediation in narrow slices: (a) confirmation state carries no
+   Host-authored dialogue and requires exact Planner wording; (b) named cancellation
+   returns trusted state/effect facts to Planner instead of replacing Planner output
+   with Host prose; (c) remove deterministic status-to-speech outcome composition and
+   Host body-recovery planning/prompt ownership, using ordinary Evidence -> Situation ->
+   Planner continuation instead. Keep only the already-approved tiny cognition-unavailable
+   operational fallback where no safe semantic owner can run.
+2. **Make the authority rule executable.** Extend repository/behavior tests so a
+   passing gate cannot coexist with ordinary Host-authored semantic response strings.
+   Test observable authority and truth-stage provenance rather than exact incidental
+   wording.
+3. **Converge current documentation.** Rewrite or retire stale `docs/chromie_mind.md`
+   semantics, remove exact duplicated `docs/CONFIGURATION.md` sections, and make ROADMAP
+   distinguish implemented source from qualification/readiness without asking a future
+   session to re-implement closed migrations.
+4. **Decide dormant global TaskGraph debt deliberately.** Provider/body-local DAGs are
+   valid. The default-off Chromie-global TaskGraph and `residual_replan` planning guidance
+   must either demonstrate a non-overlapping execution-only responsibility beneath
+   Planner/Work or be removed; do not rename the same overlap.
+5. **Perform repository hygiene after correctness.** Delete verified orphan legacy-agent
+   prompt assets and dead `ToolClient`, add the missing async test dependency, consolidate
+   repeated whitespace and JSON-schema validation mechanisms, remove stale naming/aliases
+   when no current consumer requires them, and add non-Python obsolete-artifact checks.
+6. **Continue structural simplification separately.** Large Host/Planner/GA files remain
+   maintainability risks, but extract only existing mechanical ownership seams. Do not add
+   a Speech Manager, Reconciliation Manager, Meta Planner, or one manager per cognitive
+   term.
+7. **Requalify behavior only after source closure.** Re-run canonical gates, bilingual
+   confirmation/cancellation cases, provider-backed result Evidence, embodied failures,
+   multi-Goal cancellation, latency, Social Attention, and live/simulator evidence on the
+   exact revision. Source/test/target/release claims remain separate.
 
 ## Evidence interpretation
 

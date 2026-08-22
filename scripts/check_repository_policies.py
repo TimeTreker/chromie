@@ -811,8 +811,12 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
                 "_NEGATIVE_PHRASES",
                 "_OPERATIONAL_INTERRUPT_PHRASES",
                 "_normalize_reply",
+                "_confirmation_prompt",
+                '"Confirmed."',
+                '"Okay, I will not perform that action."',
+                '"That confirmation expired',
             ),
-            "confirmation language meaning must come from typed Goal Association output",
+            "confirmation may own typed authorization state but may not infer reply meaning or author user-visible dialogue",
         ),
         "shared/chromie_contracts/semantic_task.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,

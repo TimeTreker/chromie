@@ -699,7 +699,10 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             ],
             ["cancelled", "cancelled"],
         )
-        self.assertEqual(len(launched), 2)
+        # Denial is an authorization state transition, not a second Host-authored
+        # conversational response. The only launched response is the original
+        # Planner-authored confirmation prompt.
+        self.assertEqual(len(launched), 1)
 
     async def test_multi_goal_confirmation_approval_schedules_all_scoped_goals(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
@@ -774,6 +777,8 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             metadata={
                 "planning_result": "composed_plan",
                 "semantic_plan_confirmation_required": True,
+                "confirmation_prompt": "I can walk and blink. Should I do that now?",
+                "confirmation_prompt_source": "planner_wording_runtime_validated",
             },
         )
 

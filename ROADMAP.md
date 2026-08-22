@@ -356,57 +356,69 @@ callbacks into a second planner.
 
 ## Current priorities
 
-1. Implement the owner-approved GI/Fast-Planner input-ownership migration before
-   treating the Chongqing weather fix as architectural closure. Then preserve the
-   completed authority spine and implement only the contract detail now proven necessary:
-   Communicative-Act/wording ownership, claim-specific Epistemic Qualification, and
-   bounded Forward Adaptation. Multi-user identity is not a new owner:
-   recognition/authentication is a factual Capability/Evidence claim and effect-specific
-   authorization/consent stays in Host policy. New top-level architecture requires the
-   Charter irreducibility review.
-2. Preserve the merged source contracts from Issues
-   [#17](https://github.com/TimeTreker/chromie/issues/17),
-   [#18](https://github.com/TimeTreker/chromie/issues/18),
-   [#20](https://github.com/TimeTreker/chromie/issues/20), and the completed
-   Goal-scoped cross-lane Interaction Context from
-   [#22](https://github.com/TimeTreker/chromie/issues/22) before qualifying a
-   replacement model profile. Same-model timing evidence must remain separate
-   from cross-model reload measurement; no prompt-prefix result may claim
-   cross-model KV reuse or model-reload savings.
-3. Preserve the closed 2026-08-07 post-merge audit contracts. Clean merged
-   Chromie `a36444b` and Soridormi `fa8080d2` retain exact compound arguments,
-   ordered MuJoCo execution, provider-start deterministic cancellation, and
-   safe-idle recovery. The dependency-complete source gate and rebuilt clean
-   generated-speech/GPU profile remain bound to `90aa72a`. Current source
-   replaces the former online semantic-review/recovery chain with bounded Fast
-   interpretation, one risk-bounded Deep escalation for uncertain `tool`,
-   `memory`, or `robot_action` work, and terminal Host validation. Hard semantic,
-   delivery-evidence, safety, provider, or provenance failures remain
-   non-averageable blockers.
-4. Keep every admitted non-operational turn on one Goal-driven semantic path.
-   Interpretation failure must remain an explicit unavailable outcome; it must
-   never be converted into plausible chat, tool, memory, or motion intent.
-5. Preserve the source-qualified `chromie.vocal.perform` contract and its clean
-   default-provider distinction evidence; real modes remain a separate target
-   evidence track.
-6. Preserve Issue #7's source-qualified peer media-playback contract and its
-   clean default-provider distinction evidence. Real operations remain a
-   separate target-evidence track; singing remains in Vocal, existing-audio
-   playback remains Activity, and ordinary TTS is neither kind of evidence.
-7. Preserve exact provider-prefixed capability identity from model proposal
-   through trusted validation, authorization, execution, and evidence. Backend
-   replacement stays behind that exact capability identity; do not introduce a
-   neutral late-binding alias merely to relocate implementation.
-8. Close source-bound and target-bound evidence separately. A passing source
-   gate does not prove GPU, microphone, speaker, simulator, or physical-provider
-   behavior. Core embodied closure requires simulator evidence; physical-provider
-   evidence is recorded only when an optional concrete deployment is being
-   qualified and never blocks ordinary Chromie completion.
-9. Reduce compatibility surfaces only after the maintained path has equivalent
-   retained evidence. Compatibility code must be gated, named, and unable to
-   re-enter after Goal-driven authority has been selected.
-10. Keep documentation, benchmarks, static analysis, configuration ownership,
-   and unit behavior in the canonical pull-request gate.
+### 2026-08-22 audit-remediation line
+
+Do not add another cognitive layer while the maintained Host still authors ordinary
+meaning that the Charter assigns to Planner.  The audit-remediation line is deliberately
+subtractive and precedes broad structural cleanup.  Each slice must remove an authority
+leak or historical surface rather than relocate it behind a new manager.
+
+1. **Phase 1 — close live semantic-authority violations.**
+   - **1A Confirmation authority:** authorization state owns only exact request identity,
+     TTL/fingerprint, and typed decision. It must reuse Planner-authored confirmation
+     wording exactly and has no fallback phrase or resolution message. Missing Planner
+     wording fails closed. **Implemented in the current patch; broader confirmation/body
+     recovery re-entry remains below.**
+   - **1B Cancellation and technical failure truth:** preserve deterministic stop/cancel
+     safety, but return receipts/state facts to cognition rather than replacing the
+     Planner response with Host self-narration. Processing/commit failures must never be
+     rounded into capability inability or pipeline jargon. The tiny cognition-unavailable
+     operational fallback is the only ordinary Host speech exception.
+   - **1C Result meaning:** remove `status -> sentence` outcome composition and other
+     post-execution Host result interpretation. Trusted Evidence updates Goal/Work/Situation
+     and reactivates Planner; unavailable Planner cognition records failure and remains
+     conservative rather than manufacturing semantic completion/refusal text.
+   - **1D Body recovery:** remove Host-authored retry plans/prompts. Recoverable body
+     failure remains trusted Evidence; Planner may choose retry/clarification/no new Work,
+     while Soridormi and Runtime retain safety/preflight authority.
+
+   **Phase 1 exit:** a source/AST policy and behavior regressions demonstrate that normal
+   confirmation, cancellation, execution failure, partial/refused/result, and recoverable
+   body paths contain no Host-authored semantic response owner; fixed protective reflexes
+   and the documented cognition-unavailable emergency utterance are the only explicit
+   exceptions.
+
+2. **Phase 2 — documentation convergence.** Rewrite/retire stale `chromie_mind.md`
+   architecture, remove duplicate authoritative configuration sections, reconcile
+   implementation-vs-qualification wording, and remove stale semantic vocabulary from
+   current-authority docs. Do not create another standalone architecture document.
+
+3. **Phase 3 — dormant TaskGraph decision.** Keep provider-local/physical DAGs. Audit the
+   default-off Chromie-global TaskGraph and `residual_replan` surface against Goal + Work +
+   Evidence + Situation + Planner. If it cannot prove a distinct execution-only owner,
+   delete it instead of renaming it. This is verified architecture debt, not a claim that
+   a second planner runs on every default turn.
+
+4. **Phase 4 — repository hygiene.** Remove verified orphan multi-agent prompt assets and
+   dead `ToolClient`; restore a fully executable pinned test environment; consolidate the
+   57 repeated whitespace normalizers and the three JSON-schema/type validation
+   implementations through small shared mechanical helpers; clean stale names and
+   compatibility aliases only when current consumers are absent.
+
+5. **Phase 5 — structural simplification.** Continue reducing Host/Planner/GA
+   reconstructability cost only across real existing ownership seams. File size alone is
+   not a gate. Share mechanisms, never merge or add semantic authorities merely to reduce
+   line count.
+
+6. **Phase 6 — qualification and release evidence.** Re-run canonical gates and then
+   retain bilingual/live/simulator/provider evidence for the exact source revision.
+   Qualification must prove that speech is Planner-authored, result claims are
+   Evidence-bound, duplicate speech/effects do not occur, and human-facing latency targets
+   are measured separately from cold-load/watchdog time.
+
+Across all phases: `use less to solve more`; fix the earliest wrong boundary; do not add a
+`SpeechManager`, Response Composer, recovery brain, compatibility semantic path, or renamed
+TaskGraph equivalent.
 
 ## Completed foundations
 
