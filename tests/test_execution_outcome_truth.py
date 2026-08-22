@@ -5,7 +5,10 @@ import unittest
 from datetime import datetime, timezone
 from typing import Any
 
-from orchestrator.runtime.outcome_reconciliation import planner_execution_outcome_truth
+from orchestrator.runtime.outcome_reconciliation import (
+    ExecutionOutcomeReconciler,
+    planner_execution_outcome_truth,
+)
 from shared.chromie_contracts.execution_outcome import (
     ClaimQualification,
     ExecutionEvidence,
@@ -15,6 +18,7 @@ from shared.chromie_contracts.execution_outcome import (
     aggregate_execution_status,
     execution_outcome_fingerprint,
 )
+from shared.chromie_contracts.interaction import CapabilityRequest, CapabilityResult
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.plan import canonical_plan_fingerprint
 
@@ -204,6 +208,63 @@ class OutcomeTruthProjectionTests(unittest.TestCase):
             qualification["qualifications"][0]["status"],
             "insufficient",
         )
+
+
+    def test_projection_preserves_provider_retryability_as_fact_only(self) -> None:
+        statuses = [("goal-motion", ["failed"])]
+        plan = _plan(statuses, plan_id="plan-recoverable-motion")
+        step = plan.steps[0]
+        request = CapabilityRequest(
+            request_id="request-motion",
+            capability_id=step.capability_id,
+            args={},
+            timing="sequential",
+            metadata={
+                "source": "goal_driven_canonical_plan",
+                "canonical_plan_id": plan.plan_id,
+                "canonical_plan_fingerprint": canonical_plan_fingerprint(plan),
+                "step_id": step.step_id,
+                "source_goal_ids": list(step.source_goal_ids),
+            },
+        )
+        result = CapabilityResult(
+            request_id=request.request_id,
+            capability_id=request.capability_id,
+            status="failed",
+            reason_code="path_temporarily_blocked",
+            output={
+                "recovery": {
+                    "recoverable": True,
+                    "retryable": True,
+                    "failure_class": "b_level_recovery",
+                    "user_message": "do not project this provider wording",
+                }
+            },
+        )
+        bundle = ExecutionOutcomeReconciler().build(
+            turn_id="turn-recoverable-motion",
+            plan=plan,
+            interaction_id="interaction-recoverable-motion",
+            requests=[request],
+            results=[result],
+            output_schemas={request.request_id: {}},
+        )
+
+        projection = planner_execution_outcome_truth(bundle)
+        recovery = projection["evidence"][0]["provider_retryability"]
+
+        self.assertEqual(
+            recovery,
+            {
+                "recoverable": True,
+                "retryable": True,
+                "failure_class": "b_level_recovery",
+            },
+        )
+        rendered = repr(projection)
+        self.assertNotIn("do not project this provider wording", rendered)
+        self.assertNotIn("try again", rendered.casefold())
+        self.assertNotIn("confirm", rendered.casefold())
 
     def test_projection_excludes_provider_message_and_observation_payload(self) -> None:
         secret = "NEVER-SPEAK-THIS-SECRET"

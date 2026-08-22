@@ -95,9 +95,12 @@ final result speech. Barge-in may invalidate stale audible output, but an
 ordinary newer turn does not cancel the earlier routed turn or discard its Goal
 and outcome evidence. Explicit deterministic control or a Core-authorized
 foreground interruption may cancel only its bound scope. A recoverable
-Soridormi failure can
-propose only a fresh-confirmed child plan containing the failed recoverable
-subset; it cannot replay or mutate completed parent work.
+Soridormi failure remains trusted terminal Evidence. Provider-declared
+recoverable/retryable/failure-class facts are projected without interpretation;
+Goal/Work/Situation then re-enter the same Planner, which may author retry, an
+alternative, clarification, waiting, or no new Work. Runtime and Soridormi still
+own physical validation, confirmation enforcement, preflight, and execution. Host
+does not synthesize a retry plan or recovery prompt.
 
 The common safe base enables this single path with local capabilities limited to
 explicitly registered safe providers. The Soridormi launcher adds the trusted body

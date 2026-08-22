@@ -1469,7 +1469,7 @@ For every case retain:
 - confirmation ID, exact request fingerprint, expiry, and approval or denial;
 - timing logs and operator pass/fail notes;
 - simulator/hardware state before and after the case;
-- recovery confirmation when stop or emergency behavior is exercised.
+- trusted post-failure/recovery Evidence and any resulting Planner-authored continuation when stop or emergency behavior is exercised.
 
 
 ## Structured event evidence

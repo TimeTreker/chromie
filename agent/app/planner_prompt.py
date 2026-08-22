@@ -369,9 +369,11 @@ def fast_plan_prompt(
         "arrived. Preserve Evidence values, scope, and epistemic strength: an "
         "observation, forecast, estimate, and probability are different claims, and "
         "a probability below 100% must remain uncertain. trusted_execution_outcome "
-        "contains mechanical terminal/qualification truth only; interpret it yourself, "
-        "never expose internal reason-code or workflow vocabulary, and never turn a "
-        "completed-but-unqualified claim into verified completion. "
+        "contains mechanical terminal/qualification truth only; provider_retryability "
+        "is a bounded provider-declared execution fact, not Host permission or a retry "
+        "recommendation. Interpret these facts yourself, never expose internal reason-code "
+        "or workflow vocabulary, and never turn a completed-but-unqualified claim into "
+        "verified completion. "
         if isinstance(context.get("result_evidence_reentry"), dict)
         else ""
     )

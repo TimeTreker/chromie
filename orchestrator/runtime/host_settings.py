@@ -330,8 +330,6 @@ class SessionLifecycleSettings:
     addressedness_gate_enabled: bool
     addressedness_engagement_timeout_s: float
     confirmation_ttl_s: float
-    body_recovery_max_attempts: int
-    body_recovery_confirmation_ttl_s: float
     idle_sweep_s: float
     idle_timeout_ms: float
 
@@ -807,15 +805,6 @@ class HostSettingsSnapshot:
                 ),
                 confirmation_ttl_s=_float(
                     values, "ORCH_CONFIRMATION_TTL_SEC", 20.0, minimum=0.1
-                ),
-                body_recovery_max_attempts=_int(
-                    values, "ORCH_BODY_RECOVERY_MAX_ATTEMPTS", 1, minimum=0
-                ),
-                body_recovery_confirmation_ttl_s=_float(
-                    values,
-                    "ORCH_BODY_RECOVERY_CONFIRMATION_TTL_S",
-                    10.0,
-                    minimum=1.0,
                 ),
                 idle_sweep_s=_float(
                     values, "ORCH_SESSION_IDLE_SWEEP_S", 5.0, minimum=1.0

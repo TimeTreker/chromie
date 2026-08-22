@@ -849,27 +849,26 @@ verified-tool index alone contains no result facts and cannot authorize a
 direct external-fact response; without matching delivered dialogue, the plan
 must retrieve exact evidence, perform a fresh read, or escalate.
 
-The current deterministic composer is the conservative, language-matched
-status path. If its input validation or composition fails, the host retains the
-execution evidence and suppresses an unvalidated outcome response; failure
-cannot erase evidence or turn an uncertain result into success.
+Post-execution meaning is Planner-owned. Host closure retains trusted Evidence,
+Goal/Work updates, and mechanical completion qualification; if Planner re-entry
+is unavailable, the Host keeps those facts and emits no invented result sentence.
+Failure cannot erase Evidence or turn an uncertain result into success.
 
-### 8.3 Recovery is a confirmed child plan
+### 8.3 Recovery is ordinary post-Evidence planning
 
-A recoverable embodied failure does not mutate or replay the parent plan. The
-host selects only the failed recoverable Soridormi steps, constructs a new
-immutable `CanonicalPlan` with `plan_relation=recovery_subset`, records the
-parent plan ID and fingerprint, and gives the child plan its own ID and
-fingerprint. Retry requests receive new request and idempotency identities and
-must match that child plan exactly.
+A recoverable embodied failure is not a Host-created child plan. Runtime records
+the exact failed Activity and bounded provider-declared recovery facts
+(`recoverable`, `retryable`, or `failure_class`) as Evidence. Those facts are not
+a retry recommendation or authorization. The same Goal/Work/Situation snapshot
+then re-enters Planner, which may choose a retry, a different Activity, a
+clarification, waiting, or no new Work.
 
-The child plan requires fresh request-bound confirmation and then re-enters the
-normal validation, Trusted Capability Runtime, Soridormi preflight, outcome reconciliation,
-and final-response path. Earlier completed sibling goals remain in parent
-history and are not overwritten or replayed. If a complete child plan cannot be
-constructed, any committed sibling lacks a terminal result, a non-recoverable
-sibling exists, the retry budget is exhausted, or confirmation is absent, no
-retry runs.
+Any new effectful Activity authored by Planner receives ordinary fresh request
+identity and must pass the same confirmation, Runtime validation, and Soridormi
+preflight/safety boundary as every other physical Activity. Completed sibling
+Work remains completed and cannot be replayed merely because a different step
+failed. Host does not synthesize retry Plans, retry request IDs, or recovery
+confirmation wording.
 
 ## 9. Stop, cancel, and emergency input
 

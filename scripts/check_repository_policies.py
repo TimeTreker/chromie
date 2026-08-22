@@ -671,6 +671,7 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
     forbidden_files = {
         "orchestrator/runtime/deepthinking_policy.py": RULE_HOST_SEMANTIC_AUTHORITY,
         "orchestrator/runtime/outcome_response.py": RULE_HOST_SEMANTIC_AUTHORITY,
+        "orchestrator/runtime/body_recovery.py": RULE_HOST_SEMANTIC_AUTHORITY,
         "agent/app/agents/motion_planner.py": RULE_LEGACY_PHRASE_AGENTS,
         "agent/app/agents/robot_pose_controller.py": RULE_LEGACY_PHRASE_AGENTS,
     }
@@ -704,6 +705,10 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
                 "host_named_goal_cancellation_reconciled",
                 '"I cancelled the selected goal."',
                 '"I could not reliably stop the selected goal',
+                "_maybe_stage_body_recovery_confirmation",
+                "_stage_body_recovery_confirmation",
+                "host_body_recovery_confirmation",
+                "proposal_from_body_recovery",
             ),
             "ordinary deep-thinking and user-facing wording must remain model/Core-authored",
         ),

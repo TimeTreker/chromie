@@ -59,8 +59,9 @@ remediation line. Verified live defects include:
 - named Goal cancellation replaces Planner output with Host-written success/failure prose;
 - cognitive commit/runtime-entry failures expose pipeline jargon or collapse processing
   failure into capability inability;
-- Host body recovery constructs a retry plan and confirmation prompt after execution
-  failure.
+- Host body recovery historically constructed a retry Plan and confirmation prompt after
+  execution failure; Phase 1D removes that authority and preserves only bounded
+  provider-declared retryability facts in terminal Evidence.
 
 Verified architecture debt, but not default-turn evidence of a second live planner:
 Chromie-global TaskGraph execution is wired but feature-disabled by default; its
@@ -71,9 +72,10 @@ Verified repository-hygiene work follows correctness: orphan legacy-agent prompt
 `ToolClient`, repeated whitespace normalizers, three JSON-schema/type validator copies,
 missing async test dependency, stale naming, and compatibility residue.
 
-## Current patch line — Phase 1A through 1C
+## Current patch line — Phase 1A through 1D
 
-The audit remediation is now source-closed through ordinary post-execution result meaning:
+The live semantic-authority audit remediation is now source-closed across confirmation,
+cancellation, ordinary result meaning, and recoverable body failure:
 
 - Phase 1A: `ConfirmationDialogue` owns authorization facts only and requires exact
   Planner-authored confirmation wording;
@@ -85,20 +87,24 @@ The audit remediation is now source-closed through ordinary post-execution resul
   statuses can re-enter Planner as bounded `ToolResultEvidence`; and a separate trusted
   execution-outcome projection carries aggregate/Goal status plus mechanical completion
   qualification without authoring meaning. If Planner re-entry is unavailable, Evidence is
-  retained and no Host result sentence is manufactured.
+  retained and no Host result sentence is manufactured;
+- Phase 1D: `body_recovery.py` and its Host-generated retry child Plan/prompt path are
+  removed. Execution Evidence now retains bounded provider-declared `recoverable`,
+  `retryable`, and `failure_class` facts; the same Planner owns retry, alternative,
+  clarification, wait, or no new Work. Runtime/Soridormi still own confirmation
+  enforcement, safety, preflight, and execution.
 
-This is **not Phase 1 closure**. Host body-recovery retry-plan and confirmation-prompt
-construction remains Phase 1D.
+This closes the verified live Phase 1 semantic-authority findings in source. Qualification
+remains separate from source closure.
 
 ## Required execution order
 
-1. Finish **Phase 1D**: body recovery must return trusted failure/recovery facts to Planner
-   instead of authoring Host retry Plans or confirmation prompts. Reuse the generalized
-   Planner state re-entry created in Phase 1B; do not add a Speech Manager, replacement
-   Response Composer, or Recovery Brain.
-2. Run focused confirmation/cancellation/outcome/body-recovery regressions, semantic
-   authority audit, repository policies, docs check, and `./scripts/run_tests.sh` in the
-   dependency-complete environment.
+1. Run focused confirmation/cancellation/outcome/body-failure regressions, semantic
+   authority audit, repository policies, docs/configuration checks, and
+   `./scripts/run_tests.sh` in the dependency-complete environment.
+2. Run current-revision bilingual/provider/simulator qualification for failed recoverable
+   body Work and verify Planner owns retry/alternative/clarification/wait/silence while
+   Runtime/Soridormi still enforce physical confirmation and safety.
 3. Execute **Phase 2** documentation convergence, then **Phase 3** dormant TaskGraph
    decision, then **Phase 4** repository hygiene/duplicate-mechanism cleanup.
 4. Continue structural decomposition only across existing ownership seams.
@@ -110,23 +116,25 @@ Detailed phase order and exit criteria live in `ROADMAP.md`; current facts live 
 
 ## Verification for this slice
 
-Current source verification on the uploaded `chromie_2026082206.zip` baseline plus this
-Phase 1C change:
+Current source verification on the uploaded `chromie_2026082206.zip` baseline plus applied
+Phase 1C and this Phase 1D change:
 
 - execution-outcome truth/reconciliation, terminal-Evidence re-entry, cognitive turn-loop,
-  confirmation contract, and behavior-scenario focused suite: **56 passed + 18 subtests**;
-- Planner prompt/internal-layer plus Fast/Deep Planner regressions: **188 passed + 5
-  subtests**;
-- combined focused verification: **244 passed + 23 subtests**;
+  Interaction Runtime, and confirmation regressions: **105 passed + 26 subtests**;
+- Planner prompt/internal-layer, Fast/Deep Planner, and behavior-scenario regressions:
+  **197 passed + 9 subtests**;
+- combined non-overlapping focused verification: **302 passed + 35 subtests**;
 - `python -m compileall -q agent orchestrator shared scripts tests`: **passed**;
-- runtime exception-boundary inventory, repository policies, documentation checks,
-  semantic-authority audit, runtime-structure ratchet, and test-ownership checks:
-  **passed**;
-- the Host structural ratchet remains **105 methods / 305 init lines / 110 initialized
-  attributes / 0 direct LLM calls**.
+- runtime configuration inventory, Host/service configuration ownership, runtime
+  exception-boundary inventory, repository policies, documentation checks, semantic-authority
+  audit, runtime-structure ratchet, and test-ownership checks: **passed**;
+- the Host structural ratchet is reduced to **103 methods / 301 init lines / 108
+  initialized attributes / 0 direct LLM calls**.
 
-Full canonical-suite completion is not claimed by this patch handoff; run
-`./scripts/run_tests.sh` in the pinned `requirements-test.txt` environment after applying.
+A broader `PYTHONPATH=agent:. python -m pytest -q tests agent/tests` run reached about 61%
+with no failure before this environment's 120-second command limit. Full canonical-suite
+completion is therefore not claimed by this patch handoff; run `./scripts/run_tests.sh` in
+the pinned `requirements-test.txt` environment after applying.
 
 Do not claim microphone, audible speaker, GPU/model, MuJoCo, or physical-robot behavior
 from source tests. Those remain separate target evidence.

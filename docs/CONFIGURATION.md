@@ -462,8 +462,6 @@ Do not commit a real execution token. Manifest strings may use required
 | `ORCH_ASR_TIMEOUT_MS` | Host wait for one final ASR response; common default `30000`. |
 | `ORCH_ACTION_TIMEOUT_MS` | Host timeout for one legacy hardware-daemon action; common default `5000`. |
 | `ORCH_SORIDORMI_CATALOG_REFRESH_TTL_S` | Seconds to keep the Orchestrator-side Soridormi named-skill catalog before reloading; code default `30`. Unknown requested `soridormi.*` skills force an immediate refresh even before this TTL expires. Set `0` to reload before every body-skill execution. |
-| `ORCH_BODY_RECOVERY_MAX_ATTEMPTS` | Maximum request-bound B-level recovery retries for recoverable Soridormi single-skill failures; code default `1`. Set `0` to disable recovery prompts and use terminal fallback speech. |
-| `ORCH_BODY_RECOVERY_CONFIRMATION_TTL_S` | Confirmation TTL for B-level recovery prompts; code default `10`. A user confirmation after expiry does not retry; approved retries still re-enter preflight/CapabilityRuntime/Soridormi validation. |
 
 Ordinary semantic escalation and deep-thinking delegation are authored by the
 Goal-driven Cognitive Core and its planner models. The Host has no
@@ -1221,8 +1219,6 @@ Do not commit a real execution token. Manifest strings may use required
 | `ORCH_ASR_TIMEOUT_MS` | Host wait for one final ASR response; common default `30000`. |
 | `ORCH_ACTION_TIMEOUT_MS` | Host timeout for one legacy hardware-daemon action; common default `5000`. |
 | `ORCH_SORIDORMI_CATALOG_REFRESH_TTL_S` | Seconds to keep the Orchestrator-side Soridormi named-skill catalog before reloading; code default `30`. Unknown requested `soridormi.*` skills force an immediate refresh even before this TTL expires. Set `0` to reload before every body-skill execution. |
-| `ORCH_BODY_RECOVERY_MAX_ATTEMPTS` | Maximum request-bound B-level recovery retries for recoverable Soridormi single-skill failures; code default `1`. Set `0` to disable recovery prompts and use terminal fallback speech. |
-| `ORCH_BODY_RECOVERY_CONFIRMATION_TTL_S` | Confirmation TTL for B-level recovery prompts; code default `10`. A user confirmation after expiry does not retry; approved retries still re-enter preflight/CapabilityRuntime/Soridormi validation. |
 
 Ordinary semantic escalation and deep-thinking delegation are authored by the
 Goal-driven Cognitive Core and its planner models. The Host has no

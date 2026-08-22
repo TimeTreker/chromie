@@ -120,6 +120,37 @@ def _sensitive_output_path(value: Any, *, path: str = "$") -> str | None:
     return None
 
 
+def _provider_retryability_truth(result: CapabilityResult) -> dict[str, Any]:
+    """Return bounded provider-declared recovery facts without interpreting them.
+
+    Providers may mark a failed operation recoverable/retryable or classify the
+    failure. Those declarations are execution facts useful to Planner re-entry;
+    they are not Host authorization, a retry recommendation, or user-facing text.
+    """
+
+    output = result.output if isinstance(result.output, dict) else {}
+    recovery = output.get("recovery")
+    recovery = recovery if isinstance(recovery, dict) else {}
+    truth: dict[str, Any] = {}
+    for key in ("recoverable", "retryable"):
+        value = output.get(key)
+        if not isinstance(value, bool):
+            value = recovery.get(key)
+        if isinstance(value, bool):
+            truth[key] = value
+    failure_class = (
+        output.get("failure_class")
+        or output.get("failure_type")
+        or recovery.get("failure_class")
+        or recovery.get("failure_type")
+    )
+    if isinstance(failure_class, str):
+        normalized = " ".join(failure_class.strip().split())[:160]
+        if normalized:
+            truth["failure_class"] = normalized
+    return truth
+
+
 class ExecutionOutcomeReconciler:
     """Join an immutable plan, committed requests, and trusted runtime results.
 
@@ -940,6 +971,7 @@ class ExecutionOutcomeReconciler:
                     "correlation": "plan_step_request_and_capability_result",
                     "request_args": dict(request.args),
                     "provider_execution": dict(result.metadata),
+                    "provider_retryability": _provider_retryability_truth(result),
                     "reported_provider_completion": (
                         str(result.status).strip().casefold() == "completed"
                     ),
@@ -1324,6 +1356,9 @@ def planner_execution_outcome_truth(
                 "reason_code": str(evidence.reason_code or ""),
                 "observation_status": (
                     observation.status if observation is not None else "none"
+                ),
+                "provider_retryability": dict(
+                    evidence.metadata.get("provider_retryability") or {}
                 ),
             }
         )

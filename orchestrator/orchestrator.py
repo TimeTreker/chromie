@@ -49,10 +49,6 @@ from orchestrator.runtime.audio_device_lifecycle import (
     set_output_device_params,
     uses_followed_system_default,
 )
-from orchestrator.runtime.body_recovery import (
-    BodyRecoveryConfirmation,
-    build_body_recovery_confirmation,
-)
 from orchestrator.runtime.confirmation import (
     ConfirmationDialogue,
     ConfirmationReplyMeaning,
@@ -281,10 +277,6 @@ class VoiceAssistant:
         self.episode_recorder = host_support.episode_recorder
         self.confirmation_dialogue = ConfirmationDialogue(
             ttl_s=session_settings.confirmation_ttl_s,
-        )
-        self.body_recovery_max_attempts = session_settings.body_recovery_max_attempts
-        self.body_recovery_confirmation_ttl_s = (
-            session_settings.body_recovery_confirmation_ttl_s
         )
         logger.info(
             "Conversation state: enabled=%s conversation_id=%s max_turns=%s idle_s=%s hard_idle_s=%s max_context_chars=%s",
@@ -4142,7 +4134,6 @@ class VoiceAssistant:
         session_id: str | None,
         generation: int,
         provider_status: dict[str, Any] | None,
-        recovery_confirmation_staged: bool,
         suppress_final_reason: str | None = None,
     ) -> str:
         closure = self._cognitive_turn_closure_adapter()
@@ -4451,17 +4442,6 @@ class VoiceAssistant:
                 goal_state_results=goal_state_results,
             )
             return f"suppressed_{suppress_final_reason}"
-        if recovery_confirmation_staged:
-            self._record_cognitive_outcome_evidence(
-                bundle,
-                session_id=session_id,
-                final_response=None,
-                delivery_status="waiting_for_recovery_confirmation",
-                suppression_reason="recovery_confirmation_staged",
-                goal_state_results=goal_state_results,
-            )
-            return "waiting_for_recovery_confirmation"
-
         delivered_incremental_evidence = {
             str(item).strip()
             for item in response.metadata.get(
@@ -5740,22 +5720,12 @@ class VoiceAssistant:
                     request_id=request.request_id,
                     status="not_run",
                 )
-        recovery_confirmation_staged = (
-            await self._maybe_stage_body_recovery_confirmation(
-                response,
-                execution,
-                session_id,
-            )
-            if execution.status != "completed"
-            else False
-        )
         closure_status = await self._close_cognitive_execution(
             response=response,
             execution=execution,
             session_id=session_id,
             generation=generation,
             provider_status=provider_status,
-            recovery_confirmation_staged=recovery_confirmation_staged,
         )
         response.metadata["cognitive_turn_closure_status"] = closure_status
         record_execution_experience_safely(
@@ -5843,94 +5813,6 @@ class VoiceAssistant:
             status.get("fallen"),
         )
         return status
-
-    async def _maybe_stage_body_recovery_confirmation(
-        self,
-        response: InteractionResponse,
-        execution: CapabilityRuntimeResult,
-        session_id: str | None,
-    ) -> bool:
-        if execution.status == "cancelled":
-            return False
-        recovery = build_body_recovery_confirmation(
-            response,
-            execution.results,
-            max_attempts=getattr(self, "body_recovery_max_attempts", 1),
-            timeout_s=getattr(self, "body_recovery_confirmation_ttl_s", 10.0),
-            language=str(response.metadata.get("language") or ""),
-        )
-        if recovery is None:
-            return False
-        return await self._stage_body_recovery_confirmation(
-            recovery,
-            session_id=session_id,
-            language=str(response.metadata.get("language") or ""),
-        )
-
-    async def _stage_body_recovery_confirmation(
-        self,
-        recovery: BodyRecoveryConfirmation,
-        *,
-        session_id: str | None,
-        language: str | None,
-    ) -> bool:
-        pending = self.confirmation_dialogue.begin(
-            recovery.response,
-            confirmed_request_ids=set(recovery.confirmed_request_ids),
-            origin_session_id=session_id,
-            conversation_id=self.conversation_state.conversation_id,
-            prompt_override=recovery.prompt,
-            ttl_s=getattr(self, "body_recovery_confirmation_ttl_s", 10.0),
-        )
-        self.session_log(
-            session_id,
-            "body_recovery_requested: confirmation_id=%s interaction_id=%s "
-            "failed_request_ids=%s retry_request_ids=%s attempt=%s/%s expires_at=%.3f",
-            pending.confirmation_id,
-            recovery.response.interaction_id,
-            ",".join(recovery.failed_request_ids),
-            ",".join(recovery.retry_request_ids),
-            recovery.attempt,
-            recovery.max_attempts,
-            pending.expires_at,
-        )
-        self.conversation_state.record_pending_task(
-            sid=session_id,
-            task_type="body_recovery_confirmation",
-            status="awaiting_confirmation",
-            summary=", ".join(
-                request.capability_id
-                for request in recovery.response.capabilities
-                if request.request_id in recovery.confirmed_request_ids
-            ),
-            metadata={
-                "confirmation_id": pending.confirmation_id,
-                "interaction_id": recovery.response.interaction_id,
-                "fingerprint": pending.fingerprint,
-                "expires_at": pending.expires_at,
-                "failed_request_ids": list(recovery.failed_request_ids),
-                "retry_request_ids": list(recovery.retry_request_ids),
-                "body_recovery_attempt": recovery.attempt,
-                "body_recovery_max_attempts": recovery.max_attempts,
-            },
-        )
-        prompt_response = self._host_speech_response(
-            pending.prompt,
-            style="confirm",
-            source="host_body_recovery_confirmation",
-        )
-        prompt_dispatch = await self.interaction_runtime.submit_response(
-            prompt_response,
-            session_id=session_id,
-        )
-        prompt_execution = await self.interaction_runtime.wait_dispatch(prompt_dispatch)
-        self._record_successfully_delivered_speech(
-            prompt_response,
-            prompt_execution,
-            session_id=session_id,
-            log_event="body_recovery_history_after_delivery",
-        )
-        return True
 
     def _prepared_interaction_response_for_record(
         self,

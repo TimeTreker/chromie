@@ -303,14 +303,6 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
             lambda response, **kwargs: response
         )
 
-        async def no_recovery(self, *args, **kwargs) -> bool:
-            return False
-
-        assistant._maybe_stage_body_recovery_confirmation = MethodType(
-            no_recovery,
-            assistant,
-        )
-
         async def planner_reentry(self, **kwargs):
             del self
             goal_ids = list(kwargs.get("goal_ids") or [])

@@ -3139,16 +3139,17 @@ The host validates that:
 If outcome-response validation or qualification fails, the Host retains the trusted
 outcome bundle and emits no unvalidated completion claim from that candidate.
 
-### 15.3 Recovery child plans
+### 15.3 Recoverable body failure
 
-A recoverable Soridormi failure may produce a retry proposal only by creating a
-new immutable child `CanonicalPlan` containing the failed recoverable subset.
-The child records the parent plan ID and fingerprint, receives its own plan
-fingerprint, new request/idempotency identities, and fresh request-bound
-confirmation. It then re-enters ordinary validation, execution, and
-reconciliation. Completed parent steps are neither mutated nor replayed; an
-invalid subset, non-recoverable sibling, exhausted budget, or missing
-confirmation means no retry.
+A recoverable Soridormi failure remains terminal execution Evidence; Host does
+not turn it into a child Plan. Bounded provider-declared retryability facts may
+be projected with the Evidence, but they do not authorize or recommend a retry.
+Goal/Work/Situation re-enter the same Planner, which owns whether the next delta
+is retry Work, alternative Work, clarification, waiting, or no new Activity.
+Any newly authored physical Activity receives ordinary fresh identity and passes
+normal confirmation, Runtime validation, and Soridormi preflight/safety checks.
+Completed Work remains completed and is not replayed solely because a sibling
+failed.
 
 ### 15.4 Claim validation
 

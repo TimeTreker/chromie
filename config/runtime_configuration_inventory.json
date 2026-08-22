@@ -2286,22 +2286,6 @@
     },
     {
       "boolean": false,
-      "category": "service_internal",
-      "key": "ORCH_BODY_RECOVERY_CONFIRMATION_TTL_S",
-      "owners": [
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "ORCH_BODY_RECOVERY_MAX_ATTEMPTS",
-      "owners": [
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": false,
       "category": "profile_constant",
       "key": "ORCH_CAPABILITY_MAX_CONCURRENCY",
       "owners": [
@@ -4055,10 +4039,10 @@
       "bounded_compatibility_alias": 0,
       "profile_constant": 130,
       "public_choice": 9,
-      "service_internal": 212
+      "service_internal": 210
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 388
+    "total_keys": 386
   }
 }

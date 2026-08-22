@@ -1604,7 +1604,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(body_results[0].status, "failed")
         self.assertEqual([item["text"] for item in spoken], ["Starting."])
 
-    async def test_recoverable_retry_failure_returns_evidence_without_host_speech(
+    async def test_planner_retry_failure_returns_evidence_without_host_speech(
         self,
     ) -> None:
         spoken: list[str] = []
@@ -1627,14 +1627,14 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             InteractionResponse(
                 capabilities=[
                     {
-                        "request_id": "nod-1_recovery1",
+                        "request_id": "nod-1-retry",
                         "capability_id": "soridormi.nod_yes",
-                        "metadata": {"body_recovery_attempt": 1},
+                        "metadata": {"source": "planner_retry_test"},
                     }
                 ],
                 metadata={"language": "en-US"},
             ),
-            session_id="sid-recoverable-budget",
+            session_id="sid-planner-retry",
         )
 
         self.assertEqual(result.status, "failed")

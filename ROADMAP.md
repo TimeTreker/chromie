@@ -367,7 +367,7 @@ leak or historical surface rather than relocate it behind a new manager.
    - **1A Confirmation authority:** authorization state owns only exact request identity,
      TTL/fingerprint, and typed decision. It must reuse Planner-authored confirmation
      wording exactly and has no fallback phrase or resolution message. Missing Planner
-     wording fails closed. **Implemented in Phase 1A; body-recovery re-entry remains below.**
+     wording fails closed. **Implemented in Phase 1A.**
    - **1B Cancellation and technical failure truth:** preserve deterministic stop/cancel
      safety, but return receipts/state facts to cognition rather than replacing the
      Planner response with Host self-narration. Named-Goal cancellation now materializes
@@ -383,9 +383,12 @@ leak or historical surface rather than relocate it behind a new manager.
      conservative rather than manufacturing semantic completion/refusal text. Aggregate
      re-entry now exposes terminal status plus mechanical completion qualification to the
      same Planner; the deterministic `outcome_response.py` owner is removed. **Implemented.**
-   - **1D Body recovery:** remove Host-authored retry plans/prompts. Recoverable body
-     failure remains trusted Evidence; Planner may choose retry/clarification/no new Work,
-     while Soridormi and Runtime retain safety/preflight authority.
+   - **1D Body recovery:** recoverable body failure remains trusted Evidence; bounded
+     provider-declared retryability facts are exposed without interpretation and the same
+     Planner may choose retry/alternative/clarification/wait/no new Work. Host no longer
+     builds retry Plans, retry request identities, or recovery prompts; Soridormi and
+     Runtime retain confirmation enforcement, safety, preflight, and execution authority.
+     **Implemented in Phase 1D.**
 
    **Phase 1 exit:** a source/AST policy and behavior regressions demonstrate that normal
    confirmation, cancellation, execution failure, partial/refused/result, and recoverable

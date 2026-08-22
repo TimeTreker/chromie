@@ -1576,15 +1576,6 @@ async def evaluate_cognitive_turn_loop_scenario(
         lambda prepared, **kwargs: prepared
     )
 
-    async def no_recovery(self: Any, *args: Any, **kwargs: Any) -> bool:
-        del self, args, kwargs
-        return False
-
-    assistant._maybe_stage_body_recovery_confirmation = MethodType(
-        no_recovery,
-        assistant,
-    )
-
     planner_reentry_speech = stub.get("planner_reentry_speech")
     if isinstance(planner_reentry_speech, list):
         async def scripted_planner_reentry(self: Any, **kwargs: Any) -> InteractionResponse:
