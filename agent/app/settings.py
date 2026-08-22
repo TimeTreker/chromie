@@ -68,62 +68,62 @@ class Settings(BaseModel):
             if item.strip()
         )
     )
-    enable_read_only_task_graph_execution: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_ENABLE_READ_ONLY_TASK_GRAPH_EXECUTION", "0").strip().lower()
+    enable_read_only_dag_execution: bool = Field(
+        default_factory=lambda: os.getenv("AGENT_ENABLE_READ_ONLY_DAG_EXECUTION", "0").strip().lower()
         not in {"0", "false", "no", "off"}
     )
-    enable_planning_task_graph_execution: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION", "0").strip().lower()
+    enable_planning_dag_execution: bool = Field(
+        default_factory=lambda: os.getenv("AGENT_ENABLE_PLANNING_DAG_EXECUTION", "0").strip().lower()
         not in {"0", "false", "no", "off"}
     )
-    enable_parallel_task_graph_execution: bool = Field(
+    enable_parallel_dag_execution: bool = Field(
         default_factory=lambda: os.getenv(
-            "AGENT_ENABLE_PARALLEL_TASK_GRAPH_EXECUTION",
+            "AGENT_ENABLE_PARALLEL_DAG_EXECUTION",
             "0",
         ).strip().lower()
         not in {"0", "false", "no", "off"}
     )
-    task_graph_max_concurrency: int = Field(
+    dag_engine_max_concurrency: int = Field(
         default_factory=lambda: int(
-            os.getenv("AGENT_TASK_GRAPH_MAX_CONCURRENCY", "4")
+            os.getenv("AGENT_DAG_ENGINE_MAX_CONCURRENCY", "4")
         ),
         ge=1,
         le=64,
     )
-    enable_guarded_task_graph_execution: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION", "0").strip().lower()
+    enable_guarded_dag_execution: bool = Field(
+        default_factory=lambda: os.getenv("AGENT_ENABLE_GUARDED_DAG_EXECUTION", "0").strip().lower()
         not in {"0", "false", "no", "off"}
     )
-    enable_physical_task_graph_execution: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION", "0").strip().lower()
+    enable_physical_dag_execution: bool = Field(
+        default_factory=lambda: os.getenv("AGENT_ENABLE_PHYSICAL_DAG_EXECUTION", "0").strip().lower()
         not in {"0", "false", "no", "off"}
     )
-    task_graph_execution_token: str = Field(
-        default_factory=lambda: os.getenv("AGENT_TASK_GRAPH_EXECUTION_TOKEN", "")
+    dag_engine_execution_token: str = Field(
+        default_factory=lambda: os.getenv("AGENT_DAG_ENGINE_EXECUTION_TOKEN", "")
     )
-    task_graph_diagnostics_token: str = Field(
+    dag_engine_diagnostics_token: str = Field(
         default_factory=lambda: (
-            os.getenv("AGENT_TASK_GRAPH_DIAGNOSTICS_TOKEN", "").strip()
-            or os.getenv("AGENT_TASK_GRAPH_EXECUTION_TOKEN", "").strip()
+            os.getenv("AGENT_DAG_ENGINE_DIAGNOSTICS_TOKEN", "").strip()
+            or os.getenv("AGENT_DAG_ENGINE_EXECUTION_TOKEN", "").strip()
         )
     )
-    task_graph_trace_max_entries: int = Field(
+    dag_engine_trace_max_entries: int = Field(
         default_factory=lambda: int(
-            os.getenv("AGENT_TASK_GRAPH_TRACE_MAX_ENTRIES", "128")
+            os.getenv("AGENT_DAG_ENGINE_TRACE_MAX_ENTRIES", "128")
         ),
         ge=1,
         le=10000,
     )
-    task_graph_trace_ttl_sec: float = Field(
+    dag_engine_trace_ttl_sec: float = Field(
         default_factory=lambda: float(
-            os.getenv("AGENT_TASK_GRAPH_TRACE_TTL_SEC", "900")
+            os.getenv("AGENT_DAG_ENGINE_TRACE_TTL_SEC", "900")
         ),
         gt=0,
         le=86400,
     )
-    task_graph_grant_max_entries: int = Field(
+    dag_engine_grant_max_entries: int = Field(
         default_factory=lambda: int(
-            os.getenv("AGENT_TASK_GRAPH_GRANT_MAX_ENTRIES", "128")
+            os.getenv("AGENT_DAG_ENGINE_GRANT_MAX_ENTRIES", "128")
         ),
         ge=1,
         le=10000,

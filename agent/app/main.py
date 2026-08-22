@@ -91,18 +91,18 @@ from .cognitive_core.goal_interpreter import (
     interpret_goal,
 )
 from .cognitive_core.goal_interpreter.errors import InterpretationUnavailableError
-from .task_graph import (
+from .work_dag import (
     ExecutionTrace,
-    TaskGraph,
-    TaskGraphCancelResponse,
-    TaskGraphConfirmationGrantRequest,
-    TaskGraphConfirmationGrantResponse,
-    TaskGraphDryRunRequest,
-    TaskGraphExecuteRequest,
-    TaskGraphGuardedExecuteRequest,
-    TaskGraphSchedulerStatus,
-    TaskGraphService,
-    TaskGraphValidationResponse,
+    WorkDAG,
+    WorkDAGCancelResponse,
+    WorkDAGConfirmationGrantRequest,
+    WorkDAGConfirmationGrantResponse,
+    WorkDAGDryRunRequest,
+    WorkDAGExecuteRequest,
+    WorkDAGGuardedExecuteRequest,
+    DAGEngineStatus,
+    DAGEngineService,
+    WorkDAGValidationResponse,
 )
 from .tool_invocation import McpStreamableHttpInvoker
 
@@ -296,38 +296,38 @@ social_attention_context_builder = SocialAttentionContextBuilder(social_attentio
 social_attention_planner = SocialAttentionPlanner(social_attention_services)
 read_only_invoker = (
     McpStreamableHttpInvoker(capability_registry)
-    if settings.enable_read_only_task_graph_execution
+    if settings.enable_read_only_dag_execution
     else None
 )
 planning_invoker = (
     McpStreamableHttpInvoker(capability_registry)
-    if settings.enable_planning_task_graph_execution
+    if settings.enable_planning_dag_execution
     else None
 )
-if settings.enable_physical_task_graph_execution and not settings.enable_guarded_task_graph_execution:
+if settings.enable_physical_dag_execution and not settings.enable_guarded_dag_execution:
     raise ValueError(
-        "AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION is required when physical TaskGraph execution is enabled"
+        "AGENT_ENABLE_GUARDED_DAG_EXECUTION is required when physical WorkDAG execution is enabled"
     )
-if settings.enable_guarded_task_graph_execution and not settings.task_graph_execution_token:
+if settings.enable_guarded_dag_execution and not settings.dag_engine_execution_token:
     raise ValueError(
-        "AGENT_TASK_GRAPH_EXECUTION_TOKEN is required when guarded TaskGraph execution is enabled"
+        "AGENT_DAG_ENGINE_EXECUTION_TOKEN is required when guarded WorkDAG execution is enabled"
     )
 guarded_invoker = (
     McpStreamableHttpInvoker(capability_registry)
-    if settings.enable_guarded_task_graph_execution
+    if settings.enable_guarded_dag_execution
     else None
 )
-task_graph_service = TaskGraphService(
+work_dag_service = DAGEngineService(
     capability_registry,
     read_only_invoker=read_only_invoker,
     planning_invoker=planning_invoker,
     guarded_invoker=guarded_invoker,
-    allow_physical_motion=settings.enable_physical_task_graph_execution,
-    enable_parallel_execution=settings.enable_parallel_task_graph_execution,
-    max_concurrency=settings.task_graph_max_concurrency,
-    trace_max_entries=settings.task_graph_trace_max_entries,
-    trace_ttl_s=settings.task_graph_trace_ttl_sec,
-    grant_max_entries=settings.task_graph_grant_max_entries,
+    allow_physical_motion=settings.enable_physical_dag_execution,
+    enable_parallel_execution=settings.enable_parallel_dag_execution,
+    max_concurrency=settings.dag_engine_max_concurrency,
+    trace_max_entries=settings.dag_engine_trace_max_entries,
+    trace_ttl_s=settings.dag_engine_trace_ttl_sec,
+    grant_max_entries=settings.dag_engine_grant_max_entries,
 )
 logger.info(
     "loaded capability registry sources=%s manifests=%s tools=%d",
@@ -499,26 +499,26 @@ app = FastAPI(
 )
 
 
-def require_task_graph_execution_auth(authorization: str | None) -> None:
-    expected = f"Bearer {settings.task_graph_execution_token}"
+def require_dag_engine_execution_auth(authorization: str | None) -> None:
+    expected = f"Bearer {settings.dag_engine_execution_token}"
     if not authorization or not secrets.compare_digest(authorization, expected):
-        raise HTTPException(status_code=401, detail="invalid TaskGraph execution authorization")
+        raise HTTPException(status_code=401, detail="invalid WorkDAG execution authorization")
 
 
-def require_task_graph_diagnostics_auth(authorization: str | None) -> None:
-    if not settings.task_graph_diagnostics_token:
+def require_dag_engine_diagnostics_auth(authorization: str | None) -> None:
+    if not settings.dag_engine_diagnostics_token:
         raise HTTPException(
             status_code=503,
             detail=(
-                "TaskGraph diagnostics are disabled; configure "
-                "AGENT_TASK_GRAPH_DIAGNOSTICS_TOKEN"
+                "WorkDAG diagnostics are disabled; configure "
+                "AGENT_DAG_ENGINE_DIAGNOSTICS_TOKEN"
             ),
         )
-    expected = f"Bearer {settings.task_graph_diagnostics_token}"
+    expected = f"Bearer {settings.dag_engine_diagnostics_token}"
     if not authorization or not secrets.compare_digest(authorization, expected):
         raise HTTPException(
             status_code=401,
-            detail="invalid TaskGraph diagnostics authorization",
+            detail="invalid WorkDAG diagnostics authorization",
         )
 
 
@@ -529,7 +529,7 @@ async def initialize_cognitive_core() -> None:
 
 @app.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
-    scheduler = task_graph_service.scheduler_status()
+    engine = work_dag_service.engine_status()
     return HealthResponse(
         ok=True,
         model=settings.model,
@@ -557,17 +557,17 @@ async def health() -> HealthResponse:
             settings.agent_skill_projection_total_max_chars
         ),
         agent_skill_projection_count_limit=settings.agent_skill_projection_count_limit,
-        read_only_task_graph_execution_enabled=read_only_invoker is not None,
-        planning_task_graph_execution_enabled=planning_invoker is not None,
-        parallel_task_graph_execution_enabled=(
-            settings.enable_parallel_task_graph_execution
+        read_only_work_dag_execution_enabled=read_only_invoker is not None,
+        planning_work_dag_execution_enabled=planning_invoker is not None,
+        parallel_work_dag_execution_enabled=(
+            settings.enable_parallel_dag_execution
         ),
-        task_graph_max_concurrency=settings.task_graph_max_concurrency,
-        task_graph_active_count=scheduler.active_count,
-        task_graph_waiting_count=scheduler.waiting_count,
-        guarded_task_graph_execution_enabled=guarded_invoker is not None,
-        physical_task_graph_execution_enabled=(
-            guarded_invoker is not None and settings.enable_physical_task_graph_execution
+        dag_engine_max_concurrency=settings.dag_engine_max_concurrency,
+        work_dag_active_count=engine.active_count,
+        work_dag_waiting_count=engine.waiting_count,
+        guarded_work_dag_execution_enabled=guarded_invoker is not None,
+        physical_work_dag_execution_enabled=(
+            guarded_invoker is not None and settings.enable_physical_dag_execution
         ),
         capability_catalog_enabled=True,
         capability_catalog_version=capability_catalog.version,
@@ -827,52 +827,52 @@ async def capability_llm_context(
     }
 
 
-@app.post("/task-graphs/validate", response_model=TaskGraphValidationResponse)
-async def validate_task_graph(graph: TaskGraph) -> TaskGraphValidationResponse:
-    return task_graph_service.validate(graph)
+@app.post("/work-dags/validate", response_model=WorkDAGValidationResponse)
+async def validate_work_dag(dag: WorkDAG) -> WorkDAGValidationResponse:
+    return work_dag_service.validate(dag)
 
 
-@app.post("/task-graphs/dry-run", response_model=ExecutionTrace)
-async def dry_run_task_graph(
-    request: TaskGraphDryRunRequest,
+@app.post("/work-dags/dry-run", response_model=ExecutionTrace)
+async def dry_run_work_dag(
+    request: WorkDAGDryRunRequest,
     authorization: str | None = Header(default=None),
 ) -> ExecutionTrace:
-    require_task_graph_diagnostics_auth(authorization)
+    require_dag_engine_diagnostics_auth(authorization)
     try:
-        return task_graph_service.dry_run(request.graph, auto_confirm=request.auto_confirm)
+        return work_dag_service.dry_run(request.dag, auto_confirm=request.auto_confirm)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-@app.post("/task-graphs/execute-read-only", response_model=ExecutionTrace)
-async def execute_read_only_task_graph(request: TaskGraphExecuteRequest) -> ExecutionTrace:
+@app.post("/work-dags/execute-read-only", response_model=ExecutionTrace)
+async def execute_read_only_work_dag(request: WorkDAGExecuteRequest) -> ExecutionTrace:
     try:
-        return await task_graph_service.execute_read_only(request.graph)
+        return await work_dag_service.execute_read_only(request.dag)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-@app.post("/task-graphs/execute-planning", response_model=ExecutionTrace)
-async def execute_planning_task_graph(request: TaskGraphExecuteRequest) -> ExecutionTrace:
+@app.post("/work-dags/execute-planning", response_model=ExecutionTrace)
+async def execute_planning_work_dag(request: WorkDAGExecuteRequest) -> ExecutionTrace:
     try:
-        return await task_graph_service.execute_planning(request.graph)
+        return await work_dag_service.execute_planning(request.dag)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-@app.post("/task-graphs/execute-guarded", response_model=ExecutionTrace)
-async def execute_guarded_task_graph(
-    request: TaskGraphGuardedExecuteRequest,
+@app.post("/work-dags/execute-guarded", response_model=ExecutionTrace)
+async def execute_guarded_work_dag(
+    request: WorkDAGGuardedExecuteRequest,
     authorization: str | None = Header(default=None),
 ) -> ExecutionTrace:
-    require_task_graph_execution_auth(authorization)
+    require_dag_engine_execution_auth(authorization)
     try:
-        return await task_graph_service.execute_guarded(
-            request.graph,
+        return await work_dag_service.execute_guarded(
+            request.dag,
             request.confirmation_grant,
         )
     except RuntimeError as exc:
@@ -882,16 +882,16 @@ async def execute_guarded_task_graph(
 
 
 @app.post(
-    "/task-graphs/confirmation-grants",
-    response_model=TaskGraphConfirmationGrantResponse,
+    "/work-dags/confirmation-grants",
+    response_model=WorkDAGConfirmationGrantResponse,
 )
-async def create_task_graph_confirmation_grant(
-    request: TaskGraphConfirmationGrantRequest,
+async def create_work_dag_confirmation_grant(
+    request: WorkDAGConfirmationGrantRequest,
     authorization: str | None = Header(default=None),
-) -> TaskGraphConfirmationGrantResponse:
-    require_task_graph_execution_auth(authorization)
+) -> WorkDAGConfirmationGrantResponse:
+    require_dag_engine_execution_auth(authorization)
     try:
-        return task_graph_service.issue_confirmation_grant(request)
+        return work_dag_service.issue_confirmation_grant(request)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ValueError as exc:
@@ -899,35 +899,35 @@ async def create_task_graph_confirmation_grant(
 
 
 @app.post(
-    "/task-graphs/{graph_id}/cancel",
-    response_model=TaskGraphCancelResponse,
+    "/work-dags/{dag_id}/cancel",
+    response_model=WorkDAGCancelResponse,
 )
-async def cancel_task_graph(
-    graph_id: str,
+async def cancel_work_dag(
+    dag_id: str,
     authorization: str | None = Header(default=None),
-) -> TaskGraphCancelResponse:
-    require_task_graph_execution_auth(authorization)
-    return task_graph_service.cancel_execution(graph_id)
+) -> WorkDAGCancelResponse:
+    require_dag_engine_execution_auth(authorization)
+    return work_dag_service.cancel_execution(dag_id)
 
 
-@app.get("/task-graphs/{graph_id}/trace", response_model=ExecutionTrace)
-async def get_task_graph_trace(
-    graph_id: str,
+@app.get("/work-dags/{dag_id}/trace", response_model=ExecutionTrace)
+async def get_work_dag_trace(
+    dag_id: str,
     authorization: str | None = Header(default=None),
 ) -> ExecutionTrace:
-    require_task_graph_diagnostics_auth(authorization)
-    trace = task_graph_service.get_trace(graph_id)
+    require_dag_engine_diagnostics_auth(authorization)
+    trace = work_dag_service.get_trace(dag_id)
     if trace is None:
-        raise HTTPException(status_code=404, detail=f"No TaskGraph trace found for {graph_id!r}")
+        raise HTTPException(status_code=404, detail=f"No WorkDAG trace found for {dag_id!r}")
     return trace
 
 
-@app.get("/task-graphs/scheduler/status", response_model=TaskGraphSchedulerStatus)
-async def get_task_graph_scheduler_status(
+@app.get("/work-dags/engine/status", response_model=DAGEngineStatus)
+async def get_dag_engine_status(
     authorization: str | None = Header(default=None),
-) -> TaskGraphSchedulerStatus:
-    require_task_graph_diagnostics_auth(authorization)
-    return task_graph_service.scheduler_status()
+) -> DAGEngineStatus:
+    require_dag_engine_diagnostics_auth(authorization)
+    return work_dag_service.engine_status()
 
 
 

@@ -85,7 +85,7 @@ def test_checked_in_soridormi_manifest_preserves_safety_contract() -> None:
     assert "task_id" not in task_preview.output_schema["properties"]
     assert "persistent" in task_preview.output_schema["properties"]
     assert "plan_steps" in task_preview.output_schema["properties"]
-    assert "task_graph" in task_preview.output_schema["properties"]
+    assert "work_dag" in task_preview.output_schema["properties"]
     assert "blocked_subsystems" in task_preview.output_schema["properties"]
     assert "recommended_next_actions" in task_preview.output_schema["properties"]
     assert "plan_step_boundary" in task_preview.llm_hints
@@ -105,7 +105,7 @@ def test_checked_in_soridormi_manifest_preserves_safety_contract() -> None:
     assert "skill_summary" in task_submit.output_schema["properties"]
     assert "skill_sequence" in task_submit.output_schema["properties"]
     assert "plan_steps" in task_submit.output_schema["properties"]
-    assert "task_graph" in task_submit.output_schema["properties"]
+    assert "work_dag" in task_submit.output_schema["properties"]
     assert "blocked_subsystems" in task_submit.output_schema["properties"]
     assert "recommended_next_actions" in task_submit.output_schema["properties"]
     assert "estimated_duration_s" in task_submit.output_schema["properties"]

@@ -8,18 +8,18 @@ from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from .models import TaskGraph
+from .models import WorkDAG
 
 
 @dataclass(frozen=True)
 class ConfirmationGrant:
-    graph_hash: str
+    dag_hash: str
     confirmed_node_ids: frozenset[str]
     expires_at: float
 
 
 class ConfirmationGrantStore:
-    """Issue short-lived, single-use confirmation grants bound to an exact graph."""
+    """Issue short-lived, single-use confirmation grants bound to an exact dag."""
 
     def __init__(
         self,
@@ -35,7 +35,7 @@ class ConfirmationGrantStore:
 
     def issue(
         self,
-        graph: TaskGraph,
+        dag: WorkDAG,
         confirmed_node_ids: set[str],
         *,
         ttl_s: int,
@@ -44,7 +44,7 @@ class ConfirmationGrantStore:
         self._purge_expired(now)
         token = secrets.token_urlsafe(32)
         grant = ConfirmationGrant(
-            graph_hash=self.graph_hash(graph),
+            dag_hash=self.dag_hash(dag),
             confirmed_node_ids=frozenset(confirmed_node_ids),
             expires_at=now + ttl_s,
         )
@@ -53,7 +53,7 @@ class ConfirmationGrantStore:
         self._grants[self._token_hash(token)] = grant
         return token, grant
 
-    def consume(self, token: str, graph: TaskGraph) -> ConfirmationGrant:
+    def consume(self, token: str, dag: WorkDAG) -> ConfirmationGrant:
         grant = self._grants.pop(self._token_hash(token), None)
         if grant is None:
             self._purge_expired()
@@ -62,13 +62,13 @@ class ConfirmationGrantStore:
         self._purge_expired(now)
         if grant.expires_at < now:
             raise ValueError("confirmation grant has expired")
-        if not secrets.compare_digest(grant.graph_hash, self.graph_hash(graph)):
-            raise ValueError("confirmation grant does not match this TaskGraph")
+        if not secrets.compare_digest(grant.dag_hash, self.dag_hash(dag)):
+            raise ValueError("confirmation grant does not match this WorkDAG")
         return grant
 
-    def graph_hash(self, graph: TaskGraph) -> str:
+    def dag_hash(self, dag: WorkDAG) -> str:
         payload = json.dumps(
-            graph.model_dump(mode="json"),
+            dag.model_dump(mode="json"),
             ensure_ascii=False,
             separators=(",", ":"),
             sort_keys=True,

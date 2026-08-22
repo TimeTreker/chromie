@@ -50,10 +50,10 @@ from .capability_runtime import (
     vocal_performance_definition,
 )
 from .capability_adapters import (
-    TaskGraphCancelHandler,
-    TaskGraphHandler,
-    TaskGraphCapabilityProvider,
-    task_graph_capability_definition,
+    WorkDAGCancelHandler,
+    WorkDAGHandler,
+    WorkDAGCapabilityProvider,
+    work_dag_capability_definition,
 )
 from .soridormi_capability_provider import (
     SoridormiCapabilityProvider,
@@ -80,7 +80,7 @@ CommunicativeDeliveryRecorder = Callable[[str | None, str, dict[str, Any]], None
 CommunicativeGoalCompletionRecorder = Callable[
     [str | None, list[str], dict[str, Any]], None
 ]
-_TASK_GRAPH_CAPABILITY_ID = "chromie.task_graph.execute"
+_WORK_DAG_CAPABILITY_ID = "chromie.work_dag.execute"
 
 
 def _float_env(name: str, default: float, *, minimum: float = 0.0) -> float:
@@ -154,8 +154,8 @@ class InteractionRuntimeCoordinator:
         *,
         speech_cancel_scheduler: SpeechCancelScheduler | None = None,
         soridormi_invoker: AsyncToolInvoker | None = None,
-        task_graph_handler: TaskGraphHandler | None = None,
-        task_graph_cancel_handler: TaskGraphCancelHandler | None = None,
+        work_dag_handler: WorkDAGHandler | None = None,
+        work_dag_cancel_handler: WorkDAGCancelHandler | None = None,
         agent_tool_handler: AgentToolHandler | None = None,
         conversation_memory_handler: ConversationMemoryHandler | None = None,
         vocal_provider: VocalPerformanceCapabilityProvider | None = None,
@@ -172,7 +172,7 @@ class InteractionRuntimeCoordinator:
         self.registry = CapabilityRegistry()
         self.registry.register(local_speech_definition())
         self.registry.register(session_interrupt_definition())
-        self.registry.register(task_graph_capability_definition())
+        self.registry.register(work_dag_capability_definition())
         self.runtime = CapabilityRuntime(
             self.registry,
             max_concurrency=max(
@@ -212,12 +212,12 @@ class InteractionRuntimeCoordinator:
                 self.runtime.register_provider(
                     ConversationMemoryCapabilityProvider(conversation_memory_handler)
                 )
-        self._task_graph_enabled = task_graph_handler is not None
-        if task_graph_handler is not None:
+        self._work_dag_enabled = work_dag_handler is not None
+        if work_dag_handler is not None:
             self.runtime.register_provider(
-                TaskGraphCapabilityProvider(
-                    task_graph_handler,
-                    task_graph_cancel_handler,
+                WorkDAGCapabilityProvider(
+                    work_dag_handler,
+                    work_dag_cancel_handler,
                 )
             )
         self.soridormi_invoker = soridormi_invoker
@@ -770,20 +770,20 @@ class InteractionRuntimeCoordinator:
             for request in prepared.capabilities
             if request.capability_id.startswith("soridormi.")
         ]
-        task_graph_requests = [
+        work_dag_requests = [
             request
             for request in prepared.capabilities
-            if request.capability_id == _TASK_GRAPH_CAPABILITY_ID
+            if request.capability_id == _WORK_DAG_CAPABILITY_ID
         ]
-        if task_graph_requests and not self._task_graph_enabled:
+        if work_dag_requests and not self._work_dag_enabled:
             failed = await self._body_setup_failure(
                 prepared,
-                task_graph_requests,
+                work_dag_requests,
                 session_id=session_id,
-                reason_code="task_graph_execution_disabled",
+                reason_code="work_dag_execution_disabled",
                 message=(
-                    "InteractionResponse requested a TaskGraph, but host "
-                    "TaskGraph execution is disabled"
+                    "InteractionResponse requested a WorkDAG, but host "
+                    "WorkDAG execution is disabled"
                 ),
             )
             return CapabilityInteractionDispatch(

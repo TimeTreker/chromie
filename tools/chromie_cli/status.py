@@ -29,7 +29,7 @@ def status(root: Path) -> CommandResult:
         "active_profile": snapshot.active_profile,
         "runtime_file_used": snapshot.runtime_file_used,
         "physical_execution": "disabled"
-        if not snapshot.bool_value("AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION")
+        if not snapshot.bool_value("AGENT_ENABLE_PHYSICAL_DAG_EXECUTION")
         else "unsupported_enabled",
         "structured_interaction": "enabled"
         if snapshot.bool_value("ORCH_ENABLE_INTERACTION_RESPONSE")
@@ -38,11 +38,11 @@ def status(root: Path) -> CommandResult:
         if snapshot.bool_value("ORCH_ENABLE_SORIDORMI_CAPABILITIES")
         else "disabled",
         "risk_summary": {
-            "physical_task_graph": snapshot.get(
-                "AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION", "0"
+            "physical_work_dag": snapshot.get(
+                "AGENT_ENABLE_PHYSICAL_DAG_EXECUTION", "0"
             ),
-            "guarded_task_graph": snapshot.get(
-                "AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION", "0"
+            "guarded_work_dag": snapshot.get(
+                "AGENT_ENABLE_GUARDED_DAG_EXECUTION", "0"
             ),
             "legacy_action_dry_run": snapshot.get("ORCH_ACTION_DRY_RUN", "true"),
         },

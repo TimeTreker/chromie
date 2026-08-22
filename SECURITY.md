@@ -25,7 +25,7 @@ Include:
 
 ## High-risk areas
 
-- guarded TaskGraph bearer-token handling;
+- guarded WorkDAG bearer-token handling;
 - capability-manifest substitution and remote MCP endpoints;
 - Agent Skill metadata/content substitution, path escape, digest drift, or unapproved prompt material;
 - confirmation grants and replay resistance;
@@ -104,7 +104,7 @@ safety infrastructure.
 
 ## Secret handling
 
-- Do not commit `AGENT_TASK_GRAPH_EXECUTION_TOKEN`.
+- Do not commit `AGENT_DAG_ENGINE_EXECUTION_TOKEN`.
 - Do not publish `.env.local`, `.env.runtime`, private model credentials, raw
   acceptance recordings, JSONL speech events, or unredacted evidence archives.
 - Treat MCP endpoints as privileged when they expose side effects.

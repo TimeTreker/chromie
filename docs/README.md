@@ -178,10 +178,10 @@ mechanical-contract owner.
 - [Experience-To-Ability Learning](EXPERIENCE_TO_ABILITY_LEARNING.md)
 - [Memory Extraction and Prompt Context](MEMORY_EXTRACTION.md)
 - [Adding Agent and Tool Capabilities](ADDING_AGENT_CAPABILITIES.md)
-- [TaskGraph](agent_task_graph.md)
+- [WorkDAG and DAGEngine](work_dag.md)
 - [Trace Schema](RUNTIME_OBSERVABILITY.md)
 - [SenseVoice ASR](SENSEVOICE_ASR.md)
-- [TaskGraph Concurrency Decision](task_graph_concurrency_decision.md)
+- [DAGEngine Concurrency](dag_engine_concurrency.md)
 - [Conversation State](conversation_state.md)
 - [Scoped Discourse Referents and Verified Tool Memory](DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md)
 

@@ -16,11 +16,11 @@ from agent.app.capabilities.models import (
     ToolCapability,
     TransportSpec,
 )
-from agent.app.task_graph.models import TaskGraph
-from agent.app.task_graph.grants import ConfirmationGrantStore
-from agent.app.task_graph.service import (
-    TaskGraphConfirmationGrantRequest,
-    TaskGraphService,
+from agent.app.work_dag.models import WorkDAG
+from agent.app.work_dag.grants import ConfirmationGrantStore
+from agent.app.work_dag.service import (
+    WorkDAGConfirmationGrantRequest,
+    DAGEngineService,
 )
 from agent.app.tool_invocation import McpStreamableHttpInvoker
 
@@ -79,22 +79,22 @@ def _registry():
     return build_chromie_registry([bundle])
 
 
-def _confirmed_write_graph() -> TaskGraph:
-    return TaskGraph.model_validate(
+def _confirmed_write_graph() -> WorkDAG:
+    return WorkDAG.model_validate(
         {
-            "graph_id": "confirmed-write",
-            "created_by": "user",
+            "dag_id": "confirmed-write",
+            "authored_by": "user",
             "nodes": [
                 {
                     "id": "confirm",
-                    "tool": "chromie.ask_confirmation",
-                    "type": "confirmation",
+                    "capability_id": "chromie.ask_confirmation",
+                    "role": "confirmation",
                     "args": {"question": "Write the value?"},
                 },
                 {
                     "id": "write",
-                    "tool": "remote.write",
-                    "type": "action",
+                    "capability_id": "remote.write",
+                    "role": "activity",
                     "depends_on": ["confirm"],
                     "args": {"value": "approved"},
                 },
@@ -103,57 +103,57 @@ def _confirmed_write_graph() -> TaskGraph:
     )
 
 
-def _physical_graph() -> TaskGraph:
-    return TaskGraph.model_validate(
+def _physical_graph() -> WorkDAG:
+    return WorkDAG.model_validate(
         {
-            "graph_id": "physical-motion",
-            "created_by": "user",
+            "dag_id": "physical-motion",
+            "authored_by": "user",
             "nodes": [
                 {
                     "id": "confirm",
-                    "tool": "chromie.ask_confirmation",
-                    "type": "confirmation",
+                    "capability_id": "chromie.ask_confirmation",
+                    "role": "confirmation",
                     "args": {"question": "Move now?"},
                 },
                 {
                     "id": "monitor",
-                    "tool": "remote.monitor",
-                    "type": "monitor",
+                    "capability_id": "remote.monitor",
+                    "role": "monitor",
                     "during": ["move"],
                 },
                 {
                     "id": "move",
-                    "tool": "remote.move",
-                    "type": "action",
+                    "capability_id": "remote.move",
+                    "role": "activity",
                     "depends_on": ["confirm"],
                     "args": {"distance_m": 0.1},
                     "on_failure": {"strategy": "goto", "target": "emergency"},
                 },
                 {
                     "id": "emergency",
-                    "tool": "remote.emergency_stop",
-                    "type": "safety",
+                    "capability_id": "remote.emergency_stop",
+                    "role": "safety",
                 },
             ],
         }
     )
 
 
-class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
-    def _grant(self, service: TaskGraphService, graph: TaskGraph) -> str:
+class GuardedWorkDAGExecutionTests(unittest.IsolatedAsyncioTestCase):
+    def _grant(self, service: DAGEngineService, graph: WorkDAG) -> str:
         return service.issue_confirmation_grant(
-            TaskGraphConfirmationGrantRequest(
-                graph=graph,
+            WorkDAGConfirmationGrantRequest(
+                dag=graph,
                 confirmed_node_ids={"confirm"},
             )
         ).confirmation_grant
 
     async def test_disabled_guarded_execution_cannot_issue_grant(self) -> None:
-        service = TaskGraphService(_registry())
-        with self.assertRaisesRegex(RuntimeError, "guarded TaskGraph execution is disabled"):
+        service = DAGEngineService(_registry())
+        with self.assertRaisesRegex(RuntimeError, "guarded WorkDAG execution is disabled"):
             service.issue_confirmation_grant(
-                TaskGraphConfirmationGrantRequest(
-                    graph=_confirmed_write_graph(),
+                WorkDAGConfirmationGrantRequest(
+                    dag=_confirmed_write_graph(),
                     confirmed_node_ids={"confirm"},
                 )
             )
@@ -166,7 +166,7 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"written": True}}
 
         registry = _registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             guarded_invoker=McpStreamableHttpInvoker(registry, call=call),
         )
@@ -196,33 +196,33 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"written": True}}
 
         registry = _registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             guarded_invoker=McpStreamableHttpInvoker(registry, call=call),
             enable_parallel_execution=True,
             max_concurrency=2,
         )
-        graph = TaskGraph.model_validate(
+        graph = WorkDAG.model_validate(
             {
-                "graph_id": "parallel-guarded-write",
-                "created_by": "user",
+                "dag_id": "parallel-guarded-write",
+                "authored_by": "user",
                 "nodes": [
                     {
                         "id": "confirm",
-                        "tool": "chromie.ask_confirmation",
-                        "type": "confirmation",
+                        "capability_id": "chromie.ask_confirmation",
+                        "role": "confirmation",
                         "args": {"question": "Write both values?"},
                     },
                     {
                         "id": "write-a",
-                        "tool": "remote.write",
-                        "type": "action",
+                        "capability_id": "remote.write",
+                        "role": "activity",
                         "depends_on": ["confirm"],
                     },
                     {
                         "id": "write-b",
-                        "tool": "remote.write",
-                        "type": "action",
+                        "capability_id": "remote.write",
+                        "role": "activity",
                         "depends_on": ["confirm"],
                     },
                 ],
@@ -261,7 +261,7 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"completed": True}}
 
         registry = _registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             guarded_invoker=McpStreamableHttpInvoker(registry, call=call),
             allow_physical_motion=True,
@@ -287,7 +287,7 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"written": True}}
 
         registry = _registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             guarded_invoker=McpStreamableHttpInvoker(registry, call=call),
         )
@@ -295,7 +295,7 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError, "node-bound confirmation proof"):
             graph = _confirmed_write_graph()
             grant = service.issue_confirmation_grant(
-                TaskGraphConfirmationGrantRequest(graph=graph)
+                WorkDAGConfirmationGrantRequest(dag=graph)
             ).confirmation_grant
             await service.execute_guarded(graph, grant)
 
@@ -311,7 +311,7 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"completed": True}}
 
         registry = _registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             guarded_invoker=McpStreamableHttpInvoker(registry, call=call),
             allow_physical_motion=True,
@@ -331,7 +331,7 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"active": False}}
 
         registry = _registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             guarded_invoker=McpStreamableHttpInvoker(registry, call=call),
             allow_physical_motion=True,
@@ -355,13 +355,13 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"active": True}}
 
         registry = _registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             guarded_invoker=McpStreamableHttpInvoker(registry, call=call),
             allow_physical_motion=False,
         )
 
-        with self.assertRaisesRegex(ValueError, "physical TaskGraph execution is disabled"):
+        with self.assertRaisesRegex(ValueError, "physical WorkDAG execution is disabled"):
             graph = _physical_graph()
             await service.execute_guarded(graph, self._grant(service, graph))
 
@@ -372,7 +372,7 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"written": True}}
 
         registry = _registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             guarded_invoker=McpStreamableHttpInvoker(registry, call=call),
         )
@@ -383,7 +383,7 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError, "invalid or already used"):
             await service.execute_guarded(graph, grant)
 
-        other_graph = graph.model_copy(update={"graph_id": "different"}, deep=True)
+        other_graph = graph.model_copy(update={"dag_id": "different"}, deep=True)
         other_grant = self._grant(service, graph)
         with self.assertRaisesRegex(ValueError, "does not match"):
             await service.execute_guarded(other_graph, other_grant)
@@ -412,7 +412,7 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"stopped": True}}
 
         registry = _registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             guarded_invoker=McpStreamableHttpInvoker(registry, call=call),
             allow_physical_motion=True,
@@ -423,7 +423,7 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
         )
         await asyncio.wait_for(motion_started.wait(), timeout=1.0)
 
-        cancellation = service.cancel_execution(graph.graph_id)
+        cancellation = service.cancel_execution(graph.dag_id)
         trace = await asyncio.wait_for(execution, timeout=1.0)
 
         self.assertTrue(cancellation.cancellation_requested)
@@ -432,7 +432,7 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(trace.result_map()["move"].status, "cancelled")
         self.assertEqual(trace.result_map()["emergency"].status, "success")
         self.assertFalse(motion_transport_cancelled)
-        self.assertFalse(service.cancel_execution(graph.graph_id).cancellation_requested)
+        self.assertFalse(service.cancel_execution(graph.dag_id).cancellation_requested)
         with self.assertRaisesRegex(ValueError, "invalid or already used"):
             await service.execute_guarded(
                 graph,
@@ -462,7 +462,7 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"completed": True}}
 
         registry = _registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             guarded_invoker=McpStreamableHttpInvoker(
                 registry,
@@ -473,7 +473,7 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
         graph = _physical_graph()
         grant = self._grant(service, graph)
 
-        cancellation = service.cancel_execution(graph.graph_id)
+        cancellation = service.cancel_execution(graph.dag_id)
         trace = await service.execute_guarded(graph, grant)
 
         self.assertTrue(cancellation.cancellation_requested)
@@ -496,7 +496,7 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"stopped": True}}
 
         registry = _registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             guarded_invoker=McpStreamableHttpInvoker(registry, call=call),
             allow_physical_motion=True,
@@ -535,7 +535,7 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
 
         registry = _registry()
         registry.get_tool("remote.emergency_stop").execution.idempotent = True
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             guarded_invoker=McpStreamableHttpInvoker(registry, call=call),
             allow_physical_motion=True,
@@ -565,7 +565,7 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"stopped": True}}
 
         registry = _registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             guarded_invoker=McpStreamableHttpInvoker(registry, call=call),
             allow_physical_motion=True,
@@ -579,11 +579,11 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
         payload["nodes"].append(
             {
                 "id": "stop",
-                "tool": "remote.stop",
-                "type": "safety",
+                "capability_id": "remote.stop",
+                "role": "safety",
             }
         )
-        graph = TaskGraph.model_validate(payload)
+        graph = WorkDAG.model_validate(payload)
 
         trace = await service.execute_guarded(graph, self._grant(service, graph))
 
@@ -605,7 +605,7 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"stopped": True}}
 
         registry = _registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             guarded_invoker=McpStreamableHttpInvoker(registry, call=call),
             allow_physical_motion=True,
@@ -616,11 +616,11 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
         payload["nodes"].append(
             {
                 "id": "stop",
-                "tool": "remote.stop",
-                "type": "safety",
+                "capability_id": "remote.stop",
+                "role": "safety",
             }
         )
-        graph = TaskGraph.model_validate(payload)
+        graph = WorkDAG.model_validate(payload)
 
         trace = await service.execute_guarded(graph, self._grant(service, graph))
 
@@ -648,13 +648,13 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"stopped": True}}
 
         registry = _registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             guarded_invoker=McpStreamableHttpInvoker(registry, call=call),
             allow_physical_motion=True,
         )
         payload = _physical_graph().model_dump(mode="json")
-        payload["graph_id"] = "physical-cancel-with-stop"
+        payload["dag_id"] = "physical-cancel-with-stop"
         move = next(node for node in payload["nodes"] if node["id"] == "move")
         move["on_failure"] = {"strategy": "goto", "target": "stop"}
         move["on_event"] = {
@@ -663,17 +663,17 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
         payload["nodes"].append(
             {
                 "id": "stop",
-                "tool": "remote.stop",
-                "type": "safety",
+                "capability_id": "remote.stop",
+                "role": "safety",
             }
         )
-        graph = TaskGraph.model_validate(payload)
+        graph = WorkDAG.model_validate(payload)
         execution = asyncio.create_task(
             service.execute_guarded(graph, self._grant(service, graph))
         )
         await asyncio.wait_for(motion_started.wait(), timeout=1.0)
 
-        service.cancel_execution(graph.graph_id)
+        service.cancel_execution(graph.dag_id)
         trace = await asyncio.wait_for(execution, timeout=1.0)
 
         self.assertEqual(trace.status, "cancelled")
@@ -688,7 +688,7 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
         store = ConfirmationGrantStore()
         graph = _confirmed_write_graph()
         with patch(
-            "agent.app.task_graph.grants.time.time",
+            "agent.app.work_dag.grants.time.time",
             side_effect=[100.0, 102.0],
         ):
             token, _ = store.issue(graph, {"confirm"}, ttl_s=1)

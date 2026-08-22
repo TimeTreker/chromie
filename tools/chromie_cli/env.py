@@ -13,12 +13,11 @@ TRUE_VALUES = {"1", "true", "yes", "on"}
 FALSE_VALUES = {"0", "false", "no", "off"}
 
 BOOL_VARS = (
-    "AGENT_ENABLE_TASK_GRAPH_PLANNING",
-    "AGENT_ENABLE_READ_ONLY_TASK_GRAPH_EXECUTION",
-    "AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION",
-    "AGENT_ENABLE_PARALLEL_TASK_GRAPH_EXECUTION",
-    "AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION",
-    "AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION",
+    "AGENT_ENABLE_READ_ONLY_DAG_EXECUTION",
+    "AGENT_ENABLE_PLANNING_DAG_EXECUTION",
+    "AGENT_ENABLE_PARALLEL_DAG_EXECUTION",
+    "AGENT_ENABLE_GUARDED_DAG_EXECUTION",
+    "AGENT_ENABLE_PHYSICAL_DAG_EXECUTION",
     "ORCH_ENABLE_AGENT",
     "ORCH_ENABLE_INTERACTION_RESPONSE",
     "ORCH_ENABLE_SORIDORMI_CAPABILITIES",
@@ -29,10 +28,10 @@ BOOL_VARS = (
 
 POSITIVE_INT_VARS = (
     "AGENT_GOAL_INTERPRETER_TIMEOUT_MS",
-    "AGENT_TASK_GRAPH_MAX_CONCURRENCY",
-    "AGENT_TASK_GRAPH_TRACE_MAX_ENTRIES",
-    "AGENT_TASK_GRAPH_TRACE_TTL_SEC",
-    "AGENT_TASK_GRAPH_GRANT_MAX_ENTRIES",
+    "AGENT_DAG_ENGINE_MAX_CONCURRENCY",
+    "AGENT_DAG_ENGINE_TRACE_MAX_ENTRIES",
+    "AGENT_DAG_ENGINE_TRACE_TTL_SEC",
+    "AGENT_DAG_ENGINE_GRANT_MAX_ENTRIES",
     "AGENT_CAPABILITY_CATALOG_REFRESH_SEC",
     "AGENT_CAPABILITY_MATCH_LIMIT",
     "ORCH_CONVERSATION_MAX_TURNS",
@@ -80,10 +79,9 @@ STATUS_KEYS = (
     "ORCH_ENABLE_INTERACTION_RESPONSE",
     "ORCH_ENABLE_SORIDORMI_CAPABILITIES",
     "ORCH_ACTION_DRY_RUN",
-    "AGENT_ENABLE_TASK_GRAPH_PLANNING",
-    "AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION",
-    "AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION",
-    "AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION",
+    "AGENT_ENABLE_PLANNING_DAG_EXECUTION",
+    "AGENT_ENABLE_GUARDED_DAG_EXECUTION",
+    "AGENT_ENABLE_PHYSICAL_DAG_EXECUTION",
     "AGENT_URL",
     "ASR_URL",
     "TTS_URL",
@@ -237,7 +235,7 @@ def load_env(root: Path) -> EnvSnapshot:
 def deployment_mode(snapshot: EnvSnapshot) -> str:
     interaction = snapshot.bool_value("ORCH_ENABLE_INTERACTION_RESPONSE")
     soridormi = snapshot.bool_value("ORCH_ENABLE_SORIDORMI_CAPABILITIES")
-    physical = snapshot.bool_value("AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION")
+    physical = snapshot.bool_value("AGENT_ENABLE_PHYSICAL_DAG_EXECUTION")
     if physical:
         return "physical_robot_unsupported"
     if interaction and soridormi:
@@ -297,8 +295,8 @@ def validate_config(snapshot: EnvSnapshot) -> list[Diagnostic]:
 
     interaction = snapshot.bool_value("ORCH_ENABLE_INTERACTION_RESPONSE")
     soridormi = snapshot.bool_value("ORCH_ENABLE_SORIDORMI_CAPABILITIES")
-    physical = snapshot.bool_value("AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION")
-    guarded = snapshot.bool_value("AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION")
+    physical = snapshot.bool_value("AGENT_ENABLE_PHYSICAL_DAG_EXECUTION")
+    guarded = snapshot.bool_value("AGENT_ENABLE_GUARDED_DAG_EXECUTION")
 
     if soridormi and not interaction:
         diagnostics.append(
@@ -330,7 +328,7 @@ def validate_config(snapshot: EnvSnapshot) -> list[Diagnostic]:
             Diagnostic(
                 "failure",
                 "physical_execution_unsupported",
-                "AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION must remain off until commissioning evidence exists",
+                "AGENT_ENABLE_PHYSICAL_DAG_EXECUTION must remain off until commissioning evidence exists",
             )
         )
     if physical and not guarded:
@@ -338,15 +336,15 @@ def validate_config(snapshot: EnvSnapshot) -> list[Diagnostic]:
             Diagnostic(
                 "failure",
                 "physical_requires_guarded",
-                "Physical TaskGraph execution requires guarded execution",
+                "Physical WorkDAG execution requires guarded execution",
             )
         )
-    if guarded and not values.get("AGENT_TASK_GRAPH_EXECUTION_TOKEN", "").strip():
+    if guarded and not values.get("AGENT_DAG_ENGINE_EXECUTION_TOKEN", "").strip():
         diagnostics.append(
             Diagnostic(
                 "failure",
                 "missing_execution_token",
-                "Guarded TaskGraph execution requires AGENT_TASK_GRAPH_EXECUTION_TOKEN",
+                "Guarded WorkDAG execution requires AGENT_DAG_ENGINE_EXECUTION_TOKEN",
             )
         )
     if not snapshot.bool_value("ORCH_ACTION_DRY_RUN", default=True):

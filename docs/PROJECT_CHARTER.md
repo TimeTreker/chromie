@@ -368,9 +368,9 @@ Read the diagram with these boundaries:
   provider concurrency, and resource ownership. Vocal work, locomotion, and
   manipulation may overlap when their declared resources do not conflict. Multiple
   safe weather/information reads may overlap within provider/rate/concurrency
-  limits. Internal nodes of one physical TaskGraph remain sequential; separate
-  embodied Activities overlap only when Soridormi explicitly declares that plan
-  and its resources safe.
+  limits. A Planner-authored WorkDAG may express concurrency, but DAGEngine dispatches
+  only nodes whose dependency, Capability-concurrency, and resource contracts permit
+  overlap. Provider-local embodied DAGs remain subject to the provider's own safety and resource authority.
 - `realization` describes **how** that Activity is carried out. Vocal Expression
   modes such as speaking, singing, humming, or recitation and Activity-lane
   Capability work belong here; they are not sibling Primary-Activity kinds.
@@ -469,7 +469,7 @@ the Host.
 - select zero or more owner-approved Agent Skills as reusable reasoning
   methods;
 - select registered named capabilities for a typed Plan;
-- propose validated TaskGraphs.
+- author validated Chromie-level WorkDAG topology as part of HOW planning.
 
 ### The language model must never
 
@@ -1019,6 +1019,8 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    transports/backends may realize execution beneath the same Capability contract without
    becoming cognitive architecture. Do not add a parallel Work Manager, Result Agent, or
    Event Agent merely to implement this lifecycle.
+
+43. **Planner is the sole WorkDAG semantic mutation authority; DAGEngine advances execution mechanically.** A Chromie-level `WorkDAG` is a revisioned directed acyclic representation of Planner-authored planned Work, not another cognitive owner. Planner owns node selection, Capability choice, arguments, Goal ownership, dependency/concurrency topology, and any bounded fallback/retry policy committed in that DAG. Goal Association may change canonical Goal continuity but must never edit WorkDAG directly; changed Goal truth creates a Planner opportunity. `DAGEngine` may validate acyclicity/contracts, enforce monotonic `dag_id`/`revision` identity, calculate readiness, dispatch permitted parallel nodes, advance dependency state, enforce committed policy, propagate cancellation, inherit already-completed immutable nodes across the next valid revision, and record execution facts. Normal node completion therefore continues mechanically without another Planner call. It may not invent replacement Work, choose alternative Capabilities, rewrite completed history, author a recovery plan, produce engine-authored next-action guidance, interpret outcomes into user-facing meaning, or speak. Material failure or a changed Goal/Situation returns Evidence to the same Planner, which may choose NO_CHANGE or author the next/new WorkDAG. Provider-local DAGs/controllers remain valid implementation details behind their advertised Capability boundaries.
 
 ### One personal voice; resources constrain coexistence
 

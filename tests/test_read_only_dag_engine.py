@@ -12,8 +12,8 @@ from agent.app.capabilities.models import (
     ToolCapability,
     TransportSpec,
 )
-from agent.app.task_graph.models import TaskGraph
-from agent.app.task_graph.service import TaskGraphService
+from agent.app.work_dag.models import WorkDAG
+from agent.app.work_dag.service import DAGEngineService
 from agent.app.tool_invocation import McpStreamableHttpInvoker
 
 
@@ -51,7 +51,7 @@ def _registry():
     return build_chromie_registry([bundle])
 
 
-class ReadOnlyTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
+class ReadOnlyWorkDAGExecutionTests(unittest.IsolatedAsyncioTestCase):
     async def test_executes_read_only_graph_and_resolves_refs(self) -> None:
         calls: list[tuple[str, dict[str, Any]]] = []
 
@@ -61,20 +61,20 @@ class ReadOnlyTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
                 return {"structuredContent": {"value": "result-1"}}
             return {"structuredContent": {"plan": f"use {args['input']}"}}
 
-        service = TaskGraphService(
+        service = DAGEngineService(
             _registry(),
             read_only_invoker=McpStreamableHttpInvoker(_registry(), call=call),
         )
-        graph = TaskGraph.model_validate(
+        graph = WorkDAG.model_validate(
             {
-                "graph_id": "read-only-success",
-                "created_by": "user",
+                "dag_id": "read-only-success",
+                "authored_by": "user",
                 "nodes": [
-                    {"id": "lookup", "tool": "remote.lookup", "type": "query"},
+                    {"id": "lookup", "capability_id": "remote.lookup", "role": "activity"},
                     {
                         "id": "plan",
-                        "tool": "remote.plan",
-                        "type": "plan",
+                        "capability_id": "remote.plan",
+                        "role": "activity",
                         "depends_on": ["lookup"],
                         "args": {"input": {"$ref": "lookup.output.value"}},
                     },
@@ -88,7 +88,7 @@ class ReadOnlyTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(dry_run.status, {"success", "aborted"})
         self.assertEqual(trace.status, "success")
         self.assertEqual(calls[1], ("remote.plan", {"input": "result-1"}))
-        self.assertEqual(service.get_trace(graph.graph_id).status, "success")
+        self.assertEqual(service.get_trace(graph.dag_id).status, "success")
 
     async def test_rejects_entire_graph_before_calling_any_side_effect(self) -> None:
         calls = 0
@@ -99,20 +99,20 @@ class ReadOnlyTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"ok": True}}
 
         registry = _registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             read_only_invoker=McpStreamableHttpInvoker(registry, call=call),
         )
-        graph = TaskGraph.model_validate(
+        graph = WorkDAG.model_validate(
             {
-                "graph_id": "read-only-rejected",
-                "created_by": "user",
+                "dag_id": "read-only-rejected",
+                "authored_by": "user",
                 "nodes": [
-                    {"id": "lookup", "tool": "remote.lookup", "type": "query"},
+                    {"id": "lookup", "capability_id": "remote.lookup", "role": "activity"},
                     {
                         "id": "write",
-                        "tool": "remote.write",
-                        "type": "action",
+                        "capability_id": "remote.write",
+                        "role": "activity",
                         "depends_on": ["lookup"],
                     },
                 ],
@@ -123,19 +123,19 @@ class ReadOnlyTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             await service.execute_read_only(graph)
 
         self.assertEqual(calls, 0)
-        self.assertIsNone(service.get_trace(graph.graph_id))
+        self.assertIsNone(service.get_trace(graph.dag_id))
 
     async def test_disabled_execution_fails_without_invocation(self) -> None:
-        graph = TaskGraph.model_validate(
+        graph = WorkDAG.model_validate(
             {
-                "graph_id": "disabled",
-                "created_by": "user",
-                "nodes": [{"id": "lookup", "tool": "remote.lookup", "type": "query"}],
+                "dag_id": "disabled",
+                "authored_by": "user",
+                "nodes": [{"id": "lookup", "capability_id": "remote.lookup", "role": "activity"}],
             }
         )
 
         with self.assertRaisesRegex(RuntimeError, "disabled"):
-            await TaskGraphService(_registry()).execute_read_only(graph)
+            await DAGEngineService(_registry()).execute_read_only(graph)
 
     async def test_parallel_execution_is_bounded_and_result_order_is_stable(self) -> None:
         active = 0
@@ -155,33 +155,33 @@ class ReadOnlyTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"node": args["node"]}}
 
         registry = _registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             read_only_invoker=McpStreamableHttpInvoker(registry, call=call),
             enable_parallel_execution=True,
             max_concurrency=2,
         )
-        graph = TaskGraph.model_validate(
+        graph = WorkDAG.model_validate(
             {
-                "graph_id": "parallel-order",
-                "created_by": "user",
+                "dag_id": "parallel-order",
+                "authored_by": "user",
                 "nodes": [
                     {
                         "id": "c",
-                        "tool": "remote.lookup",
-                        "type": "query",
+                        "capability_id": "remote.lookup",
+                        "role": "activity",
                         "args": {"node": "c", "delay_s": 0.01},
                     },
                     {
                         "id": "a",
-                        "tool": "remote.lookup",
-                        "type": "query",
+                        "capability_id": "remote.lookup",
+                        "role": "activity",
                         "args": {"node": "a", "delay_s": 0.04},
                     },
                     {
                         "id": "b",
-                        "tool": "remote.lookup",
-                        "type": "query",
+                        "capability_id": "remote.lookup",
+                        "role": "activity",
                         "args": {"node": "b", "delay_s": 0.02},
                     },
                 ],
@@ -214,17 +214,17 @@ class ReadOnlyTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"ok": True}}
 
         registry = _registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             read_only_invoker=McpStreamableHttpInvoker(registry, call=call),
         )
-        graph = TaskGraph.model_validate(
+        graph = WorkDAG.model_validate(
             {
-                "graph_id": "sequential-fallback",
-                "created_by": "user",
+                "dag_id": "sequential-fallback",
+                "authored_by": "user",
                 "nodes": [
-                    {"id": "a", "tool": "remote.lookup", "type": "query"},
-                    {"id": "b", "tool": "remote.lookup", "type": "query"},
+                    {"id": "a", "capability_id": "remote.lookup", "role": "activity"},
+                    {"id": "b", "capability_id": "remote.lookup", "role": "activity"},
                 ],
             }
         )
@@ -252,20 +252,20 @@ class ReadOnlyTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
 
         registry = _registry()
         registry.get_tool("remote.lookup").execution.exclusive_group = "remote_api"
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             read_only_invoker=McpStreamableHttpInvoker(registry, call=call),
             enable_parallel_execution=True,
             max_concurrency=2,
         )
 
-        def graph(graph_id: str) -> TaskGraph:
-            return TaskGraph.model_validate(
+        def graph(graph_id: str) -> WorkDAG:
+            return WorkDAG.model_validate(
                 {
-                    "graph_id": graph_id,
-                    "created_by": "user",
+                    "dag_id": graph_id,
+                    "authored_by": "user",
                     "nodes": [
-                        {"id": "lookup", "tool": "remote.lookup", "type": "query"}
+                        {"id": "lookup", "capability_id": "remote.lookup", "role": "activity"}
                     ],
                 }
             )
@@ -296,19 +296,19 @@ class ReadOnlyTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
 
         registry = _registry()
         registry.get_tool("remote.lookup").execution.can_run_parallel = False
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             read_only_invoker=McpStreamableHttpInvoker(registry, call=call),
             enable_parallel_execution=True,
             max_concurrency=2,
         )
-        graph = TaskGraph.model_validate(
+        graph = WorkDAG.model_validate(
             {
-                "graph_id": "non-parallel-capability",
-                "created_by": "user",
+                "dag_id": "non-parallel-capability",
+                "authored_by": "user",
                 "nodes": [
-                    {"id": "a", "tool": "remote.lookup", "type": "query"},
-                    {"id": "b", "tool": "remote.lookup", "type": "query"},
+                    {"id": "a", "capability_id": "remote.lookup", "role": "activity"},
+                    {"id": "b", "capability_id": "remote.lookup", "role": "activity"},
                 ],
             }
         )
@@ -335,21 +335,21 @@ class ReadOnlyTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"ok": True}}
 
         registry = _registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             read_only_invoker=McpStreamableHttpInvoker(registry, call=call),
             enable_parallel_execution=True,
             max_concurrency=2,
         )
-        retry_graph = TaskGraph.model_validate(
+        retry_graph = WorkDAG.model_validate(
             {
-                "graph_id": "retry-policy",
-                "created_by": "user",
+                "dag_id": "retry-policy",
+                "authored_by": "user",
                 "nodes": [
                     {
                         "id": "lookup",
-                        "tool": "remote.lookup",
-                        "type": "query",
+                        "capability_id": "remote.lookup",
+                        "role": "activity",
                         "retry": {"max_attempts": 2, "backoff_s": 0},
                     }
                 ],
@@ -361,15 +361,15 @@ class ReadOnlyTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(retry_trace.node_results[0].status, "success")
         self.assertEqual(retry_trace.node_results[0].attempts, 2)
 
-        timeout_graph = TaskGraph.model_validate(
+        timeout_graph = WorkDAG.model_validate(
             {
-                "graph_id": "timeout-policy",
-                "created_by": "user",
+                "dag_id": "timeout-policy",
+                "authored_by": "user",
                 "nodes": [
                     {
                         "id": "lookup",
-                        "tool": "remote.lookup",
-                        "type": "query",
+                        "capability_id": "remote.lookup",
+                        "role": "activity",
                         "args": {"timeout": True},
                         "timeout_s": 0.01,
                     }
@@ -396,21 +396,21 @@ class ReadOnlyTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"ok": True}}
 
         registry = _registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             read_only_invoker=McpStreamableHttpInvoker(registry, call=call),
             enable_parallel_execution=True,
             max_concurrency=2,
         )
-        graph = TaskGraph.model_validate(
+        graph = WorkDAG.model_validate(
             {
-                "graph_id": "failure-policies",
-                "created_by": "user",
+                "dag_id": "failure-policies",
+                "authored_by": "user",
                 "nodes": [
                     {
                         "id": "defaulted",
-                        "tool": "remote.lookup",
-                        "type": "query",
+                        "capability_id": "remote.lookup",
+                        "role": "activity",
                         "args": {"fail": True},
                         "on_failure": {
                             "strategy": "continue_with_default",
@@ -419,15 +419,15 @@ class ReadOnlyTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
                     },
                     {
                         "id": "skipped",
-                        "tool": "remote.lookup",
-                        "type": "query",
+                        "capability_id": "remote.lookup",
+                        "role": "activity",
                         "args": {"fail": True},
                         "on_failure": {"strategy": "skip"},
                     },
                     {
                         "id": "failed",
-                        "tool": "remote.lookup",
-                        "type": "query",
+                        "capability_id": "remote.lookup",
+                        "role": "activity",
                         "args": {"fail": True},
                         "on_failure": {
                             "strategy": "goto",
@@ -436,8 +436,8 @@ class ReadOnlyTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
                     },
                     {
                         "id": "fallback",
-                        "tool": "remote.lookup",
-                        "type": "query",
+                        "capability_id": "remote.lookup",
+                        "role": "activity",
                     },
                 ],
             }
@@ -477,27 +477,27 @@ class ReadOnlyTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             }
 
         registry = _registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             read_only_invoker=McpStreamableHttpInvoker(registry, call=call),
             enable_parallel_execution=True,
             max_concurrency=2,
         )
-        graph = TaskGraph.model_validate(
+        graph = WorkDAG.model_validate(
             {
-                "graph_id": "abort-sibling",
-                "created_by": "user",
+                "dag_id": "abort-sibling",
+                "authored_by": "user",
                 "nodes": [
                     {
                         "id": "fail",
-                        "tool": "remote.lookup",
-                        "type": "query",
+                        "capability_id": "remote.lookup",
+                        "role": "activity",
                         "on_failure": {"strategy": "abort_task"},
                     },
                     {
                         "id": "slow",
-                        "tool": "remote.lookup",
-                        "type": "query",
+                        "capability_id": "remote.lookup",
+                        "role": "activity",
                         "args": {"slow": True},
                     },
                 ],
@@ -529,23 +529,23 @@ class ReadOnlyTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"ok": True}}
 
         registry = _registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             read_only_invoker=McpStreamableHttpInvoker(registry, call=call),
             enable_parallel_execution=True,
             max_concurrency=2,
         )
 
-        def graph(graph_id: str, marker: str) -> TaskGraph:
-            return TaskGraph.model_validate(
+        def graph(graph_id: str, marker: str) -> WorkDAG:
+            return WorkDAG.model_validate(
                 {
-                    "graph_id": graph_id,
-                    "created_by": "user",
+                    "dag_id": graph_id,
+                    "authored_by": "user",
                     "nodes": [
                         {
                             "id": "lookup",
-                            "tool": "remote.lookup",
-                            "type": "query",
+                            "capability_id": "remote.lookup",
+                            "role": "activity",
                             "args": {"graph": marker},
                         }
                     ],
@@ -597,34 +597,34 @@ class ReadOnlyTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"ok": True}}
 
         registry = _registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             read_only_invoker=McpStreamableHttpInvoker(
                 registry,
                 call=call,
             ),
         )
-        graph = TaskGraph.model_validate(
+        graph = WorkDAG.model_validate(
             {
-                "graph_id": "early-cancel",
-                "created_by": "user",
+                "dag_id": "early-cancel",
+                "authored_by": "user",
                 "nodes": [
                     {
                         "id": "lookup",
-                        "tool": "remote.lookup",
-                        "type": "query",
+                        "capability_id": "remote.lookup",
+                        "role": "activity",
                     }
                 ],
             }
         )
 
         dry_run = service.dry_run(graph)
-        cancellation = service.cancel_execution(graph.graph_id)
+        cancellation = service.cancel_execution(graph.dag_id)
         trace = await service.execute_read_only(graph)
         second_dry_run = service.dry_run(graph)
         replay = await service.execute_read_only(graph)
         different = graph.model_copy(
-            update={"user_request": "different retained graph content"},
+            update={"summary": "different retained DAG content"},
             deep=True,
         )
 
@@ -635,14 +635,14 @@ class ReadOnlyTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(replay.status, "cancelled")
         self.assertEqual(trace.events[0].type, "cancelled_before_start")
         self.assertEqual(calls, 0)
-        self.assertEqual(service.get_trace(graph.graph_id).status, "cancelled")
+        self.assertEqual(service.get_trace(graph.dag_id).status, "cancelled")
         self.assertFalse(
-            service.cancel_execution(graph.graph_id).cancellation_requested
+            service.cancel_execution(graph.dag_id).cancellation_requested
         )
-        with self.assertRaisesRegex(ValueError, "different graph content"):
+        with self.assertRaisesRegex(ValueError, "different DAG content"):
             await service.execute_read_only(different)
 
-    async def test_scheduler_status_reports_active_work(self) -> None:
+    async def test_dag_engine_status_reports_active_work(self) -> None:
         started = asyncio.Event()
         release = asyncio.Event()
 
@@ -657,29 +657,29 @@ class ReadOnlyTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"ok": True}}
 
         registry = _registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             read_only_invoker=McpStreamableHttpInvoker(registry, call=call),
             enable_parallel_execution=True,
             max_concurrency=2,
         )
-        graph = TaskGraph.model_validate(
+        graph = WorkDAG.model_validate(
             {
-                "graph_id": "diagnostics",
-                "created_by": "user",
+                "dag_id": "diagnostics",
+                "authored_by": "user",
                 "nodes": [
-                    {"id": "lookup", "tool": "remote.lookup", "type": "query"}
+                    {"id": "lookup", "capability_id": "remote.lookup", "role": "activity"}
                 ],
             }
         )
         execution = asyncio.create_task(service.execute_read_only(graph))
         await started.wait()
 
-        status = service.scheduler_status()
+        status = service.engine_status()
 
         self.assertTrue(status.parallel_enabled)
         self.assertEqual(status.active_count, 1)
-        self.assertEqual(status.active_graph_ids, ["diagnostics"])
+        self.assertEqual(status.active_dag_ids, ["diagnostics"])
         release.set()
         await execution
 
@@ -694,31 +694,31 @@ class ReadOnlyTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"value": args["value"]}}
 
         registry = _registry()
-        graph = TaskGraph.model_validate(
+        graph = WorkDAG.model_validate(
             {
-                "graph_id": "conformance",
-                "created_by": "user",
+                "dag_id": "conformance",
+                "authored_by": "user",
                 "nodes": [
                     {
                         "id": "b",
-                        "tool": "remote.lookup",
-                        "type": "query",
+                        "capability_id": "remote.lookup",
+                        "role": "activity",
                         "args": {"value": "b", "delay_s": 0.01},
                     },
                     {
                         "id": "a",
-                        "tool": "remote.lookup",
-                        "type": "query",
+                        "capability_id": "remote.lookup",
+                        "role": "activity",
                         "args": {"value": "a", "delay_s": 0.02},
                     },
                 ],
             }
         )
-        sequential = TaskGraphService(
+        sequential = DAGEngineService(
             registry,
             read_only_invoker=McpStreamableHttpInvoker(registry, call=call),
         )
-        parallel = TaskGraphService(
+        parallel = DAGEngineService(
             registry,
             read_only_invoker=McpStreamableHttpInvoker(registry, call=call),
             enable_parallel_execution=True,

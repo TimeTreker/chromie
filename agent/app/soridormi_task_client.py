@@ -80,14 +80,14 @@ class SoridormiTaskMonitorTimeout(SoridormiTaskClientError):
         self.last_events = last_events
 
 
-def soridormi_client_task_ref(graph_id: str, node_id: str) -> str:
+def soridormi_client_task_ref(dag_id: str, node_id: str) -> str:
     """Return Chromie's stable idempotency key for one Soridormi task node."""
 
-    if not graph_id.strip():
-        raise ValueError("graph_id is required")
+    if not dag_id.strip():
+        raise ValueError("dag_id is required")
     if not node_id.strip():
         raise ValueError("node_id is required")
-    raw = f"chromie:{graph_id}:{node_id}"
+    raw = f"chromie:{dag_id}:{node_id}"
     safe = _UNSAFE_REF_CHARS.sub("-", raw).strip("-")
     digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
     if safe == raw and len(safe) <= _MAX_CLIENT_TASK_REF_LENGTH:
@@ -102,7 +102,7 @@ def soridormi_client_task_ref(graph_id: str, node_id: str) -> str:
 def with_client_task_ref(
     payload: dict[str, Any],
     *,
-    graph_id: str,
+    dag_id: str,
     node_id: str,
 ) -> dict[str, Any]:
     """Copy a submit payload and attach Chromie's retry-safe task reference."""
@@ -113,7 +113,7 @@ def with_client_task_ref(
         if not str(explicit_ref).strip():
             raise ValueError("client_task_ref must be non-empty when provided")
         return copied
-    copied["client_task_ref"] = soridormi_client_task_ref(graph_id, node_id)
+    copied["client_task_ref"] = soridormi_client_task_ref(dag_id, node_id)
     return copied
 
 
@@ -141,10 +141,10 @@ class SoridormiTaskClient:
         self,
         payload: dict[str, Any],
         *,
-        graph_id: str,
+        dag_id: str,
         node_id: str,
     ) -> dict[str, Any]:
-        args = with_client_task_ref(payload, graph_id=graph_id, node_id=node_id)
+        args = with_client_task_ref(payload, dag_id=dag_id, node_id=node_id)
         outcome = await self._invoker.invoke("soridormi.task.submit", args)
         return self._output_or_raise("soridormi.task.submit", outcome)
 
@@ -344,12 +344,12 @@ class SoridormiTaskMonitoringInvoker:
     ) -> dict[str, Any]:
         if args.get("client_task_ref") is not None:
             return dict(args)
-        if context is None or not context.task_graph_id or not context.task_node_id:
+        if context is None or not context.work_dag_id or not context.work_node_id:
             return dict(args)
         return with_client_task_ref(
             args,
-            graph_id=context.task_graph_id,
-            node_id=context.task_node_id,
+            dag_id=context.work_dag_id,
+            node_id=context.work_node_id,
         )
 
     @staticmethod

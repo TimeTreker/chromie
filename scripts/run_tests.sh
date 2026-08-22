@@ -30,7 +30,7 @@ import runpy
 
 modules = [
     runpy.run_path("agent/tests/test_capability_registry.py"),
-    runpy.run_path("agent/tests/test_task_graph_validator_executor.py"),
+    runpy.run_path("agent/tests/test_work_dag_validator_executor.py"),
 ]
 
 tests = [

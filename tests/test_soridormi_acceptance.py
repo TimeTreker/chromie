@@ -18,7 +18,7 @@ from agent.app.soridormi_acceptance import (
     run_soridormi_runtime_cancellation_acceptance,
     run_soridormi_runtime_preflight,
     run_soridormi_task_agent_acceptance,
-    soridormi_task_agent_graph_id,
+    soridormi_task_agent_dag_id,
 )
 from agent.app.tool_invocation import McpStreamableHttpInvoker
 
@@ -85,7 +85,7 @@ class SoridormiAcceptanceTests(unittest.IsolatedAsyncioTestCase):
             return [
                 CapabilityProbeResult(
                     url="http://soridormi:8000/mcp",
-                    expected_schemas={"required.tool": {}},
+                    expected_schemas={"required.capability_id": {}},
                     advertised_schemas={},
                 )
             ]
@@ -143,7 +143,7 @@ class SoridormiAcceptanceTests(unittest.IsolatedAsyncioTestCase):
         registry = self._registry()
         calls: list[tuple[str, dict[str, Any]]] = []
         expected_ref = (
-            f"chromie:{soridormi_task_agent_graph_id(default_soridormi_task_goal())}:submit"
+            f"chromie:{soridormi_task_agent_dag_id(default_soridormi_task_goal())}:submit"
         )
 
         async def probe(_registry):
@@ -363,7 +363,7 @@ class SoridormiAcceptanceTests(unittest.IsolatedAsyncioTestCase):
         graph = build_soridormi_task_agent_graph(default_soridormi_task_goal())
 
         self.assertEqual(
-            [node.tool for node in graph.nodes],
+            [node.capability_id for node in graph.nodes],
             [
                 "soridormi.task.get_capabilities",
                 "soridormi.task.preview",
@@ -372,8 +372,8 @@ class SoridormiAcceptanceTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
         self.assertEqual(
-            graph.graph_id,
-            soridormi_task_agent_graph_id(default_soridormi_task_goal()),
+            graph.dag_id,
+            soridormi_task_agent_dag_id(default_soridormi_task_goal()),
         )
 
     async def test_runtime_preflight_requires_runtime_backend_and_ready_state(

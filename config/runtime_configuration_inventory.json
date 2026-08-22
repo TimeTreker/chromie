@@ -174,6 +174,68 @@
       ]
     },
     {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "AGENT_DAG_ENGINE_DIAGNOSTICS_TOKEN",
+      "owners": [
+        ".env.common",
+        "agent/app/settings.py",
+        "docker-compose.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "profile_constant",
+      "key": "AGENT_DAG_ENGINE_EXECUTION_TOKEN",
+      "owners": [
+        ".env.common",
+        "agent/app/settings.py",
+        "docker-compose.yml",
+        "orchestrator/clients/agent_client.py",
+        "orchestrator/runtime/host_settings.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "AGENT_DAG_ENGINE_GRANT_MAX_ENTRIES",
+      "owners": [
+        ".env.common",
+        "agent/app/settings.py",
+        "docker-compose.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "AGENT_DAG_ENGINE_MAX_CONCURRENCY",
+      "owners": [
+        ".env.common",
+        "agent/app/settings.py",
+        "docker-compose.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "AGENT_DAG_ENGINE_TRACE_MAX_ENTRIES",
+      "owners": [
+        ".env.common",
+        "agent/app/settings.py",
+        "docker-compose.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "AGENT_DAG_ENGINE_TRACE_TTL_SEC",
+      "owners": [
+        ".env.common",
+        "agent/app/settings.py",
+        "docker-compose.yml"
+      ]
+    },
+    {
       "boolean": true,
       "category": "service_internal",
       "key": "AGENT_DEEP_PLANNER_ENABLED",
@@ -276,7 +338,7 @@
     {
       "boolean": true,
       "category": "service_internal",
-      "key": "AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION",
+      "key": "AGENT_ENABLE_GUARDED_DAG_EXECUTION",
       "owners": [
         ".env.common",
         "agent/app/settings.py",
@@ -286,7 +348,7 @@
     {
       "boolean": true,
       "category": "service_internal",
-      "key": "AGENT_ENABLE_PARALLEL_TASK_GRAPH_EXECUTION",
+      "key": "AGENT_ENABLE_PARALLEL_DAG_EXECUTION",
       "owners": [
         ".env.common",
         "agent/app/settings.py",
@@ -296,7 +358,7 @@
     {
       "boolean": true,
       "category": "service_internal",
-      "key": "AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION",
+      "key": "AGENT_ENABLE_PHYSICAL_DAG_EXECUTION",
       "owners": [
         ".env.common",
         "agent/app/settings.py",
@@ -306,7 +368,7 @@
     {
       "boolean": true,
       "category": "service_internal",
-      "key": "AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION",
+      "key": "AGENT_ENABLE_PLANNING_DAG_EXECUTION",
       "owners": [
         ".env.common",
         "agent/app/settings.py",
@@ -316,7 +378,7 @@
     {
       "boolean": true,
       "category": "service_internal",
-      "key": "AGENT_ENABLE_READ_ONLY_TASK_GRAPH_EXECUTION",
+      "key": "AGENT_ENABLE_READ_ONLY_DAG_EXECUTION",
       "owners": [
         ".env.common",
         "agent/app/settings.py",
@@ -1040,68 +1102,6 @@
       "owners": [
         "env/modes/qualification.env",
         "env/validation/architecture.env"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "AGENT_TASK_GRAPH_DIAGNOSTICS_TOKEN",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "profile_constant",
-      "key": "AGENT_TASK_GRAPH_EXECUTION_TOKEN",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml",
-        "orchestrator/clients/agent_client.py",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "AGENT_TASK_GRAPH_GRANT_MAX_ENTRIES",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "AGENT_TASK_GRAPH_MAX_CONCURRENCY",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "AGENT_TASK_GRAPH_TRACE_MAX_ENTRIES",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "AGENT_TASK_GRAPH_TRACE_TTL_SEC",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
       ]
     },
     {

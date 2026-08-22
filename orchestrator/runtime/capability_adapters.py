@@ -4,105 +4,96 @@ import inspect
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from agent.app.task_graph.models import ExecutionTrace, TaskGraph
-from agent.app.task_graph.residual import attach_residual_replan_state
-
-from shared.chromie_contracts.interaction import (
-    InteractionResponse,
-    InteractionSpeech,
-    CapabilityRequest,
-    CapabilityResult,
-)
+from agent.app.work_dag.models import WorkDAG
+from shared.chromie_contracts.interaction import CapabilityRequest, CapabilityResult
 
 from .capability_runtime import CapabilityDefinition, CapabilityExecutionContext
 
 
+WorkDAGHandler = Callable[[dict[str, Any]], dict[str, Any] | Awaitable[dict[str, Any]]]
+WorkDAGCancelHandler = Callable[[str], dict[str, Any] | Awaitable[dict[str, Any]]]
 
 
-TaskGraphHandler = Callable[[dict[str, Any]], dict[str, Any] | Awaitable[dict[str, Any]]]
-TaskGraphCancelHandler = Callable[
-    [str],
-    dict[str, Any] | Awaitable[dict[str, Any]],
-]
-
-
-TASK_GRAPH_RESULT_OUTPUT_SCHEMA: dict[str, Any] = {
+WORK_DAG_RESULT_OUTPUT_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
-        "graph_id": {"type": "string"},
+        "dag_id": {"type": "string"},
+        "dag_revision": {"type": "integer", "minimum": 1},
+        "goal_ids": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
         "status": {
             "type": "string",
             "enum": ["success", "failed", "aborted", "cancelled"],
         },
-        "outcome_summary": {"type": "string"},
-        "residual_replan": {
-            "type": ["object", "null"],
-            "properties": {
-                "status": {"type": "string"},
-                "graph_id": {"type": "string"},
-                "original_goal": {"type": "string"},
-                "trace_status": {"type": "string"},
-                "outcome_summary": {"type": "string"},
-                "failure_code": {"type": ["string", "null"]},
-                "failed_step": {
-                    "type": ["object", "null"],
-                    "properties": {
-                        "node_id": {"type": "string"},
-                        "tool": {"type": "string"},
-                        "type": {"type": "string"},
-                        "status": {"type": "string"},
-                        "error": {"type": ["string", "null"]},
-                        "attempts": {"type": "integer"},
-                        "depends_on": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                        },
+        "node_results": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "node_id": {"type": "string"},
+                    "capability_id": {"type": ["string", "null"]},
+                    "status": {"type": "string"},
+                    "error": {"type": ["string", "null"]},
+                    "attempts": {"type": "integer"},
+                    "inherited_from_revision": {"type": ["integer", "null"], "minimum": 1},
+                    "blocked_by": {
+                        "type": "array",
+                        "items": {"type": "string"},
                     },
-                    "additionalProperties": False,
-                },
-                "remaining_node_ids": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                },
-                "recommended_next_actions": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                },
-                "replan_scope": {
-                    "type": "object",
-                    "properties": {
-                        "mode": {"type": "string"},
-                        "exclude_completed_node_ids": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                        },
-                        "failed_node_id": {"type": ["string", "null"]},
-                        "remaining_node_ids": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                        },
+                    "source_goal_ids": {
+                        "type": "array",
+                        "items": {"type": "string"},
                     },
-                    "additionalProperties": False,
+                    "reason_code": {"type": ["string", "null"]},
+                    "blocked_subsystems": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                    "provider_reported_next_actions": {"type": "array"},
                 },
-                "safety_note": {"type": "string"},
+                "required": [
+                    "node_id",
+                    "status",
+                    "attempts",
+                    "blocked_by",
+                    "source_goal_ids",
+                ],
+                "additionalProperties": False,
             },
-            "additionalProperties": False,
+        },
+        "pending_node_ids": {
+            "type": "array",
+            "items": {"type": "string"},
         },
     },
-    "required": ["graph_id", "status", "outcome_summary"],
+    "required": [
+        "dag_id",
+        "dag_revision",
+        "goal_ids",
+        "status",
+        "node_results",
+        "pending_node_ids",
+    ],
     "additionalProperties": False,
 }
 
 
-class TaskGraphCapabilityProvider:
-    """Capability provider around the guarded deterministic TaskGraph executor."""
+class WorkDAGCapabilityProvider:
+    """Capability adapter for the deterministic DAGEngine.
 
-    provider_id = "chromie.task_graph"
+    WorkDAG is authored before this adapter runs.  The adapter may project
+    execution facts, but it must never choose replacement Work or manufacture
+    a recovery recommendation.
+    """
+
+    provider_id = "chromie.dag_engine"
 
     def __init__(
         self,
-        handler: TaskGraphHandler,
-        cancel_handler: TaskGraphCancelHandler | None = None,
+        handler: WorkDAGHandler,
+        cancel_handler: WorkDAGCancelHandler | None = None,
     ) -> None:
         self._handler = handler
         self._cancel_handler = cancel_handler
@@ -114,21 +105,25 @@ class TaskGraphCapabilityProvider:
         definition: CapabilityDefinition,
         context: CapabilityExecutionContext,
     ) -> CapabilityResult:
-        raw = self._handler(request.args["graph"])
+        del context
+        dag_payload = request.args["dag"]
+        dag = WorkDAG.model_validate(dag_payload)
+        if dag.authored_by != "planner":
+            raise ValueError(
+                "chromie.work_dag.execute accepts only Planner-authored WorkDAG values"
+            )
+        raw = self._handler(dag.model_dump(mode="json"))
         output = await raw if inspect.isawaitable(raw) else raw
-        output = _with_residual_replan(request.args.get("graph"), output)
-        status = _task_graph_result_status(output)
-        message = _task_graph_result_message(output, status)
-        model_safe_output = _task_graph_result_output(output)
+        status = _work_dag_result_status(output)
         return CapabilityResult(
             request_id=request.request_id,
             capability_id=request.capability_id,
             capability_version=definition.version,
             status=status,
             provider_id=self.provider_id,
-            output=model_safe_output,
-            reason_code=_task_graph_reason_code(output, status),
-            message=message,
+            output=_work_dag_result_output(dag_payload, output),
+            reason_code=_work_dag_reason_code(output, status),
+            message="",
         )
 
     async def cancel(
@@ -137,193 +132,189 @@ class TaskGraphCapabilityProvider:
         definition: CapabilityDefinition,
         context: CapabilityExecutionContext,
     ) -> None:
+        del definition, context
         if self._cancel_handler is None:
-            raise RuntimeError(
-                "TaskGraph cancellation endpoint is not configured"
-            )
-        graph = request.args.get("graph")
-        graph_id = (
-            str(graph.get("graph_id") or "").strip()
-            if isinstance(graph, dict)
-            else ""
-        )
-        if not graph_id:
-            raise RuntimeError(
-                "TaskGraph cancellation requires the committed graph_id"
-            )
-        raw = self._cancel_handler(graph_id)
+            raise RuntimeError("DAGEngine cancellation endpoint is not configured")
+        dag = request.args.get("dag")
+        dag_id = str(dag.get("dag_id") or "").strip() if isinstance(dag, dict) else ""
+        if not dag_id:
+            raise RuntimeError("DAGEngine cancellation requires the committed dag_id")
+        raw = self._cancel_handler(dag_id)
         receipt = await raw if inspect.isawaitable(raw) else raw
         if not isinstance(receipt, dict):
-            raise RuntimeError(
-                "TaskGraph cancellation endpoint returned an invalid receipt"
-            )
+            raise RuntimeError("DAGEngine cancellation endpoint returned an invalid receipt")
         if (
-            str(receipt.get("graph_id") or "").strip() != graph_id
+            str(receipt.get("dag_id") or "").strip() != dag_id
             or receipt.get("cancellation_requested") is not True
         ):
             raise RuntimeError(
-                "TaskGraph cancellation was not confirmed "
-                f"for graph_id={graph_id!r}"
+                "DAGEngine cancellation was not confirmed " f"for dag_id={dag_id!r}"
             )
         self.cancelled_request_ids.add(request.request_id)
 
 
-def _with_residual_replan(graph_payload: Any, output: dict[str, Any]) -> dict[str, Any]:
-    if output.get("residual_replan") is not None:
-        return output
-    if str(output.get("status") or "").strip().lower() not in {"failed", "aborted"}:
-        return output
-    if not isinstance(graph_payload, dict):
-        return output
-    try:
-        graph = TaskGraph.model_validate(graph_payload)
-        trace = ExecutionTrace.model_validate(output)
-    except Exception:
-        return output
-    attach_residual_replan_state(graph, trace)
-    return trace.model_dump(mode="json")
+def _work_dag_result_output(
+    dag_payload: Any,
+    output: dict[str, Any],
+) -> dict[str, Any]:
+    """Project only execution facts into Planner-visible Evidence."""
 
-
-def _task_graph_result_output(output: dict[str, Any]) -> dict[str, Any]:
-    """Project TaskGraph evidence into the committed model-safe result schema."""
-
-    projected: dict[str, Any] = {
-        "graph_id": str(output.get("graph_id") or ""),
-        "status": str(output.get("status") or "").strip().lower(),
-        "outcome_summary": str(output.get("outcome_summary") or ""),
-    }
-    residual = output.get("residual_replan")
-    if not isinstance(residual, dict):
-        return projected
-
-    failed_step = residual.get("failed_step")
-    projected_failed_step: dict[str, Any] | None = None
-    if isinstance(failed_step, dict):
-        projected_failed_step = {}
-        for key in ("node_id", "tool", "type", "status"):
-            if key in failed_step:
-                projected_failed_step[key] = str(failed_step.get(key) or "")
-        if "error" in failed_step:
-            error = failed_step.get("error")
-            projected_failed_step["error"] = None if error is None else str(error)
-        if isinstance(failed_step.get("attempts"), int):
-            projected_failed_step["attempts"] = failed_step["attempts"]
-        depends_on = failed_step.get("depends_on")
-        if isinstance(depends_on, list):
-            projected_failed_step["depends_on"] = [
-                str(item) for item in depends_on if str(item).strip()
-            ]
-
-    replan_scope = residual.get("replan_scope")
-    projected_scope: dict[str, Any] = {}
-    if isinstance(replan_scope, dict):
-        if "mode" in replan_scope:
-            projected_scope["mode"] = str(replan_scope.get("mode") or "")
-        for key in ("exclude_completed_node_ids", "remaining_node_ids"):
-            values = replan_scope.get(key)
-            if isinstance(values, list):
-                projected_scope[key] = [
-                    str(item) for item in values if str(item).strip()
+    dag_id = str(output.get("dag_id") or "").strip()
+    known_node_ids: list[str] = []
+    goal_ids: list[str] = []
+    node_goal_ids: dict[str, list[str]] = {}
+    if isinstance(dag_payload, dict):
+        dag_id = dag_id or str(dag_payload.get("dag_id") or "").strip()
+        goal_ids = [
+            str(value).strip()
+            for value in (dag_payload.get("goal_ids") or [])
+            if str(value).strip()
+        ]
+        raw_nodes = dag_payload.get("nodes")
+        if isinstance(raw_nodes, list):
+            for item in raw_nodes:
+                if not isinstance(item, dict):
+                    continue
+                node_id = str(item.get("id") or "").strip()
+                if not node_id:
+                    continue
+                known_node_ids.append(node_id)
+                node_goal_ids[node_id] = [
+                    str(value).strip()
+                    for value in (item.get("source_goal_ids") or [])
+                    if str(value).strip()
                 ]
-        if "failed_node_id" in replan_scope:
-            failed_node_id = replan_scope.get("failed_node_id")
-            projected_scope["failed_node_id"] = (
-                None if failed_node_id is None else str(failed_node_id)
+
+    projected_results: list[dict[str, Any]] = []
+    completed_ids: set[str] = set()
+    raw_results = output.get("node_results")
+    if isinstance(raw_results, list):
+        for item in raw_results[:64]:
+            if not isinstance(item, dict):
+                continue
+            node_id = str(item.get("node_id") or "").strip()
+            if not node_id:
+                continue
+            status = str(item.get("status") or "").strip()
+            if status:
+                completed_ids.add(node_id)
+            projected: dict[str, Any] = {
+                "node_id": node_id,
+                "status": status,
+                "attempts": int(item.get("attempts") or 1),
+                "inherited_from_revision": (
+                    int(item["inherited_from_revision"])
+                    if isinstance(item.get("inherited_from_revision"), int)
+                    else None
+                ),
+                "blocked_by": [
+                    str(value)
+                    for value in (item.get("blocked_by") or [])
+                    if str(value).strip()
+                ],
+                "source_goal_ids": list(node_goal_ids.get(node_id, [])),
+            }
+            capability_id = item.get("capability_id")
+            projected["capability_id"] = (
+                None if capability_id is None else str(capability_id)
             )
+            error = item.get("error")
+            projected["error"] = None if error is None else str(error)
+            node_output = item.get("output")
+            if isinstance(node_output, dict):
+                reason_code = node_output.get("reason_code") or node_output.get("error_code")
+                projected["reason_code"] = (
+                    None if reason_code is None else str(reason_code)
+                )
+                blocked = node_output.get("blocked_subsystems")
+                projected["blocked_subsystems"] = (
+                    [str(value) for value in blocked if str(value).strip()]
+                    if isinstance(blocked, list)
+                    else []
+                )
+                recommendations = node_output.get("recommended_next_actions")
+                projected["provider_reported_next_actions"] = (
+                    list(recommendations[:16]) if isinstance(recommendations, list) else []
+                )
+            else:
+                projected["reason_code"] = None
+                projected["blocked_subsystems"] = []
+                projected["provider_reported_next_actions"] = []
+            projected_results.append(projected)
 
-    projected_residual: dict[str, Any] = {}
-    for key in (
-        "status",
-        "graph_id",
-        "original_goal",
-        "trace_status",
-        "outcome_summary",
-        "safety_note",
-    ):
-        if key in residual:
-            projected_residual[key] = str(residual.get(key) or "")
-    if "failure_code" in residual:
-        failure_code = residual.get("failure_code")
-        projected_residual["failure_code"] = (
-            None if failure_code is None else str(failure_code)
-        )
-    if projected_failed_step is not None:
-        projected_residual["failed_step"] = projected_failed_step
-    remaining = residual.get("remaining_node_ids")
-    if isinstance(remaining, list):
-        projected_residual["remaining_node_ids"] = [
-            str(item) for item in remaining if str(item).strip()
-        ]
-    recommendations = residual.get("recommended_next_actions")
-    if isinstance(recommendations, list):
-        projected_residual["recommended_next_actions"] = [
-            item for item in recommendations if isinstance(item, str) and item.strip()
-        ]
-    if projected_scope:
-        projected_residual["replan_scope"] = projected_scope
-    projected["residual_replan"] = projected_residual
-    return projected
+    dag_revision = output.get("dag_revision")
+    if not isinstance(dag_revision, int) and isinstance(dag_payload, dict):
+        dag_revision = dag_payload.get("revision")
+    return {
+        "dag_id": dag_id,
+        "dag_revision": int(dag_revision or 1),
+        "goal_ids": goal_ids,
+        "status": str(output.get("status") or "").strip().lower(),
+        "node_results": projected_results,
+        "pending_node_ids": [node_id for node_id in known_node_ids if node_id not in completed_ids],
+    }
 
 
-def _task_graph_result_status(output: dict[str, Any]) -> str:
-    """Map only explicit terminal TaskGraph evidence to CapabilityResult status."""
-
-    graph_status = str(output.get("status") or "").strip().lower()
-    if graph_status == "success":
+def _work_dag_result_status(output: dict[str, Any]) -> str:
+    dag_status = str(output.get("status") or "").strip().lower()
+    if dag_status == "success":
         return "completed"
-    if graph_status == "cancelled":
+    if dag_status == "cancelled":
         return "cancelled"
-    if graph_status in {"failed", "aborted"}:
-        return "failed"
-    # Missing, pending, running, or unknown provider states are not completion
-    # evidence. The provider adapter must fail closed rather than turning
-    # an incomplete receipt into a successful user-visible result.
     return "failed"
 
 
-def _task_graph_result_message(output: dict[str, Any], status: str) -> str:
-    if status == "completed":
-        return ""
-    summary = str(output.get("outcome_summary") or "").strip()
-    if summary:
-        return summary
-    graph_status = str(output.get("status") or "unknown").strip() or "unknown"
-    return f"TaskGraph ended with status={graph_status}"
-
-
-def _task_graph_reason_code(
-    output: dict[str, Any],
-    status: str,
-) -> str | None:
+def _work_dag_reason_code(output: dict[str, Any], status: str) -> str | None:
     if status == "completed":
         return None
     if status == "cancelled":
-        return "task_graph_cancelled"
-    graph_status = str(output.get("status") or "").strip().lower()
-    if not graph_status:
-        return "task_graph_missing_terminal_status"
-    if graph_status in {"pending", "running"}:
-        return "task_graph_non_terminal_result"
-    if graph_status not in {"failed", "aborted"}:
-        return "task_graph_invalid_terminal_status"
-    return "task_graph_failed"
+        return "work_dag_cancelled"
+    dag_status = str(output.get("status") or "").strip().lower()
+    if not dag_status:
+        return "work_dag_missing_terminal_status"
+    if dag_status in {"pending", "running"}:
+        return "work_dag_non_terminal_result"
+    if dag_status not in {"failed", "aborted"}:
+        return "work_dag_invalid_terminal_status"
+    return "work_dag_failed"
 
 
-def task_graph_capability_definition() -> CapabilityDefinition:
+def _work_dag_input_schema() -> dict[str, Any]:
+    dag_schema = WorkDAG.model_json_schema()
+    properties = dag_schema.get("properties")
+    if isinstance(properties, dict):
+        properties["authored_by"] = {"type": "string", "const": "planner"}
+        goal_ids = properties.get("goal_ids")
+        if isinstance(goal_ids, dict):
+            goal_ids["minItems"] = 1
+    required = list(dag_schema.get("required") or [])
+    for field in ("dag_id", "revision", "authored_by", "goal_ids", "nodes"):
+        if field not in required:
+            required.append(field)
+    dag_schema["required"] = required
+    defs = dag_schema.pop("$defs", {})
+    schema: dict[str, Any] = {
+        "type": "object",
+        "properties": {"dag": dag_schema},
+        "required": ["dag"],
+        "additionalProperties": False,
+    }
+    if defs:
+        schema["$defs"] = defs
+    return schema
+
+
+def work_dag_capability_definition() -> CapabilityDefinition:
     return CapabilityDefinition(
-        capability_id="chromie.task_graph.execute",
-        version="1.0.0",
-        provider_id=TaskGraphCapabilityProvider.provider_id,
-        description="Execute a validated legacy Chromie TaskGraph.",
-        input_schema={
-            "type": "object",
-            "properties": {
-                "graph": {"type": "object"},
-            },
-            "required": ["graph"],
-            "additionalProperties": False,
-        },
-        output_schema=TASK_GRAPH_RESULT_OUTPUT_SCHEMA,
+        capability_id="chromie.work_dag.execute",
+        version="2.0.0",
+        provider_id=WorkDAGCapabilityProvider.provider_id,
+        description=(
+            "Execute a Planner-authored WorkDAG through the deterministic DAGEngine. "
+            "The DAGEngine schedules committed nodes; it does not plan replacement Work."
+        ),
+        input_schema=_work_dag_input_schema(),
+        output_schema=WORK_DAG_RESULT_OUTPUT_SCHEMA,
         timeout_ms=120000,
         interruptible=True,
         can_run_parallel=False,
@@ -332,5 +323,7 @@ def task_graph_capability_definition() -> CapabilityDefinition:
             "effects": ["physical_motion"],
             "safety_class": "physical_motion",
             "cancellation_granularity": "request",
+            "semantic_owner": "planner",
+            "execution_owner": "dag_engine",
         },
     )

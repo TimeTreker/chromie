@@ -82,7 +82,7 @@ class HostSettingsSnapshotTests(unittest.TestCase):
                     "ORCH_CAPABILITY_MAX_CONCURRENCY": "5",
                     "CHROMIE_RUNTIME_TRACE_RESOURCE_SAMPLING": "session",
                     "CHROMIE_RUNTIME_TRACE_ACCELERATOR_PROVIDER": "off",
-                    "AGENT_TASK_GRAPH_EXECUTION_TOKEN": "secret",
+                    "AGENT_DAG_ENGINE_EXECUTION_TOKEN": "secret",
                     "ORCH_EVENT_LOG_PATH": "evidence/events.jsonl",
                 },
             )
@@ -98,7 +98,7 @@ class HostSettingsSnapshotTests(unittest.TestCase):
         self.assertEqual(settings.capability_runtime.capability_max_concurrency, 5)
         self.assertEqual(settings.telemetry.system_resource_mode, "session")
         self.assertEqual(settings.telemetry.accelerator_provider, "off")
-        self.assertEqual(settings.cognition.task_graph_execution_token, "secret")
+        self.assertEqual(settings.cognition.dag_engine_execution_token, "secret")
         self.assertEqual(settings.session.event_log_path, root / "evidence/events.jsonl")
 
     def test_legacy_skill_concurrency_key_is_not_a_compatibility_alias(self) -> None:

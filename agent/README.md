@@ -2,7 +2,7 @@
 
 `chromie-agent` is Chromie's single model-facing cognitive service. It exposes
 separately testable Goal Interpretation, Goal Association, Planner fast/deep passes,
-Reflection, Social Attention, capability-catalog, and TaskGraph diagnostic
+Reflection, Social Attention, capability-catalog, and WorkDAG diagnostic
 surfaces. These are module/contract boundaries inside one FastAPI service, not a
 microservice per cognitive role. The Cognitive Gateway itself remains Host-owned.
 
@@ -46,7 +46,7 @@ Social Attention is an optional Activity-scoped auxiliary cognition path. It may
 
 Goal Association keeps one semantic authority while separating implementation concerns: `app/goal_association_contract.py` owns only the model-facing typed DTO/schema and local normalization rules, while `app/goal_association.py` owns the resolver/inference transaction that decides canonical Goal continuity. The contract module has no model client, runtime state, Goal commit, or tracing authority.
 
-TaskGraph endpoints are deterministic validation/execution infrastructure. The retired LLM `TaskGraphPlanner` bridge has been removed; TaskGraph infrastructure does not own cognitive planning.
+WorkDAG endpoints are deterministic validation/execution infrastructure. The retired LLM `WorkDAGPlanner` bridge has been removed; WorkDAG infrastructure does not own cognitive planning.
 
 ## Current HTTP surface
 
@@ -64,7 +64,7 @@ Important endpoints include:
 - `POST /deep-plan`
 - `POST /social-attention/plan`
 - Agent Skill selection/disclosure endpoints
-- TaskGraph validate/dry-run/guarded execution/trace diagnostics
+- WorkDAG validate/dry-run/guarded execution/trace diagnostics
 
 See [`../docs/API_REFERENCE.md`](../docs/API_REFERENCE.md) for the exact maintained API surface.
 
@@ -83,9 +83,9 @@ current local date/time and UTC offset. It takes no arguments, returns immutable
 Evidence through the ordinary tool-result path, and does not permit a Planner to
 guess or announce the current time before that Evidence returns.
 
-## TaskGraph diagnostics
+## WorkDAG diagnostics
 
-TaskGraph validation and explicitly gated execution remain available for engineering/control-plane diagnostics. Read-only, planning, guarded, and physical execution retain their separate authorization gates. These endpoints do not replace the canonical Fast/Deep Planner.
+WorkDAG validation and explicitly gated execution remain available for engineering/control-plane diagnostics. Read-only, planning, guarded, and physical execution retain their separate authorization gates. These endpoints do not replace the canonical Fast/Deep Planner.
 
 ## Run locally
 
@@ -109,5 +109,5 @@ For project architecture and current status, see:
 Additional owned mechanical contracts:
 
 - [Capability Result Evidence Re-entry](../docs/CAPABILITY_RESULT_EVIDENCE_REENTRY.md)
-- [TaskGraph mechanics](../docs/agent_task_graph.md)
-- [TaskGraph concurrency decision](../docs/task_graph_concurrency_decision.md)
+- [WorkDAG mechanics](../docs/work_dag.md)
+- [WorkDAG concurrency decision](../docs/dag_engine_concurrency.md)

@@ -64,7 +64,7 @@ than disappearing silently.
 Required invariants no longer depend on `assert`, which Python removes under
 `-O`. Explicit exceptions now protect:
 
-- TaskGraph invocation outcomes;
+- WorkDAG invocation outcomes;
 - confirmation replacement and approved-response binding;
 - semantic create operations and pending-task metadata;
 - provider output-schema object validation;
@@ -75,7 +75,7 @@ Required invariants no longer depend on `assert`, which Python removes under
 
 The maintained audit covers:
 
-- `agent/app/` model, Goal Association, TaskGraph, and compatibility schema paths;
+- `agent/app/` model, Goal Association, WorkDAG, and compatibility schema paths;
 - `orchestrator/` interaction, conversation state, cancellation, recovery,
   episode, audio cleanup, and execution joins;
 - `shared/chromie_runtime/` Runtime Trace evidence;

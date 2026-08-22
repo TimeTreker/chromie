@@ -56,7 +56,7 @@ class SoridormiTaskClientTests(unittest.IsolatedAsyncioTestCase):
     def test_payload_copy_preserves_explicit_client_task_ref(self) -> None:
         payload = {"task_type": "move_velocity", "client_task_ref": "external-ref"}
 
-        copied = with_client_task_ref(payload, graph_id="graph", node_id="node")
+        copied = with_client_task_ref(payload, dag_id="graph", node_id="node")
 
         self.assertEqual(copied["client_task_ref"], "external-ref")
         self.assertIsNot(copied, payload)
@@ -82,7 +82,7 @@ class SoridormiTaskClientTests(unittest.IsolatedAsyncioTestCase):
 
         output = await client.submit(
             {"task_type": "move_velocity", "parameters": {"vx_mps": 0.2}},
-            graph_id="bring-water",
+            dag_id="bring-water",
             node_id="approach-kitchen",
         )
 
@@ -243,8 +243,8 @@ class SoridormiTaskClientTests(unittest.IsolatedAsyncioTestCase):
             "soridormi.task.submit",
             {"task_type": "deliver_object"},
             context=ToolInvocationContext(
-                task_graph_id="delivery",
-                task_node_id="submit",
+                work_dag_id="delivery",
+                work_node_id="submit",
             ),
         )
 
@@ -306,7 +306,7 @@ class SoridormiTaskClientTests(unittest.IsolatedAsyncioTestCase):
         outcome = await invoker.invoke(
             "soridormi.task.submit",
             {"task_type": "navigate_to_location"},
-            context=ToolInvocationContext(task_graph_id="nav", task_node_id="go"),
+            context=ToolInvocationContext(work_dag_id="nav", work_node_id="go"),
         )
 
         self.assertEqual(calls, ["soridormi.task.submit", "soridormi.task.events"])

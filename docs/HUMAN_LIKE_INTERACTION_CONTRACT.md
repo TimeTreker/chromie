@@ -52,7 +52,7 @@ Core ability classes include:
 - **Natural uncertainty handling** that asks about the real ambiguity instead
   of producing generic missing-skill or internal-policy speech.
 - **Composable high-level action planning** for supported multi-step body
-  requests. Internal nodes of one physical TaskGraph remain sequential and
+  requests. Internal nodes of one physical WorkDAG remain sequential and
   validated; independent Runtime Activities may overlap only when their declared
   dependencies, provider concurrency, and resources allow it.
 - **Truthful embodied speech** that reflects proposal, confirmation,
@@ -369,8 +369,7 @@ scheduled independently, including with bounded parallel model calls, but both
 consume the applicable immutable authoritative state: the same turn, plus Goal
 versions, a Canonical Plan, and evidence when each exists. Neither a response
 delivery transport nor an execution specialist may reinterpret the Goal, widen effects,
-authorize work, or become a second conversation authority. Physical TaskGraph
-execution remains sequential.
+authorize work, or become a second conversation authority. WorkDAG execution follows Planner-authored dependency/concurrency topology; DAGEngine may dispatch only mechanically ready, runtime-qualified nodes.
 
 A provider-free already-complete Communicative Act is selected by Fast Planner from
 Goal Interpretation's Responsibility evidence. Its exact wording is authored in that

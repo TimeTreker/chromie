@@ -393,8 +393,7 @@ out of Soridormi.
    user's goal or independently own the final answer.
 10. Completion, failure, cancellation, and observation claims require trusted
     evidence and downstream outcome reconciliation.
-11. Physical TaskGraph work remains sequential and validated; admission cannot
-    relax execution safety or resource policy.
+11. WorkDAG execution follows Planner-authored dependency/concurrency topology; DAGEngine may dispatch only mechanically ready, runtime-qualified nodes, and admission cannot relax execution safety or resource policy.
 12. Historical compatibility names are evidence-only and must not re-enter current topology or authority.
 13. An ordinary admitted turn never implies cancellation of another turn;
     interruption requires an explicit protective scope or an unambiguous Core

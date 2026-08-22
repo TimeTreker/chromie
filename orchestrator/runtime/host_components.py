@@ -117,7 +117,7 @@ def build_agent_client(settings: HostSettingsSnapshot) -> AgentClient:
     return AgentClient(
         cognition.agent_url,
         cognition.agent_timeout_ms,
-        task_graph_execution_token=cognition.task_graph_execution_token,
+        dag_engine_execution_token=cognition.dag_engine_execution_token,
     )
 
 
@@ -138,8 +138,8 @@ def build_interaction_runtime(
         assistant._schedule_interaction_speech,
         speech_cancel_scheduler=assistant._cancel_interaction_speech,
         soridormi_invoker=invoker,
-        task_graph_handler=assistant._execute_planning_task_graph,
-        task_graph_cancel_handler=assistant._cancel_planning_task_graph,
+        work_dag_handler=assistant._execute_planning_work_dag,
+        work_dag_cancel_handler=assistant._cancel_planning_work_dag,
         agent_tool_handler=assistant._execute_agent_tool,
         conversation_memory_handler=(
             assistant.conversation_state.retrieve_verified_tool_memory

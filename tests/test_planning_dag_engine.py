@@ -13,8 +13,8 @@ from agent.app.capabilities.models import (
     ToolCapability,
     TransportSpec,
 )
-from agent.app.task_graph.models import TaskGraph
-from agent.app.task_graph.service import TaskGraphService
+from agent.app.work_dag.models import WorkDAG
+from agent.app.work_dag.service import DAGEngineService
 from agent.app.tool_invocation import McpStreamableHttpInvoker
 
 
@@ -110,7 +110,7 @@ def _soridormi_task_registry():
     )
 
 
-class PlanningTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
+class PlanningWorkDAGExecutionTests(unittest.IsolatedAsyncioTestCase):
     async def test_allows_stateful_non_physical_plan_creation(self) -> None:
         calls: list[str] = []
 
@@ -119,20 +119,20 @@ class PlanningTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"ok": True}}
 
         registry = _registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             planning_invoker=McpStreamableHttpInvoker(registry, call=call),
         )
-        graph = TaskGraph.model_validate(
+        graph = WorkDAG.model_validate(
             {
-                "graph_id": "planning",
-                "created_by": "system",
+                "dag_id": "planning",
+                "authored_by": "system",
                 "nodes": [
-                    {"id": "status", "tool": "remote.status", "type": "query"},
+                    {"id": "status", "capability_id": "remote.status", "role": "activity"},
                     {
                         "id": "plan",
-                        "tool": "remote.create_plan",
-                        "type": "plan",
+                        "capability_id": "remote.create_plan",
+                        "role": "activity",
                         "depends_on": ["status"],
                     },
                 ],
@@ -157,15 +157,15 @@ class PlanningTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"ok": True}}
 
         registry = _registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             planning_invoker=McpStreamableHttpInvoker(registry, call=call),
         )
-        graph = TaskGraph.model_validate(
+        graph = WorkDAG.model_validate(
             {
-                "graph_id": "unsafe-planning",
-                "created_by": "system",
-                "nodes": [{"id": "move", "tool": "remote.move"}],
+                "dag_id": "unsafe-planning",
+                "authored_by": "system",
+                "nodes": [{"id": "move", "capability_id": "remote.move"}],
             }
         )
 
@@ -176,22 +176,22 @@ class PlanningTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
     async def test_rejects_planning_tool_with_physical_effect(self) -> None:
         registry = _registry()
         registry.get_tool("remote.create_plan").effects = ["physical_motion"]
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             planning_invoker=McpStreamableHttpInvoker(
                 registry,
                 call=lambda *args: None,
             ),
         )
-        graph = TaskGraph.model_validate(
+        graph = WorkDAG.model_validate(
             {
-                "graph_id": "inconsistent-planning",
-                "created_by": "system",
+                "dag_id": "inconsistent-planning",
+                "authored_by": "system",
                 "nodes": [
                     {
                         "id": "plan",
-                        "tool": "remote.create_plan",
-                        "type": "plan",
+                        "capability_id": "remote.create_plan",
+                        "role": "activity",
                     }
                 ],
             }
@@ -213,19 +213,19 @@ class PlanningTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"ok": True}}
 
         registry = _registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             planning_invoker=McpStreamableHttpInvoker(registry, call=call),
             enable_parallel_execution=True,
             max_concurrency=2,
         )
-        graph = TaskGraph.model_validate(
+        graph = WorkDAG.model_validate(
             {
-                "graph_id": "parallel-planning",
-                "created_by": "system",
+                "dag_id": "parallel-planning",
+                "authored_by": "system",
                 "nodes": [
-                    {"id": "plan-a", "tool": "remote.create_plan", "type": "plan"},
-                    {"id": "plan-b", "tool": "remote.create_plan", "type": "plan"},
+                    {"id": "plan-a", "capability_id": "remote.create_plan", "role": "activity"},
+                    {"id": "plan-b", "capability_id": "remote.create_plan", "role": "activity"},
                 ],
             }
         )
@@ -281,19 +281,19 @@ class PlanningTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             raise AssertionError(f"unexpected tool {tool}")
 
         registry = _soridormi_task_registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             planning_invoker=McpStreamableHttpInvoker(registry, call=call),
         )
-        graph = TaskGraph.model_validate(
+        graph = WorkDAG.model_validate(
             {
-                "graph_id": "water-run",
-                "created_by": "system",
+                "dag_id": "water-run",
+                "authored_by": "system",
                 "nodes": [
                     {
                         "id": "body-task",
-                        "tool": "soridormi.task.submit",
-                        "type": "plan",
+                        "capability_id": "soridormi.task.submit",
+                        "role": "activity",
                         "args": {
                             "task_type": "navigate_to_location",
                             "parameters": {"destination": "kitchen"},
@@ -306,7 +306,6 @@ class PlanningTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
         trace = await service.execute_planning(graph)
 
         self.assertEqual(trace.status, "success")
-        self.assertEqual(trace.outcome_summary, "TaskGraph completed successfully.")
         self.assertEqual(
             calls,
             [
@@ -415,7 +414,7 @@ class PlanningTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             raise AssertionError(f"unexpected tool {tool}")
 
         registry = _soridormi_task_registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             planning_invoker=McpStreamableHttpInvoker(registry, call=call),
         )
@@ -424,27 +423,27 @@ class PlanningTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             "summary": "Bring water from the kitchen.",
             "parameters": {"object": "water", "source": "kitchen"},
         }
-        graph = TaskGraph.model_validate(
+        graph = WorkDAG.model_validate(
             {
-                "graph_id": "delivery-request",
-                "created_by": "system",
+                "dag_id": "delivery-request",
+                "authored_by": "system",
                 "nodes": [
                     {
                         "id": "capabilities",
-                        "tool": "soridormi.task.get_capabilities",
-                        "type": "query",
+                        "capability_id": "soridormi.task.get_capabilities",
+                        "role": "activity",
                     },
                     {
                         "id": "preview",
-                        "tool": "soridormi.task.preview",
-                        "type": "plan",
+                        "capability_id": "soridormi.task.preview",
+                        "role": "activity",
                         "depends_on": ["capabilities"],
                         "args": task_payload,
                     },
                     {
                         "id": "submit",
-                        "tool": "soridormi.task.submit",
-                        "type": "plan",
+                        "capability_id": "soridormi.task.submit",
+                        "role": "activity",
                         "depends_on": ["preview"],
                         "args": task_payload,
                     },
@@ -455,7 +454,6 @@ class PlanningTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
         trace = await service.execute_planning(graph)
 
         self.assertEqual(trace.status, "success")
-        self.assertEqual(trace.outcome_summary, "TaskGraph completed successfully.")
         self.assertEqual(
             [tool for tool, _ in calls],
             [
@@ -506,19 +504,19 @@ class PlanningTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             }
 
         registry = _soridormi_task_registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             planning_invoker=McpStreamableHttpInvoker(registry, call=call),
         )
-        graph = TaskGraph.model_validate(
+        graph = WorkDAG.model_validate(
             {
-                "graph_id": "blocked-nav",
-                "created_by": "system",
+                "dag_id": "blocked-nav",
+                "authored_by": "system",
                 "nodes": [
                     {
                         "id": "go",
-                        "tool": "soridormi.task.submit",
-                        "type": "plan",
+                        "capability_id": "soridormi.task.submit",
+                        "role": "activity",
                         "args": {"task_type": "navigate_to_location"},
                     }
                 ],
@@ -528,19 +526,6 @@ class PlanningTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
         trace = await service.execute_planning(graph)
 
         self.assertEqual(trace.status, "aborted")
-        self.assertIn(
-            "TaskGraph aborted: node go (soridormi.task.submit) failed",
-            trace.outcome_summary,
-        )
-        self.assertIn("reason code: missing_navigation_pipeline", trace.outcome_summary)
-        self.assertIn(
-            "blocked subsystems: navigation, localization",
-            trace.outcome_summary,
-        )
-        self.assertIn(
-            "recommended next actions: report_blocked_capability (missing_navigation_pipeline)",
-            trace.outcome_summary,
-        )
         self.assertEqual(calls, ["soridormi.task.submit"])
         result = trace.result_map()["go"]
         self.assertEqual(result.status, "failed_fatal")
@@ -578,19 +563,19 @@ class PlanningTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             }
 
         registry = _soridormi_task_registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             planning_invoker=McpStreamableHttpInvoker(registry, call=call),
         )
-        graph = TaskGraph.model_validate(
+        graph = WorkDAG.model_validate(
             {
-                "graph_id": "blocked-nav-report",
-                "created_by": "system",
+                "dag_id": "blocked-nav-report",
+                "authored_by": "system",
                 "nodes": [
                     {
                         "id": "go",
-                        "tool": "soridormi.task.submit",
-                        "type": "plan",
+                        "capability_id": "soridormi.task.submit",
+                        "role": "activity",
                         "args": {"task_type": "navigate_to_location"},
                         "on_failure": FailurePolicy(
                             strategy="goto",
@@ -599,8 +584,8 @@ class PlanningTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
                     },
                     {
                         "id": "report",
-                        "tool": "chromie.report",
-                        "type": "report",
+                        "capability_id": "chromie.report",
+                        "role": "report",
                         "args": {
                             "message": {
                                 "$ref": "go.error",
@@ -634,26 +619,25 @@ class PlanningTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             result_map["report"].output["reported"],
             True,
         )
-        self.assertIn("missing_navigation_pipeline", trace.outcome_summary)
 
     async def test_planning_execution_still_rejects_speak_nodes(self) -> None:
         registry = _soridormi_task_registry()
-        service = TaskGraphService(
+        service = DAGEngineService(
             registry,
             planning_invoker=McpStreamableHttpInvoker(
                 registry,
                 call=lambda *args: None,
             ),
         )
-        graph = TaskGraph.model_validate(
+        graph = WorkDAG.model_validate(
             {
-                "graph_id": "speak-rejected",
-                "created_by": "system",
+                "dag_id": "speak-rejected",
+                "authored_by": "system",
                 "nodes": [
                     {
                         "id": "speak",
-                        "tool": "chromie.speak",
-                        "type": "report",
+                        "capability_id": "chromie.speak",
+                        "role": "report",
                         "args": {"text": "I cannot do that yet."},
                     }
                 ],

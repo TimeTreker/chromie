@@ -41,7 +41,7 @@ provider, confirmation, resource, timeout, and cancellation policy.
 
 The runtime package provides the shared asyncio `ResourceArbiter` used by:
 
-- Agent TaskGraph execution;
+- Agent WorkDAG execution;
 - host Trusted Capability Runtime scheduling.
 
 It enforces bounded concurrency and named exclusive groups within one Python
@@ -66,7 +66,7 @@ from chromie_runtime import ResourceArbiter
 ```
 
 Run the repository test suite after changing a contract because compatibility,
-serialization, API, Trusted Capability Runtime, and TaskGraph tests all depend on this
+serialization, API, Trusted Capability Runtime, and WorkDAG tests all depend on this
 package:
 
 ```bash

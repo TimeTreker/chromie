@@ -22,15 +22,15 @@ class HealthResponse(BaseModel):
     agent_skill_projection_max_chars: int = 0
     agent_skill_projection_total_max_chars: int = 0
     agent_skill_projection_count_limit: int = 0
-    read_only_task_graph_execution_enabled: bool = False
-    planning_task_graph_execution_enabled: bool = False
-    parallel_task_graph_execution_enabled: bool = False
-    task_graph_max_concurrency: int = 1
-    task_graph_active_count: int = 0
-    task_graph_waiting_count: int = 0
-    active_task_graph_ids: list[str] = Field(default_factory=list)
-    guarded_task_graph_execution_enabled: bool = False
-    physical_task_graph_execution_enabled: bool = False
+    read_only_work_dag_execution_enabled: bool = False
+    planning_work_dag_execution_enabled: bool = False
+    parallel_work_dag_execution_enabled: bool = False
+    dag_engine_max_concurrency: int = 1
+    work_dag_active_count: int = 0
+    work_dag_waiting_count: int = 0
+    active_work_dag_ids: list[str] = Field(default_factory=list)
+    guarded_work_dag_execution_enabled: bool = False
+    physical_work_dag_execution_enabled: bool = False
     capability_catalog_enabled: bool = False
     capability_catalog_version: int = 0
     goal_association_enabled: bool = False

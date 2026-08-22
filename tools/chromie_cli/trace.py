@@ -15,7 +15,7 @@ from .output import CommandResult, ExitCode
 IDENTIFIER_KEYS = {
     "session": {"sid", "session_id", "origin_session_id", "session_ids"},
     "interaction": {"interaction_id", "active_interaction_ids"},
-    "graph": {"graph_id", "active_graph_ids"},
+    "dag": {"dag_id", "active_dag_ids"},
     "trace": {"trace_id"},
 }
 TRACE_JSON_FILENAMES = {
@@ -29,10 +29,9 @@ TRACE_CONTENT_KEYS = {
     "session_id",
     "session_ids",
     "interaction_id",
-    "graph_id",
+    "dag_id",
     "trace_id",
-    "outcome_summary",
-    "node_results",
+        "node_results",
     "events",
     "traces",
     "results",
@@ -48,7 +47,7 @@ def trace_view(
     source_file: Path | None = None,
     session: str | None = None,
     interaction: str | None = None,
-    graph: str | None = None,
+    dag: str | None = None,
     trace: str | None = None,
     limit: int = 20,
 ) -> CommandResult:
@@ -57,7 +56,7 @@ def trace_view(
     filters = {
         "session": _clean_filter(session),
         "interaction": _clean_filter(interaction),
-        "graph": _clean_filter(graph),
+        "dag": _clean_filter(dag),
         "trace": _clean_filter(trace),
     }
     active_filters = {name: value for name, value in filters.items() if value}
@@ -419,8 +418,8 @@ def _jsonl_kind(records: list[dict[str, Any]]) -> str:
 
 def _json_kind(path: Path, value: Any) -> str:
     if isinstance(value, dict):
-        if "graph_id" in value and ("node_results" in value or "outcome_summary" in value):
-            return "task_graph_trace"
+        if "dag_id" in value and "node_results" in value:
+            return "work_dag_trace"
         if "interaction_id" in value and "traces" in value and "results" in value:
             return "capability_runtime_execution"
         if "interaction_id" in value and "capabilities" in value:
@@ -443,10 +442,9 @@ def _summarize_json_payload(value: Any, *, limit: int) -> dict[str, Any]:
         "sid",
         "session_id",
         "interaction_id",
-        "graph_id",
+        "dag_id",
         "trace_id",
-        "outcome_summary",
-        "summary",
+                "summary",
         "text",
     ):
         if key in value:
@@ -577,7 +575,7 @@ def _summarize_event_record(record: dict[str, Any]) -> dict[str, Any]:
         "event",
         "message",
         "interaction_id",
-        "graph_id",
+        "dag_id",
         "trace_id",
         "status",
     )
@@ -777,7 +775,7 @@ def _summarize_node_result(item: dict[str, Any]) -> dict[str, Any]:
         key: _shorten(item[key])
         for key in (
             "node_id",
-            "tool",
+            "capability_id",
             "status",
             "error",
             "attempts",
@@ -790,7 +788,7 @@ def _summarize_node_result(item: dict[str, Any]) -> dict[str, Any]:
 def _summarize_execution_event(item: dict[str, Any]) -> dict[str, Any]:
     return {
         key: _shorten(item[key])
-        for key in ("timestamp", "type", "node_id", "tool", "message", "status")
+        for key in ("timestamp", "type", "node_id", "capability_id", "message", "status")
         if key in item
     }
 

@@ -328,7 +328,7 @@ documented in
 |---|---|
 | `orchestrator/` | Host audio, interruption, conversation state, and Trusted Capability Runtime |
 | `agent/app/cognitive_core/goal_interpreter/` | Goal Interpretation implementation: provider-neutral Responsibility meaning only |
-| `agent/` | Native interaction, capabilities, and TaskGraph APIs |
+| `agent/` | Native interaction, capabilities, and WorkDAG APIs |
 | `asr/`, `tts/` | Speech services |
 | `shared/` | Shared contracts and scheduling primitives |
 | `capabilities/` | Pinned external capability manifests and prompt-tier presets |

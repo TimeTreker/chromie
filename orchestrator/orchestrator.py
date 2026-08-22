@@ -3878,18 +3878,18 @@ class VoiceAssistant:
             timeout_ms=timeout_ms,
         )
 
-    async def _execute_planning_task_graph(self, graph: dict[str, Any]) -> dict[str, Any]:
+    async def _execute_planning_work_dag(self, dag: dict[str, Any]) -> dict[str, Any]:
         session = await self.get_http_session()
-        return await self.agent_client.execute_planning_task_graph(session, graph)
+        return await self.agent_client.execute_planning_work_dag(session, dag)
 
-    async def _cancel_planning_task_graph(
+    async def _cancel_planning_work_dag(
         self,
-        graph_id: str,
+        dag_id: str,
     ) -> dict[str, Any]:
         session = await self.get_http_session()
-        return await self.agent_client.cancel_planning_task_graph(
+        return await self.agent_client.cancel_planning_work_dag(
             session,
-            graph_id,
+            dag_id,
         )
 
     def _cognitive_turn_closure_adapter(self) -> CognitiveTurnClosure:

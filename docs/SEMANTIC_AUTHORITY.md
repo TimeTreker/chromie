@@ -76,6 +76,12 @@ source strategy. Fast/deep are cognition passes of that same Planner authority. 
 widen, narrow, or invent Responsibility meaning. No maintained `RouteDecision` or
 legacy Agent semantic compatibility surface remains on the Core path.
 
+WorkDAG does not add another semantic owner. Goal Association may create/update canonical
+Goal truth but cannot edit graph topology. Planner alone may retain the current WorkDAG,
+author its exact next revision, merge coherent planned Work, or create a new WorkDAG.
+DAGEngine advances execution state and reports Evidence only; normal node completion may
+continue mechanically without a Planner turn, while material invalidation re-enters Planner.
+
 ## Entrypoint ownership
 
 | Entrypoint | Semantic owner | Role | Planner path | Failure behavior |
@@ -83,7 +89,7 @@ legacy Agent semantic compatibility surface remains on the Core path.
 | Orchestrator turn in `apply` | Goal-Driven Cognitive Core | authoritative | Goal Interpretation → concurrent Planner fast pass / Goal Association → optional Planner deep pass for complex HOW → asynchronous Trusted Capability Runtime → Runtime event / Evidence → CognitiveOpportunity → Planner re-entry when useful | Once ownership is acquired, any semantic, validation, execution-preparation, or Goal-state error fails closed. |
 | Orchestrator turn in `report_only` | Goal-Driven Cognitive Core | observer | Same bounded cognitive stages, evidence only | No semantic state, user-visible speech, or execution authority is committed by the observer result. |
 | Cognitive Gateway protective reflex | Host deterministic control | pre-semantic | Stop/cancel/emergency/silence policy only | Never enters ordinary Goal semantics merely to enact a reflex. |
-| Agent module endpoints | The named cognitive owner only | bounded module authority | `/cognitive-core/interpret`, Planner, Goal Association, Reflection, Social Attention, Agent Skill, tool, and TaskGraph contracts | Endpoint failure remains local to that bounded contract; it cannot reopen a second semantic planner. |
+| Agent module endpoints | The named cognitive owner only | bounded module authority | `/cognitive-core/interpret`, Planner, Goal Association, Reflection, Social Attention, Agent Skill, tool, and WorkDAG contracts | Endpoint failure remains local to that bounded contract; it cannot reopen a second semantic planner. |
 
 The maintained first user-facing speech path is Planner-owned. Goal
 Interpretation emits Responsibility evidence only. Planner's fast pass may author one

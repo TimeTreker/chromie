@@ -65,7 +65,7 @@ def _run_trace_view(command: str, args: argparse.Namespace) -> CommandResult:
         source_file=args.file,
         session=args.session,
         interaction=args.interaction,
-        graph=args.graph,
+        dag=args.dag,
         trace=args.trace,
         limit=args.limit,
     )
@@ -203,7 +203,7 @@ def build_parser() -> argparse.ArgumentParser:
     trace_subparsers = trace.add_subparsers(dest="trace_command", metavar="COMMAND")
     trace_view_parser = trace_subparsers.add_parser(
         "view",
-        help="view retained session, interaction, Capability Runtime, and TaskGraph traces",
+        help="view retained session, interaction, Capability Runtime, and WorkDAG traces",
     )
     trace_view_parser.add_argument(
         "--trace-root",
@@ -228,9 +228,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="filter by InteractionResponse or Capability Runtime interaction id",
     )
     trace_view_parser.add_argument(
-        "--graph",
+        "--dag",
         default=None,
-        help="filter by TaskGraph graph id",
+        help="filter by WorkDAG graph id",
     )
     trace_view_parser.add_argument(
         "--trace",

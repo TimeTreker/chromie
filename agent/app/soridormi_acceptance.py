@@ -12,10 +12,10 @@ from pydantic import BaseModel, Field
 from .capabilities.loader import build_configured_registry
 from .capabilities.models import CapabilityRegistry
 from .capabilities.probe import CapabilityProbeResult, probe_mcp_capabilities
-from .task_graph.models import ExecutionTrace, TaskGraph
-from .task_graph.service import (
-    TaskGraphConfirmationGrantRequest,
-    TaskGraphService,
+from .work_dag.models import ExecutionTrace, WorkDAG
+from .work_dag.service import (
+    WorkDAGConfirmationGrantRequest,
+    DAGEngineService,
 )
 from .tool_invocation import (
     AsyncToolInvoker,
@@ -144,22 +144,22 @@ def require_soridormi_runtime_status(
 
 def build_soridormi_planning_graph(
     commands: list[dict[str, Any]],
-) -> TaskGraph:
-    return TaskGraph.model_validate(
+) -> WorkDAG:
+    return WorkDAG.model_validate(
         {
-            "graph_id": "soridormi-planning-acceptance",
-            "created_by": "system",
+            "dag_id": "soridormi-planning-acceptance",
+            "authored_by": "system",
             "summary": "Read Soridormi status and create a zero-motion plan.",
             "nodes": [
                 {
                     "id": "status",
-                    "tool": "soridormi.robot.get_status",
-                    "type": "query",
+                    "capability_id": "soridormi.robot.get_status",
+                    "role": "activity",
                 },
                 {
                     "id": "plan",
-                    "tool": "soridormi.motion.create_plan",
-                    "type": "plan",
+                    "capability_id": "soridormi.motion.create_plan",
+                    "role": "activity",
                     "depends_on": ["status"],
                     "args": {"commands": commands},
                 },
@@ -179,7 +179,7 @@ def default_soridormi_task_goal() -> dict[str, Any]:
     }
 
 
-def soridormi_task_agent_graph_id(goal: dict[str, Any]) -> str:
+def soridormi_task_agent_dag_id(goal: dict[str, Any]) -> str:
     serialized = json.dumps(
         goal,
         sort_keys=True,
@@ -193,11 +193,11 @@ def soridormi_task_agent_graph_id(goal: dict[str, Any]) -> str:
 
 def build_soridormi_task_agent_graph(
     goal: dict[str, Any],
-) -> TaskGraph:
-    return TaskGraph.model_validate(
+) -> WorkDAG:
+    return WorkDAG.model_validate(
         {
-            "graph_id": soridormi_task_agent_graph_id(goal),
-            "created_by": "system",
+            "dag_id": soridormi_task_agent_dag_id(goal),
+            "authored_by": "system",
             "summary": (
                 "Inspect, preview, submit, and monitor a no-motion Soridormi "
                 "task-agent goal."
@@ -205,27 +205,27 @@ def build_soridormi_task_agent_graph(
             "nodes": [
                 {
                     "id": "capabilities",
-                    "tool": "soridormi.task.get_capabilities",
-                    "type": "query",
+                    "capability_id": "soridormi.task.get_capabilities",
+                    "role": "activity",
                 },
                 {
                     "id": "preview",
-                    "tool": "soridormi.task.preview",
-                    "type": "plan",
+                    "capability_id": "soridormi.task.preview",
+                    "role": "activity",
                     "depends_on": ["capabilities"],
                     "args": goal,
                 },
                 {
                     "id": "submit",
-                    "tool": "soridormi.task.submit",
-                    "type": "plan",
+                    "capability_id": "soridormi.task.submit",
+                    "role": "activity",
                     "depends_on": ["preview"],
                     "args": goal,
                 },
                 {
                     "id": "events",
-                    "tool": "soridormi.task.events",
-                    "type": "query",
+                    "capability_id": "soridormi.task.events",
+                    "role": "activity",
                     "depends_on": ["submit"],
                     "args": {"task_id": {"$ref": "submit.output.task_id"}},
                 },
@@ -237,31 +237,30 @@ def build_soridormi_task_agent_graph(
 def build_soridormi_guarded_graph(
     plan_id: str,
     *,
-    graph_id: str = "soridormi-guarded-dry-run-acceptance",
-) -> TaskGraph:
-    return TaskGraph.model_validate(
+    dag_id: str = "soridormi-guarded-dry-run-acceptance",
+) -> WorkDAG:
+    return WorkDAG.model_validate(
         {
-            "graph_id": graph_id,
-            "created_by": "system",
-            "requires_confirmation": True,
+            "dag_id": dag_id,
+            "authored_by": "system",
             "summary": "Execute a confirmed Soridormi dry-run plan with safety monitoring.",
             "nodes": [
                 {
                     "id": "confirm",
-                    "tool": "chromie.ask_confirmation",
-                    "type": "confirmation",
+                    "capability_id": "chromie.ask_confirmation",
+                    "role": "confirmation",
                     "args": {"question": "Run the Soridormi dry-run acceptance plan?"},
                 },
                 {
                     "id": "monitor",
-                    "tool": "soridormi.safety.monitor_motion",
-                    "type": "monitor",
+                    "capability_id": "soridormi.safety.monitor_motion",
+                    "role": "monitor",
                     "during": ["execute"],
                 },
                 {
                     "id": "execute",
-                    "tool": "soridormi.motion.execute_plan",
-                    "type": "action",
+                    "capability_id": "soridormi.motion.execute_plan",
+                    "role": "activity",
                     "depends_on": ["confirm"],
                     "args": {"plan_id": plan_id},
                     "on_failure": {"strategy": "goto", "target": "stop"},
@@ -275,13 +274,13 @@ def build_soridormi_guarded_graph(
                 },
                 {
                     "id": "stop",
-                    "tool": "soridormi.motion.stop",
-                    "type": "safety",
+                    "capability_id": "soridormi.motion.stop",
+                    "role": "safety",
                 },
                 {
                     "id": "emergency",
-                    "tool": "soridormi.safety.emergency_stop",
-                    "type": "safety",
+                    "capability_id": "soridormi.safety.emergency_stop",
+                    "role": "safety",
                 },
             ],
         }
@@ -353,7 +352,7 @@ async def run_soridormi_planning_acceptance(
         )
 
     graph = build_soridormi_planning_graph(commands)
-    trace = await TaskGraphService(
+    trace = await DAGEngineService(
         registry,
         planning_invoker=invoker,
     ).execute_planning(graph)
@@ -391,7 +390,7 @@ async def run_soridormi_task_agent_acceptance(
 
     graph = build_soridormi_task_agent_graph(goal)
     gated_invoker = _NoMotionTaskAgentGate(invoker)
-    trace = await TaskGraphService(
+    trace = await DAGEngineService(
         registry,
         planning_invoker=gated_invoker,
     ).execute_planning(graph)
@@ -401,7 +400,8 @@ async def run_soridormi_task_agent_acceptance(
     if error := _task_agent_capability_error(capabilities):
         raise RuntimeError(error)
     if trace.status != "success":
-        detail = trace.outcome_summary or "Soridormi task-agent acceptance graph failed"
+        failed = [item for item in trace.node_results if item.status not in {"success", "skipped"}]
+        detail = failed[0].error if failed and failed[0].error else f"Soridormi WorkDAG acceptance failed with status={trace.status}"
         raise RuntimeError(detail)
 
     preview = results["preview"].output
@@ -446,7 +446,7 @@ async def run_soridormi_guarded_dry_run_acceptance(
     invoker: AsyncToolInvoker,
     exercise_emergency_stop: bool = False,
 ) -> tuple[ExecutionTrace, ExecutionTrace, dict[str, Any] | None, dict[str, Any] | None]:
-    service = TaskGraphService(
+    service = DAGEngineService(
         registry,
         guarded_invoker=invoker,
         allow_physical_motion=True,
@@ -454,8 +454,8 @@ async def run_soridormi_guarded_dry_run_acceptance(
 
     graph = build_soridormi_guarded_graph(plan_id)
     grant = service.issue_confirmation_grant(
-        TaskGraphConfirmationGrantRequest(
-            graph=graph,
+        WorkDAGConfirmationGrantRequest(
+            dag=graph,
             confirmed_node_ids={"confirm"},
         )
     )
@@ -471,11 +471,11 @@ async def run_soridormi_guarded_dry_run_acceptance(
 
     failure_graph = build_soridormi_guarded_graph(
         "soridormi-missing-acceptance-plan",
-        graph_id="soridormi-stop-fallback-acceptance",
+        dag_id="soridormi-stop-fallback-acceptance",
     )
     failure_grant = service.issue_confirmation_grant(
-        TaskGraphConfirmationGrantRequest(
-            graph=failure_graph,
+        WorkDAGConfirmationGrantRequest(
+            dag=failure_graph,
             confirmed_node_ids={"confirm"},
         )
     )
@@ -542,18 +542,18 @@ async def run_soridormi_runtime_cancellation_acceptance(
     else:
         observed_invoker = _ExecutePlanObserver(invoker, execution_started)
 
-    service = TaskGraphService(
+    service = DAGEngineService(
         registry,
         guarded_invoker=observed_invoker,
         allow_physical_motion=True,
     )
     graph = build_soridormi_guarded_graph(
         plan_id,
-        graph_id="soridormi-runtime-cancellation-acceptance",
+        dag_id="soridormi-runtime-cancellation-acceptance",
     )
     grant = service.issue_confirmation_grant(
-        TaskGraphConfirmationGrantRequest(
-            graph=graph,
+        WorkDAGConfirmationGrantRequest(
+            dag=graph,
             confirmed_node_ids={"confirm"},
         )
     )
@@ -571,7 +571,7 @@ async def run_soridormi_runtime_cancellation_acceptance(
             raise RuntimeError(
                 "Soridormi operation completed before cancellation was requested"
             )
-        cancellation = service.cancel_execution(graph.graph_id)
+        cancellation = service.cancel_execution(graph.dag_id)
         if not cancellation.cancellation_requested:
             raise RuntimeError(
                 "Soridormi operation completed before cancellation was requested"
@@ -579,7 +579,7 @@ async def run_soridormi_runtime_cancellation_acceptance(
         trace = await asyncio.wait_for(execution, timeout=start_timeout_s)
     except (Exception, asyncio.CancelledError):
         if not execution.done():
-            service.cancel_execution(graph.graph_id)
+            service.cancel_execution(graph.dag_id)
             await asyncio.gather(execution, return_exceptions=True)
         raise
     finally:
@@ -755,7 +755,7 @@ def main() -> None:
         action="store_true",
         help=(
             "Run no-motion soridormi.task.get_capabilities, preview, submit, "
-            "and event-monitor acceptance through Chromie's planning TaskGraph."
+            "and event-monitor acceptance through Chromie's planning WorkDAG."
         ),
     )
     execution_group.add_argument(

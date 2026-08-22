@@ -57,7 +57,7 @@ running.
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/health` | Return current model/runtime state, loaded capability sources, Planner availability, Social Attention mode, and TaskGraph diagnostic counters. |
+| `GET` | `/health` | Return current model/runtime state, loaded capability sources, Planner availability, Social Attention mode, and WorkDAG diagnostic counters. |
 | `GET` | `/semantic-authority` | Return the machine-readable maintained single-authority matrix for Goal-driven `apply` and `report_only`. |
 | `POST` | `/cognitive-gateway/attention-review` | Focused pre-Core admission review; returns addressedness evidence only and fails open. |
 | `POST` | `/cognitive-core/interpret` | Envelope-first ordinary semantic Goal Interpretation inside the Core. |
@@ -130,7 +130,7 @@ caller-supplied disclosure context is removed before trusted injection.
 
 The retired Agent `/run`, `/interaction`, and `/agents` endpoints are not part of
 the maintained service. User-turn orchestration is Host-owned; the Agent service
-exposes bounded cognitive module endpoints plus trusted tool/TaskGraph support.
+exposes bounded cognitive module endpoints plus trusted tool/WorkDAG support.
 Important interaction-related endpoints are:
 
 | Method | Path | Purpose |
@@ -466,70 +466,63 @@ the foreground interaction. Their cancellation receipts retain exact selected
 request identities and provider/dispatch failures; a receipt is not audible
 silence or provider-safe-state proof.
 
-### TaskGraph validation and execution
+### WorkDAG validation and DAGEngine execution
+
+WorkDAG is Planner-authored planned-Work topology. DAGEngine validates and advances
+that topology mechanically; it does not create replacement Work or user-facing meaning.
 
 | Method | Path | Gate or authorization | Purpose |
 |---|---|---|---|
-| `POST` | `/task-graphs/validate` | Always available | Validate graph structure and active capability policy. |
-| `POST` | `/task-graphs/dry-run` | Diagnostics bearer token | Produce a deterministic trace without remote calls. |
-| `POST` | `/task-graphs/execute-read-only` | `AGENT_ENABLE_READ_ONLY_TASK_GRAPH_EXECUTION=1` | Execute preflight-approved side-effect-free work. |
-| `POST` | `/task-graphs/execute-planning` | `AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION=1` | Execute safe reads and stateful `planning_only` tools. |
-| `POST` | `/task-graphs/confirmation-grants` | Guarded execution enabled plus bearer token | Issue a short-lived, single-use grant bound to a graph and confirmation nodes. |
-| `POST` | `/task-graphs/execute-guarded` | Guarded execution enabled plus bearer token | Execute authorized side effects; physical motion also requires its separate gate and monitor proofs. |
-| `POST` | `/task-graphs/{graph_id}/cancel` | Guarded execution bearer token | Cancel an active graph or reserve a bounded cancel-before-start tombstone for a not-yet-arrived execute request. |
-| `GET` | `/task-graphs/{graph_id}/trace` | Diagnostics bearer token | Return the latest non-expired in-memory retained trace. |
-| `GET` | `/task-graphs/scheduler/status` | Diagnostics bearer token | Return scheduler mode, active/waiting counters, and active graph IDs. |
+| `POST` | `/work-dags/validate` | Always available | Validate WorkDAG structure, acyclicity, Capability references, and deterministic execution policy. |
+| `POST` | `/work-dags/dry-run` | Diagnostics bearer token | Produce a deterministic trace without remote side effects. |
+| `POST` | `/work-dags/execute-read-only` | `AGENT_ENABLE_READ_ONLY_DAG_EXECUTION=1` | Execute preflight-approved side-effect-free nodes. |
+| `POST` | `/work-dags/execute-planning` | `AGENT_ENABLE_PLANNING_DAG_EXECUTION=1` | Execute safe reads and `planning_only` provider operations in an already-authored WorkDAG. |
+| `POST` | `/work-dags/confirmation-grants` | Guarded execution enabled plus bearer token | Issue a short-lived, single-use grant bound to one WorkDAG and confirmed nodes. |
+| `POST` | `/work-dags/execute-guarded` | Guarded execution enabled plus bearer token | Execute authorized side effects; physical motion retains separate confirmation/safety proof requirements. |
+| `POST` | `/work-dags/{dag_id}/cancel` | DAGEngine execution bearer token | Cancel an active DAG or reserve a bounded cancel-before-start tombstone. |
+| `GET` | `/work-dags/{dag_id}/trace` | Diagnostics bearer token | Return the latest non-expired mechanical execution trace. |
+| `GET` | `/work-dags/engine/status` | Diagnostics bearer token | Return DAGEngine mode, active/waiting counters, and active DAG IDs. |
 
 Bearer format:
 
 ```text
-Authorization: Bearer <AGENT_TASK_GRAPH_EXECUTION_TOKEN>
+Authorization: Bearer <AGENT_DAG_ENGINE_EXECUTION_TOKEN>
 ```
 
-Dry-run, trace, and scheduler requests use
-`AGENT_TASK_GRAPH_DIAGNOSTICS_TOKEN`. When that variable is blank, the Agent
-falls back to `AGENT_TASK_GRAPH_EXECUTION_TOKEN`; when both are blank, the
-diagnostic endpoints return 503. Invalid or missing credentials return 401.
+Dry-run, trace, and engine-status requests use `AGENT_DAG_ENGINE_DIAGNOSTICS_TOKEN`.
+When that variable is blank, Agent falls back to `AGENT_DAG_ENGINE_EXECUTION_TOKEN`;
+when both are blank, diagnostic endpoints return 503. Invalid or missing credentials
+return 401.
 
-`graph_id` is also the cancellation-path identity. It must contain 1–128
-URL-path-safe letters, digits, periods, underscores, colons, or hyphens. If a
-cancel request wins the transport race against execution registration, the
-Agent retains a capacity- and TTL-bounded tombstone and returns a cancelled
-trace when that graph arrives, without calling its provider. A graph with an
-already-retained terminal trace returns `cancellation_requested=false`.
-Read-only or planning execution retries with the same retained `graph_id`,
-exact graph fingerprint, and execution lane return the retained trace without
-invoking providers. Guarded retries must also present a fresh valid
-graph-bound grant. Reusing the ID for different graph content or a different
-successful execution lane is rejected until retention expires. Dry-run traces
-are diagnostics only: they neither satisfy execution replay nor prevent a
-later cancellation tombstone.
+`dag_id` is the cancellation/replay identity. It contains 1–128 URL-path-safe letters,
+digits, periods, underscores, colons, or hyphens. A cancel-before-start tombstone is
+capacity- and TTL-bounded. Retained execution replay for the same revision requires the same `dag_id`, `revision`,
+exact DAG fingerprint, and compatible execution lane. A semantic change keeps the same
+`dag_id` only when Planner authors the exact next `revision` with
+`parent_revision=previous_revision`. DAGEngine rejects skipped revisions and protects each
+already-successful/skipped node from removal or semantic rewriting; such nodes are inherited
+into the next trace with `inherited_from_revision` and are not dispatched again. Guarded
+replay still requires a fresh valid grant for newly executable effectful nodes.
 
-TaskGraph execution responses return an `ExecutionTrace`. Its `summary` remains
-the planner-provided task summary, while `outcome_summary` is generated
-deterministically from node results. Failed Soridormi task nodes preserve
-`reason_code`, `blocked_subsystems`, and `recommended_next_actions` in that
-summary so user-facing report/speech code does not need to infer the refusal.
-Planning execution can run `chromie.report` as a trace-only local report node;
-it does not play audio. `chromie.speak` remains rejected from planning
-execution and should be emitted through `InteractionResponse`/Trusted Capability Runtime when
-audible playback is required.
-When the current Planner emits a `chromie.task_graph.execute` Capability request, the Host
-Trusted Capability Runtime can route that request to `POST /task-graphs/execute-planning`.
-The Agent-side planning execution flag still controls whether the graph runs;
-disabled planning execution returns a safe failure instead of falling back to
-raw control or guarded execution. Failed, aborted, or cancelled graph traces are
-reported back as non-completed capability results so `after_capabilities` speech is not
-played as if the task succeeded.
-TaskGraph `$ref` arguments may read `<node>.output[.<field>]`, `<node>.error`,
-or `<node>.status`; LLM-planned Soridormi task-submit nodes that omit a failure
-fallback are normalized with a trace-only report fallback that reads
-`<submit_node>.error`.
+`ExecutionTrace.summary` is the bounded Planner-authored DAG summary. DAGEngine does
+not generate an `outcome_summary`. Trace/node records include `dag_revision` plus execution facts such as
+node status, Capability id, attempts, errors, blockers, and diagnostic events. The
+Planner-visible Capability result also preserves the DAG `goal_ids` and each node's
+Planner-authored `source_goal_ids`, so execution facts remain traceable to their DAG and
+canonical Goal ownership without DAGEngine inventing semantics. Provider
+fields such as `reason_code`, `blocked_subsystems`, or provider next-action suggestions
+remain provider-reported facts; they do not become DAGEngine recovery decisions.
 
-Traces and grants are process-memory state; they are not durable across Agent
-restarts. Traces use configurable TTL/LRU retention (defaults: 900 seconds and
-128 entries). Unconsumed grants are capped at 128 entries by default and expired
-entries are purged before issue or consume.
+The Planner-facing `chromie.work_dag.execute` Capability accepts a fully authored `dag`
+argument. Host routes it to DAGEngine execution; the Agent-side execution flag still
+controls whether it runs. A disabled execution lane fails closed. Failed, aborted, or
+cancelled traces return non-completed Capability results and re-enter the ordinary
+Evidence/Planner path. DAGEngine never emits `residual_replan` or replacement Work.
+
+WorkDAG `$ref` arguments may read `<node>.output[.<field>]`, `<node>.error`, or
+`<node>.status`. Pre-authored fallback/retry policy remains part of committed WorkDAG
+topology; semantic replanning after changed reality belongs to Planner and normally
+produces a revised/new WorkDAG. Goal Association never edits the DAG directly; a Goal change is input to Planner. Retaining the current WorkDAG is a valid NO_CHANGE decision.
 
 ## Hardware compatibility HTTP API — port 8095
 

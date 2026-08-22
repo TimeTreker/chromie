@@ -118,18 +118,18 @@ twice.
 | `ORCH_TTS_CJK_MIN_CHUNK_CHARS` | `8` | Minimum CJK clause size used when grouping punctuation-bounded fragments. |
 | `ORCH_CONFIRMATION_TTL_SEC` | `20` | Expiry in seconds for one pending spoken, request-bound confirmation. |
 | `AGENT_SOCIAL_ATTENTION_MODE` | `on` | Embodiment-independent auxiliary interaction policy. Supported values are `off`, `report_only`, and `on`. A legacy simulator-scoped value is migrated to `on`; Soridormi/provider remains responsible for simulator-versus-physical backend selection and all body safety. |
-| `AGENT_ENABLE_READ_ONLY_TASK_GRAPH_EXECUTION` | `0` | Enable the read-only execution endpoint. |
-| `AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION` | `0` | Enable safe reads plus stateful `planning_only` execution. |
-| `AGENT_ENABLE_PARALLEL_TASK_GRAPH_EXECUTION` | `0` | Enable bounded parallel read/planning and guarded non-physical work. |
-| `AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION` | `0` | Enable bearer-authorized side-effect execution. |
-| `AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION` | `0` | Permit guarded physical nodes after all other proofs. |
+| `AGENT_ENABLE_READ_ONLY_DAG_EXECUTION` | `0` | Enable the read-only execution endpoint. |
+| `AGENT_ENABLE_PLANNING_DAG_EXECUTION` | `0` | Enable safe reads plus stateful `planning_only` execution. |
+| `AGENT_ENABLE_PARALLEL_DAG_EXECUTION` | `0` | Enable bounded parallel read/planning and guarded non-physical work. |
+| `AGENT_ENABLE_GUARDED_DAG_EXECUTION` | `0` | Enable bearer-authorized side-effect execution. |
+| `AGENT_ENABLE_PHYSICAL_DAG_EXECUTION` | `0` | Permit guarded physical nodes after all other proofs. |
 | `ORCH_ACTION_DRY_RUN` | `true` | Log compatibility actions instead of calling the hardware daemon. |
 | `ORCH_CLI_COLOR` | `auto` | Force Orchestrator session log color with `1`, disable with `0`; warnings are yellow and errors are red. |
 
-`AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION=1` requires guarded execution.
-Guarded execution requires a non-empty `AGENT_TASK_GRAPH_EXECUTION_TOKEN`.
+`AGENT_ENABLE_PHYSICAL_DAG_EXECUTION=1` requires guarded execution.
+Guarded execution requires a non-empty `AGENT_DAG_ENGINE_EXECUTION_TOKEN`.
 The host Trusted Capability Runtime uses that same authenticated cancel endpoint for
-planning TaskGraphs. Enabling host/planning TaskGraph execution without the
+planning WorkDAGs. Enabling host/planning WorkDAG execution without the
 token makes authoritative cancellation fail closed and is not a supported
 cancellable deployment.
 
@@ -387,7 +387,7 @@ retained. See
 [Runtime Trace Instrumentation Guide](RUNTIME_OBSERVABILITY_OPERATIONS.md), and
 [Accelerator Telemetry and Latency Evidence Gates](ACCELERATOR_LATENCY_EVIDENCE.md).
 
-## Agent and TaskGraph
+## Agent and WorkDAG
 
 | Variable | Meaning |
 |---|---|
@@ -442,12 +442,12 @@ provider key such as `河南省内乡县` -> `neixiang` and tries that bare key 
 descriptive English forms. Candidates are qualified against available
 administrative context. If none match, the tool returns typed
 `location_not_found`.
-| `AGENT_TASK_GRAPH_MAX_CONCURRENCY` | Process-local TaskGraph bound; default `4`, range 1–64. |
-| `AGENT_TASK_GRAPH_EXECUTION_TOKEN` | Secret bearer token for grants, guarded execution, and cancellation. |
-| `AGENT_TASK_GRAPH_DIAGNOSTICS_TOKEN` | Bearer token for dry-run, trace, and scheduler diagnostics. A blank value falls back to `AGENT_TASK_GRAPH_EXECUTION_TOKEN`; when both are blank, those endpoints return 503. |
-| `AGENT_TASK_GRAPH_TRACE_MAX_ENTRIES` | Maximum in-memory retained traces; default `128`. Least-recently-used entries are evicted first. |
-| `AGENT_TASK_GRAPH_TRACE_TTL_SEC` | Retained-trace lifetime; default `900` seconds. |
-| `AGENT_TASK_GRAPH_GRANT_MAX_ENTRIES` | Maximum in-memory unconsumed confirmation grants; default `128`. Expired grants are purged before issue/consume. |
+| `AGENT_DAG_ENGINE_MAX_CONCURRENCY` | Process-local WorkDAG bound; default `4`, range 1–64. |
+| `AGENT_DAG_ENGINE_EXECUTION_TOKEN` | Secret bearer token for grants, guarded execution, and cancellation. |
+| `AGENT_DAG_ENGINE_DIAGNOSTICS_TOKEN` | Bearer token for dry-run, trace, and DAGEngine diagnostics. A blank value falls back to `AGENT_DAG_ENGINE_EXECUTION_TOKEN`; when both are blank, those endpoints return 503. |
+| `AGENT_DAG_ENGINE_TRACE_MAX_ENTRIES` | Maximum in-memory retained traces; default `128`. Least-recently-used entries are evicted first. |
+| `AGENT_DAG_ENGINE_TRACE_TTL_SEC` | Retained-trace lifetime; default `900` seconds. |
+| `AGENT_DAG_ENGINE_GRANT_MAX_ENTRIES` | Maximum in-memory unconsumed confirmation grants; default `128`. Expired grants are purged before issue/consume. |
 | `AGENT_HOST`, `AGENT_PORT`, `AGENT_LOG_LEVEL` | Service bind/log settings. |
 
 Do not commit a real execution token. Manifest strings may use required

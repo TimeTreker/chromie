@@ -43,8 +43,8 @@ class ChromieCliTests(unittest.TestCase):
                 SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp
                 ORCH_SORIDORMI_MANIFEST=capabilities/soridormi.json
                 ORCH_ACTION_DRY_RUN=true
-                AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION=0
-                AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION=0
+                AGENT_ENABLE_PHYSICAL_DAG_EXECUTION=0
+                AGENT_ENABLE_GUARDED_DAG_EXECUTION=0
                 AGENT_GOAL_INTERPRETER_TIMEOUT_MS=1500
                 ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS=3000
                 AGENT_TIMEOUT_MS=30000
@@ -313,7 +313,7 @@ class ChromieCliTests(unittest.TestCase):
         self.assertEqual(record_graph["total_ms"], 1420.5)
         self.assertEqual(stderr, "")
 
-    def test_trace_view_summarizes_task_graph_trace(self) -> None:
+    def test_trace_view_summarizes_work_dag_trace(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             trace_dir = root / ".chromie" / "acceptance" / "text-mujoco" / "case-1"
@@ -321,14 +321,13 @@ class ChromieCliTests(unittest.TestCase):
             (trace_dir / "trace.json").write_text(
                 json.dumps(
                     {
-                        "graph_id": "graph-1",
+                        "dag_id": "dag-1",
                         "status": "failed",
                         "summary": "Check task",
-                        "outcome_summary": "TaskGraph failed: node submit blocked.",
-                        "node_results": [
+                                                "node_results": [
                             {
                                 "node_id": "submit",
-                                "tool": "soridormi.task.submit",
+                                "capability_id": "soridormi.task.submit",
                                 "status": "blocked",
                                 "error": "blocked_subsystem",
                                 "blocked_by": ["locomotion"],
@@ -338,7 +337,7 @@ class ChromieCliTests(unittest.TestCase):
                             {
                                 "type": "node_blocked",
                                 "node_id": "submit",
-                                "tool": "soridormi.task.submit",
+                                "capability_id": "soridormi.task.submit",
                                 "message": "locomotion unavailable",
                             }
                         ],
@@ -352,19 +351,15 @@ class ChromieCliTests(unittest.TestCase):
                 "--json",
                 "trace",
                 "view",
-                "--graph",
-                "graph-1",
+                "--dag",
+                "dag-1",
             )
         self.assertEqual(code, int(ExitCode.OK))
         payload = json.loads(stdout)
         artifact = payload["details"]["artifacts"][0]
-        self.assertEqual(artifact["kind"], "task_graph_trace")
+        self.assertEqual(artifact["kind"], "work_dag_trace")
         self.assertEqual(
-            artifact["summary"]["outcome_summary"],
-            "TaskGraph failed: node submit blocked.",
-        )
-        self.assertEqual(
-            artifact["summary"]["node_results"][0]["tool"],
+            artifact["summary"]["node_results"][0]["capability_id"],
             "soridormi.task.submit",
         )
         self.assertEqual(stderr, "")
@@ -536,8 +531,8 @@ class ChromieCliTests(unittest.TestCase):
                 """
                 ORCH_ENABLE_INTERACTION_RESPONSE=0
                 ORCH_ENABLE_SORIDORMI_CAPABILITIES=1
-                AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION=1
-                AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION=0
+                AGENT_ENABLE_PHYSICAL_DAG_EXECUTION=1
+                AGENT_ENABLE_GUARDED_DAG_EXECUTION=0
                 ORCH_ACTION_DRY_RUN=false
                 AGENT_GOAL_INTERPRETER_TIMEOUT_MS=1500
                 ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS=3000
@@ -570,8 +565,8 @@ class ChromieCliTests(unittest.TestCase):
                 ORCH_ENABLE_INTERACTION_RESPONSE=0
                 ORCH_ENABLE_SORIDORMI_CAPABILITIES=0
                 ORCH_ACTION_DRY_RUN=true
-                AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION=0
-                AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION=0
+                AGENT_ENABLE_PHYSICAL_DAG_EXECUTION=0
+                AGENT_ENABLE_GUARDED_DAG_EXECUTION=0
                 AGENT_URL=
                 ACTION_EXECUTOR_URL=
                 ASR_URL=

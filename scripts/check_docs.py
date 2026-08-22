@@ -96,9 +96,9 @@ IGNORED_MARKDOWN_DIRS = {
 }
 
 STALE_PHRASES = {
-    "tool actions for a future executor": "TaskGraph execution is implemented",
+    "tool actions for a future executor": "WorkDAG execution is implemented",
     "vision_agent`: placeholder": "vision is a compatibility proposal, not an undocumented placeholder",
-    "taskgraph execution is not connected": "TaskGraph execution endpoints are implemented",
+    "taskgraph execution is not connected": "WorkDAG execution endpoints are implemented",
     "/interaction still adapts": "native InteractionRuntime is now the default",
     "currently implemented by adapting the `/run` result": "native InteractionRuntime is now the default",
     "the native interaction agent is not present yet": "native InteractionRuntime is implemented",

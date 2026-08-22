@@ -144,7 +144,7 @@ Any missing identity, low-level contract leak, unsafe-idle result, trace drift,
 unreviewed stop behavior, or threshold failure rejects the candidate.
 
 Candidate selection still does not enable
-`AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION` or authorize a Soridormi hardware
+`AGENT_ENABLE_PHYSICAL_DAG_EXECUTION` or authorize a Soridormi hardware
 command. Motion requires the later supervised Physical pilot gate.
 
 The completed directory must pass:

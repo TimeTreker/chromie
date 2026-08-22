@@ -17,7 +17,7 @@ does not promise support for any deployment target.
 - generated-speech regression through `synthetic`, `virtual-mic`, and
   `acoustic` modes;
 - structured speech/text routing into Soridormi named skills and MuJoCo `sim`;
-- TaskGraph validation and gated read, planning, guarded, and physical-policy
+- WorkDAG validation and gated read, planning, guarded, and physical-policy
   paths, with physical execution gates remaining off.
 
 ## Explicit Non-Claims

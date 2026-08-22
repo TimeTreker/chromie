@@ -149,15 +149,15 @@ GROUPS: dict[str, TestGroup] = {
         ),
     ),
     "taskgraph": TestGroup(
-        "TaskGraph validation, scheduling, grants, retention, and execution policy.",
+        "WorkDAG validation, scheduling, grants, retention, and execution policy.",
         (
             _unittest(
-                "tests.test_guarded_task_graph_execution",
-                "tests.test_planning_task_graph_execution",
-                "tests.test_read_only_task_graph_execution",
+                "tests.test_guarded_work_dag_execution",
+                "tests.test_planning_work_dag_execution",
+                "tests.test_read_only_work_dag_execution",
                 "tests.test_resource_arbiter",
-                "tests.test_task_graph_planning",
-                "tests.test_task_graph_retention",
+                "tests.test_work_dag_planning",
+                "tests.test_work_dag_retention",
             ),
         ),
     ),
@@ -212,7 +212,7 @@ GROUPS: dict[str, TestGroup] = {
                     "import inspect, runpy, sys; "
                     "sys.path.insert(0, 'agent'); "
                     "mods=[runpy.run_path('agent/tests/test_capability_registry.py'),"
-                    "runpy.run_path('agent/tests/test_task_graph_validator_executor.py')]; "
+                    "runpy.run_path('agent/tests/test_work_dag_validator_executor.py')]; "
                     "tests=[f for m in mods for n,f in m.items() "
                     "if n.startswith('test_') and inspect.isfunction(f)]; "
                     "[f() for f in tests]; "

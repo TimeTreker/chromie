@@ -14,10 +14,9 @@ except ImportError:  # pragma: no cover - repository development path
 
 from ..capabilities.models import CapabilityRegistry, FailurePolicy
 from ..tool_invocation import AsyncToolInvoker, ToolInvocationContext
-from .models import ExecutionEvent, ExecutionTrace, NodeResult, TaskGraph, TaskNode
+from .models import ExecutionEvent, ExecutionTrace, NodeResult, WorkDAG, WorkNode
 from .refs import resolve_refs
-from .reporting import build_trace_outcome_summary
-from .validator import GraphValidator
+from .validator import WorkDAGValidator
 
 _READ_ONLY_CLASSES = {"safe_read", "planning_only"}
 _LOCAL_PLANNING_REPORT_TOOLS = {"chromie.report"}
@@ -28,7 +27,6 @@ def _finalize_trace(
     *,
     sort_node_events: bool,
 ) -> ExecutionTrace:
-    trace.outcome_summary = build_trace_outcome_summary(trace)
     node_order = {
         node_id: index
         for index, node_id in enumerate(
@@ -65,8 +63,8 @@ def _finalize_trace(
 
 
 @dataclass
-class TaskGraphRunState:
-    nodes: dict[str, TaskNode]
+class DAGRunState:
+    nodes: dict[str, WorkNode]
     pending: set[str]
     results: dict[str, NodeResult]
     activated_fallbacks: set[str]
@@ -74,31 +72,40 @@ class TaskGraphRunState:
     aborted: bool = False
 
     @classmethod
-    def create(cls, graph: TaskGraph) -> "TaskGraphRunState":
-        nodes = graph.node_map()
+    def create(
+        cls,
+        dag: WorkDAG,
+        prior_results: dict[str, NodeResult] | None = None,
+    ) -> "DAGRunState":
+        nodes = dag.node_map()
         fallback_targets: set[str] = set()
-        for node in graph.nodes:
+        for node in dag.nodes:
             for policy in (node.on_failure, node.on_timeout):
                 if policy and policy.target:
                     fallback_targets.add(policy.target)
             for policy in node.on_event.values():
                 if policy.target:
                     fallback_targets.add(policy.target)
+        inherited = {
+            node_id: result.model_copy(deep=True)
+            for node_id, result in (prior_results or {}).items()
+            if node_id in nodes and result.status in {"success", "skipped"}
+        }
         return cls(
             nodes=nodes,
-            pending=set(nodes),
-            results={},
+            pending=set(nodes) - set(inherited),
+            results=inherited,
             activated_fallbacks=set(),
             fallback_targets=fallback_targets,
         )
 
 
-class TaskGraphExecutionProofs(BaseModel):
+class DAGExecutionProofs(BaseModel):
     confirmed_node_ids: set[str] = Field(default_factory=set)
 
 
-class ReadOnlyTaskGraphExecutor:
-    """Execute a validated graph only when every node is free of side effects."""
+class ReadOnlyDAGEngine:
+    """Execute a validated WorkDAG only when every node is free of side effects."""
 
     def __init__(
         self,
@@ -122,17 +129,34 @@ class ReadOnlyTaskGraphExecutor:
             else None
         )
 
-    async def run(self, graph: TaskGraph) -> ExecutionTrace:
-        report = GraphValidator(self.registry).validate(graph)
+    async def run(
+        self,
+        dag: WorkDAG,
+        *,
+        prior_results: dict[str, NodeResult] | None = None,
+    ) -> ExecutionTrace:
+        report = WorkDAGValidator(self.registry).validate(dag)
         report.raise_for_errors()
-        self._preflight(graph)
+        self._preflight(dag)
 
         trace = ExecutionTrace(
-            graph_id=graph.graph_id,
+            dag_id=dag.dag_id,
+            dag_revision=dag.revision,
             status="running",
-            summary=graph.summary or graph.summary_zh or "",
+            summary=dag.summary,
         )
-        state = TaskGraphRunState.create(graph)
+        state = DAGRunState.create(dag, prior_results=prior_results)
+        for result in sorted(state.results.values(), key=lambda item: item.node_id):
+            trace.node_results.append(result.model_copy(deep=True))
+            trace.events.append(
+                ExecutionEvent(
+                    type="node_inherited",
+                    node_id=result.node_id,
+                    capability_id=result.capability_id,
+                    message="completed node inherited from prior WorkDAG revision",
+                    data={"from_revision": result.inherited_from_revision},
+                )
+            )
 
         try:
             while state.pending and not state.aborted:
@@ -154,7 +178,7 @@ class ReadOnlyTaskGraphExecutor:
                         ordered_ready,
                         state,
                         trace,
-                        graph_id=graph.graph_id,
+                        dag_id=dag.dag_id,
                     )
                 else:
                     completed = []
@@ -163,7 +187,7 @@ class ReadOnlyTaskGraphExecutor:
                         result = await self._execute_node(
                             node,
                             state.results,
-                            graph_id=graph.graph_id,
+                            dag_id=dag.dag_id,
                         )
                         completed.append(result)
                         if self._apply_failure_policy(node, result, state, trace):
@@ -177,8 +201,8 @@ class ReadOnlyTaskGraphExecutor:
             trace.status = "cancelled"
             trace.events.append(
                 ExecutionEvent(
-                    type="graph_cancelled",
-                    message="TaskGraph execution cancelled.",
+                    type="dag_cancelled",
+                    message="WorkDAG execution cancelled.",
                 )
             )
             return _finalize_trace(trace, sort_node_events=True)
@@ -187,8 +211,8 @@ class ReadOnlyTaskGraphExecutor:
             trace.status = "aborted"
             trace.events.append(
                 ExecutionEvent(
-                    type="graph_aborted",
-                    message="TaskGraph aborted by failure policy.",
+                    type="dag_aborted",
+                    message="WorkDAG aborted by failure policy.",
                 )
             )
         else:
@@ -203,8 +227,8 @@ class ReadOnlyTaskGraphExecutor:
             )
         return _finalize_trace(trace, sort_node_events=True)
 
-    def _ready_nodes(self, state: TaskGraphRunState) -> list[TaskNode]:
-        ready: list[TaskNode] = []
+    def _ready_nodes(self, state: DAGRunState) -> list[WorkNode]:
+        ready: list[WorkNode] = []
         for node_id in state.pending:
             node = state.nodes[node_id]
             if node_id in state.activated_fallbacks:
@@ -222,15 +246,15 @@ class ReadOnlyTaskGraphExecutor:
 
     async def _execute_parallel_wave(
         self,
-        nodes: list[TaskNode],
-        state: TaskGraphRunState,
+        nodes: list[WorkNode],
+        state: DAGRunState,
         trace: ExecutionTrace,
         *,
-        graph_id: str,
+        dag_id: str,
     ) -> list[NodeResult]:
         tasks = {
             asyncio.create_task(
-                self._execute_node(node, state.results, graph_id=graph_id)
+                self._execute_node(node, state.results, dag_id=dag_id)
             ): node
             for node in nodes
         }
@@ -258,7 +282,7 @@ class ReadOnlyTaskGraphExecutor:
                     completed.extend(
                         NodeResult(
                             node_id=tasks[task].id,
-                            tool=tasks[task].tool,
+                            capability_id=tasks[task].capability_id,
                             status="cancelled",
                             error="cancelled by sibling failure policy",
                         )
@@ -275,7 +299,7 @@ class ReadOnlyTaskGraphExecutor:
                     completed.append(
                         NodeResult(
                             node_id=node.id,
-                            tool=node.tool,
+                            capability_id=node.capability_id,
                             status="cancelled",
                             error="execution cancelled",
                         )
@@ -290,9 +314,9 @@ class ReadOnlyTaskGraphExecutor:
 
     def _apply_failure_policy(
         self,
-        node: TaskNode,
+        node: WorkNode,
         result: NodeResult,
-        state: TaskGraphRunState,
+        state: DAGRunState,
         trace: ExecutionTrace,
     ) -> bool:
         if result.status == "success":
@@ -302,7 +326,7 @@ class ReadOnlyTaskGraphExecutor:
             ExecutionEvent(
                 type="failure_policy",
                 node_id=node.id,
-                tool=node.tool,
+                capability_id=node.capability_id,
                 message=f"Applying {policy.strategy} after {result.status}.",
                 data={"target": policy.target},
             )
@@ -322,7 +346,7 @@ class ReadOnlyTaskGraphExecutor:
                 ExecutionEvent(
                     type="fallback_triggered",
                     node_id=node.id,
-                    tool=node.tool,
+                    capability_id=node.capability_id,
                     data={"target": policy.target},
                 )
             )
@@ -339,21 +363,21 @@ class ReadOnlyTaskGraphExecutor:
 
     def _effective_failure_policy(
         self,
-        node: TaskNode,
+        node: WorkNode,
         status: str,
     ) -> FailurePolicy:
         if status == "timeout" and node.on_timeout is not None:
             return node.on_timeout
         if node.on_failure is not None:
             return node.on_failure
-        policy = self.registry.get_tool(node.tool).default_failure_policy
+        policy = self.registry.get_tool(node.capability_id).default_failure_policy
         if policy.strategy == "retry":
             return policy.then or FailurePolicy(strategy="abort_task")
         return policy
 
     def _record_blocked_descendants(
         self,
-        state: TaskGraphRunState,
+        state: DAGRunState,
         trace: ExecutionTrace,
     ) -> None:
         changed = True
@@ -375,7 +399,7 @@ class ReadOnlyTaskGraphExecutor:
                         state.results,
                         NodeResult(
                             node_id=node.id,
-                            tool=node.tool,
+                            capability_id=node.capability_id,
                             status="blocked",
                             blocked_by=blocked_by,
                         ),
@@ -384,7 +408,7 @@ class ReadOnlyTaskGraphExecutor:
 
     def _record_remaining(
         self,
-        state: TaskGraphRunState,
+        state: DAGRunState,
         trace: ExecutionTrace,
         *,
         status: str,
@@ -402,34 +426,34 @@ class ReadOnlyTaskGraphExecutor:
                 state.results,
                 NodeResult(
                     node_id=node.id,
-                    tool=node.tool,
+                    capability_id=node.capability_id,
                     status=status,
                     blocked_by=blocked_by if status == "blocked" else [],
                 ),
             )
         state.pending.clear()
 
-    def _preflight(self, graph: TaskGraph) -> None:
-        if not graph.nodes:
-            raise ValueError("read-only TaskGraph execution requires at least one node")
+    def _preflight(self, dag: WorkDAG) -> None:
+        if not dag.nodes:
+            raise ValueError("read-only WorkDAG execution requires at least one node")
         unsafe: list[str] = []
-        for node in graph.nodes:
-            capability = self.registry.get_tool(node.tool)
+        for node in dag.nodes:
+            capability = self.registry.get_tool(node.capability_id)
             if capability.safety_class not in _READ_ONLY_CLASSES:
-                unsafe.append(f"{node.id}:{node.tool}[{capability.safety_class}]")
+                unsafe.append(f"{node.id}:{node.capability_id}[{capability.safety_class}]")
             elif not capability.execution.side_effect_free:
-                unsafe.append(f"{node.id}:{node.tool}[side_effect_free=false]")
+                unsafe.append(f"{node.id}:{node.capability_id}[side_effect_free=false]")
         if unsafe:
             raise ValueError(
-                "read-only TaskGraph execution rejected non-read-only nodes: " + ", ".join(unsafe)
+                "read-only WorkDAG execution rejected non-read-only nodes: " + ", ".join(unsafe)
             )
 
     async def _execute_node(
         self,
-        node: TaskNode,
+        node: WorkNode,
         results: dict[str, NodeResult],
         *,
-        graph_id: str,
+        dag_id: str,
     ) -> NodeResult:
         started = time.monotonic()
         try:
@@ -437,14 +461,14 @@ class ReadOnlyTaskGraphExecutor:
         except KeyError as exc:
             return NodeResult(
                 node_id=node.id,
-                tool=node.tool,
+                capability_id=node.capability_id,
                 status="failed_fatal",
                 error=str(exc),
                 started_at=started,
                 finished_at=time.monotonic(),
             )
 
-        capability = self.registry.get_tool(node.tool)
+        capability = self.registry.get_tool(node.capability_id)
         default_policy = capability.default_failure_policy
         max_attempts = (
             node.retry.max_attempts
@@ -461,14 +485,14 @@ class ReadOnlyTaskGraphExecutor:
             else default_policy.backoff_s or 0.0
         )
         context = ToolInvocationContext(
-            task_graph_id=graph_id,
-            task_node_id=node.id,
+            work_dag_id=dag_id,
+            work_node_id=node.id,
         )
         for attempt in range(1, max_attempts + 1):
             async def invoke() -> Any:
                 if self.resource_arbiter is None:
                     return await self.invoker.invoke(
-                        node.tool,
+                        node.capability_id,
                         args,
                         context=context,
                     )
@@ -477,7 +501,7 @@ class ReadOnlyTaskGraphExecutor:
                     exclusive_group=capability.execution.exclusive_group,
                 ):
                     return await self.invoker.invoke(
-                        node.tool,
+                        node.capability_id,
                         args,
                         context=context,
                     )
@@ -492,7 +516,7 @@ class ReadOnlyTaskGraphExecutor:
             except TimeoutError:
                 return NodeResult(
                     node_id=node.id,
-                    tool=node.tool,
+                    capability_id=node.capability_id,
                     status="timeout",
                     error=f"node exceeded {timeout_s:.3f}s timeout",
                     attempts=attempt,
@@ -502,7 +526,7 @@ class ReadOnlyTaskGraphExecutor:
             if outcome.status == "success" or outcome.status != "failed_retryable" or attempt >= max_attempts:
                 return NodeResult(
                     node_id=node.id,
-                    tool=node.tool,
+                    capability_id=node.capability_id,
                     status=outcome.status,
                     output=outcome.output,
                     error=outcome.error,
@@ -512,7 +536,7 @@ class ReadOnlyTaskGraphExecutor:
                 )
             if backoff_s:
                 await asyncio.sleep(backoff_s)
-        raise AssertionError("read-only TaskGraph retry loop exhausted unexpectedly")
+        raise AssertionError("read-only WorkDAG retry loop exhausted unexpectedly")
 
     def _record(
         self,
@@ -526,27 +550,27 @@ class ReadOnlyTaskGraphExecutor:
             ExecutionEvent(
                 type="node_result",
                 node_id=result.node_id,
-                tool=result.tool,
+                capability_id=result.capability_id,
                 message=result.status,
                 data={"error": result.error},
             )
         )
 
 
-class PlanningTaskGraphExecutor(ReadOnlyTaskGraphExecutor):
+class PlanningDAGEngine(ReadOnlyDAGEngine):
     """Execute safe reads and non-physical planning tools, including plan creation."""
 
-    def _preflight(self, graph: TaskGraph) -> None:
-        if not graph.nodes:
-            raise ValueError("planning TaskGraph execution requires at least one node")
+    def _preflight(self, dag: WorkDAG) -> None:
+        if not dag.nodes:
+            raise ValueError("planning WorkDAG execution requires at least one node")
         unsafe: list[str] = []
-        for node in graph.nodes:
-            capability = self.registry.get_tool(node.tool)
-            if node.tool in _LOCAL_PLANNING_REPORT_TOOLS and node.type == "report":
+        for node in dag.nodes:
+            capability = self.registry.get_tool(node.capability_id)
+            if node.capability_id in _LOCAL_PLANNING_REPORT_TOOLS and node.role == "report":
                 continue
             if capability.safety_class == "safe_read":
                 if not capability.execution.side_effect_free:
-                    unsafe.append(f"{node.id}:{node.tool}[side_effect_free=false]")
+                    unsafe.append(f"{node.id}:{node.capability_id}[side_effect_free=false]")
                 continue
             if capability.safety_class == "planning_only":
                 prohibited_effects = {
@@ -555,30 +579,30 @@ class PlanningTaskGraphExecutor(ReadOnlyTaskGraphExecutor):
                 } & set(capability.effects)
                 if prohibited_effects:
                     unsafe.append(
-                        f"{node.id}:{node.tool}[effects={sorted(prohibited_effects)}]"
+                        f"{node.id}:{node.capability_id}[effects={sorted(prohibited_effects)}]"
                     )
                 continue
-            unsafe.append(f"{node.id}:{node.tool}[{capability.safety_class}]")
+            unsafe.append(f"{node.id}:{node.capability_id}[{capability.safety_class}]")
         if unsafe:
             raise ValueError(
-                "planning TaskGraph execution rejected unsafe nodes: "
+                "planning WorkDAG execution rejected unsafe nodes: "
                 + ", ".join(unsafe)
             )
 
     async def _execute_node(
         self,
-        node: TaskNode,
+        node: WorkNode,
         results: dict[str, NodeResult],
         *,
-        graph_id: str,
+        dag_id: str,
     ) -> NodeResult:
-        if node.tool == "chromie.report":
+        if node.capability_id == "chromie.report":
             return self._execute_local_report_node(node, results)
-        return await super()._execute_node(node, results, graph_id=graph_id)
+        return await super()._execute_node(node, results, dag_id=dag_id)
 
     def _execute_local_report_node(
         self,
-        node: TaskNode,
+        node: WorkNode,
         results: dict[str, NodeResult],
     ) -> NodeResult:
         started = time.monotonic()
@@ -587,7 +611,7 @@ class PlanningTaskGraphExecutor(ReadOnlyTaskGraphExecutor):
         except KeyError as exc:
             return NodeResult(
                 node_id=node.id,
-                tool=node.tool,
+                capability_id=node.capability_id,
                 status="failed_fatal",
                 error=str(exc),
                 started_at=started,
@@ -598,7 +622,7 @@ class PlanningTaskGraphExecutor(ReadOnlyTaskGraphExecutor):
         if not message:
             return NodeResult(
                 node_id=node.id,
-                tool=node.tool,
+                capability_id=node.capability_id,
                 status="failed_fatal",
                 error="chromie.report requires a non-empty message",
                 started_at=started,
@@ -607,7 +631,7 @@ class PlanningTaskGraphExecutor(ReadOnlyTaskGraphExecutor):
 
         return NodeResult(
             node_id=node.id,
-            tool=node.tool,
+            capability_id=node.capability_id,
             status="success",
             output={
                 "reported": True,
@@ -619,7 +643,7 @@ class PlanningTaskGraphExecutor(ReadOnlyTaskGraphExecutor):
         )
 
 
-class GuardedTaskGraphExecutor:
+class GuardedDAGEngine:
     """Execute side effects only with node-bound confirmation and monitor proof."""
 
     def __init__(
@@ -648,24 +672,47 @@ class GuardedTaskGraphExecutor:
 
     async def run(
         self,
-        graph: TaskGraph,
-        proofs: TaskGraphExecutionProofs,
+        dag: WorkDAG,
+        proofs: DAGExecutionProofs,
+        *,
+        prior_results: dict[str, NodeResult] | None = None,
     ) -> ExecutionTrace:
-        report = GraphValidator(self.registry).validate(graph)
+        report = WorkDAGValidator(self.registry).validate(dag)
         report.raise_for_errors()
-        self._preflight(graph, proofs)
+        inherited_ids = {
+            node_id
+            for node_id, result in (prior_results or {}).items()
+            if result.status in {"success", "skipped"}
+        }
+        self._preflight(dag, proofs, completed_node_ids=inherited_ids)
 
         trace = ExecutionTrace(
-            graph_id=graph.graph_id,
+            dag_id=dag.dag_id,
+            dag_revision=dag.revision,
             status="running",
-            summary=graph.summary or graph.summary_zh or "",
+            summary=dag.summary,
         )
-        nodes = graph.node_map()
-        pending = set(nodes)
-        results: dict[str, NodeResult] = {}
+        nodes = dag.node_map()
+        results: dict[str, NodeResult] = {
+            node_id: result.model_copy(deep=True)
+            for node_id, result in (prior_results or {}).items()
+            if node_id in nodes and result.status in {"success", "skipped"}
+        }
+        pending = set(nodes) - set(results)
+        for result in sorted(results.values(), key=lambda item: item.node_id):
+            trace.node_results.append(result.model_copy(deep=True))
+            trace.events.append(
+                ExecutionEvent(
+                    type="node_inherited",
+                    node_id=result.node_id,
+                    capability_id=result.capability_id,
+                    message="completed node inherited from prior WorkDAG revision",
+                    data={"from_revision": result.inherited_from_revision},
+                )
+            )
         active_monitors: set[str] = set()
-        fallback_targets = self._fallback_targets(graph)
-        current_node: TaskNode | None = None
+        fallback_targets = self._fallback_targets(dag)
+        current_node: WorkNode | None = None
         physical_started = False
         inflight_physical: set[asyncio.Task[Any]] = set()
 
@@ -733,7 +780,7 @@ class GuardedTaskGraphExecutor:
                     monitor_started = (
                         result.output.get("ok") is True or result.output.get("active") is True
                     )
-                    if node.type == "monitor" and result.status == "success" and monitor_started:
+                    if node.role == "monitor" and result.status == "success" and monitor_started:
                         active_monitors.add(node.id)
                     if result.status != "success":
                         if self._is_physical(node):
@@ -756,14 +803,14 @@ class GuardedTaskGraphExecutor:
                     results,
                     NodeResult(
                         node_id=current_node.id,
-                        tool=current_node.tool,
+                        capability_id=current_node.capability_id,
                         status="cancelled",
                         error="execution cancelled",
                     ),
                 )
             if physical_started:
                 await asyncio.shield(
-                    self._run_all_emergency_fallbacks(graph, nodes, pending, results, trace)
+                    self._run_all_emergency_fallbacks(dag, nodes, pending, results, trace)
                 )
                 await asyncio.shield(self._drain_inflight_physical(inflight_physical))
             for node_id in sorted(pending - fallback_targets):
@@ -772,11 +819,11 @@ class GuardedTaskGraphExecutor:
                     self._record(
                         trace,
                         results,
-                        NodeResult(node_id=node.id, tool=node.tool, status="cancelled"),
+                        NodeResult(node_id=node.id, capability_id=node.capability_id, status="cancelled"),
                     )
             trace.status = "cancelled"
             trace.events.append(
-                ExecutionEvent(type="graph_cancelled", message="TaskGraph execution cancelled.")
+                ExecutionEvent(type="dag_cancelled", message="WorkDAG execution cancelled.")
             )
             return _finalize_trace(trace, sort_node_events=False)
 
@@ -787,18 +834,24 @@ class GuardedTaskGraphExecutor:
         )
         return _finalize_trace(trace, sort_node_events=False)
 
-    def _preflight(self, graph: TaskGraph, proofs: TaskGraphExecutionProofs) -> None:
-        if not graph.nodes:
-            raise ValueError("guarded TaskGraph execution requires at least one node")
-        nodes = graph.node_map()
+    def _preflight(
+        self,
+        dag: WorkDAG,
+        proofs: DAGExecutionProofs,
+        *,
+        completed_node_ids: set[str] | None = None,
+    ) -> None:
+        if not dag.nodes:
+            raise ValueError("guarded WorkDAG execution requires at least one node")
+        nodes = dag.node_map()
         invalid_proofs = sorted(proofs.confirmed_node_ids - set(nodes))
         if invalid_proofs:
             raise ValueError(f"confirmation proofs reference unknown nodes: {invalid_proofs}")
 
         confirmation_nodes = {
             node.id
-            for node in graph.nodes
-            if node.type == "confirmation" or node.tool == "chromie.ask_confirmation"
+            for node in dag.nodes
+            if node.role == "confirmation" or node.capability_id == "chromie.ask_confirmation"
         }
         non_confirmation_proofs = sorted(proofs.confirmed_node_ids - confirmation_nodes)
         if non_confirmation_proofs:
@@ -806,10 +859,13 @@ class GuardedTaskGraphExecutor:
                 f"confirmation proofs must reference confirmation nodes: {non_confirmation_proofs}"
             )
 
-        for node in graph.nodes:
-            capability = self.registry.get_tool(node.tool)
+        completed_node_ids = set(completed_node_ids or ())
+        for node in dag.nodes:
+            if node.id in completed_node_ids:
+                continue
+            capability = self.registry.get_tool(node.capability_id)
             if capability.safety_class == "restricted":
-                raise ValueError(f"guarded execution rejects restricted tool {node.tool!r}")
+                raise ValueError(f"guarded execution rejects restricted capability {node.capability_id!r}")
             if capability.confirmation.required:
                 required = self._transitive_confirmation_nodes(
                     node.id,
@@ -822,7 +878,7 @@ class GuardedTaskGraphExecutor:
                     )
             if capability.safety_class == "physical_motion":
                 if not self.allow_physical_motion:
-                    raise ValueError("physical TaskGraph execution is disabled")
+                    raise ValueError("physical WorkDAG execution is disabled")
                 if self._failure_fallback_node(node, nodes) is None:
                     raise ValueError(
                         f"physical node {node.id!r} requires a stop fallback target"
@@ -838,30 +894,30 @@ class GuardedTaskGraphExecutor:
                     raise ValueError(
                         f"physical node {node.id!r} requires an emergency-stop fallback target"
                     )
-            if node.tool == "chromie.ask_confirmation":
+            if node.capability_id == "chromie.ask_confirmation":
                 continue
             agent = self.registry.get_agent(capability.agent_id)
             if agent.transport.kind not in {"mcp_streamable_http", "streamable_http"}:
                 raise ValueError(
-                    f"guarded execution requires MCP Streamable HTTP for {node.tool!r}"
+                    f"guarded execution requires MCP Streamable HTTP for {node.capability_id!r}"
                 )
 
     async def _execute_node(
         self,
-        node: TaskNode,
-        nodes: dict[str, TaskNode],
+        node: WorkNode,
+        nodes: dict[str, WorkNode],
         results: dict[str, NodeResult],
-        proofs: TaskGraphExecutionProofs,
+        proofs: DAGExecutionProofs,
         active_monitors: set[str],
         *,
         inflight_physical: set[asyncio.Task[Any]] | None = None,
     ) -> NodeResult:
         started = time.monotonic()
-        if node.tool == "chromie.ask_confirmation":
+        if node.capability_id == "chromie.ask_confirmation":
             confirmed = node.id in proofs.confirmed_node_ids
             return NodeResult(
                 node_id=node.id,
-                tool=node.tool,
+                capability_id=node.capability_id,
                 status="success" if confirmed else "failed_fatal",
                 output={"confirmed": confirmed},
                 error=None if confirmed else "confirmation proof missing",
@@ -874,18 +930,18 @@ class GuardedTaskGraphExecutor:
         except KeyError as exc:
             return NodeResult(
                 node_id=node.id,
-                tool=node.tool,
+                capability_id=node.capability_id,
                 status="failed_fatal",
                 error=str(exc),
                 started_at=started,
                 finished_at=time.monotonic(),
             )
 
-        capability = self.registry.get_tool(node.tool)
+        capability = self.registry.get_tool(node.capability_id)
         confirmation_nodes = {
             item.id
             for item in nodes.values()
-            if item.type == "confirmation" or item.tool == "chromie.ask_confirmation"
+            if item.role == "confirmation" or item.capability_id == "chromie.ask_confirmation"
         }
         confirmed = bool(
             self._transitive_confirmation_nodes(node.id, nodes, confirmation_nodes)
@@ -896,12 +952,12 @@ class GuardedTaskGraphExecutor:
             allow_side_effects=capability.safety_class in {"low_risk_action", "physical_motion"},
             confirmed=confirmed,
             safety_monitor_active=monitor_active,
-            allow_safety_controls=node.type in {"monitor", "safety"},
+            allow_safety_controls=node.role in {"monitor", "safety"},
         )
-        if node.type in {"monitor", "safety"} or self._is_physical(node):
+        if node.role in {"monitor", "safety"} or self._is_physical(node):
             if self._is_physical(node) and inflight_physical is not None:
                 invocation = asyncio.create_task(
-                    self.invoker.invoke(node.tool, args, context=context)
+                    self.invoker.invoke(node.capability_id, args, context=context)
                 )
                 inflight_physical.add(invocation)
                 invocation.add_done_callback(
@@ -913,13 +969,13 @@ class GuardedTaskGraphExecutor:
                 outcome = await asyncio.shield(invocation)
             else:
                 outcome = await self.invoker.invoke(
-                    node.tool,
+                    node.capability_id,
                     args,
                     context=context,
                 )
             return NodeResult(
                 node_id=node.id,
-                tool=node.tool,
+                capability_id=node.capability_id,
                 status=outcome.status,
                 output=outcome.output,
                 error=outcome.error,
@@ -933,7 +989,7 @@ class GuardedTaskGraphExecutor:
             async def invoke() -> Any:
                 if self.resource_arbiter is None:
                     return await self.invoker.invoke(
-                        node.tool,
+                        node.capability_id,
                         args,
                         context=context,
                     )
@@ -942,7 +998,7 @@ class GuardedTaskGraphExecutor:
                     exclusive_group=capability.execution.exclusive_group,
                 ):
                     return await self.invoker.invoke(
-                        node.tool,
+                        node.capability_id,
                         args,
                         context=context,
                     )
@@ -956,7 +1012,7 @@ class GuardedTaskGraphExecutor:
             except TimeoutError:
                 return NodeResult(
                     node_id=node.id,
-                    tool=node.tool,
+                    capability_id=node.capability_id,
                     status="timeout",
                     error=f"node exceeded {timeout_s:.3f}s timeout",
                     attempts=attempt,
@@ -970,7 +1026,7 @@ class GuardedTaskGraphExecutor:
             ):
                 return NodeResult(
                     node_id=node.id,
-                    tool=node.tool,
+                    capability_id=node.capability_id,
                     status=outcome.status,
                     output=outcome.output,
                     error=outcome.error,
@@ -980,7 +1036,7 @@ class GuardedTaskGraphExecutor:
                 )
             if backoff_s:
                 await asyncio.sleep(backoff_s)
-        raise AssertionError("guarded TaskGraph retry loop exhausted unexpectedly")
+        raise AssertionError("guarded WorkDAG retry loop exhausted unexpectedly")
 
     @staticmethod
     def _finish_inflight_physical(
@@ -1010,12 +1066,12 @@ class GuardedTaskGraphExecutor:
                     task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
 
-    def _can_parallelize_guarded(self, node: TaskNode) -> bool:
+    def _can_parallelize_guarded(self, node: WorkNode) -> bool:
         if not self.parallel_enabled:
             return False
-        capability = self.registry.get_tool(node.tool)
+        capability = self.registry.get_tool(node.capability_id)
         return (
-            node.type not in {"confirmation", "monitor", "safety"}
+            node.role not in {"confirmation", "monitor", "safety"}
             and not self._is_physical(node)
             and capability.safety_class
             in {"safe_read", "planning_only", "low_risk_action"}
@@ -1024,10 +1080,10 @@ class GuardedTaskGraphExecutor:
 
     async def _execute_guarded_wave(
         self,
-        ready: list[TaskNode],
-        nodes: dict[str, TaskNode],
+        ready: list[WorkNode],
+        nodes: dict[str, WorkNode],
         results: dict[str, NodeResult],
-        proofs: TaskGraphExecutionProofs,
+        proofs: DAGExecutionProofs,
         active_monitors: set[str],
         trace: ExecutionTrace,
     ) -> list[NodeResult]:
@@ -1063,7 +1119,7 @@ class GuardedTaskGraphExecutor:
                     completed.extend(
                         NodeResult(
                             node_id=tasks[task].id,
-                            tool=tasks[task].tool,
+                            capability_id=tasks[task].capability_id,
                             status="cancelled",
                             error="cancelled by sibling guarded-node failure",
                         )
@@ -1081,7 +1137,7 @@ class GuardedTaskGraphExecutor:
                     cancelled.append(
                         NodeResult(
                             node_id=node.id,
-                            tool=node.tool,
+                            capability_id=node.capability_id,
                             status="cancelled",
                             error="execution cancelled",
                         )
@@ -1094,13 +1150,13 @@ class GuardedTaskGraphExecutor:
             raise
         return completed
 
-    def _execution_priority(self, node: TaskNode) -> tuple[int, str]:
-        priority = {"confirmation": 0, "monitor": 1, "safety": 2}.get(node.type, 3)
+    def _execution_priority(self, node: WorkNode) -> tuple[int, str]:
+        priority = {"confirmation": 0, "monitor": 1, "safety": 2}.get(node.role, 3)
         return priority, node.id
 
-    def _fallback_targets(self, graph: TaskGraph) -> set[str]:
+    def _fallback_targets(self, dag: WorkDAG) -> set[str]:
         targets: set[str] = set()
-        for node in graph.nodes:
+        for node in dag.nodes:
             for policy in (node.on_failure, node.on_timeout):
                 if policy and policy.target:
                     targets.add(policy.target)
@@ -1109,55 +1165,55 @@ class GuardedTaskGraphExecutor:
                     targets.add(policy.target)
         return targets
 
-    def _is_physical(self, node: TaskNode) -> bool:
-        capability = self.registry.get_tool(node.tool)
+    def _is_physical(self, node: WorkNode) -> bool:
+        capability = self.registry.get_tool(node.capability_id)
         return capability.safety_class == "physical_motion" or "physical_motion" in capability.effects
 
     def _failure_fallback_node(
         self,
-        node: TaskNode,
-        nodes: dict[str, TaskNode],
+        node: WorkNode,
+        nodes: dict[str, WorkNode],
         *,
         status: str = "failed_fatal",
-    ) -> TaskNode | None:
+    ) -> WorkNode | None:
         policy = node.on_timeout if status == "timeout" and node.on_timeout else node.on_failure
         target = policy.target if policy else None
         if not target or target not in nodes:
             return None
         fallback = nodes[target]
-        capability = self.registry.get_tool(fallback.tool)
+        capability = self.registry.get_tool(fallback.capability_id)
         if (
-            fallback.type == "safety"
+            fallback.role == "safety"
             and capability.safety_class == "safety_critical"
-            and "stop" in fallback.tool
+            and "stop" in fallback.capability_id
         ):
             return fallback
         return None
 
     def _emergency_fallback_node(
         self,
-        node: TaskNode,
-        nodes: dict[str, TaskNode],
-    ) -> TaskNode | None:
+        node: WorkNode,
+        nodes: dict[str, WorkNode],
+    ) -> WorkNode | None:
         policies = [node.on_failure, *node.on_event.values()]
         for policy in policies:
             target = policy.target if policy else None
             if not target or target not in nodes:
                 continue
             fallback = nodes[target]
-            capability = self.registry.get_tool(fallback.tool)
+            capability = self.registry.get_tool(fallback.capability_id)
             if (
-                fallback.type == "safety"
+                fallback.role == "safety"
                 and capability.safety_class == "safety_critical"
-                and "emergency_stop" in fallback.tool
+                and "emergency_stop" in fallback.capability_id
             ):
                 return fallback
         return None
 
     async def _run_fallback(
         self,
-        fallback: TaskNode | None,
-        nodes: dict[str, TaskNode],
+        fallback: WorkNode | None,
+        nodes: dict[str, WorkNode],
         pending: set[str],
         results: dict[str, NodeResult],
         trace: ExecutionTrace,
@@ -1167,13 +1223,13 @@ class GuardedTaskGraphExecutor:
         if fallback is None or fallback.id in results:
             return
         pending.discard(fallback.id)
-        capability = self.registry.get_tool(fallback.tool)
+        capability = self.registry.get_tool(fallback.capability_id)
         max_attempts = 3 if capability.execution.idempotent else 1
         outcome = None
         attempts = 0
         for attempts in range(1, max_attempts + 1):
             outcome = await self.invoker.invoke(
-                fallback.tool,
+                fallback.capability_id,
                 fallback.args,
                 context=ToolInvocationContext(allow_safety_controls=True),
             )
@@ -1189,7 +1245,7 @@ class GuardedTaskGraphExecutor:
             results,
             NodeResult(
                 node_id=fallback.id,
-                tool=fallback.tool,
+                capability_id=fallback.capability_id,
                 status=outcome.status,
                 output=outcome.output,
                 error=outcome.error,
@@ -1200,16 +1256,16 @@ class GuardedTaskGraphExecutor:
             ExecutionEvent(
                 type=event_type,
                 node_id=fallback.id,
-                tool=fallback.tool,
+                capability_id=fallback.capability_id,
                 message=outcome.status,
             )
         )
 
     async def _run_failure_fallback(
         self,
-        node: TaskNode,
+        node: WorkNode,
         status: str,
-        nodes: dict[str, TaskNode],
+        nodes: dict[str, WorkNode],
         pending: set[str],
         results: dict[str, NodeResult],
         trace: ExecutionTrace,
@@ -1223,15 +1279,15 @@ class GuardedTaskGraphExecutor:
             trace,
             event_type=(
                 "emergency_fallback"
-                if fallback and "emergency_stop" in fallback.tool
+                if fallback and "emergency_stop" in fallback.capability_id
                 else "stop_fallback"
             ),
         )
 
     async def _run_emergency_fallback(
         self,
-        node: TaskNode,
-        nodes: dict[str, TaskNode],
+        node: WorkNode,
+        nodes: dict[str, WorkNode],
         pending: set[str],
         results: dict[str, NodeResult],
         trace: ExecutionTrace,
@@ -1247,20 +1303,20 @@ class GuardedTaskGraphExecutor:
 
     async def _run_all_emergency_fallbacks(
         self,
-        graph: TaskGraph,
-        nodes: dict[str, TaskNode],
+        dag: WorkDAG,
+        nodes: dict[str, WorkNode],
         pending: set[str],
         results: dict[str, NodeResult],
         trace: ExecutionTrace,
     ) -> None:
-        for node in graph.nodes:
+        for node in dag.nodes:
             if self._is_physical(node):
                 await self._run_emergency_fallback(node, nodes, pending, results, trace)
 
     def _transitive_confirmation_nodes(
         self,
         node_id: str,
-        nodes: dict[str, TaskNode],
+        nodes: dict[str, WorkNode],
         confirmation_nodes: set[str],
     ) -> set[str]:
         found: set[str] = set()
@@ -1281,7 +1337,7 @@ class GuardedTaskGraphExecutor:
     def _record_blocked(
         self,
         pending: set[str],
-        nodes: dict[str, TaskNode],
+        nodes: dict[str, WorkNode],
         results: dict[str, NodeResult],
         trace: ExecutionTrace,
     ) -> None:
@@ -1295,7 +1351,7 @@ class GuardedTaskGraphExecutor:
                 results,
                 NodeResult(
                     node_id=node.id,
-                    tool=node.tool,
+                    capability_id=node.capability_id,
                     status="blocked",
                     blocked_by=blocked_by,
                 ),
@@ -1313,7 +1369,7 @@ class GuardedTaskGraphExecutor:
             ExecutionEvent(
                 type="node_result",
                 node_id=result.node_id,
-                tool=result.tool,
+                capability_id=result.capability_id,
                 message=result.status,
                 data={"error": result.error},
             )

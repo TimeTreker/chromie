@@ -13,8 +13,8 @@ from agent.app.capabilities.models import (
     CapabilityRegistry,
     ToolCapability,
 )
-from agent.app.task_graph.models import TaskGraph
-from agent.app.task_graph.validator import GraphValidator
+from agent.app.work_dag.models import WorkDAG
+from agent.app.work_dag.validator import WorkDAGValidator
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -200,7 +200,7 @@ def _task_args(task_type: str) -> dict[str, Any]:
 
 
 
-class TaskGraphPlanningTests(unittest.IsolatedAsyncioTestCase):
+class WorkDAGPlanningTests(unittest.IsolatedAsyncioTestCase):
     def test_checked_in_soridormi_manifest_declares_expected_task_types(self) -> None:
         self.assertEqual(
             set(_declared_soridormi_task_types()),
@@ -208,16 +208,18 @@ class TaskGraphPlanningTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_undeclared_soridormi_task_type_is_rejected_by_graph_validator(self) -> None:
-        graph = TaskGraph.model_validate(
+        graph = WorkDAG.model_validate(
             {
-                "graph_id": "raw-body",
+                "dag_id": "raw-body",
                 "summary": "Invalid raw body request.",
-                "created_by": "llm",
+                "authored_by": "planner",
+                "goal_ids": ["goal-body"],
                 "nodes": [
                     {
                         "id": "submit",
-                        "tool": "soridormi.task.submit",
-                        "type": "plan",
+                        "capability_id": "soridormi.task.submit",
+                        "role": "activity",
+                        "source_goal_ids": ["goal-body"],
                         "args": {
                             "task_type": "raw_joint_action",
                             "parameters": {"action_14d": [0.0] * 14},
@@ -227,7 +229,7 @@ class TaskGraphPlanningTests(unittest.IsolatedAsyncioTestCase):
             }
         )
 
-        report = GraphValidator(_checked_in_soridormi_registry()).validate(graph)
+        report = WorkDAGValidator(_checked_in_soridormi_registry()).validate(graph)
 
         self.assertFalse(report.valid)
         self.assertTrue(

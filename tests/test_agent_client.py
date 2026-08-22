@@ -157,55 +157,54 @@ class AgentClientTests(unittest.IsolatedAsyncioTestCase):
         }
         self.assertIn("orchestrator.agent_client", modules)
 
-    async def test_execute_planning_task_graph_posts_graph_payload(self) -> None:
+    async def test_execute_planning_work_dag_posts_dag_payload(self) -> None:
         trace = {
-            "graph_id": "nav",
+            "dag_id": "nav",
             "status": "success",
-            "outcome_summary": "TaskGraph completed successfully.",
         }
         session = _FakeSession(_FakeResponse(payload=trace))
 
-        result = await AgentClient("http://agent.local/").execute_planning_task_graph(
+        result = await AgentClient("http://agent.local/").execute_planning_work_dag(
             session,  # type: ignore[arg-type]
-            {"graph_id": "nav", "nodes": []},
+            {"dag_id": "nav", "nodes": []},
             timeout_ms=2500,
         )
 
         self.assertEqual(result, trace)
         self.assertEqual(
             session.posts[0]["url"],
-            "http://agent.local/task-graphs/execute-planning",
+            "http://agent.local/work-dags/execute-planning",
         )
         self.assertEqual(
             session.posts[0]["json"],
-            {"graph": {"graph_id": "nav", "nodes": []}},
+            {"dag": {"dag_id": "nav", "nodes": []}},
         )
         self.assertAlmostEqual(session.posts[0]["timeout"].total, 2.5)
 
-    async def test_execute_planning_task_graph_raises_on_http_error(self) -> None:
+    async def test_execute_planning_work_dag_raises_on_http_error(self) -> None:
         session = _FakeSession(
             _FakeResponse(status=503, text='{"detail":"planning disabled"}')
         )
 
         with self.assertRaisesRegex(RuntimeError, "HTTP 503"):
-            await AgentClient("http://agent.local").execute_planning_task_graph(
+            await AgentClient("http://agent.local").execute_planning_work_dag(
                 session,  # type: ignore[arg-type]
-                {"graph_id": "nav", "nodes": []},
+                {"dag_id": "nav", "nodes": []},
             )
 
-    async def test_cancel_planning_task_graph_uses_authenticated_endpoint(
+    async def test_cancel_planning_work_dag_uses_authenticated_endpoint(
         self,
     ) -> None:
         receipt = {
-            "graph_id": "nav-room",
+            "dag_id": "nav-room",
             "cancellation_requested": True,
         }
         session = _FakeSession(_FakeResponse(payload=receipt))
 
         result = await AgentClient(
             "http://agent.local/",
-            task_graph_execution_token="execution-secret",
-        ).cancel_planning_task_graph(
+            dag_engine_execution_token="execution-secret",
+        ).cancel_planning_work_dag(
             session,  # type: ignore[arg-type]
             "nav-room",
             timeout_ms=2500,
@@ -214,7 +213,7 @@ class AgentClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, receipt)
         self.assertEqual(
             session.posts[0]["url"],
-            "http://agent.local/task-graphs/nav-room/cancel",
+            "http://agent.local/work-dags/nav-room/cancel",
         )
         self.assertEqual(
             session.posts[0]["headers"],
@@ -222,17 +221,17 @@ class AgentClientTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertAlmostEqual(session.posts[0]["timeout"].total, 2.5)
 
-    async def test_cancel_planning_task_graph_requires_token(self) -> None:
+    async def test_cancel_planning_work_dag_requires_token(self) -> None:
         session = _FakeSession(_FakeResponse())
 
         with self.assertRaisesRegex(
             RuntimeError,
-            "AGENT_TASK_GRAPH_EXECUTION_TOKEN",
+            "AGENT_DAG_ENGINE_EXECUTION_TOKEN",
         ):
             await AgentClient(
                 "http://agent.local",
-                task_graph_execution_token="",
-            ).cancel_planning_task_graph(
+                dag_engine_execution_token="",
+            ).cancel_planning_work_dag(
                 session,  # type: ignore[arg-type]
                 "nav",
             )

@@ -10,10 +10,10 @@ from app.capabilities.models import (
     MonitoringPolicy,
     ToolCapability,
 )
-from app.task_graph.executor import DagDryRunExecutor
-from app.task_graph.models import TaskGraph
-from app.task_graph.service import TaskGraphService
-from app.task_graph.validator import GraphValidator
+from app.work_dag.executor import DAGDryRunEngine
+from app.work_dag.models import WorkDAG
+from app.work_dag.service import DAGEngineService
+from app.work_dag.validator import WorkDAGValidator
 
 
 def _soridormi_bundle() -> CapabilityBundle:
@@ -96,17 +96,17 @@ def _registry():
     return build_chromie_registry([_soridormi_bundle()])
 
 
-def _motion_graph() -> TaskGraph:
-    return TaskGraph.model_validate(
+def _motion_graph() -> WorkDAG:
+    return WorkDAG.model_validate(
         {
-            "graph_id": "walk_forward_dry_run",
-            "summary_zh": "慢速向前走一点，然后停止。",
+            "dag_id": "walk_forward_dry_run",
+            "summary": "慢速向前走一点，然后停止。",
             "nodes": [
-                {"id": "status", "tool": "soridormi.robot.get_status", "type": "query"},
+                {"id": "status", "capability_id": "soridormi.robot.get_status", "role": "activity"},
                 {
                     "id": "make_plan",
-                    "tool": "soridormi.skill.create_plan",
-                    "type": "plan",
+                    "capability_id": "soridormi.skill.create_plan",
+                    "role": "activity",
                     "depends_on": ["status"],
                     "args": {
                         "capability_id": "walk_forward",
@@ -115,30 +115,30 @@ def _motion_graph() -> TaskGraph:
                 },
                 {
                     "id": "confirm",
-                    "tool": "chromie.ask_confirmation",
-                    "type": "confirmation",
+                    "capability_id": "chromie.ask_confirmation",
+                    "role": "confirmation",
                     "depends_on": ["make_plan"],
                     "args": {"question": "要执行这个短距离移动吗？", "plan_summary": {"$ref": "make_plan.output.summary"}},
                 },
                 {
                     "id": "monitor",
-                    "tool": "soridormi.safety.monitor_motion",
-                    "type": "monitor",
+                    "capability_id": "soridormi.safety.monitor_motion",
+                    "role": "monitor",
                     "during": ["execute_motion"],
                 },
                 {
                     "id": "execute_motion",
-                    "tool": "soridormi.skill.execute_plan",
-                    "type": "action",
+                    "capability_id": "soridormi.skill.execute_plan",
+                    "role": "activity",
                     "depends_on": ["confirm"],
                     "args": {"plan_id": {"$ref": "make_plan.output.plan_id"}},
                     "on_failure": {"strategy": "goto", "target": "stop_after_failure"},
                 },
-                {"id": "stop_after_failure", "tool": "soridormi.motion.stop", "type": "safety"},
+                {"id": "stop_after_failure", "capability_id": "soridormi.motion.stop", "role": "safety"},
                 {
                     "id": "report_done",
-                    "tool": "chromie.report",
-                    "type": "report",
+                    "capability_id": "chromie.report",
+                    "role": "report",
                     "depends_on": ["execute_motion"],
                     "args": {"message": {"$ref": "execute_motion.output.summary"}},
                 },
@@ -148,7 +148,7 @@ def _motion_graph() -> TaskGraph:
 
 
 def test_validator_accepts_confirmed_and_monitored_physical_motion_graph() -> None:
-    report = GraphValidator(_registry()).validate(_motion_graph())
+    report = WorkDAGValidator(_registry()).validate(_motion_graph())
     assert report.valid, report.errors
 
 
@@ -157,20 +157,20 @@ def test_validator_rejects_physical_motion_without_confirmation() -> None:
     for node in graph.nodes:
         if node.id == "execute_motion":
             node.depends_on = ["make_plan"]
-    report = GraphValidator(_registry()).validate(graph)
+    report = WorkDAGValidator(_registry()).validate(graph)
     assert not report.valid
     assert any("confirmation" in error for error in report.errors)
 
 
 def test_validator_rejects_unknown_tool() -> None:
-    graph = TaskGraph.model_validate({"graph_id": "bad", "nodes": [{"id": "x", "tool": "missing.tool"}]})
-    report = GraphValidator(_registry()).validate(graph)
+    graph = WorkDAG.model_validate({"dag_id": "bad", "nodes": [{"id": "x", "capability_id": "missing.tool"}]})
+    report = WorkDAGValidator(_registry()).validate(graph)
     assert not report.valid
-    assert any("unknown tool" in error for error in report.errors)
+    assert any("unknown capability" in error for error in report.errors)
 
 
 def test_dry_run_executor_resolves_refs_and_records_success_trace() -> None:
-    trace = DagDryRunExecutor(_registry()).run(_motion_graph())
+    trace = DAGDryRunEngine(_registry()).run(_motion_graph())
     assert trace.status == "success"
     outputs = trace.result_map()
     assert outputs["execute_motion"].output["completed"] is True
@@ -182,7 +182,7 @@ def test_dry_run_executor_triggers_fallback_and_blocks_downstream_on_declined_co
     for node in graph.nodes:
         if node.id == "confirm":
             node.on_failure = FailurePolicy(strategy="goto", target="stop_after_failure")
-    trace = DagDryRunExecutor(_registry(), auto_confirm=False).run(graph)
+    trace = DAGDryRunEngine(_registry(), auto_confirm=False).run(graph)
     results = trace.result_map()
     assert results["confirm"].status == "failed_fatal"
     assert results["stop_after_failure"].status == "success"
@@ -190,17 +190,17 @@ def test_dry_run_executor_triggers_fallback_and_blocks_downstream_on_declined_co
     assert any(event.type == "fallback_triggered" for event in trace.events)
 
 
-def test_task_graph_service_validates_runs_and_retains_trace() -> None:
-    service = TaskGraphService(build_chromie_registry())
-    graph = TaskGraph.model_validate(
+def test_work_dag_service_validates_runs_and_retains_trace() -> None:
+    service = DAGEngineService(build_chromie_registry())
+    graph = WorkDAG.model_validate(
         {
-            "graph_id": "service_report",
+            "dag_id": "service_report",
             "nodes": [
                 {
                     "id": "report",
-                    "tool": "chromie.report",
-                    "type": "report",
-                    "args": {"message": "TaskGraph service is reachable."},
+                    "capability_id": "chromie.report",
+                    "role": "report",
+                    "args": {"message": "WorkDAG service is reachable."},
                 }
             ],
         }
@@ -211,25 +211,25 @@ def test_task_graph_service_validates_runs_and_retains_trace() -> None:
 
     trace = service.dry_run(graph)
     assert trace.status == "success"
-    assert service.get_trace(graph.graph_id).result_map()["report"].output["reported"] is True
+    assert service.get_trace(graph.dag_id).result_map()["report"].output["reported"] is True
 
 
-def test_task_graph_service_rejects_invalid_graph_without_storing_trace() -> None:
-    service = TaskGraphService(build_chromie_registry())
-    graph = TaskGraph.model_validate(
-        {"graph_id": "invalid_service_graph", "nodes": [{"id": "bad", "tool": "missing.tool"}]}
+def test_work_dag_service_rejects_invalid_graph_without_storing_trace() -> None:
+    service = DAGEngineService(build_chromie_registry())
+    graph = WorkDAG.model_validate(
+        {"dag_id": "invalid_service_graph", "nodes": [{"id": "bad", "capability_id": "missing.tool"}]}
     )
 
     try:
         service.dry_run(graph)
     except ValueError as exc:
-        assert "unknown tool" in str(exc)
+        assert "unknown capability" in str(exc)
     else:
-        raise AssertionError("invalid TaskGraph unexpectedly ran")
+        raise AssertionError("invalid WorkDAG unexpectedly ran")
 
-    assert service.get_trace(graph.graph_id) is None
+    assert service.get_trace(graph.dag_id) is None
 
-from app.task_graph.executor import DagToolExecutor
+from app.work_dag.executor import DAGToolEngine
 from app.tool_invocation import FunctionToolInvoker, ToolCallOutcome
 
 
@@ -249,7 +249,7 @@ def test_tool_executor_invokes_registered_handlers_and_resolves_refs() -> None:
     invoker.register("soridormi.skill.execute_plan", execute)
     invoker.register("chromie.report", lambda args: {"reported": True, "message": args["message"]})
 
-    trace = DagToolExecutor(_registry(), invoker).run(_motion_graph())
+    trace = DAGToolEngine(_registry(), invoker).run(_motion_graph())
 
     assert trace.status == "success"
     assert observed["execute_plan_id"] == "real-plan-1"
@@ -267,21 +267,21 @@ def test_tool_executor_retries_retryable_failures() -> None:
         return {"text": "hello", "language": "en"}
 
     invoker.register("chromie.listen", flaky_listen)
-    graph = TaskGraph.model_validate(
+    graph = WorkDAG.model_validate(
         {
-            "graph_id": "retry_listen",
+            "dag_id": "retry_listen",
             "nodes": [
                 {
                     "id": "listen",
-                    "tool": "chromie.listen",
-                    "type": "query",
+                    "capability_id": "chromie.listen",
+                    "role": "activity",
                     "retry": {"max_attempts": 2, "backoff_s": 0.0},
                 }
             ],
         }
     )
 
-    trace = DagToolExecutor(build_chromie_registry(), invoker).run(graph)
+    trace = DAGToolEngine(build_chromie_registry(), invoker).run(graph)
     result = trace.result_map()["listen"]
     assert trace.status == "success"
     assert result.attempts == 2

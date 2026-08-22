@@ -48,14 +48,14 @@ class AgentClient:
         base_url: str,
         timeout_ms: int = 3000,
         *,
-        task_graph_execution_token: str | None = None,
+        dag_engine_execution_token: str | None = None,
     ):
         self.base_url = base_url.rstrip("/")
         self.timeout_ms = max(100, int(timeout_ms))
-        self.task_graph_execution_token = (
-            str(task_graph_execution_token).strip()
-            if task_graph_execution_token is not None
-            else os.getenv("AGENT_TASK_GRAPH_EXECUTION_TOKEN", "").strip()
+        self.dag_engine_execution_token = (
+            str(dag_engine_execution_token).strip()
+            if dag_engine_execution_token is not None
+            else os.getenv("AGENT_DAG_ENGINE_EXECUTION_TOKEN", "").strip()
         )
 
 
@@ -412,52 +412,52 @@ class AgentClient:
             )
             return result
 
-    async def execute_planning_task_graph(
+    async def execute_planning_work_dag(
         self,
         session: aiohttp.ClientSession,
-        graph: dict[str, Any],
+        dag: dict[str, Any],
         *,
         timeout_ms: int = 120000,
     ) -> dict[str, Any]:
         timeout = aiohttp.ClientTimeout(total=max(100, int(timeout_ms)) / 1000.0)
         async with session.post(
-            f"{self.base_url}/task-graphs/execute-planning",
-            json={"graph": graph},
+            f"{self.base_url}/work-dags/execute-planning",
+            json={"dag": dag},
             timeout=timeout,
         ) as resp:
             body = await resp.text()
             if resp.status != 200:
                 raise RuntimeError(
-                    f"Agent TaskGraph execution returned HTTP {resp.status}: {body[:500]}"
+                    f"Agent WorkDAG execution returned HTTP {resp.status}: {body[:500]}"
                 )
             return dict(await resp.json())
 
-    async def cancel_planning_task_graph(
+    async def cancel_planning_work_dag(
         self,
         session: aiohttp.ClientSession,
-        graph_id: str,
+        dag_id: str,
         *,
         timeout_ms: int = 3000,
     ) -> dict[str, Any]:
-        normalized_graph_id = str(graph_id or "").strip()
-        if not normalized_graph_id:
-            raise ValueError("TaskGraph cancellation requires graph_id")
-        if not self.task_graph_execution_token:
+        normalized_dag_id = str(dag_id or "").strip()
+        if not normalized_dag_id:
+            raise ValueError("WorkDAG cancellation requires dag_id")
+        if not self.dag_engine_execution_token:
             raise RuntimeError(
-                "AGENT_TASK_GRAPH_EXECUTION_TOKEN is required for "
-                "TaskGraph cancellation"
+                "AGENT_DAG_ENGINE_EXECUTION_TOKEN is required for "
+                "WorkDAG cancellation"
             )
         timeout = aiohttp.ClientTimeout(
             total=max(100, int(timeout_ms)) / 1000.0
         )
         async with session.post(
             (
-                f"{self.base_url}/task-graphs/"
-                f"{quote(normalized_graph_id, safe='')}/cancel"
+                f"{self.base_url}/work-dags/"
+                f"{quote(normalized_dag_id, safe='')}/cancel"
             ),
             headers={
                 "Authorization": (
-                    f"Bearer {self.task_graph_execution_token}"
+                    f"Bearer {self.dag_engine_execution_token}"
                 )
             },
             timeout=timeout,
@@ -465,7 +465,7 @@ class AgentClient:
             body = await resp.text()
             if resp.status != 200:
                 raise RuntimeError(
-                    "Agent TaskGraph cancellation returned "
+                    "Agent WorkDAG cancellation returned "
                     f"HTTP {resp.status}: {body[:500]}"
                 )
             return dict(await resp.json())

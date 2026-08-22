@@ -19,22 +19,22 @@ organized by capability, risk, and retained evidence.
 ## Current execution order
 
 The current-revision implementation/qualification axes remain separate. Phase 1 live
-semantic-authority source closure and Phase 2 documentation convergence are complete in
-the maintained tree; they are not requests to re-implement those migrations. Continue in
+semantic-authority source closure, Phase 2 documentation convergence, and Phase 3
+WorkDAG/DAGEngine authority convergence are complete in the maintained tree; they are not
+requests to re-implement those migrations. Continue in
 this order:
 
-1. **Decide dormant Chromie-global TaskGraph debt.** Keep provider/body-local DAGs, but
-   determine whether the default-off global TaskGraph and `residual_replan` surface owns a
-   distinct execution-only responsibility beneath Planner/Work. Delete it if that boundary
-   cannot be demonstrated; do not rename the overlap.
-2. **Perform repository hygiene and mechanical deduplication.** Remove verified orphan
+1. **Perform repository hygiene and mechanical deduplication.** Phase 3 is source-closed:
+   Planner authors/revises WorkDAG; DAGEngine advances execution mechanically; GA changes
+   Goal continuity only; completed DAG nodes are immutable/inherited; no `residual_replan`
+   or DAGEngine-authored recovery meaning remains. Remove verified orphan
    assets/dead placeholders, restore the pinned async test dependency, consolidate repeated
    normalization/schema mechanisms through small shared helpers, and remove compatibility
    residue only after current consumers are checked.
-3. **Continue structural simplification only across existing ownership seams.** File or
+2. **Continue structural simplification only across existing ownership seams.** File or
    method count is evidence of reconstructability cost, not permission to create another
    semantic manager.
-4. **Then run current-revision qualification and retain target evidence.** Re-run canonical
+3. **Then run current-revision qualification and retain target evidence.** Re-run canonical
    gates and retain bilingual/provider/simulator/live evidence for Planner-owned speech,
    Evidence-bound result claims, retry/alternative/silence behavior, duplicate-effect
    prevention, Social Attention, and latency. Source implementation, automated verification,
@@ -402,11 +402,16 @@ authority behind a new manager.
    qualification; and the docs gate rejects duplicate Configuration H2 sections plus the
    reviewed stale semantic phrases. **Implemented in Phase 2.**
 
-3. **Phase 3 — dormant TaskGraph decision.** Keep provider-local/physical DAGs. Audit the
-   default-off Chromie-global TaskGraph and `residual_replan` surface against Goal + Work +
-   Evidence + Situation + Planner. If it cannot prove a distinct execution-only owner,
-   delete it instead of renaming it. This is verified architecture debt, not a claim that
-   a second planner runs on every default turn.
+3. **Phase 3 — WorkDAG / DAGEngine authority convergence.** WorkDAG is the revisioned,
+   Planner-authored topology of coherent planned Work; DAGEngine is the deterministic DAG
+   runtime. Planner is the only ordinary semantic mutation entry. GA changes Goal continuity
+   only, then Planner may retain the current DAG (`reuse_activity_id` / NO_CHANGE), extend or
+   replace it with the exact next revision, or create/merge another coherent DAG. Normal node
+   completion advances in DAGEngine without another model call. Completed/skipped nodes are
+   immutable Evidence-bound history and are inherited without redispatch. Engine-authored
+   `residual_replan`, recovery recommendations, and outcome narration are removed; material
+   failure returns facts to Planner. Provider-local DAGs remain valid behind provider
+   Capability boundaries. **Implemented in Phase 3.**
 
 4. **Phase 4 — repository hygiene.** Remove verified orphan multi-agent prompt assets and
    dead `ToolClient`; restore a fully executable pinned test environment; consolidate the
@@ -426,8 +431,7 @@ authority behind a new manager.
    are measured separately from cold-load/watchdog time.
 
 Across all phases: `use less to solve more`; fix the earliest wrong boundary; do not add a
-`SpeechManager`, Response Composer, recovery brain, compatibility semantic path, or renamed
-TaskGraph equivalent.
+`SpeechManager`, Response Composer, recovery brain, compatibility semantic path, or a second WorkDAG semantic owner.
 
 ## Completed foundations
 

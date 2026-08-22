@@ -28,7 +28,7 @@ For authoritative architecture, status, and configuration, see:
 - `hardware/daemon.py` is a legacy mock compatibility boundary, not the alpha
   embodiment path.
 
-The Agent does not call TTS or low-level hardware. Separately gated TaskGraph
+The Agent does not call TTS or low-level hardware. Separately gated WorkDAG
 read/planning/guarded endpoints may use MCP, but normal embodied apply is
 adapted and authorized by the Trusted Capability Runtime. The language model is never
 the final authorization boundary for a side effect.
@@ -314,13 +314,13 @@ Cancellation:
    Soridormi motion cancellation, exposes only global-domain cancellation;
 6. dispatches Soridormi's dedicated E-stop for global emergency, retaining its
    result separately from safe-idle proof;
-7. calls the authenticated Agent TaskGraph cancel endpoint for selected
-   TaskGraph work and treats a missing/negative cancellation receipt as failure.
+7. calls the authenticated Agent WorkDAG cancel endpoint for selected
+   WorkDAG work and treats a missing/negative cancellation receipt as failure.
 
-TaskGraph execution itself is also terminal-evidence bound. Only explicit
+WorkDAG execution itself is also terminal-evidence bound. Only explicit
 `success` completes the CapabilityResult; absent, `pending`, `running`, or unknown
 status fails closed. The provider exposes a closed summary/result contract to
-the cognitive turn while detailed Agent-side TaskGraph traces remain the
+the cognitive turn while detailed Agent-side WorkDAG traces remain the
 authoritative execution record.
 
 Independent unselected Trusted Capability Runtime work continues; existing sequencing,

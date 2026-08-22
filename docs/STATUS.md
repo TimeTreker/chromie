@@ -77,6 +77,7 @@ human-facing behavior is considered qualified.
 | Cognitive Gateway / Attention | Maintained configuration controls Attention Review; deterministic protective reflex remains separate. Disabled or unavailable semantic review fails open without fabricating high-confidence addressedness. | Source and focused contract regressions cover admission, fail-open behavior, temporary addressedness rules, and schema boundaries. | Current-revision open-room microphone behavior still requires live evidence. | Development only. |
 | Goal Interpretation / Goal Association | GI is WHAT-only. GA is the canonical Goal-continuity writer. Standalone admitted greetings may speak before GA but still receive canonical conversational Goal continuity. GA representation mechanics are now split internally: `agent/app/goal_association_contract.py` owns model DTO/schema/normalization/typed integrity checks and `agent/app/goal_association_prompt.py` owns bounded prompt projection/system prompts. Resolver/inference and canonical continuity remain in the single `GoalAssociationResolver` authority. | Contract and focused Goal/continuity tests are maintained, including guards that neither extracted module owns a model client/runtime/Goal-commit authority and that the Resolver does not re-own their mechanics. | Live-model semantic quality remains revision-bound and must be requalified after material model/prompt changes. | Development only. |
 | Planner / communication | One Planner authority is the target HOW and ordinary Communicative-Activity owner; Fast/Deep remain passes of that owner. Planner contract decomposition is maintained. Phase 1A closes generic Confirmation Dialogue wording; Phase 1B closes named-cancellation narration and Host confirmation-remainder synthesis by returning typed cancellation Evidence to Planner; Phase 1C removes deterministic outcome/result wording and returns terminal outcome truth to Planner; Phase 1D removes Host body-recovery Plan/prompt synthesis and exposes only bounded provider retryability facts through Evidence. | Planner/GA/runtime tests and repository policy guard confirmation, named-cancellation, outcome-result, and body-recovery Host semantic ownership plus cancellation/terminal-Evidence binding and Planner re-entry. | Warm latency and complete user-facing authority still require current-revision qualification after source closure. | Development only. |
+| WorkDAG / DAGEngine | Planner is the sole ordinary semantic author/modifier of revisioned WorkDAG topology. GA changes Goal continuity only. DAGEngine owns acyclicity/contract checks, readiness, bounded parallel dispatch, dependency/blocked/cancellation state, trace, and immutable completed-node inheritance; normal completion advances mechanically while material change returns Evidence to Planner. Provider-local DAGs remain provider internals. | Focused WorkDAG revision tests prove exact `revision + 1`, stable `dag_id`, completed-node immutability and no redispatch; DAGEngine/Planner/capability tests guard removal of `residual_replan` and engine-authored outcome meaning. | Current-model quality of Planner-authored DAG topology and live multi-Goal revision/merge behavior still requires target qualification. | Development only. |
 | Async Runtime / Evidence re-entry | Terminal Runtime events are correlated into Evidence and may create bounded `CognitiveOpportunity` re-entry. Planner may answer, create follow-up Work, revise existing Work, wait, or do nothing. Re-entry is not response-only and does not fabricate a UserTurn, Responsibility, or confirmation. Missing originating Responsibility provenance retains Evidence but fails that opportunity closed. | Focused async regressions cover incremental terminal Evidence, follow-up Work while siblings continue, cancellation/supersession containment, duplicate-execution prevention, and missing-provenance rejection before Planner invocation. | Provider-backed weather/body episodes should be retained on the exact current revision. | Development only. |
 | Identity / personality truth | Chromie's owner-approved social identity is a six-year-old girl and family young secretary. That is not a biological-human claim; truthful robotic embodiment remains available when relevant. | Mind-profile, prompt-context, and identity/body benchmark contracts guard the two-layer truth boundary. | Bilingual live identity conversation remains to be requalified on the current model/profile. | Development only. |
 | Social Attention | Optional embodied decoration remains subordinate to a concrete primary Activity, has no speech or Goal-completion authority, and may validly return none. | Source-level behavior and capability-grounding checks exist. | Reviewed live baseline remains open for the current revision. | Development only. |
@@ -85,19 +86,19 @@ human-facing behavior is considered qualified.
 
 ## Current open work
 
-1. **Decide dormant global TaskGraph debt deliberately.** Provider/body-local DAGs are
-   valid. The default-off Chromie-global TaskGraph and `residual_replan` planning guidance
-   must either demonstrate a non-overlapping execution-only responsibility beneath
-   Planner/Work or be removed; do not rename the same overlap.
-2. **Perform repository hygiene after correctness.** Delete verified orphan legacy-agent
+1. **Perform repository hygiene after correctness.** Phase 3 WorkDAG/DAGEngine authority
+   is source-closed: Planner alone authors/revises WorkDAG semantics; GA only changes Goal
+   continuity; DAGEngine advances ready/running/completed/blocked/cancelled state, inherits
+   immutable completed nodes across the exact next revision, and never replans or speaks.
+   Delete verified orphan legacy-agent
    prompt assets and dead `ToolClient`; restore the pinned async test dependency; consolidate
    repeated whitespace normalization and JSON-schema/type validation mechanisms; remove stale
    naming/aliases when current consumers are absent; and extend non-Python obsolete-artifact
    checks.
-3. **Continue structural simplification separately.** Large Host/Planner/GA files remain
+2. **Continue structural simplification separately.** Large Host/Planner/GA files remain
    maintainability risks, but extract only existing mechanical ownership seams. Do not add a
    Speech Manager, Reconciliation Manager, Meta Planner, or one manager per cognitive term.
-4. **Requalify behavior on the exact current revision.** Re-run canonical gates, bilingual
+3. **Requalify behavior on the exact current revision.** Re-run canonical gates, bilingual
    confirmation/cancellation cases, provider-backed result Evidence, embodied failures,
    multi-Goal cancellation, latency, Social Attention, and live/simulator evidence. Source
    implementation, automated verification, target validation, and release readiness remain

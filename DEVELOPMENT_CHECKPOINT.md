@@ -13,9 +13,9 @@ Canonical owners remain [Project Charter](docs/PROJECT_CHARTER.md),
 [Current Status](docs/STATUS.md), [Roadmap](ROADMAP.md), and
 [Acceptance](docs/ACCEPTANCE.md). Source and executable evidence win over stale prose.
 
-Current focus: **Phase 3 dormant TaskGraph decision**, after source-closing the verified
-live semantic-authority leaks and converging current documentation. Do not redesign the
-Goal-driven backbone or reintroduce removed response/recovery owners.
+Current focus: **Phase 4 repository hygiene**, after source-closing Phase 3 WorkDAG /
+DAGEngine authority convergence. Do not redesign the Goal-driven backbone, put DAG
+semantics into Goal Association, or reintroduce removed response/recovery owners.
 
 ## Current architecture
 
@@ -23,7 +23,8 @@ Goal-driven backbone or reintroduce removed response/recovery owners.
 person -> Gateway -> GI -> Responsibility / WHAT
                            |-> GA -> canonical Goal continuity
                            `-> Planner fast/deep -> Plan / Activities
-                                                 -> Runtime -> Provider
+                                                 -> optional WorkDAG
+                                                 -> DAGEngine / Runtime -> Provider
                                                  -> async event -> Evidence
 Responsibility + Goal + Situation + Work + Evidence
                            -> CognitiveOpportunity -> Planner
@@ -77,24 +78,40 @@ Current documentation now matches the maintained authority line:
 - `docs/API_REFERENCE.md` names the current Fast/Deep Planner authority rather than an
   obsolete Agent capability planner.
 - `ROADMAP.md` and `docs/STATUS.md` now separate implemented source closure from later
-  target qualification and put Phase 3/4/5/6 in one consistent order.
+  target qualification and put Phase 4/5/6 in one consistent order after Phase 3 closure.
 - `scripts/check_docs.py` rejects duplicate Configuration H2 sections and reviewed stale
   semantic phrases so this drift cannot silently return.
 
 No new architecture document or semantic owner was added.
 
-## Verified dormant architecture debt
+## Phase 3 WorkDAG / DAGEngine convergence
 
-Chromie-global TaskGraph execution is wired but feature-disabled by default. Its
-`residual_replan` projection carries completed/failed/remaining-step state plus planning
-guidance. Phase 3 must decide whether this has a distinct execution-only responsibility
-beneath Goal + Work + Evidence + Situation + Planner.
+Chromie-level planned Work now has an explicit execution-only graph boundary:
 
-Keep provider/body-local DAGs. Do not treat their internal planning as Chromie's global
-semantic authority. If the Chromie-global layer cannot prove a distinct boundary, delete it
-rather than rename it.
+- Planner is the sole ordinary semantic author and modifier of `WorkDAG` topology.
+- `dag_id` remains stable across one coherent line of planned Work; Planner-authored
+  semantic changes advance `revision` exactly once and bind `parent_revision`.
+- Goal Association never edits a WorkDAG. GA changes canonical Goal continuity; that
+  changed Goal truth creates a Planner opportunity. Planner may choose NO_CHANGE by
+  retaining/reusing the current WorkDAG Activity, or author the next/new WorkDAG.
+- DAGEngine owns only graph validation, ready-node calculation, bounded parallel dispatch,
+  dependency/blocked/cancellation state, execution trace, and already-completed-node
+  inheritance across a valid next revision. Normal node completion returns to DAGEngine
+  and does not pay a Planner round trip.
+- Completed/skipped nodes are immutable execution history. The next revision cannot remove
+  or rewrite them, and DAGEngine does not dispatch them again.
+- `residual_replan`, engine-authored next-action recommendations, and deterministic DAG
+  outcome narration are removed. Material failure or changed reality returns facts through
+  Evidence to the same Planner.
+- Provider-local DAG/controllers such as Soridormi internals remain provider implementation
+  details and are not renamed into Chromie WorkDAG.
 
-## Repository hygiene after TaskGraph decision
+The current `chromie.work_dag.execute` Capability is an execution boundary for a fully
+Planner-authored DAG, not delegation of planning to DAGEngine. A future first-class
+`CanonicalPlan.work_dag` representation would be a representation-only change and must
+retain the same authority split.
+
+## Repository hygiene after WorkDAG convergence
 
 Phase 4 retains the verified cleanup inventory: orphan legacy-agent prompt assets, dead
 `ToolClient`, missing async test dependency, repeated whitespace normalizers, three
@@ -103,12 +120,11 @@ small deterministic mechanisms; do not create a framework merely to remove dupli
 
 ## Required execution order
 
-1. Execute **Phase 3** dormant TaskGraph / `residual_replan` decision.
-2. Execute **Phase 4** repository hygiene and deterministic-mechanism deduplication.
-3. Continue **Phase 5** structural simplification only across existing ownership seams.
-4. Execute **Phase 6** current-revision qualification and retain bilingual/provider/
+1. Execute **Phase 4** repository hygiene and deterministic-mechanism deduplication.
+2. Continue **Phase 5** structural simplification only across existing ownership seams.
+3. Execute **Phase 6** current-revision qualification and retain bilingual/provider/
    simulator/live evidence.
-5. Keep source implementation, automated verification, target validation, and release
+4. Keep source implementation, automated verification, target validation, and release
    readiness as separate claims.
 
 Detailed phase order and exit criteria live in `ROADMAP.md`; current facts live in
@@ -116,7 +132,7 @@ Detailed phase order and exit criteria live in `ROADMAP.md`; current facts live 
 
 ## Verification for this slice
 
-Phase 2 is documentation/gate work only. Run:
+Phase 3 changes source contracts, DAGEngine mechanics, APIs, tests, and documentation. Run:
 
 ```bash
 python scripts/check_docs.py

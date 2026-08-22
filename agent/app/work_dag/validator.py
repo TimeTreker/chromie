@@ -5,12 +5,12 @@ from typing import Any
 
 from ..capabilities.models import CapabilityRegistry, ToolCapability
 
-from .models import TaskGraph, TaskNode
+from .models import WorkDAG, WorkNode
 from .refs import iter_refs, ref_node_id
 
 
 @dataclass
-class GraphValidationReport:
+class WorkDAGValidationReport:
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
@@ -20,29 +20,29 @@ class GraphValidationReport:
 
     def raise_for_errors(self) -> None:
         if self.errors:
-            raise ValueError("TaskGraph validation failed: " + "; ".join(self.errors))
+            raise ValueError("WorkDAG validation failed: " + "; ".join(self.errors))
 
 
-class GraphValidator:
-    """Validate an LLM-proposed TaskGraph against Chromie's global registry."""
+class WorkDAGValidator:
+    """Validate a Planner-authored WorkDAG against Chromie's global registry."""
 
     def __init__(self, registry: CapabilityRegistry) -> None:
         self.registry = registry
 
-    def validate(self, graph: TaskGraph) -> GraphValidationReport:
-        report = GraphValidationReport()
-        nodes = graph.node_map()
-        self._validate_node_refs(graph, nodes, report)
-        self._validate_tools(graph, report)
-        self._validate_args(graph, report)
-        self._validate_fallbacks(graph, nodes, report)
-        self._validate_refs(graph, nodes, report)
-        self._validate_cycles(graph, nodes, report)
-        self._validate_physical_motion(graph, nodes, report)
+    def validate(self, dag: WorkDAG) -> WorkDAGValidationReport:
+        report = WorkDAGValidationReport()
+        nodes = dag.node_map()
+        self._validate_node_refs(dag, nodes, report)
+        self._validate_tools(dag, report)
+        self._validate_args(dag, report)
+        self._validate_fallbacks(dag, nodes, report)
+        self._validate_refs(dag, nodes, report)
+        self._validate_cycles(dag, nodes, report)
+        self._validate_physical_motion(dag, nodes, report)
         return report
 
-    def _validate_node_refs(self, graph: TaskGraph, nodes: dict[str, TaskNode], report: GraphValidationReport) -> None:
-        for node in graph.nodes:
+    def _validate_node_refs(self, dag: WorkDAG, nodes: dict[str, WorkNode], report: WorkDAGValidationReport) -> None:
+        for node in dag.nodes:
             for dep in node.depends_on:
                 if dep not in nodes:
                     report.errors.append(f"node {node.id!r} depends on unknown node {dep!r}")
@@ -50,32 +50,32 @@ class GraphValidator:
                 if running not in nodes:
                     report.errors.append(f"monitor node {node.id!r} references unknown during node {running!r}")
 
-    def _validate_tools(self, graph: TaskGraph, report: GraphValidationReport) -> None:
-        for node in graph.nodes:
+    def _validate_tools(self, dag: WorkDAG, report: WorkDAGValidationReport) -> None:
+        for node in dag.nodes:
             try:
-                tool = self.registry.get_tool(node.tool)
+                capability = self.registry.get_tool(node.capability_id)
             except KeyError:
-                report.errors.append(f"node {node.id!r} uses unknown tool {node.tool!r}")
+                report.errors.append(f"node {node.id!r} uses unknown capability {node.capability_id!r}")
                 continue
-            if graph.created_by == "llm" and not tool.llm_visible:
-                report.errors.append(f"LLM graph may not call hidden tool {node.tool!r}")
-            if graph.created_by == "llm" and tool.safety_class == "restricted":
-                report.errors.append(f"LLM graph may not call restricted tool {node.tool!r}")
-            if not tool.availability.available:
-                reason = tool.availability.reason or "unavailable"
-                report.errors.append(f"tool {node.tool!r} is unavailable: {reason}")
-            if node.timeout_s is not None and tool.execution.timeout_s is not None and node.timeout_s > tool.execution.timeout_s:
+            if dag.authored_by == "planner" and not capability.llm_visible:
+                report.errors.append(f"Planner-authored WorkDAG may not call hidden capability {node.capability_id!r}")
+            if dag.authored_by == "planner" and capability.safety_class == "restricted":
+                report.errors.append(f"Planner-authored WorkDAG may not call restricted capability {node.capability_id!r}")
+            if not capability.availability.available:
+                reason = capability.availability.reason or "unavailable"
+                report.errors.append(f"capability {node.capability_id!r} is unavailable: {reason}")
+            if node.timeout_s is not None and capability.execution.timeout_s is not None and node.timeout_s > capability.execution.timeout_s:
                 report.errors.append(
-                    f"node {node.id!r} timeout {node.timeout_s}s exceeds tool default {tool.execution.timeout_s}s"
+                    f"node {node.id!r} timeout {node.timeout_s}s exceeds capability default {capability.execution.timeout_s}s"
                 )
 
-    def _validate_args(self, graph: TaskGraph, report: GraphValidationReport) -> None:
-        for node in graph.nodes:
+    def _validate_args(self, dag: WorkDAG, report: WorkDAGValidationReport) -> None:
+        for node in dag.nodes:
             try:
-                tool = self.registry.get_tool(node.tool)
+                capability = self.registry.get_tool(node.capability_id)
             except KeyError:
                 continue
-            self._validate_value_against_schema(node.id, "args", node.args, tool.input_schema, report)
+            self._validate_value_against_schema(node.id, "args", node.args, capability.input_schema, report)
 
     def _validate_value_against_schema(
         self,
@@ -83,7 +83,7 @@ class GraphValidator:
         path: str,
         value: Any,
         schema: dict[str, Any],
-        report: GraphValidationReport,
+        report: WorkDAGValidationReport,
     ) -> None:
         if not schema:
             return
@@ -151,8 +151,8 @@ class GraphValidator:
                 return True
         return False
 
-    def _validate_fallbacks(self, graph: TaskGraph, nodes: dict[str, TaskNode], report: GraphValidationReport) -> None:
-        for node in graph.nodes:
+    def _validate_fallbacks(self, dag: WorkDAG, nodes: dict[str, WorkNode], report: WorkDAGValidationReport) -> None:
+        for node in dag.nodes:
             for field_name, policy in (("on_failure", node.on_failure), ("on_timeout", node.on_timeout)):
                 if policy and policy.strategy == "goto" and not policy.target:
                     report.errors.append(f"node {node.id!r} {field_name} goto policy must specify target")
@@ -164,8 +164,8 @@ class GraphValidator:
                 if policy.target and policy.target not in nodes:
                     report.errors.append(f"node {node.id!r} event {event!r} target {policy.target!r} does not exist")
 
-    def _validate_refs(self, graph: TaskGraph, nodes: dict[str, TaskNode], report: GraphValidationReport) -> None:
-        for node in graph.nodes:
+    def _validate_refs(self, dag: WorkDAG, nodes: dict[str, WorkNode], report: WorkDAGValidationReport) -> None:
+        for node in dag.nodes:
             for ref in iter_refs(node.args):
                 source = ref_node_id(ref)
                 if source is None:
@@ -183,9 +183,9 @@ class GraphValidator:
                 ):
                     report.warnings.append(f"node {node.id!r} refs {source!r} without an explicit dependency")
 
-    def _validate_cycles(self, graph: TaskGraph, nodes: dict[str, TaskNode], report: GraphValidationReport) -> None:
-        edges: dict[str, set[str]] = {node.id: set() for node in graph.nodes}
-        for node in graph.nodes:
+    def _validate_cycles(self, dag: WorkDAG, nodes: dict[str, WorkNode], report: WorkDAGValidationReport) -> None:
+        edges: dict[str, set[str]] = {node.id: set() for node in dag.nodes}
+        for node in dag.nodes:
             for dep in node.depends_on:
                 if dep in nodes:
                     edges[dep].add(node.id)
@@ -202,7 +202,7 @@ class GraphValidator:
         def dfs(node_id: str, stack: list[str]) -> None:
             if node_id in visiting:
                 cycle = " -> ".join(stack + [node_id])
-                report.errors.append(f"task graph contains cycle: {cycle}")
+                report.errors.append(f"work DAG contains cycle: {cycle}")
                 return
             if node_id in visited:
                 return
@@ -215,27 +215,27 @@ class GraphValidator:
         for node_id in nodes:
             dfs(node_id, [])
 
-    def _validate_physical_motion(self, graph: TaskGraph, nodes: dict[str, TaskNode], report: GraphValidationReport) -> None:
-        confirmation_nodes = {node.id for node in graph.nodes if node.type == "confirmation" or node.tool == "chromie.ask_confirmation"}
-        monitor_nodes = [node for node in graph.nodes if node.type == "monitor"]
+    def _validate_physical_motion(self, dag: WorkDAG, nodes: dict[str, WorkNode], report: WorkDAGValidationReport) -> None:
+        confirmation_nodes = {node.id for node in dag.nodes if node.role == "confirmation" or node.capability_id == "chromie.ask_confirmation"}
+        monitor_nodes = [node for node in dag.nodes if node.role == "monitor"]
 
-        for node in graph.nodes:
+        for node in dag.nodes:
             try:
-                tool = self.registry.get_tool(node.tool)
+                capability = self.registry.get_tool(node.capability_id)
             except KeyError:
                 continue
-            if tool.safety_class != "physical_motion" and "physical_motion" not in tool.effects:
+            if capability.safety_class != "physical_motion" and "physical_motion" not in capability.effects:
                 continue
-            if tool.confirmation.required and not self._has_transitive_dependency(node.id, confirmation_nodes, nodes):
+            if capability.confirmation.required and not self._has_transitive_dependency(node.id, confirmation_nodes, nodes):
                 report.errors.append(f"physical-motion node {node.id!r} must depend on a confirmation node")
-            if tool.monitoring.requires_safety_monitor:
+            if capability.monitoring.requires_safety_monitor:
                 has_monitor = any(node.id in monitor.during for monitor in monitor_nodes)
                 if not has_monitor:
                     report.errors.append(f"physical-motion node {node.id!r} must be covered by a monitor node")
-            if not node.on_failure and tool.default_failure_policy.strategy not in {"stop_and_report", "emergency_stop"}:
+            if not node.on_failure and capability.default_failure_policy.strategy not in {"stop_and_report", "emergency_stop"}:
                 report.warnings.append(f"physical-motion node {node.id!r} has no explicit safe failure policy")
 
-    def _has_transitive_dependency(self, node_id: str, candidates: set[str], nodes: dict[str, TaskNode]) -> bool:
+    def _has_transitive_dependency(self, node_id: str, candidates: set[str], nodes: dict[str, WorkNode]) -> bool:
         seen: set[str] = set()
 
         def walk(current: str) -> bool:
@@ -253,7 +253,7 @@ class GraphValidator:
         self,
         source_id: str,
         target_id: str,
-        nodes: dict[str, TaskNode],
+        nodes: dict[str, WorkNode],
     ) -> bool:
         source = nodes[source_id]
         for policy in (source.on_failure, source.on_timeout, *source.on_event.values()):

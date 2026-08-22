@@ -120,7 +120,7 @@ semantics become clearer.
 - Keep risky feature gates default-off and fail closed when providers are
   disabled or unavailable.
 - Preserve confirmation, monitor, cancellation, timeout, and fallback semantics.
-- Keep physical TaskGraph nodes sequential.
+- Keep physical WorkDAG nodes sequential.
 - Log fallback causes; do not hide model or service failures.
 - Do not use production `assert` for runtime invariants; classify and handle
   failures according to `docs/RUNTIME_FAILURE_PATHS.md`. Stable mechanical

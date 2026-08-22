@@ -629,31 +629,31 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("timeout=host.asr_timeout_s", input_source)
         self.assertNotIn("timeout=15.0", input_source)
 
-    def test_task_graph_diagnostics_fail_closed_without_token(self) -> None:
-        with patch.object(agent_main.settings, "task_graph_diagnostics_token", ""):
+    def test_work_dag_diagnostics_fail_closed_without_token(self) -> None:
+        with patch.object(agent_main.settings, "dag_engine_diagnostics_token", ""):
             with self.assertRaises(HTTPException) as raised:
-                agent_main.require_task_graph_diagnostics_auth(None)
+                agent_main.require_dag_engine_diagnostics_auth(None)
         self.assertEqual(raised.exception.status_code, 503)
 
-    def test_task_graph_diagnostics_require_matching_bearer(self) -> None:
-        with patch.object(agent_main.settings, "task_graph_diagnostics_token", "secret"):
+    def test_work_dag_diagnostics_require_matching_bearer(self) -> None:
+        with patch.object(agent_main.settings, "dag_engine_diagnostics_token", "secret"):
             with self.assertRaises(HTTPException) as raised:
-                agent_main.require_task_graph_diagnostics_auth("Bearer wrong")
+                agent_main.require_dag_engine_diagnostics_auth("Bearer wrong")
             self.assertEqual(raised.exception.status_code, 401)
-            agent_main.require_task_graph_diagnostics_auth("Bearer secret")
+            agent_main.require_dag_engine_diagnostics_auth("Bearer secret")
 
     def test_blank_diagnostics_token_falls_back_to_execution_token(self) -> None:
         with patch.dict(
             os.environ,
             {
-                "AGENT_TASK_GRAPH_DIAGNOSTICS_TOKEN": "",
-                "AGENT_TASK_GRAPH_EXECUTION_TOKEN": "execution-secret",
+                "AGENT_DAG_ENGINE_DIAGNOSTICS_TOKEN": "",
+                "AGENT_DAG_ENGINE_EXECUTION_TOKEN": "execution-secret",
             },
             clear=False,
         ):
             settings = agent_main.Settings()
         self.assertEqual(
-            settings.task_graph_diagnostics_token,
+            settings.dag_engine_diagnostics_token,
             "execution-secret",
         )
 

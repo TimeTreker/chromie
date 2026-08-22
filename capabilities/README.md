@@ -7,7 +7,7 @@ policy inputs consumed by `chromie-agent`. Docker mounts it read-only at
 The manifests are policy inputs, not informal tool descriptions. They define
 agent identities, tool schemas, side-effect classes, confirmation requirements,
 safety monitors, fallbacks, parallelism policy, and transport metadata used by
-TaskGraph validation and execution.
+Planner-authored WorkDAG validation and deterministic DAGEngine execution.
 
 ## Soridormi snapshot
 
@@ -37,7 +37,7 @@ or infer it from walking or grasping primitives. See
 [`Resource Acquisition and Delivery`](../docs/RESOURCE_ACQUISITION_AND_DELIVERY.md).
 
 The Soridormi task surface includes retry and monitoring contracts used by Chromie's
-TaskGraph:
+WorkDAG/DAGEngine execution boundary:
 
 - `client_task_ref` lets Chromie retry `soridormi.task.submit` without creating
   duplicate Soridormi task records.
@@ -166,7 +166,8 @@ Safe acceptance commands are documented in
 Chromie currently has two related but distinct capability views:
 
 1. The Agent capability registry is a startup-loaded, static manifest view used
-   for TaskGraph planning, validation, policy, and MCP invocation.
+   to validate Planner-authored WorkDAG nodes, enforce DAGEngine execution policy, and
+   invoke qualified provider operations. The registry does not plan DAG topology.
 2. The Orchestrator Skill Registry is a runtime catalog of trusted named skills
    used by `InteractionResponse` and the host Trusted Capability Runtime.
 

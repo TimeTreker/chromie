@@ -3,9 +3,9 @@ from __future__ import annotations
 import unittest
 
 from agent.app.capabilities.local import build_chromie_registry
-from agent.app.task_graph.grants import ConfirmationGrantStore
-from agent.app.task_graph.models import TaskGraph
-from agent.app.task_graph.service import TaskGraphService
+from agent.app.work_dag.grants import ConfirmationGrantStore
+from agent.app.work_dag.models import WorkDAG
+from agent.app.work_dag.service import DAGEngineService
 
 
 class _Clock:
@@ -16,15 +16,15 @@ class _Clock:
         return self.now
 
 
-def _report_graph(graph_id: str) -> TaskGraph:
-    return TaskGraph.model_validate(
+def _report_graph(graph_id: str) -> WorkDAG:
+    return WorkDAG.model_validate(
         {
-            "graph_id": graph_id,
+            "dag_id": graph_id,
             "nodes": [
                 {
                     "id": "report",
-                    "tool": "chromie.report",
-                    "type": "report",
+                    "capability_id": "chromie.report",
+                    "role": "report",
                     "args": {"message": graph_id},
                 }
             ],
@@ -32,15 +32,15 @@ def _report_graph(graph_id: str) -> TaskGraph:
     )
 
 
-def _confirmation_graph(graph_id: str = "confirmation") -> TaskGraph:
-    return TaskGraph.model_validate(
+def _confirmation_graph(graph_id: str = "confirmation") -> WorkDAG:
+    return WorkDAG.model_validate(
         {
-            "graph_id": graph_id,
+            "dag_id": graph_id,
             "nodes": [
                 {
                     "id": "confirm",
-                    "tool": "chromie.ask_confirmation",
-                    "type": "confirmation",
+                    "capability_id": "chromie.ask_confirmation",
+                    "role": "confirmation",
                     "args": {"question": "Continue?"},
                 }
             ],
@@ -48,16 +48,16 @@ def _confirmation_graph(graph_id: str = "confirmation") -> TaskGraph:
     )
 
 
-class TaskGraphRetentionTests(unittest.TestCase):
+class WorkDAGRetentionTests(unittest.TestCase):
     def test_graph_id_is_safe_for_cancel_route(self) -> None:
         graph = _report_graph("goal:fetch_phone-01")
-        self.assertEqual(graph.graph_id, "goal:fetch_phone-01")
+        self.assertEqual(graph.dag_id, "goal:fetch_phone-01")
         with self.assertRaisesRegex(ValueError, "URL-path-safe"):
             _report_graph("goal/fetch phone")
 
     def test_traces_use_ttl_and_lru_capacity(self) -> None:
         clock = _Clock()
-        service = TaskGraphService(
+        service = DAGEngineService(
             build_chromie_registry(),
             trace_max_entries=2,
             trace_ttl_s=10,

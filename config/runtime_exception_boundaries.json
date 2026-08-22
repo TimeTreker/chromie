@@ -269,21 +269,6 @@
     },
     {
       "path": "agent/app/fast_planner.py",
-      "symbol": "FastPlannerResolver.resolve_first_response",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "agent.fast_planner",
-      "contract": "Map first-response inference or DTO failure to an explicit no-Activity FastPlannerFirstResponse without inventing speech or blocking remaining cognition.",
-      "review_status": "reviewed",
-      "body_sha256": "2a075f8bb26aea813252cad1f3014f04c800644f64dca9af1e9042d68a2dcf62",
-      "failure_signals": [
-        "diagnostic",
-        "return",
-        "state_update"
-      ]
-    },
-    {
-      "path": "agent/app/fast_planner.py",
       "symbol": "FastPlannerResolver.resolve_advance",
       "ordinal": 1,
       "classification": "typed_failure_mapping",
@@ -293,6 +278,21 @@
       "body_sha256": "d4e42855b699f20a478747054d497588595a2a542676c9187383c2c32755d2bb",
       "failure_signals": [
         "continue",
+        "return",
+        "state_update"
+      ]
+    },
+    {
+      "path": "agent/app/fast_planner.py",
+      "symbol": "FastPlannerResolver.resolve_first_response",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "agent.fast_planner",
+      "contract": "Map first-response inference or DTO failure to an explicit no-Activity FastPlannerFirstResponse without inventing speech or blocking remaining cognition.",
+      "review_status": "reviewed",
+      "body_sha256": "2a075f8bb26aea813252cad1f3014f04c800644f64dca9af1e9042d68a2dcf62",
+      "failure_signals": [
+        "diagnostic",
         "return",
         "state_update"
       ]
@@ -402,20 +402,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "8f455c0206e62dd42c98728184b0f62878ab00caeadd10cce46e064a2359408a",
-      "failure_signals": [
-        "bare_reraise"
-      ]
-    },
-    {
-      "path": "agent/app/task_graph/service.py",
-      "symbol": "TaskGraphService._execute_tracked",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "4e0b2073558f5460833e8c120c738458e8814125f50be1da8f0beca0cdad910c",
+      "body_sha256": "e38474020db6258095026de45e77d6bafc74df81e9b0014904470be07673ee1f",
       "failure_signals": [
         "bare_reraise"
       ]
@@ -447,6 +434,19 @@
       ]
     },
     {
+      "path": "agent/app/work_dag/service.py",
+      "symbol": "DAGEngineService._execute_tracked",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "4e0b2073558f5460833e8c120c738458e8814125f50be1da8f0beca0cdad910c",
+      "failure_signals": [
+        "bare_reraise"
+      ]
+    },
+    {
       "path": "orchestrator/audio_device_manager.py",
       "symbol": "AudioDeviceManager._resolve",
       "ordinal": 1,
@@ -471,32 +471,6 @@
       "body_sha256": "3601443727e4a4e366c3ec83d126b28b3a2abd09f021e199692513e85346bd35",
       "failure_signals": [
         "raise"
-      ]
-    },
-    {
-      "path": "orchestrator/runtime/audio_device_lifecycle.py",
-      "symbol": "apply_pending_output_device_change.stop_and_close",
-      "ordinal": 1,
-      "classification": "diagnostic_cleanup",
-      "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
-      "review_status": "reviewed",
-      "body_sha256": "8658c2645d06af2c60221987f6f97e4b6537366a80e6c7c3da4bd75f2464edf0",
-      "failure_signals": [
-        "diagnostic"
-      ]
-    },
-    {
-      "path": "orchestrator/runtime/audio_device_lifecycle.py",
-      "symbol": "apply_pending_output_device_change.stop_and_close",
-      "ordinal": 2,
-      "classification": "diagnostic_cleanup",
-      "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
-      "review_status": "reviewed",
-      "body_sha256": "2b13808c4a47e0ef92c09d898a0134d28ec2c9e3bc7efd9e931d34b3f15e9980",
-      "failure_signals": [
-        "diagnostic"
       ]
     },
     {
@@ -534,19 +508,6 @@
       "body_sha256": "9b53d7d67af521265e6868237630f3e01b7f44fb347a5987eb8b71b29407fde3",
       "failure_signals": [
         "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/runtime/audio_device_lifecycle.py",
-      "symbol": "audio_device_monitor.collect_pipewire_changes",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "8e7ad241a902bc068f21da54ca17ef9eafe150488384550e036204ac3af04563",
-      "failure_signals": [
-        "diagnostic"
       ]
     },
     {
@@ -650,34 +611,6 @@
     },
     {
       "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._plan_evidence_bound_capability_result_response",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "a60c93e77f60d60363c6eef8d64bafac2c6b13deb9aaf41994d3c0a7b5e808ab",
-      "failure_signals": [
-        "diagnostic",
-        "return"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._plan_incremental_terminal_result_response",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "orchestrator",
-      "contract": "Map Planner Evidence re-entry failure to no incremental response with diagnostics; never speak an unvalidated provider result.",
-      "review_status": "reviewed",
-      "body_sha256": "39f3c55cb2a194294fbca3c660d612fb49ce80399ca41dffb788b68e790e7848",
-      "failure_signals": [
-        "diagnostic",
-        "return"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant._consume_detached_cognitive_dispatch",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
@@ -761,6 +694,47 @@
     },
     {
       "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._plan_evidence_bound_capability_result_response",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "a60c93e77f60d60363c6eef8d64bafac2c6b13deb9aaf41994d3c0a7b5e808ab",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._plan_incremental_terminal_result_response",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Map Planner Evidence re-entry failure to no incremental response with diagnostics; never speak an unvalidated provider result.",
+      "review_status": "reviewed",
+      "body_sha256": "39f3c55cb2a194294fbca3c660d612fb49ce80399ca41dffb788b68e790e7848",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._planner_state_reentry_response",
+      "ordinal": 1,
+      "classification": "narrow_reraise",
+      "owner": "orchestrator",
+      "contract": "Retain Planner state re-entry failure evidence, then re-raise so the caller fails closed without Host-authored semantic wording.",
+      "review_status": "reviewed",
+      "body_sha256": "1f743fa38cf04e565fb92542dd6b6aa97ca64e193a0cbaacfa3e815f38c73e3d",
+      "failure_signals": [
+        "bare_reraise"
+      ]
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant._reconcile_reflex_cancellation_receipt",
       "ordinal": 1,
       "classification": "typed_failure_mapping",
@@ -772,45 +746,6 @@
         "diagnostic",
         "return",
         "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/runtime/observability_recording.py",
-      "symbol": "record_execution_experience_safely",
-      "ordinal": 1,
-      "classification": "diagnostic_cleanup",
-      "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not alter Goal, Planner, speech, or execution truth.",
-      "review_status": "reviewed",
-      "body_sha256": "b907b80767f62bc176e43ca23ce665531659e4d5f5311c029208d6ad682091f0",
-      "failure_signals": [
-        "diagnostic"
-      ]
-    },
-    {
-      "path": "orchestrator/runtime/observability_recording.py",
-      "symbol": "record_cognitive_runtime_evidence",
-      "ordinal": 1,
-      "classification": "diagnostic_cleanup",
-      "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not alter Goal, Planner, speech, or execution truth.",
-      "review_status": "reviewed",
-      "body_sha256": "a57d6fcab595a7832364c138180ea17170180111f6791488b1621c4d2dfd0f0a",
-      "failure_signals": [
-        "diagnostic"
-      ]
-    },
-    {
-      "path": "orchestrator/runtime/observability_recording.py",
-      "symbol": "record_cognitive_gateway_evidence",
-      "ordinal": 1,
-      "classification": "diagnostic_cleanup",
-      "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not alter Goal, Planner, speech, or execution truth.",
-      "review_status": "reviewed",
-      "body_sha256": "bef62d2b48dd953de95a5d2512ee1eb0b9c1df9e56db0097a903af0eecd226ad",
-      "failure_signals": [
-        "diagnostic"
       ]
     },
     {
@@ -910,21 +845,6 @@
       ]
     },
     {
-      "path": "orchestrator/runtime/audio_device_lifecycle.py",
-      "symbol": "refresh_system_default_audio_devices",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "85aaea1da1a6d4d9cde2f1abb7acda54e081884b82804eee9ae94a0dff631769",
-      "failure_signals": [
-        "continue",
-        "diagnostic",
-        "state_update"
-      ]
-    },
-    {
       "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant._resolve_pending_confirmation_meaning",
       "ordinal": 1,
@@ -967,14 +887,14 @@
       ]
     },
     {
-      "path": "orchestrator/runtime/shutdown_lifecycle.py",
-      "symbol": "shutdown_voice_assistant",
-      "ordinal": 1,
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._try_apply_cognitive_runtime",
+      "ordinal": 2,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Final accelerator telemetry is diagnostic-only; teardown must continue to session finalization and resource release when that sample fails.",
+      "contract": "If post-cancellation Planner state re-entry itself fails, retain diagnostics and fall back only to the bounded operational safety utterance rather than inventing cancellation meaning.",
       "review_status": "reviewed",
-      "body_sha256": "fe216815b4bc0aa965c12c224e64486ae8ffe195f683d91da3fc6c849e040ae0",
+      "body_sha256": "99c4b17ec02d5b5f369bd0cba70b848d4a954c2dc3f13751ac208f656a9765af",
       "failure_signals": [
         "diagnostic"
       ]
@@ -1048,16 +968,57 @@
       ]
     },
     {
-      "path": "orchestrator/runtime/capability_adapters.py",
-      "symbol": "_with_residual_replan",
+      "path": "orchestrator/runtime/audio_device_lifecycle.py",
+      "symbol": "apply_pending_output_device_change.stop_and_close",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "8658c2645d06af2c60221987f6f97e4b6537366a80e6c7c3da4bd75f2464edf0",
+      "failure_signals": [
+        "diagnostic"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/audio_device_lifecycle.py",
+      "symbol": "apply_pending_output_device_change.stop_and_close",
+      "ordinal": 2,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "2b13808c4a47e0ef92c09d898a0134d28ec2c9e3bc7efd9e931d34b3f15e9980",
+      "failure_signals": [
+        "diagnostic"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/audio_device_lifecycle.py",
+      "symbol": "audio_device_monitor.collect_pipewire_changes",
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "db51771e88ff730d27111c8d9e1c25f1295cdf4e8ae6f4713c92db86bf83d268",
+      "body_sha256": "8e7ad241a902bc068f21da54ca17ef9eafe150488384550e036204ac3af04563",
       "failure_signals": [
-        "return"
+        "diagnostic"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/audio_device_lifecycle.py",
+      "symbol": "refresh_system_default_audio_devices",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "85aaea1da1a6d4d9cde2f1abb7acda54e081884b82804eee9ae94a0dff631769",
+      "failure_signals": [
+        "continue",
+        "diagnostic",
+        "state_update"
       ]
     },
     {
@@ -1408,19 +1369,6 @@
     },
     {
       "path": "orchestrator/runtime/interaction_coordinator.py",
-      "symbol": "InteractionRuntimeCoordinator.start_fast_planner_communicative_act.observe_completion",
-      "ordinal": 1,
-      "classification": "diagnostic_cleanup",
-      "owner": "orchestrator.interaction_runtime",
-      "contract": "Log an optional delivered-speech recorder failure without changing the already-completed Vocal execution or crashing Runtime.",
-      "review_status": "reviewed",
-      "body_sha256": "256b8fd73cab768931861de8a9ad6077696170845b32b0f2eec36d8c1c39b001",
-      "failure_signals": [
-        "diagnostic"
-      ]
-    },
-    {
-      "path": "orchestrator/runtime/interaction_coordinator.py",
       "symbol": "InteractionRuntimeCoordinator.bind_fast_planner_communicative_execution.reconcile_completion",
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
@@ -1443,6 +1391,19 @@
       "body_sha256": "07f6ab372f607c8cd6d045cb3659728fe6de119730c36921c3bb943cd80f4aa5",
       "failure_signals": [
         "return"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/interaction_coordinator.py",
+      "symbol": "InteractionRuntimeCoordinator.start_fast_planner_communicative_act.observe_completion",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator.interaction_runtime",
+      "contract": "Log an optional delivered-speech recorder failure without changing the already-completed Vocal execution or crashing Runtime.",
+      "review_status": "reviewed",
+      "body_sha256": "256b8fd73cab768931861de8a9ad6077696170845b32b0f2eec36d8c1c39b001",
+      "failure_signals": [
+        "diagnostic"
       ]
     },
     {
@@ -1525,6 +1486,45 @@
       "body_sha256": "e072562ebc9fea2cbe7665b5912f1aa3e43fcec0f985fc8feffce52e20219210",
       "failure_signals": [
         "raise"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/observability_recording.py",
+      "symbol": "record_cognitive_gateway_evidence",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not alter Goal, Planner, speech, or execution truth.",
+      "review_status": "reviewed",
+      "body_sha256": "bef62d2b48dd953de95a5d2512ee1eb0b9c1df9e56db0097a903af0eecd226ad",
+      "failure_signals": [
+        "diagnostic"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/observability_recording.py",
+      "symbol": "record_cognitive_runtime_evidence",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not alter Goal, Planner, speech, or execution truth.",
+      "review_status": "reviewed",
+      "body_sha256": "a57d6fcab595a7832364c138180ea17170180111f6791488b1621c4d2dfd0f0a",
+      "failure_signals": [
+        "diagnostic"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/observability_recording.py",
+      "symbol": "record_execution_experience_safely",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not alter Goal, Planner, speech, or execution truth.",
+      "review_status": "reviewed",
+      "body_sha256": "b907b80767f62bc176e43ca23ce665531659e4d5f5311c029208d6ad682091f0",
+      "failure_signals": [
+        "diagnostic"
       ]
     },
     {
@@ -1771,6 +1771,19 @@
       ]
     },
     {
+      "path": "orchestrator/runtime/shutdown_lifecycle.py",
+      "symbol": "shutdown_voice_assistant",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Final accelerator telemetry is diagnostic-only; teardown must continue to session finalization and resource release when that sample fails.",
+      "review_status": "reviewed",
+      "body_sha256": "fe216815b4bc0aa965c12c224e64486ae8ffe195f683d91da3fc6c849e040ae0",
+      "failure_signals": [
+        "diagnostic"
+      ]
+    },
+    {
       "path": "orchestrator/vad.py",
       "symbol": "<module>",
       "ordinal": 1,
@@ -1848,32 +1861,6 @@
       "body_sha256": "1da14c5fde2aabf84c559f6b9bb11adef0de4c1f243cfff302d95cbc89de1cfd",
       "failure_signals": [
         "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._planner_state_reentry_response",
-      "ordinal": 1,
-      "classification": "narrow_reraise",
-      "owner": "orchestrator",
-      "contract": "Retain Planner state re-entry failure evidence, then re-raise so the caller fails closed without Host-authored semantic wording.",
-      "review_status": "reviewed",
-      "body_sha256": "1f743fa38cf04e565fb92542dd6b6aa97ca64e193a0cbaacfa3e815f38c73e3d",
-      "failure_signals": [
-        "bare_reraise"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._try_apply_cognitive_runtime",
-      "ordinal": 2,
-      "classification": "diagnostic_cleanup",
-      "owner": "orchestrator",
-      "contract": "If post-cancellation Planner state re-entry itself fails, retain diagnostics and fall back only to the bounded operational safety utterance rather than inventing cancellation meaning.",
-      "review_status": "reviewed",
-      "body_sha256": "99c4b17ec02d5b5f369bd0cba70b848d4a954c2dc3f13751ac208f656a9765af",
-      "failure_signals": [
-        "diagnostic"
       ]
     }
   ],

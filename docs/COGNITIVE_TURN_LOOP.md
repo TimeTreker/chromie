@@ -163,7 +163,7 @@ new authoritative state. It is not permission to repair a rejected model output.
 It may return only to canonical planning with the original/current Goal authority
 intact. It cannot return to input classification, widen the Goal, bypass a new
 material confirmation, or repeat a physical action without fresh authorization.
-Physical TaskGraph work remains sequential.
+WorkDAG execution follows Planner-authored dependency/concurrency topology; DAGEngine may dispatch only nodes that are mechanically ready and runtime-qualified.
 
 ### 3.0 Fast/Deep escalation is cognition depth, not repair
 

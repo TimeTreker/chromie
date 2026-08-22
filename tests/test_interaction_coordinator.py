@@ -1205,7 +1205,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status, "completed")
         self.assertEqual(spoken, [])
 
-    async def test_task_graph_capability_executes_handler_and_defers_completion_wording(
+    async def test_work_dag_capability_executes_handler_and_defers_completion_wording(
         self,
     ) -> None:
         spoken: list[str] = []
@@ -1214,16 +1214,15 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         async def execute_graph(graph: dict[str, Any]) -> dict[str, Any]:
             graphs.append(graph)
             return {
-                "graph_id": graph["graph_id"],
+                "dag_id": graph["dag_id"],
                 "status": "success",
-                "outcome_summary": "TaskGraph completed successfully.",
                 "node_results": [],
                 "events": [],
             }
 
         coordinator = InteractionRuntimeCoordinator(
             lambda args: spoken.append(str(args["text"])) or {"scheduled": True},
-            task_graph_handler=execute_graph,
+            work_dag_handler=execute_graph,
         )
 
         result = await _execute_to_terminal(coordinator,
@@ -1232,8 +1231,8 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                 capabilities=[
                     {
                         "request_id": "graph-1",
-                        "capability_id": "chromie.task_graph.execute",
-                        "args": {"graph": {"graph_id": "nav", "nodes": []}},
+                        "capability_id": "chromie.work_dag.execute",
+                        "args": {"dag": {"dag_id": "nav", "revision": 1, "authored_by": "planner", "goal_ids": ["goal-nav"], "nodes": []}},
                         "timing": "sequential",
                     }
                 ],
@@ -1242,31 +1241,39 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(result.status, "completed")
-        self.assertEqual(graphs, [{"graph_id": "nav", "nodes": []}])
+        self.assertEqual(len(graphs), 1)
+        self.assertEqual(graphs[0]["dag_id"], "nav")
+        self.assertEqual(graphs[0]["revision"], 1)
+        self.assertEqual(graphs[0]["authored_by"], "planner")
+        self.assertEqual(graphs[0]["goal_ids"], ["goal-nav"])
+        self.assertEqual(graphs[0]["nodes"], [])
         self.assertEqual(spoken, [])
-        self.assertEqual(result.results[0].capability_id, "chromie.task_graph.execute")
+        self.assertEqual(result.results[0].capability_id, "chromie.work_dag.execute")
         self.assertEqual(result.results[0].status, "completed")
 
-    async def test_failed_task_graph_suppresses_unverified_completion_speech(
+    async def test_failed_work_dag_suppresses_unverified_completion_speech(
         self,
     ) -> None:
         spoken: list[str] = []
 
         async def execute_graph(graph: dict[str, Any]) -> dict[str, Any]:
             return {
-                "graph_id": graph["graph_id"],
+                "dag_id": graph["dag_id"],
                 "status": "failed",
-                "outcome_summary": (
-                    "TaskGraph failed at node go: "
-                    "reason code: missing_navigation_pipeline"
-                ),
-                "node_results": [],
+                "node_results": [{
+                    "node_id": "go",
+                    "capability_id": "soridormi.task.submit",
+                    "status": "failed_fatal",
+                    "attempts": 1,
+                    "blocked_by": [],
+                    "output": {"reason_code": "missing_navigation_pipeline"},
+                }],
                 "events": [],
             }
 
         coordinator = InteractionRuntimeCoordinator(
             lambda args: spoken.append(str(args["text"])) or {"scheduled": True},
-            task_graph_handler=execute_graph,
+            work_dag_handler=execute_graph,
         )
 
         result = await _execute_to_terminal(coordinator,
@@ -1275,8 +1282,8 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                 capabilities=[
                     {
                         "request_id": "graph-1",
-                        "capability_id": "chromie.task_graph.execute",
-                        "args": {"graph": {"graph_id": "nav", "nodes": []}},
+                        "capability_id": "chromie.work_dag.execute",
+                        "args": {"dag": {"dag_id": "nav", "revision": 1, "authored_by": "planner", "goal_ids": ["goal-nav"], "nodes": []}},
                         "timing": "sequential",
                     }
                 ],
@@ -1287,16 +1294,19 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.status, "failed")
         self.assertEqual(result.results[0].status, "failed")
-        self.assertEqual(result.results[0].reason_code, "task_graph_failed")
-        self.assertIn("missing_navigation_pipeline", result.results[0].message)
+        self.assertEqual(result.results[0].reason_code, "work_dag_failed")
+        self.assertEqual(
+            result.results[0].output["node_results"][0]["reason_code"],
+            "missing_navigation_pipeline",
+        )
         self.assertEqual(spoken, [])
 
-    async def test_non_terminal_task_graph_result_fails_closed(self) -> None:
+    async def test_non_terminal_work_dag_result_fails_closed(self) -> None:
         for graph_status, expected_reason in (
-            ("", "task_graph_missing_terminal_status"),
-            ("pending", "task_graph_non_terminal_result"),
-            ("running", "task_graph_non_terminal_result"),
-            ("mystery", "task_graph_invalid_terminal_status"),
+            ("", "work_dag_missing_terminal_status"),
+            ("pending", "work_dag_non_terminal_result"),
+            ("running", "work_dag_non_terminal_result"),
+            ("mystery", "work_dag_invalid_terminal_status"),
         ):
             with self.subTest(graph_status=graph_status):
                 spoken: list[str] = []
@@ -1306,8 +1316,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                     status: str = graph_status,
                 ) -> dict[str, Any]:
                     output = {
-                        "graph_id": graph["graph_id"],
-                        "outcome_summary": "No terminal execution evidence.",
+                        "dag_id": graph["dag_id"],
                     }
                     if status:
                         output["status"] = status
@@ -1316,16 +1325,16 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                 coordinator = InteractionRuntimeCoordinator(
                     lambda args: spoken.append(str(args["text"]))
                     or {"scheduled": True},
-                    task_graph_handler=execute_graph,
+                    work_dag_handler=execute_graph,
                 )
                 result = await _execute_to_terminal(coordinator,
                     InteractionResponse(
                         capabilities=[
                             {
                                 "request_id": "graph-1",
-                                "capability_id": "chromie.task_graph.execute",
+                                "capability_id": "chromie.work_dag.execute",
                                 "args": {
-                                    "graph": {"graph_id": "nav", "nodes": []}
+                                    "dag": {"dag_id": "nav", "revision": 1, "authored_by": "planner", "goal_ids": ["goal-nav"], "nodes": []}
                                 },
                                 "timing": "sequential",
                             }
@@ -1340,23 +1349,22 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(result.results[0].reason_code, expected_reason)
                 self.assertEqual(spoken, [])
 
-    async def test_cancelled_task_graph_suppresses_unverified_completion_speech(
+    async def test_cancelled_work_dag_suppresses_unverified_completion_speech(
         self,
     ) -> None:
         spoken: list[str] = []
 
         async def execute_graph(graph: dict[str, Any]) -> dict[str, Any]:
             return {
-                "graph_id": graph["graph_id"],
+                "dag_id": graph["dag_id"],
                 "status": "cancelled",
-                "outcome_summary": "TaskGraph was cancelled at node monitor.",
                 "node_results": [],
                 "events": [],
             }
 
         coordinator = InteractionRuntimeCoordinator(
             lambda args: spoken.append(str(args["text"])) or {"scheduled": True},
-            task_graph_handler=execute_graph,
+            work_dag_handler=execute_graph,
         )
 
         result = await _execute_to_terminal(coordinator,
@@ -1365,8 +1373,8 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                 capabilities=[
                     {
                         "request_id": "graph-1",
-                        "capability_id": "chromie.task_graph.execute",
-                        "args": {"graph": {"graph_id": "nav", "nodes": []}},
+                        "capability_id": "chromie.work_dag.execute",
+                        "args": {"dag": {"dag_id": "nav", "revision": 1, "authored_by": "planner", "goal_ids": ["goal-nav"], "nodes": []}},
                         "timing": "sequential",
                     }
                 ],
@@ -1377,31 +1385,31 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.status, "failed")
         self.assertEqual(result.results[0].status, "cancelled")
-        self.assertEqual(result.results[0].reason_code, "task_graph_cancelled")
+        self.assertEqual(result.results[0].reason_code, "work_dag_cancelled")
         self.assertEqual(spoken, [])
 
-    async def test_scoped_task_graph_cancel_uses_authoritative_endpoint(
+    async def test_scoped_work_dag_cancel_uses_authoritative_endpoint(
         self,
     ) -> None:
         started = asyncio.Event()
-        cancelled_graph_ids: list[str] = []
+        cancelled_dag_ids: list[str] = []
 
         async def execute_graph(graph: dict[str, Any]) -> dict[str, Any]:
             started.set()
             await asyncio.Event().wait()
-            raise AssertionError("cancelled TaskGraph execution resumed")
+            raise AssertionError("cancelled WorkDAG execution resumed")
 
-        async def cancel_graph(graph_id: str) -> dict[str, Any]:
-            cancelled_graph_ids.append(graph_id)
+        async def cancel_dag(dag_id: str) -> dict[str, Any]:
+            cancelled_dag_ids.append(dag_id)
             return {
-                "graph_id": graph_id,
+                "dag_id": dag_id,
                 "cancellation_requested": True,
             }
 
         coordinator = InteractionRuntimeCoordinator(
             lambda args: {"scheduled": True},
-            task_graph_handler=execute_graph,
-            task_graph_cancel_handler=cancel_graph,
+            work_dag_handler=execute_graph,
+            work_dag_cancel_handler=cancel_dag,
         )
         execution_task = asyncio.create_task(
             _execute_to_terminal(coordinator,
@@ -1410,10 +1418,13 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                     capabilities=[
                         {
                             "request_id": "graph-request",
-                            "capability_id": "chromie.task_graph.execute",
+                            "capability_id": "chromie.work_dag.execute",
                             "args": {
-                                "graph": {
-                                    "graph_id": "graph-cancel",
+                                "dag": {
+                                    "dag_id": "graph-cancel",
+                                    "revision": 1,
+                                    "authored_by": "planner",
+                                    "goal_ids": ["goal-cancel"],
                                     "nodes": [],
                                 }
                             },
@@ -1434,7 +1445,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
         execution = await execution_task
 
-        self.assertEqual(cancelled_graph_ids, ["graph-cancel"])
+        self.assertEqual(cancelled_dag_ids, ["graph-cancel"])
         self.assertEqual(_provider_failure_texts(receipt), ())
         self.assertEqual(
             _request_ids(receipt.cancel_requested_request_bindings),
@@ -1447,7 +1458,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             "cancelled_embodied_motion",
         )
 
-    async def test_scoped_task_graph_cancel_fails_closed_without_endpoint(
+    async def test_scoped_work_dag_cancel_fails_closed_without_endpoint(
         self,
     ) -> None:
         started = asyncio.Event()
@@ -1455,11 +1466,11 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         async def execute_graph(graph: dict[str, Any]) -> dict[str, Any]:
             started.set()
             await asyncio.Event().wait()
-            raise AssertionError("cancelled TaskGraph execution resumed")
+            raise AssertionError("cancelled WorkDAG execution resumed")
 
         coordinator = InteractionRuntimeCoordinator(
             lambda args: {"scheduled": True},
-            task_graph_handler=execute_graph,
+            work_dag_handler=execute_graph,
         )
         execution_task = asyncio.create_task(
             _execute_to_terminal(coordinator,
@@ -1468,10 +1479,13 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                     capabilities=[
                         {
                             "request_id": "graph-request",
-                            "capability_id": "chromie.task_graph.execute",
+                            "capability_id": "chromie.work_dag.execute",
                             "args": {
-                                "graph": {
-                                    "graph_id": "graph-no-cancel",
+                                "dag": {
+                                    "dag_id": "graph-no-cancel",
+                                    "revision": 1,
+                                    "authored_by": "planner",
+                                    "goal_ids": ["goal-cancel"],
                                     "nodes": [],
                                 }
                             },
@@ -1504,7 +1518,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             "cancellation_failed_embodied_motion",
         )
 
-    async def test_task_graph_capability_fails_closed_when_handler_is_disabled(
+    async def test_work_dag_capability_fails_closed_when_handler_is_disabled(
         self,
     ) -> None:
         spoken: list[str] = []
@@ -1517,8 +1531,8 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                 capabilities=[
                     {
                         "request_id": "graph-1",
-                        "capability_id": "chromie.task_graph.execute",
-                        "args": {"graph": {"graph_id": "nav", "nodes": []}},
+                        "capability_id": "chromie.work_dag.execute",
+                        "args": {"dag": {"dag_id": "nav", "revision": 1, "authored_by": "planner", "goal_ids": ["goal-nav"], "nodes": []}},
                         "timing": "sequential",
                     }
                 ],
@@ -1528,7 +1542,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(result.status, "failed")
-        self.assertEqual(result.results[0].reason_code, "task_graph_execution_disabled")
+        self.assertEqual(result.results[0].reason_code, "work_dag_execution_disabled")
         self.assertEqual(spoken, [])
 
     async def test_cancelled_body_capability_suppresses_all_terminal_speech(self) -> None:

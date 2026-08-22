@@ -65,8 +65,8 @@ class ToolInvocationContext(BaseModel):
     trusted_preflight_authorized: bool = False
     safety_monitor_active: bool = False
     allow_safety_controls: bool = False
-    task_graph_id: str | None = None
-    task_node_id: str | None = None
+    work_dag_id: str | None = None
+    work_node_id: str | None = None
 
 
 class AsyncToolInvoker(Protocol):
@@ -84,7 +84,7 @@ class FunctionToolInvoker:
     """In-process tool registry for tests and local Chromie tools.
 
     Real MCP transports can implement ToolInvoker later without changing the
-    TaskGraph schema or executor. Handlers receive already-resolved node args.
+    WorkDAG schema or executor. Handlers receive already-resolved node args.
     """
 
     def __init__(self) -> None:

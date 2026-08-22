@@ -277,7 +277,7 @@ class CognitionSettings:
     social_attention_mode: str
     capability_manifest_paths: str
     soridormi_manifest: Path
-    task_graph_execution_token: str
+    dag_engine_execution_token: str
 
 
 @dataclass(frozen=True)
@@ -611,8 +611,8 @@ class HostSettingsSnapshot:
                     "capabilities/soridormi.json",
                     project_root=project_root,
                 ),
-                task_graph_execution_token=_text(
-                    values, "AGENT_TASK_GRAPH_EXECUTION_TOKEN", ""
+                dag_engine_execution_token=_text(
+                    values, "AGENT_DAG_ENGINE_EXECUTION_TOKEN", ""
                 ),
             ),
             conversation=ConversationSettings(
