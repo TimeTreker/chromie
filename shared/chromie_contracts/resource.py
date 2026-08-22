@@ -7,6 +7,7 @@ import re
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .text import normalize_whitespace
 from .interaction import reject_forbidden_low_level_fields
 
 
@@ -133,9 +134,7 @@ class ResourceDescriptor(BaseModel):
     @field_validator("description", "quantity", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
     @field_validator("attributes")
     @classmethod
@@ -179,9 +178,7 @@ class ResourceSource(BaseModel):
     @field_validator("description", mode="before")
     @classmethod
     def normalize_description(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
     @field_validator("bindings")
     @classmethod
@@ -254,9 +251,7 @@ class ResourceRecipient(BaseModel):
     def normalize_text(cls, value: Any) -> Any:
         if value is None:
             return None
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
 
 class AcquireAndDeliverResource(BaseModel):

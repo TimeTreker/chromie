@@ -2,9 +2,9 @@
 
 Status: current resume point; incomplete development snapshot
 Updated: 2026-08-22
-Patch baseline: user-supplied `chromie_2026082206.zip` plus the applied rebased Phase 1C
-and Phase 1D patches. The archive already contained the user's applied Phase 1A/1B state.
-No archive-wide Git identity is claimed.
+Patch baseline: user-supplied `chromie_2026082206.zip` plus the applied Phase 1C,
+Phase 1D, Phase 2, and Phase 3 patches. The archive already contained the user's applied
+Phase 1A/1B state. No archive-wide Git identity is claimed.
 
 ## Read first
 
@@ -13,8 +13,7 @@ Canonical owners remain [Project Charter](docs/PROJECT_CHARTER.md),
 [Current Status](docs/STATUS.md), [Roadmap](ROADMAP.md), and
 [Acceptance](docs/ACCEPTANCE.md). Source and executable evidence win over stale prose.
 
-Current focus: **Phase 4 repository hygiene**, after source-closing Phase 3 WorkDAG /
-DAGEngine authority convergence. Do not redesign the Goal-driven backbone, put DAG
+Current focus: **Phase 5 structural simplification**, after source-closing Phase 4 repository hygiene and deterministic-mechanism deduplication. Do not redesign the Goal-driven backbone, put DAG
 semantics into Goal Association, or reintroduce removed response/recovery owners.
 
 ## Current architecture
@@ -111,20 +110,26 @@ Planner-authored DAG, not delegation of planning to DAGEngine. A future first-cl
 `CanonicalPlan.work_dag` representation would be a representation-only change and must
 retain the same authority split.
 
-## Repository hygiene after WorkDAG convergence
+## Phase 4 repository hygiene
 
-Phase 4 retains the verified cleanup inventory: orphan legacy-agent prompt assets, dead
-`ToolClient`, missing async test dependency, repeated whitespace normalizers, three
-JSON-schema/type validator copies, stale naming, and compatibility residue. Consolidate
-small deterministic mechanisms; do not create a framework merely to remove duplication.
+Phase 4 is source-closed as a narrow cleanup slice:
+
+- the five unreferenced legacy multi-agent prompt assets and dead `ToolClient` placeholder are removed;
+- `pytest-asyncio==1.3.0` is pinned beside pytest so the documented test environment can execute the retained async tests;
+- string-field whitespace normalization uses one small `shared/chromie_contracts/text.py` helper instead of copied validator bodies;
+- the bounded JSON-Schema subset now has one shared `shared/chromie_contracts/json_schema.py` mechanism, while callers retain their existing return-vs-fail-closed policy and the local-tool path retains its prior array-bound behavior;
+- the stale mock-hardware `robot_pose_controller` target name is removed;
+- the retired `CHROMIE_EVENT_ROOT` / `legacy_event_root` alias is removed in favor of the canonical `CHROMIE_RUNTIME_EVENT_ROOT`; and
+- repository policy now rejects the verified obsolete assets plus re-copied private schema matchers / contract whitespace bodies.
+
+This is mechanical cleanup only. No cognitive owner, routing layer, response owner, or new framework was added.
 
 ## Required execution order
 
-1. Execute **Phase 4** repository hygiene and deterministic-mechanism deduplication.
-2. Continue **Phase 5** structural simplification only across existing ownership seams.
-3. Execute **Phase 6** current-revision qualification and retain bilingual/provider/
+1. Continue **Phase 5** structural simplification only across existing ownership seams.
+2. Execute **Phase 6** current-revision qualification and retain bilingual/provider/
    simulator/live evidence.
-4. Keep source implementation, automated verification, target validation, and release
+3. Keep source implementation, automated verification, target validation, and release
    readiness as separate claims.
 
 Detailed phase order and exit criteria live in `ROADMAP.md`; current facts live in
@@ -132,7 +137,7 @@ Detailed phase order and exit criteria live in `ROADMAP.md`; current facts live 
 
 ## Verification for this slice
 
-Phase 3 changes source contracts, DAGEngine mechanics, APIs, tests, and documentation. Run:
+Phase 4 changes repository hygiene, shared deterministic helpers, test dependencies, configuration aliases, tests, and current status documentation. Run:
 
 ```bash
 python scripts/check_docs.py

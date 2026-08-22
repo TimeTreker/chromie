@@ -57,9 +57,7 @@ def persist_runtime_event(
     normalized_severity = _required_token(severity, "severity")
     normalized_producer = _required_token(producer, "producer")
     settings = RuntimePolicySettings.from_env()
-    root = settings.configured_path(
-        event_root, "runtime_event_root", "legacy_event_root"
-    )
+    root = settings.configured_path(event_root, "runtime_event_root")
     resolved_id = event_id or _event_id()
     timestamp = occurred_at or datetime.now(timezone.utc).isoformat()
     if root is None:

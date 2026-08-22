@@ -5,6 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .text import normalize_whitespace
+
 from .interaction import reject_forbidden_low_level_fields
 
 
@@ -53,11 +55,7 @@ InteractionEventType = Literal[
 
 
 def _normalize_text(value: Any) -> Any:
-    if value is None:
-        return None
-    if isinstance(value, str):
-        return " ".join(value.strip().split())
-    return value
+    return normalize_whitespace(value)
 
 
 def _normalize_text_list(value: Any) -> list[str]:

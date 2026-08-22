@@ -7,6 +7,8 @@ from typing import Any, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .text import normalize_whitespace
+
 from .interaction import CapabilityIdentityModel, reject_forbidden_low_level_fields
 
 
@@ -225,9 +227,7 @@ class ClaimQualification(BaseModel):
 
 
 def _normalize_identifier(value: Any) -> Any:
-    if isinstance(value, str):
-        return " ".join(value.strip().split())
-    return value
+    return normalize_whitespace(value)
 
 
 def _normalize_ids(value: Any) -> list[str]:

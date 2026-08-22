@@ -24,8 +24,10 @@ from .clients.weather_client import (
 )
 
 try:
+    from chromie_contracts.json_schema import json_schema_validation_errors
     from chromie_contracts.tool_result import ToolExecutionRequest, ToolExecutionResponse
 except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.json_schema import json_schema_validation_errors
     from shared.chromie_contracts.tool_result import ToolExecutionRequest, ToolExecutionResponse
 
 logger = logging.getLogger("chromie.agent.local_tool_execution")
@@ -337,68 +339,14 @@ def _truthy(value: Any) -> bool:
 
 
 def _validate_json_schema(value: Any, schema: dict[str, Any], *, path: str) -> None:
-    """Validate the bounded JSON-Schema subset used by capability manifests."""
-
-    if not schema:
-        return
-    schema_type = schema.get("type")
-    allowed_types = (
-        schema_type
-        if isinstance(schema_type, list)
-        else [schema_type]
-        if schema_type
-        else []
+    errors = json_schema_validation_errors(
+        value,
+        schema,
+        path=path,
+        validate_array_bounds=False,
     )
-    if allowed_types and not any(_matches_type(value, item) for item in allowed_types):
-        raise ValueError(f"{path} expected {allowed_types}, got {type(value).__name__}")
-    if "enum" in schema and value not in schema["enum"]:
-        raise ValueError(f"{path} must be one of {schema['enum']}")
-    if isinstance(value, str):
-        if "minLength" in schema and len(value) < schema["minLength"]:
-            raise ValueError(f"{path} is shorter than {schema['minLength']}")
-        if "maxLength" in schema and len(value) > schema["maxLength"]:
-            raise ValueError(f"{path} is longer than {schema['maxLength']}")
-    if isinstance(value, (int, float)) and not isinstance(value, bool):
-        if "minimum" in schema and value < schema["minimum"]:
-            raise ValueError(f"{path} is below minimum {schema['minimum']}")
-        if "maximum" in schema and value > schema["maximum"]:
-            raise ValueError(f"{path} exceeds maximum {schema['maximum']}")
-    if isinstance(value, dict):
-        properties = schema.get("properties", {})
-        for required in schema.get("required", []):
-            if required not in value:
-                raise ValueError(f"{path} is missing required field {required!r}")
-        if schema.get("additionalProperties") is False:
-            unknown = sorted(set(value) - set(properties))
-            if unknown:
-                raise ValueError(f"{path} has unknown fields: {unknown}")
-        for key, item in value.items():
-            child_schema = properties.get(key)
-            if isinstance(child_schema, dict):
-                _validate_json_schema(item, child_schema, path=f"{path}.{key}")
-    if isinstance(value, list):
-        item_schema = schema.get("items")
-        if isinstance(item_schema, dict):
-            for index, item in enumerate(value):
-                _validate_json_schema(item, item_schema, path=f"{path}[{index}]")
-
-
-def _matches_type(value: Any, schema_type: str) -> bool:
-    if schema_type == "null":
-        return value is None
-    if schema_type == "object":
-        return isinstance(value, dict)
-    if schema_type == "array":
-        return isinstance(value, list)
-    if schema_type == "string":
-        return isinstance(value, str)
-    if schema_type == "boolean":
-        return isinstance(value, bool)
-    if schema_type == "integer":
-        return isinstance(value, int) and not isinstance(value, bool)
-    if schema_type == "number":
-        return isinstance(value, (int, float)) and not isinstance(value, bool)
-    return True
+    if errors:
+        raise ValueError(errors[0])
 
 
 __all__ = ["LocalToolExecutor"]

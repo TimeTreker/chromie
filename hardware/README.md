@@ -72,7 +72,7 @@ until implementation selects and uses them.
 curl -X POST http://127.0.0.1:8095/actions \
   -H 'Content-Type: application/json' \
   -d '{
-    "target": "robot_pose_controller",
+    "target": "mock_hardware",
     "type": "head.turn",
     "params": {"yaw_degrees": -20, "pitch_degrees": 0, "duration_ms": 600}
   }'

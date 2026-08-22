@@ -255,6 +255,28 @@ class RepositoryEngineeringPolicyTests(unittest.TestCase):
         self.assertIn("reject_contract_marker_as_spoken_text", symbols)
         self.assertIn("ACTION_PHRASES", symbols)
 
+    def test_obsolete_assets_and_copied_mechanisms_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            prompt = root / "agent" / "app" / "prompts" / "speaker_agent.txt"
+            prompt.parent.mkdir(parents=True)
+            prompt.write_text("old speaker prompt", encoding="utf-8")
+            validator = root / "agent" / "app" / "capabilities" / "validator.py"
+            validator.parent.mkdir(parents=True)
+            validator.write_text("def _matches_type(value, schema_type): return True\n", encoding="utf-8")
+            goal = root / "shared" / "chromie_contracts" / "goal.py"
+            goal.parent.mkdir(parents=True)
+            goal.write_text(
+                'def normalize(value):\n    return " ".join(value.strip().split())\n',
+                encoding="utf-8",
+            )
+
+            findings = policies.audit_repository_hygiene(root)
+
+        rule_ids = {item.rule_id for item in findings}
+        self.assertIn(policies.RULE_OBSOLETE_ARTIFACT, rule_ids)
+        self.assertIn(policies.RULE_DUPLICATED_MECHANISM, rule_ids)
+
     def test_model_facing_skill_id_field_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

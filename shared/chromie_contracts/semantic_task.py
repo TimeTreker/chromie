@@ -4,6 +4,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .text import normalize_whitespace
 from .interaction import reject_forbidden_low_level_fields
 from .resource import AcquireAndDeliverResource
 
@@ -125,9 +126,7 @@ class SemanticGoal(BaseModel):
     def normalize_text(cls, value: Any) -> Any:
         if value is None:
             return None
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
     @field_validator(
         "source_responsibility_refs",
@@ -209,9 +208,7 @@ class InformationGap(BaseModel):
     @field_validator("gap_id", "description", "source_reference", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
     @field_validator("required_for", mode="before")
     @classmethod
@@ -272,9 +269,7 @@ class ResponseStage(BaseModel):
     )
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
     @field_validator("covers_task_ids", "covers_goal_ids", "claims", mode="before")
     @classmethod
@@ -375,9 +370,7 @@ class SemanticTaskOperation(BaseModel):
     )
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
     @field_validator("target_task_ids", "resolved_gap_ids", mode="before")
     @classmethod
@@ -435,9 +428,7 @@ class SemanticTaskOperationSet(BaseModel):
     @field_validator("reason_summary", mode="before")
     @classmethod
     def normalize_reason_summary(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
     @field_validator("metadata")
     @classmethod
@@ -464,9 +455,7 @@ class TaskContextSnapshot(BaseModel):
     @field_validator("task_id", "last_user_update", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
     @field_validator("confirmation", "evidence_summary", "metadata")
     @classmethod
@@ -494,9 +483,7 @@ class PlanningResult(BaseModel):
     def normalize_text(cls, value: Any) -> Any:
         if value is None:
             return None
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
     @field_validator("plan", "metadata")
     @classmethod

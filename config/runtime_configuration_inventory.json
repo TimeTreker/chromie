@@ -1445,14 +1445,6 @@
     },
     {
       "boolean": false,
-      "category": "service_internal",
-      "key": "CHROMIE_EVENT_ROOT",
-      "owners": [
-        "shared/chromie_runtime/settings.py"
-      ]
-    },
-    {
-      "boolean": false,
       "category": "profile_constant",
       "key": "CHROMIE_GPU_CLASS",
       "owners": [
@@ -4039,10 +4031,10 @@
       "bounded_compatibility_alias": 0,
       "profile_constant": 130,
       "public_choice": 9,
-      "service_internal": 210
+      "service_internal": 209
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 386
+    "total_keys": 385
   }
 }

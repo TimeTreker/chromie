@@ -106,8 +106,8 @@ class CognitiveIntegrityEventTests(unittest.TestCase):
                 interpretation_unresolved=[],
                 context={},
             )
-            old = os.environ.get("CHROMIE_EVENT_ROOT")
-            os.environ["CHROMIE_EVENT_ROOT"] = str(Path(directory) / "events")
+            old = os.environ.get("CHROMIE_RUNTIME_EVENT_ROOT")
+            os.environ["CHROMIE_RUNTIME_EVENT_ROOT"] = str(Path(directory) / "events")
             try:
                 metadata = cognitive_integrity_metadata(
                     stage="goal_association",
@@ -116,9 +116,9 @@ class CognitiveIntegrityEventTests(unittest.TestCase):
                 )
             finally:
                 if old is None:
-                    os.environ.pop("CHROMIE_EVENT_ROOT", None)
+                    os.environ.pop("CHROMIE_RUNTIME_EVENT_ROOT", None)
                 else:
-                    os.environ["CHROMIE_EVENT_ROOT"] = old
+                    os.environ["CHROMIE_RUNTIME_EVENT_ROOT"] = old
             self.assertTrue(metadata["user_notification_required"])
             self.assertTrue(metadata["execution_prevented"])
             self.assertEqual(metadata["incident"]["capture_status"], "complete")

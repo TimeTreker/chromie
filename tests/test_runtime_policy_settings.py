@@ -30,6 +30,13 @@ class RuntimePolicySettingsTests(unittest.TestCase):
             Path("~/events").expanduser().resolve(),
         )
 
+    def test_retired_event_root_alias_is_ignored(self) -> None:
+        settings = RuntimePolicySettings.from_env(
+            {"CHROMIE_EVENT_ROOT": "~/legacy-events"}
+        )
+        self.assertIsNone(settings.configured_path(None, "runtime_event_root"))
+        self.assertFalse(hasattr(settings, "legacy_event_root"))
+
     def test_invalid_values_fall_back_to_bounded_policy(self) -> None:
         settings = RuntimePolicySettings.from_env(
             {

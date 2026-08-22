@@ -6,6 +6,7 @@ from typing import Annotated, Any, Literal, Union, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .text import normalize_whitespace
 from .agent_skill import PlanAgentSkillProvenance
 from .interaction import CapabilityIdentityModel, reject_forbidden_low_level_fields
 from .semantic_task import (
@@ -119,7 +120,7 @@ class _FastPlannerCommunicativeActBase(BaseModel):
     @field_validator("activity_id", "text", "speech_act", mode="before")
     @classmethod
     def normalize_communicative_act_text(cls, value: Any) -> Any:
-        return " ".join(value.strip().split()) if isinstance(value, str) else value
+        return normalize_whitespace(value)
 
     @field_validator("source_responsibility_refs", "evidence_refs", mode="before")
     @classmethod
@@ -159,7 +160,7 @@ class PlannerInformationGap(InformationGap):
     @field_validator("source_reference", mode="before")
     @classmethod
     def normalize_source_reference(cls, value: Any) -> Any:
-        return " ".join(value.strip().split()) if isinstance(value, str) else value
+        return normalize_whitespace(value)
 
     @model_validator(mode="after")
     def validate_planner_gap(self) -> "PlannerInformationGap":
@@ -259,7 +260,7 @@ class FastPlannerCapabilityActivity(CapabilityIdentityModel):
     @field_validator("activity_id", "reason_summary", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
-        return " ".join(value.strip().split()) if isinstance(value, str) else value
+        return normalize_whitespace(value)
 
     @field_validator("source_responsibility_refs", mode="before")
     @classmethod
@@ -292,7 +293,7 @@ class PlannedCommunicativeAct(BaseModel):
     @field_validator("activity_id", "text", "speech_act", mode="before")
     @classmethod
     def normalize_act_text(cls, value: Any) -> Any:
-        return " ".join(value.strip().split()) if isinstance(value, str) else value
+        return normalize_whitespace(value)
 
     @field_validator(
         "source_goal_ids",
@@ -429,7 +430,7 @@ class FastPlannerFirstResponse(BaseModel):
     @field_validator("turn_id", mode="before")
     @classmethod
     def normalize_turn_id(cls, value: Any) -> Any:
-        return " ".join(value.strip().split()) if isinstance(value, str) else value
+        return normalize_whitespace(value)
 
     @field_validator("metadata")
     @classmethod
@@ -504,7 +505,7 @@ class FastPlannerAdvance(BaseModel):
     @field_validator("turn_id", "reason_summary", mode="before")
     @classmethod
     def normalize_advance_text(cls, value: Any) -> Any:
-        return " ".join(value.strip().split()) if isinstance(value, str) else value
+        return normalize_whitespace(value)
 
     @field_validator("covered_responsibility_refs", "continuations", "unresolved", mode="before")
     @classmethod
@@ -606,7 +607,7 @@ class FastPlannerAdvanceModelOutput(BaseModel):
     @field_validator("reason_summary", mode="before")
     @classmethod
     def normalize_output_text(cls, value: Any) -> Any:
-        return " ".join(value.strip().split()) if isinstance(value, str) else value
+        return normalize_whitespace(value)
 
 
 def _normalize_ids(value: Any) -> list[str]:
@@ -647,7 +648,7 @@ class PlanParameterResolution(BaseModel):
     @field_validator("step_id", "parameter", "rationale", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
-        return " ".join(value.strip().split()) if isinstance(value, str) else value
+        return normalize_whitespace(value)
 
     @field_validator("source_goal_ids", mode="before")
     @classmethod
@@ -679,7 +680,7 @@ class GoalSatisfactionAssessment(BaseModel):
     @field_validator("rationale", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
-        return " ".join(value.strip().split()) if isinstance(value, str) else value
+        return normalize_whitespace(value)
 
     @field_validator("satisfied_goal_ids", "unmet_goal_ids", mode="before")
     @classmethod
@@ -711,7 +712,7 @@ class CanonicalPlanStep(CapabilityIdentityModel):
     @field_validator("step_id", "reuse_activity_id", "reason_summary", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
-        return " ".join(value.strip().split()) if isinstance(value, str) else value
+        return normalize_whitespace(value)
 
     @field_validator("source_goal_ids", mode="before")
     @classmethod
@@ -740,7 +741,7 @@ class _GoalPlanOutcomeBase(BaseModel):
     @field_validator("goal_id", "response_text", "rationale", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
-        return " ".join(value.strip().split()) if isinstance(value, str) else value
+        return normalize_whitespace(value)
 
     @field_validator("unresolved", mode="before")
     @classmethod
@@ -891,7 +892,7 @@ class CanonicalPlan(BaseModel):
     @field_validator("plan_id", "goal_summary", "response_text", "escalation_reason", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
-        return " ".join(value.strip().split()) if isinstance(value, str) else value
+        return normalize_whitespace(value)
 
     @field_validator("goal_ids", "unresolved", mode="before")
     @classmethod

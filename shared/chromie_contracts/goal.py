@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .text import normalize_whitespace
 from .interaction import reject_forbidden_low_level_fields
 from .semantic_task import InformationGap, ResponsibilityStatus, SemanticGoal, TaskContextSnapshot
 from .discourse import DiscourseReferentUpdate, ResolvedDiscourseReference
@@ -36,9 +37,7 @@ class GoalVersionRef(BaseModel):
     @field_validator("goal_id", mode="before")
     @classmethod
     def normalize_goal_id(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
 
 class GoalAssociation(BaseModel):
@@ -61,9 +60,7 @@ class GoalAssociation(BaseModel):
     @field_validator("association_id", "reason_summary", "ambiguity_summary", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
     @field_validator(
         "source_responsibility_refs",
@@ -120,9 +117,7 @@ class GoalSet(BaseModel):
     @field_validator("turn_id", "reason_summary", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
     @field_validator("metadata")
     @classmethod
@@ -159,9 +154,7 @@ class ActiveGoalSnapshot(BaseModel):
     def normalize_text(cls, value: Any) -> Any:
         if value is None:
             return None
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
     @field_validator("metadata")
     @classmethod
@@ -244,9 +237,7 @@ class GoalAssociationResolution(BaseModel):
     @field_validator("turn_id", "reason_summary", mode="before")
     @classmethod
     def normalize_resolution_text(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
     @field_validator("metadata")
     @classmethod

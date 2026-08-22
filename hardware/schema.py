@@ -32,7 +32,7 @@ class ActionCommand(BaseModel):
     """
 
     id: str = Field(default_factory=lambda: f"act_{uuid4().hex[:12]}")
-    target: str = Field(default="robot_pose_controller")
+    target: str = Field(default="mock_hardware")
     type: str = Field(..., description="Action type, e.g. head.turn, led.set")
     params: dict[str, Any] = Field(default_factory=dict)
     blocking: bool = False

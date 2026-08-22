@@ -413,11 +413,13 @@ authority behind a new manager.
    failure returns facts to Planner. Provider-local DAGs remain valid behind provider
    Capability boundaries. **Implemented in Phase 3.**
 
-4. **Phase 4 — repository hygiene.** Remove verified orphan multi-agent prompt assets and
-   dead `ToolClient`; restore a fully executable pinned test environment; consolidate the
-   57 repeated whitespace normalizers and the three JSON-schema/type validation
-   implementations through small shared mechanical helpers; clean stale names and
-   compatibility aliases only when current consumers are absent.
+4. **Phase 4 — repository hygiene.** Verified orphan multi-agent prompt assets and the
+   dead `ToolClient` are removed; `pytest-asyncio` is pinned; repeated string-field whitespace
+   normalization and the three bounded JSON-Schema/type implementations converge on two
+   small shared mechanical helpers; stale mock-hardware naming and the unused
+   `CHROMIE_EVENT_ROOT` compatibility alias are removed. Repository policy rejects the
+   verified obsolete artifacts and direct re-copying of these shared mechanisms.
+   **Implemented in Phase 4.**
 
 5. **Phase 5 — structural simplification.** Continue reducing Host/Planner/GA
    reconstructability cost only across real existing ownership seams. File size alone is

@@ -82,23 +82,19 @@ human-facing behavior is considered qualified.
 | Identity / personality truth | Chromie's owner-approved social identity is a six-year-old girl and family young secretary. That is not a biological-human claim; truthful robotic embodiment remains available when relevant. | Mind-profile, prompt-context, and identity/body benchmark contracts guard the two-layer truth boundary. | Bilingual live identity conversation remains to be requalified on the current model/profile. | Development only. |
 | Social Attention | Optional embodied decoration remains subordinate to a concrete primary Activity, has no speech or Goal-completion authority, and may validly return none. | Source-level behavior and capability-grounding checks exist. | Reviewed live baseline remains open for the current revision. | Development only. |
 | Host structural boundary | Pure Planner-reentry policy lives in `orchestrator/runtime/planner_reentry.py`; TTS text segmentation lives in `orchestrator/runtime/tts_text.py`; Goal-list console projection lives in `orchestrator/runtime/goal_list_console.py`; fail-soft observability recording policy lives in `orchestrator/runtime/observability_recording.py`; fixed-reflex confirmation-token revocation/audit bookkeeping lives with the existing `ConfirmationDialogue` owner in `orchestrator/runtime/confirmation.py`; OS-default audio-device detection/queue/apply lifecycle lives in `orchestrator/runtime/audio_device_lifecycle.py`; top-level process teardown now lives in stateless `orchestrator/runtime/shutdown_lifecycle.py`, reusing the existing InputTurn/Playback/Session owners rather than reimplementing their task or transport truth in `VoiceAssistant`; accelerator sample scheduling, detached task tracking, and trace attachment now live with the existing fail-soft observability policy in `orchestrator/runtime/observability_recording.py`; PlaybackTransport now owns its provider/output methods directly, so the seven `VoiceAssistant` playback/TTS compatibility delegates have been removed while the same session trace spans live on the transport owner; `InputSessionRuntime` now likewise calls its own microphone/VAD/ASR/routed-turn/session-idle operations directly, removing twelve input/session compatibility delegates from `VoiceAssistant` while `InputTurnLifecycle` remains the task-state owner. These are existing Host concerns extracted without adding semantic owners, managers, or state stores. | Focused regressions pass; the method ratchet moves `159 -> 150 -> 142 -> 139 -> 136 -> 129 -> 127 -> 124 -> 117 -> 105 -> 103`, with the current ceiling at `103 methods / 301 init lines / 108 initialized attributes / 0 direct-LLM calls`. | Not a runtime target; full Host decomposition remains separate from behavior qualification. | Development only. |
-| Static quality gates | Repository policy, documentation, configuration ownership/inventory, structure ratchets, and selected static-analysis scopes are maintained. Phase 2 adds duplicate-H2 detection for the Configuration authority and stale-current-semantic phrase checks so deleted architecture cannot survive only in prose. | Dependency-free gates can run without GPU. Ruff/Mypy scopes are still deliberately narrow and must be widened only after the pinned analyzers pass on each added slice. | Not a runtime target. | Development only. |
+| Static quality gates | Repository policy, documentation, configuration ownership/inventory, structure ratchets, and selected static-analysis scopes are maintained. Phase 2 guards documentation authority; Phase 4 additionally rejects verified obsolete prompt/client artifacts and direct re-copying of shared whitespace/JSON-Schema mechanisms. The pinned test environment now includes `pytest-asyncio`. | Dependency-free gates can run without GPU. Ruff/Mypy scopes are still deliberately narrow and must be widened only after the pinned analyzers pass on each added slice. | Not a runtime target. | Development only. |
 
 ## Current open work
 
-1. **Perform repository hygiene after correctness.** Phase 3 WorkDAG/DAGEngine authority
-   is source-closed: Planner alone authors/revises WorkDAG semantics; GA only changes Goal
-   continuity; DAGEngine advances ready/running/completed/blocked/cancelled state, inherits
-   immutable completed nodes across the exact next revision, and never replans or speaks.
-   Delete verified orphan legacy-agent
-   prompt assets and dead `ToolClient`; restore the pinned async test dependency; consolidate
-   repeated whitespace normalization and JSON-schema/type validation mechanisms; remove stale
-   naming/aliases when current consumers are absent; and extend non-Python obsolete-artifact
-   checks.
-2. **Continue structural simplification separately.** Large Host/Planner/GA files remain
+1. **Continue structural simplification separately.** Phase 4 repository hygiene is
+   source-closed: obsolete legacy-agent prompts and `ToolClient` are removed; the async test
+   plugin is pinned; shared whitespace and bounded JSON-Schema mechanisms replace the
+   reviewed duplicate bodies; stale mock-hardware naming and the retired Runtime-event alias
+   are removed; policy guards prevent those reviewed residues from silently returning. Large
+   Host/Planner/GA files remain
    maintainability risks, but extract only existing mechanical ownership seams. Do not add a
    Speech Manager, Reconciliation Manager, Meta Planner, or one manager per cognitive term.
-3. **Requalify behavior on the exact current revision.** Re-run canonical gates, bilingual
+2. **Requalify behavior on the exact current revision.** Re-run canonical gates, bilingual
    confirmation/cancellation cases, provider-backed result Evidence, embodied failures,
    multi-Goal cancellation, latency, Social Attention, and live/simulator evidence. Source
    implementation, automated verification, target validation, and release readiness remain

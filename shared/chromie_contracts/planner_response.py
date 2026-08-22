@@ -4,6 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .text import normalize_whitespace
 from .execution_lanes import LaneCoordinationGroup
 from .interaction import reject_forbidden_low_level_fields
 from .plan import CanonicalPlan, canonical_plan_fingerprint
@@ -35,7 +36,7 @@ class PlannerResponseProjection(BaseModel):
     )
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
-        return " ".join(value.strip().split()) if isinstance(value, str) else value
+        return normalize_whitespace(value)
 
     @field_validator("metadata")
     @classmethod

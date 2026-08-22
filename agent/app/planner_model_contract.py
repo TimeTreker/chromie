@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 try:
     from chromie_contracts.interaction import CapabilityIdentityModel
+    from chromie_contracts.text import normalize_whitespace
     from chromie_contracts.plan import (
         GoalOutcomeDisposition,
         GoalSatisfactionAssessment,
@@ -19,6 +20,7 @@ try:
     )
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.interaction import CapabilityIdentityModel
+    from shared.chromie_contracts.text import normalize_whitespace
     from shared.chromie_contracts.plan import (
         GoalOutcomeDisposition,
         GoalSatisfactionAssessment,
@@ -75,7 +77,7 @@ class PlannerCommunicationGoalResponse(BaseModel):
     @field_validator("goal_id", "response_text", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
-        return " ".join(value.strip().split()) if isinstance(value, str) else value
+        return normalize_whitespace(value)
 
 class PlannerCommunicationReview(BaseModel):
     """Bounded model review of a retained-evidence conversational follow-up."""
@@ -94,7 +96,7 @@ class PlannerCommunicationReview(BaseModel):
     @field_validator("response_text", "reason", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
-        return " ".join(value.strip().split()) if isinstance(value, str) else value
+        return normalize_whitespace(value)
 
     @model_validator(mode="after")
     def validate_goal_responses(self) -> "PlannerCommunicationReview":

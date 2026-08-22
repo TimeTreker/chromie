@@ -73,7 +73,6 @@ class RuntimePolicySettings:
     accelerator_timeout_ms: int = 1000
     accelerator_min_interval_s: float = 5.0
     runtime_event_root: str = ""
-    legacy_event_root: str = ""
     data_loop_trigger_root: str = ""
     environment: Mapping[str, str] = field(default_factory=dict, repr=False, compare=False)
 
@@ -171,7 +170,6 @@ class RuntimePolicySettings:
                 3600.0,
             ),
             runtime_event_root=_text(source, "CHROMIE_RUNTIME_EVENT_ROOT"),
-            legacy_event_root=_text(source, "CHROMIE_EVENT_ROOT"),
             data_loop_trigger_root=_text(source, "CHROMIE_DATA_LOOP_TRIGGER_ROOT"),
             environment=source,
         )

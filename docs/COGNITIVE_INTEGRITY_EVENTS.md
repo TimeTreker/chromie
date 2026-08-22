@@ -18,7 +18,7 @@ and context reduction are forbidden, and new execution is prevented.
 ## Chromie and data-loop boundary
 
 Chromie classifies the event, gathers evidence, atomically writes a complete
-package under `CHROMIE_EVENT_ROOT/ready/<event_id>`, and optionally writes a
+package under `CHROMIE_RUNTIME_EVENT_ROOT/ready/<event_id>`, and optionally writes a
 lightweight trigger descriptor to `CHROMIE_DATA_LOOP_TRIGGER_ROOT`.
 
 The external data-loop system owns deduplication, event and transport merging,

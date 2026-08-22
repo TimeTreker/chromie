@@ -20,8 +20,10 @@ from .prompt_projection import bounded_json
 
 try:
     from chromie_contracts.core_interpretation import CognitiveWorkRequest
+    from chromie_contracts.text import normalize_whitespace
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+    from shared.chromie_contracts.text import normalize_whitespace
 
 
 class _CoverageSourceExcerptViolation(ValueError):
@@ -189,9 +191,7 @@ class GoalAssociationModelAssociation(BaseModel):
     @field_validator("reason_summary", "updated_description", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
     @field_validator(
         "source_responsibility_refs",
@@ -255,9 +255,7 @@ class GoalAssociationModelBinding(BaseModel):
     @field_validator("name", "entity_type", "value", "referent_id", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
     @model_validator(mode="after")
     def validate_semantic_value(self) -> "GoalAssociationModelBinding":
@@ -299,9 +297,7 @@ class GoalAssociationModelResolvedReference(BaseModel):
     )
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
 class GoalAssociationModelReferentUpdate(BaseModel):
     """Model-facing scoped discourse mutation; identifiers remain Host-owned."""
@@ -326,9 +322,7 @@ class GoalAssociationModelReferentUpdate(BaseModel):
     )
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
     @field_validator(
         "aliases",
@@ -379,9 +373,7 @@ class GoalAssociationModelResourceRecipient(BaseModel):
     def normalize_text(cls, value: Any) -> Any:
         if value is None:
             return None
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
 
 class GoalAssociationModelInformationSource(BaseModel):
@@ -405,9 +397,7 @@ class GoalAssociationModelInformationSource(BaseModel):
     def normalize_text(cls, value: Any) -> Any:
         if value is None:
             return None
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
     @model_validator(mode="after")
     def validate_shape(self) -> "GoalAssociationModelInformationSource":
@@ -436,9 +426,7 @@ class GoalAssociationModelPhysicalSource(BaseModel):
     @field_validator("description", mode="before")
     @classmethod
     def normalize_description(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
     @model_validator(mode="after")
     def validate_shape(self) -> "GoalAssociationModelPhysicalSource":
@@ -515,9 +503,7 @@ class GoalAssociationModelInformationResourceResponsibility(BaseModel):
     @field_validator("description", "quantity", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
     @field_validator("quantity")
     @classmethod
@@ -567,9 +553,7 @@ class GoalAssociationModelPhysicalResourceResponsibility(BaseModel):
     @field_validator("description", "quantity", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
     @field_validator("quantity")
     @classmethod
@@ -663,9 +647,7 @@ class GoalAssociationModelGoal(BaseModel):
     @field_validator("description", mode="before")
     @classmethod
     def normalize_description(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
     @field_validator(
         "source_responsibility_refs",
@@ -750,9 +732,7 @@ class GoalSegmentationModelOutput(BaseModel):
     @field_validator("reason_summary", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
     @model_validator(mode="after")
     def validate_shape(self) -> "GoalSegmentationModelOutput":
@@ -819,9 +799,7 @@ class GoalAssociationModelOutput(BaseModel):
     @field_validator("reason_summary", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
     @model_validator(mode="after")
     def validate_shape(self) -> "GoalAssociationModelOutput":
@@ -879,9 +857,7 @@ class GoalResponsibilityCoverageItem(BaseModel):
     @field_validator("source_excerpt", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
     @field_validator("candidate_goal_indices")
     @classmethod
@@ -973,9 +949,7 @@ class GoalResponsibilityCoverageCertificate(BaseModel):
     @field_validator("reason_summary", mode="before")
     @classmethod
     def normalize_reason_summary(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return " ".join(value.strip().split())
-        return value
+        return normalize_whitespace(value)
 
     @model_validator(mode="after")
     def validate_material_evidence(self) -> "GoalResponsibilityCoverageCertificate":

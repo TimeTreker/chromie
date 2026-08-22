@@ -46,6 +46,8 @@ RULE_CANONICAL_CAPABILITY_ID = "contracts.canonical_capability_identity"
 RULE_EXCEPTION_CONFIG = "policy.exception_config"
 RULE_STALE_EXCEPTION = "policy.exception_stale"
 RULE_UNCLASSIFIED_BROAD_EXCEPTION = "python.unclassified_broad_exception"
+RULE_OBSOLETE_ARTIFACT = "repository.obsolete_artifact"
+RULE_DUPLICATED_MECHANISM = "repository.duplicated_mechanism"
 
 EXCEPTION_TARGET_RULES = frozenset(
     {
@@ -62,6 +64,8 @@ EXCEPTION_TARGET_RULES = frozenset(
         RULE_LEGACY_PHRASE_AGENTS,
         RULE_MEMORY_MODEL_AUTHORED,
         RULE_CANONICAL_CAPABILITY_ID,
+        RULE_OBSOLETE_ARTIFACT,
+        RULE_DUPLICATED_MECHANISM,
     }
 )
 
@@ -1058,6 +1062,83 @@ def _base_name(node: ast.expr) -> str:
     return ""
 
 
+
+def audit_repository_hygiene(root: Path) -> list[PolicyFinding]:
+    """Reject verified obsolete assets and re-copied shared mechanisms."""
+
+    findings: list[PolicyFinding] = []
+    forbidden_artifacts = (
+        "agent/app/clients/tool_client.py",
+        "agent/app/prompts/conversation_agent.txt",
+        "agent/app/prompts/motion_planner_agent.txt",
+        "agent/app/prompts/robot_pose_controller_agent.txt",
+        "agent/app/prompts/safety_agent.txt",
+        "agent/app/prompts/speaker_agent.txt",
+    )
+    for relative in forbidden_artifacts:
+        if (root / relative).exists():
+            findings.append(
+                _source_policy_finding(
+                    root=root,
+                    path=relative,
+                    rule_id=RULE_OBSOLETE_ARTIFACT,
+                    symbol="<artifact>",
+                    message="verified obsolete scaffolding must not be reintroduced",
+                )
+            )
+
+    duplicated_schema_targets = (
+        "agent/app/capabilities/validator.py",
+        "agent/app/local_tool_execution.py",
+        "orchestrator/runtime/capability_runtime.py",
+    )
+    for relative in duplicated_schema_targets:
+        path = root / relative
+        if not path.exists():
+            continue
+        source = path.read_text(encoding="utf-8")
+        if "def _matches_type(" in source:
+            findings.append(
+                _source_policy_finding(
+                    root=root,
+                    path=relative,
+                    rule_id=RULE_DUPLICATED_MECHANISM,
+                    symbol="_matches_type",
+                    message="bounded JSON-Schema type matching must use shared/chromie_contracts/json_schema.py",
+                )
+            )
+
+    normalization_targets = (
+        "agent/app/goal_association_contract.py",
+        "agent/app/planner_model_contract.py",
+        "shared/chromie_contracts/execution_lanes.py",
+        "shared/chromie_contracts/execution_outcome.py",
+        "shared/chromie_contracts/goal.py",
+        "shared/chromie_contracts/interaction.py",
+        "shared/chromie_contracts/interaction_ledger.py",
+        "shared/chromie_contracts/plan.py",
+        "shared/chromie_contracts/planner_response.py",
+        "shared/chromie_contracts/resource.py",
+        "shared/chromie_contracts/semantic_task.py",
+    )
+    copied_normalizer = 'return " ".join(value.strip().split())'
+    for relative in normalization_targets:
+        path = root / relative
+        if not path.exists():
+            continue
+        source = path.read_text(encoding="utf-8")
+        if copied_normalizer in source:
+            findings.append(
+                _source_policy_finding(
+                    root=root,
+                    path=relative,
+                    rule_id=RULE_DUPLICATED_MECHANISM,
+                    symbol="normalize_whitespace",
+                    message="contract whitespace normalization must use shared/chromie_contracts/text.py",
+                )
+            )
+    return findings
+
 def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
     """Enforce canonical executable Capability vocabulary.
 
@@ -1731,6 +1812,7 @@ def audit_repository(
     findings.extend(audit_agent_skill_authority(root))
     findings.extend(audit_agent_skill_selection(root))
     findings.extend(audit_semantic_authority_boundaries(root))
+    findings.extend(audit_repository_hygiene(root))
     findings.extend(audit_canonical_capability_identity(root))
     findings.extend(
         PolicyFinding(

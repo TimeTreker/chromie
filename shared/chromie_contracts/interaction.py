@@ -8,6 +8,7 @@ from typing import Any, Literal, TypeVar
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from .text import normalize_whitespace
 
 InteractionStatus = Literal["ok", "clarify", "refused", "ignored", "error"]
 CapabilityTiming = Literal["parallel", "sequential"]
@@ -858,7 +859,7 @@ class CapabilityIdentityModel(BaseModel):
     @field_validator("capability_id", mode="before")
     @classmethod
     def normalize_capability_id(cls, value: Any) -> Any:
-        return " ".join(value.strip().split()) if isinstance(value, str) else value
+        return normalize_whitespace(value)
 
 
 class InteractionSpeech(BaseModel):
