@@ -19,6 +19,7 @@ from shared.chromie_contracts.execution_outcome import (
     ExecutionOutcomeBundle,
     GoalExecutionOutcome,
     ModelObservation,
+    goal_completion_qualification_summary,
     ProviderPostconditionEvidence,
     aggregate_execution_status,
     claim_qualification_policy_sha256,
@@ -1296,6 +1297,53 @@ class ExecutionOutcomeReconciler:
         }:
             return normalized, None  # type: ignore[return-value]
         return "failed", "non_terminal_capability_result"
+
+
+def planner_execution_outcome_truth(
+    bundle: ExecutionOutcomeBundle,
+) -> dict[str, Any]:
+    """Project immutable execution truth for Planner re-entry.
+
+    This projection carries only factual terminal status, evidence correlation,
+    observation availability, and mechanical completion qualification. It does
+    not interpret those facts, recommend next Work, or author user-visible text.
+    """
+
+    validated = ExecutionOutcomeBundle.model_validate(
+        bundle.model_dump(mode="python")
+    )
+    evidence_rows: list[dict[str, Any]] = []
+    for evidence in validated.evidence:
+        observation = evidence.observation
+        evidence_rows.append(
+            {
+                "evidence_id": evidence.evidence_id,
+                "capability_id": evidence.capability_id,
+                "source_goal_ids": list(evidence.source_goal_ids),
+                "status": evidence.status,
+                "reason_code": str(evidence.reason_code or ""),
+                "observation_status": (
+                    observation.status if observation is not None else "none"
+                ),
+            }
+        )
+    return {
+        "outcome_id": validated.outcome_id,
+        "aggregate_status": validated.aggregate_status,
+        "goal_outcomes": [
+            {
+                "goal_id": outcome.goal_id,
+                "status": outcome.status,
+                "reason_codes": list(outcome.reason_codes),
+                "evidence_ids": list(outcome.evidence_ids),
+                "completion_qualification": (
+                    goal_completion_qualification_summary(validated, outcome)
+                ),
+            }
+            for outcome in validated.goal_outcomes
+        ],
+        "evidence": evidence_rows,
+    }
 
 
 def build_execution_outcome_bundle(

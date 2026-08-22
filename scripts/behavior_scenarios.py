@@ -52,6 +52,7 @@ from orchestrator.runtime.soridormi_capability_provider import (
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
+    InteractionSpeech,
     MEDIA_CAPABILITY_IDS,
     CapabilityResult,
     VOCAL_PERFORMANCE_CAPABILITY_ID,
@@ -1583,6 +1584,66 @@ async def evaluate_cognitive_turn_loop_scenario(
         no_recovery,
         assistant,
     )
+
+    planner_reentry_speech = stub.get("planner_reentry_speech")
+    if isinstance(planner_reentry_speech, list):
+        async def scripted_planner_reentry(self: Any, **kwargs: Any) -> InteractionResponse:
+            del self
+            goal_ids = [str(item) for item in kwargs.get("goal_ids") or []]
+            phase = str(kwargs.get("phase") or "")
+            context_updates = kwargs.get("context_updates") or {}
+            truth = context_updates.get("trusted_execution_outcome")
+            if not isinstance(truth, dict):
+                raise AssertionError("Planner re-entry did not receive trusted execution truth")
+            if [item.get("goal_id") for item in truth.get("goal_outcomes") or []] != goal_ids:
+                raise AssertionError("Planner re-entry Goal truth does not match bound Goals")
+            evidence = list(kwargs.get("repeat_check_evidence") or [])
+            evidence_ids = [item.evidence_id for item in evidence]
+            speech = []
+            for index, row in enumerate(planner_reentry_speech, start=1):
+                if not isinstance(row, dict):
+                    raise ValueError("stub.planner_reentry_speech entries must be objects")
+                goal_id = str(row.get("goal_id") or "").strip()
+                text = str(row.get("text") or "").strip()
+                if goal_id not in goal_ids or not text:
+                    raise ValueError("Planner re-entry speech requires bound goal_id and text")
+                speech.append(
+                    InteractionSpeech(
+                        id=f"scenario-planner-result-{index}",
+                        text=text,
+                        timing="immediate",
+                        style=str(row.get("style") or "brief"),
+                        priority="normal",
+                        interruptible=True,
+                        metadata={
+                            "source": "scenario_planner_evidence_reentry",
+                            "truth_stage": "post_evidence",
+                            "covers_goal_ids": [goal_id],
+                            "goal_status": str(row.get("goal_status") or ""),
+                            "evidence_refs": evidence_ids,
+                            "wait_for_playback_start": True,
+                            "playback_start_required_for_delivery": True,
+                        },
+                    )
+                )
+            return InteractionResponse(
+                interaction_id=f"planner-result-{scenario.scenario_id}",
+                status="ok",
+                speech=speech,
+                capabilities=[],
+                requires_confirmation=False,
+                metadata={
+                    "source": "scenario_planner_evidence_reentry",
+                    "phase": phase,
+                    "source_goal_ids": goal_ids,
+                    "evidence_refs": evidence_ids,
+                },
+            )
+
+        assistant._planner_state_reentry_response = MethodType(
+            scripted_planner_reentry,
+            assistant,
+        )
 
     stop_envelope = None
     cancellation_receipt = None

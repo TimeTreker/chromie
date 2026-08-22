@@ -21,6 +21,7 @@ from shared.chromie_contracts.execution_outcome import (
 )
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
+    InteractionSpeech,
     CapabilityResult,
     output_schema_sha256,
 )
@@ -131,6 +132,12 @@ def _response(plan: CanonicalPlan) -> InteractionResponse:
             "canonical_plan": plan.model_dump(mode="json"),
             "canonical_plan_id": plan.plan_id,
             "canonical_plan_fingerprint": fingerprint,
+            "user_turn_envelope": {
+                "normalized_input": {
+                    "text": "Run two test capabilities.",
+                    "language": "en-US",
+                }
+            },
         },
     )
 
@@ -302,6 +309,62 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
         assistant._maybe_stage_body_recovery_confirmation = MethodType(
             no_recovery,
             assistant,
+        )
+
+        async def planner_reentry(self, **kwargs):
+            del self
+            goal_ids = list(kwargs.get("goal_ids") or [])
+            phase = str(kwargs.get("phase") or "")
+            context_updates = kwargs.get("context_updates") or {}
+            truth = context_updates.get("trusted_execution_outcome")
+            if not isinstance(truth, dict):
+                raise AssertionError("Planner test stub requires trusted execution truth")
+            rows = truth.get("goal_outcomes") or []
+            if [row.get("goal_id") for row in rows] != goal_ids:
+                raise AssertionError("Planner test stub Goal truth mismatch")
+            evidence = list(kwargs.get("repeat_check_evidence") or [])
+            evidence_by_id = {item.evidence_id: item for item in evidence}
+            speech = []
+            for index, row in enumerate(rows, start=1):
+                refs = [str(item) for item in row.get("evidence_ids") or []]
+                summary = ""
+                for ref in refs:
+                    item = evidence_by_id.get(ref)
+                    if item is None:
+                        continue
+                    summary = str(item.data.get("user_summary") or "").strip()
+                    if summary:
+                        break
+                text = summary or f"Planner observed {row.get('status')} for {row.get('goal_id')}."
+                speech.append(
+                    InteractionSpeech(
+                        id=f"planner-result-{index}",
+                        text=text,
+                        timing="immediate",
+                        style="brief",
+                        metadata={
+                            "source": "test_planner_evidence_reentry",
+                            "truth_stage": "post_evidence",
+                            "goal_status": str(row.get("status") or ""),
+                            "covers_goal_ids": [str(row.get("goal_id") or "")],
+                            "evidence_refs": refs,
+                            "wait_for_playback_start": True,
+                            "playback_start_required_for_delivery": True,
+                        },
+                    )
+                )
+            return InteractionResponse(
+                interaction_id="planner-evidence-result",
+                status="ok",
+                speech=speech,
+                metadata={
+                    "source": "test_planner_evidence_reentry",
+                    "phase": phase,
+                },
+            )
+
+        assistant._planner_state_reentry_response = MethodType(
+            planner_reentry, assistant
         )
         return assistant, session_id, evidence
 

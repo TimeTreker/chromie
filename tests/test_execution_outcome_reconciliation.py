@@ -6,10 +6,10 @@ from datetime import datetime, timedelta, timezone
 from pydantic import ValidationError
 
 from orchestrator.runtime.outcome_reconciliation import (
+    planner_execution_outcome_truth,
     ExecutionOutcomeReconciler,
     build_execution_outcome_bundle,
 )
-from orchestrator.runtime.outcome_response import compose_outcome_response
 from shared.chromie_contracts.execution_outcome import (
     ClaimQualificationPolicy,
     ExecutionOutcomeBundle,
@@ -1166,7 +1166,7 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
                 request.capability_id: schema,
             },
         )
-        speech = compose_outcome_response(bundle, plan, "en-US")
+        projection = planner_execution_outcome_truth(bundle)
 
         self.assertEqual(bundle.evidence[0].observation.status, "sensitive")
         self.assertEqual(bundle.evidence[0].observation.data, {})
@@ -1174,10 +1174,7 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
             secret,
             bundle.evidence[0].observation.model_dump_json(),
         )
-        self.assertNotIn(
-            secret,
-            " ".join(item.text for item in speech.speech),
-        )
+        self.assertNotIn(secret, repr(projection))
 
     def test_request_and_result_correlation_fail_closed(self) -> None:
         plan = single_plan()

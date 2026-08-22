@@ -670,6 +670,7 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
     findings: list[PolicyFinding] = []
     forbidden_files = {
         "orchestrator/runtime/deepthinking_policy.py": RULE_HOST_SEMANTIC_AUTHORITY,
+        "orchestrator/runtime/outcome_response.py": RULE_HOST_SEMANTIC_AUTHORITY,
         "agent/app/agents/motion_planner.py": RULE_LEGACY_PHRASE_AGENTS,
         "agent/app/agents/robot_pose_controller.py": RULE_LEGACY_PHRASE_AGENTS,
     }

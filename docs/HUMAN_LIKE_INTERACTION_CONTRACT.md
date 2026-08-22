@@ -719,8 +719,11 @@ processing failure. Host/runtime code enforces the typed state and speech envelo
 using a phrase blacklist. A failed or unavailable post-Evidence Planner response must not
 fall through to a deterministic `status -> sentence` result composer; Runtime retains the
 factual outcome and either re-enters the owning Planner later or remains conservatively
-non-semantic. The tiny documented cognition-unavailable operational utterance is an
-exception for loss of cognition itself, not a second result interpreter.
+non-semantic. The maintained Host projects terminal status, observation availability, and
+mechanical completion qualification as trusted Planner input; those facts are not dialogue
+and do not author their own result meaning. The tiny documented cognition-unavailable
+operational utterance is an exception for loss of cognition itself, not a second result
+interpreter.
 
 Capability limitation is represented through typed Goal outcomes and Plan structure,
 not a repair route. An unavailable or unsupported Capability outcome has no executable

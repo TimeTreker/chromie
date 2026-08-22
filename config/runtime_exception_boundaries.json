@@ -585,7 +585,7 @@
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "f0a9cdee9281f1284f6a5870b525cf2b669e96d6ba3fb73aa2412bdde54017c9",
+      "body_sha256": "5f1258c4fb0fb621743349d701cf6e27f00c7f2beff2d0ab379edbfef651df0c",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -614,7 +614,7 @@
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "8143aee2ffbbab7721037b0d9546d6e3324976f3ad9becc44859c3e392a70b8b",
+      "body_sha256": "13872357e8eb97505892e4a208b51a578a6eb96d14feead6f724e3085d5941a5",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -1523,19 +1523,6 @@
       "contract": "Contain the exact Goal Work-stop boundary and fail closed without committing cancellation or replacement semantics when runtime/evidence closure is uncertain.",
       "review_status": "reviewed",
       "body_sha256": "e072562ebc9fea2cbe7665b5912f1aa3e43fcec0f985fc8feffce52e20219210",
-      "failure_signals": [
-        "raise"
-      ]
-    },
-    {
-      "path": "orchestrator/runtime/outcome_response.py",
-      "symbol": "_validated_inputs",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "c3cfe3446a78338f793b40437e28f8bd7ba3254765eb62d471562c12f137ecb5",
       "failure_signals": [
         "raise"
       ]

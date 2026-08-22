@@ -59,7 +59,6 @@ remediation line. Verified live defects include:
 - named Goal cancellation replaces Planner output with Host-written success/failure prose;
 - cognitive commit/runtime-entry failures expose pipeline jargon or collapse processing
   failure into capability inability;
-- `outcome_response.py` mechanically maps terminal state to user-visible result meaning;
 - Host body recovery constructs a retry plan and confirmation prompt after execution
   failure.
 
@@ -72,36 +71,31 @@ Verified repository-hygiene work follows correctness: orphan legacy-agent prompt
 `ToolClient`, repeated whitespace normalizers, three JSON-schema/type validator copies,
 missing async test dependency, stale naming, and compatibility residue.
 
-## Current patch slice — Phase 1B
+## Current patch line — Phase 1A through 1C
 
-Phase 1A remains in force and Phase 1B now closes the named-cancellation authority leak:
+The audit remediation is now source-closed through ordinary post-execution result meaning:
 
-- deterministic named-Goal cancellation still owns runtime stop dispatch, atomic Goal-state
-  reconciliation, confirmation-token revocation, and widened-scope facts;
-- those facts are materialized as immutable `GoalCancellationEvidence` with exact target,
-  coaffected Goal, dispatch, reconciliation, and status provenance;
-- the existing Planner state re-entry path receives that Evidence and decides any
-  conversational response, follow-up Work, or silence; no new response manager exists;
-- cancelling one Goal from a pending multi-Goal confirmation revokes the whole stale token.
-  Host no longer synthesizes a child Plan, replacement confirmation prompt, or remainder
-  speech for siblings; Planner may replan still-open Goals from current state;
-- failed/uncertain cancellation attempts also become Evidence. If Planner re-entry is
-  unavailable, a narrow operational fail-safe only warns the person not to assume the stop
-  succeeded; it does not narrate internal pipeline state or claim success;
-- Fast/Deep Planner validation and prompts explicitly admit exact bound cancellation
-  Evidence without treating a cancelled Goal as fresh executable Work;
-- repository policy forbids restoring the removed cancellation/confirmation-remainder
-  Host phrase owners.
+- Phase 1A: `ConfirmationDialogue` owns authorization facts only and requires exact
+  Planner-authored confirmation wording;
+- Phase 1B: named cancellation preserves the current Planner response/Work, revokes stale
+  confirmation scope without rebuilding child Plans/prompts, and keeps only the narrow
+  deterministic stop/cancel failure-or-uncertainty warning;
+- Phase 1C: the deterministic `outcome_response.py` status-to-sentence owner is removed;
+  reconciliation/Goal-state failures no longer narrate Host machinery; all terminal
+  statuses can re-enter Planner as bounded `ToolResultEvidence`; and a separate trusted
+  execution-outcome projection carries aggregate/Goal status plus mechanical completion
+  qualification without authoring meaning. If Planner re-entry is unavailable, Evidence is
+  retained and no Host result sentence is manufactured.
 
-This is **not Phase 1 closure**. Deterministic outcome/result wording and Host
-body-recovery planning/prompt ownership remain next.
+This is **not Phase 1 closure**. Host body-recovery retry-plan and confirmation-prompt
+construction remains Phase 1D.
 
 ## Required execution order
 
-1. Finish **Phase 1C/1D**: post-Evidence result meaning, outcome failure, and body
-   recovery return facts to Planner instead of authoring Host speech/retry semantics.
-   Reuse the generalized Planner state re-entry created in Phase 1B; do not add a Speech
-   Manager or replacement Response Composer.
+1. Finish **Phase 1D**: body recovery must return trusted failure/recovery facts to Planner
+   instead of authoring Host retry Plans or confirmation prompts. Reuse the generalized
+   Planner state re-entry created in Phase 1B; do not add a Speech Manager, replacement
+   Response Composer, or Recovery Brain.
 2. Run focused confirmation/cancellation/outcome/body-recovery regressions, semantic
    authority audit, repository policies, docs check, and `./scripts/run_tests.sh` in the
    dependency-complete environment.
@@ -116,14 +110,14 @@ Detailed phase order and exit criteria live in `ROADMAP.md`; current facts live 
 
 ## Verification for this slice
 
-Current source verification on the audit workspace:
+Current source verification on the uploaded `chromie_2026082206.zip` baseline plus this
+Phase 1C change:
 
-- cancellation control/Evidence, confirmation, terminal-Evidence re-entry, Fast/Deep
-  Planner, prompt/internal-layer, and Planner-owned communication focused suite:
-  **219 passed**;
-- the multi-Goal confirmation regression proves that cancelling one target revokes the
-  stale shared token and returns the still-open sibling to
-  `confirmation_revoked_requires_replan` rather than fabricating a Host child Plan;
+- execution-outcome truth/reconciliation, terminal-Evidence re-entry, cognitive turn-loop,
+  confirmation contract, and behavior-scenario focused suite: **56 passed + 18 subtests**;
+- Planner prompt/internal-layer plus Fast/Deep Planner regressions: **188 passed + 5
+  subtests**;
+- combined focused verification: **244 passed + 23 subtests**;
 - `python -m compileall -q agent orchestrator shared scripts tests`: **passed**;
 - runtime exception-boundary inventory, repository policies, documentation checks,
   semantic-authority audit, runtime-structure ratchet, and test-ownership checks:
@@ -131,10 +125,8 @@ Current source verification on the audit workspace:
 - the Host structural ratchet remains **105 methods / 305 init lines / 110 initialized
   attributes / 0 direct LLM calls**.
 
-`./scripts/run_tests.sh` reaches the repository/test-ownership gates but this audit
-workspace does not contain the pinned Ruff executable, so canonical-suite completion is
-not claimed here. Install the pinned `requirements-test.txt` environment and rerun that
-script before treating this slice as fully verified.
+Full canonical-suite completion is not claimed by this patch handoff; run
+`./scripts/run_tests.sh` in the pinned `requirements-test.txt` environment after applying.
 
 Do not claim microphone, audible speaker, GPU/model, MuJoCo, or physical-robot behavior
 from source tests. Those remain separate target evidence.

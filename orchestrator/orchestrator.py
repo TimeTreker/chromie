@@ -100,9 +100,9 @@ from orchestrator.runtime.goal_list_console import (
 from orchestrator.runtime.input_turn_lifecycle import InputTurnLifecycle
 from orchestrator.runtime.input_session_runtime import input_session_runtime_for
 from orchestrator.runtime.outcome_delivery import build_host_outcome_delivery
+from orchestrator.runtime.outcome_reconciliation import planner_execution_outcome_truth
 from orchestrator.runtime.playback_delivery import PlaybackDeliveryLifecycle
 from orchestrator.runtime.playback_transport import transport_for as playback_transport_for
-from orchestrator.runtime.outcome_response import compose_outcome_response
 from orchestrator.runtime.observability_recording import (
     record_cognitive_gateway_evidence,
     record_cognitive_runtime_evidence,
@@ -4212,27 +4212,9 @@ class VoiceAssistant:
             response.metadata["execution_outcome_error"] = (
                 f"reconciliation_failed:{type(exc).__name__}"
             )
-            if (
-                not recovery_confirmation_staged
-                and suppress_final_reason is None
-                and not self._outcome_response_is_stale(
-                    generation=generation,
-                    session_id=session_id,
-                )
-            ):
-                warning = self._host_speech_response(
-                    (
-                        "执行已经结束，但我没能可靠核对结果。"
-                        if str(response.metadata.get("language") or "").lower().startswith("zh")
-                        else "Execution ended, but I could not verify the result reliably."
-                    ),
-                    style="warning",
-                    source="host_cognitive_outcome_reconciliation_failure",
-                )
-                await self._execute_cognitive_outcome_response(
-                    warning,
-                    session_id=session_id,
-                )
+            # No trusted outcome bundle exists at this boundary. Preserve the
+            # diagnostic fact and fail closed; Host cannot infer result meaning or
+            # manufacture a post-execution utterance without trusted Evidence.
             return "reconciliation_failed"
 
         response.metadata["execution_outcome_bundle"] = bundle.model_dump(
@@ -4280,34 +4262,13 @@ class VoiceAssistant:
             response.metadata["execution_outcome_goal_state_error"] = (
                 type(exc).__name__
             )
-            warning: InteractionResponse | None = None
-            delivery_status = "goal_state_commit_failed"
-            if (
-                not recovery_confirmation_staged
-                and suppress_final_reason is None
-                and not self._outcome_response_is_stale(
-                    generation=generation,
-                    session_id=session_id,
-                )
-            ):
-                warning = self._host_speech_response(
-                    (
-                        "结果已经返回，但我没能可靠更新任务状态。"
-                        if str(response.metadata.get("language") or "").lower().startswith("zh")
-                        else "The result returned, but I could not update the task state reliably."
-                    ),
-                    style="warning",
-                    source="host_cognitive_outcome_goal_state_failure",
-                )
-                delivery_status = await self._execute_cognitive_outcome_response(
-                    warning,
-                    session_id=session_id,
-                )
+            # Evidence is retained, but Goal/Responsibility state did not commit.
+            # Do not let Host turn that implementation failure into result meaning.
             self._record_cognitive_outcome_evidence(
                 bundle,
                 session_id=session_id,
-                final_response=warning,
-                delivery_status=delivery_status,
+                final_response=None,
+                delivery_status="goal_state_commit_failed",
                 suppression_reason="goal_state_commit_failed",
             )
             return "goal_state_commit_failed"
@@ -4575,17 +4536,20 @@ class VoiceAssistant:
             if final_response is None:
                 self.session_log(
                     session_id,
-                    "fast_planner_evidence_reentry_response_unavailable: "
-                    "aggregate=%s evidence=%s fallback=mechanical_outcome_projection",
+                    "planner_evidence_reentry_response_unavailable: "
+                    "aggregate=%s evidence=%s action=retain_evidence_no_speech",
                     bundle.aggregate_status,
                     len(bundle.evidence),
                 )
-                language = str(response.metadata.get("language") or "en-US")
-                final_response = compose_outcome_response(
+                self._record_cognitive_outcome_evidence(
                     bundle,
-                    plan,
-                    language,
+                    session_id=session_id,
+                    final_response=None,
+                    delivery_status="planner_reentry_unavailable",
+                    suppression_reason="planner_reentry_unavailable",
+                    goal_state_results=goal_state_results,
                 )
+                return "planner_reentry_unavailable"
         except Exception as exc:
             self.session_log(
                 session_id,
@@ -5314,13 +5278,6 @@ class VoiceAssistant:
             or (normalized_input.get("language") if isinstance(normalized_input, dict) else "")
             or "en-US"
         )
-        if any(
-            outcome.status == "completed"
-            and (summary := goal_completion_qualification_summary(bundle, outcome))["required"]
-            and not summary["established"]
-            for outcome in bundle.goal_outcomes
-        ):
-            return compose_outcome_response(bundle, plan, language)
 
         delivered_incremental_evidence = {
             str(item).strip()
@@ -5345,20 +5302,20 @@ class VoiceAssistant:
             if item.evidence_id in planner_handled_incremental_evidence:
                 continue
             observation = item.observation
-            if (
-                observation is None
-                or observation.status != "available"
-                or not observation.schema_validated
-                or not observation.data
-            ):
-                continue
+            observation_data = (
+                dict(observation.data)
+                if observation is not None
+                and observation.status == "available"
+                and observation.schema_validated
+                else {}
+            )
             evidence.append(
                 ToolResultEvidence(
                     evidence_id=item.evidence_id,
                     tool_id=item.capability_id,
                     status=item.status,
-                    data=observation.data,
-                    output_sha256=canonical_value_sha256(observation.data),
+                    data=observation_data,
+                    output_sha256=canonical_value_sha256(observation_data),
                 )
             )
         if not evidence:
@@ -5378,6 +5335,7 @@ class VoiceAssistant:
                 "execution_outcome_bundle": bundle.model_dump(
                     mode="json", exclude_none=True
                 ),
+                "trusted_execution_outcome": planner_execution_outcome_truth(bundle),
                 "aggregate_status": bundle.aggregate_status,
                 "goal_statuses": [
                     {

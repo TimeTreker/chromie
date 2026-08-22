@@ -5,12 +5,18 @@ import unittest
 from types import SimpleNamespace
 
 from orchestrator.orchestrator import VoiceAssistant
+from shared.chromie_contracts.execution_outcome import (
+    ExecutionEvidence,
+    ExecutionOutcomeBundle,
+    GoalExecutionOutcome,
+)
 from shared.chromie_contracts.interaction import InteractionResponse, InteractionSpeech
 from shared.chromie_contracts.plan import (
     CanonicalPlan,
     CanonicalPlanStep,
     GoalSatisfactionAssessment,
     RespondGoalPlanOutcome,
+    canonical_plan_fingerprint,
 )
 from shared.chromie_contracts.tool_result import (
     ToolResultEvidence,
@@ -227,6 +233,98 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         self.assertIsNotNone(duplicate)
         assert duplicate is not None
         self.assertEqual(duplicate.speech, [])
+
+
+    def test_aggregate_reentry_exposes_failed_terminal_truth_without_host_wording(self) -> None:
+        goal_id = "goal-motion"
+        original = CanonicalPlan(
+            plan_id="motion-plan",
+            planner_tier="fast",
+            disposition="execute",
+            coverage="complete",
+            confidence=0.98,
+            goal_ids=[goal_id],
+            steps=[
+                CanonicalPlanStep(
+                    step_id="move",
+                    capability_id="soridormi.motion.walk",
+                    args={"duration_s": 1},
+                    source_goal_ids=[goal_id],
+                )
+            ],
+        )
+        bundle = ExecutionOutcomeBundle(
+            outcome_id="outcome-motion-failed",
+            turn_id="turn-motion",
+            interaction_id="interaction-motion",
+            canonical_plan_id=original.plan_id,
+            canonical_plan_fingerprint=canonical_plan_fingerprint(original),
+            canonical_goal_ids=[goal_id],
+            aggregate_status="failed",
+            evidence=[
+                ExecutionEvidence(
+                    evidence_id="motion-failed",
+                    request_id="request-motion",
+                    step_id="move",
+                    capability_id="soridormi.motion.walk",
+                    source_goal_ids=[goal_id],
+                    status="failed",
+                    reported_status="failed",
+                    reason_code="provider_failed",
+                )
+            ],
+            goal_outcomes=[
+                GoalExecutionOutcome(
+                    goal_id=goal_id,
+                    status="failed",
+                    step_ids=["move"],
+                    evidence_ids=["motion-failed"],
+                    unresolved_step_ids=["move"],
+                    reason_codes=["provider_failed"],
+                )
+            ],
+        )
+        source = InteractionResponse(
+            interaction_id="interaction-motion",
+            status="ok",
+            metadata={
+                "language": "zh-CN",
+                "user_turn_envelope": {
+                    "normalized_input": {
+                        "text": "往前走一下",
+                        "language": "zh-CN",
+                    }
+                },
+            },
+        )
+        captured: dict[str, object] = {}
+
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.session_log = lambda *_args, **_kwargs: None
+
+        async def capture(**kwargs):
+            captured.update(kwargs)
+            return InteractionResponse(interaction_id="planner-result", status="ok")
+
+        assistant._planner_state_reentry_response = capture
+        response = asyncio.run(
+            assistant._plan_evidence_bound_capability_result_response(
+                source_response=source,
+                bundle=bundle,
+                plan=original,
+                session_id="session",
+            )
+        )
+
+        self.assertIsNotNone(response)
+        evidence = captured["repeat_check_evidence"]
+        self.assertEqual(len(evidence), 1)
+        self.assertEqual(evidence[0].status, "failed")
+        self.assertEqual(evidence[0].data, {})
+        truth = captured["context_updates"]["trusted_execution_outcome"]
+        self.assertEqual(truth["aggregate_status"], "failed")
+        self.assertEqual(truth["goal_outcomes"][0]["status"], "failed")
+        self.assertNotIn("speech", truth)
 
     def test_host_reentry_fails_closed_without_originating_responsibility(self) -> None:
         goal_id = "goal-weather"

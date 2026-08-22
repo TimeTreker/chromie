@@ -4,7 +4,12 @@
   "suite": "cognitive_turn_loop",
   "level": "integration",
   "description": "A provider schema that becomes invalid after request commitment retains terminal status but cannot expose its payload in final speech.",
-  "tags": ["level-a", "schema-gate", "model-observation", "truthful-speech"],
+  "tags": [
+    "level-a",
+    "schema-gate",
+    "model-observation",
+    "truthful-speech"
+  ],
   "input": {
     "text": "Run the schema-less check.",
     "language": "en-US"
@@ -16,8 +21,23 @@
       {
         "capability_id": "chromie.scenario.schema_less_check",
         "provider_id": "scenario.schema-less",
-        "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
-        "output_schema": {"type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"], "additionalProperties": false}
+        "input_schema": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "properties": {
+            "summary": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "summary"
+          ],
+          "additionalProperties": false
+        }
       }
     ],
     "current_output_schemas": {
@@ -29,7 +49,9 @@
       "disposition": "execute",
       "coverage": "complete",
       "confidence": 0.99,
-      "goal_ids": ["goal-schema-less"],
+      "goal_ids": [
+        "goal-schema-less"
+      ],
       "goal_summary": "Run a check whose committed output schema becomes invalid before closure.",
       "steps": [
         {
@@ -37,7 +59,9 @@
           "capability_id": "chromie.scenario.schema_less_check",
           "args": {},
           "timing": "sequential",
-          "source_goal_ids": ["goal-schema-less"]
+          "source_goal_ids": [
+            "goal-schema-less"
+          ]
         }
       ],
       "goal_outcomes": [
@@ -45,20 +69,33 @@
           "goal_id": "goal-schema-less",
           "disposition": "execute",
           "coverage": "complete",
-          "step_ids": ["schema-less"]
+          "step_ids": [
+            "schema-less"
+          ]
         }
       ],
       "goal_satisfaction": {
         "score": 1.0,
         "status": "exact",
-        "satisfied_goal_ids": ["goal-schema-less"]
+        "satisfied_goal_ids": [
+          "goal-schema-less"
+        ]
       }
     },
     "results": [
       {
         "step_id": "schema-less",
         "status": "completed",
-        "output": {"summary": "UNTRUSTED-SCHEMALESS-PAYLOAD"}
+        "output": {
+          "summary": "UNTRUSTED-SCHEMALESS-PAYLOAD"
+        }
+      }
+    ],
+    "planner_reentry_speech": [
+      {
+        "goal_id": "goal-schema-less",
+        "goal_status": "completed",
+        "text": "I could not confirm that finished."
       }
     ]
   },
@@ -68,22 +105,41 @@
     "turn_identity_preserved": true,
     "runtime_status": "completed",
     "aggregate_status": "completed",
-    "evidence_statuses": ["completed"],
-    "goal_statuses": ["completed"],
-    "observation_statuses": ["schema_unavailable"],
-    "schema_gate_reasons": ["current_output_schema_invalid"],
-    "goal_state_statuses": ["recoverable"],
-    "goal_state_outcome_statuses": ["completed"],
+    "evidence_statuses": [
+      "completed"
+    ],
+    "goal_statuses": [
+      "completed"
+    ],
+    "observation_statuses": [
+      "schema_unavailable"
+    ],
+    "schema_gate_reasons": [
+      "current_output_schema_invalid"
+    ],
+    "goal_state_statuses": [
+      "recoverable"
+    ],
+    "goal_state_outcome_statuses": [
+      "completed"
+    ],
     "closure_status": "speech_runtime_completed",
     "delivery_status": "speech_runtime_completed",
     "suppression_reason": "",
     "final_response_absent": false,
     "final_speech_only": true,
     "final_speech_count": 1,
-    "final_goal_statuses": ["completed"],
+    "final_goal_statuses": [
+      "completed"
+    ],
     "final_capability_ids": [],
     "runtime_call_count": 2,
-    "final_speech_contains_all": ["could not confirm"],
-    "final_speech_forbid": ["UNTRUSTED-SCHEMALESS-PAYLOAD", "Done."]
+    "final_speech_contains_all": [
+      "could not confirm"
+    ],
+    "final_speech_forbid": [
+      "UNTRUSTED-SCHEMALESS-PAYLOAD",
+      "Done."
+    ]
   }
 }
