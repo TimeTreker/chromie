@@ -3,8 +3,8 @@
 Status: current resume point; incomplete development snapshot
 Updated: 2026-08-22
 Patch baseline: user-supplied `chromie_2026082206.zip` plus the applied Phase 1C,
-Phase 1D, Phase 2, and Phase 3 patches. The archive already contained the user's applied
-Phase 1A/1B state. No archive-wide Git identity is claimed.
+Phase 1D, Phase 2, Phase 3, and Phase 4 patches. The archive already contained the user's
+applied Phase 1A/1B state. No archive-wide Git identity is claimed.
 
 ## Read first
 
@@ -13,7 +13,8 @@ Canonical owners remain [Project Charter](docs/PROJECT_CHARTER.md),
 [Current Status](docs/STATUS.md), [Roadmap](ROADMAP.md), and
 [Acceptance](docs/ACCEPTANCE.md). Source and executable evidence win over stale prose.
 
-Current focus: **Phase 5 structural simplification**, after source-closing Phase 4 repository hygiene and deterministic-mechanism deduplication. Do not redesign the Goal-driven backbone, put DAG
+Current focus: **Phase 6 current-revision qualification**, after source-closing the bounded
+Phase 5 structural simplification slice. Do not redesign the Goal-driven backbone, put DAG
 semantics into Goal Association, or reintroduce removed response/recovery owners.
 
 ## Current architecture
@@ -41,8 +42,13 @@ Responsibility + Goal + Situation + Work + Evidence
 
 Planner implementation remains internally decomposed without changing authority:
 `planner_model_contract.py`, `planner_context.py`, `planner_grounding.py`,
-`planner_schema.py`, `planner_validation.py`, `planner_fallback.py`,
+`planner_schema.py`, shared `planner_validation.py`, pass-specific
+`planner_fast_validation.py` / `planner_deep_validation.py`, `planner_fallback.py`,
 `planner_audit.py`, and `planner_prompt.py` are implementation layers of that same owner.
+Goal Association likewise separates model DTOs (`goal_association_contract.py`), constrained
+decoder schemas (`goal_association_schema.py`), deterministic normalization/coverage checks
+(`goal_association_validation.py`), and prompt projection (`goal_association_prompt.py`) while
+`GoalAssociationResolver` remains the sole continuity transaction.
 
 ## Audit remediation closed in source
 
@@ -62,82 +68,56 @@ repository/documentation debt. The live Phase 1 findings are source-closed:
 This is implementation/source closure only. Current-revision bilingual/provider/simulator
 and live evidence remains open.
 
-## Phase 2 documentation convergence
+## Prior source closures
 
-Current documentation now matches the maintained authority line:
+- Phase 2 aligned current authority docs with the maintained Goal-driven architecture and
+  added documentation anti-drift guards.
+- Phase 3 established Planner-authored revisioned WorkDAG plus deterministic DAGEngine; GA
+  changes Goal continuity only, completed nodes remain immutable history, and engine-authored
+  replanning meaning is removed.
+- Phase 4 removed verified orphan/dead artifacts, pinned the async test plugin, consolidated
+  shared whitespace/JSON-Schema mechanisms, and removed reviewed compatibility residue.
 
-- `docs/chromie_mind.md` is rewritten around owner-approved MindProfile context and the
-  current Gateway -> GI -> GA/Planner -> Runtime/Evidence loop; deleted conversation/
-  capability/deepthinking agents and route hints are no longer described as current.
-- The duplicated tail of `docs/CONFIGURATION.md` is removed, retaining one canonical H2
-  section for each configuration area.
-- `docs/COGNITIVE_TURN_LOOP.md` and `docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md` no longer
-  describe Host speech-only outcome fallback, no-planner response branches, route/intent GI
-  branches, or a bounded realizer that owns Planner wording.
-- `docs/API_REFERENCE.md` names the current Fast/Deep Planner authority rather than an
-  obsolete Agent capability planner.
-- `ROADMAP.md` and `docs/STATUS.md` now separate implemented source closure from later
-  target qualification and put Phase 4/5/6 in one consistent order after Phase 3 closure.
-- `scripts/check_docs.py` rejects duplicate Configuration H2 sections and reviewed stale
-  semantic phrases so this drift cannot silently return.
+These phases are source-closed implementation work, not current-revision target qualification.
 
-No new architecture document or semantic owner was added.
+## Phase 5 structural simplification
 
-## Phase 3 WorkDAG / DAGEngine convergence
+Phase 5 is source-closed as a bounded reconstructability slice rather than a line-count campaign:
 
-Chromie-level planned Work now has an explicit execution-only graph boundary:
+- `goal_association_contract.py` now owns only GA model DTO/typed representation; constrained
+  decoder construction lives in `goal_association_schema.py`, and deterministic normalization,
+  grounding/conflict, and coverage mechanics live in `goal_association_validation.py`. The
+  Resolver remains the only GA model invocation and Goal-continuity transaction.
+- shared Planner contract validation remains in `planner_validation.py`; Fast-specific
+  qualification/fail-safe mechanics live in `planner_fast_validation.py`, and Deep-specific
+  repair/safety/diagnostic mechanics live in `planner_deep_validation.py`. Fast/Deep Resolver
+  method counts and semantic authority are unchanged.
+- the former hotspots fall from roughly 4.2K lines in one Planner validation module to a
+  2.8K shared core plus bounded pass-specific layers, and from roughly 2.9K lines in one GA
+  contract module to three roughly 1K-line representation/schema/validation layers. No
+  compatibility re-export facade is retained.
+- the Host/runtime hotspots were reviewed but not split merely for size: the remaining large
+  `VoiceAssistant`, Conversation State, Cognitive Runtime, and Capability Runtime methods own
+  real lifecycle/state/runtime transactions. Future extraction still requires a concrete
+  mechanical ownership seam; file or method count alone is not sufficient.
 
-- Planner is the sole ordinary semantic author and modifier of `WorkDAG` topology.
-- `dag_id` remains stable across one coherent line of planned Work; Planner-authored
-  semantic changes advance `revision` exactly once and bind `parent_revision`.
-- Goal Association never edits a WorkDAG. GA changes canonical Goal continuity; that
-  changed Goal truth creates a Planner opportunity. Planner may choose NO_CHANGE by
-  retaining/reusing the current WorkDAG Activity, or author the next/new WorkDAG.
-- DAGEngine owns only graph validation, ready-node calculation, bounded parallel dispatch,
-  dependency/blocked/cancellation state, execution trace, and already-completed-node
-  inheritance across a valid next revision. Normal node completion returns to DAGEngine
-  and does not pay a Planner round trip.
-- Completed/skipped nodes are immutable execution history. The next revision cannot remove
-  or rewrite them, and DAGEngine does not dispatch them again.
-- `residual_replan`, engine-authored next-action recommendations, and deterministic DAG
-  outcome narration are removed. Material failure or changed reality returns facts through
-  Evidence to the same Planner.
-- Provider-local DAG/controllers such as Soridormi internals remain provider implementation
-  details and are not renamed into Chromie WorkDAG.
-
-The current `chromie.work_dag.execute` Capability is an execution boundary for a fully
-Planner-authored DAG, not delegation of planning to DAGEngine. A future first-class
-`CanonicalPlan.work_dag` representation would be a representation-only change and must
-retain the same authority split.
-
-## Phase 4 repository hygiene
-
-Phase 4 is source-closed as a narrow cleanup slice:
-
-- the five unreferenced legacy multi-agent prompt assets and dead `ToolClient` placeholder are removed;
-- `pytest-asyncio==1.3.0` is pinned beside pytest so the documented test environment can execute the retained async tests;
-- string-field whitespace normalization uses one small `shared/chromie_contracts/text.py` helper instead of copied validator bodies;
-- the bounded JSON-Schema subset now has one shared `shared/chromie_contracts/json_schema.py` mechanism, while callers retain their existing return-vs-fail-closed policy and the local-tool path retains its prior array-bound behavior;
-- the stale mock-hardware `robot_pose_controller` target name is removed;
-- the retired `CHROMIE_EVENT_ROOT` / `legacy_event_root` alias is removed in favor of the canonical `CHROMIE_RUNTIME_EVENT_ROOT`; and
-- repository policy now rejects the verified obsolete assets plus re-copied private schema matchers / contract whitespace bodies.
-
-This is mechanical cleanup only. No cognitive owner, routing layer, response owner, or new framework was added.
+This slice adds no Planner, GA reviewer, reconciliation manager, state store, or response owner.
 
 ## Required execution order
 
-1. Continue **Phase 5** structural simplification only across existing ownership seams.
-2. Execute **Phase 6** current-revision qualification and retain bilingual/provider/
+1. Execute **Phase 6** current-revision qualification and retain bilingual/provider/
    simulator/live evidence.
-3. Keep source implementation, automated verification, target validation, and release
+2. Keep source implementation, automated verification, target validation, and release
    readiness as separate claims.
+3. Reopen structural work only for a demonstrated concrete ownership seam or defect; do not
+   resume decomposition merely because a file remains large.
 
 Detailed phase order and exit criteria live in `ROADMAP.md`; current facts live in
 `docs/STATUS.md`.
 
 ## Verification for this slice
 
-Phase 4 changes repository hygiene, shared deterministic helpers, test dependencies, configuration aliases, tests, and current status documentation. Run:
+Phase 5 changes only Planner/GA mechanical module ownership, imports, tests, and current architecture documentation. Run:
 
 ```bash
 python scripts/check_docs.py
@@ -148,6 +128,10 @@ python scripts/check_test_ownership.py
 python -m compileall -q agent orchestrator shared scripts tests
 ```
 
-Also run the Mind/Planner documentation-adjacent focused tests and the canonical
-`./scripts/run_tests.sh` in the pinned dependency environment. Do not claim microphone,
-audible speaker, GPU/model, MuJoCo, or physical-robot behavior from source/docs tests.
+Retained source verification for this slice: the focused Planner/GA contract set passes
+`397 tests + 13 subtests`; the broader Planner/GA/Cognitive Runtime plus Agent set passes
+`427 tests + 5 subtests`; all listed architecture/configuration guards pass. A larger
+`tests + agent/tests` run reached about 61% with no failure before the current execution
+window expired. `./scripts/run_tests.sh` still stops at the environment's missing pinned
+Ruff executable, so canonical full-suite completion is not claimed here. Do not claim
+microphone, audible speaker, GPU/model, MuJoCo, or physical-robot behavior from source tests.

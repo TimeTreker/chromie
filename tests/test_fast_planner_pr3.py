@@ -12,6 +12,7 @@ from pydantic import ValidationError
 
 from agent.app.fast_planner import FastPlannerResolver
 from agent.app import planner_validation
+from agent.app import planner_fast_validation
 from agent.app.planner_model_contract import (
     PlannerDTOContractError,
     PlannerModelOutput,
@@ -4142,7 +4143,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             ]
         }
 
-        planner_validation.validate_work_reuse_selection(
+        planner_fast_validation.validate_work_reuse_selection(
             output,
             context=context,
         )
@@ -4153,7 +4154,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             PlannerDTOContractError,
             "changes immutable args",
         ):
-            planner_validation.validate_work_reuse_selection(
+            planner_fast_validation.validate_work_reuse_selection(
                 changed,
                 context=context,
             )

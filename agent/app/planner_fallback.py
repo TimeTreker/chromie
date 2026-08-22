@@ -5,7 +5,7 @@ from typing import Any
 
 from .clients.ollama_client import OllamaGenerationError, llm_failure_metadata
 from .planner_context import expected_goal_ids
-from . import planner_validation as _planner_validation
+from . import planner_fast_validation as _planner_fast_validation
 try:
     from chromie_contracts.core_interpretation import CognitiveWorkRequest
 except ImportError:  # pragma: no cover
@@ -52,7 +52,7 @@ def materialize_fast_advance_fail_safe(
         cognition_text_reference(raw_output),
     )
     progress_activities = (
-        _planner_validation.validated_fail_safe_progress(
+        _planner_fast_validation.validated_fail_safe_progress(
             raw_output,
             responsibility_refs=responsibility_refs,
         )

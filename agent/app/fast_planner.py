@@ -45,24 +45,26 @@ from .planner_context import (
     result_evidence_reentry_goal_ids,
 )
 from .planner_validation import (
-    AuthoritativeGroundingValidationError,
-    CapabilityArgumentValidationError,
-    capability_argument_errors,
     coordinated_action_goal_ids,
     normalize_detached_parameter_resolutions,
     normalize_missing_numeric_parameter_provenance,
     normalize_schema_default_parameter_provenance,
-    planner_validation_error_json,
-    qualify_fast_canonical_plan,
-    restore_required_capability_args_from_responsibilities,
     validate_explicit_numeric_parameter_grounding,
     validate_external_response_evidence_boundary,
-    validate_fast_advance_output,
     validate_goal_binding_argument_grounding,
     validate_user_supplied_parameter_provenance,
     validate_resource_responsibility_capability_grounding,
     validate_goal_responsibility_outcomes,
     validate_planner_model_output,
+)
+from .planner_fast_validation import (
+    AuthoritativeGroundingValidationError,
+    CapabilityArgumentValidationError,
+    capability_argument_errors,
+    planner_validation_error_json,
+    qualify_fast_canonical_plan,
+    restore_required_capability_args_from_responsibilities,
+    validate_fast_advance_output,
     validate_work_reuse_selection,
 )
 from .planner_fallback import (

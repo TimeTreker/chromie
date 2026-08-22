@@ -76,18 +76,22 @@ except ImportError:  # pragma: no cover
 logger = logging.getLogger("chromie.agent.goal_association")
 
 from .goal_association_contract import (
-    _CoverageSourceExcerptViolation,
     GoalAssociationModelBinding,
     GoalAssociationModelGoal,
     GoalAssociationModelOutput,
     GoalResponsibilityCoverageCertificate,
     GoalSegmentationModelOutput,
+)
+from .goal_association_schema import (
+    coverage_certificate_response_schema,
+    goal_association_response_schema,
+)
+from .goal_association_validation import (
+    _CoverageSourceExcerptViolation,
     action_collection_bindings,
     binding_semantic_contract_conflicts,
-    coverage_certificate_response_schema,
     coverage_verdict,
     drop_ungrounded_resource_query_locations,
-    goal_association_response_schema,
     non_verbatim_explicit_location_bindings,
     normalize_grounded_generic_location_types,
     normalize_optional_referent_updates,
@@ -100,6 +104,7 @@ from .goal_association_contract import (
     source_grounded_binding_coverage_conflicts,
     validation_error_json,
 )
+
 
 from .goal_association_prompt import (
     build_fresh_interpretation_prompt,

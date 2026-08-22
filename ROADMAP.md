@@ -18,27 +18,20 @@ organized by capability, risk, and retained evidence.
 
 ## Current execution order
 
-The current-revision implementation/qualification axes remain separate. Phase 1 live
-semantic-authority source closure, Phase 2 documentation convergence, and Phase 3
-WorkDAG/DAGEngine authority convergence are complete in the maintained tree; they are not
-requests to re-implement those migrations. Continue in
-this order:
+The current-revision implementation/qualification axes remain separate. Phases 1 through 5
+are source-closed in the maintained tree; they are not requests to re-implement those
+migrations. Continue in this order:
 
-1. **Perform repository hygiene and mechanical deduplication.** Phase 3 is source-closed:
-   Planner authors/revises WorkDAG; DAGEngine advances execution mechanically; GA changes
-   Goal continuity only; completed DAG nodes are immutable/inherited; no `residual_replan`
-   or DAGEngine-authored recovery meaning remains. Remove verified orphan
-   assets/dead placeholders, restore the pinned async test dependency, consolidate repeated
-   normalization/schema mechanisms through small shared helpers, and remove compatibility
-   residue only after current consumers are checked.
-2. **Continue structural simplification only across existing ownership seams.** File or
-   method count is evidence of reconstructability cost, not permission to create another
-   semantic manager.
-3. **Then run current-revision qualification and retain target evidence.** Re-run canonical
-   gates and retain bilingual/provider/simulator/live evidence for Planner-owned speech,
-   Evidence-bound result claims, retry/alternative/silence behavior, duplicate-effect
-   prevention, Social Attention, and latency. Source implementation, automated verification,
-   target validation, and release readiness remain separate axes.
+1. **Run current-revision qualification and retain target evidence.** Re-run canonical gates
+   and retain bilingual/provider/simulator/live evidence for Planner-owned speech,
+   Evidence-bound result claims, WorkDAG revision/continuation, retry/alternative/silence
+   behavior, duplicate-effect prevention, Social Attention, and latency.
+2. **Keep implementation, automated verification, target validation, and release readiness
+   separate.** A source-closed architecture slice does not qualify microphone, provider,
+   simulator, model quality, or latency behavior.
+3. **Reopen structural work only for a concrete ownership seam or defect.** File or method
+   count remains evidence of reconstructability cost, not permission to create another
+   semantic manager or perform decomposition for its own sake.
 
 ## Immediate architecture line — consolidate the reviewed authority baseline
 
@@ -421,10 +414,15 @@ authority behind a new manager.
    verified obsolete artifacts and direct re-copying of these shared mechanisms.
    **Implemented in Phase 4.**
 
-5. **Phase 5 — structural simplification.** Continue reducing Host/Planner/GA
-   reconstructability cost only across real existing ownership seams. File size alone is
-   not a gate. Share mechanisms, never merge or add semantic authorities merely to reduce
-   line count.
+5. **Phase 5 — structural simplification.** GA model DTOs, decoder schemas, and deterministic
+   normalization/coverage mechanics are separated into representation/schema/validation
+   modules while the Resolver remains the sole continuity transaction. Planner shared
+   validation remains common, while Fast-specific qualification/fail-safe mechanics and
+   Deep-specific repair/safety/diagnostic mechanics move to pass-specific mechanical modules.
+   No compatibility re-export facade, second Planner/GA authority, or Host semantic manager is
+   added. Remaining Host/runtime large methods are retained where the reviewed code owns a
+   real lifecycle/state/runtime transaction rather than a safely extractable mechanical seam.
+   **Implemented in Phase 5.**
 
 6. **Phase 6 — qualification and release evidence.** Re-run canonical gates and then
    retain bilingual/live/simulator/provider evidence for the exact source revision.
@@ -671,11 +669,11 @@ module boundaries, lowering the composition root from 150 to 142 methods. Statel
 slices adds a semantic owner, manager, state store, service, environment key, or public
 runtime path.
 
-**Goal Association internal decomposition implemented further.** GA now separates model DTO/schema/normalization/typed-integrity mechanics into `agent/app/goal_association_contract.py` and bounded prompt projection/system-prompt construction into `agent/app/goal_association_prompt.py`. `GoalAssociationResolver` remains the only GA model-invocation/continuity transaction and the only canonical Goal-continuity writer. Neither extracted module may own Ollama invocation, runtime state, Goal commit, tracing, or a second semantic lifecycle. The resolver source is therefore concentrated on semantic transaction/materialization rather than decoder-schema and prompt mechanics. The same standard applies to future Planner/GA internal decomposition: extract representation, projection, decode, normalization, or mechanical validation only when the original semantic owner remains singular.
+**Goal Association internal decomposition implemented further.** GA model DTO/typed representation lives in `agent/app/goal_association_contract.py`; constrained-decoder schema construction lives in `agent/app/goal_association_schema.py`; deterministic normalization, grounding/conflict, and coverage mechanics live in `agent/app/goal_association_validation.py`; bounded prompt projection/system-prompt construction lives in `agent/app/goal_association_prompt.py`. `GoalAssociationResolver` remains the only GA model-invocation/continuity transaction and canonical Goal-continuity writer. None of these mechanical layers may own Ollama invocation, runtime state, Goal commit, tracing, or a second semantic lifecycle.
 
 **Planner prompt/projection decomposition implemented.** Fast and Deep Planner prompt construction, first-response truth/progress prompt text, system prompts, model-facing capability compaction, and layered-prompt assembly live in `agent/app/planner_prompt.py`; raw read-only catalog payload projection lives in `planner_context.py`. The prompt module has no model client, runtime trace, Plan validation/materialization, Goal mutation, execution authorization, or second semantic lifecycle. `FastPlannerResolver` and `DeepPlannerResolver` retain model invocation, same-tier repair/escalation decisions, audit invocation, Plan return, and the single Planner HOW authority; fast/deep remain cognition depth/pass labels rather than separate planners.
 
-**Planner Resolver convergence implemented.** The former 6K-line `agent/app/planner_contract.py` catch-all is removed rather than preserved as a re-export facade. The same Planner owner is internally separated into `planner_model_contract.py` (model DTOs/errors, stable Plan IDs, canonical materialization), `planner_context.py` (read-only Goal/Evidence/Situation/Gateway and catalog-payload projection), `planner_grounding.py` (canonical material/binding comparison), `planner_schema.py` (constrained decoder schemas, including Fast/Deep pass-specific schemas), `planner_validation.py` (deterministic qualification, normalization, repair feedback, provenance and integrity checks), `planner_fallback.py` (mechanical materialization of an already-decided clarify/unavailable/escalate/fail-safe disposition only), and `planner_audit.py` (the pre-existing bounded model-assisted coverage/communication audits). Fast/Deep Resolver methods no longer re-own deterministic schema, validation, normalization, fallback-construction, stable-ID, or projection mechanics; Fast is reduced to 7 lifecycle methods and Deep to 3. Every executable model step must explicitly author `timing`; the Host no longer preserves a singleton omission path that silently supplies `sequential`. These modules are implementation layers of one Planner authority; they do not create a Planner reviewer, reconciliation stage, response composer, Goal writer, Capability executor, or Runtime state store.
+**Planner Resolver convergence implemented.** The former 6K-line `agent/app/planner_contract.py` catch-all is removed rather than preserved as a re-export facade. The same Planner owner is internally separated into `planner_model_contract.py` (model DTOs/errors, stable Plan IDs, canonical materialization), `planner_context.py` (read-only Goal/Evidence/Situation/Gateway and catalog-payload projection), `planner_grounding.py` (canonical material/binding comparison), `planner_schema.py` (constrained decoder schemas, including Fast/Deep pass-specific schemas), `planner_validation.py` (shared deterministic provenance/integrity checks), `planner_fast_validation.py` (Fast qualification/reuse/fail-safe validation mechanics), `planner_deep_validation.py` (Deep repair/safety/diagnostic validation mechanics), `planner_fallback.py` (mechanical materialization of an already-decided clarify/unavailable/escalate/fail-safe disposition only), and `planner_audit.py` (the pre-existing bounded model-assisted coverage/communication audits). Fast/Deep Resolver methods no longer re-own deterministic schema, validation, normalization, fallback-construction, stable-ID, or projection mechanics; Fast is reduced to 7 lifecycle methods and Deep to 3. Every executable model step must explicitly author `timing`; the Host no longer preserves a singleton omission path that silently supplies `sequential`. These modules are implementation layers of one Planner authority; they do not create a Planner reviewer, reconciliation stage, response composer, Goal writer, Capability executor, or Runtime state store.
 
 - Decompose the Orchestrator composition root without raising existing method,
   property, initializer, exception-boundary, or direct-model-call ratchets.

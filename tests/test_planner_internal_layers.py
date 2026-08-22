@@ -8,6 +8,8 @@ from agent.app import (
     planner_audit,
     planner_context,
     planner_fallback,
+    planner_fast_validation,
+    planner_deep_validation,
     planner_grounding,
     planner_model_contract,
     planner_prompt,
@@ -47,7 +49,13 @@ def test_planner_context_is_read_only_projection_only() -> None:
 
 
 def test_planner_schema_and_validation_have_distinct_mechanical_owners() -> None:
-    for module in (planner_schema, planner_validation, planner_grounding):
+    for module in (
+        planner_schema,
+        planner_validation,
+        planner_fast_validation,
+        planner_deep_validation,
+        planner_grounding,
+    ):
         namespace = vars(module)
         for forbidden in (
             "OllamaClient",
@@ -63,6 +71,14 @@ def test_planner_schema_and_validation_have_distinct_mechanical_owners() -> None
     assert planner_validation.validate_planner_model_output.__module__ == (
         "agent.app.planner_validation"
     )
+    assert planner_fast_validation.qualify_fast_canonical_plan.__module__ == (
+        "agent.app.planner_fast_validation"
+    )
+    assert planner_deep_validation.deep_plan_validation_errors.__module__ == (
+        "agent.app.planner_deep_validation"
+    )
+    assert not hasattr(planner_validation, "qualify_fast_canonical_plan")
+    assert not hasattr(planner_validation, "deep_plan_validation_errors")
     assert planner_grounding._material_values_equal.__module__ == (
         "agent.app.planner_grounding"
     )
@@ -111,6 +127,12 @@ def test_fast_deep_and_prompt_depend_on_real_planner_layer_owners() -> None:
     )
     assert deep_planner.validate_planner_model_output is (
         planner_validation.validate_planner_model_output
+    )
+    assert fast_planner.qualify_fast_canonical_plan is (
+        planner_fast_validation.qualify_fast_canonical_plan
+    )
+    assert deep_planner.deep_plan_validation_errors is (
+        planner_deep_validation.deep_plan_validation_errors
     )
     assert fast_planner.materialize_planner_output is (
         planner_model_contract.materialize_planner_output

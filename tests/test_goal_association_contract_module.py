@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from agent.app import goal_association
 from agent.app import goal_association_contract
+from agent.app import goal_association_schema
+from agent.app import goal_association_validation
 
 
 def test_goal_association_model_contract_has_one_definition_owner() -> None:
@@ -39,6 +41,30 @@ def test_goal_association_contract_module_stays_model_only() -> None:
     ):
         assert forbidden not in namespace
 
+
+
+def test_goal_association_schema_and_validation_are_mechanical_layers_only() -> None:
+    for module in (goal_association_schema, goal_association_validation):
+        namespace = vars(module)
+        for forbidden in (
+            "OllamaClient",
+            "runtime_tracer",
+            "GoalAssociationResolution",
+            "ActiveGoalSnapshot",
+            "stable_goal_operation_id",
+            "CapabilityRuntime",
+            "ConversationState",
+        ):
+            assert forbidden not in namespace
+
+    assert goal_association_schema.goal_association_response_schema.__module__ == (
+        "agent.app.goal_association_schema"
+    )
+    assert goal_association_validation.source_grounded_binding_coverage_conflicts.__module__ == (
+        "agent.app.goal_association_validation"
+    )
+    assert not hasattr(goal_association_contract, "goal_association_response_schema")
+    assert not hasattr(goal_association_contract, "source_grounded_binding_coverage_conflicts")
 
 def test_goal_association_identity_contract_preserves_current_truth_boundary() -> None:
     text = goal_association_contract._GOAL_SEGMENTATION_IDENTITY_CONTRACT

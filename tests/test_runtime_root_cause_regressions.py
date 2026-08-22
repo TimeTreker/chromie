@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from agent.app import planner_validation
+from agent.app import planner_deep_validation
 from agent.app import planner_schema
 from agent.app import planner_prompt as planner_prompt
 
@@ -215,7 +216,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(planner_validation.requires_safety_revision(feedback))
         self.assertEqual(
-            planner_validation.safety_revision_contract_errors(
+            planner_deep_validation.safety_revision_contract_errors(
                 CanonicalPlan(
                     plan_id="semantic-repair",
                     planner_tier="deep",
@@ -358,7 +359,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             }
         )
 
-        errors = planner_validation.safety_revision_contract_errors(
+        errors = planner_deep_validation.safety_revision_contract_errors(
             exact,
             feedback,
         )
@@ -368,14 +369,14 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             "safety_revision_contract_not_satisfied",
         )
         self.assertEqual(
-            planner_validation.safety_revision_contract_errors(
+            planner_deep_validation.safety_revision_contract_errors(
                 adjusted,
                 feedback,
             ),
             [],
         )
         self.assertEqual(
-            planner_validation.safety_revision_contract_errors(
+            planner_deep_validation.safety_revision_contract_errors(
                 relabeled_parallel,
                 feedback,
             )[0]["parallel_step_ids"],

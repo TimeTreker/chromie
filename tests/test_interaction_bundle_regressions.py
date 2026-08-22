@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from agent.app import goal_association_contract as ga_contract
+from agent.app import goal_association_validation as ga_validation
 
 import unittest
 
@@ -45,7 +45,7 @@ class GoalAndCoverageRegressionTests(unittest.TestCase):
             }
         )
 
-        required = ga_contract.responsibility_coverage_required(
+        required = ga_validation.responsibility_coverage_required(
             output,
             request=object(),
         )

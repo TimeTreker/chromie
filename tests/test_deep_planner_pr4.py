@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from agent.app import planner_validation
+from agent.app import planner_deep_validation
 from agent.app import planner_schema
 from agent.app.planner_model_contract import materialize_planner_output
 from agent.app import planner_prompt as planner_prompt
@@ -85,7 +86,7 @@ class DeepPlannerMixedAccountingNormalizationTests(unittest.TestCase):
         }
 
         normalized, repairs = (
-            planner_validation.normalize_mixed_goal_outcome_accounting(
+            planner_deep_validation.normalize_mixed_goal_outcome_accounting(
                 raw,
                 expected_goal_ids=["goal-walk", "goal-sing"],
             )
@@ -116,7 +117,7 @@ class DeepPlannerMixedAccountingNormalizationTests(unittest.TestCase):
         }
 
         normalized, repairs = (
-            planner_validation.normalize_mixed_goal_outcome_accounting(
+            planner_deep_validation.normalize_mixed_goal_outcome_accounting(
                 raw,
                 expected_goal_ids=["goal-walk", "goal-sing"],
             )
@@ -177,7 +178,7 @@ class DeepPlannerMixedAccountingNormalizationTests(unittest.TestCase):
         }
 
         normalized, repairs = (
-            planner_validation.normalize_mixed_goal_outcome_accounting(
+            planner_deep_validation.normalize_mixed_goal_outcome_accounting(
                 raw,
                 expected_goal_ids=["goal-walk", "goal-sing"],
             )
@@ -837,7 +838,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertIn("ledger-deep-marker", prompt)
 
     def test_resolution_mismatch_feedback_carries_selected_capability_schema(self):
-        feedback = planner_validation.deep_validation_error_items(
+        feedback = planner_deep_validation.deep_validation_error_items(
             ValueError(
                 "parameter resolution references an argument absent from its step"
             ),
@@ -913,7 +914,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         )
 
     def test_numeric_repair_feedback_rejects_default_strategy_for_goal_value(self):
-        feedback = planner_validation.deep_validation_error_items(
+        feedback = planner_deep_validation.deep_validation_error_items(
             ValueError(
                 "explicit numeric goal value has no matching user_supplied "
                 "parameter resolution"
@@ -948,7 +949,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertIn("strategy user_supplied", mismatch["corrective_contract"])
 
     def test_numeric_repair_feedback_forbids_borrowing_sibling_goal_value(self):
-        feedback = planner_validation.deep_validation_error_items(
+        feedback = planner_deep_validation.deep_validation_error_items(
             ValueError(
                 "numeric user_supplied parameter resolution is not present in "
                 "its authoritative source Goal"
@@ -1108,7 +1109,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         )
 
     def test_single_parallel_labeled_step_does_not_force_adjustment(self):
-        feedback = planner_validation.initial_safety_feedback(
+        feedback = planner_deep_validation.initial_safety_feedback(
             {
                 "fast_plan_resolution": {
                     "metadata": {
