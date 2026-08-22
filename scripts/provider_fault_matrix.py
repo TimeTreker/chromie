@@ -7,6 +7,7 @@ import argparse
 import asyncio
 import json
 import os
+import subprocess
 import sys
 import time
 from dataclasses import asdict, dataclass
@@ -29,6 +30,27 @@ from orchestrator.runtime.interaction_coordinator import (
 from shared.chromie_contracts.interaction import InteractionResponse, CapabilityResult
 
 MATRIX_VERSION = "1.2"
+
+
+def _git_provenance() -> dict[str, Any]:
+    try:
+        revision = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"],
+            cwd=ROOT,
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        dirty = bool(
+            subprocess.check_output(
+                ["git", "status", "--porcelain"],
+                cwd=ROOT,
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).strip()
+        )
+    except Exception:
+        return {"chromie_revision": None, "chromie_dirty": None}
+    return {"chromie_revision": revision, "chromie_dirty": dirty}
 
 
 @dataclass(frozen=True)
@@ -568,6 +590,10 @@ async def run_matrix(
     ]
     payload = _matrix_payload(results, thresholds=thresholds)
     payload["evidence_source"] = "local_stub"
+    payload["qualification"] = {
+        "level_a_provider_faults_eligible": bool(payload["passed"]),
+        "live_provider_faults_eligible": False,
+    }
     return payload
 
 
@@ -608,6 +634,15 @@ async def run_live_matrix(
             await controller.clear()
     payload = _matrix_payload(results, thresholds=thresholds)
     payload["evidence_source"] = "live"
+    provenance = payload.get("provenance") if isinstance(payload.get("provenance"), dict) else {}
+    payload["qualification"] = {
+        "level_a_provider_faults_eligible": False,
+        "live_provider_faults_eligible": bool(
+            payload["passed"]
+            and provenance.get("chromie_revision")
+            and provenance.get("chromie_dirty") is False
+        ),
+    }
     return payload
 
 
@@ -631,10 +666,12 @@ def _matrix_payload(
         for result in results
         if result.terminal_latency_ms is not None
     ]
+    passed = all(result.passed for result in results)
     return {
         "matrix_version": MATRIX_VERSION,
-        "passed": all(result.passed for result in results),
+        "passed": passed,
         "scenario_count": len(results),
+        "provenance": _git_provenance(),
         "thresholds_ms": asdict(thresholds),
         "summary": {
             "passed_count": sum(result.passed for result in results),

@@ -3,7 +3,7 @@
 Status: current resume point; incomplete development snapshot
 Updated: 2026-08-22
 Patch baseline: user-supplied `chromie_2026082206.zip` plus the applied Phase 1C,
-Phase 1D, Phase 2, Phase 3, and Phase 4 patches. The archive already contained the user's
+Phase 1D, Phase 2, Phase 3, Phase 4, and Phase 5 patches. The archive already contained the user's
 applied Phase 1A/1B state. No archive-wide Git identity is claimed.
 
 ## Read first
@@ -82,42 +82,51 @@ These phases are source-closed implementation work, not current-revision target 
 
 ## Phase 5 structural simplification
 
-Phase 5 is source-closed as a bounded reconstructability slice rather than a line-count campaign:
-
-- `goal_association_contract.py` now owns only GA model DTO/typed representation; constrained
-  decoder construction lives in `goal_association_schema.py`, and deterministic normalization,
-  grounding/conflict, and coverage mechanics live in `goal_association_validation.py`. The
-  Resolver remains the only GA model invocation and Goal-continuity transaction.
-- shared Planner contract validation remains in `planner_validation.py`; Fast-specific
-  qualification/fail-safe mechanics live in `planner_fast_validation.py`, and Deep-specific
-  repair/safety/diagnostic mechanics live in `planner_deep_validation.py`. Fast/Deep Resolver
-  method counts and semantic authority are unchanged.
-- the former hotspots fall from roughly 4.2K lines in one Planner validation module to a
-  2.8K shared core plus bounded pass-specific layers, and from roughly 2.9K lines in one GA
-  contract module to three roughly 1K-line representation/schema/validation layers. No
-  compatibility re-export facade is retained.
-- the Host/runtime hotspots were reviewed but not split merely for size: the remaining large
-  `VoiceAssistant`, Conversation State, Cognitive Runtime, and Capability Runtime methods own
-  real lifecycle/state/runtime transactions. Future extraction still requires a concrete
-  mechanical ownership seam; file or method count alone is not sufficient.
-
-This slice adds no Planner, GA reviewer, reconciliation manager, state store, or response owner.
+Phase 5 is source-closed. GA representation/schema/validation and shared/Fast/Deep Planner
+validation mechanics are separated without changing semantic owners or retaining compatibility
+re-export facades. Host/runtime hotspots were reviewed but not split merely for size; future
+extraction still requires a concrete mechanical ownership seam. No Planner, GA reviewer,
+reconciliation manager, state store, or response owner was added.
 
 ## Required execution order
 
-1. Execute **Phase 6** current-revision qualification and retain bilingual/provider/
-   simulator/live evidence.
-2. Keep source implementation, automated verification, target validation, and release
-   readiness as separate claims.
-3. Reopen structural work only for a demonstrated concrete ownership seam or defect; do not
-   resume decomposition merely because a file remains large.
+1. Commit the exact Phase 6 source, start maintained services/Soridormi `sim`, then initialize
+   `run_target_evidence_closure.py --profile current_revision_qualification`.
+2. Capture the deployed runtime identity and collect the source, interaction-behavior, live
+   provider-fault, Gateway/Core, Agent Skill/weather, Social Attention, and LAN tracks.
+3. Finalize only on the unchanged clean revision. `target_evidence_closure_eligible=true` is
+   the Phase 6 target-evidence exit condition; physical voice/robot remain separate optional
+   claims and `release_qualified` remains false.
+4. Keep source implementation, automated verification, target validation, and release
+   readiness as separate claims. Reopen structural work only for a demonstrated defect or
+   ownership seam.
 
 Detailed phase order and exit criteria live in `ROADMAP.md`; current facts live in
 `docs/STATUS.md`.
 
+## Phase 6 qualification infrastructure
+
+Phase 6 reuses existing evidence owners rather than creating another benchmark.
+`config/source_qualification.json` now retains semantic-authority, focused Phase 1-5
+regressions, complete Level-A General Ability, and deterministic provider-fault evidence even
+when the optional long full-suite run is being diagnosed separately.
+
+`benchmarks/manifests/target_evidence_closure_v1.json` adds the
+`current_revision_qualification` profile. Its required current-revision tracks are source
+qualification, Gateway/Core, Agent Skill/weather, eight manifest-owned executed General
+Ability cases under full assertions, the live provider fault matrix, Social Attention, and
+LAN evidence. General Ability summaries and provider-fault reports now retain explicit
+Chromie revision/dirty provenance. The closure rejects preview-only interaction evidence,
+local-stub provider faults, dirty reports, or different revisions.
+
+This is qualification **infrastructure**, not a fabricated live result. The operator must run
+the profile on the committed target after applying this patch.
+
 ## Verification for this slice
 
-Phase 5 changes only Planner/GA mechanical module ownership, imports, tests, and current architecture documentation. Run:
+Phase 6 changes qualification/evidence plumbing, manifests, provenance, retained scenarios,
+tests, and current qualification documentation; it does not change the cognitive authority
+backbone. The deterministic/current-source side has been exercised with:
 
 ```bash
 python scripts/check_docs.py
@@ -125,13 +134,25 @@ python scripts/check_repository_policies.py
 python scripts/semantic_authority_audit.py
 python scripts/check_runtime_structure.py
 python scripts/check_test_ownership.py
+python scripts/check_runtime_exception_boundaries.py
+python scripts/check_host_configuration_ownership.py
+python scripts/check_service_configuration_ownership.py
+python scripts/runtime_configuration_inventory.py --check
+python scripts/general_ability_acceptance.py --mode level-a --no-write
+python scripts/provider_fault_matrix.py
 python -m compileall -q agent orchestrator shared scripts tests
 ```
 
-Retained source verification for this slice: the focused Planner/GA contract set passes
-`397 tests + 13 subtests`; the broader Planner/GA/Cognitive Runtime plus Agent set passes
-`427 tests + 5 subtests`; all listed architecture/configuration guards pass. A larger
-`tests + agent/tests` run reached about 61% with no failure before the current execution
-window expired. `./scripts/run_tests.sh` still stops at the environment's missing pinned
-Ruff executable, so canonical full-suite completion is not claimed here. Do not claim
-microphone, audible speaker, GPU/model, MuJoCo, or physical-robot behavior from source tests.
+Retained verification in the patch workspace passes `123 tests + 14 subtests`; Level-A
+General Ability passes `43/43`, and the deterministic provider-fault matrix passes `16/16`
+with safe idle behavior. All listed architecture/documentation/configuration guards pass.
+A clean-revision source-qualification run reports no failed gate, but is correctly
+`blocked` in this environment because the pinned Ruff and mypy executables are not installed
+(and the long full suite was intentionally skipped for that probe). Therefore
+`source_qualified=true` is not claimed here.
+
+No Phase 6 target evidence is fabricated by this patch. The committed target still must run
+the `current_revision_qualification` profile with executed/full live-text cases, live provider
+faults, Gateway/Core, Agent Skill/weather, Social Attention, and LAN evidence on the same clean
+revision. Do not claim microphone, audible speaker, GPU/model, MuJoCo, physical-robot, or
+`target_evidence_closure_eligible=true` until the corresponding retained artifacts exist.

@@ -279,6 +279,15 @@ def _track_status(
             expected_revision=expected_revision,
         )
     )
+    required_values = spec.get("required_values")
+    if isinstance(required_values, dict):
+        for dotted_path, expected_value in required_values.items():
+            actual_value = _nested(payload, str(dotted_path))
+            if actual_value != expected_value:
+                status["errors"].append(
+                    "required_value_mismatch:"
+                    f"path={dotted_path}:expected={expected_value!r}:actual={actual_value!r}"
+                )
     status["source_revision"] = expected_revision
     review_relative = spec.get("review")
     if review_relative:
@@ -338,6 +347,24 @@ def _copy(source: Path, destination: Path) -> Path:
     return destination
 
 
+def _attach_report(
+    *,
+    args: argparse.Namespace,
+    track_id: str,
+    source: Path,
+) -> Path:
+    manifest = _manifest(args)
+    root = _root(args.evidence_root, existing=True)
+    state = _load_state(root, manifest)
+    _assert_initialized_source(state)
+    spec = _track_spec(manifest, track_id)
+    destination = root / str(spec.get("report") or "")
+    _copy(source, destination)
+    _refresh(root, manifest, state)
+    print(destination)
+    return destination
+
+
 def init(args: argparse.Namespace) -> int:
     manifest = _manifest(args)
     profile = _profile(manifest, args.profile)
@@ -380,11 +407,147 @@ def init(args: argparse.Namespace) -> int:
     return 0
 
 
-def _run_command(command: list[str], *, dry_run: bool) -> int:
+def _run_command(
+    command: list[str],
+    *,
+    dry_run: bool,
+    env_updates: dict[str, str] | None = None,
+) -> int:
     print("[target-evidence] " + " ".join(command))
     if dry_run:
         return 0
-    return subprocess.run(command, cwd=ROOT, check=False).returncode
+    environment = os.environ.copy()
+    if env_updates:
+        environment.update(env_updates)
+    return subprocess.run(
+        command, cwd=ROOT, check=False, env=environment
+    ).returncode
+
+
+def collect_source_qualification(args: argparse.Namespace) -> int:
+    manifest = _manifest(args)
+    root = _root(args.evidence_root, existing=True)
+    state = _load_state(root, manifest)
+    _assert_initialized_source(state)
+    destination = root / str(
+        _track_spec(manifest, "source_qualification").get("report") or ""
+    )
+    command = [
+        args.python,
+        "scripts/run_source_qualification.py",
+        "--output",
+        str(destination),
+    ]
+    if _run_command(command, dry_run=args.dry_run) != 0:
+        return 1
+    if not args.dry_run:
+        _refresh(root, manifest, state)
+    return 0
+
+
+def attach_source_qualification(args: argparse.Namespace) -> int:
+    _attach_report(
+        args=args,
+        track_id="source_qualification",
+        source=args.qualification,
+    )
+    return 0
+
+
+def collect_interaction_behavior(args: argparse.Namespace) -> int:
+    manifest = _manifest(args)
+    root = _root(args.evidence_root, existing=True)
+    state = _load_state(root, manifest)
+    current = _assert_initialized_source(state)
+    runtime_identity = _read_json(args.runtime_identity.expanduser().resolve())
+    chromie_identity = (
+        runtime_identity.get("chromie")
+        if isinstance(runtime_identity.get("chromie"), dict)
+        else {}
+    )
+    if chromie_identity.get("revision") != current.get("revision"):
+        raise ValueError("runtime identity revision differs from current Chromie source")
+    if chromie_identity.get("dirty") is not False:
+        raise ValueError("interaction qualification requires a clean runtime identity")
+    cases = manifest.get("interaction_behavior_cases")
+    if not isinstance(cases, list) or not cases or not all(
+        isinstance(item, str) and item.strip() for item in cases
+    ):
+        raise ValueError("manifest interaction_behavior_cases must be non-empty strings")
+    run_root = root / "interaction-behavior" / "general-ability"
+    command = [
+        args.python,
+        "scripts/general_ability_acceptance.py",
+        "--mode",
+        "live-text",
+        "--assertion-scope",
+        "full",
+        "--goal-driven-runtime",
+        "apply",
+        "--execute",
+        "--grant-confirmation",
+        "--evidence-dir",
+        str(run_root),
+        "--runtime-identity",
+        str(args.runtime_identity.expanduser().resolve()),
+        "--agent-url",
+        args.agent_url,
+        "--soridormi-mcp-url",
+        args.soridormi_mcp_url,
+        "--case-timeout-s",
+        str(args.case_timeout_s),
+    ]
+    if args.soridormi_repo:
+        command.extend(["--soridormi-repo", str(args.soridormi_repo)])
+    if args.speaker:
+        command.append("--speaker")
+    for case_id in cases:
+        command.extend(["--only-case", case_id])
+    if _run_command(command, dry_run=args.dry_run) != 0:
+        return 1
+    if args.dry_run:
+        return 0
+    summary = run_root / "summary.json"
+    _attach_report(args=args, track_id="interaction_behavior", source=summary)
+    return 0
+
+
+def attach_provider_faults(args: argparse.Namespace) -> int:
+    _attach_report(
+        args=args,
+        track_id="provider_faults",
+        source=args.qualification,
+    )
+    return 0
+
+
+def collect_provider_faults(args: argparse.Namespace) -> int:
+    manifest = _manifest(args)
+    root = _root(args.evidence_root, existing=True)
+    state = _load_state(root, manifest)
+    _assert_initialized_source(state)
+    destination = root / str(
+        _track_spec(manifest, "provider_faults").get("report") or ""
+    )
+    command = [
+        args.python,
+        "scripts/provider_fault_matrix.py",
+        "--live",
+        "--manifest",
+        str(args.manifest_path),
+        "--output",
+        str(destination),
+    ]
+    result = _run_command(
+        command,
+        dry_run=args.dry_run,
+        env_updates={"SORIDORMI_MCP_URL": args.soridormi_mcp_url},
+    )
+    if result != 0:
+        return result
+    if not args.dry_run:
+        _refresh(root, manifest, state)
+    return 0
 
 
 def collect_core(args: argparse.Namespace) -> int:
@@ -856,11 +1019,50 @@ def build_parser() -> argparse.ArgumentParser:
     init_parser.add_argument("--evidence-root", type=Path)
     init_parser.add_argument(
         "--profile",
-        choices=("source_bound_development", "supervised_physical_pilot"),
+        choices=(
+            "source_bound_development",
+            "current_revision_qualification",
+            "supervised_physical_pilot",
+        ),
         default="source_bound_development",
     )
     init_parser.add_argument("--reviewer", default=os.getenv("USER", "").strip())
     init_parser.add_argument("--allow-dirty", action="store_true")
+
+    collect_source = sub.add_parser("collect-source-qualification")
+    _common(collect_source)
+    collect_source.add_argument("--dry-run", action="store_true")
+
+    source_qualification = sub.add_parser("attach-source-qualification")
+    _common(source_qualification)
+    source_qualification.add_argument("--qualification", type=Path, required=True)
+
+    interaction = sub.add_parser("collect-interaction-behavior")
+    _collector_common(interaction)
+    interaction.add_argument("--runtime-identity", type=Path, required=True)
+    interaction.add_argument("--soridormi-repo", default=os.getenv("SORIDORMI_REPO", ""))
+    interaction.add_argument(
+        "--soridormi-mcp-url",
+        default=os.getenv("SORIDORMI_MCP_URL", "http://127.0.0.1:8000/mcp"),
+    )
+    interaction.add_argument("--case-timeout-s", type=float, default=1200.0)
+
+    collect_provider_faults_parser = sub.add_parser("collect-provider-faults")
+    _common(collect_provider_faults_parser)
+    collect_provider_faults_parser.add_argument(
+        "--soridormi-mcp-url",
+        default=os.getenv("SORIDORMI_MCP_URL", "http://127.0.0.1:8000/mcp"),
+    )
+    collect_provider_faults_parser.add_argument(
+        "--manifest-path",
+        type=Path,
+        default=ROOT / "capabilities" / "soridormi.json",
+    )
+    collect_provider_faults_parser.add_argument("--dry-run", action="store_true")
+
+    provider_faults = sub.add_parser("attach-provider-faults")
+    _common(provider_faults)
+    provider_faults.add_argument("--qualification", type=Path, required=True)
 
     core = sub.add_parser("collect-core")
     _collector_common(core)
@@ -930,6 +1132,16 @@ def main(argv: Iterable[str] | None = None) -> int:
             if not args.reviewer:
                 raise ValueError("--reviewer is required when USER is unavailable")
             return init(args)
+        if args.command == "collect-source-qualification":
+            return collect_source_qualification(args)
+        if args.command == "attach-source-qualification":
+            return attach_source_qualification(args)
+        if args.command == "collect-interaction-behavior":
+            return collect_interaction_behavior(args)
+        if args.command == "collect-provider-faults":
+            return collect_provider_faults(args)
+        if args.command == "attach-provider-faults":
+            return attach_provider_faults(args)
         if args.command == "collect-core":
             return collect_core(args)
         if args.command == "finalize-core":

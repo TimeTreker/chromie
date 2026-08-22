@@ -1263,6 +1263,21 @@ def _load_json_object(path: Path) -> dict[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 
+def _runtime_provenance(path: Path) -> dict[str, Any]:
+    runtime_identity = _load_json_object(path.expanduser().resolve())
+    source_identity = (
+        runtime_identity.get("chromie")
+        if isinstance(runtime_identity.get("chromie"), dict)
+        else {}
+    )
+    return {
+        "chromie_revision": source_identity.get("revision"),
+        "chromie_dirty": source_identity.get("dirty"),
+        "source_tree_sha256": source_identity.get("source_tree_sha256"),
+        "runtime_identity_sha256": runtime_identity.get("identity_sha256"),
+    }
+
+
 def _write_reviewer_packet(
     *,
     root: Path,
@@ -1892,6 +1907,7 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
         "ok": not errors,
         "mode": "live-text",
         "evidence_level": "C" if args.execute else "C-preview",
+        "provenance": _runtime_provenance(Path(args.runtime_identity)),
         "claim_scope": LIVE_TEXT_EXECUTE_CLAIM if args.execute else LIVE_TEXT_PREVIEW_CLAIM,
         "input_channel": "injected_text",
         "exclusive_host_lock": True,

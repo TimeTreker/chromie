@@ -18,6 +18,7 @@ from scripts.general_ability_acceptance import (
     _exclusive_orchestrator_lock,
     _fast_response_timing_evidence,
     _run_live_case,
+    _runtime_provenance,
     _write_reviewer_packet,
     build_parser,
     level_a_keys,
@@ -35,6 +36,32 @@ from scripts.interaction_text_mujoco_check import build_parser as build_text_che
 
 
 class GeneralAbilityAcceptanceTests(unittest.TestCase):
+    def test_runtime_provenance_is_revision_bound_for_target_closure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "runtime-identity.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "identity_sha256": "identity-digest",
+                        "chromie": {
+                            "revision": "revision-1",
+                            "dirty": False,
+                            "source_tree_sha256": "tree-digest",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                _runtime_provenance(path),
+                {
+                    "chromie_revision": "revision-1",
+                    "chromie_dirty": False,
+                    "source_tree_sha256": "tree-digest",
+                    "runtime_identity_sha256": "identity-digest",
+                },
+            )
+
     def test_live_runner_refuses_a_second_orchestrator_owner(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             lock_path = Path(temp_dir) / "orchestrator.lock"

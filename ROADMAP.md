@@ -424,11 +424,17 @@ authority behind a new manager.
    real lifecycle/state/runtime transaction rather than a safely extractable mechanical seam.
    **Implemented in Phase 5.**
 
-6. **Phase 6 — qualification and release evidence.** Re-run canonical gates and then
-   retain bilingual/live/simulator/provider evidence for the exact source revision.
-   Qualification must prove that speech is Planner-authored, result claims are
-   Evidence-bound, duplicate speech/effects do not occur, and human-facing latency targets
-   are measured separately from cold-load/watchdog time.
+6. **Phase 6 — qualification and release evidence.** The source-side qualification
+   harness is now implemented: canonical source qualification explicitly includes semantic
+   authority, focused audit-remediation regressions, retained Level-A general ability, and
+   the deterministic provider fault matrix; target-evidence closure adds a
+   `current_revision_qualification` profile requiring the same clean revision across source,
+   Gateway/Core, Agent Skill/weather, manifest-owned live interaction behavior, live provider
+   faults, Social Attention, and LAN tracks. The interaction track executes eight retained
+   cases with full assertions and includes duplicate-effect cardinality plus declared warm
+   Fast-Planner/playback budgets where owned by the case. **Target evidence remains open until
+   an actual current-revision bundle finalizes eligible.** Physical voice/robot remain separate
+   optional evidence.
 
 Across all phases: `use less to solve more`; fix the earliest wrong boundary; do not add a
 `SpeechManager`, Response Composer, recovery brain, compatibility semantic path, or a second WorkDAG semantic owner.

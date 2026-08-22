@@ -13,8 +13,13 @@ class SourceQualificationTests(unittest.TestCase):
     def test_contract_has_unique_gates_and_explicit_target_exclusions(self) -> None:
         gates, exclusions = load_contract(Path("config/source_qualification.json"))
         self.assertEqual(len(gates), len({gate.gate_id for gate in gates}))
-        self.assertIn("mypy", {gate.gate_id for gate in gates})
-        self.assertIn("maintained_tests", {gate.gate_id for gate in gates})
+        gate_ids = {gate.gate_id for gate in gates}
+        self.assertIn("mypy", gate_ids)
+        self.assertIn("maintained_tests", gate_ids)
+        self.assertIn("semantic_authority", gate_ids)
+        self.assertIn("audit_remediation_regression", gate_ids)
+        self.assertIn("general_ability_level_a", gate_ids)
+        self.assertIn("provider_fault_matrix_level_a", gate_ids)
         self.assertIn("release qualification", exclusions)
 
     def test_missing_dependency_is_blocked_not_passed(self) -> None:

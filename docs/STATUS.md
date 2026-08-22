@@ -1,7 +1,7 @@
 # Chromie Current Status
 
 **Updated:** 2026-08-22
-**Current focus:** Close the verified live semantic-authority leaks before further cognitive expansion; preserve the Goal-driven, event/readiness architecture while removing Host-authored ordinary meaning.
+**Current focus:** Phase 6 current-revision qualification of the Goal-driven single-authority architecture. The Phase 1-5 source remediation is closed; retain source, bilingual live-text/simulator, provider-fault, Social Attention, LAN, and latency evidence on one exact clean revision before making target-behavior claims.
 
 This file contains current facts only. Historical implementation narratives,
 superseded architecture, old test totals, and revision-specific diagnostics belong in
@@ -86,12 +86,14 @@ human-facing behavior is considered qualified.
 
 ## Current open work
 
-1. **Requalify behavior on the exact current revision.** Phase 5 structural simplification is
-   source-closed for the reviewed Planner/GA mechanical seams; remaining Host/runtime large
-   methods stay intact where they own real lifecycle/state/runtime transactions. Re-run
-   canonical gates, bilingual confirmation/cancellation, provider-backed result Evidence,
-   WorkDAG revision/continuation, embodied failures, multi-Goal cancellation, latency, Social
-   Attention, and live/simulator evidence.
+1. **Run the `current_revision_qualification` evidence profile on the committed target.**
+   The profile requires the canonical source report, eight manifest-owned retained live
+   interaction cases, the live provider fault matrix, Gateway/Core, Agent Skill/weather,
+   Social Attention, and LAN evidence on the same clean revision. WorkDAG revision/no-redispatch
+   remains an explicit source gate; selected live cases cover bilingual effectful speech,
+   cancellation, provider-backed Evidence re-entry, multi-goal behavior, follow-up continuity,
+   duplicate-effect cardinality, and declared warm Planner/playback budgets. Physical voice
+   and physical robot remain separate optional evidence tracks.
 2. **Retain the structural rule during qualification and later maintenance.** Reopen
    decomposition only for a concrete ownership seam or defect; file size alone is not
    permission to add a Speech Manager, Reconciliation Manager, Meta Planner, or one manager
@@ -104,6 +106,12 @@ MindProfile as bounded context rather than deleted agents/routes; the duplicated
 `docs/CONFIGURATION.md` tail is removed; current architecture docs no longer retain the
 reviewed Host-result-fallback or route/intent-GI contradictions; and the docs gate protects
 those boundaries mechanically.
+
+Phase 6 qualification infrastructure is source-complete, but Phase 6 itself is not closed by
+that source change. `target_evidence_closure_eligible=true` from a
+`current_revision_qualification` bundle is the retained target-evidence exit condition. A
+source report alone, preview-only General Ability run, local-stub provider fault matrix, or
+older revision remains insufficient.
 
 ## Evidence interpretation
 

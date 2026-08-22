@@ -51,6 +51,31 @@ Required tracks:
 This is the core Chromie development-closure profile. Physical voice and
 physical robot evidence are optional and do not affect its result.
 
+### `current_revision_qualification`
+
+This is the Phase 6 audit-remediation qualification profile. It requires every report
+to bind to the same clean committed Chromie revision and adds three tracks to the
+existing source-bound development evidence:
+
+- canonical source qualification, including semantic-authority, audit-regression,
+  WorkDAG/Evidence re-entry, Level-A general-ability, and deterministic provider-fault
+  gates;
+- retained `general_ability_acceptance --mode live-text --execute --assertion-scope full`
+  evidence for the manifest-owned current-revision interaction cases; and
+- the live Soridormi provider fault matrix with safe-idle and terminal-latency checks.
+
+The retained interaction set covers Chinese and English effectful turns, cancellation,
+provider-backed weather/Evidence re-entry, multi-goal body/conversation behavior,
+continuity across turns, duplicate-effect cardinality checks, and the declared warm
+Fast-Planner/playback budgets where a case owns those thresholds. Source WorkDAG revision
+and no-redispatch invariants remain deterministic gates because a live interaction does
+not become more authoritative by inventing a special fault solely to exercise graph
+revision.
+
+Physical microphone/speaker and physical robot claims remain optional. This profile can
+qualify current-revision simulator/live-service behavior without silently promoting it to
+physical-device or release readiness.
+
 ### `supervised_physical_pilot` (optional integration profile)
 
 Requires every source-bound development track plus:
@@ -79,6 +104,44 @@ python scripts/run_target_evidence_closure.py init \
   --evidence-root "$EVIDENCE_ROOT"
 ```
 
+For the Phase 6 current-revision closure use:
+
+```bash
+python scripts/run_target_evidence_closure.py init \
+  --profile current_revision_qualification \
+  --reviewer "$USER" \
+  --evidence-root "$EVIDENCE_ROOT"
+```
+
+Then capture the exact deployed runtime identity and collect the three Phase 6-specific
+tracks before (or alongside) the existing Core/weather/Social-Attention/LAN tracks:
+
+```bash
+python scripts/capture_runtime_identity.py \
+  --output "$EVIDENCE_ROOT/runtime-identity.json"
+
+python scripts/run_target_evidence_closure.py collect-source-qualification \
+  --evidence-root "$EVIDENCE_ROOT"
+
+python scripts/run_target_evidence_closure.py collect-interaction-behavior \
+  --evidence-root "$EVIDENCE_ROOT" \
+  --runtime-identity "$EVIDENCE_ROOT/runtime-identity.json" \
+  --soridormi-repo ../soridormi \
+  --agent-url http://127.0.0.1:8092 \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp
+
+python scripts/run_target_evidence_closure.py collect-provider-faults \
+  --evidence-root "$EVIDENCE_ROOT" \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp
+```
+
+`collect-interaction-behavior` always uses the manifest-owned case set, `execute`,
+`assertion-scope=full`, the Goal-driven runtime, and supervised confirmation grants. A
+preview-only, dirty, different-revision, or user-outcome-only report is mechanically
+ineligible for this track. `collect-provider-faults` requires Soridormi's declared hidden
+test controls and records only a live matrix as target-eligible; the local-stub matrix
+remains Level-A source evidence.
+
 Use the stricter profile only when supervised physical evidence is intended:
 
 ```bash
@@ -99,6 +162,29 @@ the earlier revision.
 
 The `status` command may still inspect an existing bundle from another checkout,
 but that does not make its reports eligible for the current revision.
+
+## Phase 6 source and interaction evidence
+
+The current-revision profile treats the source report as a retained track rather than
+assuming that tests run earlier in a shell still describe the deployed commit.
+`collect-source-qualification` writes its report directly into the closure. The source
+contract includes the ordinary repository/static gates plus the semantic-authority audit,
+focused Phase 1-5 regression set, all retained Level-A general-ability scenarios, and the
+local deterministic provider fault matrix. The full maintained suite remains required; a
+missing pinned tool/dependency blocks rather than passes the source track.
+
+The interaction collector reuses `scripts/general_ability_acceptance.py`; it does not
+contain a second evaluator. The exact case list lives in
+`benchmarks/manifests/target_evidence_closure_v1.json`. Each retained summary includes the
+Chromie revision and runtime-identity digest used by the run. The closure rejects a report
+that did not execute, used preview-only evidence, skipped full assertion scope, ran the
+Goal-driven runtime off, or came from a dirty/different revision.
+
+The live provider-fault track reuses `scripts/provider_fault_matrix.py --live`. It proves
+that restart/unavailability/timeout/disconnect/refusal/cancellation paths remain bounded,
+return to safe idle, and do not regain Host-authored semantic failure speech. The same
+script without `--live` is still useful Level-A evidence but cannot satisfy this target
+track.
 
 ## Gateway/Core source-bound evidence
 

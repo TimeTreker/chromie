@@ -28,6 +28,22 @@
         "physical_robot"
       ],
       "optional_tracks": []
+    },
+    "current_revision_qualification": {
+      "description": "Qualify the exact current revision across source gates, retained live interaction behavior, live provider fault handling, existing Gateway/weather/Social Attention/LAN tracks, while keeping physical audio and robot claims separate.",
+      "required_tracks": [
+        "source_qualification",
+        "gateway_core",
+        "agent_skill_weather",
+        "interaction_behavior",
+        "provider_faults",
+        "social_attention",
+        "lan_exposure"
+      ],
+      "optional_tracks": [
+        "physical_voice",
+        "physical_robot"
+      ]
     }
   },
   "tracks": {
@@ -64,6 +80,38 @@
       "eligibility_path": "physical_robot_claim_eligible",
       "review": "physical-robot/human-review.json",
       "source_revision_path": "chromie_revision"
+    },
+    "source_qualification": {
+      "report": "source/qualification.json",
+      "eligibility_path": "source_qualified",
+      "source_revision_path": "revision",
+      "required_values": {
+        "source_clean": true,
+        "target_validated": false,
+        "release_qualified": false
+      }
+    },
+    "interaction_behavior": {
+      "report": "interaction-behavior/qualification.json",
+      "eligibility_path": "ok",
+      "source_revision_path": "provenance.chromie_revision",
+      "required_values": {
+        "mode": "live-text",
+        "evidence_level": "C",
+        "execute": true,
+        "assertion_scope": "full",
+        "goal_driven_runtime": "apply",
+        "provenance.chromie_dirty": false
+      }
+    },
+    "provider_faults": {
+      "report": "provider-faults/qualification.json",
+      "eligibility_path": "qualification.live_provider_faults_eligible",
+      "source_revision_path": "provenance.chromie_revision",
+      "required_values": {
+        "evidence_source": "live",
+        "provenance.chromie_dirty": false
+      }
     }
   },
   "social_attention_review_checks": [
@@ -79,5 +127,34 @@
     "bounded_workspace",
     "provider_source_identity_matches",
     "post_execution_safe_state_confirmed"
-  ]
+  ],
+  "interaction_behavior_cases": [
+    "user_probe_walk_forward_ten_seconds",
+    "multi_goal_walk_then_blink",
+    "user_probe_cancel_recent_walk",
+    "chongqing_daytime_weather_progress_and_lookup",
+    "debug_bundle_run_15_while_singing",
+    "multi_goal_blink_and_joke",
+    "user_probe_continue_recent_walk",
+    "user_probe_current_local_time"
+  ],
+  "interaction_behavior_claims": {
+    "input_channel": "injected_text",
+    "requires_execute": true,
+    "requires_full_assertion_scope": true,
+    "covers": [
+      "Chinese and English Planner-owned pre-effect communication",
+      "deterministic cancellation without Host result narration",
+      "provider-backed external information with Evidence re-entry",
+      "multi-goal body/conversation execution and normal DAG continuation",
+      "retained Goal continuity across follow-up turns",
+      "duplicate-effect resistance through observation cardinality in retained cases",
+      "warm Fast-Planner commitment and playback-start budgets where the case declares them"
+    ],
+    "does_not_prove": [
+      "physical microphone",
+      "audible speaker",
+      "physical robot"
+    ]
+  }
 }

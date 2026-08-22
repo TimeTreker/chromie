@@ -245,7 +245,16 @@
           ],
           "min_new_goal_count": 1,
           "min_goal_outcome_count": 1,
-          "description": "The supplied Chinese motion probe must preserve its direction and duration in one catalog-backed body Goal."
+          "description": "The supplied Chinese motion probe must preserve its direction and duration in one catalog-backed body Goal.",
+          "expected_observations": [
+            {
+              "type": "locomotion.walk_forward",
+              "args": {
+                "duration_s": 10.0
+              },
+              "max_occurrences": 1
+            }
+          ]
         }
       ]
     },
@@ -1095,13 +1104,15 @@
               "type": "locomotion.walk_forward",
               "args": {
                 "duration_s": 1.0
-              }
+              },
+              "max_occurrences": 1
             },
             {
               "type": "social_attention.blink",
               "args": {
                 "count": 2
-              }
+              },
+              "max_occurrences": 1
             }
           ],
           "expected_observation_sequence": [
@@ -1133,10 +1144,12 @@
               "type": "social_attention.blink",
               "args": {
                 "count": 2
-              }
+              },
+              "max_occurrences": 1
             },
             {
-              "type": "speech.output"
+              "type": "speech.output",
+              "max_occurrences": 1
             }
           ]
         }

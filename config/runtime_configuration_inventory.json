@@ -3407,7 +3407,8 @@
       "key": "SORIDORMI_REPO",
       "owners": [
         "scripts/general_ability_acceptance.py",
-        "scripts/interaction_text_mujoco_check.py"
+        "scripts/interaction_text_mujoco_check.py",
+        "scripts/run_target_evidence_closure.py"
       ]
     },
     {

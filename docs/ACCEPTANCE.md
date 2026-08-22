@@ -980,6 +980,32 @@ procedure before further motion.
 
 ## Source-bound target-evidence closure
 
+Phase 6 uses the `current_revision_qualification` target-evidence profile. The profile is
+not another behavior evaluator: it binds reports from the existing source qualification,
+General Ability live-text runner, Provider Fault Matrix, Gateway/Core, Agent Skill/weather,
+Social Attention, and LAN procedures to one clean Git revision. Source-only green tests
+therefore cannot be mistaken for target qualification, and an older live bundle cannot be
+carried across a source change.
+
+The canonical source qualification now includes the semantic-authority audit, a focused
+regression set for confirmation/cancellation/result-Evidence/WorkDAG re-entry, all retained
+Level-A general-ability scenarios, and the local deterministic provider fault matrix in
+addition to the ordinary repository/static/full-suite gates. Missing pinned analyzers or
+test dependencies block qualification rather than becoming a pass.
+
+For the Phase 6 live interaction track the coordinator owns the exact case selection and
+invokes General Ability with `--execute`, `--assertion-scope full`, Goal-driven runtime
+`apply`, and the retained runtime identity. The track requires Chinese and English
+effectful cases, cancellation, provider-backed weather/Evidence re-entry, multi-goal mixed
+body/conversation behavior, follow-up continuity, duplicate-effect cardinality checks, and
+the declared warm 2s Planner-commit / 3s playback-start budgets where a retained case owns
+those thresholds. The track is injected-text/simulator evidence; it does not claim a
+physical microphone or audible speaker.
+
+The live provider fault track must come from `provider_fault_matrix.py --live`, remain safe
+idle after every scenario, pass the retained terminal-latency thresholds, and bind to the
+same clean Chromie revision. The local-stub matrix is Level-A evidence only.
+
 New target evidence is coordinated by
 [Target Evidence Closure](TARGET_EVIDENCE_CLOSURE.md). The retired broad supervised runner combined unrelated smoke, cancellation, and
 recovery artifacts without one source-bound profile or fingerprinted review. Use

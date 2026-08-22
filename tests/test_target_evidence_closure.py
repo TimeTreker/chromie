@@ -273,6 +273,147 @@ class TargetEvidenceClosureTests(unittest.TestCase):
             self.assertEqual(len(qualification), 1)
             self.assertEqual(qualification[0].count("--report"), 11)
 
+    def test_current_revision_profile_requires_source_behavior_and_provider_fault_tracks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.initialize(root, profile="current_revision_qualification")
+            self.write_required_reports(root)
+            with patch.object(
+                closure,
+                "_git_state",
+                return_value={"revision": "revision-1", "dirty": False},
+            ):
+                state = closure._refresh(root, self.manifest, closure._load_state(root, self.manifest))
+            self.assertFalse(state["qualification"]["required_complete"])
+            self.assertIn("source_qualification", state["tracks"])
+            self.assertIn("interaction_behavior", state["tracks"])
+            self.assertIn("provider_faults", state["tracks"])
+
+    def test_interaction_behavior_track_requires_execute_full_and_clean_source(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.initialize(root, profile="current_revision_qualification")
+            report = root / "interaction-behavior" / "qualification.json"
+            self.write_json(
+                report,
+                {
+                    "ok": True,
+                    "mode": "live-text",
+                    "evidence_level": "C-preview",
+                    "execute": False,
+                    "assertion_scope": "user-outcome",
+                    "goal_driven_runtime": "apply",
+                    "provenance": {
+                        "chromie_revision": "revision-1",
+                        "chromie_dirty": False,
+                    },
+                },
+            )
+            status = closure._track_status(
+                root,
+                self.manifest,
+                "interaction_behavior",
+                expected_revision="revision-1",
+            )
+            self.assertFalse(status["eligible"])
+            self.assertTrue(
+                any(error.startswith("required_value_mismatch") for error in status["errors"])
+            )
+
+    def test_interaction_behavior_collector_runs_manifest_cases_as_execute_full(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.initialize(root, profile="current_revision_qualification")
+            runtime_identity = root / "runtime-identity.json"
+            self.write_json(
+                runtime_identity,
+                {
+                    "identity_sha256": "runtime-1",
+                    "chromie": {"revision": "revision-1", "dirty": False},
+                },
+            )
+            args = argparse.Namespace(
+                manifest=MANIFEST_PATH,
+                evidence_root=root,
+                python="python",
+                reviewer="reviewer-1",
+                agent_url="http://127.0.0.1:8092",
+                speaker=False,
+                resume=False,
+                dry_run=True,
+                runtime_identity=runtime_identity,
+                soridormi_repo="",
+                soridormi_mcp_url="http://127.0.0.1:8000/mcp",
+                case_timeout_s=30.0,
+            )
+            with patch.object(
+                closure,
+                "_git_state",
+                return_value={"revision": "revision-1", "dirty": False},
+            ), patch.object(closure, "_run_command", return_value=0) as run:
+                self.assertEqual(closure.collect_interaction_behavior(args), 0)
+            command = run.call_args.args[0]
+            self.assertIn("--execute", command)
+            self.assertIn("full", command)
+            self.assertIn("--grant-confirmation", command)
+            for case_id in self.manifest["interaction_behavior_cases"]:
+                self.assertIn(case_id, command)
+
+    def test_current_revision_profile_finalizes_when_all_required_tracks_match_revision(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.initialize(root, profile="current_revision_qualification")
+            self.write_required_reports(root)
+            self.write_json(
+                root / "source" / "qualification.json",
+                {
+                    "revision": "revision-1",
+                    "source_clean": True,
+                    "source_qualified": True,
+                    "target_validated": False,
+                    "release_qualified": False,
+                },
+            )
+            self.write_json(
+                root / "interaction-behavior" / "qualification.json",
+                {
+                    "ok": True,
+                    "mode": "live-text",
+                    "evidence_level": "C",
+                    "execute": True,
+                    "assertion_scope": "full",
+                    "goal_driven_runtime": "apply",
+                    "provenance": {
+                        "chromie_revision": "revision-1",
+                        "chromie_dirty": False,
+                    },
+                },
+            )
+            self.write_json(
+                root / "provider-faults" / "qualification.json",
+                {
+                    "passed": True,
+                    "evidence_source": "live",
+                    "provenance": {
+                        "chromie_revision": "revision-1",
+                        "chromie_dirty": False,
+                    },
+                    "qualification": {
+                        "live_provider_faults_eligible": True,
+                    },
+                },
+            )
+            with patch.object(
+                closure,
+                "_git_state",
+                return_value={"revision": "revision-1", "dirty": False},
+            ), redirect_stdout(io.StringIO()):
+                result = closure.finalize(self.args(root))
+            self.assertEqual(result, 0)
+            report = json.loads((root / "closure-report.json").read_text())
+            self.assertTrue(report["qualification"]["target_evidence_closure_eligible"])
+            self.assertFalse(report["qualification"]["physical_support_claimed"])
+
 
 if __name__ == "__main__":
     unittest.main()
