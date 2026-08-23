@@ -116,6 +116,8 @@ from orchestrator.runtime.planner_reentry import (
     execution_outcome_user_text,
     planner_reentry_repeats_completed_activity,
     planner_reentry_responsibilities,
+    meaningful_provider_state,
+    provider_state_relevance,
     suppress_already_delivered_speech,
     terminal_evidence_relevance,
 )
@@ -4901,6 +4903,125 @@ class VoiceAssistant:
         )
 
 
+    async def _reenter_cognition_for_provider_state(
+        self,
+        *,
+        response: InteractionResponse,
+        event: Any,
+        provider_state: dict[str, Any],
+        session_id: str | None,
+    ) -> None:
+        """Reactivate Planner for one meaningful live provider-state transition.
+
+        Runtime state is bounded provenance, not a fabricated user turn and not
+        completion Evidence.  Heartbeats/percentage churn are filtered before this
+        method is called.
+        """
+
+        request = next(
+            (item for item in response.capabilities if item.request_id == event.request_id),
+            None,
+        )
+        if request is None:
+            return
+        goal_ids = [
+            str(value).strip()
+            for value in request.metadata.get("source_goal_ids") or []
+            if str(value).strip()
+        ]
+        if not goal_ids:
+            return
+        relevant, relevance_reason = provider_state_relevance(
+            source_response=response,
+            request_id=event.request_id,
+            source_goal_ids=goal_ids,
+            goal_bindings=self.conversation_state.goal_cancellation_bindings(goal_ids),
+        )
+        if not relevant:
+            self.session_log(
+                session_id,
+                "provider_state_reentry_suppressed: request_id=%s reason=%s",
+                event.request_id,
+                relevance_reason,
+            )
+            return
+        metadata = response.metadata if isinstance(response.metadata, dict) else {}
+        envelope = metadata.get("user_turn_envelope")
+        normalized_input = (
+            envelope.get("normalized_input") if isinstance(envelope, dict) else None
+        )
+        user_request = (
+            str(normalized_input.get("text") or "").strip()
+            if isinstance(normalized_input, dict)
+            else ""
+        )
+        if not user_request:
+            return
+        try:
+            canonical_plan = CanonicalPlan.model_validate(
+                metadata.get("canonical_plan") or {}
+            )
+        except (TypeError, ValueError) as exc:
+            self.session_log(
+                session_id,
+                "provider_state_reentry_rejected: request_id=%s error_type=%s error=%s",
+                event.request_id,
+                type(exc).__name__,
+                exc,
+            )
+            return
+        evidence_ref = (
+            f"provider-state:{event.dispatch_id}:{event.request_id}:{event.sequence}"
+        )
+        opportunity = CognitiveOpportunity.create(
+            trigger="provider_state",
+            goal_ids=goal_ids,
+            evidence_refs=[evidence_ref],
+            reason_codes=["meaningful_provider_state_transition"],
+            recommended_cognition="fast",
+        )
+        response.metadata.setdefault(
+            "incremental_cognitive_opportunities", []
+        ).append(opportunity.prompt_projection())
+        bounded_event = {
+            "evidence_ref": evidence_ref,
+            "sequence": event.sequence,
+            "dispatch_id": event.dispatch_id,
+            "request_id": event.request_id,
+            "capability_id": event.capability_id,
+            "provider_id": event.provider_id,
+            "state": dict(provider_state),
+        }
+        planner_response = await self._planner_state_reentry_response(
+            source_response=response,
+            canonical_plan=canonical_plan,
+            user_request=user_request,
+            language=str(metadata.get("language") or "en-US"),
+            goal_ids=goal_ids,
+            evidence_goal_ids=goal_ids,
+            evidence_refs=[evidence_ref],
+            session_id=session_id,
+            phase="provider_state_reentry",
+            context_updates={
+                "trusted_provider_state_event": bounded_event,
+                "provider_state_reentry": {
+                    "source_goal_ids": goal_ids,
+                    "evidence_refs": [evidence_ref],
+                    "planner_authority": "planner",
+                },
+                "cognitive_opportunity": opportunity.prompt_projection(),
+            },
+            fast_workflow_stage="fast_planner_provider_state_reentry",
+            deep_workflow_stage="planner_deep_pass_provider_state_reentry",
+            response_source="fast_planner_provider_state_reentry",
+        )
+        if planner_response is None:
+            return
+        await self._apply_planner_reentry_response(
+            planner_response, session_id=session_id
+        )
+
+
     async def _apply_planner_reentry_response(
         self,
         response: InteractionResponse,
@@ -5604,16 +5725,33 @@ class VoiceAssistant:
         if receipt is not None:
             cursor = receipt.event_cursor
             runtime_terminal_ids: set[str] = set()
+            provider_state_signatures: dict[str, dict[str, Any]] = {}
             while len(runtime_terminal_ids) < len(runtime_capability_request_ids):
                 event = await self.interaction_runtime.runtime.wait_runtime_event(
                     cursor,
                     dispatch_id=receipt.dispatch_id,
                 )
                 cursor = event.sequence
+                if event.request_id not in runtime_capability_request_ids:
+                    continue
+                if event.type == "progress" and not event.terminal:
+                    projected_state = meaningful_provider_state(event.progress)
+                    if projected_state and provider_state_signatures.get(
+                        event.request_id
+                    ) != projected_state:
+                        provider_state_signatures[event.request_id] = dict(
+                            projected_state
+                        )
+                        await self._reenter_cognition_for_provider_state(
+                            response=response,
+                            event=event,
+                            provider_state=projected_state,
+                            session_id=session_id,
+                        )
+                    continue
                 if (
                     not event.terminal
                     or event.result is None
-                    or event.request_id not in runtime_capability_request_ids
                     or event.request_id in runtime_terminal_ids
                 ):
                     continue

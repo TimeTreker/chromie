@@ -130,7 +130,7 @@ composer or execution specialist.
 | Goal Association | unchanged GI result plus bounded retained Goals | Canonical Goal create/associate/update DTO | `requires_replan`, Work compatibility, Capability, cancellation, or next action |
 | Planner current-state re-entry | Canonical Goals, open Responsibilities, Situation, Evidence, and bounded queued/running/completed Work after a meaningful state transition | 0..N desired Activity changes, including explicit reuse/cancel/replace/follow-up/response decisions | execution truth or mutation without Runtime validation |
 | Host Orchestrator and Trusted Capability Runtime | validated Plan plus exact live request/version/state/resource/safety bindings | accepted/rejected dispatch, reuse/cancellation receipts, traces, and typed Evidence | semantic compatibility, Goal meaning, or rewritten Planner wording |
-| Runtime event → Evidence → `CognitiveOpportunity` | exact Runtime event/request provenance plus affected Goal IDs and admitted Evidence | ephemeral readiness signal for Planner; no fabricated user turn and no response decision | Goal ownership, Evidence truth, or any Activity by itself |
+| Runtime event/state transition → Evidence or bounded provider-state observation → `CognitiveOpportunity` | exact Runtime event/request provenance plus affected Goal IDs and admitted Evidence/state observation | ephemeral readiness signal for Planner; no fabricated user turn and no response decision. Provider-state heartbeats/percent churn do not qualify; blocked/waiting/degraded/paused/recovering or material member-state changes may qualify. | Goal ownership, Evidence truth, or any Activity by itself |
 
 ## 3. Turn state machine
 

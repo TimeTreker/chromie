@@ -101,6 +101,105 @@ def terminal_evidence_relevance(
     return True, "current"
 
 
+
+def provider_state_relevance(
+    *,
+    source_response: InteractionResponse,
+    request_id: str,
+    source_goal_ids: Sequence[str],
+    goal_bindings: Sequence[Mapping[str, Any]],
+) -> tuple[bool, str]:
+    """Check that a live provider-state event still belongs to current Work.
+
+    Provider progress is observational Runtime state, not completion Evidence.  It may
+    reactivate Planner only while the originating request is still bound to the same
+    open Responsibility and canonical Plan.
+    """
+
+    normalized_request_id = str(request_id or "").strip()
+    normalized_goal_ids = [
+        str(value).strip() for value in source_goal_ids if str(value).strip()
+    ]
+    if not normalized_request_id or not normalized_goal_ids:
+        return False, "source_binding_missing"
+    metadata = (
+        source_response.metadata
+        if isinstance(source_response.metadata, dict)
+        else {}
+    )
+    expected_plan_id = str(metadata.get("canonical_plan_id") or "").strip()
+    expected_fingerprint = str(
+        metadata.get("canonical_plan_fingerprint") or ""
+    ).strip()
+    if not expected_plan_id or not expected_fingerprint:
+        return False, "source_plan_binding_missing"
+
+    bindings = {
+        str(item.get("goal_id") or "").strip(): item
+        for item in goal_bindings
+        if str(item.get("goal_id") or "").strip()
+    }
+    for goal_id in normalized_goal_ids:
+        binding = bindings.get(goal_id)
+        if not binding or binding.get("found") is not True:
+            return False, "goal_binding_missing"
+        if str(binding.get("responsibility_status") or "") != "open":
+            return False, "goal_responsibility_terminal"
+        if str(binding.get("canonical_plan_id") or "") != expected_plan_id:
+            return False, "canonical_plan_superseded"
+        if (
+            str(binding.get("canonical_plan_fingerprint") or "")
+            != expected_fingerprint
+        ):
+            return False, "canonical_plan_superseded"
+        request_ids = {
+            str(item).strip()
+            for item in binding.get("request_ids") or ()
+            if str(item).strip()
+        }
+        if normalized_request_id not in request_ids:
+            return False, "request_binding_superseded"
+    return True, "current"
+
+
+def meaningful_provider_state(
+    progress: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Project only provider state transitions worth waking cognition for.
+
+    Percent/heartbeat churn is intentionally ignored.  Runtime may publish progress
+    frequently; Planner should wake only for explicit state/phase changes, waiting or
+    blocked conditions, degradation, or member-state changes.
+    """
+
+    if not isinstance(progress, Mapping):
+        return {}
+    projected: dict[str, Any] = {}
+    quiet_statuses = {"", "accepted", "scheduled", "running", "in_progress"}
+    for key in ("status", "state", "phase", "condition", "waiting_for"):
+        value = progress.get(key)
+        if value is None:
+            continue
+        text = _normalized_text(value)
+        if not text:
+            continue
+        if key in {"status", "state"} and text.lower() in quiet_statuses:
+            continue
+        projected[key] = text
+    for key in ("blocked", "degraded", "paused", "recovering"):
+        if progress.get(key) is True:
+            projected[key] = True
+    member_status = progress.get("member_status")
+    if isinstance(member_status, Mapping):
+        meaningful_members = {
+            str(member_id): _normalized_text(status)
+            for member_id, status in member_status.items()
+            if _normalized_text(status).lower() not in quiet_statuses
+        }
+        if meaningful_members:
+            projected["member_status"] = meaningful_members
+    return projected
+
 def planner_reentry_responsibilities(
     *,
     source_response: InteractionResponse,
