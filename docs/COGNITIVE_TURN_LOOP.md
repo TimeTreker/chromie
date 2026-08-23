@@ -130,7 +130,9 @@ composer or execution specialist.
 | Goal Association | unchanged GI result plus bounded retained Goals | Canonical Goal create/associate/update DTO | `requires_replan`, Work compatibility, Capability, cancellation, or next action |
 | Planner current-state re-entry | Canonical Goals, open Responsibilities, Situation, Evidence, and bounded queued/running/completed Work after a meaningful state transition | 0..N desired Activity changes, including explicit reuse/cancel/replace/follow-up/response decisions | execution truth or mutation without Runtime validation |
 | Host Orchestrator and Trusted Capability Runtime | validated Plan plus exact live request/version/state/resource/safety bindings | accepted/rejected dispatch, reuse/cancellation receipts, traces, and typed Evidence | semantic compatibility, Goal meaning, or rewritten Planner wording |
-| Runtime event/state transition → Evidence or bounded provider-state observation → `CognitiveOpportunity` | exact Runtime event/request provenance plus affected Goal IDs and admitted Evidence/state observation | ephemeral readiness signal for Planner; no fabricated user turn and no response decision. Provider-state heartbeats/percent churn do not qualify; blocked/waiting/degraded/paused/recovering or material member-state changes may qualify. | Goal ownership, Evidence truth, or any Activity by itself |
+| Runtime event/state transition → Evidence or bounded provider-state observation → `CognitiveOpportunity` | exact Runtime event/request provenance plus affected Goal IDs and admitted Evidence/state observation | ephemeral readiness signal for Planner; no fabricated user turn and no response decision. Provider-state heartbeats/percent churn do not qualify; blocked/waiting/degraded/paused/recovering or material member-state changes may qualify. After restart, an open Goal marked `runtime_revalidation_required` may also re-enter only after fresh provider/catalog truth exists and exact original Responsibility provenance was durably retained; the stale pre-restart Plan/request binding is invalidated rather than resumed. | Goal ownership, Evidence truth, or any Activity by itself |
+
+`CognitiveOpportunityTrigger` also reserves `situation_revision` and `time_condition`, but they are not production producers in this revision. A Situation trigger requires a separately trusted live-Situation observation source, and a time trigger requires a durable scheduler/condition owner. The Host must not manufacture either from periodic polling, from an already-consumed execution result, or by parsing an arbitrary Goal string into a deadline. Contract readiness is not execution authority.
 
 ## 3. Turn state machine
 
@@ -850,6 +852,30 @@ is unavailable, the Host keeps those facts and emits no invented result sentence
 Failure cannot erase Evidence or turn an uncertain result into success.
 
 ### 8.3 Recovery is ordinary post-Evidence planning
+
+### Restart revalidation is fresh cognition, not Work replay
+
+When durable task storage restores an unfinished Goal, the Host marks its prior
+Runtime binding `runtime_revalidation_required`. The previous request IDs, provider
+state, confirmation, and Plan are not current truth. For Goals recorded by the
+current runtime, the durable record also keeps only the exact Goal-scoped Goal
+Interpretation Responsibility provenance needed to recover the original WHAT.
+
+After service readiness, if a restored Goal has a prior provider-backed Capability
+binding, the Host obtains a fresh provider/catalog projection. Only then may it
+create `CognitiveOpportunity(trigger=provider_state)` and re-enter the same Planner
+with the durable Goal, original Responsibility provenance, and fresh provider
+truth. Planner decides whether to produce new Work, communicate, wait, or remain
+silent. The old Plan is never dispatched. Once Planner has successfully consumed
+the fresh state, the stale request/Plan binding is invalidated before any newly
+planned Work is recorded. Missing original Responsibility provenance or unavailable
+fresh provider truth fails closed and leaves the Goal recoverable for a later user
+turn; the Host does not reconstruct or guess a replacement Responsibility.
+
+Effectful Work produced by this re-entry still obeys the normal confirmation
+boundary. Internal provider-state cognition cannot auto-confirm a body or other
+confirmation-requiring effect; if fresh Planner Work requires confirmation, the
+normal Confirmation Dialogue is staged again against the newly planned request.
 
 A recoverable embodied failure is not a Host-created child plan. Runtime records
 the exact failed Activity and bounded provider-declared recovery facts

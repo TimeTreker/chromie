@@ -3818,6 +3818,8 @@ class ConversationStateManager:
         turn_id: str = "",
         canonical_plan_id: str = "",
         canonical_plan_fingerprint: str = "",
+        runtime_revalidation_responsibilities: list[dict[str, Any]] | None = None,
+        runtime_revalidation_language: str = "",
     ) -> None:
         """Track execution lifecycle for one semantic goal only.
 
@@ -3843,6 +3845,20 @@ class ConversationStateManager:
             "canonical_plan_fingerprint": str(
                 canonical_plan_fingerprint or ""
             ).strip(),
+            **(
+                {
+                    "runtime_revalidation_responsibilities": [
+                        self._json_safe(item)
+                        for item in runtime_revalidation_responsibilities
+                        if isinstance(item, dict)
+                    ],
+                    "runtime_revalidation_language": self._compact_text(
+                        runtime_revalidation_language or "auto", limit=64
+                    ),
+                }
+                if runtime_revalidation_responsibilities
+                else {}
+            ),
         }
         self._pending_tasks.append(
             {
@@ -5110,6 +5126,149 @@ class ConversationStateManager:
         }
         self._persist_task_contexts_if_enabled()
 
+    def _runtime_revalidation_responsibilities(
+        self,
+        *,
+        result_metadata: dict[str, Any] | None,
+        goal_id: str,
+    ) -> list[dict[str, Any]]:
+        """Retain exact GI provenance needed to replan an open Goal after restart.
+
+        This is not a second Responsibility authority.  The canonical Goal remains
+        the durable owed outcome; these immutable source records only let Planner
+        recover the original WHAT without fabricating a new UserTurn.
+        """
+
+        if not isinstance(result_metadata, dict):
+            return []
+        interpretation = result_metadata.get("goal_interpretation")
+        if not isinstance(interpretation, dict):
+            return []
+        raw_responsibilities = interpretation.get("responsibilities")
+        if not isinstance(raw_responsibilities, list):
+            return []
+        context = self._task_context_by_goal_id(goal_id)
+        if context is None:
+            return []
+        semantic_goal = context.get("semantic_goal")
+        if not isinstance(semantic_goal, dict):
+            return []
+        source_refs = {
+            str(item).strip()
+            for item in semantic_goal.get("source_responsibility_refs") or []
+            if str(item).strip()
+        }
+        if not source_refs:
+            return []
+        retained: list[dict[str, Any]] = []
+        for item in raw_responsibilities:
+            if not isinstance(item, dict):
+                continue
+            if str(item.get("local_ref") or "").strip() not in source_refs:
+                continue
+            retained.append(self._json_safe(item))
+        return retained
+
+    def runtime_revalidation_candidates(self) -> list[dict[str, Any]]:
+        """Return bounded open Goals whose pre-restart Runtime binding is stale."""
+
+        candidates: list[dict[str, Any]] = []
+        for context in self._active_task_contexts():
+            metadata = context.get("metadata")
+            if not isinstance(metadata, dict) or metadata.get("runtime_revalidation_required") is not True:
+                continue
+            semantic_goal = context.get("semantic_goal")
+            if not isinstance(semantic_goal, dict):
+                continue
+            goal_id = str(semantic_goal.get("goal_id") or context.get("task_id") or "").strip()
+            if not goal_id:
+                continue
+            planned_capabilities = metadata.get("planned_capabilities")
+            if not isinstance(planned_capabilities, list):
+                planned_capabilities = []
+            capability_ids = list(
+                dict.fromkeys(
+                    str(item.get("capability_id") or "").strip()
+                    for item in planned_capabilities
+                    if isinstance(item, dict)
+                    and str(item.get("capability_id") or "").strip()
+                )
+            )
+            responsibilities = metadata.get("runtime_revalidation_responsibilities")
+            if not isinstance(responsibilities, list):
+                responsibilities = []
+            candidates.append(
+                {
+                    "goal_id": goal_id,
+                    "task_id": str(context.get("task_id") or ""),
+                    "source_text": str(semantic_goal.get("source_text") or context.get("last_meaningful_user_turn") or "").strip(),
+                    "language": str(metadata.get("runtime_revalidation_language") or "auto").strip() or "auto",
+                    "capability_ids": capability_ids,
+                    "responsibilities": [
+                        self._json_safe(item)
+                        for item in responsibilities
+                        if isinstance(item, dict)
+                    ],
+                    "restored_ms": metadata.get("restored_ms"),
+                }
+            )
+        return candidates
+
+    def complete_runtime_revalidation(
+        self,
+        goal_ids: list[str],
+        *,
+        evidence_ref: str,
+    ) -> list[str]:
+        """Invalidate stale pre-restart Work only after Planner saw fresh provider truth."""
+
+        completed: list[str] = []
+        now = _now_ms()
+        for goal_id in dict.fromkeys(str(item).strip() for item in goal_ids if str(item).strip()):
+            context = self._task_context_by_goal_id(goal_id)
+            if context is None:
+                continue
+            metadata = context.get("metadata")
+            if not isinstance(metadata, dict) or metadata.get("runtime_revalidation_required") is not True:
+                continue
+            previous_plan_id = str(metadata.get("canonical_plan_id") or "").strip()
+            previous_fingerprint = str(metadata.get("canonical_plan_fingerprint") or "").strip()
+            previous_capabilities = metadata.get("planned_capabilities")
+            updated = dict(metadata)
+            updated.pop("runtime_revalidation_required", None)
+            for key in (
+                "canonical_plan_id",
+                "canonical_plan_fingerprint",
+                "request_ids",
+                "remaining_request_ids",
+                "request_statuses",
+                "planned_capabilities",
+                "confirmation_id",
+                "confirmation_request_ids",
+                "confirmation_pending",
+            ):
+                updated.pop(key, None)
+            if previous_plan_id:
+                updated["recovery_previous_canonical_plan_id"] = previous_plan_id
+            if previous_fingerprint:
+                updated["recovery_previous_canonical_plan_fingerprint"] = previous_fingerprint
+            if isinstance(previous_capabilities, list) and previous_capabilities:
+                updated["recovery_previous_planned_capabilities"] = self._json_safe(previous_capabilities)
+            updated["runtime_revalidation_evidence_ref"] = str(evidence_ref or "").strip()
+            updated["runtime_revalidated_ms"] = now
+            context["metadata"] = updated
+            if str(context.get("plan_status") or "") == "revalidation_required":
+                context["plan_status"] = "revalidated"
+            if str(context.get("status") or "") == "recoverable":
+                context["status"] = "planning"
+                context["commitment_state"] = "evaluating"
+            context["updated_ms"] = now
+            completed.append(goal_id)
+        if completed:
+            self._persist_task_contexts_if_enabled()
+            self.last_activity_ms = now
+        return completed
+
     def record_interaction_response(
         self,
         sid: str | None,
@@ -5141,7 +5300,9 @@ class ConversationStateManager:
         canonical_plan_id = ""
         canonical_plan_fingerprint = ""
         goal_outcomes: dict[str, dict[str, Any]] = {}
+        runtime_revalidation_language = "auto"
         if isinstance(result_metadata, dict):
+            runtime_revalidation_language = str(result_metadata.get("language") or "auto")
             self._record_tool_evidence(result_metadata)
             turn_id = str(result_metadata.get("turn_id") or "").strip()
             canonical_plan_id = str(
@@ -5249,6 +5410,13 @@ class ConversationStateManager:
                     turn_id=turn_id,
                     canonical_plan_id=canonical_plan_id,
                     canonical_plan_fingerprint=canonical_plan_fingerprint,
+                    runtime_revalidation_responsibilities=(
+                        self._runtime_revalidation_responsibilities(
+                            result_metadata=result_metadata,
+                            goal_id=goal_id,
+                        )
+                    ),
+                    runtime_revalidation_language=runtime_revalidation_language,
                 )
 
         actions = data.get("actions", []) or data.get("capabilities", []) or []
@@ -5343,6 +5511,13 @@ class ConversationStateManager:
                     turn_id=turn_id,
                     canonical_plan_id=canonical_plan_id,
                     canonical_plan_fingerprint=canonical_plan_fingerprint,
+                    runtime_revalidation_responsibilities=(
+                        self._runtime_revalidation_responsibilities(
+                            result_metadata=result_metadata,
+                            goal_id=goal_id,
+                        )
+                    ),
+                    runtime_revalidation_language=runtime_revalidation_language,
                 )
 
             if unscoped:

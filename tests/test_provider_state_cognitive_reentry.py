@@ -94,3 +94,126 @@ def test_meaningful_provider_state_preserves_phase_change_even_when_status_is_ru
     assert meaningful_provider_state(
         {"status": "running", "phase": "waiting_for_grasp", "percent": 50}
     ) == {"phase": "waiting_for_grasp"}
+
+
+class _FreshDefinition:
+    def __init__(self, capability_id: str, *, available: bool = True) -> None:
+        self.capability_id = capability_id
+        self.available = available
+        self.provider_id = "soridormi.mcp"
+        self.version = "1.0"
+        self.unavailable_reason = None if available else "provider_reports_unavailable"
+
+
+class _FreshRuntime:
+    def __init__(self) -> None:
+        self.refresh_calls = 0
+        self.definitions = {
+            "soridormi.walk_forward": _FreshDefinition("soridormi.walk_forward"),
+            "soridormi.blink_eyes": _FreshDefinition(
+                "soridormi.blink_eyes", available=False
+            ),
+        }
+
+    async def refresh_soridormi_catalog(self, *, force: bool = True) -> None:
+        assert force is True
+        self.refresh_calls += 1
+
+    def capability_definition(self, capability_id: str):
+        if capability_id not in self.definitions:
+            raise ValueError(capability_id)
+        return self.definitions[capability_id]
+
+
+class _RestoredState:
+    def runtime_revalidation_candidates(self):
+        return [
+            {
+                "goal_id": "goal-walk",
+                "capability_ids": [
+                    "soridormi.walk_forward",
+                    "soridormi.blink_eyes",
+                ],
+            }
+        ]
+
+
+def test_restart_revalidation_uses_one_fresh_catalog_before_planner_reentry():
+    import asyncio
+
+    from orchestrator.orchestrator import VoiceAssistant
+
+    host = VoiceAssistant.__new__(VoiceAssistant)
+    host.conversation_state = _RestoredState()
+    host.interaction_runtime = _FreshRuntime()
+    host.session_log = lambda *_args, **_kwargs: None
+    captured = []
+
+    async def capture_reentry(*, candidate, provider_state):
+        captured.append((candidate, provider_state))
+        return True
+
+    host._reenter_restored_goal_for_provider_state = capture_reentry
+    asyncio.run(host._revalidate_restored_goals_from_provider_state())
+
+    assert host.interaction_runtime.refresh_calls == 1
+    assert len(captured) == 1
+    states = {item["capability_id"]: item for item in captured[0][1]}
+    assert states["soridormi.walk_forward"]["available"] is True
+    assert states["soridormi.blink_eyes"]["available"] is False
+    assert (
+        states["soridormi.blink_eyes"]["unavailable_reason"]
+        == "provider_reports_unavailable"
+    )
+
+
+def test_planner_reentry_stages_fresh_confirmation_instead_of_auto_dispatch():
+    import asyncio
+
+    from orchestrator.orchestrator import VoiceAssistant
+    from shared.chromie_contracts.interaction import CapabilityRequest
+
+    class _ConfirmationRuntime:
+        async def confirmation_request_ids(self, _response):
+            return {"request-walk"}
+
+    class _NoRecordState:
+        def record_interaction_response(self, *_args, **_kwargs):
+            raise AssertionError("confirmation-gated Work must not be recorded as dispatched")
+
+    host = VoiceAssistant.__new__(VoiceAssistant)
+    host.interaction_runtime = _ConfirmationRuntime()
+    host.conversation_state = _NoRecordState()
+    host.session_log = lambda *_args, **_kwargs: None
+    staged = []
+
+    async def stage(response, session_id, *, language, reset_playback=True):
+        staged.append((response.interaction_id, session_id, language, reset_playback))
+        return True
+
+    host._stage_interaction_confirmation = stage
+    response = InteractionResponse(
+        interaction_id="interaction-restored-confirm",
+        capabilities=[
+            CapabilityRequest(
+                request_id="request-walk",
+                capability_id="soridormi.walk_forward",
+                args={},
+                requires_confirmation=True,
+            )
+        ],
+        metadata={"language": "en-US"},
+    )
+    result = asyncio.run(
+        host._apply_planner_reentry_response(response, session_id=None)
+    )
+
+    assert result == "planner_reentry_confirmation_staged"
+    assert staged == [
+        (
+            "interaction-restored-confirm",
+            "interaction-restored-confirm",
+            "en-US",
+            False,
+        )
+    ]

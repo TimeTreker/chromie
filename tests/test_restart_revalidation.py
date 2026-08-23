@@ -131,6 +131,103 @@ class RestartRevalidationTests(unittest.TestCase):
             self.assertEqual(situation.revision, 1)
             self.assertNotIn("must_not_persist", json.dumps(situation.prompt_projection()))
 
+
+    def test_revalidation_candidate_retains_exact_responsibility_seed_and_clears_stale_runtime_binding(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            store_path = Path(temp_dir) / "task_contexts.json"
+            manager = ConversationStateManager(
+                base_conversation_id="restart-seed",
+                task_store_enabled=True,
+                task_store_path=store_path,
+            )
+            results = manager.apply_goal_association_resolution(
+                {
+                    "resolution_status": "resolved",
+                    "turn_id": "turn-create",
+                    "new_goals": [
+                        {
+                            "goal_id": "goal-walk",
+                            "description": "Walk forward.",
+                            "source_text": "Walk forward.",
+                            "source_responsibility_refs": ["resp-walk"],
+                        }
+                    ],
+                    "confidence": 1.0,
+                },
+                sid="sid-create",
+                user_text="Walk forward.",
+                atomic=True,
+            )
+            self.assertTrue(all(item.get("applied") for item in results))
+            responsibility = {
+                "local_ref": "resp-walk",
+                "outcome": "Walk forward.",
+                "output_mode": "body_action",
+                "completion_requires_work": True,
+                "confidence": 1.0,
+            }
+            retained = manager._runtime_revalidation_responsibilities(
+                result_metadata={
+                    "goal_interpretation": {"responsibilities": [responsibility]}
+                },
+                goal_id="goal-walk",
+            )
+            self.assertEqual(retained, [responsibility])
+
+            context = manager._task_contexts[-1]
+            context["status"] = "running"
+            context["commitment_state"] = "executing"
+            context["plan_status"] = "committed"
+            context["metadata"].update(
+                {
+                    "canonical_plan_id": "plan-old",
+                    "canonical_plan_fingerprint": "f" * 64,
+                    "planned_capabilities": [
+                        {
+                            "capability_id": "soridormi.walk_forward",
+                            "request_id": "request-walk",
+                        }
+                    ],
+                    "runtime_revalidation_responsibilities": retained,
+                    "runtime_revalidation_language": "en-US",
+                }
+            )
+            self.assertTrue(manager.persist_task_contexts())
+
+            restored = ConversationStateManager(
+                base_conversation_id="restart-seed",
+                task_store_enabled=True,
+                task_store_path=store_path,
+            )
+            candidates = restored.runtime_revalidation_candidates()
+            self.assertEqual(len(candidates), 1)
+            self.assertEqual(candidates[0]["goal_id"], "goal-walk")
+            self.assertEqual(
+                candidates[0]["capability_ids"], ["soridormi.walk_forward"]
+            )
+            self.assertEqual(candidates[0]["responsibilities"], [responsibility])
+
+            evidence_ref = "provider-state:restart:goal-walk:1"
+            completed = restored.complete_runtime_revalidation(
+                ["goal-walk"], evidence_ref=evidence_ref
+            )
+            self.assertEqual(completed, ["goal-walk"])
+            binding = restored.goal_cancellation_bindings(["goal-walk"])[0]
+            self.assertFalse(binding["requires_revalidation"])
+            self.assertFalse(binding["requires_runtime_dispatch"])
+            self.assertEqual(binding["request_ids"], [])
+            restored_context = restored.snapshot()["current_task_context"]
+            self.assertEqual(restored_context["status"], "planning")
+            self.assertEqual(restored_context["plan_status"], "revalidated")
+            self.assertEqual(
+                restored_context["metadata"]["runtime_revalidation_evidence_ref"],
+                evidence_ref,
+            )
+            self.assertEqual(
+                restored_context["metadata"]["recovery_previous_canonical_plan_id"],
+                "plan-old",
+            )
+
     def test_terminal_responsibilities_are_not_restored(self) -> None:
         with TemporaryDirectory() as temp_dir:
             store_path = Path(temp_dir) / "task_contexts.json"

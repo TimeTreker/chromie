@@ -5022,6 +5022,181 @@ class VoiceAssistant:
         )
 
 
+    def _fresh_capability_state_projection(
+        self, capability_ids: list[str]
+    ) -> list[dict[str, Any]]:
+        projection: list[dict[str, Any]] = []
+        for capability_id in dict.fromkeys(
+            str(item).strip() for item in capability_ids if str(item).strip()
+        ):
+            try:
+                definition = self.interaction_runtime.capability_definition(capability_id)
+            except ValueError:
+                projection.append(
+                    {
+                        "capability_id": capability_id,
+                        "known": False,
+                        "available": False,
+                        "unavailable_reason": "not_in_fresh_registry",
+                    }
+                )
+                continue
+            projection.append(
+                {
+                    "capability_id": capability_id,
+                    "known": True,
+                    "available": bool(definition.available),
+                    "provider_id": definition.provider_id,
+                    "version": definition.version,
+                    **(
+                        {"unavailable_reason": definition.unavailable_reason}
+                        if definition.unavailable_reason
+                        else {}
+                    ),
+                }
+            )
+        return projection
+
+    async def _reenter_restored_goal_for_provider_state(
+        self,
+        *,
+        candidate: dict[str, Any],
+        provider_state: list[dict[str, Any]],
+    ) -> bool:
+        goal_id = str(candidate.get("goal_id") or "").strip()
+        user_request = str(candidate.get("source_text") or "").strip()
+        raw_responsibilities = candidate.get("responsibilities")
+        if not goal_id or not user_request or not isinstance(raw_responsibilities, list):
+            return False
+        responsibilities: list[CognitiveResponsibilityProposal] = []
+        try:
+            for item in raw_responsibilities:
+                if isinstance(item, dict):
+                    responsibilities.append(
+                        CognitiveResponsibilityProposal.model_validate(item)
+                    )
+        except (TypeError, ValueError) as exc:
+            self.session_log(
+                None,
+                "restored_goal_revalidation_rejected: goal_id=%s reason=invalid_responsibility_provenance error_type=%s",
+                goal_id,
+                type(exc).__name__,
+            )
+            return False
+        if not responsibilities:
+            self.session_log(
+                None,
+                "restored_goal_revalidation_deferred: goal_id=%s reason=missing_responsibility_provenance",
+                goal_id,
+            )
+            return False
+        restored_marker = str(candidate.get("restored_ms") or "unknown").strip()
+        evidence_ref = f"provider-state:restart:{goal_id}:{restored_marker}"[:220]
+        opportunity = CognitiveOpportunity.create(
+            trigger="provider_state",
+            goal_ids=[goal_id],
+            evidence_refs=[evidence_ref],
+            reason_codes=["restored_goal_fresh_provider_state"],
+            recommended_cognition="fast",
+        )
+        planner_response = await self._planner_state_reentry_response(
+            source_response=None,
+            canonical_plan=None,
+            user_request=user_request,
+            language=str(candidate.get("language") or "auto"),
+            goal_ids=[goal_id],
+            evidence_goal_ids=[goal_id],
+            evidence_refs=[evidence_ref],
+            session_id=None,
+            phase="restored_provider_state_revalidation",
+            context_updates={
+                "trusted_provider_state_event": {
+                    "evidence_ref": evidence_ref,
+                    "source": "restart_provider_revalidation",
+                    "capabilities": provider_state,
+                },
+                "provider_state_reentry": {
+                    "source_goal_ids": [goal_id],
+                    "evidence_refs": [evidence_ref],
+                    "planner_authority": "planner",
+                    "restored_goal": True,
+                },
+                "cognitive_opportunity": opportunity.prompt_projection(),
+            },
+            fast_workflow_stage="fast_planner_restored_provider_state_reentry",
+            deep_workflow_stage="planner_deep_pass_restored_provider_state_reentry",
+            response_source="fast_planner_restored_provider_state_reentry",
+            responsibilities_override=responsibilities,
+        )
+        if planner_response is None:
+            return False
+        completed = self.conversation_state.complete_runtime_revalidation(
+            [goal_id],
+            evidence_ref=evidence_ref,
+        )
+        if goal_id not in completed:
+            return False
+        await self._apply_planner_reentry_response(planner_response, session_id=None)
+        return True
+
+    async def _revalidate_restored_goals_from_provider_state(self) -> None:
+        candidates = self.conversation_state.runtime_revalidation_candidates()
+        if not candidates:
+            return
+        body_capability_ids = sorted(
+            {
+                capability_id
+                for candidate in candidates
+                for capability_id in candidate.get("capability_ids") or []
+                if str(capability_id).startswith("soridormi.")
+            }
+        )
+        if body_capability_ids:
+            try:
+                await asyncio.wait_for(
+                    self.interaction_runtime.refresh_soridormi_catalog(force=True),
+                    timeout=5.0,
+                )
+            except (TimeoutError, RuntimeError) as exc:
+                self.session_log(
+                    None,
+                    "restored_goal_revalidation_deferred: reason=provider_state_unavailable error_type=%s",
+                    type(exc).__name__,
+                )
+                return
+        for candidate in candidates:
+            capability_ids = [
+                str(item).strip()
+                for item in candidate.get("capability_ids") or []
+                if str(item).strip()
+            ]
+            if not capability_ids:
+                self.session_log(
+                    None,
+                    "restored_goal_revalidation_deferred: goal_id=%s reason=no_prior_capability_binding",
+                    candidate.get("goal_id"),
+                )
+                continue
+            provider_state = self._fresh_capability_state_projection(capability_ids)
+            await self._reenter_restored_goal_for_provider_state(
+                candidate=candidate,
+                provider_state=provider_state,
+            )
+
+    def _schedule_restored_goal_revalidation(self) -> None:
+        if not self.conversation_state.runtime_revalidation_candidates():
+            return
+        task = asyncio.create_task(
+            self._revalidate_restored_goals_from_provider_state(),
+            name="restored-goal-provider-revalidation",
+        )
+        result_tasks = getattr(self, "active_capability_result_tasks", None)
+        if not isinstance(result_tasks, dict):
+            result_tasks = {}
+            self.active_capability_result_tasks = result_tasks
+        result_tasks[task] = "restored-goal-provider-revalidation"
+        task.add_done_callback(self._capability_result_task_done)
+
     async def _apply_planner_reentry_response(
         self,
         response: InteractionResponse,
@@ -5044,12 +5219,26 @@ class VoiceAssistant:
             )
         confirmation_ids = await self.interaction_runtime.confirmation_request_ids(response)
         if confirmation_ids:
-            self.session_log(
-                session_id,
-                "planner_reentry_dispatch_suppressed: reason=confirmation_required requests=%s",
-                ",".join(sorted(confirmation_ids)),
+            confirmation_session_id = str(
+                session_id
+                or response.metadata.get("parent_interaction_id")
+                or response.interaction_id
             )
+            staged = await self._stage_interaction_confirmation(
+                response,
+                confirmation_session_id,
+                language=str(response.metadata.get("language") or "auto"),
+                reset_playback=False,
+            )
+            if staged:
+                self.session_log(
+                    confirmation_session_id,
+                    "planner_reentry_confirmation_staged: requests=%s",
+                    ",".join(sorted(confirmation_ids)),
+                )
+                return "planner_reentry_confirmation_staged"
             return "planner_reentry_confirmation_required"
+        self.conversation_state.record_interaction_response(session_id, response)
         await self._dispatch_detached_interaction(
             response,
             session_id,
@@ -5062,8 +5251,8 @@ class VoiceAssistant:
     async def _planner_state_reentry_response(
         self,
         *,
-        source_response: InteractionResponse,
-        canonical_plan: CanonicalPlan,
+        source_response: InteractionResponse | None,
+        canonical_plan: CanonicalPlan | None,
         user_request: str,
         language: str,
         goal_ids: list[str],
@@ -5075,6 +5264,8 @@ class VoiceAssistant:
         fast_workflow_stage: str,
         deep_workflow_stage: str,
         response_source: str,
+        responsibilities_override: list[CognitiveResponsibilityProposal] | None = None,
+        parent_interaction_id: str | None = None,
         repeat_check_evidence: list[ToolResultEvidence] | None = None,
         repeat_check_context: dict[str, Any] | None = None,
     ) -> InteractionResponse | None:
@@ -5105,34 +5296,38 @@ class VoiceAssistant:
             return None
         metadata = (
             source_response.metadata
-            if isinstance(source_response.metadata, dict)
+            if source_response is not None
+            and isinstance(source_response.metadata, dict)
             else {}
         )
         association = metadata.get("goal_association")
-        if not isinstance(association, dict):
-            self.session_log(
-                session_id,
-                "planner_state_reentry_rejected: reason=missing_goal_association",
+        if source_response is not None:
+            if not isinstance(association, dict):
+                self.session_log(
+                    session_id,
+                    "planner_state_reentry_rejected: reason=missing_goal_association",
+                )
+                return None
+            association_goal_ids = {
+                str(goal_id).strip()
+                for item in association.get("associations") or []
+                if isinstance(item, dict)
+                for goal_id in item.get("target_goal_ids") or []
+            } | {
+                str(item.get("goal_id") or "").strip()
+                for item in association.get("new_goals") or []
+                if isinstance(item, dict)
+            }
+            if not set(normalized_goal_ids).issubset(association_goal_ids):
+                raise ValueError(
+                    "Planner state re-entry Goal binding is not present in Goal Association"
+                )
+        responsibilities = list(responsibilities_override or [])
+        if not responsibilities and source_response is not None:
+            responsibilities = planner_reentry_responsibilities(
+                source_response=source_response,
+                goal_ids=normalized_goal_ids,
             )
-            return None
-        association_goal_ids = {
-            str(goal_id).strip()
-            for item in association.get("associations") or []
-            if isinstance(item, dict)
-            for goal_id in item.get("target_goal_ids") or []
-        } | {
-            str(item.get("goal_id") or "").strip()
-            for item in association.get("new_goals") or []
-            if isinstance(item, dict)
-        }
-        if not set(normalized_goal_ids).issubset(association_goal_ids):
-            raise ValueError(
-                "Planner state re-entry Goal binding is not present in Goal Association"
-            )
-        responsibilities = planner_reentry_responsibilities(
-            source_response=source_response,
-            goal_ids=normalized_goal_ids,
-        )
         if not responsibilities:
             self.session_log(
                 session_id,
@@ -5141,19 +5336,21 @@ class VoiceAssistant:
             )
             return None
 
-        sid = str(session_id or canonical_plan.plan_id)
+        sid = str(
+            session_id
+            or (canonical_plan.plan_id if canonical_plan is not None else "")
+            or f"restored:{normalized_goal_ids[0]}"
+        )
         context = self._goal_driven_authority_context(
             self.build_context(sid),
             session_id=sid,
             observer=False,
         )
-        context.update(
-            {
-                "goal_association_resolution": association,
-                "canonical_plan_resolution": canonical_plan.prompt_projection(),
-                **context_updates,
-            }
-        )
+        context.update(context_updates)
+        if isinstance(association, dict):
+            context["goal_association_resolution"] = association
+        if canonical_plan is not None:
+            context["canonical_plan_resolution"] = canonical_plan.prompt_projection()
         if isinstance(metadata.get("user_turn_envelope"), dict):
             context["user_turn_envelope"] = dict(metadata["user_turn_envelope"])
         if isinstance(metadata.get("goal_interpretation"), dict):
@@ -5262,11 +5459,15 @@ class VoiceAssistant:
                 raise ValueError(
                     "Deep Planner state re-entry changed the bound Goal set"
                 )
-        if repeat_check_evidence and planner_reentry_repeats_completed_activity(
-            source_response=source_response,
-            plan=replanned,
-            extra_context=repeat_check_context,
-            evidence=repeat_check_evidence,
+        if (
+            source_response is not None
+            and repeat_check_evidence
+            and planner_reentry_repeats_completed_activity(
+                source_response=source_response,
+                plan=replanned,
+                extra_context=repeat_check_context,
+                evidence=repeat_check_evidence,
+            )
         ):
             raise ValueError(
                 "Planner state re-entry attempted to repeat the completed terminal Activity"
@@ -5279,11 +5480,25 @@ class VoiceAssistant:
         )
         response.metadata.update(
             {
-                "goal_association": association,
                 "planner_state_reentry": True,
                 "planner_state_reentry_phase": phase,
                 "planner_state_reentry_evidence_refs": normalized_evidence_refs,
-                "parent_interaction_id": source_response.interaction_id,
+                **(
+                    {"goal_association": association}
+                    if isinstance(association, dict)
+                    else {}
+                ),
+                **(
+                    {
+                        "parent_interaction_id": str(
+                            parent_interaction_id
+                            or (source_response.interaction_id if source_response is not None else "")
+                        ).strip()
+                    }
+                    if parent_interaction_id
+                    or source_response is not None
+                    else {}
+                ),
             }
         )
         if isinstance(metadata.get("goal_interpretation"), dict):
@@ -6840,6 +7055,7 @@ class VoiceAssistant:
                 audio_device_monitor(self)
             )
         await self._announce_runtime_ready()
+        self._schedule_restored_goal_revalidation()
         input_runtime = input_session_runtime_for(self)
         if self.audio_input_mode == "stdin":
             await input_runtime.injected_audio_stream()
