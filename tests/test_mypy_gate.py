@@ -40,6 +40,7 @@ class MypyGateTests(unittest.TestCase):
             entries,
             (
                 "scripts/check_local_runtime_exposure.py",
+                "scripts/run_mypy.py",
                 "scripts/run_ruff.py",
                 "shared/chromie_contracts/errors.py",
                 "shared/chromie_contracts/semantic_authority.py",

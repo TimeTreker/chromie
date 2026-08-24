@@ -89,6 +89,8 @@ from .situation import (
     CognitiveOpportunity,
     CognitiveOpportunityMode,
     CognitiveOpportunityTrigger,
+    GoalTimeCondition,
+    SituationRevisionObservation,
     SituationConditionRef,
     SituationEvidenceKind,
     SituationEvidenceRef,

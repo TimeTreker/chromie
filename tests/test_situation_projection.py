@@ -101,3 +101,39 @@ def test_cognitive_opportunity_is_stable_bounded_and_ephemeral_by_contract():
         "outcome-1",
         "evidence-1",
     ]
+
+
+def test_trusted_situation_revision_emits_only_on_semantic_delta() -> None:
+    from orchestrator.runtime.situation import derive_situation_revision_opportunity
+    from shared.chromie_contracts.situation import SituationRevisionObservation
+
+    projection = build_situation_projection(
+        context={"active_goal_snapshots": [{"goal_id": "goal-look"}]},
+        turn_id="turn-look",
+        revision=3,
+    )
+    observation = SituationRevisionObservation(
+        observation_id="scene-observation-3",
+        source_id="trusted_scene_projection",
+        source_revision=3,
+        goal_ids=["goal-look"],
+        evidence_refs=["scene-evidence-3"],
+        projection=projection,
+    )
+
+    opportunity = derive_situation_revision_opportunity(
+        observation,
+        previous_situation_digest="b" * 64,
+    )
+    assert opportunity is not None
+    assert opportunity.trigger == "situation_revision"
+    assert opportunity.goal_ids == ["goal-look"]
+    assert opportunity.evidence_refs == ["scene-evidence-3"]
+    assert opportunity.situation_digest == projection.digest
+    assert (
+        derive_situation_revision_opportunity(
+            observation,
+            previous_situation_digest=projection.digest,
+        )
+        is None
+    )

@@ -1,4 +1,5 @@
 scripts/agent_skill_digest.py
 scripts/check_local_runtime_exposure.py
+scripts/run_mypy.py
 shared/chromie_contracts/errors.py
 shared/chromie_contracts/semantic_authority.py

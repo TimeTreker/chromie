@@ -5,8 +5,10 @@ import json
 from typing import Any, Iterable
 
 from shared.chromie_contracts.situation import (
+    CognitiveOpportunity,
     SituationConditionRef,
     SituationEvidenceRef,
+    SituationRevisionObservation,
     SituationProjection,
 )
 
@@ -143,4 +145,32 @@ def build_situation_projection(
     )
 
 
-__all__ = ["build_situation_projection"]
+def derive_situation_revision_opportunity(
+    observation: SituationRevisionObservation,
+    *,
+    previous_situation_digest: str = "",
+) -> CognitiveOpportunity | None:
+    """Derive Planner readiness from one trusted live-Situation observation.
+
+    The producer is delta-driven: replaying the same Situation digest is a no-op.
+    Source trust/admission belongs to the caller that constructs the typed observation;
+    this function neither observes the world nor invents Evidence.
+    """
+
+    previous = _normalized(previous_situation_digest)
+    if previous and previous == observation.projection.digest:
+        return None
+    return CognitiveOpportunity.create(
+        trigger="situation_revision",
+        goal_ids=list(observation.goal_ids),
+        evidence_refs=list(observation.evidence_refs),
+        reason_codes=["trusted_situation_revision"],
+        recommended_cognition="fast",
+        situation_digest=observation.projection.digest,
+    )
+
+
+__all__ = [
+    "build_situation_projection",
+    "derive_situation_revision_opportunity",
+]

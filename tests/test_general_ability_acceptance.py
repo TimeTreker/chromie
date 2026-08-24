@@ -93,6 +93,10 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             "evidence_bound_cognitive_turn_closure",
             ability_ids,
         )
+        self.assertIn("human_like_cognitive_continuity", ability_ids)
+        self.assertIn("planner_goal_semantic_quality", ability_ids)
+        self.assertIn("workdag_multi_goal_revision_integrity", ability_ids)
+        self.assertIn("continuous_cognition_recovery", ability_ids)
         self.assertEqual(validate_manifest(manifest), [])
         self.assertGreaterEqual(len(level_a_keys(manifest.ability_classes)), 20)
         live_ids = live_case_ids(manifest.ability_classes)
@@ -100,6 +104,27 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         self.assertIn("multi_goal_look_then_blink", live_ids)
         self.assertIn("weather_then_chinese_walk_blink_song", live_ids)
         self.assertIn("beijing_rain_evidence_bound_result", live_ids)
+        self.assertIn("qualification_human_continuity_continue_walk", live_ids)
+        self.assertIn("qualification_planner_weather_evidence", live_ids)
+        self.assertIn("qualification_workdag_walk_blink_once", live_ids)
+        self.assertIn("qualification_continuous_weather_reentry", live_ids)
+
+    def test_manifest_rejects_first_turn_previous_speech_comparison(self) -> None:
+        payload = json.loads(DEFAULT_MANIFEST.read_text(encoding="utf-8"))
+        continuity = next(
+            item
+            for item in payload["ability_classes"]
+            if item.get("id") == "human_like_cognitive_continuity"
+        )
+        continuity["live_text_cases"][0]["turns"][0][
+            "forbid_repeat_of_previous_speech"
+        ] = True
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "manifest.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            manifest = load_manifest(path)
+            errors = validate_manifest(manifest, validate_level_a_sources=False)
+        self.assertTrue(any("previous-speech comparison" in item for item in errors))
 
     def test_live_validation_requires_structured_pending_work_speech(self) -> None:
         case = TextScenarioCase(

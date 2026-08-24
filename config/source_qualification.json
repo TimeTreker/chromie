@@ -3,44 +3,75 @@
   "gates": [
     {
       "id": "repository_policies",
-      "argv": ["{python}", "scripts/check_repository_policies.py"]
+      "argv": [
+        "{python}",
+        "scripts/check_repository_policies.py"
+      ]
     },
     {
       "id": "test_ownership",
-      "argv": ["{python}", "scripts/check_test_ownership.py"]
+      "argv": [
+        "{python}",
+        "scripts/check_test_ownership.py"
+      ]
     },
     {
       "id": "runtime_exception_boundaries",
-      "argv": ["{python}", "scripts/check_runtime_exception_boundaries.py"]
+      "argv": [
+        "{python}",
+        "scripts/check_runtime_exception_boundaries.py"
+      ]
     },
     {
       "id": "runtime_configuration_inventory",
-      "argv": ["{python}", "scripts/runtime_configuration_inventory.py", "--check"]
+      "argv": [
+        "{python}",
+        "scripts/runtime_configuration_inventory.py",
+        "--check"
+      ]
     },
     {
       "id": "host_configuration_ownership",
-      "argv": ["{python}", "scripts/check_host_configuration_ownership.py"]
+      "argv": [
+        "{python}",
+        "scripts/check_host_configuration_ownership.py"
+      ]
     },
     {
       "id": "service_configuration_ownership",
-      "argv": ["{python}", "scripts/check_service_configuration_ownership.py"]
+      "argv": [
+        "{python}",
+        "scripts/check_service_configuration_ownership.py"
+      ]
     },
     {
       "id": "runtime_structure",
-      "argv": ["{python}", "scripts/check_runtime_structure.py"]
+      "argv": [
+        "{python}",
+        "scripts/check_runtime_structure.py"
+      ]
     },
     {
       "id": "documentation",
-      "argv": ["{python}", "scripts/check_docs.py"]
+      "argv": [
+        "{python}",
+        "scripts/check_docs.py"
+      ]
     },
     {
       "id": "semantic_authority",
-      "argv": ["{python}", "scripts/semantic_authority_audit.py"]
+      "argv": [
+        "{python}",
+        "scripts/semantic_authority_audit.py"
+      ]
     },
     {
       "id": "audit_remediation_regression",
       "argv": [
-        "{python}", "-m", "pytest", "-q",
+        "{python}",
+        "-m",
+        "pytest",
+        "-q",
         "tests/test_confirmation_dialogue.py",
         "tests/test_named_goal_cancellation_closure.py",
         "tests/test_goal_cancellation_evidence_reentry.py",
@@ -54,26 +85,65 @@
       "dependency": "pytest==9.1.1"
     },
     {
+      "id": "current_revision_cognition_regression",
+      "argv": [
+        "{python}",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_goal_interpreter_llm_prompt.py",
+        "tests/test_goal_association_pr2.py",
+        "tests/test_fast_planner_pr3.py",
+        "tests/test_deep_planner_pr4.py",
+        "tests/test_work_dag_planning.py",
+        "tests/test_work_dag_revision.py",
+        "tests/test_work_dag_execution_state.py",
+        "tests/test_cognitive_turn_loop_closure.py",
+        "tests/test_continuous_cognition_runtime.py",
+        "tests/test_conversation_state.py",
+        "tests/test_situation_projection.py",
+        "tests/test_cognitive_gateway_reflex.py"
+      ],
+      "dependency": "pytest==9.1.1"
+    },
+    {
       "id": "general_ability_level_a",
-      "argv": ["{python}", "scripts/general_ability_acceptance.py", "--mode", "level-a", "--no-write"]
+      "argv": [
+        "{python}",
+        "scripts/general_ability_acceptance.py",
+        "--mode",
+        "level-a",
+        "--no-write"
+      ]
     },
     {
       "id": "provider_fault_matrix_level_a",
-      "argv": ["{python}", "scripts/provider_fault_matrix.py"]
+      "argv": [
+        "{python}",
+        "scripts/provider_fault_matrix.py"
+      ]
     },
     {
       "id": "ruff",
-      "argv": ["{python}", "scripts/run_ruff.py"],
+      "argv": [
+        "{python}",
+        "scripts/run_ruff.py"
+      ],
       "dependency": "ruff==0.16.0"
     },
     {
       "id": "mypy",
-      "argv": ["{python}", "scripts/run_mypy.py"],
+      "argv": [
+        "{python}",
+        "scripts/run_mypy.py"
+      ],
       "dependency": "mypy==2.3.0"
     },
     {
       "id": "maintained_tests",
-      "argv": ["./scripts/run_tests.sh"],
+      "argv": [
+        "./scripts/run_tests.sh"
+      ],
       "full_suite": true
     }
   ],

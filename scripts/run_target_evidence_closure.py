@@ -288,6 +288,40 @@ def _track_status(
                     "required_value_mismatch:"
                     f"path={dotted_path}:expected={expected_value!r}:actual={actual_value!r}"
                 )
+
+    required_ability_classes = spec.get("required_ability_classes")
+    if isinstance(required_ability_classes, list):
+        ability_rows = payload.get("ability_classes")
+        present_ability_ids = {
+            str(item.get("id") or "").strip()
+            for item in ability_rows or []
+            if isinstance(item, dict)
+            and str(item.get("id") or "").strip()
+            and item.get("ok") is True
+        }
+        for ability_id in required_ability_classes:
+            normalized = str(ability_id or "").strip()
+            if normalized and normalized not in present_ability_ids:
+                status["errors"].append(
+                    f"required_ability_class_missing_or_failed:{normalized}"
+                )
+
+    required_case_ids = spec.get("required_case_ids")
+    if isinstance(required_case_ids, list):
+        case_rows = payload.get("cases")
+        present_case_ids = {
+            str(item.get("case_id") or "").strip()
+            for item in case_rows or []
+            if isinstance(item, dict)
+            and str(item.get("case_id") or "").strip()
+            and item.get("ok") is True
+        }
+        for case_id in required_case_ids:
+            normalized = str(case_id or "").strip()
+            if normalized and normalized not in present_case_ids:
+                status["errors"].append(
+                    f"required_interaction_case_missing_or_failed:{normalized}"
+                )
     status["source_revision"] = expected_revision
     review_relative = spec.get("review")
     if review_relative:
@@ -396,9 +430,21 @@ def init(args: argparse.Namespace) -> int:
     }
     _write_state(root, state)
     plan = root / "closure-plan.md"
+    topic_lines = ""
+    if args.profile == "current_revision_qualification":
+        topics = manifest.get("current_revision_topics")
+        if isinstance(topics, list):
+            rendered = [
+                f"- {item.get('topic_id')}. `{item.get('id')}` — {item.get('evidence')}"
+                for item in topics
+                if isinstance(item, dict) and item.get("id")
+            ]
+            if rendered:
+                topic_lines = "\nRequired audit topics:\n\n" + "\n".join(rendered) + "\n"
     plan.write_text(
         "# Target Evidence Closure Plan\n\n"
-        f"Profile: `{args.profile}`\n\n"
+        f"Profile: `{args.profile}`\n"
+        f"{topic_lines}\n"
         "Use `python scripts/run_target_evidence_closure.py status --evidence-root "
         f"{root}` after each collector or attachment. Human review is never automatic.\n",
         encoding="utf-8",

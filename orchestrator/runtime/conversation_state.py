@@ -38,7 +38,7 @@ try:
         execution_outcome_fingerprint,
         goal_completion_qualification_summary,
     )
-    from chromie_contracts.situation import CognitiveOpportunity
+    from chromie_contracts.situation import CognitiveOpportunity, GoalTimeCondition
     from chromie_contracts.reflex import CancellationDispatchReceipt
     from chromie_contracts.reflection import ReflectionResolution
     from chromie_contracts.plan import PlannerInformationGap
@@ -64,7 +64,7 @@ except ImportError:  # pragma: no cover - repository development path
         execution_outcome_fingerprint,
         goal_completion_qualification_summary,
     )
-    from shared.chromie_contracts.situation import CognitiveOpportunity
+    from shared.chromie_contracts.situation import CognitiveOpportunity, GoalTimeCondition
     from shared.chromie_contracts.reflex import CancellationDispatchReceipt
     from shared.chromie_contracts.reflection import ReflectionResolution
     from shared.chromie_contracts.plan import PlannerInformationGap
@@ -5171,6 +5171,143 @@ class ConversationStateManager:
                 continue
             retained.append(self._json_safe(item))
         return retained
+
+    def register_goal_time_condition(
+        self,
+        condition: GoalTimeCondition | dict[str, Any],
+    ) -> bool:
+        """Persist one structured Planner-authored wake condition on an open Goal.
+
+        Host never parses a Goal sentence into time semantics. The caller must supply
+        a typed condition already bound to the current canonical Plan and original
+        Responsibility refs. Revisions supersede stale conditions mechanically.
+        """
+
+        validated = (
+            condition
+            if isinstance(condition, GoalTimeCondition)
+            else GoalTimeCondition.model_validate(condition)
+        )
+        context = self._task_context_by_goal_id(validated.goal_id)
+        if context is None or self._goal_responsibility_status(context) != "open":
+            return False
+        metadata = context.get("metadata")
+        if not isinstance(metadata, dict):
+            metadata = {}
+        if str(metadata.get("canonical_plan_id") or "").strip() != validated.source_plan_id:
+            return False
+        goal = self._semantic_goal_from_context(context)
+        source_refs = {str(item).strip() for item in goal.source_responsibility_refs}
+        if not set(validated.source_responsibility_refs).issubset(source_refs):
+            return False
+        existing = metadata.get("time_conditions")
+        if not isinstance(existing, list):
+            existing = []
+        payload = validated.model_dump(mode="json")
+        retained = [
+            item
+            for item in existing
+            if isinstance(item, dict)
+            and str(item.get("condition_id") or "") != validated.condition_id
+        ]
+        retained.append(payload)
+        context["metadata"] = {**metadata, "time_conditions": retained[-16:]}
+        context["updated_ms"] = _now_ms()
+        self._persist_task_contexts_if_enabled()
+        return True
+
+    def due_time_condition_opportunities(
+        self,
+        *,
+        now_ms: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Atomically consume due structured conditions and emit Planner readiness.
+
+        Conditions are discarded when their Goal/Plan binding is no longer current.
+        A returned item carries source provenance plus an ephemeral
+        ``CognitiveOpportunity``; it does not choose an Activity or response.
+        """
+
+        now = int(_now_ms() if now_ms is None else now_ms)
+        due: list[dict[str, Any]] = []
+        changed = False
+        for context in self._active_task_contexts():
+            metadata = context.get("metadata")
+            if not isinstance(metadata, dict):
+                continue
+            raw_conditions = metadata.get("time_conditions")
+            if not isinstance(raw_conditions, list) or not raw_conditions:
+                continue
+            goal = self._semantic_goal_from_context(context)
+            current_plan_id = str(metadata.get("canonical_plan_id") or "").strip()
+            keep: list[dict[str, Any]] = []
+            for raw in raw_conditions:
+                try:
+                    condition = GoalTimeCondition.model_validate(raw)
+                except (TypeError, ValueError):
+                    changed = True
+                    continue
+                if (
+                    condition.goal_id != goal.goal_id
+                    or condition.source_plan_id != current_plan_id
+                    or self._goal_responsibility_status(context) != "open"
+                ):
+                    changed = True
+                    continue
+                if condition.due_at_ms > now:
+                    keep.append(condition.model_dump(mode="json"))
+                    continue
+                changed = True
+                opportunity = CognitiveOpportunity.create(
+                    trigger="time_condition",
+                    goal_ids=[condition.goal_id],
+                    reason_codes=[condition.reason_code],
+                    recommended_cognition="fast",
+                )
+                due.append(
+                    {
+                        "condition": condition.model_dump(mode="json"),
+                        "opportunity": opportunity.prompt_projection(),
+                        "source_text": str(
+                            goal.source_text
+                            or context.get("last_meaningful_user_turn")
+                            or ""
+                        ).strip(),
+                        "language": str(
+                            metadata.get("runtime_revalidation_language") or "auto"
+                        ).strip()
+                        or "auto",
+                    }
+                )
+            if len(keep) != len(raw_conditions):
+                context["metadata"] = {**metadata, "time_conditions": keep}
+                context["updated_ms"] = _now_ms()
+        if changed:
+            self._persist_task_contexts_if_enabled()
+        return due
+
+    def next_time_condition_due_ms(self) -> int | None:
+        """Return the nearest durable due time without interpreting Goal text."""
+
+        nearest: int | None = None
+        for context in self._active_task_contexts():
+            metadata = context.get("metadata")
+            if not isinstance(metadata, dict):
+                continue
+            current_plan_id = str(metadata.get("canonical_plan_id") or "").strip()
+            for raw in metadata.get("time_conditions") or []:
+                try:
+                    condition = GoalTimeCondition.model_validate(raw)
+                except (TypeError, ValueError):
+                    continue
+                if condition.source_plan_id != current_plan_id:
+                    continue
+                nearest = (
+                    condition.due_at_ms
+                    if nearest is None
+                    else min(nearest, condition.due_at_ms)
+                )
+        return nearest
 
     def runtime_revalidation_candidates(self) -> list[dict[str, Any]]:
         """Return bounded open Goals whose pre-restart Runtime binding is stale."""

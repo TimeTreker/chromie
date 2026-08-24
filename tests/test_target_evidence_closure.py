@@ -97,6 +97,82 @@ class TargetEvidenceClosureTests(unittest.TestCase):
             python="python",
         )
 
+    def current_revision_interaction_report(self) -> dict:
+        spec = self.manifest["tracks"]["interaction_behavior"]
+        return {
+            "ok": True,
+            "mode": "live-text",
+            "evidence_level": "C",
+            "execute": True,
+            "assertion_scope": "full",
+            "goal_driven_runtime": "apply",
+            "provenance": {
+                "chromie_revision": "revision-1",
+                "chromie_dirty": False,
+            },
+            "ability_classes": [
+                {"id": ability_id, "ok": True}
+                for ability_id in spec.get("required_ability_classes", [])
+            ],
+            "cases": [
+                {"case_id": case_id, "ok": True}
+                for case_id in spec.get("required_case_ids", [])
+            ],
+        }
+
+
+    def test_current_revision_profile_keeps_physical_tracks_optional(self) -> None:
+        profile = self.manifest["profiles"]["current_revision_qualification"]
+        self.assertNotIn("physical_voice", profile["required_tracks"])
+        self.assertNotIn("physical_robot", profile["required_tracks"])
+        self.assertIn("physical_voice", profile["optional_tracks"])
+        self.assertIn("physical_robot", profile["optional_tracks"])
+
+    def test_physical_robot_attachment_rejects_unbound_or_unsupervised_claims(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.initialize(root, profile="supervised_physical_pilot")
+            bad = root / "input-physical.json"
+            self.write_json(
+                bad,
+                {
+                    "evidence_type": "physical_robot_supervised",
+                    "passed": True,
+                    "physical_robot_claim_eligible": True,
+                    "chromie_revision": "wrong-revision",
+                    "source_clean": True,
+                    "provider_source_bound": True,
+                    "safe_state_before": True,
+                    "safe_state_after": True,
+                    "operator": "",
+                },
+            )
+            args = argparse.Namespace(
+                manifest=MANIFEST_PATH,
+                evidence_root=root,
+                qualification=bad,
+                review=None,
+                python="python",
+            )
+            with patch.object(
+                closure,
+                "_git_state",
+                return_value={"revision": "revision-1", "dirty": False},
+            ):
+                with self.assertRaisesRegex(ValueError, "revision"):
+                    closure.attach_physical_robot(args)
+
+            payload = json.loads(bad.read_text(encoding="utf-8"))
+            payload["chromie_revision"] = "revision-1"
+            self.write_json(bad, payload)
+            with patch.object(
+                closure,
+                "_git_state",
+                return_value={"revision": "revision-1", "dirty": False},
+            ):
+                with self.assertRaisesRegex(ValueError, "safety operator"):
+                    closure.attach_physical_robot(args)
+
     def test_source_bound_profile_finalizes_without_physical_tracks(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -359,6 +435,37 @@ class TargetEvidenceClosureTests(unittest.TestCase):
             for case_id in self.manifest["interaction_behavior_cases"]:
                 self.assertIn(case_id, command)
 
+    def test_interaction_behavior_track_requires_each_declared_topic_slice(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.initialize(root, profile="current_revision_qualification")
+            report = self.current_revision_interaction_report()
+            report["ability_classes"][0]["ok"] = False
+            report["cases"][-1]["ok"] = False
+            self.write_json(
+                root / "interaction-behavior" / "qualification.json",
+                report,
+            )
+            status = closure._track_status(
+                root,
+                self.manifest,
+                "interaction_behavior",
+                expected_revision="revision-1",
+            )
+            self.assertFalse(status["eligible"])
+            self.assertTrue(
+                any(
+                    item.startswith("required_ability_class_missing_or_failed")
+                    for item in status["errors"]
+                )
+            )
+            self.assertTrue(
+                any(
+                    item.startswith("required_interaction_case_missing_or_failed")
+                    for item in status["errors"]
+                )
+            )
+
     def test_current_revision_profile_finalizes_when_all_required_tracks_match_revision(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -376,18 +483,7 @@ class TargetEvidenceClosureTests(unittest.TestCase):
             )
             self.write_json(
                 root / "interaction-behavior" / "qualification.json",
-                {
-                    "ok": True,
-                    "mode": "live-text",
-                    "evidence_level": "C",
-                    "execute": True,
-                    "assertion_scope": "full",
-                    "goal_driven_runtime": "apply",
-                    "provenance": {
-                        "chromie_revision": "revision-1",
-                        "chromie_dirty": False,
-                    },
-                },
+                self.current_revision_interaction_report(),
             )
             self.write_json(
                 root / "provider-faults" / "qualification.json",

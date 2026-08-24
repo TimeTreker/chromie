@@ -129,6 +129,97 @@ class SituationProjection(BaseModel):
 
         return self.model_dump(mode="json")
 
+
+class SituationRevisionObservation(BaseModel):
+    """Trusted external Situation delta admitted for continuous cognition.
+
+    The observation names its independently trusted source and references retained
+    Evidence; it does not become Goal/Evidence truth itself.  Runtime may derive a
+    CognitiveOpportunity only when the supplied projection actually changed.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal[1] = 1
+    observation_id: str = Field(min_length=1, max_length=200)
+    source_id: str = Field(min_length=1, max_length=160)
+    source_revision: int = Field(ge=1)
+    goal_ids: list[str] = Field(min_length=1, max_length=8)
+    evidence_refs: list[str] = Field(min_length=1, max_length=16)
+    projection: SituationProjection
+
+    @field_validator("observation_id", "source_id", mode="before")
+    @classmethod
+    def normalize_observation_text(cls, value: Any) -> str:
+        return " ".join(str(value or "").strip().split())
+
+    @field_validator("goal_ids", "evidence_refs", mode="before")
+    @classmethod
+    def normalize_observation_lists(cls, value: Any) -> list[str]:
+
+        if value is None:
+            return []
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, list):
+            raise ValueError("expected an array")
+        out: list[str] = []
+        for item in value:
+            text = " ".join(str(item or "").strip().split())
+            if text and text not in out:
+                out.append(text)
+        return out
+
+    @model_validator(mode="after")
+    def validate_projection_binding(self) -> "SituationRevisionObservation":
+        if self.source_revision != self.projection.revision:
+            raise ValueError("source_revision must match Situation projection revision")
+        projection_goals = set(self.projection.focus_goal_ids)
+        if not set(self.goal_ids).issubset(projection_goals):
+            raise ValueError("Situation observation Goal IDs must be in projection focus")
+        return self
+
+
+class GoalTimeCondition(BaseModel):
+    """Durable Planner-authored wake condition for one existing Goal.
+
+    The condition is structured provenance, never a deadline parsed by Host from
+    free-form Goal text. ConversationState owns persistence/consumption while the
+    same Planner owns what to do when the condition becomes due.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal[1] = 1
+    condition_id: str = Field(min_length=1, max_length=200)
+    goal_id: str = Field(min_length=1, max_length=160)
+    due_at_ms: int = Field(ge=1)
+    source_plan_id: str = Field(min_length=1, max_length=200)
+    source_responsibility_refs: list[str] = Field(min_length=1, max_length=8)
+    reason_code: str = Field(default="planner_time_condition", min_length=1, max_length=120)
+
+    @field_validator("condition_id", "goal_id", "source_plan_id", "reason_code", mode="before")
+    @classmethod
+    def normalize_condition_text(cls, value: Any) -> str:
+        return " ".join(str(value or "").strip().split())
+
+    @field_validator("source_responsibility_refs", mode="before")
+    @classmethod
+    def normalize_responsibility_refs(cls, value: Any) -> list[str]:
+
+        if value is None:
+            return []
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, list):
+            raise ValueError("expected an array")
+        out: list[str] = []
+        for item in value:
+            text = " ".join(str(item or "").strip().split())
+            if text and text not in out:
+                out.append(text)
+        return out
+
 CognitiveOpportunityTrigger = Literal[
     "execution_outcome",
     "situation_revision",

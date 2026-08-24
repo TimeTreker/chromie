@@ -218,6 +218,28 @@
       "forbidden_behaviors": [
         "backend_identity_or_calibration_leakage"
       ]
+    },
+    {
+      "id": "subordinate_fail_soft_integrity",
+      "description": "Auxiliary expression remains subordinate, non-duplicating, and fail-soft under resource/provider conflict.",
+      "selectors": {
+        "datasets": [
+          "social_attention"
+        ]
+      },
+      "minimum_cases": 128,
+      "required_invariants": [
+        "primary_response_not_delayed",
+        "auxiliary_behavior_is_parallel_only",
+        "provider_contract_respected"
+      ],
+      "forbidden_behaviors": [
+        "duplicate_auxiliary_of_explicit_action",
+        "auxiliary_motion_competes_with_explicit_action",
+        "unsupported_auxiliary_capability_call",
+        "auxiliary_behavior_blocks_or_reorders_primary_work",
+        "auxiliary_behavior_delays_primary_response"
+      ]
     }
   ]
 }

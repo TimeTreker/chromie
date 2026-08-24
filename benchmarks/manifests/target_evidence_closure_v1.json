@@ -102,7 +102,30 @@
         "assertion_scope": "full",
         "goal_driven_runtime": "apply",
         "provenance.chromie_dirty": false
-      }
+      },
+      "required_ability_classes": [
+        "human_like_cognitive_continuity",
+        "planner_goal_semantic_quality",
+        "workdag_multi_goal_revision_integrity",
+        "continuous_cognition_recovery",
+        "speech_identity_latency"
+      ],
+      "required_case_ids": [
+        "user_probe_walk_forward_ten_seconds",
+        "multi_goal_walk_then_blink",
+        "user_probe_cancel_recent_walk",
+        "chongqing_daytime_weather_progress_and_lookup",
+        "debug_bundle_run_15_while_singing",
+        "multi_goal_blink_and_joke",
+        "user_probe_continue_recent_walk",
+        "user_probe_current_local_time",
+        "qualification_human_continuity_continue_walk",
+        "qualification_planner_weather_evidence",
+        "qualification_workdag_walk_blink_once",
+        "qualification_continuous_weather_reentry",
+        "qualification_identity_zh_warm_latency",
+        "qualification_identity_en_warm_latency"
+      ]
     },
     "provider_faults": {
       "report": "provider-faults/qualification.json",
@@ -119,7 +142,10 @@
     "none_behavior_remains_acceptable",
     "primary_work_is_not_delayed",
     "backend_identity_and_calibration_are_not_leaked",
-    "model_choice_remains_a_human_decision"
+    "model_choice_remains_a_human_decision",
+    "subordinate_expression_only",
+    "no_primary_activity_duplication",
+    "resource_conflicts_fail_soft"
   ],
   "physical_robot_review_checks": [
     "safety_operator_present",
@@ -136,7 +162,13 @@
     "debug_bundle_run_15_while_singing",
     "multi_goal_blink_and_joke",
     "user_probe_continue_recent_walk",
-    "user_probe_current_local_time"
+    "user_probe_current_local_time",
+    "qualification_human_continuity_continue_walk",
+    "qualification_planner_weather_evidence",
+    "qualification_workdag_walk_blink_once",
+    "qualification_continuous_weather_reentry",
+    "qualification_identity_zh_warm_latency",
+    "qualification_identity_en_warm_latency"
   ],
   "interaction_behavior_claims": {
     "input_channel": "injected_text",
@@ -149,12 +181,66 @@
       "multi-goal body/conversation execution and normal DAG continuation",
       "retained Goal continuity across follow-up turns",
       "duplicate-effect resistance through observation cardinality in retained cases",
-      "warm Fast-Planner commitment and playback-start budgets where the case declares them"
+      "warm Fast-Planner commitment and playback-start budgets where the case declares them",
+      "bilingual maintained identity without backend self-description",
+      "warm identity-response Fast-Planner commitment and playback-start budgets"
     ],
     "does_not_prove": [
       "physical microphone",
       "audible speaker",
       "physical robot"
     ]
-  }
+  },
+  "current_revision_topics": [
+    {
+      "topic_id": 1,
+      "id": "current_revision_qualification",
+      "evidence": "all required tracks must bind to one clean committed revision"
+    },
+    {
+      "topic_id": 2,
+      "id": "human_like_cognitive_continuity",
+      "evidence": "interaction_behavior ability class"
+    },
+    {
+      "topic_id": 3,
+      "id": "planner_goal_semantic_quality",
+      "evidence": "interaction_behavior ability class"
+    },
+    {
+      "topic_id": 4,
+      "id": "workdag_multi_goal_revision_integrity",
+      "evidence": "interaction_behavior ability class plus exact observation cardinality"
+    },
+    {
+      "topic_id": 5,
+      "id": "continuous_cognition_recovery",
+      "evidence": "interaction_behavior evidence re-entry plus live provider_faults track"
+    },
+    {
+      "topic_id": 6,
+      "id": "situation_revision_producer",
+      "evidence": "typed trusted SituationRevisionObservation plus delta-only CognitiveOpportunity source regression"
+    },
+    {
+      "topic_id": 7,
+      "id": "time_condition_producer",
+      "evidence": "durable Goal-scoped structured time condition persistence and one-shot due opportunity regression"
+    },
+    {
+      "topic_id": 8,
+      "id": "cognitive_gateway_live_and_reflex_reconciliation",
+      "evidence": "Gateway/Core retained track plus multi-Goal global-emergency canonical reconciliation regression"
+    },
+    {
+      "topic_id": 9,
+      "id": "social_attention_live_qualification",
+      "evidence": "reviewed Social Attention track with subordinate/nonblocking/no-duplication/fail-soft checks"
+    },
+    {
+      "topic_id": 10,
+      "id": "speech_identity_latency_qualification",
+      "evidence": "bilingual identity live-text cases with declared warm Planner/playback budgets"
+    }
+  ]
 }

@@ -92,3 +92,47 @@ Current-revision target qualification remains a separate claim. Do not treat det
 closure as proof of live bilingual behavior, provider fault handling, GPU/model quality, MuJoCo,
 or physical robot behavior. After P3 source/tests are clean, resume the existing
 `current_revision_qualification` evidence profile on the exact committed revision.
+
+## Audit continuation Patch 1 — topics 1–5
+
+Source support for the first five remaining audit topics is now explicit rather than implied by
+a generic live-text pass:
+
+1. `current_revision_qualification` requires one clean revision and exact retained track/case
+   coverage.
+2. `human_like_cognitive_continuity` measures retained follow-up meaning and rejects exact
+   repeated assistant speech on a new turn.
+3. `planner_goal_semantic_quality` measures WHAT/continuity/HOW separation with an
+   evidence-backed information probe.
+4. `workdag_multi_goal_revision_integrity` measures two independent body effects exactly once
+   and a follow-up revision that must not replay completed locomotion.
+5. `continuous_cognition_recovery` requires evidence-bound Planner re-entry and pins provider
+   fault / continuous-cognition source regressions.
+
+These are qualification mechanisms, not fabricated qualification evidence. The topics close only
+when a clean committed revision produces an eligible current-revision target bundle.
+
+## Audit continuation Patch 2 — topics 6–10
+
+The next five audit topics are now represented by explicit source/qualification boundaries:
+
+6. `situation_revision` accepts only a typed trusted observation and wakes cognition only for a new Situation digest.
+7. `time_condition` uses a durable Goal/Plan-bound structured condition owned by ConversationState; stale conditions fail closed and due conditions emit once. Host never parses a Goal sentence into a deadline.
+8. Cognitive Gateway broad fixed-reflex reconciliation is covered by a real multi-Goal global-emergency regression proving every selected Goal/request binding is reconciled.
+9. Social Attention target review now explicitly requires subordinate-only expression, no duplicate primary Activity, and fail-soft resource/provider conflict behavior in addition to non-blocking primary work.
+10. Current-revision interaction qualification now includes Chinese and English identity turns with backend-leakage guards and the maintained warm Fast-Planner/playback-start budgets.
+
+These mechanisms do not fabricate live evidence. Situation/time producers still need real source episodes, Social Attention still needs human-reviewed target evidence, and speech latency remains an injected-text scheduling claim unless physical voice evidence is separately retained.
+
+
+## Audit continuation Patch 3 — topics 11–15
+
+The final five source/audit topics are now closed without adding speculative cognitive owners:
+
+11. Epistemic Qualification has executable regressions for freshness, contradiction, independent trust domains, and closed-world negative claims; absence cannot establish a negative claim without complete declared collection coverage.
+12. Reflection/forward adaptation remains evidence-bound and ephemeral: task/session lessons can appear in later same-session context, but clear at the conversation boundary, never enter durable profile memory through Reflection, and cannot request Stable Mind/system mutation.
+13. Deferred cognition features now have an admission rule in the Charter. Affect simulation, ambient autonomy, multi-user identity, broader autonomy, competence calibration, and similar machinery require an originating episode, authority/irreducibility review, and qualification plan before any production runtime switch is introduced. A repository regression guards the current deferred boundary.
+14. Static-analysis maintenance widens incrementally rather than by declaration: `scripts/run_mypy.py` is now covered by both the Ruff and Mypy ratchets while the `VoiceAssistant` structural ceiling remains unchanged.
+15. Physical-robot evidence remains optional for `current_revision_qualification`, while the supervised physical-pilot path remains fail-closed: exact Chromie revision, source-clean/provider-bound evidence, safe state before/after, and a named safety operator are required before the claim can be attached.
+
+After Patch 3, the audit no longer calls for another broad source-architecture rewrite. The next main activity is current-revision target qualification on the exact committed tree; observed qualification failures, rather than speculative architecture work, should drive any subsequent patch.

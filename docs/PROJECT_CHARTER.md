@@ -41,6 +41,20 @@ disciplined architecture review, and belongs at this layer rather than in an
 existing component contract. This is the operating discipline behind **Use less
 to solve more**; it is not an additional numbered principle.
 
+#### Deferred cognition admission
+
+A later cognition idea does not become production architecture merely because the
+current contracts can name it. Affect simulation, ambient autonomy, multi-user
+identity, broader autonomy, competence calibration, and similarly speculative
+Mind machinery remain deferred until one **originating episode** demonstrates a
+current limitation. Before implementation, record an **authority/irreducibility review**
+showing why the existing Gateway, Goal, Planner, Situation, Memory, Reflection,
+or provider owners cannot represent the need correctly, and define a bounded
+**qualification plan** with privacy/safety review where applicable. Until then, do not
+add a production runtime switch, persistent owner, background loop, or model-facing
+contract field for the deferred concept. This is an admission rule, not a new runtime
+manager.
+
 ### One resource responsibility, dynamically bounded capabilities
 
 `AcquireAndDeliverResource` is one provider-neutral human responsibility.

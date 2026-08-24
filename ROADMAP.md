@@ -430,11 +430,13 @@ authority behind a new manager.
    the deterministic provider fault matrix; target-evidence closure adds a
    `current_revision_qualification` profile requiring the same clean revision across source,
    Gateway/Core, Agent Skill/weather, manifest-owned live interaction behavior, live provider
-   faults, Social Attention, and LAN tracks. The interaction track executes eight retained
-   cases with full assertions and includes duplicate-effect cardinality plus declared warm
-   Fast-Planner/playback budgets where owned by the case. **Target evidence remains open until
-   an actual current-revision bundle finalizes eligible.** Physical voice/robot remain separate
-   optional evidence.
+   faults, Social Attention, and LAN tracks. The interaction track now requires explicit
+   passing coverage for human-like continuity, Planner/Goal semantic quality, WorkDAG
+   multi-Goal revision/cardinality, and continuous-cognition recovery in addition to the
+   retained baseline probes and warm Fast-Planner/playback budgets. Source qualification pins
+   the corresponding semantic/WorkDAG/turn-loop/continuous-cognition regressions. **Target
+   evidence remains open until an actual current-revision bundle finalizes eligible.** Physical
+   voice/robot remain separate optional evidence.
 
 Across all phases: `use less to solve more`; fix the earliest wrong boundary; do not add a
 `SpeechManager`, Response Composer, recovery brain, compatibility semantic path, or a second WorkDAG semantic owner.

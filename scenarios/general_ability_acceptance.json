@@ -1194,6 +1194,363 @@
         }
       ],
       "live_text_cases": []
+    },
+    {
+      "id": "human_like_cognitive_continuity",
+      "title": "Human-like Cognitive Continuity",
+      "general_rule": "Chromie should remain one continuous interlocutor while work progresses: preserve recent meaning, avoid duplicate acknowledgements, keep conversation available, and let follow-up turns revise only the relevant unfinished responsibility.",
+      "minimum_level_a_cases": 4,
+      "root_cause_boundaries": [
+        "Cognitive Gateway",
+        "Goal Interpretation/Goal Association",
+        "Planner",
+        "Host interaction state",
+        "Test evidence"
+      ],
+      "level_a_scenarios": [
+        {
+          "key": "cognitive_turn_loop/ordinary_overlap_preserves_prior_turn",
+          "rationale": "A newer conversational turn does not erase valid unfinished work from the prior turn."
+        },
+        {
+          "key": "cognitive_turn_loop/newer_turn_suppresses_stale_final",
+          "rationale": "Superseded final speech is not replayed after a newer turn takes conversational authority."
+        },
+        {
+          "key": "cognitive_core_dialogue/weather_then_repeated_walk_stays_grounded",
+          "rationale": "Recent context is retained without contaminating the next requested outcome."
+        },
+        {
+          "key": "cognitive_turn_loop/active_stop_cancel_retains_outcome",
+          "rationale": "A stop/cancel turn changes the active work truth without fabricating or erasing the underlying Goal history."
+        }
+      ],
+      "live_text_cases": [
+        {
+          "id": "qualification_human_continuity_continue_walk",
+          "description": "A follow-up continuation must bind to the retained walking Goal and perform exactly one new continuation effect rather than acknowledge or execute twice.",
+          "turns": [
+            {
+              "id": "human_continuity_walk_context",
+              "text": "你往前走 10 秒。",
+              "language": "zh-CN",
+              "expected_capabilities": [
+                "soridormi.walk_forward"
+              ],
+              "expected_args": [
+                "0:duration_s=10.0"
+              ],
+              "min_new_goal_count": 1,
+              "min_goal_outcome_count": 1,
+              "expected_observations": [
+                {
+                  "type": "locomotion.walk_forward",
+                  "args": {
+                    "duration_s": 10.0
+                  },
+                  "min_occurrences": 1,
+                  "max_occurrences": 1
+                }
+              ]
+            },
+            {
+              "id": "human_continuity_continue",
+              "text": "刚才那个继续。",
+              "language": "zh-CN",
+              "expected_capabilities": [
+                "soridormi.walk_forward"
+              ],
+              "expected_args": [
+                "0:duration_s=10.0"
+              ],
+              "forbidden_speech_any": [
+                "刚才那个事情",
+                "刚才那个动作",
+                "继续说",
+                "接着说"
+              ],
+              "min_goal_outcome_count": 1,
+              "expected_observations": [
+                {
+                  "type": "locomotion.walk_forward",
+                  "args": {
+                    "duration_s": 10.0
+                  },
+                  "min_occurrences": 1,
+                  "max_occurrences": 1
+                }
+              ],
+              "forbid_repeat_of_previous_speech": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "planner_goal_semantic_quality",
+      "title": "Planner and Goal Semantic Quality",
+      "general_rule": "Goal Interpretation must preserve WHAT, Goal Association must preserve continuity only, and Planner must choose HOW from current context without inventing capabilities, collapsing independent outcomes, or converting evidence needs into user ambiguity.",
+      "minimum_level_a_cases": 4,
+      "root_cause_boundaries": [
+        "Goal Interpretation",
+        "Goal Association",
+        "Planner",
+        "Capability catalog",
+        "Evidence boundary"
+      ],
+      "level_a_scenarios": [
+        {
+          "key": "goal_interpretation/compound_walk_blink_joke_while_walking",
+          "rationale": "Three independently satisfiable outcomes remain three Responsibilities before planning."
+        },
+        {
+          "key": "goal_interpretation/chongqing_daytime_weather_is_evidence_not_user_gap",
+          "rationale": "Unknown weather truth is an evidence need, not a fabricated user clarification."
+        },
+        {
+          "key": "goal_interpretation/ambiguous_move_there",
+          "rationale": "Real semantic ambiguity remains explicit and is not guessed into an executable destination."
+        },
+        {
+          "key": "cognitive_runtime/multi_goal_response_coverage",
+          "rationale": "Planner response coverage remains bound to the canonical Goal set."
+        }
+      ],
+      "live_text_cases": [
+        {
+          "id": "qualification_planner_weather_evidence",
+          "text": "今天白天重庆天气怎么样？",
+          "language": "zh-CN",
+          "require_fast_communicative_act": true,
+          "expected_fast_communicative_speech_acts": [
+            "acknowledge_and_check"
+          ],
+          "require_fast_planner_evidence_reentry": true,
+          "forbidden_plan_agent_skills": [
+            "builtin.conversation"
+          ],
+          "min_new_goal_count": 1,
+          "min_goal_outcome_count": 1,
+          "description": "A fully scoped information Goal must be planned as evidence-backed information work and return through Planner re-entry, not be downgraded to immediate conversational speech."
+        }
+      ]
+    },
+    {
+      "id": "workdag_multi_goal_revision_integrity",
+      "title": "WorkDAG Multi-Goal Revision Integrity",
+      "general_rule": "Planner-authored WorkDAG topology must preserve independent Goals, execute mechanically ready work once, retain completed-node immutability, and revise only affected unfinished work without duplicate physical effects.",
+      "minimum_level_a_cases": 4,
+      "root_cause_boundaries": [
+        "Planner",
+        "WorkDAG",
+        "DAGEngine",
+        "Trusted Capability Runtime",
+        "Execution observations"
+      ],
+      "level_a_scenarios": [
+        {
+          "key": "cognitive_runtime/daily_multi_goal_walk_blink_and_greet",
+          "rationale": "Body and conversational outcomes remain separate while one episode coordinates them."
+        },
+        {
+          "key": "cognitive_runtime/daily_multi_goal_repeated_blink_sequence",
+          "rationale": "Repeated same-capability requests retain distinct Work ownership rather than accidental deduplication."
+        },
+        {
+          "key": "cognitive_runtime/qualified_media_walk_parallel",
+          "rationale": "Independent media and locomotion work preserve parallel-capable topology and exact provider grounding."
+        },
+        {
+          "key": "cognitive_runtime/daily_multi_goal_blink_joke_and_ambiguous_move",
+          "rationale": "Executable, conversational, and unresolved outcomes coexist without collapsing the DAG."
+        }
+      ],
+      "live_text_cases": [
+        {
+          "id": "qualification_workdag_walk_blink_once",
+          "description": "Two independent embodied Goals must each execute exactly once; a passing result is cardinality evidence against duplicate dispatch.",
+          "turns": [
+            {
+              "id": "workdag_walk_blink_initial",
+              "text": "往前走 10 秒，同时眨一下眼睛。",
+              "language": "zh-CN",
+              "expected_capabilities": [
+                "soridormi.walk_forward",
+                "soridormi.blink_eyes"
+              ],
+              "expected_args": [
+                "0:duration_s=10.0"
+              ],
+              "min_new_goal_count": 2,
+              "min_goal_outcome_count": 2,
+              "expected_observations": [
+                {
+                  "type": "locomotion.walk_forward",
+                  "args": {
+                    "duration_s": 10.0
+                  },
+                  "min_occurrences": 1,
+                  "max_occurrences": 1
+                },
+                {
+                  "type": "gesture.blink_eyes",
+                  "min_occurrences": 1,
+                  "max_occurrences": 1
+                }
+              ]
+            },
+            {
+              "id": "workdag_blink_revision_no_walk_replay",
+              "text": "再眨一下眼睛，别再走了。",
+              "language": "zh-CN",
+              "expected_capabilities": [
+                "soridormi.blink_eyes"
+              ],
+              "forbidden_capabilities": [
+                "soridormi.walk_forward"
+              ],
+              "min_new_goal_count": 1,
+              "min_goal_outcome_count": 1,
+              "expected_observations": [
+                {
+                  "type": "gesture.blink_eyes",
+                  "min_occurrences": 1,
+                  "max_occurrences": 1
+                }
+              ],
+              "forbid_repeat_of_previous_speech": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "continuous_cognition_recovery",
+      "title": "Continuous Cognition and Recovery",
+      "general_rule": "Meaningful runtime Evidence or provider-state change may reactivate the same Planner without fabricating a user turn, replaying completed work, or letting stale request/Plan provenance regain authority.",
+      "minimum_level_a_cases": 4,
+      "root_cause_boundaries": [
+        "Runtime Evidence",
+        "CognitiveOpportunity",
+        "Planner re-entry",
+        "Conversation state",
+        "Trusted Capability Runtime"
+      ],
+      "level_a_scenarios": [
+        {
+          "key": "cognitive_turn_loop/provider_exception_before_results",
+          "rationale": "Provider failure remains typed runtime truth and cannot become fabricated successful completion."
+        },
+        {
+          "key": "cognitive_turn_loop/newer_turn_suppresses_stale_final",
+          "rationale": "Stale completion from an older turn cannot reclaim conversational authority."
+        },
+        {
+          "key": "cognitive_turn_loop/admitted_mixed_completed_not_run_final",
+          "rationale": "Mixed completed/not-run work remains evidence-bound rather than flattened into a false terminal success."
+        },
+        {
+          "key": "cognitive_runtime/chat_turn_cannot_replay_completed_motion",
+          "rationale": "Later conversational cognition cannot redispatch already completed physical work."
+        }
+      ],
+      "live_text_cases": [
+        {
+          "id": "qualification_continuous_weather_reentry",
+          "text": "查一下重庆今晚热不热。",
+          "language": "zh-CN",
+          "require_fast_communicative_act": true,
+          "expected_fast_communicative_speech_acts": [
+            "acknowledge_and_check"
+          ],
+          "require_fast_planner_evidence_reentry": true,
+          "min_new_goal_count": 1,
+          "min_goal_outcome_count": 1,
+          "description": "External information completion must return through evidence-bound Planner re-entry instead of Host-authored completion speech."
+        }
+      ]
+    },
+    {
+      "id": "speech_identity_latency",
+      "title": "Speech Identity and Warm Response Latency",
+      "general_rule": "Chromie should answer ordinary identity turns in her maintained person identity, in the user language, without backend narration, while warm Fast-Planner commitment and playback scheduling stay within the declared interactive budgets.",
+      "minimum_level_a_cases": 4,
+      "root_cause_boundaries": [
+        "Mind profile",
+        "Planner communication",
+        "Playback delivery",
+        "Latency evidence"
+      ],
+      "level_a_scenarios": [
+        {
+          "key": "goal_interpretation/goal_interpretation_normal_greeting",
+          "rationale": "Simple social language remains an ordinary conversational WHAT before Planner wording."
+        },
+        {
+          "key": "cognitive_runtime/chat_apply_response",
+          "rationale": "Grounded conversational response traverses the maintained cognitive runtime without tool impersonation."
+        },
+        {
+          "key": "cognitive_runtime/qualified_vocal_provider_exact_recitation",
+          "rationale": "Vocal realization preserves exact Planner/provider authority rather than backend narration."
+        },
+        {
+          "key": "cognitive_turn_loop/newer_turn_suppresses_stale_final",
+          "rationale": "Speech delivery remains turn-current rather than replaying stale text."
+        }
+      ],
+      "live_text_cases": [
+        {
+          "id": "qualification_identity_zh_warm_latency",
+          "text": "你好，你是谁呀？",
+          "language": "zh-CN",
+          "expect_no_capabilities": true,
+          "require_speech": true,
+          "require_fast_communicative_act": true,
+          "expected_speech_any": [
+            "Chromie",
+            "chromie",
+            "克罗米"
+          ],
+          "forbidden_speech_any": [
+            "作为AI",
+            "语言模型",
+            "系统提示",
+            "backend",
+            "模型拓扑"
+          ],
+          "max_warm_gi_handoff_to_fast_commit_ms": 2000,
+          "max_warm_fast_commit_to_playback_start_ms": 3000,
+          "expect_no_fast_contract_failure": true,
+          "min_new_goal_count": 1,
+          "min_goal_outcome_count": 1,
+          "description": "Chinese identity response must preserve Chromie identity without backend self-description and meet the same warm interactive latency budget used by effectful progress speech."
+        },
+        {
+          "id": "qualification_identity_en_warm_latency",
+          "text": "Hi, who are you?",
+          "language": "en-US",
+          "expect_no_capabilities": true,
+          "require_speech": true,
+          "require_fast_communicative_act": true,
+          "expected_speech_any": [
+            "Chromie",
+            "chromie"
+          ],
+          "forbidden_speech_any": [
+            "language model",
+            "system prompt",
+            "backend",
+            "model topology"
+          ],
+          "max_warm_gi_handoff_to_fast_commit_ms": 2000,
+          "max_warm_fast_commit_to_playback_start_ms": 3000,
+          "expect_no_fast_contract_failure": true,
+          "min_new_goal_count": 1,
+          "min_goal_outcome_count": 1,
+          "description": "English identity response must preserve the same maintained identity and warm response path without internal implementation narration."
+        }
+      ]
     }
   ]
 }

@@ -1002,6 +1002,18 @@ the declared warm 2s Planner-commit / 3s playback-start budgets where a retained
 those thresholds. The track is injected-text/simulator evidence; it does not claim a
 physical microphone or audible speaker.
 
+The current-revision profile also names four mandatory behavior slices and checks that the
+retained live report contains a passing ability row and the exact passing probe cases for
+each one: `human_like_cognitive_continuity`, `planner_goal_semantic_quality`,
+`workdag_multi_goal_revision_integrity`, and `continuous_cognition_recovery`. This prevents
+a partial live run from being attached as if it closed the broader audit. The continuity
+probe rejects exact repeated assistant speech on a new follow-up turn; the WorkDAG probe
+requires exact one-occurrence body observations and then a follow-up blink without replaying
+the completed walk; the information probes require Planner-owned Evidence re-entry. The
+source qualification separately pins the GI/GA/Planner, WorkDAG, turn-loop, continuous
+cognition, and conversation-state regression files, so a live bundle cannot hide a source
+regression.
+
 The live provider fault track must come from `provider_fault_matrix.py --live`, remain safe
 idle after every scenario, pass the retained terminal-latency thresholds, and bind to the
 same clean Chromie revision. The local-stub matrix is Level-A evidence only.
@@ -1547,3 +1559,7 @@ sample count, revision cleanliness, or required metric samples are not
 qualified. The committed `.example.json` policy is disabled and carries no
 release authority. See
 [Accelerator Telemetry and Latency Evidence Gates](ACCELERATOR_LATENCY_EVIDENCE.md).
+
+### Audit topics 6–10 qualification
+
+Current-revision closure also retains explicit evidence for the second audit group. Trusted `situation_revision` observations must be delta-driven and Evidence-referenced; durable `time_condition` records must be exact Goal/Plan/Responsibility bindings and one-shot when due. Gateway regressions must prove broad emergency receipts reconcile all selected Goal requests. Social Attention human review must confirm subordinate/nonblocking/no-duplication/fail-soft behavior. Bilingual identity live-text cases carry the same warm Planner-commit and playback-start budgets as other interactive responses; they do not by themselves prove microphone or audible-speaker latency.

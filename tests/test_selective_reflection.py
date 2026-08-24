@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
+
 from agent.app.reflection import ReflectionResolver
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from shared.chromie_contracts.reflection import ReflectionRequest, ReflectionResolution
@@ -438,4 +440,85 @@ def test_reflection_actions_require_evidence_refs() -> None:
             reason_codes=["grasp_failed"],
             actions=["replan"],
             reason_summary="Try another route.",
+        )
+
+
+def test_reflection_memory_is_session_bounded_and_not_durable_profile_state() -> None:
+    manager = ConversationStateManager(base_conversation_id="reflection-session")
+    manager.apply_semantic_task_operations_atomically(
+        [
+            {
+                "operation_id": "create-goal-session",
+                "operation": "create",
+                "goal": {
+                    "goal_id": "goal-session",
+                    "description": "Try the local route.",
+                    "source_text": "Try the local route.",
+                },
+            }
+        ],
+        sid="sid-session-create",
+        user_text="Try the local route.",
+    )
+    context = manager._task_context_by_goal_id("goal-session")
+    assert context is not None
+    context["evidence_summary"] = {
+        "execution_outcome": {
+            "outcome_id": "outcome-session",
+            "turn_id": "turn-session",
+            "evidence_ids": ["evidence-session"],
+            "status": "failed",
+        }
+    }
+    resolution = ReflectionResolution(
+        opportunity_id="opportunity-session",
+        goal_ids=["goal-session"],
+        evidence_refs=["outcome-session", "evidence-session"],
+        reason_codes=["local_route_failed"],
+        actions=["propose_memory"],
+        memory_candidates=[
+            {
+                "scope": "session",
+                "kind": "calibration",
+                "text": "Prefer the alternate local route for this session.",
+                "confidence": 0.9,
+            }
+        ],
+    )
+
+    result = manager.apply_reflection_resolution(resolution, sid="sid-session")
+
+    assert result[0]["memory_promoted"] == 1
+    assert manager.snapshot()["extracted_memory"]
+    assert "Prefer the alternate local route" in manager.session_memory()["memory_summary"]
+    assert manager.snapshot()["durable_profile_memory"]["entries"] == []
+
+    manager.start_new_conversation(reason="session_boundary")
+
+    assert manager.snapshot()["extracted_memory"] == []
+    assert manager.session_memory()["memory_summary"] == "None"
+    assert manager.snapshot()["durable_profile_memory"]["entries"] == []
+
+
+def test_reflection_contract_cannot_request_stable_mind_or_system_mutation() -> None:
+    with pytest.raises(ValueError):
+        ReflectionResolution.model_validate(
+            {
+                "opportunity_id": "opportunity-system-mutation",
+                "goal_ids": ["goal-1"],
+                "evidence_refs": ["outcome-1"],
+                "actions": ["mutate_stable_mind"],
+                "reason_summary": "Rewrite the shared identity policy.",
+            }
+        )
+
+    with pytest.raises(ValueError):
+        ReflectionResolution.model_validate(
+            {
+                "opportunity_id": "opportunity-extra-authority",
+                "goal_ids": ["goal-1"],
+                "evidence_refs": ["outcome-1"],
+                "actions": [],
+                "stable_mind_patch": {"identity": "changed"},
+            }
         )

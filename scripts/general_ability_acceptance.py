@@ -92,6 +92,7 @@ class TextScenarioCase:
     forbidden_plan_agent_skills: tuple[str, ...] = field(default_factory=tuple)
     require_llm_integrity: bool = True
     expected_repeat_of_previous_speech: bool = False
+    forbid_repeat_of_previous_speech: bool = False
     description: str = ""
     turns: tuple["TextScenarioCase", ...] = field(default_factory=tuple)
 
@@ -1021,6 +1022,9 @@ def _text_scenario_case(
         expected_repeat_of_previous_speech=bool(
             raw.get("expected_repeat_of_previous_speech", False)
         ),
+        forbid_repeat_of_previous_speech=bool(
+            raw.get("forbid_repeat_of_previous_speech", False)
+        ),
         description=str(raw.get("description") or ""),
     )
 
@@ -1157,10 +1161,21 @@ def validate_manifest(
             errors.append(f"{ability.ability_id}: no acceptance cases declared")
         for ref in ability.live_text_cases:
             for turn_index, turn in enumerate(ref.case.turns):
-                if turn.expected_repeat_of_previous_speech and turn_index == 0:
+                if (
+                    turn.expected_repeat_of_previous_speech
+                    or turn.forbid_repeat_of_previous_speech
+                ) and turn_index == 0:
                     errors.append(
                         f"{ability.ability_id}/{turn.case_id}: previous-speech "
-                        "repeat assertion requires a non-first episode turn"
+                        "comparison requires a non-first episode turn"
+                    )
+                if (
+                    turn.expected_repeat_of_previous_speech
+                    and turn.forbid_repeat_of_previous_speech
+                ):
+                    errors.append(
+                        f"{ability.ability_id}/{turn.case_id}: previous speech "
+                        "cannot be both required and forbidden"
                     )
             for case in (ref.case, *ref.case.turns):
                 if case.require_speech and case.expect_no_speech:
@@ -1713,6 +1728,17 @@ def _previous_speech_repeat_error(
     return ""
 
 
+def _previous_speech_duplicate_error(
+    previous: dict[str, Any],
+    current: dict[str, Any],
+) -> str:
+    previous_text = " ".join(_speech_text(previous).split()).casefold()
+    current_text = " ".join(_speech_text(current).split()).casefold()
+    if previous_text and current_text and previous_text == current_text:
+        return "delivered speech duplicated the previous accepted assistant utterance"
+    return ""
+
+
 async def _run_live_case(
     args: argparse.Namespace,
     case: TextScenarioCase,
@@ -1774,15 +1800,23 @@ async def _run_live_case(
             )
             if repeat_error:
                 result["errors"].append(repeat_error)
-                result["ok"] = False
-                user_outcome = result.get("user_outcome")
-                if isinstance(user_outcome, dict):
-                    user_outcome["ok"] = False
-                result["diagnostic_evaluation"] = diagnostic_evaluation(
-                    turn,
-                    result,
-                    list(result["errors"]),
-                )
+        if turn.forbid_repeat_of_previous_speech:
+            duplicate_error = _previous_speech_duplicate_error(
+                raw_results[index - 1],
+                raw_results[index],
+            )
+            if duplicate_error:
+                result["errors"].append(duplicate_error)
+        if result["errors"]:
+            result["ok"] = False
+            user_outcome = result.get("user_outcome")
+            if isinstance(user_outcome, dict):
+                user_outcome["ok"] = False
+            result["diagnostic_evaluation"] = diagnostic_evaluation(
+                turn,
+                result,
+                list(result["errors"]),
+            )
         turn_results.append(result)
         episode_errors.extend(
             f"{turn.case_id}: {error}" for error in result.get("errors") or []

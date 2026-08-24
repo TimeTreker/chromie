@@ -1510,3 +1510,87 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
             events.index("reflex_completed"),
             events.index("following_started:Hello after stop."),
         )
+
+class ReflexCanonicalGoalReconciliationTests(unittest.TestCase):
+    def test_global_emergency_reconciles_every_selected_goal_request(self) -> None:
+        from orchestrator.runtime.conversation_state import ConversationStateManager
+
+        manager = ConversationStateManager(base_conversation_id="reflex-goals")
+        manager.apply_goal_association_resolution(
+            {
+                "resolution_status": "resolved",
+                "turn_id": "turn-two-goals",
+                "new_goals": [
+                    {"goal_id": "goal-walk", "description": "Walk.", "source_text": "Walk and blink."},
+                    {"goal_id": "goal-blink", "description": "Blink.", "source_text": "Walk and blink."},
+                ],
+                "confidence": 1.0,
+            },
+            sid="sid-two-goals",
+            user_text="Walk and blink.",
+            atomic=True,
+        )
+        manager.record_interaction_response(
+            "sid-two-goals",
+            InteractionResponse(
+                interaction_id="interaction-two-goals",
+                capabilities=[
+                    {
+                        "request_id": "request-walk",
+                        "capability_id": "soridormi.walk_forward",
+                        "metadata": {"source_goal_ids": ["goal-walk"]},
+                    },
+                    {
+                        "request_id": "request-blink",
+                        "capability_id": "soridormi.blink_eyes",
+                        "metadata": {"source_goal_ids": ["goal-blink"]},
+                    },
+                ],
+                metadata={"planning_result": "composed_plan"},
+            ),
+        )
+        receipt = CancellationDispatchReceipt(
+            source_turn_id="turn-estop",
+            requested_scope="global_emergency",
+            effective_scope="global_emergency",
+            interaction_ids=("interaction-two-goals",),
+            affected_goal_ids=("goal-walk", "goal-blink"),
+            selected_request_bindings=(
+                {"interaction_id": "interaction-two-goals", "request_id": "request-walk"},
+                {"interaction_id": "interaction-two-goals", "request_id": "request-blink"},
+            ),
+            active_request_bindings=(
+                {"interaction_id": "interaction-two-goals", "request_id": "request-walk"},
+                {"interaction_id": "interaction-two-goals", "request_id": "request-blink"},
+            ),
+            emergency_stop_evidence={
+                "status": "success",
+                "postcondition_confirmed": True,
+            },
+        )
+
+        results = manager.apply_reflex_cancellation_receipt(
+            receipt,
+            revoked_confirmation=None,
+            sid="sid-estop",
+            user_text="Emergency stop!",
+            source="test_global_emergency",
+        )
+
+        goal_results = [item for item in results if "goal_id" in item]
+        by_goal = {item["goal_id"]: item for item in goal_results}
+        self.assertEqual(set(by_goal), {"goal-walk", "goal-blink"})
+        self.assertEqual(by_goal["goal-walk"]["status"], "cancelled")
+        self.assertEqual(by_goal["goal-blink"]["status"], "cancelled")
+        contexts = {
+            item["semantic_goal"]["goal_id"]: item
+            for item in manager.snapshot()["task_contexts"]
+        }
+        self.assertEqual(
+            contexts["goal-walk"]["metadata"]["reflex_cancelled_request_ids"],
+            ["request-walk"],
+        )
+        self.assertEqual(
+            contexts["goal-blink"]["metadata"]["reflex_cancelled_request_ids"],
+            ["request-blink"],
+        )

@@ -259,8 +259,10 @@ Recording must never delay stopping, and stopping must not erase the turn or
 leave the cancellation unaudited. Later semantic correction must never undo an
 already-applied stop or silently resume physical work. The current host records
 the dispatch receipt with the reflex turn. Exact named-Goal cancellation has a
-separate implemented receipt-to-Goal transaction; automatic reconciliation of
-broad fixed reflex receipts into every affected canonical Goal remains open.
+the implemented receipt-to-Goal transaction. Broad fixed-reflex receipts are
+reconciled against every affected canonical Goal/request binding; the multi-Goal
+global-emergency regression guards this fan-out and preserves uncertainty for any
+unselected, non-interruptible, or failed provider cancellation.
 
 Output invalidation, scoped Trusted Capability Runtime cancellation, and the dedicated
 E-stop are dispatched in one safety-first phase. Device/audio teardown may wait

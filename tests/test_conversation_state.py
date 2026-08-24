@@ -2061,3 +2061,59 @@ class AcceptedDialogueSemanticStatusTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class TimeConditionContinuousCognitionTests(unittest.TestCase):
+    def _manager_with_bound_goal(self) -> ConversationStateManager:
+        manager = ConversationStateManager(base_conversation_id="time-condition")
+        GoalScopedLifecycleTests._create_goals(manager, "goal-reminder")
+        context = manager._task_contexts[0]
+        context["semantic_goal"]["source_responsibility_refs"] = ["resp-reminder"]
+        context["metadata"] = {
+            **context.get("metadata", {}),
+            "canonical_plan_id": "plan-reminder",
+        }
+        return manager
+
+    def test_structured_time_condition_is_durable_and_emits_once_when_due(self) -> None:
+        from shared.chromie_contracts.situation import GoalTimeCondition
+
+        with TemporaryDirectory() as tmp:
+            store = Path(tmp) / "tasks.json"
+            manager = self._manager_with_bound_goal()
+            manager.task_store_enabled = True
+            manager.task_store_path = store
+            condition = GoalTimeCondition(
+                condition_id="condition-reminder",
+                goal_id="goal-reminder",
+                due_at_ms=2_000,
+                source_plan_id="plan-reminder",
+                source_responsibility_refs=["resp-reminder"],
+            )
+            self.assertTrue(manager.register_goal_time_condition(condition))
+            self.assertEqual(manager.next_time_condition_due_ms(), 2_000)
+            self.assertEqual(manager.due_time_condition_opportunities(now_ms=1_999), [])
+
+            due = manager.due_time_condition_opportunities(now_ms=2_000)
+            self.assertEqual(len(due), 1)
+            self.assertEqual(due[0]["condition"]["condition_id"], "condition-reminder")
+            self.assertEqual(due[0]["opportunity"]["trigger"], "time_condition")
+            self.assertEqual(due[0]["opportunity"]["goal_ids"], ["goal-reminder"])
+            self.assertIsNone(manager.next_time_condition_due_ms())
+            self.assertEqual(manager.due_time_condition_opportunities(now_ms=3_000), [])
+            self.assertTrue(store.exists())
+
+    def test_time_condition_rejects_stale_plan_or_unbound_responsibility(self) -> None:
+        from shared.chromie_contracts.situation import GoalTimeCondition
+
+        manager = self._manager_with_bound_goal()
+        base = {
+            "condition_id": "condition-stale",
+            "goal_id": "goal-reminder",
+            "due_at_ms": 2_000,
+            "source_plan_id": "plan-old",
+            "source_responsibility_refs": ["resp-reminder"],
+        }
+        self.assertFalse(manager.register_goal_time_condition(GoalTimeCondition(**base)))
+        base["source_plan_id"] = "plan-reminder"
+        base["source_responsibility_refs"] = ["resp-other"]
+        self.assertFalse(manager.register_goal_time_condition(GoalTimeCondition(**base)))

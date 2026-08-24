@@ -18,6 +18,7 @@ class SourceQualificationTests(unittest.TestCase):
         self.assertIn("maintained_tests", gate_ids)
         self.assertIn("semantic_authority", gate_ids)
         self.assertIn("audit_remediation_regression", gate_ids)
+        self.assertIn("current_revision_cognition_regression", gate_ids)
         self.assertIn("general_ability_level_a", gate_ids)
         self.assertIn("provider_fault_matrix_level_a", gate_ids)
         self.assertIn("release qualification", exclusions)
